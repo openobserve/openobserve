@@ -15,6 +15,7 @@
 
 import { calculateWidthText } from "./chartDimensionUtils";
 import { createSeriesOverrideLookup, type SeriesStyle } from "./seriesOverrides";
+import { lineThicknessOf } from "./promqlChartSeriesProps";
 
 /** Chart types whose series take style overrides. */
 export const SERIES_STYLE_CHART_TYPES: ReadonlySet<string> = new Set([
@@ -36,7 +37,6 @@ export const MIN_INTERVAL_CHART_TYPES: ReadonlySet<string> = new Set([
 const HORIZONTAL_CHART_TYPES: ReadonlySet<string> = new Set(["h-bar", "h-stacked"]);
 
 const DEFAULT_POINT_SIZE = 6;
-const DEFAULT_LINE_WIDTH = 1.5;
 // ECharts lines sit at z 3 and annotation bands at 4, so 3.5 lifts a line over its twin but not over the bands.
 const RAISED_LINE_Z = 3.5;
 const RIGHT_AXIS_LABEL_GAP = 12;
@@ -47,6 +47,12 @@ const toPositive = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const toFinite = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const isPlainObject = (value: unknown): value is Record<string, any> =>
@@ -153,13 +159,33 @@ const widestLabel = (series: any[], formatter: unknown): number => {
 };
 
 // A trellis or multi-grid chart keeps one value axis per grid, so a second axis has no place there.
-const moveToRightAxis = (options: any, series: any[]) => {
+const pointValues = (series: any[]): number[] =>
+  series.flatMap((s) =>
+    s.data
+      .map((point: any) =>
+        Number(Array.isArray(point) ? point[1] : isPlainObject(point) ? point.value : point),
+      )
+      .filter((value: number) => Number.isFinite(value)),
+  );
+
+// The left axis bound was widened by every series' data, so the right one starts again from the user's value.
+const rightAxisBound = (configured: unknown, values: number[], isMax: boolean) => {
+  const bound = toFinite(configured);
+  if (bound === null) return undefined;
+  if (!values.length) return bound;
+  return isMax ? Math.max(bound, ...values) : Math.min(bound, ...values);
+};
+
+const moveToRightAxis = (options: any, series: any[], config: any) => {
   if (!series.length || !isPlainObject(options.yAxis) || options.yAxis.type !== "value") return;
   const left = options.yAxis;
+  const values = pointValues(series);
   const right = {
     ...left,
     position: "right",
     name: "",
+    min: rightAxisBound(config?.y_axis_min, values, false),
+    max: rightAxisBound(config?.y_axis_max, values, true),
     splitLine: { ...left.splitLine, show: false },
   };
   options.yAxis = [left, right];
@@ -179,7 +205,7 @@ export const applySeriesStyleOverrides = (options: any, panelSchema: any): void 
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
   if (!lookup.active) return;
   const showSymbolDefault = panelSchema?.config?.show_symbol ?? false;
-  const panelLineWidth = Number(panelSchema?.config?.line_thickness) || DEFAULT_LINE_WIDTH;
+  const panelLineWidth = lineThicknessOf(panelSchema?.config);
   const hidden = {
     chart: new Set<string>(),
     legend: new Set<string>(),
@@ -210,7 +236,7 @@ export const applySeriesStyleOverrides = (options: any, panelSchema: any): void 
       series.tooltip = { ...series.tooltip, show: false };
     }
   }
-  moveToRightAxis(options, rightSeries);
+  moveToRightAxis(options, rightSeries, panelSchema?.config);
   hideFromChart(options, hidden.chart);
   hideFromLegend(options, hidden.legend);
   hideFromTooltip(options, hidden.tooltip);

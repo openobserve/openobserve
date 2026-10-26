@@ -260,13 +260,17 @@ export const getPromqlMetricSeriesNames = async (
   source: SeriesOverridePreviewSource,
   store: any,
 ): Promise<string[]> => {
-  const [{ alignShiftedPromQLResults }, { buildPromqlSeriesNames }, { legendFallbackOf }, cache] =
-    await Promise.all([
-      import("@/utils/dashboard/convertPromQLData"),
-      import("@/utils/dashboard/promql/shared/legendBuilder"),
-      import("@/utils/dashboard/promql/formula"),
-      import("@/utils/semanticGroupsCache"),
-    ]);
+  const [
+    { alignShiftedPromQLResults, METRIC_MAX_CELLS },
+    { buildPromqlSeriesNames },
+    { legendFallbackOf },
+    cache,
+  ] = await Promise.all([
+    import("@/utils/dashboard/convertPromQLData"),
+    import("@/utils/dashboard/promql/shared/legendBuilder"),
+    import("@/utils/dashboard/promql/formula"),
+    import("@/utils/semanticGroupsCache"),
+  ]);
   const { data, parentQueryIndex, nameSuffixes } = alignShiftedPromQLResults(
     source.data,
     source.metadata,
@@ -288,15 +292,16 @@ export const getPromqlMetricSeriesNames = async (
     })),
     cache.getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
-  const unique = new Set<string>();
-  limited.forEach((q: any, i: number) => {
-    const metric = q?.result?.[0];
-    if (!metric) return;
-    const name = names.get(metric.metric) ?? "";
-    const full = nameSuffixes[i] ? `${name} (${nameSuffixes[i]})` : name;
-    if (full) unique.add(full);
-  });
-  return [...unique];
+  // One value per series, in the converter's order and under its cell cap.
+  const cellNames = limited
+    .flatMap((q: any, i: number) =>
+      (q?.result ?? []).map((metric: any) => {
+        const name = names.get(metric.metric) ?? "";
+        return nameSuffixes[i] ? `${name} (${nameSuffixes[i]})` : name;
+      }),
+    )
+    .slice(0, METRIC_MAX_CELLS);
+  return [...new Set<string>(cellNames.filter(Boolean))];
 };
 
 /** The source as PanelSchemaRenderer converts it: hidden queries dropped from data, schema and metadata alike. */

@@ -408,6 +408,7 @@ import {
 } from "@/utils/dashboard/tableConfigUtils";
 
 import SeriesAddMenu from "./SeriesAddMenu.vue";
+import { lineThicknessOf } from "@/utils/dashboard/promqlChartSeriesProps";
 import SeriesFormatControls from "./SeriesFormatControls.vue";
 import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
 import {
@@ -734,10 +735,9 @@ export default defineComponent({
       seriesDrafts.value.filter((d) => d.matchBy === "name").map((d) => d.value),
     );
 
-    const panelLineWidth = computed<number | null>(() => {
-      const width = props.previewSource?.panelSchema?.config?.line_thickness;
-      return typeof width === "number" && Number.isFinite(width) ? width : null;
-    });
+    const panelLineWidth = computed(() =>
+      lineThicknessOf(props.previewSource?.panelSchema?.config),
+    );
 
     const hasColouredValueMappings = computed(() =>
       (props.valueMapping ?? []).some((m: any) => !!(m?.color || m?.textColor)),

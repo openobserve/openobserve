@@ -570,6 +570,115 @@ describe("y-axis minimum interval", () => {
   });
 });
 
+describe("with main's stacked-chart behaviour", () => {
+  const rows = () =>
+    ["/a", "/b"].flatMap((endpoint, i) =>
+      Object.entries({ api: [12, 6], web: [9, 3], db: [4, 2] }).map(([service, v]) => ({
+        x_axis_1: endpoint,
+        breakdown_1: service,
+        y_axis_1: v[i],
+      })),
+    );
+  const stackedPanel = (config: Record<string, any>) => sqlPanel("area-stacked", config);
+  const timeStackRows = () =>
+    TIMES.flatMap((t, i) =>
+      Object.entries({ api: [12, 6, 8], web: [9, 3, 5], db: [4, 2, 1] }).map(([service, v]) => ({
+        x_axis_1: t,
+        breakdown_1: service,
+        y_axis_1: v[i],
+      })),
+    );
+  const params = (options: any) =>
+    ["api", "web", "db"].map((name) => {
+      const series = named(options, name);
+      const point = series.data[2];
+      return {
+        seriesName: name,
+        seriesIndex: options.series.indexOf(series),
+        marker: "",
+        name: TIMES[2],
+        data: point,
+        value: point,
+      };
+    });
+
+  it("stack totals follow a stacking group", async () => {
+    const options = await runSQL(
+      stackedPanel(overrides(styled("db", { stackGroup: "own" }))),
+      timeStackRows(),
+    );
+    const html = options.tooltip.formatter(params(options));
+    // api + web stay in the shared stack; db alone in its group adds no total row.
+    expect(html).toContain("Total #1 : 13ms");
+    expect(html).not.toContain(": 14ms");
+    expect(named(options, "db").stack).toBe("own");
+    expect(rows().length).toBe(6);
+  });
+
+  it("a series hidden from the tooltip is left out of its rows and of the stack total", async () => {
+    const options = await runSQL(
+      stackedPanel(overrides(styled("db", { hideFrom: { tooltip: true } }))),
+      timeStackRows(),
+    );
+    const html = options.tooltip.formatter(params(options));
+    expect(html).toContain("Total : 13");
+    expect(html).not.toContain("db");
+  });
+
+  it("threshold lines still draw on a stacked chart with a stacking group and a hidden series", async () => {
+    const options = await runSQL(
+      stackedPanel({
+        thresholds: { steps: [{ value: 10, color: "#ff0000" }] },
+        ...overrides(
+          styled("db", { stackGroup: "own" }),
+          styled("web", { hideFrom: { chart: true, legend: true } }),
+        ),
+      }),
+      timeStackRows(),
+    );
+    const marker = options.series.find((s: any) => !s.name && s.markLine?.data?.length);
+    expect(marker).toBeDefined();
+    expect(options.legend.selected).toMatchObject({ web: false });
+  });
+
+  it("a user y max widens to the stacks of its own axis after a series moves right", async () => {
+    const options = await runSQL(
+      stackedPanel({ y_axis_max: 5, ...overrides(styled("db", { yAxis: "right" })) }),
+      timeStackRows(),
+    );
+    const [left, right] = options.yAxis;
+    expect(left.max).toBe(21);
+    expect(right.max).toBe(5);
+    expect(right.min).toBeUndefined();
+  });
+
+  it("a series override's fill opacity wins over the panel fill opacity; others keep the panel's", async () => {
+    const options = await runSQL(
+      sqlPanel("area", { fill_opacity: 60, ...overrides(styled("api", { fillOpacity: 10 })) }),
+      timeRows(),
+    );
+    expect(named(options, "api").areaStyle.opacity).toBe(0.1);
+    expect(named(options, "web").areaStyle.opacity).toBe(0.6);
+  });
+
+  it("a series override's line width wins over the panel line thickness", async () => {
+    const options = await runSQL(
+      sqlPanel("line", { line_thickness: 3, ...overrides(styled("api", { lineWidth: 6 })) }),
+      timeRows(),
+    );
+    expect(named(options, "api").lineStyle.width).toBe(6);
+    expect(named(options, "web").lineStyle.width).toBe(3);
+  });
+
+  it("thinner than the panel's own line thickness raises the line", async () => {
+    const options = await runSQL(
+      sqlPanel("line", { line_thickness: 4, ...overrides(styled("api", { lineWidth: 2 })) }),
+      timeRows(),
+    );
+    expect(named(options, "api").z).toBe(3.5);
+  });
+});
+
 describe("overlapping series", () => {
   const same = { "leaf-spine": [10, 40, 25], "spine-leaf": [10, 40, 25] };
 

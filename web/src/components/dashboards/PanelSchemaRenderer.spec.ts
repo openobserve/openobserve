@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 
@@ -164,6 +164,11 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import {
+  CustomChartSkippedError,
+  panelRefreshTargets,
+  settlePanelRefresh,
+} from "@/utils/dashboard/convertCustomChartData";
 import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
 import { DASHBOARD_ANNOTATION_SOURCES_KEY } from "@/composables/dashboard/usePanelAnnotationSources";
@@ -242,8 +247,16 @@ describe("PanelSchemaRenderer", () => {
           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
           GeoMapRenderer: { template: '<div data-test="geomap-renderer"></div>' },
           MapsRenderer: { template: '<div data-test="maps-renderer"></div>' },
-          HTMLRenderer: { template: '<div data-test="html-renderer"></div>' },
-          MarkdownRenderer: { template: '<div data-test="markdown-renderer"></div>' },
+          HTMLRenderer: {
+            name: "HTMLRenderer",
+            props: ["variablesData"],
+            template: '<div data-test="html-renderer"></div>',
+          },
+          MarkdownRenderer: {
+            name: "MarkdownRenderer",
+            props: ["variablesData"],
+            template: '<div data-test="markdown-renderer"></div>',
+          },
           CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
           LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
@@ -327,6 +340,25 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="table-renderer"]').exists()).toBe(true);
     });
 
+    it("keys SQL table rows on the x and breakdown aliases of every query", () => {
+      const field = (alias: string) => ({ alias, column: alias });
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "table",
+          queries: [
+            { query: "", fields: { x: [field("host")], y: [field("count")], breakdown: [] } },
+            {
+              query: "",
+              fields: { x: [field("host")], y: [field("p95")], breakdown: [field("region")] },
+            },
+          ],
+        },
+      });
+
+      expect((wrapper.vm as any).tableRowKeyFields).toEqual(["host", "region"]);
+    });
+
     it("should render MapsRenderer for maps type", () => {
       wrapper = createWrapper({
         panelSchema: { ...defaultProps.panelSchema, type: "maps" },
@@ -366,6 +398,30 @@ describe("PanelSchemaRenderer", () => {
 
       expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
     });
+
+    it.each([
+      ["markdown", "MarkdownRenderer"],
+      ["html", "HTMLRenderer"],
+    ])(
+      "passes start_time and end_time to %s panels after the dashboard variables",
+      (type, renderer) => {
+        const selectedTimeObj = {
+          start_time: new Date(1_700_000_000_000_000),
+          end_time: new Date(1_700_000_360_000_000),
+        };
+        wrapper = createWrapper({
+          panelSchema: { ...defaultProps.panelSchema, type },
+          selectedTimeObj,
+          variablesData: { values: [{ name: "env", value: "prod" }] },
+        });
+
+        expect(wrapper.findComponent({ name: renderer }).props("variablesData").values).toEqual([
+          { name: "env", value: "prod" },
+          { name: "start_time", value: 1_700_000_000_000_000 },
+          { name: "end_time", value: 1_700_000_360_000_000 },
+        ]);
+      },
+    );
 
     it("should render CustomChartRenderer for custom_chart type", () => {
       wrapper = createWrapper({
@@ -729,6 +785,103 @@ describe("PanelSchemaRenderer", () => {
 
       expect(wrapper.vm.noData).toBe("");
       expect(wrapper.vm.tableRendererData).toEqual(converted);
+    });
+  });
+
+  describe("Geomap No Data state", () => {
+    const loaderWith = (data: any, loading = false) =>
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref(data),
+        loading: ref(loading),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+    const geomapPanel = (queryType = "sql") => ({
+      ...defaultProps.panelSchema,
+      type: "geomap",
+      queryType,
+    });
+
+    it("shows No Data when the rows hold no plottable points", async () => {
+      loaderWith([[{ lat: null, lon: null }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      wrapper.vm.panelData = { chartType: "geomap", options: { series: [] } };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+    });
+
+    it("keeps the map when at least one layer has points", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      wrapper.vm.panelData = {
+        chartType: "geomap",
+        options: { series: [{ data: [] }, { data: [[2, 1, 1]] }] },
+      };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+    });
+
+    it("shows No Data when lat/lon are not configured", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      wrapper.vm.panelData = { chartType: "geomap", options: null };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+    });
+
+    it("hands the map a placeholder instead of an empty layer list", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      const withPoints = { chartType: "geomap", options: { series: [{ data: [[2, 1, 1]] }] } };
+      wrapper.vm.panelData = withPoints;
+      await flushPromises();
+      expect(wrapper.vm.geoMapRendererData).toEqual(withPoints);
+
+      wrapper.vm.panelData = { chartType: "geomap", options: { lmap: {}, series: [] } };
+      await flushPromises();
+      expect(wrapper.vm.geoMapRendererData).toEqual({
+        options: { backgroundColor: "transparent" },
+      });
+    });
+
+    it("keeps the previous points while a reload has cleared the rows", async () => {
+      loaderWith([], true);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      const withPoints = { chartType: "geomap", options: { series: [{ data: [[2, 1, 1]] }] } };
+      wrapper.vm.panelData = withPoints;
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("");
+      expect(wrapper.vm.geoMapRendererData).toEqual(withPoints);
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+    });
+
+    it("shows No Data for PromQL series without geo labels", async () => {
+      loaderWith([{ result: [{ metric: { job: "a" }, values: [[1, "1"]] }] }]);
+      wrapper = createWrapper({ panelSchema: geomapPanel("promql") });
+      await flushPromises();
+      wrapper.vm.panelData = { chartType: "geomap", options: { series: [] } };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
     });
   });
 
@@ -1408,6 +1561,318 @@ describe("PanelSchemaRenderer", () => {
         expect(convertPanelData).toHaveBeenCalled();
         expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+      });
+
+      it("hands custom chart code the committed variables, time range, timezone and theme", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        store.state.theme = "dark";
+        const previousTimezone = store.state.timezone;
+        onTestFinished(() => {
+          store.state.timezone = previousTimezone;
+        });
+        store.state.timezone = "Asia/Kolkata";
+        wrapper = createWrapper({
+          selectedTimeObj: {
+            start_time: new Date(1_700_000_000_000_000),
+            end_time: new Date(1_700_000_600_000_000),
+          },
+          variablesData: {
+            values: [
+              { name: "service", value: "api" },
+              { name: "regions", value: ["eu", "us"] },
+              { name: "env", value: "_o2_all_" },
+              { name: "zones", value: ["_o2_all_"] },
+              { name: "picked", value: [] },
+              { name: "unset", value: null },
+            ],
+          },
+          currentVariablesData: { values: [{ name: "service", value: "uncommitted" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toEqual({
+          variables: {
+            service: "api",
+            regions: ["eu", "us"],
+            env: null,
+            zones: null,
+            picked: null,
+            unset: null,
+          },
+          timeRange: { start: 1_700_000_000_000_000, end: 1_700_000_600_000_000 },
+          timezone: "Asia/Kolkata",
+          theme: "dark",
+        });
+      });
+
+      it("passes no custom chart context for other chart types", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queryType: "promql",
+            queries: [{ query: "up", fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(convertPanelData).toHaveBeenCalled();
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
+      });
+
+      it("re-runs custom chart code when a variable the query does not use changes", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          variablesData: { values: [{ name: "threshold", value: "5" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+
+        await wrapper.setProps({ variablesData: { values: [{ name: "threshold", value: "9" }] } });
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBeGreaterThan(callsBefore);
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.variables).toEqual({
+          threshold: "9",
+        });
+      });
+
+      it("keeps the rendered chart and shows no error when the chart run is skipped", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const rendered = { chartType: "custom_chart", series: [{ type: "bar" }] };
+        vi.mocked(convertPanelData).mockResolvedValueOnce(rendered as any);
+        wrapper = createWrapper({
+          variablesData: { values: [{ name: "threshold", value: "5" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        expect(wrapper.vm.panelData).toEqual(rendered);
+        const errorEmits = wrapper.emitted("error")?.length ?? 0;
+
+        vi.mocked(convertPanelData).mockRejectedValueOnce(new CustomChartSkippedError());
+        await wrapper.setProps({ variablesData: { values: [{ name: "threshold", value: "9" }] } });
+        await flushPromises();
+
+        expect(wrapper.vm.panelData).toEqual(rendered);
+        expect(wrapper.vm.errorDetail.message).toBe("");
+        expect(wrapper.emitted("error")?.length ?? 0).toBe(errorEmits);
+      });
+
+      it("still renders the next load's result after a skipped chart run", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        const loading = ref(false);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data, loading }) as any,
+        );
+        vi.mocked(convertPanelData).mockRejectedValueOnce(new CustomChartSkippedError());
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        const errorEmits = wrapper.emitted("error")?.length ?? 0;
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        expect(wrapper.emitted("error")?.length ?? 0).toBe(errorEmits);
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+        const rendered = { chartType: "custom_chart", series: [{ type: "line" }] };
+        vi.mocked(convertPanelData).mockResolvedValueOnce(rendered as any);
+
+        loading.value = true;
+        await flushPromises();
+        loading.value = false;
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBeGreaterThan(callsBefore);
+        expect(wrapper.vm.panelData).toEqual(rendered);
+      });
+
+      it("leaves a change to a variable the query uses to the reload instead of re-running on old data", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          variablesData: { values: [{ name: "svc", value: "checkout" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [
+              {
+                query: "SELECT * FROM t WHERE svc = '$svc'",
+                customQuery: true,
+                fields: {},
+                config: {},
+              },
+            ],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+
+        await wrapper.setProps({ variablesData: { values: [{ name: "svc", value: "payments" }] } });
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(callsBefore);
+      });
+
+      it("replays a run skipped during another panel's refresh once that refresh ends", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        onTestFinished(() => panelRefreshTargets.clear());
+        wrapper = createWrapper({
+          variablesData: { values: [{ name: "threshold", value: "5" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        vi.mocked(convertPanelData).mockRejectedValueOnce(new CustomChartSkippedError());
+        await wrapper.setProps({ variablesData: { values: [{ name: "threshold", value: "9" }] } });
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+        const replayed = { chartType: "custom_chart", series: [{ type: "pie" }] };
+        vi.mocked(convertPanelData).mockResolvedValueOnce(replayed as any);
+
+        panelRefreshTargets.set("other-panel", false);
+        settlePanelRefresh("other-panel");
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(callsBefore + 1);
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.variables).toEqual({
+          threshold: "9",
+        });
+        expect(wrapper.vm.panelData).toEqual(replayed);
+
+        panelRefreshTargets.set("other-panel", false);
+        settlePanelRefresh("other-panel");
+        await flushPromises();
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(callsBefore + 1);
+      });
+
+      it("does not re-run custom chart code when only variable options or loading flags change", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const variable = { name: "threshold", value: "5", options: [], isLoading: false };
+        wrapper = createWrapper({
+          variablesData: { values: [variable] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+
+        await wrapper.setProps({
+          variablesData: {
+            values: [{ ...variable, options: [{ label: "9", value: "9" }], isLoading: true }],
+          },
+        });
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(callsBefore);
+      });
+
+      it("re-runs custom chart code with the new theme when the theme changes", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.theme).toBe("light");
+
+        store.state.theme = "dark";
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.theme).toBe("dark");
       });
 
       it("shows the error when the first load fails", async () => {
@@ -2950,7 +3415,7 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.metricItems).toHaveLength(0);
     });
 
-    it("hides the copy button for zero-valued metrics", async () => {
+    it("keeps the hover zone of a zero value but gives it no copy button", async () => {
       const layout = {
         left: 0,
         top: 0,
@@ -2967,9 +3432,28 @@ describe("PanelSchemaRenderer", () => {
         { _metricText: "0%", _metricLayout: { ...layout } },
         { _metricText: "2.00MB", _metricLayout: { ...layout } },
       ]);
-      // Only the non-zero value survives.
-      expect(wrapper.vm.metricItems).toHaveLength(1);
-      expect(wrapper.vm.metricItems[0]).toMatchObject({ text: "2.00MB" });
+      expect(wrapper.vm.metricItems).toHaveLength(5);
+      expect(wrapper.vm.metricItems.map((m: any) => m.iconStyle !== null)).toEqual([
+        false,
+        false,
+        false,
+        false,
+        true,
+      ]);
+    });
+
+    it("offers a cut series label in full on its hover zone, and only a cut one", async () => {
+      const [first, second] = metricSeries();
+      wrapper = await mountMetric([
+        {
+          ...first,
+          _metricLabel: '{instance="10.0.0.12:9100"}',
+          _metricLayout: { ...first._metricLayout, labelCut: true },
+        },
+        { ...second, _metricLabel: "web" },
+      ]);
+      expect(wrapper.vm.metricItems[0].fullLabel).toBe('{instance="10.0.0.12:9100"}');
+      expect(wrapper.vm.metricItems[1].fullLabel).toBeUndefined();
     });
 
     it("returns no items for non-metric panels", async () => {
@@ -2998,6 +3482,37 @@ describe("PanelSchemaRenderer", () => {
       expect(style.left).toBe(`${100 + textWidth / 2 + 2}px`);
       expect(style.top).toBe("50px");
       expect(style.transform).toBe("translateY(-50%)");
+    });
+
+    const clickZone = async (target: HTMLElement) => {
+      const w = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "metric",
+          config: {
+            ...defaultProps.panelSchema.config,
+            drilldown: [{ name: "Link", type: "byUrl", data: { url: "https://example.com" } }],
+          },
+        },
+      });
+      await flushPromises();
+      w.vm.panelData = { chartType: "metric", options: { series: metricSeries() } };
+      await nextTick();
+      w.vm.onMetricZoneClick(w.vm.metricItems[1], { target, offsetX: 5, offsetY: 6 });
+      await flushPromises();
+      return w;
+    };
+
+    it("opens the drilldown menu from a click on a value's hover zone", async () => {
+      wrapper = await clickZone(document.createElement("div"));
+      expect(wrapper.vm.drilldownArray).toHaveLength(1);
+    });
+
+    it("leaves the drilldown menu closed when the copy button is clicked", async () => {
+      const button = document.createElement("button");
+      button.appendChild(document.createElement("span"));
+      wrapper = await clickZone(button.firstChild as HTMLElement);
+      expect(wrapper.vm.drilldownArray).toHaveLength(0);
     });
 
     it("copies the displayed value and flags the copied state", async () => {
@@ -3356,6 +3871,11 @@ describe("PanelSchemaRenderer", () => {
       return { data, loading, errorDetail };
     };
 
+    it("emits an empty sankey notice on mount, clearing a previous chart's chip", async () => {
+      await mountRacing();
+      expect(wrapper.emitted("sankey-notice-update")?.[0]).toEqual([null]);
+    });
+
     it("keeps the latest conversion when an earlier, slower one resolves after it", async () => {
       const { data, loading } = await mountRacing();
 
@@ -3406,6 +3926,59 @@ describe("PanelSchemaRenderer", () => {
       await flushPromises();
       return chunk;
     };
+
+    it("emits an empty map notice on mount, clearing a previous chart's chip", async () => {
+      await mountRacing();
+      expect(wrapper.emitted("region-join-update")?.[0]).toEqual([null]);
+    });
+
+    it("emits the maps region join from each conversion and clears it on the next", async () => {
+      const { data } = await mountRacing();
+      const join = { unmatched: ["us-east-1"], unmatchedTotal: 1 };
+
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("a"),
+        extras: { regionJoin: join },
+      });
+      data.value = [primary];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([join]);
+
+      vi.mocked(convertPanelData).mockResolvedValueOnce(optionsWith("b"));
+      data.value = [shifted];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
+    });
+
+    it("clears the maps region join when a conversion fails", async () => {
+      const { data } = await mountRacing();
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("a"),
+        extras: { regionJoin: { unmatched: ["x"], unmatchedTotal: 1 } },
+      });
+      data.value = [primary];
+      await flushPromises();
+
+      vi.mocked(convertPanelData).mockRejectedValueOnce(new Error("bad"));
+      data.value = [shifted];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
+    });
+
+    it("clears the maps region join when the next run carries a query error", async () => {
+      const { data, errorDetail } = await mountRacing();
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("a"),
+        extras: { regionJoin: { unmatched: ["x"], unmatchedTotal: 1 } },
+      });
+      data.value = [primary];
+      await flushPromises();
+
+      errorDetail.value = { message: "bad query", code: "400" };
+      data.value = [shifted];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
+    });
 
     it("drops a previous run's conversion that resolves after the next run reset", async () => {
       const { data, loading } = await mountRacing();

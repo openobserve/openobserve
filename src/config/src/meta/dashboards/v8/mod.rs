@@ -642,6 +642,33 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     thresholds: Option<Thresholds>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    enable_roam: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    promql_series_limit: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    fill_opacity: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fill_gradient: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    bar_width: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_bar_track: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    symbol_size: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    symbol_opacity: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legend_values: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_gauge_end_labels: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_expandable_rows: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
     merge_gaps: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -983,6 +1010,8 @@ pub struct QueryConfig {
     query_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     promql_legend_fallback: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    range_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1782,6 +1811,7 @@ mod tests {
             hide: None,
             query_type: None,
             promql_legend_fallback: None,
+            range_mode: None,
         };
         let json = serde_json::to_string(&qc).unwrap();
         assert!(!json.contains("step_value"));
@@ -1792,6 +1822,19 @@ mod tests {
         assert!(!json.contains("\"max\""));
         assert!(!json.contains("timeShift"));
         assert!(!json.contains("query_label"));
+        assert!(!json.contains("range_mode"));
+    }
+
+    #[test]
+    fn test_query_config_range_mode_round_trip() {
+        let qc: QueryConfig = serde_json::from_value(serde_json::json!({
+            "promql_legend": "",
+            "range_mode": "auto"
+        }))
+        .unwrap();
+        assert_eq!(qc.range_mode.as_deref(), Some("auto"));
+        let json = serde_json::to_value(&qc).unwrap();
+        assert_eq!(json["range_mode"], serde_json::json!("auto"));
     }
 
     #[test]
@@ -2657,6 +2700,92 @@ mod tests {
         });
         let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
         assert_eq!(serde_json::to_value(&entry).unwrap(), input);
+    }
+
+    #[test]
+    fn test_panel_config_chart_style_keys_round_trip() {
+        let input = serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "enable_roam": false,
+            "promql_series_limit": 250.0,
+            "fill_opacity": 40.0,
+            "fill_gradient": false,
+            "bar_width": 12.0,
+            "show_bar_track": true,
+            "symbol_size": 8.0,
+            "symbol_opacity": 60.0,
+            "legend_values": ["value", "percent"],
+            "show_gauge_end_labels": true,
+            "table_expandable_rows": true
+        });
+        let cfg: PanelConfig = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(cfg.enable_roam, Some(false));
+        assert_eq!(cfg.promql_series_limit, Some(OrdF64::from(250.0)));
+        assert_eq!(
+            cfg.legend_values,
+            Some(vec!["value".to_string(), "percent".to_string()])
+        );
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in [
+            "enable_roam",
+            "promql_series_limit",
+            "fill_opacity",
+            "fill_gradient",
+            "bar_width",
+            "show_bar_track",
+            "symbol_size",
+            "symbol_opacity",
+            "legend_values",
+            "show_gauge_end_labels",
+            "table_expandable_rows",
+        ] {
+            assert_eq!(json[key], input[key], "{key}");
+        }
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_promql_series_limit_accepts_an_integer() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "promql_series_limit": 20
+        }))
+        .unwrap();
+        assert_eq!(cfg.promql_series_limit, Some(OrdF64::from(20.0)));
+    }
+
+    #[test]
+    fn test_panel_config_chart_style_keys_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in [
+            "enable_roam",
+            "promql_series_limit",
+            "fill_opacity",
+            "fill_gradient",
+            "bar_width",
+            "show_bar_track",
+            "symbol_size",
+            "symbol_opacity",
+            "legend_values",
+            "show_gauge_end_labels",
+            "table_expandable_rows",
+        ] {
+            assert!(json.get(key).is_none(), "{key}");
+        }
     }
 
     #[test]

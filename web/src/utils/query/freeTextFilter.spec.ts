@@ -903,6 +903,64 @@ describe("freeTextFilter", () => {
       expect(materializeFreeText("timeout", ["unknown"], ftsCtx)).toBeNull();
     });
 
+    it("does not nest another wrapper when a grouped AND chain gets a new predicate", () => {
+      let query = "error_id = 'a'";
+      for (const predicate of ["error_source = 'console'", "action_id is null", "x is null"]) {
+        query = appendConjunct(query, predicate, ["s"], ftsCtx);
+      }
+      expect(query).toBe(
+        "(\nerror_id = 'a'\n) AND error_source = 'console' AND action_id is null AND x is null",
+      );
+    });
+
+    it("still wraps a grouped filter that continues with OR", () => {
+      expect(appendConjunct("(a=1) AND b=2 OR c=3", "x=1", ["s"], ftsCtx)).toBe(
+        "(\n(a=1) AND b=2 OR c=3\n) AND x=1",
+      );
+    });
+
+    it("wraps a grouped filter whose tail is not a plain AND chain", () => {
+      const cases: Array<[string, string]> = [
+        ["(a=1) OR (b=2)", "(\n(a=1) OR (b=2)\n) AND x=1"],
+        ["(a=1) AND b=2 -- note", "(\n(a=1) AND b=2 -- note\n) AND x=1"],
+        ["(a=1) AND b=2 /* n */", "(\n(a=1) AND b=2 /* n */\n) AND x=1"],
+        ["(a=1 -- open", "(\n(a=1 -- open\n) AND x=1"],
+        ["(a=1) AND b='x", "(\n(a=1) AND b='x\n) AND x=1"],
+      ];
+      for (const [filter, expected] of cases) {
+        expect(appendConjunct(filter, "x=1", ["s"], ftsCtx)).toBe(expected);
+      }
+    });
+
+    it("appends flat after a group, quoted comment markers or OR, and nested OR", () => {
+      const cases: Array<[string, string]> = [
+        ["(a=1 OR a=2)", "(a=1 OR a=2) AND x=1"],
+        ["(a=1) AND (b=2 OR c=3)", "(a=1) AND (b=2 OR c=3) AND x=1"],
+        ["(a='x--y') AND b='or'", "(a='x--y') AND b='or' AND x=1"],
+        ["(a='/*') AND b=1", "(a='/*') AND b=1 AND x=1"],
+        ["(a=1)AND b=2", "(a=1)AND b=2 AND x=1"],
+        ["(\n-- note\na=1\n) AND b=2", "(\n-- note\na=1\n) AND b=2 AND x=1"],
+        ["(a=1 /* ) */) AND b=2", "(a=1 /* ) */) AND b=2 AND x=1"],
+        ["(a=1) AND b=2\n", "(a=1) AND b=2 AND x=1"],
+        ["(a=1) AND msg='it''s (x)' AND c=1", "(a=1) AND msg='it''s (x)' AND c=1 AND x=1"],
+      ];
+      for (const [filter, expected] of cases) {
+        expect(appendConjunct(filter, "x=1", ["s"], ftsCtx)).toBe(expected);
+      }
+    });
+
+    it("appends a mixed SQL and text tail flat", () => {
+      expect(appendConjunct("(a=1) AND timeout", "x=1", ["s"], ftsCtx)).toBe(
+        "(a=1) AND timeout AND x=1",
+      );
+    });
+
+    it("keeps appending flat when quotes hold parentheses or lowercase and", () => {
+      expect(appendConjunct("(a=')') and b=2", "x=1", ["s"], ftsCtx)).toBe(
+        "(a=')') and b=2 AND x=1",
+      );
+    });
+
     it("honours the token gate from the context", () => {
       const ctx = { ...ftsCtx, tokenLimits: { min: 8, max: 64 } };
       expect(appendConjunct("timeout", "level='error'", ["s"], ctx)).toBe(
