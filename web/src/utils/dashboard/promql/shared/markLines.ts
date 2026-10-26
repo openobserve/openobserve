@@ -15,15 +15,27 @@
 
 import { chartColor } from "@/utils/chartTheme";
 
+interface MarkLineConfig {
+  name?: string;
+  type?: string;
+  value?: unknown;
+  color?: string;
+  show_label?: boolean;
+}
+
+interface MarkLinePanel {
+  config?: { mark_line?: MarkLineConfig[] };
+}
+
 /** The panel's configured mark lines as ECharts markLine data items. */
-const getMarkLineData = (panelSchema: any) => {
+const getMarkLineData = (panelSchema: MarkLinePanel | null | undefined) => {
   return (
-    panelSchema?.config?.mark_line?.map((markLine: any) => {
+    panelSchema?.config?.mark_line?.map((markLine) => {
       return {
         name: markLine.name,
         type: markLine.type,
-        xAxis: markLine.type == "xAxis" ? markLine.value : null,
-        yAxis: markLine.type == "yAxis" ? markLine.value : null,
+        xAxis: markLine.type === "xAxis" ? markLine.value : null,
+        yAxis: markLine.type === "yAxis" ? markLine.value : null,
         label: {
           // The alert preview hides labels: its lines are colour-coded and a label clips at the top.
           show: markLine.show_label !== false,
@@ -37,7 +49,7 @@ const getMarkLineData = (panelSchema: any) => {
 };
 
 /** A series' markLine block drawing the panel's mark lines. */
-export const buildSeriesMarkLine = (panelSchema: any) => ({
+export const buildSeriesMarkLine = (panelSchema: MarkLinePanel | null | undefined) => ({
   silent: true,
   animation: false,
   data: getMarkLineData(panelSchema),

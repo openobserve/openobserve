@@ -27,8 +27,6 @@ import { createSeriesOverrideLookup } from "../seriesOverrides";
 import { calculateWidthText } from "../chartDimensionUtils";
 import { buildSeriesMarkLine } from "./shared/markLines";
 
-const DAY_SECONDS = 86400;
-
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
  */
@@ -40,8 +38,7 @@ export class BarConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const isHorizontal = chartType.startsWith("h-");
     const isStacked = chartType.includes("stacked");
-    const isHStacked = chartType === "h-stacked";
-    const markLine = isHStacked ? buildSeriesMarkLine(panelSchema) : null;
+    const markLine = isStacked ? buildSeriesMarkLine(panelSchema) : null;
     const seriesOverrides = createSeriesOverrideLookup(config);
 
     const series: any[] = [];
@@ -73,13 +70,7 @@ export class BarConverter implements PromQLChartConverter {
       processedData.forEach((queryData) => {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
-          const stamps = queryData.timestamps;
-          // A span of a day or more repeats HH:MM:SS labels.
-          const withDate =
-            isHStacked &&
-            stamps.length > 1 &&
-            stamps[stamps.length - 1][0] - stamps[0][0] >= DAY_SECONDS;
-          stamps.forEach(([, formatted]) => categories.push(formatCategory(formatted, withDate)));
+          categoryLabels(queryData.timestamps).forEach((label) => categories.push(label));
         }
 
         queryData.series.forEach((seriesData) => {
@@ -268,17 +259,34 @@ export class BarConverter implements PromQLChartConverter {
   }
 }
 
-/** A step's category label: HH:MM:SS, prefixed with YYYY-MM-DD when `withDate`. */
-function formatCategory(formatted: Date | string, withDate: boolean): string {
+interface CategoryParts {
+  date: string;
+  time: string;
+}
+
+/** A step's YYYY-MM-DD date (empty when a string label carries none) and HH:MM:SS time; null without a time. */
+function categoryParts(formatted: Date | string): CategoryParts | null {
   if (formatted instanceof Date) {
     const pad = (value: number) => String(value).padStart(2, "0");
-    const time = `${pad(formatted.getHours())}:${pad(formatted.getMinutes())}:${pad(formatted.getSeconds())}`;
-    if (!withDate) return time;
-    const date = `${formatted.getFullYear()}-${pad(formatted.getMonth() + 1)}-${pad(formatted.getDate())}`;
-    return `${date} ${time}`;
+    return {
+      date: `${formatted.getFullYear()}-${pad(formatted.getMonth() + 1)}-${pad(formatted.getDate())}`,
+      time: `${pad(formatted.getHours())}:${pad(formatted.getMinutes())}:${pad(formatted.getSeconds())}`,
+    };
   }
-  const text = formatted.toString();
-  const match = text.match(/(\d{4}-\d{2}-\d{2})?[T ]?(\d{2}:\d{2}:\d{2})/);
-  if (!match) return text;
-  return withDate && match[1] ? `${match[1]} ${match[2]}` : match[2];
+  const match = formatted.toString().match(/(\d{4}-\d{2}-\d{2})?[T ]?(\d{2}:\d{2}:\d{2})/);
+  return match ? { date: match[1] ?? "", time: match[2] } : null;
+}
+
+/** Stacked category labels: HH:MM:SS, or MM-DD HH:MM[:SS] once the steps fall on more than one date. */
+function categoryLabels(stamps: Array<[number, Date | string]>): string[] {
+  const parts = stamps.map(([, formatted]) => categoryParts(formatted));
+  // Steps on different calendar days repeat HH:MM:SS, however short the span.
+  const withDate = new Set(parts.map((part) => part?.date).filter(Boolean)).size > 1;
+  // MM-DD and no zero seconds keep a dated label inside a narrow axis.
+  const withSeconds = !withDate || parts.some((part) => part && !part.time.endsWith(":00"));
+  return parts.map((part, index) => {
+    if (!part) return stamps[index][1].toString();
+    const time = withSeconds ? part.time : part.time.slice(0, 5);
+    return withDate && part.date ? `${part.date.slice(5)} ${time}` : time;
+  });
 }

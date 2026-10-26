@@ -462,6 +462,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OToggleGroup>
 
+        <OToggleGroup
+          v-if="shouldShowLegendValues(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'legend-values')"
+          type="multiple"
+          label-position="top"
+          :label="t('dashboard.legendValues')"
+          v-model="legendValuesModel"
+          data-test="dashboard-config-legend-values"
+        >
+          <OToggleGroupItem
+            v-for="opt in legendValuesOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-legend-values-option"
+            :data-test-label="opt.value"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
         <div
           v-if="
             promqlMode &&
@@ -2075,6 +2095,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -2151,6 +2172,7 @@ import {
   shouldShowLegendWidthUnitContainer,
   shouldShowLegendHeightUnitContainer,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
@@ -2259,6 +2281,19 @@ export default defineComponent({
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
+    const legendValuesModel = computed({
+      get: (): string[] => dashboardPanelData.data.config.legend_values ?? [],
+      set: (v: unknown) => {
+        const selected = Array.isArray(v) ? v : [];
+        dashboardPanelData.data.config.legend_values = LEGEND_VALUE_KEYS.filter((key) =>
+          selected.includes(key),
+        );
+      },
+    });
+    const legendValuesOptions = [
+      { label: t("dashboard.legendValueValue"), value: "value" },
+      { label: t("dashboard.legendValuePercent"), value: "percent" },
+    ];
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
@@ -3044,6 +3079,8 @@ export default defineComponent({
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,
+      legendValuesModel,
+      legendValuesOptions,
       toggleItemValue,
       t,
       dashboardPanelData,
@@ -3090,6 +3127,7 @@ export default defineComponent({
       shouldShowLegendWidthUnitContainer,
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
+      shouldShowLegendValues,
       shouldShowGridlines,
       shouldShowTopResultsConfig,
       shouldShowAreaLineStyleConfig,
