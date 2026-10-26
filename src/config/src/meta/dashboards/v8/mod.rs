@@ -546,6 +546,7 @@ pub struct PanelConfig {
     tooltip_mode: Option<String>,
 }
 
+/// Heatmap y buckets: "size" mode is fixed-width, "log" mode one per power of `base` (2 or 10).
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 pub struct HeatmapYBucket {
