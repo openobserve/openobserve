@@ -1440,7 +1440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.lineStyle = v;
         }
       "
-      :label="t('dashboard.configSectionLineStyle')"
+      :label="
+        shouldShowScatterPointConfig(dashboardPanelData)
+          ? t('dashboard.configSectionPointStyle')
+          : t('dashboard.configSectionLineStyle')
+      "
       class="border-card-glass-border border-t border-solid"
     >
       <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
@@ -1519,6 +1523,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('dashboard.fillGradientTooltip')" max-width="15.625rem" />
           </template>
         </OSwitch>
+
+        <OInput
+          v-if="shouldShowScatterPointConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'point-size')"
+          :model-value="dashboardPanelData.data.config.symbol_size ?? ''"
+          :model-modifiers="{ number: true }"
+          type="number"
+          :min="1"
+          :max="SYMBOL_SIZE_MAX"
+          :error="!isScatterSymbolSizeValid(dashboardPanelData.data.config.symbol_size)"
+          :error-message="t('dashboard.pointSizeInvalid', { max: SYMBOL_SIZE_MAX })"
+          @update:model-value="
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.symbol_size = value === '' ? null : value)
+          "
+          :label="t('dashboard.pointSize')"
+          :placeholder="t('dashboard.pointSizeDefault')"
+          data-test="dashboard-config-symbol_size"
+        />
+
+        <OInput
+          v-if="shouldShowScatterPointConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'point-opacity')"
+          v-model.number="dashboardPanelDataModel.data.config.symbol_opacity"
+          type="number"
+          :min="0"
+          :max="100"
+          @update:model-value="
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.symbol_opacity =
+                typeof value === 'number' ? Math.min(100, Math.max(0, value)) : null)
+          "
+          :label="t('dashboard.pointOpacity')"
+          :placeholder="t('dashboard.pointOpacityDefault')"
+          data-test="dashboard-config-symbol_opacity"
+        />
       </div>
     </OCollapsible>
 
@@ -2565,10 +2605,12 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
+import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
 export default defineComponent({
@@ -3740,6 +3782,9 @@ export default defineComponent({
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
       shouldShowAreaFillConfig,
+      shouldShowScatterPointConfig,
+      isScatterSymbolSizeValid,
+      SYMBOL_SIZE_MAX,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)

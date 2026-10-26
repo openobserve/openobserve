@@ -469,6 +469,31 @@ describe("TimeSeriesConverter", () => {
 
       expect(result.series[0].symbolSize).toBe(15);
     });
+
+    it("defaults the symbol size to 5 and applies the point opacity", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
+          timestamps: [[1, "00:00:00"]],
+          queryIndex: 0,
+        },
+      ];
+      const unset = converter.convert(
+        processedData,
+        { type: "scatter", config: {} },
+        mockStore,
+        mockExtras,
+      );
+      expect(unset.series[0].symbolSize).toBe(5);
+      expect(unset.series[0].itemStyle.opacity).toBeUndefined();
+      const set = converter.convert(
+        processedData,
+        { type: "scatter", config: { symbol_opacity: 30 } },
+        mockStore,
+        mockExtras,
+      );
+      expect(set.series[0].itemStyle.opacity).toBeCloseTo(0.3);
+    });
   });
 
   describe("labels", () => {

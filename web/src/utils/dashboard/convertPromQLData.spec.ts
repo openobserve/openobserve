@@ -1897,6 +1897,31 @@ describe("Convert PromQL Data Utils", () => {
       expect(scatterSeries.symbolSize).toBe(5);
     });
 
+    it("applies scatter point size and opacity to an instant (vector) result", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "scatter",
+          config: { symbol_size: 10, symbol_opacity: 40 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "vector",
+            result: [{ metric: { __name__: "test" }, value: [1640435200, "10"] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.symbolSize).toBe(10);
+      expect(series.itemStyle.opacity).toBe(0.4);
+    });
+
     it.each([
       ["line", { resultType: "matrix", values: [[1640435200, "10"]] }],
       ["area", { resultType: "matrix", values: [[1640435200, "10"]] }],

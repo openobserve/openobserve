@@ -13,6 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import {
+  getScatterBaseOpacity,
+  getScatterSymbolOpacity,
+  getScatterSymbolSize,
+  type SeriesStyleConfig,
+} from "./scatterPointStyle";
+
 export const DEFAULT_LINE_THICKNESS = 1.5;
 export const MAX_LINE_THICKNESS = 10;
 
@@ -34,13 +41,10 @@ export const isValidLineThickness = (value: unknown): boolean =>
  * Returns the ECharts series props object based on the given PromQL chart type.
  *
  * @param {string} type - The chart type (e.g. "bar", "line", "area", "gauge", etc.)
- * @param {object} [config] - The panel config; line, area and area-stacked read its line_thickness through lineThicknessOf.
+ * @param {SeriesStyleConfig} config - The panel config: line_thickness for line, area and area-stacked, and the scatter point size.
  * @return {object} The series props object for the given chart type.
  */
-export const getPropsByChartTypeForSeries = (
-  type: string,
-  config?: { line_thickness?: unknown } | null,
-) => {
+export const getPropsByChartTypeForSeries = (type: string, config?: SeriesStyleConfig | null) => {
   const lineThickness = lineThicknessOf(config);
   switch (type) {
     case "bar":
@@ -59,7 +63,7 @@ export const getPropsByChartTypeForSeries = (
       return {
         type: "scatter",
         emphasis: { focus: "series" },
-        symbolSize: 5,
+        symbolSize: getScatterSymbolSize(config),
       };
     case "pie":
       return {
@@ -138,4 +142,16 @@ export const getPropsByChartTypeForSeries = (
         type: "bar",
       };
   }
+};
+
+/** Item opacity for a PromQL series; a time-shifted bar or scatter twin is drawn at half its base opacity. */
+export const getSeriesItemOpacity = (
+  type: string,
+  config: SeriesStyleConfig | null | undefined,
+  isShifted: boolean,
+): { opacity?: number } => {
+  if (isShifted && type === "scatter") return { opacity: getScatterBaseOpacity(config) * 0.5 };
+  if (isShifted && type === "bar") return { opacity: 0.5 };
+  const base = type === "scatter" ? getScatterSymbolOpacity(config) : undefined;
+  return base === undefined ? {} : { opacity: base };
 };

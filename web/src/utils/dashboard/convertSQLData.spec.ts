@@ -9849,6 +9849,42 @@ describe("convertSQLData", () => {
     });
   });
 
+  describe("Scatter point size and opacity", () => {
+    const searchData = [
+      [
+        { timestamp: "2024-01-01T00:00:00Z", value: 10 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 30 },
+      ],
+    ];
+    const scatterSeries = async (config: Record<string, any>) => {
+      const result = await convertSQLData(
+        { ...mockPanelSchema, type: "scatter", config },
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+      return result.options.series.find((s: any) => s.type === "scatter");
+    };
+
+    it("keeps 5 px points and the chart's default opacity when unset", async () => {
+      const series = await scatterSeries({});
+      expect(series.symbolSize).toBe(5);
+      expect(series.itemStyle?.opacity).toBeUndefined();
+    });
+
+    it("draws points at the configured size and opacity", async () => {
+      const series = await scatterSeries({ symbol_size: 11, symbol_opacity: 30 });
+      expect(series.symbolSize).toBe(11);
+      expect(series.itemStyle.opacity).toBe(0.3);
+      expect(series.color).toBeDefined();
+    });
+  });
+
   describe("Connect Nulls Configuration", () => {
     it("should use default connect_nulls (false) when config is undefined", async () => {
       const schema = {

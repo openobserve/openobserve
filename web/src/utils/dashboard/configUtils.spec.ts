@@ -33,6 +33,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1374,6 +1375,14 @@ describe("configUtils", () => {
       ["area-stacked", "line", "bar", "scatter"].forEach((type) =>
         expect(shouldShowAreaFillConfig({ data: { type } })).toBe(false),
       );
+    });
+  });
+
+  describe("shouldShowScatterPointConfig", () => {
+    it("is true for scatter only", () => {
+      expect(shouldShowScatterPointConfig({ data: { type: "scatter" } })).toBe(true);
+      expect(shouldShowScatterPointConfig({ data: { type: "line" } })).toBe(false);
+      expect(shouldShowScatterPointConfig({ data: { type: "bar" } })).toBe(false);
     });
   });
 

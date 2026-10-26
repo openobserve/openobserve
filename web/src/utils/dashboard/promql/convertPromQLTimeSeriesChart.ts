@@ -21,6 +21,8 @@ import { getSeriesColor } from "../colorPalette";
 import { buildSeriesMarkLine } from "./shared/markLines";
 import { lineThicknessOf } from "../promqlChartSeriesProps";
 import { chartColor } from "@/utils/chartTheme";
+import { getScatterSymbolSize } from "../scatterPointStyle";
+import { getSeriesItemOpacity } from "../promqlChartSeriesProps";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -107,6 +109,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           // Styling
           itemStyle: {
             color: seriesColor,
+            ...getSeriesItemOpacity(chartType, config, false),
           },
 
           // Connect null values
@@ -190,7 +193,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           emphasis: {
             focus: "series",
           },
-          ...(config.symbol_size && { symbolSize: config.symbol_size }),
+          symbolSize: getScatterSymbolSize(config),
         };
 
       case "line":

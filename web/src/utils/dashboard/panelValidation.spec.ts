@@ -537,3 +537,39 @@ describe("validatePanel line thickness", () => {
     expect(run("bar", 0)).toEqual([]);
   });
 });
+
+describe("validatePanel scatter point size", () => {
+  const run = (type: string, size: unknown) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType: "promql",
+          config: { symbol_size: size },
+          queries: [{ query: "up", config: {}, fields: { x: [], y: [], filter: {} } }],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors.filter((e) => e.includes(gt("dashboard.pointSize")));
+  };
+
+  it("blocks save for a size of 0 or less, or above the max", () => {
+    expect(run("scatter", 0)).toHaveLength(1);
+    expect(run("scatter", 5000)).toHaveLength(1);
+  });
+
+  it("accepts an unset or valid size, and ignores the key on other charts", () => {
+    expect(run("scatter", null)).toEqual([]);
+    expect(run("scatter", 0.5)).toEqual([]);
+    expect(run("line", 0)).toEqual([]);
+  });
+});

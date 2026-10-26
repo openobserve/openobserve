@@ -80,7 +80,7 @@ import {
 } from "./seriesOverrides";
 import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
-import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
+import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
@@ -1143,10 +1143,12 @@ export const convertPromQLData = async (
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 itemStyle: {
                   color: resolvedSeriesColor,
-                  // Bars and points have no line to dash.
-                  ...(nameSuffixes[index] && ["bar", "scatter"].includes(panelSchema.type)
-                    ? { opacity: 0.5 }
-                    : {}),
+                  // Bars and points have no line to dash, so a twin is faded instead.
+                  ...getSeriesItemOpacity(
+                    panelSchema.type,
+                    panelSchema.config,
+                    !!nameSuffixes[index],
+                  ),
                 },
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
@@ -1235,6 +1237,7 @@ export const convertPromQLData = async (
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 itemStyle: {
                   color: resolvedVectorColor,
+                  ...getSeriesItemOpacity(panelSchema.type, panelSchema.config, false),
                 },
                 data: values.map((value: any) => [
                   store.state.timezone != "UTC"

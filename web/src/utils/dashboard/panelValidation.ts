@@ -12,6 +12,8 @@ import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
 import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
+import { shouldShowScatterPointConfig } from "@/utils/dashboard/configUtils";
+import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
 
 /**
  * Validates a single condition item
@@ -977,6 +979,14 @@ export const validatePanel = (
     !isValidLineThickness(panelData?.data?.config?.line_thickness)
   ) {
     errors.push(t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }));
+  }
+
+  if (
+    panelData?.data &&
+    shouldShowScatterPointConfig(panelData) &&
+    !isScatterSymbolSizeValid(panelData.data.config?.symbol_size)
+  ) {
+    errors.push(t("dashboard.pointSizeInvalid", { max: SYMBOL_SIZE_MAX }));
   }
 
   // Validate timestamp alias for SQL queries with custom query mode

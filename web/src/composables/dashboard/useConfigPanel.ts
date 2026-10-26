@@ -16,6 +16,7 @@ import {
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
   shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   allVisibleQueriesInstant,
@@ -384,6 +385,14 @@ export function useConfigPanel(
       "fill-gradient": {
         label: t("dashboard.fillGradient"),
         visible: shouldShowAreaFillConfig(dashboardPanelData),
+      },
+      "point-size": {
+        label: t("dashboard.pointSize"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
+      },
+      "point-opacity": {
+        label: t("dashboard.pointOpacity"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
       },
     },
     table: {

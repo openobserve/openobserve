@@ -3461,4 +3461,70 @@ describe("ConfigPanel", () => {
       expect(gradientSwitch().exists()).toBe(false);
     });
   });
+
+  describe("Scatter point size and opacity", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const sizeInput = () => wrapper.findComponent('[data-test="dashboard-config-symbol_size"]');
+    const opacityInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-symbol_opacity"]');
+
+    it("stores the typed size, fractions included, and an empty input as null", async () => {
+      const panel = panelOf("scatter");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await sizeInput().vm.$emit("update:modelValue", 12);
+      expect(panel.data.config.symbol_size).toBe(12);
+      await sizeInput().vm.$emit("update:modelValue", 0.5);
+      expect(panel.data.config.symbol_size).toBe(0.5);
+      await sizeInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.symbol_size).toBeNull();
+    });
+
+    it("flags a size of 0 or less, or above the max, instead of clearing it", async () => {
+      const panel = reactive(panelOf("scatter"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(sizeInput().props("error")).toBe(false);
+      for (const bad of [0, -3, 5000]) {
+        await sizeInput().vm.$emit("update:modelValue", bad);
+        expect(panel.data.config.symbol_size).toBe(bad);
+        expect(sizeInput().props("error")).toBe(true);
+      }
+      await sizeInput().vm.$emit("update:modelValue", 8);
+      expect(sizeInput().props("error")).toBe(false);
+    });
+
+    it("titles the section for points on a scatter chart", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("scatter") });
+      expect(wrapper.text()).toContain("Point style");
+    });
+
+    it("clamps the opacity to 0-100 and clears an empty input to null", async () => {
+      const panel = panelOf("scatter");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", 40);
+      expect(panel.data.config.symbol_opacity).toBe(40);
+      await opacityInput().vm.$emit("update:modelValue", 140);
+      expect(panel.data.config.symbol_opacity).toBe(100);
+      await opacityInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.symbol_opacity).toBeNull();
+    });
+
+    it("is shown for scatter in PromQL mode too, and absent for other charts", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("scatter") }, { promqlMode: true });
+      expect(sizeInput().exists()).toBe(true);
+      expect(opacityInput().exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(sizeInput().exists()).toBe(false);
+      expect(opacityInput().exists()).toBe(false);
+    });
+  });
 });
