@@ -24,6 +24,7 @@ import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardPrintPage from "./dashboardPages/dashboard-print";
+import DashboardTvPlaylistPage from "./dashboardPages/dashboard-tv-playlist.js";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
@@ -204,6 +205,7 @@ class PageManager {
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
     this.dashboardPrint = new DashboardPrintPage(page);
+    this.dashboardTvPlaylist = new DashboardTvPlaylistPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.dashboardPanelTime = new DashboardPanelTime(page);

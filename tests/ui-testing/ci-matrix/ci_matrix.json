@@ -132,7 +132,8 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-favorites.spec.js"
+      "dashboard-favorites.spec.js",
+      "dashboard-tv-playlist.spec.js"
     ],
     "disabled": []
   },
