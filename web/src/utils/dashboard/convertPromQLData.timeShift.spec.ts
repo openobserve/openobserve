@@ -202,6 +202,30 @@ describe("convertPromQLData with time-shifted results", () => {
   const names = (result: any) =>
     (result.options.series ?? []).map((s: any) => s?.name).filter(Boolean);
 
+  it("area-stacked: a past period's stack lifts y_axis_max on its own, never on top", async () => {
+    const pods = (shiftS: number, value: string) =>
+      matrix(
+        series(
+          { pod: "api-1" },
+          ts.map((t) => t - shiftS),
+          value,
+        ),
+        series(
+          { pod: "api-2" },
+          ts.map((t) => t - shiftS),
+          value,
+        ),
+      );
+    const result = await convert(
+      { ...panel("area-stacked"), config: { y_axis_max: 1 } },
+      [pods(0, "1"), pods(DAY_S, "5")],
+      meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+      stepMeta(2, 60),
+    );
+
+    expect(result.options.yAxis.max).toBe(10);
+  });
+
   it("shows the current series and one per offset, suffixed with the period", async () => {
     const result = await convert(
       panel("line"),

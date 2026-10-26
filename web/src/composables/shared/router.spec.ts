@@ -1917,13 +1917,6 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it("passes the workload prop to the kubernetes page", () => {
-      const { homeChildRoutes } = useRoutes();
-      expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
-        workload: "kubernetes",
-      });
-    });
-
     // A menu entry whose workload has no registered pack can only render a dead
     // end, so the route must not come back while `curatedPacks` lacks an AWS pack.
     it("registers NO aws route, by name or by path", () => {
@@ -1932,29 +1925,21 @@ describe("useRoutes (router.ts)", () => {
       expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
     });
 
-    it("keeps exactly the curated infra workload routes plus Kubernetes 2", () => {
+    it("serves Kubernetes from the redesigned page and keeps the curated page on the hidden kubernetes-2 route", () => {
       const { homeChildRoutes } = useRoutes();
-      const infraWorkloads = homeChildRoutes
-        .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
-        .map((r: any) => r.path)
-        .sort();
-      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes", "infra/kubernetes-2"]);
-    });
-
-    it("registers Kubernetes 2 right after Kubernetes, lazily loading its own page", () => {
-      const { homeChildRoutes } = useRoutes();
-      const index = homeChildRoutes.findIndex((r: any) => r.name === "infraKubernetes");
-      const route = homeChildRoutes[index + 1] as any;
-      expect(route.name).toBe("infraKubernetes2");
-      expect(route.meta?.titleKey).toBe("menu.kubernetes2");
-      expect(route.props).toBeUndefined();
-      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const current = findRoute(homeChildRoutes, "infraKubernetes") as any;
+      expect(current.meta?.titleKey).toBe("menu.kubernetes");
+      expect(current.props).toBeUndefined();
+      expect(String(current.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const hidden = findRoute(homeChildRoutes, "infraKubernetes2") as any;
+      expect(hidden.props).toEqual({ workload: "kubernetes" });
+      expect(String(hidden.component)).toMatch(/curated\/CuratedPageView\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
     // two rows. Which chunk they load is an implementation detail and deliberately
     // NOT asserted; what must survive is the deep-link contract below.
-    it.each(["infraKubernetes"])(
+    it.each(["infraKubernetes", "infraKubernetes2"])(
       "%s keeps its titleKey and a lazily-imported component across the component swap",
       (name) => {
         const { homeChildRoutes } = useRoutes();
@@ -1964,7 +1949,7 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it.each(["infraKubernetes"])(
+    it.each(["infraKubernetes2"])(
       "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
       (name) => {
         // The chunk NAME stays unasserted; which MODULE the loader targets is what
@@ -2161,6 +2146,48 @@ describe("useRoutes (router.ts)", () => {
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("sends a playlist link on the dashboard view to the TV player", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", playlist: "d1:f1,d2", interval: "2m", slide: "2" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards/tv",
+        query: { org_identifier: "acme", playlist: "d1:f1,d2:default", interval: "2m", slide: "2" },
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("keeps the TV player's own page fallback on the dashboard view", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    it("registers the TV playlist route behind the route guard", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "dashboardTvPlaylist");
+      expect(route.path).toBe("/dashboards/tv");
+      expect(route.meta.titleKey).toBe("routeTitles.dashboardTvPlaylist");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
     });
 
     it("should call routeGuard for functionList route beforeEnter", async () => {

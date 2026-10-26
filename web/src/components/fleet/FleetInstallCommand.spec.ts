@@ -36,10 +36,15 @@ const CodeStub = {
     '<div><pre data-test="fleet-install-command-code">{{ code }}</pre><pre data-test="fleet-install-command-masked">{{ codeMasked }}</pre></div>',
 };
 
+const OpenCollapsible = { name: "OCollapsible", props: ["label"], template: "<div><slot /></div>" };
+
 function mountCommand(props: Record<string, unknown> = {}) {
   return mount(FleetInstallCommand, {
     props: { token: "o2ft_abc123", ...props },
-    global: { plugins: [i18n, store], stubs: { OCodeBlock: CodeStub } },
+    global: {
+      plugins: [i18n, store],
+      stubs: { OCodeBlock: CodeStub, OCollapsible: OpenCollapsible },
+    },
   });
 }
 
@@ -65,6 +70,16 @@ describe("FleetInstallCommand", () => {
       .findAll('[data-test^="fleet-install-command-os-"]')
       .map((b) => b.text());
     expect(offered).toEqual(["Linux", "macOS", "Windows", "Docker", "Kubernetes"]);
+  });
+
+  it("shows how to uninstall for the chosen platform, without a second platform picker", async () => {
+    const w = mountCommand();
+    const uninstall = () => w.findComponent({ name: "FleetUninstallCommand" });
+    expect(uninstall().props("platform")).toBe("linux");
+    expect(uninstall().find('[data-test="fleet-uninstall-command-os"]').exists()).toBe(false);
+    await choose(w, "docker");
+    expect(uninstall().props("platform")).toBe("docker");
+    expect(uninstall().text()).toContain("docker volume rm otel-fleet-state");
   });
 
   it("masks a real token in the shown command and leaves a placeholder readable", () => {
@@ -117,5 +132,26 @@ describe("FleetInstallCommand", () => {
     await choose(w, "kubernetes");
     expect(code(w)).toContain("o2cr.ai/openobserve/otel-fleet-collector");
     expect(w.find('[data-test="fleet-install-command-http"]').exists()).toBe(false);
+  });
+
+  it("offers the agent or gateway role only on Kubernetes, agents by default", async () => {
+    const w = mountCommand();
+    expect(w.find('[data-test="fleet-install-command-role"]').exists()).toBe(false);
+    await choose(w, "kubernetes");
+    const roles = w.findAll('[data-test^="fleet-install-command-role-"]').map((b) => b.text());
+    expect(roles).toEqual(["Agent (DaemonSet)", "Gateway (StatefulSet)"]);
+    expect(code(w)).toContain("helm upgrade --install otel-fleet-collector openobserve/");
+  });
+
+  it("installs a gateway release and names its OTLP Service", async () => {
+    const w = mountCommand();
+    await choose(w, "kubernetes");
+    w.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:model-value", "gateway");
+    await w.vm.$nextTick();
+    expect(code(w)).toContain("helm upgrade --install otel-fleet-collector-gateway");
+    expect(code(w)).toContain("--set gateway.enabled=true");
+    expect(w.find('[data-test="fleet-install-command-note"]').text()).toContain(
+      "otel-fleet-collector-gateway:4317",
+    );
   });
 });

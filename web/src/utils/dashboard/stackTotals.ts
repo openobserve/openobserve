@@ -17,6 +17,11 @@ import { escapeHtml } from "@/utils/html";
 import { gt } from "@/types/i18n";
 import type { SeriesOverrideLookup } from "./seriesOverrides";
 
+interface TooltipParam {
+  seriesIndex: number;
+  seriesName?: unknown;
+}
+
 interface StackGroup {
   first: number;
   members: number;
@@ -28,11 +33,38 @@ interface StackGroup {
   mixedUnits: boolean;
 }
 
+type ValueAxisKey = "xAxis" | "yAxis";
+
+interface ValueAxisBounds {
+  min?: unknown;
+  max?: unknown;
+}
+
+interface StackedSeries {
+  name?: unknown;
+  stack?: unknown;
+  data?: unknown;
+  _panelQueryIndex?: number;
+}
+
+interface StackedOptions {
+  series?: unknown;
+  xAxis?: unknown;
+  yAxis?: unknown;
+}
+
 const STACK_TOTAL_CHART_TYPES: ReadonlySet<string> = new Set([
   "area-stacked",
   "stacked",
   "h-stacked",
 ]);
+
+// Horizontal stacks put their values on the x axis; bars grow from 0 while a stacked area may be zoomed above it.
+const STACKED_VALUE_AXIS: Readonly<Record<string, { axis: ValueAxisKey; fromZero: boolean }>> = {
+  stacked: { axis: "yAxis", fromZero: true },
+  "area-stacked": { axis: "yAxis", fromZero: false },
+  "h-stacked": { axis: "xAxis", fromZero: true },
+};
 
 // A time shift or a second Y field appends the same "(...)" to every series name of its stack.
 const NAME_SUFFIX = / (\([^()]*\))$/;
@@ -61,10 +93,10 @@ const sharedSuffix = (names: string[]): string => {
 };
 
 const groupParams = (
-  params: any[],
-  series: any[],
+  params: TooltipParam[],
+  series: StackedSeries[],
   lookup: SeriesOverrideLookup,
-  valueOf: (param: any) => unknown,
+  valueOf: (param: TooltipParam) => unknown,
 ): Map<string, StackGroup> => {
   const groups = new Map<string, StackGroup>();
   for (const param of params) {
@@ -107,18 +139,19 @@ export const stackTotalRows = (
   params: unknown,
   series: unknown,
   lookup: SeriesOverrideLookup,
-  valueOf: (param: any) => unknown,
+  valueOf: (param: TooltipParam) => unknown,
 ): string[] => {
   if (!STACK_TOTAL_CHART_TYPES.has(panelType) || !Array.isArray(params) || !Array.isArray(series))
     return [];
-  const groups = [...groupParams(params, series, lookup, valueOf).values()].sort(
+  const stackSeries: StackedSeries[] = series;
+  const groups = [...groupParams(params, stackSeries, lookup, valueOf).values()].sort(
     (a, b) => a.first - b.first,
   );
   const distinct = (labels: string[]) => new Set(labels).size === labels.length;
   const bySuffix = groups.map((group) => (groups.length > 1 ? sharedSuffix(group.names) : ""));
   // Stacks of different panel queries read as that query's number.
   const byQuery = groups.map(
-    (group, index) => `#${((series as any[])[group.first]?._panelQueryIndex ?? index) + 1}`,
+    (group, index) => `#${(stackSeries[group.first]?._panelQueryIndex ?? index) + 1}`,
   );
   const labels = distinct(bySuffix)
     ? bySuffix
@@ -139,32 +172,57 @@ export const stackTotalRows = (
 };
 
 /** Widens a user-set value-axis min/max so it never cuts into a stack; positives and negatives stack apart. */
-export const fitAxisBoundsToStacks = (options: any): void => {
-  const axis = options?.yAxis;
-  if (!axis || !Array.isArray(options.series)) return;
-  const hasMax = typeof axis.max === "number";
-  const hasMin = typeof axis.min === "number";
+export const fitAxisBoundsToStacks = (
+  options: StackedOptions | null | undefined,
+  valueAxis: ValueAxisKey = "yAxis",
+  fromZero = true,
+): void => {
+  const axis = options?.[valueAxis];
+  if (!axis || typeof axis !== "object" || !Array.isArray(options?.series)) return;
+  const bounds = axis as ValueAxisBounds;
+  const hasMax = typeof bounds.max === "number";
+  const hasMin = typeof bounds.min === "number";
   if (!hasMax && !hasMin) return;
-  const sums = new Map<string, number>();
-  let hi = -Infinity;
-  let lo = Infinity;
-  options.series.forEach((series: any, seriesIndex: number) => {
+  const sums = new Map<string, Map<unknown, number>>();
+  const sumsOf = (key: string) => {
+    let buckets = sums.get(key);
+    if (!buckets) sums.set(key, (buckets = new Map()));
+    return buckets;
+  };
+  let hi = fromZero ? 0 : -Infinity;
+  let lo = fromZero ? 0 : Infinity;
+  let seen = false;
+  options.series.forEach((series: StackedSeries, seriesIndex: number) => {
     // Unnamed series carry annotations and limit lines, not stacked data.
     if (!series?.name || !Array.isArray(series.data)) return;
     const stack =
       series.stack === null || series.stack === undefined || series.stack === ""
         ? `series:${seriesIndex}`
-        : `stack:${series.stack}`;
+        : `stack:${String(series.stack)}`;
+    const positive = sumsOf(`${stack}|+`);
+    const negative = sumsOf(`${stack}|-`);
     series.data.forEach((point: unknown, index: number) => {
       const [bucket, value] = pointOf(point, index);
       if (value === null) return;
-      const key = `${stack}|${value < 0 ? "-" : "+"}|${String(bucket)}`;
-      const sum = (sums.get(key) ?? 0) + value;
-      sums.set(key, sum);
-      hi = Math.max(hi, value, sum);
-      lo = Math.min(lo, value, sum);
+      seen = true;
+      const buckets = value < 0 ? negative : positive;
+      const sum = (buckets.get(bucket) ?? 0) + value;
+      buckets.set(bucket, sum);
+      // Only stack ends set the extent; a segment value inside a stack never does.
+      if (value < 0) lo = Math.min(lo, sum);
+      else hi = Math.max(hi, sum);
     });
   });
-  if (hasMax && Number.isFinite(hi)) axis.max = Math.max(axis.max, hi);
-  if (hasMin && Number.isFinite(lo)) axis.min = Math.min(axis.min, lo);
+  if (!seen) return;
+  if (hasMax && Number.isFinite(hi)) bounds.max = Math.max(bounds.max as number, hi);
+  if (hasMin && Number.isFinite(lo)) bounds.min = Math.min(bounds.min as number, lo);
+};
+
+/** Fits the value-axis bounds of stacked chart types; other types are left untouched. */
+export const fitStackedAxisBounds = (
+  chartType: string,
+  options: StackedOptions | null | undefined,
+): void => {
+  const fit = STACKED_VALUE_AXIS[chartType];
+  if (fit) fitAxisBoundsToStacks(options, fit.axis, fit.fromZero);
 };

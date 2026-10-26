@@ -29,6 +29,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
+  escapeHtmlValue: vi.fn((value) => value),
   processVariableContent: vi.fn((content, variables) => {
     // Simple mock implementation that replaces {{variable}} patterns
     if (!content || typeof content !== "string") return content;
@@ -207,7 +208,7 @@ describe("MarkdownRenderer", () => {
         "# {{title}}\n\nWelcome {{userName}}!",
         { title: "Dashboard", userName: "John" },
         { panelId: undefined, tabId: undefined },
-        { allLabel: "All" },
+        { allLabel: "All", escapeValue: expect.any(Function) },
       );
     });
 
@@ -233,17 +234,6 @@ describe("MarkdownRenderer", () => {
       await wrapper.setProps({ variablesData: { title: "Updated" } });
 
       expect(rendererElement.html()).toContain("Updated");
-    });
-
-    it("should handle markdown syntax in variables", () => {
-      wrapper = createWrapper({
-        markdownContent: "{{content}}",
-        variablesData: { content: "**Bold** and *italic*" },
-      });
-
-      const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.html()).toContain("<strong>Bold</strong>");
-      expect(rendererElement.html()).toContain("<em>italic</em>");
     });
 
     it("should handle complex variable structures", () => {
@@ -389,16 +379,6 @@ describe("MarkdownRenderer", () => {
 
       expect(sanitize.mock.calls.length).toBeGreaterThan(initialCallCount);
     });
-
-    it("should handle sanitization of processed markdown", () => {
-      wrapper = createWrapper({
-        markdownContent: "{{content}}",
-        variablesData: { content: "# Title\n\n[Safe link](http://example.com)" },
-      });
-
-      const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.exists()).toBe(true);
-    });
   });
 
   describe("Layout and Styling", () => {
@@ -506,9 +486,7 @@ describe("MarkdownRenderer", () => {
         variablesData: { test: "value" },
       });
 
-      expect(wrapper.vm.processedContent).toBeDefined();
-      expect(wrapper.vm.sanitizeMarkdownPanel).toBeDefined();
-      expect(wrapper.vm.marked).toBeDefined();
+      expect(wrapper.vm.renderedHtml).toBeDefined();
       // Component now exposes useTheme()'s isDark instead of a raw store.
       expect(wrapper.vm.isDark).toBe(false);
     });
@@ -525,13 +503,13 @@ describe("MarkdownRenderer", () => {
         variablesData: { title: "Initial" },
       });
 
-      const initialProcessed = wrapper.vm.processedContent;
+      const initialRendered = wrapper.vm.renderedHtml;
 
       await wrapper.setProps({
         variablesData: { title: "Updated" },
       });
 
-      expect(wrapper.vm.processedContent).not.toBe(initialProcessed);
+      expect(wrapper.vm.renderedHtml).not.toBe(initialRendered);
     });
   });
 

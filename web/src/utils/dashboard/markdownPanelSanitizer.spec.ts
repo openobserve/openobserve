@@ -37,6 +37,9 @@ describe("markdownPanelSanitizer", () => {
       expect(isCrossOriginLink("http://o2.example.com/web", PAGE)).toBe(true);
       expect(isCrossOriginLink("https://o2.example.com:8443/web", PAGE)).toBe(true);
       expect(isCrossOriginLink("//evil.example.net/x", PAGE)).toBe(true);
+      expect(isCrossOriginLink("HTTPS://docs.example.org/x", PAGE)).toBe(true);
+      expect(isCrossOriginLink("  https://docs.example.org/x", PAGE)).toBe(true);
+      expect(isCrossOriginLink("\\\\evil.example.net/x", PAGE)).toBe(true);
     });
 
     it("rejects same-origin, relative and fragment links", () => {
@@ -49,6 +52,7 @@ describe("markdownPanelSanitizer", () => {
     it("rejects non-web schemes and unparseable hrefs", () => {
       expect(isCrossOriginLink("mailto:oncall@example.org", PAGE)).toBe(false);
       expect(isCrossOriginLink("tel:+15551234", PAGE)).toBe(false);
+      expect(isCrossOriginLink("data:text/html,<p>x</p>", PAGE)).toBe(false);
       expect(isCrossOriginLink("http://[bad", PAGE)).toBe(false);
     });
   });
@@ -76,6 +80,23 @@ describe("markdownPanelSanitizer", () => {
         expect(a.getAttribute("target")).toBe("_blank");
         expect(a.getAttribute("rel")).toBe("noopener noreferrer");
       });
+    });
+
+    it("opens a cross-origin image-map area in a new tab", () => {
+      const area = render(
+        '<map name="m"><area shape="rect" coords="0,0,1,1" href="https://docs.example.org/a"></map>',
+      ).querySelector("area");
+
+      expect(area?.getAttribute("target")).toBe("_blank");
+      expect(area?.getAttribute("rel")).toBe("noopener noreferrer");
+    });
+
+    it("keeps authored rel tokens on a cross-origin link but never opener", () => {
+      const link = render(
+        '<a href="https://docs.example.org" rel="nofollow Opener sponsored">x</a>',
+      ).querySelector("a");
+
+      expect(link?.getAttribute("rel")).toBe("nofollow sponsored noopener noreferrer");
     });
 
     it("keeps same-origin and relative links in the tab", () => {

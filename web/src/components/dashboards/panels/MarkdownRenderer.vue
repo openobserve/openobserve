@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scroll h-full w-full overflow-auto" data-test="markdown-renderer-scroll-container">
     <div
       :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
-      v-html="sanitizeMarkdownPanel(marked(processedContent))"
+      v-html="renderedHtml"
       data-test="markdown-renderer"
     ></div>
   </div>
@@ -27,10 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent } from "vue";
 import { useTheme } from "@/composables/useTheme";
+import { renderMarkdownPanel } from "@/utils/dashboard/markdownPanel";
 import { useI18nTyped } from "@/types/i18n";
-import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
-import { sanitizeMarkdownPanel } from "@/utils/dashboard/markdownPanelSanitizer";
-import { marked } from "marked";
 
 export default defineComponent({
   name: "MarkdownRenderer",
@@ -56,21 +54,19 @@ export default defineComponent({
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
 
-    const processedContent = computed(() => {
+    const renderedHtml = computed(() => {
       const context = {
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(props.markdownContent, props.variablesData, context, {
+      return renderMarkdownPanel(props.markdownContent, props.variablesData, context, {
         allLabel: t("dashboard.variableQueryValueSelector.all"),
       });
     });
 
     return {
-      sanitizeMarkdownPanel,
-      marked,
       isDark,
-      processedContent,
+      renderedHtml,
     };
   },
 });

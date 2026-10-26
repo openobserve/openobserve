@@ -418,7 +418,7 @@ fn rollouts_table() -> TableCreateStatement {
         .col(big(R::FromVersion))
         .col(big_not_null(R::ToVersion))
         .col(ColumnDef::new(R::FleetId).string_len(64).not_null())
-        .col(ColumnDef::new(R::Strategy).string_len(16).not_null())
+        .col(ColumnDef::new(R::Strategy).custom(text()).not_null())
         .col(ColumnDef::new(R::Status).string_len(16).not_null())
         .col(ColumnDef::new(R::Phases).custom(text()).not_null())
         .col(ColumnDef::new(R::Failure).custom(text()).null())

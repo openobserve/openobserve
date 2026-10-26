@@ -469,6 +469,21 @@ describe("DashboardQueryBuilder", () => {
       mockUseDashboardPanelData.promqlMode = false;
     });
 
+    it("renders no empty options row for a custom PromQL state timeline", () => {
+      mockUseDashboardPanelData.promqlMode = true;
+      wrapper = createWrapper({
+        "data.type": "state-timeline",
+        "data.queryType": "promql",
+        "data.queries": [{ customQuery: true, query: "up", fields: {}, config: {} }],
+      });
+
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.findComponent({ name: "PromQLBuilderOptions" }).exists()).toBe(false);
+      mockUseDashboardPanelData.promqlMode = false;
+    });
+
     it("shows no Range/Instant selector for an SQL query", () => {
       wrapper = createWrapper();
 

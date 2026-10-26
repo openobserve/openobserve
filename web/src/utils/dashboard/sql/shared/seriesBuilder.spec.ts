@@ -117,6 +117,33 @@ describe("seriesBuilder", () => {
     });
   });
 
+  describe("getSeriesMarkArea", () => {
+    it("puts annotation bands above bars and area fills but below annotation lines", () => {
+      const { getSeriesMarkArea, getAnnotationMarkLine } = createSeriesBuilders({
+        options: { xAxis: [{ data: [] }] },
+        panelSchema: { config: {} },
+        store: { state: { timezone: "UTC", theme: "light" } },
+        missingValueData: [],
+        xAxisKeys: [],
+        yAxisKeys: [],
+        breakDownKeys: [],
+        defaultSeriesProps: {},
+        chartMin: 0,
+        chartMax: 0,
+        dataLookupMap: new Map(),
+        annotations: { value: [] },
+        getMarkLineData: () => [],
+        getAxisDataFromKey: () => [],
+      });
+
+      const band = getSeriesMarkArea();
+      expect(band.z).toBe(4);
+      // ECharts draws a bar at z 2 and a line or area fill at z 3.
+      expect(band.z).toBeGreaterThan(3);
+      expect(getAnnotationMarkLine().zlevel).toBe(1);
+    });
+  });
+
   describe("large mode and value labels", () => {
     const deps = (
       type: string,

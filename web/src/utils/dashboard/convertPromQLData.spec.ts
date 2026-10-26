@@ -1629,33 +1629,83 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.options.yAxis.max).toBe(100); // Max of (100, dataMax) = 100
     });
 
-    it.each(["stacked", "area-stacked"])(
-      "widens a %s y_axis_max that would clip the stack total",
-      async (type) => {
-        const series = (job: string) => ({
-          metric: { job },
-          values: [
-            [1640435200, "70"],
-            [1640438800, "70"],
-          ],
-        });
-        const result = await convertPromQLData(
+    describe("stacked value-axis bounds", () => {
+      const series = (job: string, ...values: string[]) => ({
+        metric: { job },
+        values: values.map((value, i) => [1640435200 + i * 3600, value]),
+      });
+      const run = (type: string, config: object, ...queries: object[][]) =>
+        convertPromQLData(
           {
             id: "panel1",
             type,
-            config: { y_axis_max: 10 },
-            queries: [{ config: { promql_legend: "" } }],
+            config,
+            queries: queries.map(() => ({ config: { promql_legend: "" } })),
           },
-          [{ resultType: "matrix", result: [series("a"), series("b")] }],
+          queries.map((result) => ({ resultType: "matrix", result })),
           mockStore,
           mockChartPanelRef,
           mockHoveredSeriesState,
           mockAnnotations,
         );
 
-        expect(result.options.yAxis.max).toBe(140);
-      },
-    );
+      it.each([
+        ["stacked", "yAxis"],
+        ["area-stacked", "yAxis"],
+        ["h-stacked", "xAxis"],
+      ])("widens a %s y_axis_max that would clip the stack total", async (type, axis) => {
+        const result = await run(type, { y_axis_max: 10 }, [
+          series("a", "70", "70"),
+          series("b", "70", "70"),
+        ]);
+        expect(result.options[axis].max).toBe(140);
+      });
+
+      it("area-stacked: a y_axis_min above the deepest negative stack drops to its sum", async () => {
+        const result = await run("area-stacked", { y_axis_min: -10 }, [
+          series("a", "-70", "-20"),
+          series("b", "-30", "-20"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-100);
+      });
+
+      it("drops a positive y_axis_min to 0 instead of the smallest segment", async () => {
+        const result = await run("stacked", { y_axis_min: 50 }, [
+          series("a", "100"),
+          series("b", "5"),
+        ]);
+        expect(result.options.yAxis.min).toBe(0);
+      });
+
+      it("keeps a y_axis_min that already sits below the stacks", async () => {
+        const result = await run("stacked", { y_axis_min: -20 }, [
+          series("a", "100"),
+          series("b", "5"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-20);
+      });
+
+      it("fits mixed signs: positives and negatives stack apart", async () => {
+        const result = await run("stacked", { y_axis_min: -1, y_axis_max: 1 }, [
+          series("a", "100"),
+          series("b", "-40"),
+          series("c", "60"),
+          series("d", "-30"),
+        ]);
+        expect(result.options.yAxis.min).toBe(-70);
+        expect(result.options.yAxis.max).toBe(160);
+      });
+
+      it("stacks every query of the panel into one total", async () => {
+        const result = await run(
+          "stacked",
+          { y_axis_max: 10 },
+          [series("a", "70")],
+          [series("b", "200")],
+        );
+        expect(result.options.yAxis.max).toBe(270);
+      });
+    });
 
     it("should use getFinalAxisValue with null config values", async () => {
       const panelSchema = {
@@ -3973,6 +4023,31 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     describe("Additional comprehensive coverage tests", () => {
+      it("draws annotation bands above the series, so bars and area fills cannot hide them", async () => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type: "line",
+            config: {},
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { __name__: "m" }, values: [[1640435200, "100"]] }],
+            },
+          ],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const helper = result.options.series.find((s) => s.markArea);
+        expect(helper.markArea.z).toBe(4);
+        expect(helper.markArea.z).toBeGreaterThan(3);
+      });
+
       it("should handle chart with trellis layout enabled", async () => {
         const panelSchema = {
           id: "panel1",
@@ -4925,6 +5000,45 @@ describe("Convert PromQL Data Utils", () => {
       const result = await convert(streamThroughProcessor(40, 6, 100));
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+  });
+
+  describe("heatmap time axis", () => {
+    it("hands the server step to the heatmap so steps without samples still get a column", async () => {
+      const panelSchema = { id: "panel1", type: "heatmap", config: {}, queries: [{ config: {} }] };
+      const searchQueryData = [
+        {
+          result: [
+            {
+              metric: { job: "api" },
+              values: [
+                [60, "1"],
+                [180, "3"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result: any = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        [],
+        { queries: [{ startTime: 0, endTime: 240_000_000 }] },
+        [[{ step: 60_000_000 }]],
+      );
+
+      expect(result.options.xAxis[0].data).toHaveLength(5);
+      expect(result.options.series[0].data.map((cell: any) => cell[2])).toEqual([
+        "-",
+        1,
+        "-",
+        3,
+        "-",
+      ]);
     });
   });
 });

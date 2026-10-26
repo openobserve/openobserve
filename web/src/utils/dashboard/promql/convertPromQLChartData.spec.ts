@@ -257,6 +257,30 @@ describe("convertPromQLChartData", () => {
       expect(result.options.grid.left).toBe(100);
     });
 
+    it("applies axis_width to every grid of a stacked heatmap", async () => {
+      const { processPromQLData } = await import("./shared/dataProcessor");
+      const bucket = (pod: string, le: string, value: string) => ({
+        metric: { pod, le },
+        name: `${pod} ${le}`,
+        data: { 1: value },
+        values: [[1, value]],
+      });
+      vi.mocked(processPromQLData).mockResolvedValueOnce([
+        {
+          series: [bucket("a", "1", "1"), bucket("a", "+Inf", "2"), bucket("b", "1", "3")],
+          timestamps: [[1, "00:00:01"]],
+          queryIndex: 0,
+        },
+      ] as any);
+      mockContext.panelSchema.type = "heatmap";
+      mockContext.panelSchema.config = { axis_width: 100, heatmap_mode: "prometheus_histogram" };
+
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
+
+      expect(result.options.grid).toHaveLength(2);
+      expect(result.options.grid.map((grid: any) => grid.left)).toEqual([100, 100]);
+    });
+
     it("should preserve existing grid configuration when applying axis_width", async () => {
       mockContext.panelSchema.config = {
         axis_width: 100,
@@ -346,6 +370,30 @@ describe("convertPromQLChartData", () => {
 
       expect(result.extras.seriesLimit).toEqual({ shown: 4, total: 8, cap: 4 });
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBeTruthy();
+    });
+
+    it("leaves a histogram heatmap's cut to its own whole-histogram notice", async () => {
+      mockContext.panelSchema = {
+        type: "heatmap",
+        config: { promql_series_limit: 3, heatmap_mode: "prometheus_histogram" },
+        queries: [{ config: {} }],
+      };
+      const buckets: PromQLResponse = {
+        status: "success",
+        data: {
+          resultType: "matrix",
+          result: ["a", "b", "c"].flatMap((pod) =>
+            ["1", "+Inf"].map((le) => ({ metric: { pod, le }, values: [[1, "1"]] })),
+          ),
+        },
+      };
+
+      const result = await convertPromQLChartData([buckets], mockContext);
+
+      expect(result.extras.seriesLimit).toBeUndefined();
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Showing 1 of 3 histograms to stay within the series limit",
+      );
     });
 
     it("says nothing when every series fits", async () => {

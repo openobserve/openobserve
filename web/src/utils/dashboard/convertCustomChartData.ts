@@ -15,6 +15,7 @@
 
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
+import { ref } from "vue";
 
 import { gt } from "@/types/i18n";
 import echartsUrl from "echarts/dist/echarts.min.js?url";
@@ -22,6 +23,9 @@ import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
 // Single-panel refresh targets, each mapped to whether its load has settled; emptied once all have.
 export const panelRefreshTargets = new Map<string, boolean>();
+
+// Bumped when a single-panel refresh ends, so charts that skipped a run meanwhile can replay it.
+export const panelRefreshEpoch = ref(0);
 
 // import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
 const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
@@ -49,7 +53,10 @@ export const isSkippedByPanelRefresh = (panelId: string | undefined) =>
 export const settlePanelRefresh = (panelId: string | undefined) => {
   if (!panelId || !panelRefreshTargets.has(panelId)) return;
   panelRefreshTargets.set(panelId, true);
-  if ([...panelRefreshTargets.values()].every(Boolean)) panelRefreshTargets.clear();
+  if ([...panelRefreshTargets.values()].every(Boolean)) {
+    panelRefreshTargets.clear();
+    panelRefreshEpoch.value++;
+  }
 };
 
 /** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
@@ -82,6 +89,7 @@ export const runJavaScriptCode = (
     // Generate a nonce
     const nonce = Math.random().toString(36).substring(2);
     const fnTag = `__o2_fn_${randomHex()}`;
+    const readyToken = randomHex();
     const trusted = trustedCustomChartCode.has(userCode);
 
     // The sandbox iframe has no access to the app's i18n instance, so the messages it
@@ -128,10 +136,20 @@ export const runJavaScriptCode = (
     window.addEventListener('message', (event) => {
       // A sibling custom-chart frame can post here too; only the parent may hand over code.
       if (event.source !== parent || executed) return;
-      if (event.data.type === 'execute') {
+      if (event.data && event.data.type === 'connect' && event.ports && event.ports[0]) {
         executed = true;
+        const port = event.ports[0];
+        port.onmessage = (portEvent) => {
+          port.close();
+          execute(portEvent.data);
+        };
+      }
+    });
+
+    function execute(payload) {
+      if (payload && payload.type === 'execute') {
         try {
-          const data = JSON.parse(event.data.data);
+          const data = JSON.parse(payload.data);
           const deepFreeze = (obj) => {
             if (typeof obj === 'object' && obj !== null) {
               Object.values(obj).forEach(deepFreeze);
@@ -139,9 +157,8 @@ export const runJavaScriptCode = (
             }
             return obj;
           };
-          const context = deepFreeze(JSON.parse(event.data.context || '{}'));
-          const userCode = event.data.code.trim();
-          const fnTag = event.data.fnTag;
+          const context = deepFreeze(JSON.parse(payload.context || '{}'));
+          const fnTag = payload.fnTag;
 
           const convertFunctionsToString = (obj) => {
             if (typeof obj === 'function') {
@@ -192,44 +209,71 @@ export const runJavaScriptCode = (
           parent.postMessage({ type: 'error', message: error.message }, '*');
         }
       }
-    });
+    }
+
+    parent.postMessage({ type: 'ready', token: '${readyToken}' }, '*');
   </script>
     `;
 
     iframe.srcdoc = scriptContent;
 
+    const channel = new MessageChannel();
+    let connected = false;
+
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
+      const type = event.data?.type;
 
-      window.removeEventListener("message", handler);
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 2000);
-
-      if (event.data.type === "success") {
-        try {
-          resolve(rehydrateFunctions(JSON.parse(event.data.result), fnTag, trusted));
-        } catch (error) {
-          reject(error);
-        }
-      } else if (event.data.type === "error") {
-        console.error("Error executing code", event.data.message);
-        reject(new Error(event.data.message));
-      }
-    });
-
-    iframe.onload = () => {
-      iframe?.contentWindow?.postMessage(
-        {
+      if (type === "ready") {
+        // The token is known only to the srcdoc written above, which sends it before any chart code runs.
+        if (connected || event.data.token !== readyToken) return;
+        connected = true;
+        // An opaque-origin frame only accepts "*", so the payload goes over a port bound to this document.
+        iframe.contentWindow?.postMessage({ type: "connect" }, "*", [channel.port2]);
+        channel.port1.postMessage({
           type: "execute",
           code: userCode,
           fnTag,
           data: JSON.stringify(searchQueryData),
           context: JSON.stringify(context ?? {}),
-        },
-        "*",
-      );
-    };
+        });
+        return;
+      }
+      if (type !== "error" && (type !== "success" || !connected)) return;
+
+      window.removeEventListener("message", handler);
+      channel.port1.close();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 2000);
+
+      if (type === "success") {
+        try {
+          const dropped = { count: 0 };
+          const options = rehydrateFunctions(
+            JSON.parse(event.data.result),
+            fnTag,
+            trusted,
+            dropped,
+          );
+          if (dropped.count) {
+            console.warn(
+              gt(
+                "dashboard.utils.customChartCallbacksDropped",
+                { count: dropped.count },
+                dropped.count,
+              ),
+            );
+          }
+          resolve(options);
+        } catch (error) {
+          reject(error);
+        }
+      } else {
+        console.error("Error executing code", event.data.message);
+        reject(new Error(event.data.message));
+      }
+    });
   });
 };
 
@@ -354,27 +398,40 @@ export const validateUserCode = (code: string): string | null => {
   }
 };
 
-/** Marks first-party chart code (curated packs) whose function callbacks may run in the app. */
+/** Marks first-party chart code (curated packs, bundled templates) whose function callbacks may run in the app. */
 export const trustCustomChartCode = (code: string): string => {
   trustedCustomChartCode.add(code);
   return code;
 };
 
-/** Turns sandbox-tagged functions back into callables for trusted code; drops them otherwise. */
-export const rehydrateFunctions = (value: unknown, fnTag: string, trusted: boolean): unknown => {
+export const isTrustedCustomChartCode = (code: string): boolean => trustedCustomChartCode.has(code);
+
+/** Turns sandbox-tagged functions back into callables for trusted code; drops them otherwise, counting each in `dropped`. */
+export const rehydrateFunctions = (
+  value: unknown,
+  fnTag: string,
+  trusted: boolean,
+  dropped: { count: number } = { count: 0 },
+): unknown => {
   if (Array.isArray(value)) {
-    return value.map((item) => rehydrateFunctions(item, fnTag, trusted));
+    return value.map((item) => rehydrateFunctions(item, fnTag, trusted, dropped));
   }
   if (typeof value !== "object" || value === null) {
     return value;
   }
   if (Object.prototype.hasOwnProperty.call(value, fnTag)) {
     const source = (value as Record<string, unknown>)[fnTag];
-    if (!trusted || typeof source !== "string") return undefined;
+    if (!trusted || typeof source !== "string") {
+      dropped.count++;
+      return undefined;
+    }
     return new Function(`return ${source}`)();
   }
   return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => [key, rehydrateFunctions(child, fnTag, trusted)]),
+    Object.entries(value).map(([key, child]) => [
+      key,
+      rehydrateFunctions(child, fnTag, trusted, dropped),
+    ]),
   );
 };
 

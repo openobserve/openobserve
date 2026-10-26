@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { fitAxisBoundsToStacks, stackTotalRows } from "./stackTotals";
+import { fitAxisBoundsToStacks, fitStackedAxisBounds, stackTotalRows } from "./stackTotals";
 import { createSeriesOverrideLookup, toSeriesOverrideEntry } from "./seriesOverrides";
 import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
@@ -213,6 +213,37 @@ const stackRows = (xs: string[]) =>
   ]);
 const indexOf = (options: any, name: string) =>
   options.series.findIndex((s: any) => s.name === name);
+const runShiftedSQL = async (
+  panel: ReturnType<typeof sqlPanel>,
+  current: ReturnType<typeof stackRows>,
+  past: ReturnType<typeof stackRows>,
+) => {
+  const result = await convertMultiSQLData(
+    panel,
+    [current, past],
+    store,
+    panelRef(),
+    { value: null },
+    { value: [[], []] },
+    {
+      queries: [
+        { seconds: 0, periodAsStr: "" },
+        { seconds: 86400, periodAsStr: "1 day ago" },
+      ].map((timeRangeGap) => ({
+        query: "SELECT 1",
+        startTime: 1704067200000000,
+        endTime: 1704068400000000,
+        timeRangeGap,
+        panelQueryIndex: 0,
+      })),
+    },
+    { height: "400px" },
+    { value: [] },
+    false,
+  );
+  return result.options;
+};
+const tall = () => stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 * 4 }));
 
 describe("tooltip totals in rendered options", () => {
   it.each(["stacked", "h-stacked"])("SQL %s on categories", async (type) => {
@@ -382,10 +413,40 @@ describe("tooltip totals in rendered options", () => {
     const html = options.tooltip.formatter([point("api", 200), point("web", 300)]);
     expect(html).toContain("<strong>Total : 500ms</strong>");
   });
+
+  it("area-stacked time shift: the tooltip totals each period apart", async () => {
+    const options = await runShiftedSQL(
+      sqlPanel("area-stacked", endpointX),
+      stackRows(["/a", "/b"]),
+      tall(),
+    );
+    const point = (name: string, value: number) => ({
+      seriesName: name,
+      seriesIndex: indexOf(options, name),
+      name: "/a",
+      marker: "",
+      value,
+      data: value,
+    });
+    const html = options.tooltip.formatter([
+      point("api", 200),
+      point("web", 300),
+      point("api (1 day ago)", 800),
+      point("web (1 day ago)", 1200),
+    ]);
+    expect(html).toContain("<strong>Total : 500ms</strong>");
+    expect(html).toContain("<strong>Total (1 day ago) : 2s</strong>");
+    expect(html).not.toContain(": 2.5s");
+  });
 });
 
+interface Bounds {
+  min?: number;
+  max?: number;
+}
+
 describe("fitAxisBoundsToStacks", () => {
-  const fit = (yAxis: any, series: any[]) => {
+  const fit = (yAxis: Bounds, series: object[]) => {
     const options = { yAxis, series };
     fitAxisBoundsToStacks(options);
     return options.yAxis;
@@ -453,10 +514,78 @@ describe("fitAxisBoundsToStacks", () => {
   it("leaves unset bounds alone", () => {
     expect(fit({}, [{ name: "a", stack: "s", data: [500] }])).toEqual({});
   });
+
+  it("drops a positive user min to the 0 baseline, not to the smallest segment", () => {
+    const series = [
+      { name: "a", stack: "s", data: [100, 120] },
+      { name: "b", stack: "s", data: [5, 15] },
+    ];
+    expect(fit({ min: 50 }, series).min).toBe(0);
+  });
+
+  it("keeps a user min at or below the baseline of positive stacks", () => {
+    const series = [
+      { name: "a", stack: "s", data: [100] },
+      { name: "b", stack: "s", data: [5] },
+    ];
+    expect(fit({ min: -20 }, series).min).toBe(-20);
+    expect(fit({ min: 0 }, series).min).toBe(0);
+  });
+
+  it("raises a negative user max to the 0 baseline of negative stacks", () => {
+    const series = [
+      { name: "a", stack: "s", data: [-100] },
+      { name: "b", stack: "s", data: [-5] },
+    ];
+    expect(fit({ min: -10, max: -50 }, series)).toEqual({ min: -105, max: 0 });
+  });
+
+  it("leaves the bounds alone when no point has a value", () => {
+    expect(fit({ min: 50, max: 10 }, [{ name: "a", stack: "s", data: [null, "-"] }])).toEqual({
+      min: 50,
+      max: 10,
+    });
+  });
+});
+
+describe("fitStackedAxisBounds", () => {
+  const series = [
+    { name: "a", stack: "s", data: [200] },
+    { name: "b", stack: "s", data: [300] },
+  ];
+
+  it("fits the x axis of h-stacked, where the values sit", () => {
+    const options = { xAxis: { max: 100 }, yAxis: { max: 1 }, series };
+    fitStackedAxisBounds("h-stacked", options);
+    expect(options.xAxis.max).toBe(500);
+    expect(options.yAxis.max).toBe(1);
+  });
+
+  it("fits the y axis of stacked", () => {
+    const options = { yAxis: { max: 100 }, series };
+    fitStackedAxisBounds("stacked", options);
+    expect(options.yAxis.max).toBe(500);
+  });
+
+  it("keeps a positive area-stacked min, since an area may be zoomed above 0", () => {
+    const options = { yAxis: { min: 50, max: 100 }, series };
+    fitStackedAxisBounds("area-stacked", options);
+    expect(options.yAxis).toEqual({ min: 50, max: 500 });
+  });
+
+  it("leaves other chart types alone", () => {
+    const options = { yAxis: { max: 100 }, series };
+    fitStackedAxisBounds("bar", options);
+    expect(options.yAxis.max).toBe(100);
+  });
 });
 
 describe("SQL stacked y-axis bounds", () => {
-  const withBounds = (type: string, x: any, bounds: any) => {
+  const withBounds = (
+    type: string,
+    x: Parameters<typeof sqlPanel>[1],
+    bounds: { y_axis_min?: number; y_axis_max?: number },
+  ) => {
     const panel = sqlPanel(type, x);
     panel.config = { ...panel.config, ...bounds };
     return panel;
@@ -480,6 +609,22 @@ describe("SQL stacked y-axis bounds", () => {
       expect(options.yAxis.min).toBe(-500);
     },
   );
+
+  it("stacked: a positive y min above the stack baseline drops to 0", async () => {
+    const options = await runSQL(
+      withBounds("stacked", endpointX, { y_axis_min: 50 }),
+      stackRows(["/a", "/b"]),
+    );
+    expect(options.yAxis.min).toBe(0);
+  });
+
+  it("h-stacked: a y max below the stack top rises to the stack sum on the x axis", async () => {
+    const options = await runSQL(
+      withBounds("h-stacked", endpointX, { y_axis_max: 100 }),
+      stackRows(["/a", "/b"]),
+    );
+    expect(options.xAxis.max).toBe(500);
+  });
 
   it.each(["stacked", "area-stacked"])(
     "%s without user bounds keeps the automatic extent",
@@ -510,7 +655,7 @@ describe("SQL stacked y-axis bounds", () => {
     const panel = withBounds("stacked", endpointX, { y_axis_max: 100 });
     panel.queries = [panel.queries[0], panel.queries[0]];
     const tall = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 * 4 }));
-    const result: any = await convertMultiSQLData(
+    const result = await convertMultiSQLData(
       panel,
       [stackRows(["/a", "/b"]), tall],
       store,
@@ -533,34 +678,6 @@ describe("SQL stacked y-axis bounds", () => {
     expect(result.options.yAxis.max).toBe(2000);
   });
 
-  const runShiftedSQL = async (panel: any, current: any[], past: any[]) => {
-    const result: any = await convertMultiSQLData(
-      panel,
-      [current, past],
-      store,
-      panelRef(),
-      { value: null },
-      { value: [[], []] },
-      {
-        queries: [
-          { seconds: 0, periodAsStr: "" },
-          { seconds: 86400, periodAsStr: "1 day ago" },
-        ].map((timeRangeGap) => ({
-          query: "SELECT 1",
-          startTime: 1704067200000000,
-          endTime: 1704068400000000,
-          timeRangeGap,
-          panelQueryIndex: 0,
-        })),
-      },
-      { height: "400px" },
-      { value: [] },
-      false,
-    );
-    return result.options;
-  };
-  const tall = () => stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 * 4 }));
-
   it("area-stacked time shift: the past period's stack lifts the bound on its own, never on top", async () => {
     const options = await runShiftedSQL(
       withBounds("area-stacked", endpointX, { y_axis_max: 100 }),
@@ -570,28 +687,20 @@ describe("SQL stacked y-axis bounds", () => {
     expect(options.yAxis.max).toBe(2000);
   });
 
-  it("area-stacked time shift: the tooltip totals each period apart", async () => {
+  it("area-stacked time shift: a positive y min the stacks clear stays", async () => {
+    const current = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 + 60 }));
+    const past = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: 10 }));
     const options = await runShiftedSQL(
-      sqlPanel("area-stacked", endpointX),
-      stackRows(["/a", "/b"]),
-      tall(),
+      withBounds("area-stacked", endpointX, { y_axis_min: 50 }),
+      current,
+      past,
     );
-    const point = (name: string, value: number) => ({
-      seriesName: name,
-      seriesIndex: indexOf(options, name),
-      name: "/a",
-      marker: "",
-      value,
-      data: value,
-    });
-    const html = options.tooltip.formatter([
-      point("api", 200),
-      point("web", 300),
-      point("api (1 day ago)", 800),
-      point("web (1 day ago)", 1200),
-    ]);
-    expect(html).toContain("<strong>Total : 500ms</strong>");
-    expect(html).toContain("<strong>Total (1 day ago) : 2s</strong>");
-    expect(html).not.toContain(": 2.5s");
+    expect(options.yAxis.min).toBe(50);
+  });
+
+  it("area-stacked on time: a y min above the deepest negative stack drops to its sum", async () => {
+    const rows = stackRows(TIMES).map((row) => ({ ...row, y_axis_1: -row.y_axis_1 }));
+    const options = await runSQL(withBounds("area-stacked", timeX, { y_axis_min: -10 }), rows);
+    expect(options.yAxis.min).toBe(-500);
   });
 });

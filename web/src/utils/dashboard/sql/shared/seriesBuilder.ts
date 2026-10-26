@@ -17,6 +17,7 @@ import { getDataValue } from "../../aliasUtils";
 import { getSeriesColor, getAreaStyleOverride } from "../../colorPalette";
 import { getFieldLabel } from "../../fieldLabel";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
 import { chartColor, CHART_SELECTION_FILL } from "@/utils/chartTheme";
 
@@ -134,6 +135,8 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       itemStyle: {
         color: CHART_SELECTION_FILL,
       },
+      // ECharts draws markArea at z 1, under bars (z 2) and line/area fills (z 3); bands must sit on top.
+      z: ANNOTATION_MARK_AREA_Z,
       data: markAreas,
     };
   };

@@ -24,6 +24,10 @@ const TARGETABLE_TAGS = new Set(["A", "AREA", "FORM"]);
 
 const refusedIframes = new WeakSet<Element>();
 
+const ESCAPED_VALUE_ENTITY = /&(?:(amp|lt|gt|quot)|#(\d+));/g;
+
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"' };
+
 type ScopableRule = CSSRule & { selectorText?: string; cssRules?: CSSRuleList };
 
 // A private instance keeps the iframe hook out of every other sanitize call in the app.
@@ -57,7 +61,9 @@ export const sanitizeHtmlPanel = (
   });
 
   fragment.querySelectorAll("style").forEach((styleEl) => {
-    styleEl.textContent = escapeStyleText(scopeCss(styleEl.textContent || "", prefix));
+    styleEl.textContent = escapeStyleText(
+      scopeCss(decodeEscapedValues(styleEl.textContent || ""), prefix),
+    );
   });
 
   fragment.querySelectorAll("iframe").forEach((frame) => {
@@ -69,6 +75,12 @@ export const sanitizeHtmlPanel = (
 
   return fragment;
 };
+
+// style text is raw, so values escaped by escapeHtmlValue would otherwise stay as literal entities in the CSS
+const decodeEscapedValues = (cssText: string): string =>
+  cssText.replace(ESCAPED_VALUE_ENTITY, (_, name, code) =>
+    name ? NAMED_ENTITIES[name] : String.fromCharCode(Number(code)),
+  );
 
 const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
   for (const rule of Array.from(rules ?? []) as ScopableRule[]) {
@@ -82,18 +94,20 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
             : `${prefix} ${trimmed}`;
         })
         .join(", ");
-    } else if (
-      (rule?.type === CSSRule.MEDIA_RULE || rule?.type === CSSRule.SUPPORTS_RULE) &&
-      rule.cssRules
-    ) {
+    } else if (rule?.cssRules) {
+      // any grouping rule (@media, @supports, @layer, @container, ...) would otherwise apply page-wide
       prefixSelectors(rule.cssRules, prefix);
     }
   }
 };
 
+// prototype getter: a form control named "nodeName" shadows the form's own property
+const readNodeName = (node: Node): string =>
+  String(Object.getOwnPropertyDescriptor(Node.prototype, "nodeName")?.get?.call(node) ?? "");
+
 // a named target could steer a link or form into a panel iframe, past the embed origin check
 const keepOnlyBlankTarget = (node: Element): void => {
-  if (!TARGETABLE_TAGS.has(node.nodeName.toUpperCase())) return;
+  if (!TARGETABLE_TAGS.has(readNodeName(node).toUpperCase())) return;
   // prototype calls: a form control named e.g. "getAttribute" shadows the form's own method
   const target = Element.prototype.getAttribute.call(node, "target");
   if (target === null) return;

@@ -23,9 +23,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { TONE_PILL } from "./k8sTone";
 import type { DetailsRef } from "./kubernetesUrlState";
 import {
-  TONE_TEXT_CLASS,
   chipLabel,
   formatBytes,
   formatCores,
@@ -202,9 +203,14 @@ const openNode = (p: PodRow) =>
       <span v-else class="tabular-nums">{{ raw(r.format(r.used(row))) }}</span>
     </template>
     <template #cell-status="{ row }">
-      <span :class="TONE_TEXT_CLASS[toneOf(row.status?.variant)]">{{
-        row.status ? chipLabel(row.status, t) : raw("—")
-      }}</span>
+      <OTag
+        v-if="row.status"
+        size="xs"
+        :variant="TONE_PILL[toneOf(row.status.variant)].variant"
+        :icon="TONE_PILL[toneOf(row.status.variant)].icon"
+        >{{ chipLabel(row.status, t) }}</OTag
+      >
+      <span v-else>{{ raw("—") }}</span>
     </template>
   </OTable>
 </template>

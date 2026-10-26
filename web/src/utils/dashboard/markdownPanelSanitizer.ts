@@ -15,6 +15,8 @@
 
 import DOMPurify from "dompurify";
 
+const LINK_TAGS = new Set(["a", "area"]);
+
 // A private instance keeps the link hook out of every other sanitize call in the app.
 export const markdownPanelPurifier = DOMPurify(window);
 
@@ -29,15 +31,25 @@ export const isCrossOriginLink = (href: string, pageHref: string): boolean => {
   }
 };
 
-/** DOMPurify's defaults still strip an authored `target`, so only the hook decides where a link opens. */
-export const sanitizeMarkdownPanel = (html: string): string => markdownPanelPurifier.sanitize(html);
+/** Sanitize rendered Markdown HTML without `<style>`, which would restyle the whole app; an authored `target` is still stripped, so only the hook decides where a link opens. */
+export const sanitizeMarkdownPanel = (html: string): string =>
+  markdownPanelPurifier.sanitize(html, { FORBID_TAGS: ["style"] });
+
+// Authored tokens such as nofollow survive; "opener" would undo the new-tab protection.
+const withNoopener = (rel: string | null): string => {
+  const tokens = (rel ?? "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((token) => token && token !== "opener");
+  return [...new Set([...tokens, "noopener", "noreferrer"])].join(" ");
+};
 
 markdownPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
   // localName, since an SVG anchor's nodeName is lowercase
-  if (node.localName !== "a") return;
+  if (!LINK_TAGS.has(node.localName)) return;
   const href = node.getAttribute("href") || node.getAttribute("xlink:href");
   if (href && isCrossOriginLink(href, window.location.href)) {
     node.setAttribute("target", "_blank");
-    node.setAttribute("rel", "noopener noreferrer");
+    node.setAttribute("rel", withNoopener(node.getAttribute("rel")));
   }
 });

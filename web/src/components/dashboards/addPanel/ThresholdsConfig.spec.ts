@@ -57,6 +57,7 @@ vi.mock("@/utils/chartTheme", async (importOriginal) => {
 });
 
 import ThresholdsConfig from "./ThresholdsConfig.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
@@ -512,6 +513,11 @@ describe("ThresholdsConfig", () => {
   });
 
   describe("Show as", () => {
+    it("shows no stacked hint on unstacked charts", () => {
+      mountConfig({ chartType: "line", modelValue: twoSteps });
+      expect(find("dashboard-config-thresholds-show-as-info").exists()).toBe(false);
+    });
+
     it.each(["line", "area", "bar", "h-bar", "scatter"])(
       "offers four choices on %s",
       async (chartType) => {
@@ -524,7 +530,8 @@ describe("ThresholdsConfig", () => {
       "offers only Limit line and Shaded band on %s, with the hint",
       async (chartType) => {
         mountConfig({ chartType, modelValue: twoSteps });
-        expect(find("dashboard-config-thresholds").text()).toContain(
+        expect(find("dashboard-config-thresholds-show-as-info").exists()).toBe(true);
+        expect(wrapper!.findComponent(OTooltip).props("content")).toBe(
           "Stacked charts are not recolored; limits are drawn as lines or bands.",
         );
         expect(await selectOptions()).toEqual(["line", "color_band"]);

@@ -111,7 +111,9 @@ function statusLine(cls: StatusClass | "noData", text: string) {
 }
 
 function fillText(row: PodRow, fill: Exclude<MapFill, "status">, t: TranslateFn): string {
-  if (fillClass(row, fill) === "noData") return t("infra.k8s2.mapNoData");
+  const cls = fillClass(row, fill);
+  if (cls === "notRunning") return t("infra.k8s2.mapNotRunning");
+  if (cls === "noData") return t("infra.k8s2.mapNoData");
   const value = fillValue(row, fill);
   return fill === "restarts" ? String(value) : formatPct(value);
 }

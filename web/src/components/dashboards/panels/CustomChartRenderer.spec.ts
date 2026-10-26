@@ -458,6 +458,27 @@ describe("CustomChartRenderer", () => {
       expect(lastOption().backgroundColor).toBe("transparent");
     });
 
+    it("colours unstyled series from the panel palette in dark mode, keeping a palette the code sets", async () => {
+      const { getColorPalette } = await import("@/utils/dashboard/colorPalette");
+      store.state.theme = "dark";
+
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      expect(lastOption().color).toEqual(getColorPalette());
+      wrapper.unmount();
+
+      wrapper = createWrapper({ data: { ...mockChartData, color: ["red"] } });
+      await waitForChartInit(wrapper);
+      expect(lastOption().color).toEqual(["red"]);
+    });
+
+    it("leaves the series palette to the chart in light mode", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(lastOption()).not.toHaveProperty("color");
+    });
+
     it("re-creates the instance in the new theme when the theme changes", async () => {
       const echarts = await import("echarts");
       wrapper = createWrapper();

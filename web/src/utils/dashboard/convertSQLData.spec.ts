@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertMultiSQLData, convertSQLData } from "@/utils/dashboard/convertSQLData";
+import { calculateGridPositions } from "@/utils/dashboard/calculateGridForSubPlot";
 
 // Mock external dependencies
 vi.mock("date-fns-tz", () => ({
@@ -11075,5 +11076,308 @@ describe("convertSQLData", () => {
       const result = await render(panel, rows);
       expect(result.options.xAxis[0].data).toHaveLength(10);
     });
+  });
+});
+
+describe("multi-query heatmap pinned colour range", () => {
+  const store = { state: { theme: "light", zoConfig: { max_dashboard_series: 100 } } };
+  const query = () => ({
+    customQuery: true,
+    fields: {
+      x: [{ alias: "x" }],
+      y: [{ alias: "y" }],
+      z: [{ alias: "z" }],
+      breakdown: [],
+    },
+  });
+  const searchData = [
+    [
+      { x: "a", y: "r", z: 5 },
+      { x: "b", y: "r", z: 20 },
+    ],
+    [
+      { x: "a", y: "r", z: 40 },
+      { x: "b", y: "r", z: 80 },
+    ],
+  ];
+
+  const render = (config: Record<string, any>) => {
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+    return convertMultiSQLData(
+      { type: "heatmap", config: { decimals: 2, ...config }, queries: [query(), query()] },
+      searchData,
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      {},
+      { value: [[{}], [{}]] },
+      { queries: [{}, {}] },
+      {},
+      [],
+    );
+  };
+
+  it("keeps the shared automatic range when nothing is pinned", async () => {
+    const { visualMap } = (await render({})).options;
+    expect([visualMap.min, visualMap.max]).toEqual([0, 80]);
+  });
+
+  it("replaces the shared range with both pins", async () => {
+    const { visualMap } = (await render({ heatmap_color_min: 10, heatmap_color_max: 30 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([10, 30]);
+  });
+
+  it("pins only the max over the shared automatic min", async () => {
+    const { visualMap } = (await render({ heatmap_color_max: 30 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([0, 30]);
+  });
+
+  it("keeps a min pin that one query alone would reject", async () => {
+    // 50 is above query 0's own max of 20 but below the shared max of 80.
+    const { visualMap } = (await render({ heatmap_color_min: 50 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([50, 80]);
+  });
+
+  it("ignores an inverted pair and uses the shared automatic range", async () => {
+    const { visualMap } = (await render({ heatmap_color_min: 30, heatmap_color_max: 10 })).options;
+    expect([visualMap.min, visualMap.max]).toEqual([0, 80]);
+  });
+
+  it("keeps real values in every query's cells", async () => {
+    const { series } = (await render({ heatmap_color_max: 30 })).options;
+    expect(series[1].data.map((cell: any) => cell[2])).toEqual([40, 80]);
+  });
+
+  it("colours every tile from one palette and scale over the shared range", async () => {
+    const { visualMap } = (await render({ heatmap_palette: "viridis", heatmap_color_scale: "log" }))
+      .options;
+    // The log floor is the smallest positive cell of any query: query 0's 5.
+    expect([visualMap.min, visualMap.max]).toEqual([5, 80]);
+    expect(visualMap.inRange.color[0]).toBe("#440154");
+    expect(visualMap.inRange.color.at(-1)).toBe("#fde725");
+  });
+});
+
+describe("multi-query heatmap tiles", () => {
+  const store = { state: { theme: "light", zoConfig: { max_dashboard_series: 100 } } };
+  const query = () => ({
+    customQuery: true,
+    fields: {
+      x: [{ alias: "x" }],
+      y: [{ alias: "y" }],
+      z: [{ alias: "z" }],
+      breakdown: [],
+    },
+  });
+
+  const render = (searchData: any[]) => {
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+    return convertMultiSQLData(
+      { type: "heatmap", config: { decimals: 2 }, queries: [query(), query()] },
+      searchData,
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      {},
+      { value: [[{}], [{}]] },
+      { queries: [{}, {}] },
+      {},
+      [],
+    );
+  };
+
+  it("colours all-negative tiles over their negative range", async () => {
+    const { visualMap } = (
+      await render([
+        [
+          { x: "a", y: "r", z: -5 },
+          { x: "b", y: "r", z: -20 },
+        ],
+        [
+          { x: "a", y: "r", z: -40 },
+          { x: "b", y: "r", z: -2 },
+        ],
+      ])
+    ).options;
+    expect([visualMap.min, visualMap.max]).toEqual([-40, -2]);
+  });
+
+  it("hands drilldowns each tile's raw row values by its y axis", async () => {
+    const result: any = await render([[{ x: "a", y: "", z: 1 }], [{ x: "a", y: "r2", z: 1 }]]);
+    expect(result.extras.heatmapRowValues).toEqual([[""], ["r2"]]);
+  });
+
+  it("surfaces a later tile's duplicate-row warning on the panel", async () => {
+    const result: any = await render([
+      [{ x: "a", y: "r", z: 1 }],
+      [
+        { x: "a", y: "r", z: 1 },
+        { x: "a", y: "r", z: 2 },
+      ],
+    ]);
+    expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+      "Duplicate (x, y) rows found: 1; each affected cell shows the first row's value",
+    );
+  });
+});
+
+describe("heatmap drag-to-zoom and cursor sync", () => {
+  const store = {
+    state: {
+      theme: "light",
+      timezone: "UTC",
+      zoConfig: { max_dashboard_series: 100, timestamp_column: "_timestamp" },
+    },
+  };
+  const builderQuery = () => ({
+    customQuery: false,
+    fields: {
+      x: [{ alias: "x", functionName: "histogram", args: [{ value: { field: "_timestamp" } }] }],
+      y: [{ alias: "y" }],
+      z: [{ alias: "z" }],
+      breakdown: [],
+    },
+  });
+  const customQuery = () => ({ ...builderQuery(), customQuery: true });
+  const rows = [
+    { x: "2024-01-15T10:00:00", y: "r", z: 1 },
+    { x: "2024-01-15T10:01:00", y: "r", z: 2 },
+  ];
+  const range = {
+    startTime: Date.parse("2024-01-15T10:00:00Z") * 1000,
+    endTime: Date.parse("2024-01-15T10:02:00Z") * 1000,
+  };
+  const render = (query: any, resultMetaData: any = [{ histogram_interval: 60 }]) =>
+    convertSQLData(
+      { type: "heatmap", config: {}, queries: [query] },
+      [rows],
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      { value: null },
+      resultMetaData,
+      { queries: [range] },
+      {},
+      [],
+    );
+
+  it("zooms and syncs a builder heatmap whose x is histogram(_timestamp)", async () => {
+    const result: any = await render(builderQuery());
+    expect(result.options.toolbox.show).toBe(true);
+    expect(result.extras.isTimeSeries).toBe(true);
+    // The bucket starting at the range end is drawn too, as the filled x axis has always done.
+    expect(result.extras.heatmapTimeAxis.columns).toHaveLength(3);
+  });
+
+  it("keeps a heatmap with a categorical x without zoom or sync", async () => {
+    const result: any = await render(customQuery());
+    expect(result.options.toolbox.show).toBe(false);
+    expect(result.extras.isTimeSeries).toBe(false);
+    expect(result.extras.heatmapTimeAxis).toBeUndefined();
+  });
+
+  it("keeps a builder histogram heatmap without a known interval without zoom", async () => {
+    const result: any = await render(builderQuery(), [{}]);
+    expect(result.options.toolbox.show).toBe(false);
+    expect(result.extras.heatmapTimeAxis).toBeUndefined();
+  });
+
+  it("drops zoom and sync from heatmap tiles whose columns differ", async () => {
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+    const result: any = await convertMultiSQLData(
+      { type: "heatmap", config: {}, queries: [builderQuery(), builderQuery()] },
+      [rows, rows],
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      { value: null },
+      { value: [[{ histogram_interval: 60 }], [{ histogram_interval: 30 }]] },
+      { queries: [range, range] },
+      {},
+      [],
+    );
+    expect(result.extras.heatmapTimeAxis).toBeUndefined();
+    expect(result.extras.isTimeSeries).toBe(false);
+    expect(result.options.toolbox.show).toBe(false);
+  });
+});
+
+describe("multi-query heatmap tiles share one cell budget", () => {
+  const store = { state: { theme: "light", zoConfig: { max_dashboard_series: 100 } } };
+  const query = () => ({
+    customQuery: true,
+    fields: { x: [{ alias: "x" }], y: [{ alias: "y" }], z: [{ alias: "z" }], breakdown: [] },
+  });
+  const grid = () =>
+    vi.mocked(calculateGridPositions).mockReturnValueOnce({
+      gridArray: [
+        { left: "0%", top: "0%", width: "50%", height: "100%" },
+        { left: "50%", top: "0%", width: "50%", height: "100%" },
+      ],
+      gridWidth: 400,
+      gridHeight: 400,
+      gridNoOfRow: 1,
+      gridNoOfCol: 2,
+    } as any);
+  const render = (searchData: any[]) => {
+    grid();
+    return convertMultiSQLData(
+      { type: "heatmap", config: { decimals: 2 }, queries: [query(), query()] },
+      searchData,
+      store,
+      { value: { offsetWidth: 800, offsetHeight: 400 } },
+      {},
+      { value: [[{}], [{}]] },
+      { queries: [{}, {}] },
+      {},
+      [],
+    );
+  };
+
+  it("cuts each tile to half the budget, so the panel stays within it", async () => {
+    const tile = Array.from({ length: 300 }, (_u, row) =>
+      Array.from({ length: 100 }, (_v, col) => ({ x: `c${col}`, y: `r${row}`, z: 1 })),
+    ).flat();
+    const result: any = await render([tile, tile]);
+    const cells = result.options.series.map((series: any) => series.data.length);
+    expect(cells.every((count: number) => count <= 25_000)).toBe(true);
+    expect(cells.reduce((sum: number, count: number) => sum + count, 0)).toBeLessThanOrEqual(
+      50_000,
+    );
+  });
+
+  it("labels a hovered cell from its own tile's y axis when an earlier tile is empty", async () => {
+    const result: any = await render([[], [{ x: "a", y: "row-b", z: 5 }]]);
+    expect(result.options.series).toHaveLength(1);
+    const text = result.options.tooltip.formatter({
+      seriesIndex: 0,
+      value: [0, 0, 5],
+      name: "a",
+      marker: "",
+    });
+    expect(text).toContain("row-b");
   });
 });

@@ -2,6 +2,14 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export const VARIABLE_FORMATS = ["csv", "pipe", "doublequote", "singlequote"] as const;
 
+const HTML_ENTITIES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
 export type VariableFormat = (typeof VARIABLE_FORMATS)[number];
 
 // Text panels only: queries and drilldown would parse these and fall back to SQL quoting.
@@ -10,6 +18,13 @@ const CONTENT_VARIABLE_FORMATS = [...VARIABLE_FORMATS, "percentencode", "querypa
 type ContentVariableFormat = (typeof CONTENT_VARIABLE_FORMATS)[number];
 
 const QUERY_VALUE_PREFIX = /(?:[?&]|&amp;)[\w.-]+=$/;
+
+type TimeBound = Date | number | string | null;
+
+interface ContentVariable {
+  name?: string;
+  [key: string]: unknown;
+}
 
 export interface VariablePlaceholder<F extends string = VariableFormat> {
   name: string;
@@ -341,15 +356,20 @@ export const getVariablesReferencedInQueries = (
   return candidates.filter((it: any) => referenced.has(it.name));
 };
 
-/**
- * Appends `start_time` / `end_time` (the drilldown names and unit) for text panels, unless a dashboard variable already uses the name.
- */
-export const withTimeRangeVariables = (variablesData: any, timeObj: any) => {
+/** Escape a value for HTML text or any attribute; whitespace is encoded too, so an unquoted attribute cannot gain new ones. */
+export const escapeHtmlValue = (value: string): string =>
+  value.replace(/[&<>"'`=\s]/g, (ch) => HTML_ENTITIES[ch] ?? `&#${ch.charCodeAt(0)};`);
+
+/** Appends `start_time` / `end_time` (the drilldown names and unit) for text panels, unless a dashboard variable already uses the name. */
+export const withTimeRangeVariables = <T extends { values?: ContentVariable[] }>(
+  variablesData: T,
+  timeObj: { start_time?: TimeBound; end_time?: TimeBound } | null | undefined,
+): T => {
   const start = timeObj?.start_time ? new Date(timeObj.start_time).getTime() : NaN;
   const end = timeObj?.end_time ? new Date(timeObj.end_time).getTime() : NaN;
   if (!Number.isFinite(start) || !Number.isFinite(end)) return variablesData;
   const values = variablesData?.values ?? [];
-  const taken = new Set(values.map((v: any) => v?.name));
+  const taken = new Set(values.map((v) => v?.name));
   const builtins = [
     { name: "start_time", value: start },
     { name: "end_time", value: end },
@@ -381,14 +401,12 @@ const formatContentValue = (name: string, value: any, format?: ContentVariableFo
   }
 };
 
-/**
- * Substitutes variables into html/markdown panel content; with `allLabel`, the All sentinel prints that label and a cleared value prints "", except in URL formats and URL query values, which keep the sentinel so links round-trip.
- */
+/** Substitutes variables into html/markdown panel content; with `allLabel`, the All sentinel prints that label and a cleared value prints "", except in URL formats and URL query values, which keep the sentinel so links round-trip; `escapeValue` applies to every substituted string. */
 export const processVariableContent = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
-  options?: { allLabel?: string },
+  options?: { allLabel?: string; escapeValue?: (value: string) => string },
 ) => {
   const processedContent: string = normalizeVariableSyntax(content);
 
@@ -410,6 +428,7 @@ export const processVariableContent = (
     );
   });
 
+  const escapeValue = options?.escapeValue ?? ((value: string) => value);
   return replaceVariablePlaceholders<ContentVariableFormat>(
     processedContent,
     valuesByName.keys(),
@@ -422,14 +441,16 @@ export const processVariableContent = (
       const allLabel = isUrlFormat || inQueryValue ? undefined : options?.allLabel;
       const isEmpty =
         value === null || value === undefined || (Array.isArray(value) && value.length === 0);
-      if (allLabel !== undefined && isEmpty) return "";
+      if (allLabel !== undefined && isEmpty) return escapeValue("");
       if (isEmpty) value = SELECT_ALL_VALUE;
       // Legacy formats never applied to the sentinel, so saved panels keep rendering it unformatted.
-      if (value === SELECT_ALL_VALUE && !isUrlFormat) return allLabel ?? SELECT_ALL_VALUE;
+      if (value === SELECT_ALL_VALUE && !isUrlFormat) {
+        return escapeValue(allLabel ?? SELECT_ALL_VALUE);
+      }
       if (allLabel !== undefined && Array.isArray(value)) {
         value = value.map((v) => (v === SELECT_ALL_VALUE ? allLabel : v));
       }
-      return formatContentValue(name, value, format);
+      return escapeValue(formatContentValue(name, value, format));
     },
     CONTENT_VARIABLE_FORMATS,
   );

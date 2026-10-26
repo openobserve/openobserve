@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { unref } from "vue";
+import { unref, type MaybeRef } from "vue";
 import { gt } from "@/types/i18n";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { CHART_SELECTION_FILL } from "@/utils/chartTheme";
@@ -37,6 +37,8 @@ import { BarConverter } from "./convertPromQLBarChart";
 import { GeoConverter } from "./convertPromQLGeoChart";
 import { MapsConverter } from "./convertPromQLMapsChart";
 import { applyLegendConfiguration } from "../legendConfiguration";
+
+type AnnotationList = NonNullable<Parameters<typeof getAnnotationsData>[0]>["value"];
 
 /**
  * Registry of all chart type converters
@@ -122,7 +124,14 @@ export async function convertPromQLChartData(
 
   // Step 4: Delegate to chart-specific converter
   // Each converter knows how to transform data for its chart type(s)
-  const chartConfig = converter.convert(processedData, panelSchema, store, extras, chartPanelRef);
+  const chartConfig = converter.convert(
+    processedData,
+    panelSchema,
+    store,
+    extras,
+    chartPanelRef,
+    context,
+  );
 
   // Step 5: Apply common chart configurations
   const options: { series?: any[]; columns?: unknown[]; [key: string]: any } = {
@@ -131,10 +140,9 @@ export async function convertPromQLChartData(
 
     // Apply panel-level overrides
     ...(panelSchema.config?.axis_width && {
-      grid: {
-        ...chartConfig.grid,
-        left: panelSchema.config.axis_width,
-      },
+      grid: Array.isArray(chartConfig.grid)
+        ? chartConfig.grid.map((grid: any) => ({ ...grid, left: panelSchema.config.axis_width }))
+        : { ...chartConfig.grid, left: panelSchema.config.axis_width },
     }),
   };
 
@@ -171,14 +179,14 @@ export async function convertPromQLChartData(
   return { options, extras };
 }
 
-/**
- * Count the current-period series dropped by the panel cap or by the streaming loader.
- */
+/** Count the current-period series dropped by the panel cap or by the streaming loader. */
 function getSeriesLimit(
   searchQueryData: PromQLResponse[],
   processedData: ProcessedPromQLData[],
   context: ConversionContext,
 ): SeriesLimitInfo | null {
+  // A histogram heatmap reports its cut in whole histograms, not bucket series.
+  if (processedData.some((queryData) => queryData.histogramsLimited)) return null;
   const isPrimary = (index: number) => !context.nameSuffixes?.[index];
   const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
   const primaryResults = searchQueryData.filter(
@@ -208,14 +216,12 @@ function getSeriesLimit(
   return { shown, total, cap: perQuery * Math.max(primaryResults.length, 1) };
 }
 
-/**
- * Draw dashboard annotations on a category time axis, snapping each time to its nearest step.
- */
+/** Draw dashboard annotations on a category time axis, snapping each time to its nearest step. */
 function applyAnnotations(
-  options: any,
-  annotations: any,
+  options: { series?: unknown[] },
+  annotations: MaybeRef<AnnotationList | null>,
   timestamps: Array<[number, Date | string]>,
-  store: any,
+  store: { state: { timezone: string } },
 ): void {
   // The panel loader hands over a Ref; specs and other callers pass a plain array.
   const list = unref(annotations);
@@ -256,7 +262,7 @@ function applyAnnotations(
     ]);
   if (lines.length === 0 && areas.length === 0) return;
 
-  options.series.push({
+  options.series?.push({
     type: "line",
     data: [],
     markLine: {

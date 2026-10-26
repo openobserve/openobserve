@@ -26,10 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="showAsValue"
       :options="showAsOptions"
       :label="t('dashboard.thresholdShowAs')"
-      :help-text="isStacked ? t('dashboard.thresholdStackedHint') : undefined"
       data-test="dashboard-config-thresholds-show-as"
       @update:model-value="onShowAs"
-    />
+    >
+      <template v-if="isStacked" #tooltip>
+        <OTooltip :content="t('dashboard.thresholdStackedHint')" max-width="15.625rem" />
+      </template>
+    </OSelect>
 
     <OToggleGroup
       type="single"
@@ -158,6 +161,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";

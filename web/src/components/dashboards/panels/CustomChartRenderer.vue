@@ -56,6 +56,7 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import DOMPurify from "dompurify";
 import { withChartFont } from "@/utils/fonts";
 import { useTheme } from "@/composables/useTheme";
+import { getColorPalette } from "@/utils/dashboard/colorPalette";
 
 // Register necessary components.
 // echarts' subpath type decls (echarts/components, echarts/renderers) resolve to
@@ -157,11 +158,16 @@ export default defineComponent({
 
       try {
         const safeChartOptions = deepSanitize(props.data) as CustomChartData;
-        // The dark theme paints an opaque background; keep the panel surface unless the code sets one.
-        const themedOptions =
-          dark && safeChartOptions.backgroundColor == null
-            ? { ...safeChartOptions, backgroundColor: "transparent" }
-            : safeChartOptions;
+        const unset = (key: string) =>
+          safeChartOptions[key] === null || safeChartOptions[key] === undefined;
+        // ECharts' dark theme brings an opaque background and its own series palette; use the panel's instead.
+        const themedOptions = dark
+          ? {
+              ...safeChartOptions,
+              ...(unset("backgroundColor") && { backgroundColor: "transparent" }),
+              ...(unset("color") && { color: getColorPalette() }),
+            }
+          : safeChartOptions;
         chart.setOption(withChartFont(themedOptions));
 
         const o2Events = props.data.o2_events;

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
+import { toZonedTime } from "date-fns-tz";
 import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
@@ -32,7 +33,7 @@ import {
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
-import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import { isExemplarSeriesId } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import {
   stateTimelineBreakdownColumn,
   stateTimelineDrilldownSeries,
@@ -198,6 +199,48 @@ export function usePanelDrilldown({
         return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       },
     );
+  };
+
+  // A heatmap's value[0] is a column index, so its time range is that column's bounds on the heatmap time axis.
+  const heatmapColumnRange = (params: any) => {
+    const column = panelData?.value?.extras?.heatmapTimeAxis?.columns?.[params?.value?.[0]];
+    if (!column) return null;
+    const startTime = getUTCTimestampFromZonedTimestamp(column.start, store.state.timezone);
+    const endTime = getUTCTimestampFromZonedTimestamp(column.end, store.state.timezone);
+    return startTime && endTime ? { startTime, endTime } : null;
+  };
+
+  // A heatmap cell's value is [column index, row index, z]; its labels live on the axes of the grid its series is drawn in, its raw row values in extras.
+  const heatmapCellValues = (params: any): { column: any; row: any } => {
+    const options = panelData?.value?.options;
+    const series = options?.series?.[params?.seriesIndex];
+    const axisOf = (axes: any, index: number) => (Array.isArray(axes) ? axes[index] : axes);
+    const [column, row] = Array.isArray(params?.value) ? params.value : [];
+    const yAxisIndex = series?.yAxisIndex ?? 0;
+    const rawRow = panelData?.value?.extras?.heatmapRowValues?.[yAxisIndex]?.[row];
+    // A time column is its start in epoch ms, as state timelines give it: a formatted time has a space a URL cannot carry.
+    const columnRange = heatmapColumnRange(params);
+    return {
+      column: columnRange
+        ? columnRange.startTime / 1000
+        : (axisOf(options?.xAxis, series?.xAxisIndex ?? 0)?.data?.[column] ?? params?.name),
+      row: rawRow !== undefined ? rawRow : axisOf(options?.yAxis, yAxisIndex)?.data?.[row],
+    };
+  };
+
+  const seriesDrilldownVariables = (params: any) => {
+    const value = Array.isArray(params?.value)
+      ? params.value[params.value.length - 1]
+      : params?.value;
+    if (panelSchema.value.type === "heatmap") {
+      const { column, row } = heatmapCellValues(params);
+      return { __name: row ?? params?.name, __value: value, __axisValue: column };
+    }
+    return {
+      __name: ["pie", "donut"].includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      __value: value,
+      __axisValue: params?.value?.[0] ?? params?.name,
+    };
   };
 
   // get offset from parent
@@ -520,6 +563,12 @@ export function usePanelDrilldown({
     isCursorOverPanel.value = false;
   };
 
+  // Mirrors getAnnotationsData's own xAxis computation, so the manual annotation lands exactly on the band.
+  const queryMarkerStart = (marker: { start_time?: number } | null | undefined) =>
+    marker?.start_time
+      ? toZonedTime(new Date(marker.start_time / 1000), store.state.timezone)
+      : null;
+
   // A metric value is drawn by renderItem, so the click carries no value; the clicked cell holds it.
   const metricSeriesVariables = (params: { seriesIndex?: number } | undefined) => {
     if (panelSchema.value.type !== "metric" || params?.seriesIndex === undefined) return {};
@@ -529,20 +578,23 @@ export function usePanelDrilldown({
 
   const onChartClick = async (params: any, ...args: any) => {
     // An exemplar marker opens its trace, never the drilldown menu or an annotation.
-    if (params?.seriesId === EXEMPLAR_SERIES_ID) {
+    if (isExemplarSeriesId(params?.seriesId)) {
       await onExemplarClick?.(params);
       return;
     }
-    // Check if we have both drilldown and annotation at the same point
-    const hasAnnotation =
-      params?.componentType === "markLine" || params?.componentType === "markArea";
+    const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
+    // Query-source markers are read-only and explain themselves on hover.
+    const isQueryMarker = isMarker && !!params?.data?.annotationDetails?.source;
+    const hasAnnotation = isMarker && !isQueryMarker;
     const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
 
-    // If in annotation add mode, handle that first
+    // Checked before the query-band early return below, so add-mode still places an annotation on a band.
     if (allowAnnotationsAdd.value) {
       if (isAddAnnotationMode.value) {
         if (hasAnnotation) {
           editAnnotation(params?.data?.annotationDetails);
+        } else if (isQueryMarker) {
+          handleAddAnnotation(queryMarkerStart(params?.data?.annotationDetails), null);
         } else {
           // A segment's start is its zoned x value, the same unit the other charts pass.
           const segmentStart =
@@ -555,6 +607,9 @@ export function usePanelDrilldown({
         return;
       }
     }
+
+    // A query band lies over the bars, so its click must not drill down with the band's data.
+    if (isQueryMarker) return;
 
     // Cross-links are fetched lazily (not on panel render) — resolve them now, before use.
     await ensureDrilldownSchema();
@@ -793,7 +848,8 @@ export function usePanelDrilldown({
           getOriginalQueryAndStream(queryDetails, metadata) || {};
         if (!originalQuery || !streamName) return;
 
-        const hoveredTime = drilldownParams[0]?.value?.[0];
+        const isHeatmap = panelSchema.value.type === "heatmap";
+        const hoveredTime = isHeatmap ? null : drilldownParams[0]?.value?.[0];
         const hoveredTimestamp = hoveredTime
           ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
           : null;
@@ -803,7 +859,8 @@ export function usePanelDrilldown({
         const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
         const calculatedTimeRange = segment
           ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
-          : calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+          : ((isHeatmap ? heatmapColumnRange(drilldownParams[0]) : null) ??
+            calculateTimeRange(hoveredTimestamp, intervalMicro.value));
 
         let modifiedQuery = originalQuery;
 
@@ -895,13 +952,7 @@ export function usePanelDrilldown({
             drilldownVariables.series = segment;
           } else {
             drilldownVariables.series = {
-              __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-                ? drilldownParams[0].name
-                : drilldownParams[0].seriesName,
-              __value: Array.isArray(drilldownParams[0].value)
-                ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-                : drilldownParams[0].value,
-              __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+              ...seriesDrilldownVariables(drilldownParams[0]),
               ...metricSeriesVariables(drilldownParams[0]),
             };
           }
@@ -1012,15 +1063,8 @@ export function usePanelDrilldown({
       } else if (panelSchema.value.type == "state-timeline") {
         drilldownVariables.series = stateTimelineDrilldownSeries(drilldownParams[0]);
       } else {
-        // we have an series object
         drilldownVariables.series = {
-          __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-            ? drilldownParams[0].name
-            : drilldownParams[0].seriesName,
-          __value: Array.isArray(drilldownParams[0].value)
-            ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-            : drilldownParams[0].value,
-          __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+          ...seriesDrilldownVariables(drilldownParams[0]),
           ...metricSeriesVariables(drilldownParams[0]),
         };
       }

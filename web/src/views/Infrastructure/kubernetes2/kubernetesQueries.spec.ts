@@ -244,4 +244,46 @@ describe("kubernetesQueries", () => {
       );
     });
   });
+
+  describe("CST problem counts", () => {
+    const text = queryText("CST");
+    const stats = (name: string) => text.split(" or ").find((p) => p.includes(`"${name}"`)) ?? "";
+
+    it("emits every problem stat in the one union", () => {
+      for (const stat of [
+        "daemonsetsBad",
+        "statefulsetsBad",
+        "replicasetsBad",
+        "jobsBad",
+        "pvcsBad",
+        "hpasBad",
+      ]) {
+        expect(stats(stat)).toContain(`"stat", "${stat}"`);
+      }
+    });
+
+    it("matches controllers on both cluster spellings, a missing ready series counting as short", () => {
+      const ds = stats("daemonsetsBad");
+      expect(ds).toContain("unless on(k8s_cluster, k8s_cluster_name, namespace, daemonset)");
+      expect(ds).toContain("kube_daemonset_status_desired_number_scheduled");
+      expect(ds).toContain("kube_daemonset_status_number_ready");
+      expect(stats("statefulsetsBad")).toContain("kube_statefulset_status_replicas_ready");
+      expect(stats("replicasetsBad")).toContain("kube_replicaset_status_ready_replicas");
+    });
+
+    it("counts a pod once for a bad phase, an error waiting reason, or Running without a true Ready", () => {
+      expect(text).toContain(
+        'max by (k8s_cluster, k8s_cluster_name, namespace, pod) ((last_over_time(kube_pod_status_phase{phase=~"Failed|Pending|Unknown"}[10m]) == 1) or (last_over_time(kube_pod_container_status_waiting_reason{reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|ErrImageNeverPull|CreateContainerConfigError"}[10m]) == 1) or (',
+      );
+      expect(text).toContain(
+        'last_over_time(kube_pod_status_phase{phase="Running"}[10m]) == 1 unless on(k8s_cluster, k8s_cluster_name, namespace, pod) last_over_time(kube_pod_status_ready{condition="true"}[10m]) == 1))',
+      );
+    });
+
+    it("judges a job failed unless complete, a PVC by phase and an HPA by ScalingLimited", () => {
+      expect(stats("jobsBad")).toContain('kube_job_complete{condition="true"}[10m])) >= 1');
+      expect(stats("pvcsBad")).toContain('phase!="Bound"');
+      expect(stats("hpasBad")).toContain('condition="ScalingLimited",status="true"');
+    });
+  });
 });

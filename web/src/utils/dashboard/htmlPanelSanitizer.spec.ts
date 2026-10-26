@@ -21,6 +21,10 @@ import {
   isAllowedIframeSrc,
   sanitizeHtmlPanel,
 } from "@/utils/dashboard/htmlPanelSanitizer";
+import {
+  escapeHtmlValue,
+  processVariableContent,
+} from "@/utils/dashboard/variables/variablesUtils";
 
 const ORIGIN = "https://o2.example.com";
 
@@ -113,6 +117,71 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("style")?.textContent).toContain("(width < 37.5rem)");
     });
 
+    it("scopes rules nested in @layer and @container blocks", () => {
+      const css = render(
+        "<style>@layer base { .a { color: red; } } " +
+          "@container (min-width: 1px) { .b { color: blue; } }</style>",
+      ).querySelector("style")?.textContent;
+
+      expect(css).toContain("#o2-html-panel-p1 .a");
+      expect(css).toContain("#o2-html-panel-p1 .b");
+      expect(css).not.toMatch(/\{\s*\.(a|b)\s*\{/);
+    });
+
+    it("renders an HTML-escaped variable value as text, never as a form", () => {
+      const payload =
+        '<form action="https://evil.example/x"><input type="password" name="p"><button>Login</button></form>';
+      const out = render(
+        processVariableContent(
+          "<div title='${x}'>Hello ${x}</div>",
+          { values: [{ name: "x", type: "textbox", value: payload }] },
+          undefined,
+          { escapeValue: escapeHtmlValue },
+        ),
+      );
+
+      expect(out.querySelector("form")).toBeNull();
+      expect(out.querySelector("input")).toBeNull();
+      expect(out.querySelector("div")?.textContent).toBe(`Hello ${payload}`);
+      expect(out.querySelector("div")?.getAttribute("title")).toBe(payload);
+    });
+
+    it("decodes escaped values in panel CSS without letting them close the style element", () => {
+      const styleFor = (value: string) =>
+        render(
+          processVariableContent(
+            "<style>.a { font-family: ${x}; }</style><p>ok</p>",
+            { values: [{ name: "x", type: "textbox", value }] },
+            undefined,
+            { escapeValue: escapeHtmlValue },
+          ),
+        );
+
+      expect(styleFor("'Fira Code', serif").querySelector("style")?.textContent).toContain(
+        'font-family: "Fira Code", serif',
+      );
+      const out = styleFor("x</style><img src=x>");
+      const reparsed = document.createElement("div");
+      reparsed.innerHTML = out.innerHTML;
+      expect(out.querySelector("style")?.textContent).not.toContain("</");
+      expect(reparsed.querySelector("img")).toBeNull();
+    });
+
+    it("keeps an escaped value in an unquoted attribute from adding attributes", () => {
+      const value = "x style=position:fixed;inset:0";
+      const out = render(
+        processVariableContent(
+          "<a class=${x}>t</a>",
+          { values: [{ name: "x", type: "textbox", value }] },
+          undefined,
+          { escapeValue: escapeHtmlValue },
+        ),
+      );
+
+      expect(out.querySelector("a")?.hasAttribute("style")).toBe(false);
+      expect(out.querySelector("a")?.getAttribute("class")).toBe(value);
+    });
+
     it("keeps target=_blank on links and forms and forces rel=noopener noreferrer", () => {
       const out = render(
         '<a href="https://example.com/a" target="_blank" rel="opener">a</a>' +
@@ -164,19 +233,51 @@ describe("htmlPanelSanitizer", () => {
     });
 
     it("handles a form whose own attribute methods are shadowed by named controls", () => {
-      const proto = HTMLFormElement.prototype as any;
       const shadow = () => {
         throw new Error("shadowed");
       };
       // jsdom has no form named-property getters, so shadow the prototype instead
-      Object.defineProperty(proto, "getAttribute", { value: shadow, configurable: true });
+      Object.defineProperty(HTMLFormElement.prototype, "getAttribute", {
+        value: shadow,
+        configurable: true,
+      });
       try {
-        const form = render('<form action="https://example.com/f" target="_blank"></form>')
-          .firstElementChild as Element;
-        expect(Element.prototype.getAttribute.call(form, "rel")).toBe("noopener noreferrer");
+        const [blank, named] = Array.from(
+          render(
+            '<form action="https://example.com/f" target="_blank"></form>' +
+              '<form action="https://example.com/g" target="f1"></form>',
+          ).querySelectorAll("form"),
+        );
+        expect(Element.prototype.getAttribute.call(blank, "target")).toBe("_blank");
+        expect(Element.prototype.getAttribute.call(blank, "rel")).toBe("noopener noreferrer");
+        expect(Element.prototype.hasAttribute.call(named, "target")).toBe(false);
       } finally {
-        delete proto.getAttribute;
+        Reflect.deleteProperty(HTMLFormElement.prototype, "getAttribute");
       }
+    });
+
+    it("drops a form whose nodeName is shadowed by a named control, without throwing", () => {
+      Object.defineProperty(HTMLFormElement.prototype, "nodeName", {
+        get: () => document.createElement("input"),
+        configurable: true,
+      });
+      try {
+        const out = render(
+          '<form action="https://example.com/f" target="_blank"></form>' +
+            '<a href="https://example.com" target="_blank">x</a>',
+        );
+        expect(out.querySelector("form")).toBeNull();
+        expect(out.querySelector("a")?.getAttribute("rel")).toBe("noopener noreferrer");
+      } finally {
+        Reflect.deleteProperty(HTMLFormElement.prototype, "nodeName");
+      }
+    });
+
+    it("keeps no javascript: href on a _blank link", () => {
+      const link = render('<a href="javascript:alert(1)" target="_blank">x</a>').querySelector("a");
+
+      expect(link?.hasAttribute("href")).toBe(false);
+      expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
     });
 
     it("registers its iframe hook once, on a private DOMPurify instance", () => {

@@ -23,7 +23,7 @@ export const TOOLTIP_SCROLL_STYLE =
   "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;";
 
 /** Chart types drawn by the modular PromQL converters, which honour `promql_series_limit`. */
-export const PROMQL_MODULAR_CHART_TYPES = [
+export const PROMQL_MODULAR_CHART_TYPES: readonly string[] = [
   "pie",
   "donut",
   "table",
@@ -74,8 +74,10 @@ export interface ProcessedPromQLData {
   queryIndex: number;
   /** "shifted" for a past period drawn over its panel query. */
   seriesRole?: "primary" | "shifted";
-  /** The shifted period's label, e.g. "1d ago"; unset for the current period. */
+  /** The shifted period's name, e.g. "1 day ago", which its series names already carry. */
   nameSuffix?: string;
+  /** In histogram mode, the whole histograms the series limit kept out of all returned. */
+  histogramsLimited?: { shown: number; total: number };
   queryConfig: any;
 }
 
@@ -92,6 +94,7 @@ export interface PromQLChartConverter {
     store: any,
     extras: any,
     chartPanelRef?: any,
+    context?: ConversionContext,
   ): {
     // Optional: metric/table converters return values/columns instead of ECharts series
     series?: any[];
@@ -123,6 +126,7 @@ export interface ConversionContext {
   parentQueryIndex?: number[];
   /** periodAsStr per expanded result, "" for a current-period one. */
   nameSuffixes?: string[];
+  stepSeconds?: number;
 }
 
 /**

@@ -20,7 +20,6 @@ import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { buildSeriesMarkLine } from "./shared/markLines";
 import { lineThicknessOf } from "../promqlChartSeriesProps";
-import { chartColor } from "@/utils/chartTheme";
 import { getScatterSymbolSize } from "../scatterPointStyle";
 import { getSeriesItemOpacity } from "../promqlChartSeriesProps";
 import { barStyleSeriesProps } from "../barTrack";

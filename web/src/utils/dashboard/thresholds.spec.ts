@@ -640,6 +640,12 @@ describe("tooltip over-limit cue", () => {
     expect(api).toBe(`${marker} api : 1s · over 500ms`);
   });
 
+  it.each(["area-stacked", "stacked", "h-stacked"])("adds no segment cue on %s", (type) => {
+    const options: any = { ...lineOptions(), tooltip: { formatter: rowFormatter } };
+    applyLineAreaThresholds(options, panel(type, steps));
+    expect(options.tooltip.formatter).toBe(rowFormatter);
+  });
+
   it("leaves tooltips alone without thresholds", () => {
     const options: any = { ...lineOptions(), tooltip: { formatter: rowFormatter } };
     applyLineAreaThresholds(options, panel("line", undefined));
