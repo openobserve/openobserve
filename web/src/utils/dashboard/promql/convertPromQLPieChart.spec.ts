@@ -18,9 +18,7 @@ import { PieConverter } from "./convertPromQLPieChart";
 import type { ProcessedPromQLData } from "./shared/types";
 
 // Mock dependencies
-vi.mock("./shared/dataProcessor", async (importOriginal) => ({
-  everyQueryInstant: (await importOriginal<typeof import("./shared/dataProcessor")>())
-    .everyQueryInstant,
+vi.mock("./shared/dataProcessor", () => ({
   applyAggregation: vi.fn((values, aggregation) => {
     if (!values || values.length === 0) return 0;
     const numericValues = values.map((v: any) => (Array.isArray(v) ? parseFloat(v[1]) : v));
@@ -145,28 +143,27 @@ describe("PieConverter", () => {
       expect(result.tooltip).toBeDefined();
     });
 
-    it("reduces with last when every query is instant, whatever reducer was saved", async () => {
+    it("reduces an instant query's slices with last and a range query's with the saved reducer", async () => {
       const { applyAggregation } = await import("./shared/dataProcessor");
-      const processedData: ProcessedPromQLData[] = [
-        { series: [{ name: "cpu", values: [[1, "50"]] }], timestamps: [1], queryIndex: 0 } as any,
-      ];
-      const instant = { config: { query_type: "instant" } };
-      const cases: Array<[any[], string]> = [
-        [[instant, instant], "last"],
-        [[instant, { config: { query_type: "range" } }], "count"],
-        [[instant, { config: { query_type: "range", hide: true } }], "last"],
-        [[], "count"],
-      ];
-      for (const [queries, expected] of cases) {
-        vi.mocked(applyAggregation).mockClear();
-        converter.convert(
-          processedData,
-          { type: "donut", config: { aggregation: "count" }, queries },
-          mockStore,
-          { legends: [] },
-        );
-        expect(vi.mocked(applyAggregation).mock.calls[0][1]).toBe(expected);
-      }
+      const slice = (queryIndex: number, query_type: string) =>
+        ({
+          series: [{ name: `q${queryIndex}`, values: [[1, "50"]] }],
+          timestamps: [1],
+          queryIndex,
+          queryConfig: { query_type },
+        }) as any;
+      vi.mocked(applyAggregation).mockClear();
+      converter.convert(
+        [slice(0, "instant"), slice(1, "range"), { ...slice(2, "range"), queryConfig: undefined }],
+        { type: "donut", config: { aggregation: "count" } },
+        mockStore,
+        { legends: [] },
+      );
+      expect(vi.mocked(applyAggregation).mock.calls.map((call) => call[1])).toEqual([
+        "last",
+        "count",
+        "count",
+      ]);
     });
 
     it("should populate extras.legends with series names", () => {

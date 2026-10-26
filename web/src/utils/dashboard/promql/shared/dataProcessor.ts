@@ -276,9 +276,3 @@ export function applyAggregation(
       return numericValues[numericValues.length - 1];
   }
 }
-
-/** True when the panel has visible queries and every one of them is an instant query; hidden ones never run. */
-export function everyQueryInstant(queries: any[] | undefined): boolean {
-  const visible = (queries ?? []).filter((query) => !query?.config?.hide);
-  return visible.length > 0 && visible.every((query) => query?.config?.query_type === "instant");
-}

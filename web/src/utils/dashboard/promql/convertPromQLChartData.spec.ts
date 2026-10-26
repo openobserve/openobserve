@@ -23,7 +23,6 @@ vi.mock("./shared/dataProcessor", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./shared/dataProcessor")>();
   return {
     getPromqlSeriesLimit: actual.getPromqlSeriesLimit,
-    everyQueryInstant: actual.everyQueryInstant,
     processPromQLData: vi.fn(async () => [
       {
         series: [
