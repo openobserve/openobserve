@@ -20,6 +20,8 @@ const DOCUMENT_SELECTOR = /^(html|body|:root)(?![\w-])/i;
 
 const IFRAME_SANDBOX = "allow-scripts allow-same-origin";
 
+const TARGETABLE_TAGS = new Set(["A", "AREA", "FORM"]);
+
 const refusedIframes = new WeakSet<Element>();
 
 type ScopableRule = CSSRule & { selectorText?: string; cssRules?: CSSRuleList };
@@ -48,7 +50,7 @@ export const sanitizeHtmlPanel = (
 ): DocumentFragment => {
   const fragment = htmlPanelPurifier.sanitize(html, {
     ADD_TAGS: ["iframe", "style"],
-    ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp"],
+    ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp", "target"],
     // without it the parser hoists a top-level style into <head>, which DOMPurify drops
     FORCE_BODY: true,
     RETURN_DOM_FRAGMENT: true,
@@ -89,6 +91,20 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
   }
 };
 
+// a named target could steer a link or form into a panel iframe, past the embed origin check
+const keepOnlyBlankTarget = (node: Element): void => {
+  if (!TARGETABLE_TAGS.has(node.nodeName.toUpperCase())) return;
+  // prototype calls: a form control named e.g. "getAttribute" shadows the form's own method
+  const target = Element.prototype.getAttribute.call(node, "target");
+  if (target === null) return;
+  if (target.trim().toLowerCase() !== "_blank") {
+    Element.prototype.removeAttribute.call(node, "target");
+    return;
+  }
+  Element.prototype.setAttribute.call(node, "target", "_blank");
+  Element.prototype.setAttribute.call(node, "rel", "noopener noreferrer");
+};
+
 const scopeCss = (cssText: string, prefix: string): string => {
   try {
     const sheet = new CSSStyleSheet();
@@ -104,6 +120,7 @@ const scopeCss = (cssText: string, prefix: string): string => {
 };
 
 htmlPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
+  keepOnlyBlankTarget(node);
   if (node.nodeName !== "IFRAME") return;
   node.removeAttribute("srcdoc");
   const src = node.getAttribute("src") || "";

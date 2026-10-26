@@ -36,6 +36,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowLegendWidth: vi.fn(() => false),
   shouldShowLegendHeight: vi.fn(() => false),
   shouldApplyChartAlign: vi.fn(() => false),
+  shouldShowLegendValues: vi.fn(() => false),
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
@@ -43,7 +44,6 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowCartesianAxisConfig: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
-  shouldShowLineThickness: vi.fn(() => false),
   shouldShowDrilldown: vi.fn(() => false),
   shouldShowTimeShift: vi.fn(() => false),
   allVisibleQueriesInstant: vi.fn(() => false),
@@ -750,11 +750,12 @@ describe("useConfigPanel – lineStyle section", () => {
     vi.mocked(shouldShowAreaLineStyleConfig).mockReturnValue(false);
   });
 
-  it("line-thickness visibility delegates to shouldShowLineThickness", async () => {
-    const { shouldShowLineThickness } = await import("@/utils/dashboard/configUtils");
-    vi.mocked(shouldShowLineThickness).mockReturnValueOnce(true);
+  it("line-thickness visibility delegates to shouldShowAreaLineStyleConfig", async () => {
+    const { shouldShowAreaLineStyleConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowAreaLineStyleConfig).mockReturnValue(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("lineStyle", "line-thickness")).toBe(true);
+    vi.mocked(shouldShowAreaLineStyleConfig).mockReturnValue(false);
   });
 });
 
@@ -791,6 +792,32 @@ describe("useConfigPanel – table section", () => {
   it("dynamic-columns is hidden in promqlMode", () => {
     const c = makeComposable(makePanelData("table"), ref(true));
     expect(c.isConfigOptionVisible("table", "dynamic-columns")).toBe(false);
+  });
+
+  it("expandable-rows is visible for table type in sql and promql mode", () => {
+    expect(
+      makeComposable(makePanelData("table"), ref(false)).isConfigOptionVisible(
+        "table",
+        "expandable-rows",
+      ),
+    ).toBe(true);
+    expect(
+      makeComposable(makePanelData("table"), ref(true)).isConfigOptionVisible(
+        "table",
+        "expandable-rows",
+      ),
+    ).toBe(true);
+  });
+
+  it("expandable-rows is hidden in pivot mode", () => {
+    const c = makeComposable(
+      makePanelData("table"),
+      ref(false),
+      undefined,
+      undefined,
+      computed(() => true),
+    );
+    expect(c.isConfigOptionVisible("table", "expandable-rows")).toBe(false);
   });
 
   it("pagination is visible for table type", () => {
@@ -892,6 +919,15 @@ describe("useConfigPanel – map section", () => {
     expect(c.isConfigOptionVisible("map", "map-config")).toBe(true);
   });
 
+  it("map-roam is searchable for maps only", () => {
+    expect(makeComposable(makePanelData("maps")).isConfigOptionVisible("map", "map-roam")).toBe(
+      true,
+    );
+    expect(makeComposable(makePanelData("geomap")).isConfigOptionVisible("map", "map-roam")).toBe(
+      false,
+    );
+  });
+
   it("map-config is hidden for non-map types", () => {
     const c = makeComposable(makePanelData("bar"));
     expect(c.isConfigOptionVisible("map", "map-config")).toBe(false);
@@ -913,6 +949,21 @@ describe("useConfigPanel – gauge section", () => {
     const c = makeComposable(makePanelData("bar"));
     expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-end-labels")).toBe(false);
+  });
+
+  it("range mode and end labels are visible for gauge type", () => {
+    const c = makeComposable(makePanelData("gauge"));
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
+    expect(c.isConfigOptionVisible("gauge", "gauge-end-labels")).toBe(true);
+  });
+
+  it("auto range mode hides the fixed min and max", () => {
+    const c = makeComposable(makePanelData("gauge", {}, { config: { range_mode: "auto" } }));
+    expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
   });
 });
 

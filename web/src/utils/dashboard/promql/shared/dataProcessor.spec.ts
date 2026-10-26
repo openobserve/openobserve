@@ -640,5 +640,33 @@ describe("dataProcessor", () => {
     it("should return last for unknown aggregation type", () => {
       expect(applyAggregation(values, "unknown" as any)).toBe(50);
     });
+
+    it("skips NaN and infinite samples instead of returning NaN", () => {
+      const mixed: Array<[number, string]> = [
+        [1, "4"],
+        [2, "NaN"],
+        [3, "+Inf"],
+        [4, "-Inf"],
+        [5, "8"],
+      ];
+      expect(applyAggregation(mixed, "avg")).toBe(6);
+      expect(applyAggregation(mixed, "max")).toBe(8);
+      expect(applyAggregation(mixed, "min")).toBe(4);
+      expect(applyAggregation(mixed, "sum")).toBe(12);
+      expect(applyAggregation(mixed, "range")).toBe(4);
+      expect(applyAggregation(mixed, "diff")).toBe(4);
+      expect(applyAggregation(mixed, "first")).toBe(4);
+      expect(applyAggregation(mixed, "last")).toBe(8);
+      expect(applyAggregation(mixed, "count")).toBe(5);
+    });
+
+    it("returns NaN when no sample is finite", () => {
+      const none: Array<[number, string]> = [
+        [1, "NaN"],
+        [2, "+Inf"],
+      ];
+      expect(applyAggregation(none, "avg")).toBeNaN();
+      expect(applyAggregation(none, "max")).toBeNaN();
+    });
   });
 });

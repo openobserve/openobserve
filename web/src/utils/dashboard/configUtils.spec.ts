@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   allVisibleQueriesInstant,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -31,13 +32,25 @@ import {
   shouldShowAxisConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
 } from "./configUtils";
 
 describe("configUtils", () => {
+  describe("shouldShowLegendValues", () => {
+    const panel = (type: string, show_legends: boolean) => ({
+      data: { type, config: { show_legends } },
+    });
+
+    it("is true only for pie and donut with the legend shown", () => {
+      expect(shouldShowLegendValues(panel("pie", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("donut", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("pie", false))).toBe(false);
+      expect(shouldShowLegendValues(panel("bar", true))).toBe(false);
+    });
+  });
+
   describe("shouldApplyChartAlign", () => {
     it("should return true for pie chart with right legend", () => {
       const dashboardPanelData = {
@@ -1354,44 +1367,6 @@ describe("configUtils", () => {
     });
   });
 
-  describe("shouldShowLineThickness", () => {
-    const makeData = (type: string, customQuery = false) => ({
-      data: {
-        type,
-        queries: [{ customQuery }],
-      },
-      layout: { currentQueryIndex: 0 },
-    });
-
-    it("should return true for area chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area"), false)).toBe(true);
-    });
-
-    it("should return true for area-stacked chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(true);
-    });
-
-    it("should return true for line chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("line"), false)).toBe(true);
-    });
-
-    it("should return false when promqlMode is true", () => {
-      expect(shouldShowLineThickness(makeData("area"), true)).toBe(false);
-    });
-
-    it("should return false when customQuery is true", () => {
-      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(false);
-    });
-
-    it("should return false for bar chart", () => {
-      expect(shouldShowLineThickness(makeData("bar"), false)).toBe(false);
-    });
-
-    it("should return false for scatter chart", () => {
-      expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
-    });
-  });
-
   describe("shouldShowDrilldown", () => {
     it("should return true for line chart in non-logs context", () => {
       expect(shouldShowDrilldown({ data: { type: "line" } }, "dashboards")).toBe(true);
@@ -1496,6 +1471,10 @@ describe("configUtils", () => {
     it("is false with no queries or an unset query type", () => {
       expect(allVisibleQueriesInstant(panel([]))).toBe(false);
       expect(allVisibleQueriesInstant({ data: { queries: [{ config: {} }] } })).toBe(false);
+    });
+
+    it("is false when every query is hidden", () => {
+      expect(allVisibleQueriesInstant(panel(["range", "instant"], [0, 1]))).toBe(false);
     });
   });
 

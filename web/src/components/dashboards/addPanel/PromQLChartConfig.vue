@@ -401,11 +401,14 @@ export default defineComponent({
     // Chart types that support aggregation
     const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
 
+    // A pie or metric reduces each series to one value, which an instant query already is.
     const showAggregationConfig = computed(
       () =>
         chartsWithAggregation.includes(props.chartType) &&
-        // An instant query has one sample per series, so a metric has nothing to reduce.
-        !(props.chartType === "metric" && allVisibleQueriesInstant(dashboardPanelData)),
+        !(
+          ["pie", "donut", "metric"].includes(props.chartType) &&
+          allVisibleQueriesInstant(dashboardPanelData)
+        ),
     );
 
     // Aggregation value
@@ -481,16 +484,6 @@ export default defineComponent({
           dashboardPanelData.data.config = {};
         }
         dashboardPanelData.data.config.map_type = value;
-      },
-    });
-
-    const mapsEnableRoam = computed({
-      get: () => dashboardPanelData.data.config?.enable_roam !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.enable_roam = value;
       },
     });
 
@@ -690,7 +683,6 @@ export default defineComponent({
       geoNameLabel,
       mapsNameLabel,
       mapsMapType,
-      mapsEnableRoam,
       tableAggregations,
       promqlTableMode,
       promqlTableModeOptions,

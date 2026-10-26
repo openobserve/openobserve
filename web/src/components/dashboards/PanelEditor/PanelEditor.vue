@@ -298,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @result-metadata-update="onResultMetadataUpdate"
                         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                         @series-limit-update="handleSeriesLimitUpdate"
+                        @region-join-update="handleRegionJoinUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -612,6 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @result-metadata-update="onResultMetadataUpdate"
                           @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                           @series-limit-update="handleSeriesLimitUpdate"
+                          @region-join-update="handleRegionJoinUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -893,6 +895,7 @@ const {
   handleResultMetadataUpdate,
   handlePanelDiagnosticsUpdate,
   handleSeriesLimitUpdate,
+  handleRegionJoinUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,
@@ -1310,6 +1313,7 @@ const handleChartTypeSelection = async (selection: any) => {
 // Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple
 // Define your ECharts 'option' here.
 // 'data' variable is available for use and contains the response data from the search result and it is an array.
+// 'context' is read-only: variables (null when All), timeRange {start, end} in microseconds, timezone and theme ('light' or 'dark').
 `;
         dashboardPanelData.data.customChartContent = defaultComments + template.code;
 

@@ -2655,4 +2655,28 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
     });
   });
+
+  describe("add annotation button", () => {
+    const timeSeriesRenderer = {
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ checkIfPanelIsTimeSeries: true, isAddAnnotationMode: false }),
+        methods: { toggleAddAnnotationMode: vi.fn() },
+      },
+    };
+    const button = '[data-test="panel-schema-renderer-annotation-button"]';
+
+    it.each([
+      ["line", true],
+      ["stacked", true],
+      ["h-bar", false],
+      ["h-stacked", false],
+    ])("%s time-series panel shows it: %s", async (type, shown) => {
+      wrapper = createWrapper({ data: { ...mockPanelData, type } }, timeSeriesRenderer);
+      await flushPromises();
+      expect(wrapper.find(button).exists()).toBe(shown);
+    });
+  });
 });

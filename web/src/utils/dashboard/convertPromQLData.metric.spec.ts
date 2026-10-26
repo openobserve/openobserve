@@ -36,7 +36,7 @@ const series = (job: string, samples: string[]) => ({
 const matrix = (...result: any[]) => ({ resultType: "matrix", result });
 const vector = (...result: any[]) => ({ resultType: "vector", result });
 
-const convert = async (data: any[], config: any = {}) => {
+const convert = async (data: any[], config: any = {}, panelRef: any = chartRef) => {
   const panel = {
     id: "p1",
     type: "metric",
@@ -49,7 +49,7 @@ const convert = async (data: any[], config: any = {}) => {
     panel,
     data,
     store,
-    chartRef,
+    panelRef,
     null,
     { value: [] },
     metadata,
@@ -79,6 +79,12 @@ describe("convertPromQLData metric cells", () => {
     const label = cells[0].renderItem().children.find((c: any) => c.style.text === "api");
     expect(label.style).toMatchObject({ overflow: "truncate" });
     expect(label.style.width).toBeLessThan(cells[0]._metricLayout.width);
+  });
+
+  it("marks a cell whose label the canvas cuts", async () => {
+    const long = "x".repeat(80);
+    const cells = cellsOf(await convert([matrix(series(long, ["1"]), series("web", ["2"]))]));
+    expect(cells.map((c: any) => c._metricLayout.labelCut)).toEqual([true, false]);
   });
 
   it("keeps every query, not only the last one", async () => {
@@ -175,13 +181,61 @@ describe("convertPromQLData metric cells", () => {
 
   it("caps the cells and says how many were dropped", async () => {
     const many = Array.from({ length: METRIC_MAX_CELLS + 10 }, (_, i) => series(`j${i}`, ["1"]));
-    const result = await convert([matrix(...many)]);
+    const result = await convert(
+      [matrix(...many)],
+      {},
+      {
+        value: { offsetWidth: 1600, offsetHeight: 900 },
+      },
+    );
     expect(cellsOf(result)).toHaveLength(METRIC_MAX_CELLS);
     expect(result.extras.seriesLimit).toEqual({
       shown: METRIC_MAX_CELLS,
       total: METRIC_MAX_CELLS + 10,
       cap: METRIC_MAX_CELLS,
     });
+  });
+
+  it("draws only as many cells as stay legible on a small panel", async () => {
+    const many = Array.from({ length: METRIC_MAX_CELLS }, (_, i) => series(`j${i}`, ["1"]));
+    const result = await convert(
+      [matrix(...many)],
+      {},
+      {
+        value: { offsetWidth: 400, offsetHeight: 150 },
+      },
+    );
+    const cells = cellsOf(result);
+    expect(cells.length).toBeLessThan(METRIC_MAX_CELLS);
+    for (const cell of cells) {
+      expect(cell._metricLayout.width).toBeGreaterThanOrEqual(64);
+      expect(cell._metricLayout.height).toBeGreaterThanOrEqual(40);
+    }
+    expect(result.extras.seriesLimit).toEqual({
+      shown: cells.length,
+      total: METRIC_MAX_CELLS,
+      cap: cells.length,
+    });
+  });
+
+  it("reduces over the finite samples when some are NaN or infinite", async () => {
+    const data = [matrix(series("api", ["2", "NaN", "+Inf", "4"]))];
+    expect(cellsOf(await convert(data, { aggregation: "avg" }))[0]._metricText).toBe("3");
+    expect(cellsOf(await convert(data, { aggregation: "max" }))[0]._metricText).toBe("4");
+  });
+
+  it("shows a dash when no sample is finite", async () => {
+    const result = await convert([matrix(series("api", ["NaN", "+Inf"]))], {
+      aggregation: "avg",
+    });
+    const [cell] = cellsOf(result);
+    expect(cell._metricText).toBe("-");
+    expect(cell._metricRaw).toBeNull();
+  });
+
+  it("builds no sparkline data while the sparkline is off", async () => {
+    const result = await convert([matrix(series("api", ["1", "2"]), series("web", ["3", "4"]))]);
+    for (const cell of cellsOf(result)) expect(cell._metricSparkData).toBeNull();
   });
 
   it("shows no cap notice under the cap", async () => {

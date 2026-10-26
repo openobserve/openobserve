@@ -15,11 +15,26 @@
 
 import { chartColor } from "@/utils/chartTheme";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import { calculateWidthText } from "./chartDimensionUtils";
 import {
   calculateMetricFontSize,
   METRIC_SPARKLINE,
   type SparklineConfig,
 } from "./sql/charts/convertSQLMetricChart";
+
+// Smallest cell that still fits a 12px value above an 11px label.
+const METRIC_MIN_CELL_W = 64;
+const METRIC_MIN_CELL_H = 40;
+
+/** Largest cell count, up to `max`, whose grid keeps every cell legible on this panel. */
+export const metricCellsThatFit = (panelW: number, panelH: number, max: number): number => {
+  if (!(panelW > 0 && panelH > 0)) return max;
+  for (let n = max; n > 1; n--) {
+    const { gridWidth, gridHeight } = calculateGridPositions(panelW, panelH, n);
+    if (gridWidth >= METRIC_MIN_CELL_W && gridHeight >= METRIC_MIN_CELL_H) return n;
+  }
+  return 1;
+};
 
 /** Lays metric cells out as a grid: sets each cell's `_metricLayout` and a `renderItem` that draws it in panel pixels. */
 export const layoutMetricGrid = (
@@ -36,7 +51,6 @@ export const layoutMetricGrid = (
   );
   const labelFontSize = Math.max(11, Math.min(14, Math.round(gridData.gridWidth / 30)));
 
-  // Panel-level sparkline (all metric cells share the same config).
   const sparkOn = !!panelSpark?.enabled;
   const sparkBackground = sparkOn && panelSpark?.layout === "background";
   const sparkBottom = sparkOn && !sparkBackground;
@@ -51,7 +65,6 @@ export const layoutMetricGrid = (
     Math.max(1, valueBandHeight),
   );
 
-  // Draw a mini sparkline (line/area/bar) inside a cell rect.
   const buildCellSparkline = (
     data: number[],
     cfg: any,
@@ -151,11 +164,12 @@ export const layoutMetricGrid = (
       fontSize: sharedFontSize,
       // A copy button placed below the value must clear the field label.
       labelClearance: labelFontSize * 1.2 + 8,
+      // The canvas cuts a long label, so the hover zone offers it in full.
+      labelCut: calculateWidthText(s._metricLabel ?? "", `${labelFontSize}px`) > cellWidth * 0.95,
     };
     s.renderItem = () => {
       try {
         const children: any[] = [];
-        // per-cell mapped background drawn behind the value
         if (cellBg) {
           children.push({
             type: "rect",
@@ -164,7 +178,6 @@ export const layoutMetricGrid = (
             silent: true,
           });
         }
-        // per-cell sparkline trend (behind the value)
         if (sparkOn && Array.isArray(s._metricSparkData)) {
           children.push(
             ...buildCellSparkline(

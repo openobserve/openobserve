@@ -575,17 +575,19 @@ describe("ThresholdsConfig", () => {
     });
   });
 
-  describe("metric value mappings note", () => {
-    it("shows only on metric with coloured value mappings", () => {
-      mountConfig({ chartType: "metric", hasColouredValueMappings: true });
+  describe("value mappings note", () => {
+    it.each(["metric", "gauge"])("shows on %s only with coloured value mappings", (chartType) => {
+      mountConfig({ chartType, hasColouredValueMappings: true });
       expect(find("dashboard-config-thresholds-mapping-note").text()).toBe(
         "Value mappings win over these steps",
       );
       wrapper!.unmount();
-      mountConfig({ chartType: "metric", hasColouredValueMappings: false });
+      mountConfig({ chartType, hasColouredValueMappings: false });
       expect(find("dashboard-config-thresholds-mapping-note").exists()).toBe(false);
-      wrapper!.unmount();
-      mountConfig({ chartType: "gauge", hasColouredValueMappings: true });
+    });
+
+    it("is hidden on other charts", () => {
+      mountConfig({ chartType: "line", hasColouredValueMappings: true });
       expect(find("dashboard-config-thresholds-mapping-note").exists()).toBe(false);
     });
   });

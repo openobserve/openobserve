@@ -894,4 +894,105 @@ describe("GeoMapRenderer", () => {
       expect(wrapper.props("data").options.lmap.center).toEqual([-74.006, 40.7128]);
     });
   });
+  describe("Map lifecycle across refreshes", () => {
+    const defaultGetModel = mockChart.getModel.getMockImplementation();
+    const useLeaflet = (getMap: () => any) =>
+      mockChart.getModel.mockImplementation(() => ({
+        getComponent: vi.fn(() => ({ getLeaflet: vi.fn(getMap) })),
+      }));
+    const refreshWith = async (lmap: any) => {
+      await wrapper.setProps({
+        data: { options: { lmap, series: [{ type: "scatter", data: [[1, 2, 3]] }] } },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    };
+
+    afterEach(() => {
+      mockChart.getModel.mockImplementation(defaultGetModel!);
+      mockChart.setOption.mockImplementation(() => {});
+    });
+
+    it("keeps the user's view and tile layer when only the data changes", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const L: any = await import("leaflet");
+      mockChart.setOption.mockClear();
+      mockLeafletMap.setView.mockClear();
+      L.default.tileLayer.mockClear();
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10, roam: true });
+
+      const [options, opts] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.lmap).toEqual({ roam: true });
+      expect(opts).toEqual({ replaceMerge: ["series", "visualMap"] });
+      expect(mockLeafletMap.setView).not.toHaveBeenCalled();
+      expect(L.default.tileLayer).not.toHaveBeenCalled();
+    });
+
+    it("moves the map when the configured view changes", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      mockLeafletMap.setView.mockClear();
+
+      await refreshWith({ center: [10, 20], zoom: 4 });
+
+      expect(mockChart.setOption.mock.calls.at(-1)![0].lmap.center).toEqual([10, 20]);
+      expect(mockLeafletMap.setView).toHaveBeenCalledWith([20, 10], 4);
+    });
+
+    it("builds the map from scratch and adds tiles once when none exists yet", async () => {
+      let map: any;
+      useLeaflet(() => map);
+      mockChart.setOption.mockImplementation(() => {
+        map = mockLeafletMap;
+      });
+      const L: any = await import("leaflet");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(mockChart.setOption.mock.calls[0][1]).toBe(true);
+      expect(L.default.tileLayer).toHaveBeenCalledTimes(1);
+      expect(mockLeafletMap.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
+    });
+
+    it("rebuilds the map after a no-data placeholder", async () => {
+      let map: any = mockLeafletMap;
+      useLeaflet(() => map);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      mockChart.setOption.mockImplementation((_options: any, notMerge: any) => {
+        if (notMerge === true)
+          map = _options.lmap ? { ...mockLeafletMap, setView: vi.fn() } : undefined;
+      });
+      mockTileLayer.addTo.mockClear();
+
+      await wrapper.setProps({ data: { options: { backgroundColor: "transparent" } } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockChart.setOption.mock.calls.at(-1)![1]).toBe(true);
+      expect(map).toBeUndefined();
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10 });
+
+      expect(mockChart.setOption.mock.calls.at(-1)![1]).toBe(true);
+      expect(mockTileLayer.addTo).toHaveBeenCalledWith(map);
+      expect(map.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
+    });
+
+    it("adds a tile layer to a replaced map", async () => {
+      let map: any = mockLeafletMap;
+      useLeaflet(() => map);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const L: any = await import("leaflet");
+      L.default.tileLayer.mockClear();
+      const replacement = { ...mockLeafletMap, setView: vi.fn() };
+      mockTileLayer.addTo.mockClear();
+      map = replacement;
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10 });
+
+      expect(mockTileLayer.addTo).toHaveBeenCalledWith(replacement);
+      expect(replacement.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
+    });
+  });
 });
