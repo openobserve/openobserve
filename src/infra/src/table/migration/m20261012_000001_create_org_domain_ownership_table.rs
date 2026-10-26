@@ -52,7 +52,7 @@ fn create_domains_stmt() -> TableCreateStatement {
         .col(
             ColumnDef::new(OrgDomainOwnership::Domain)
                 .string_len(253)
-                .not_null()
+                .not_null(),
         )
         .col(
             ColumnDef::new(OrgDomainOwnership::VerificationToken)
@@ -72,10 +72,21 @@ fn create_domains_stmt() -> TableCreateStatement {
                 .integer()
                 .null(),
         )
-        .col(ColumnDef::new(OrgDomainOwnership::VerifiedAt).big_integer().null())
-
-        .col(ColumnDef::new(OrgDomainOwnership::ReleasedAt).big_integer().null())
-        .col(ColumnDef::new(OrgDomainOwnership::LastCheckedAt).big_integer().null())
+        .col(
+            ColumnDef::new(OrgDomainOwnership::VerifiedAt)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(OrgDomainOwnership::ReleasedAt)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(OrgDomainOwnership::LastCheckedAt)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(OrgDomainOwnership::CreatedAt)
                 .big_integer()
@@ -90,7 +101,7 @@ fn create_domains_stmt() -> TableCreateStatement {
             ColumnDef::new(OrgDomainOwnership::MetaMapped)
                 .boolean()
                 .not_null()
-                .default(false)
+                .default(false),
         )
         .to_owned()
 }

@@ -81,7 +81,9 @@ pub async fn link_domain(
         }
     };
     if existing.is_some() {
-        return MetaHttpResponse::bad_request(format!("there is already a request open for this domain by this org"));
+        return MetaHttpResponse::bad_request(format!(
+            "there is already a request open for this domain by this org"
+        ));
     }
 
     match org_domain_ownership::save_org_domain_mapping(&org_id, &domain).await {

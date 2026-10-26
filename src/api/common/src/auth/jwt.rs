@@ -894,24 +894,6 @@ pub async fn process_domain_org_mapping(
         return Ok(false);
     };
 
-     match org_status::read_active(&mapped.org_id).await {
-                Ok(true) => {}
-                Ok(false) => {
-                    log::warn!(
-                        "domain org mapping for user {user_email} points at inactive org {}, skipping",
-                        mapped.org_id
-                    );
-                    return Ok(false);
-                }
-                Err(e) => {
-                    log::warn!(
-                        "domain org mapping for user {user_email}: cannot read the status of org {}, skipping: {e}",
-                        mapped.org_id
-                    );
-                    return Ok(false);
-                }
-            }
-
     let org_settings = get_org_setting(&org_id).await?;
     let mappings = org_settings.domain_org_mappings;
 
@@ -971,6 +953,24 @@ pub async fn process_domain_org_mapping(
     let mut added = 0;
 
     for mapped in mapped_orgs {
+        match org_status::read_active(&mapped.org_id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                log::warn!(
+                    "domain org mapping for user {user_email} points at inactive org {}, skipping",
+                    mapped.org_id
+                );
+                return Ok(false);
+            }
+            Err(e) => {
+                log::warn!(
+                    "domain org mapping for user {user_email}: cannot read the status of org {}, skipping: {e}",
+                    mapped.org_id
+                );
+                return Ok(false);
+            }
+        }
+
         if org_status::is_blocked(&mapped.org_id) {
             log::info!(
                 "user {user_email} supposed to be mapped to org {} but org status is blocked, so skipping",

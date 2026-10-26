@@ -79,7 +79,7 @@ pub async fn create(
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
         Ok(settings) => settings,
-        Err(refusal) => return refusal,
+        Err(refusal) => return MetaHttpResponse::bad_request(refusal),
     };
     #[cfg(feature = "cloud")]
     if let Err(response) = check_budget_config(&org_id, &settings).await {
@@ -314,15 +314,15 @@ async fn check_domain_org_mappings(
             return Err(format!("No org with org id {} found", mapping.org_id));
         }
 
-         // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
+        // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
         match db::org_status::read_active(&mapping.org_id).await {
             Ok(true) => {}
             Ok(false) => return Err(inactive_mapping_target(&mapping.org_id).await),
             Err(e) => {
-                return Err(MetaHttpResponse::internal_error(format!(
+                return Err(format!(
                     "cannot read the status of org {}: {e}",
                     mapping.org_id
-                )));
+                ));
             }
         }
 
@@ -337,16 +337,14 @@ async fn check_domain_org_mappings(
             mapping.base_role.as_str(),
             "admin" | "editor" | "viewer" | "allowed_user"
         ) {
-            return Err(MetaHttpResponse::bad_request(format!(
+            return Err(format!(
                 "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
                 mapping.base_role, mapping.org_id
-            )));
+            ));
         }
         if let Some(claim) = mapping.role_claim_name.as_mut() {
             if claim.trim().is_empty() {
-                return Err(MetaHttpResponse::bad_request(
-                    "role claim name must not be empty",
-                ));
+                return Err("role claim name must not be empty".into());
             }
             *claim = claim.trim().to_string();
         }
@@ -390,11 +388,11 @@ async fn check_domain_management_config(
 }
 /// The refusal for a mapping whose target org is not active: missing, blocked, or unreadable.
 #[cfg(feature = "cloud")]
-async fn inactive_mapping_target(org_id: &str) -> Response {
+async fn inactive_mapping_target(org_id: &str) -> String {
     match infra::table::organizations::find(org_id).await {
-        Ok(None) => MetaHttpResponse::bad_request(format!("No org with org id {org_id} found")),
-        Ok(Some(_)) => MetaHttpResponse::bad_request(format!("org {org_id} is not active")),
-        Err(e) => MetaHttpResponse::internal_error(format!("cannot read org {org_id}: {e}")),
+        Ok(None) => format!("No org with org id {org_id} found"),
+        Ok(Some(_)) => format!("org {org_id} is not active"),
+        Err(e) => format!("cannot read org {org_id}: {e}"),
     }
 }
 
