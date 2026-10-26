@@ -37,7 +37,7 @@ use datafusion::{
 use hashbrown::HashSet;
 pub use metrics_index::{matcher_predicates, matcher_residual_field};
 use promql_parser::{
-    label::{MatchOp, Matchers},
+    label::{MatchOp, Matcher, Matchers},
     parser::{Offset, VectorSelector},
 };
 
@@ -68,6 +68,13 @@ pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
         df = df.filter(predicate)?;
     }
     Ok(df)
+}
+
+/// True when `matcher`'s label is absent from `schema` and "" (a missing label's value) fails it.
+pub fn absent_label_rejects_all(schema: &Schema, matcher: &Matcher) -> bool {
+    ![TIMESTAMP_COL_NAME, VALUE_LABEL, NAME_LABEL].contains(&matcher.name.as_str())
+        && schema.field_with_name(&matcher.name).is_err()
+        && !matcher.is_match("")
 }
 
 pub fn apply_label_selector(
@@ -659,5 +666,31 @@ mod tests {
             panic!("expected vector selector");
         };
         selector.matchers
+    }
+
+    #[test]
+    fn test_absent_label_reads_as_empty_string() {
+        let schema = ArrowSchema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, rejects) in [
+            (r#"m{absent="x"}"#, true),
+            (r#"m{absent=~"foo.+"}"#, true),
+            (r#"m{absent!=""}"#, true),
+            (r#"m{absent=""}"#, false),
+            (r#"m{absent!="x"}"#, false),
+            (r#"m{absent=~".*"}"#, false),
+            (r#"m{absent=~"foo|"}"#, false),
+            (r#"m{absent!~"x"}"#, false),
+            (r#"m{job="x"}"#, false),
+            (r#"{__name__="m"}"#, false),
+        ] {
+            assert_eq!(
+                parsed_matchers(query)
+                    .matchers
+                    .iter()
+                    .any(|mat| absent_label_rejects_all(&schema, mat)),
+                rejects,
+                "{query}"
+            );
+        }
     }
 }
