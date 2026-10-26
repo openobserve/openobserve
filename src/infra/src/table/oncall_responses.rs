@@ -662,7 +662,10 @@ async fn hand_over(
             oncall_responses::Column::AckedBy,
             Expr::value(next.acked_by.clone()),
         )
-        .col_expr(oncall_responses::Column::AckedAt, Expr::value(next.acked_at))
+        .col_expr(
+            oncall_responses::Column::AckedAt,
+            Expr::value(next.acked_at),
+        )
         .col_expr(
             oncall_responses::Column::SnoozedUntil,
             Expr::value(next.snoozed_until),
@@ -680,10 +683,7 @@ async fn hand_over(
             oncall_responses::Column::ExhaustedAt,
             Expr::value(next.exhausted_at),
         )
-        .col_expr(
-            oncall_responses::Column::UpdatedAt,
-            next_revision(now),
-        )
+        .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::ClosedAt.is_null())

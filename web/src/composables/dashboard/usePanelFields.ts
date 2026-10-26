@@ -15,6 +15,7 @@
 
 import { computed } from "vue";
 import { generateLabelFromName } from "@/utils/dashboard/fieldLabel";
+import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
 
 const colors = [
   "#5960b2",
@@ -59,6 +60,7 @@ export const usePanelFields = ({
       case "donut":
       case "heatmap":
       case "gauge":
+      case "state-timeline":
       case "area":
       case "bar":
       case "h-bar":
@@ -96,6 +98,7 @@ export const usePanelFields = ({
       case "area-stacked":
       case "stacked":
       case "h-stacked":
+      case "state-timeline":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
@@ -127,6 +130,7 @@ export const usePanelFields = ({
         );
       case "area-stacked":
       case "heatmap":
+      case "state-timeline":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -326,7 +330,12 @@ export const usePanelFields = ({
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
-      functionName: dashboardPanelData.data.type == "heatmap" || isDerived ? null : "count",
+      functionName:
+        dashboardPanelData.data.type == "heatmap" || isDerived
+          ? null
+          : dashboardPanelData.data.type == "state-timeline"
+            ? STATE_TIMELINE_Y_FUNCTION
+            : "count",
       args: [
         {
           type: "field",
