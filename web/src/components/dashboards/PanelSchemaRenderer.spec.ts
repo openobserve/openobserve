@@ -3387,6 +3387,11 @@ describe("PanelSchemaRenderer", () => {
       return chunk;
     };
 
+    it("emits an empty map notice on mount, clearing a previous chart's chip", async () => {
+      await mountRacing();
+      expect(wrapper.emitted("region-join-update")?.[0]).toEqual([null]);
+    });
+
     it("emits the maps region join from each conversion and clears it on the next", async () => {
       const { data } = await mountRacing();
       const join = { unmatched: ["us-east-1"], unmatchedTotal: 1 };
@@ -3415,6 +3420,21 @@ describe("PanelSchemaRenderer", () => {
       await flushPromises();
 
       vi.mocked(convertPanelData).mockRejectedValueOnce(new Error("bad"));
+      data.value = [shifted];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
+    });
+
+    it("clears the maps region join when the next run carries a query error", async () => {
+      const { data, errorDetail } = await mountRacing();
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("a"),
+        extras: { regionJoin: { unmatched: ["x"], unmatchedTotal: 1 } },
+      });
+      data.value = [primary];
+      await flushPromises();
+
+      errorDetail.value = { message: "bad query", code: "400" };
       data.value = [shifted];
       await flushPromises();
       expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);

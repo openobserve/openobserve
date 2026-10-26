@@ -1488,6 +1488,7 @@ export default defineComponent({
           };
         }
       } else {
+        regionJoin.value = null;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
@@ -1824,9 +1825,14 @@ export default defineComponent({
       emit("series-limit-update", value);
     });
 
-    watch(regionJoin, (value) => {
-      emit("region-join-update", value);
-    });
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's chips.
+    watch(
+      regionJoin,
+      (value) => {
+        emit("region-join-update", value);
+      },
+      { immediate: true },
+    );
 
     watch(
       () => panelDiagnostics?.value,
