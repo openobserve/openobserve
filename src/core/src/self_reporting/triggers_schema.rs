@@ -71,6 +71,11 @@ pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
     }
 }
 
+/// Forget that the org's triggers stream was set up, so a reused org id is set up again.
+pub(crate) fn forget_org(org_id: &str) {
+    INITIALIZED_ORGS.remove(org_id);
+}
+
 /// Internal function that performs the actual schema initialization.
 /// This should only be called by ensure_triggers_stream_initialized.
 ///
@@ -173,13 +178,24 @@ mod tests {
         assert!(field_names.contains(&"synthetics_error_source".to_string()));
         assert!(field_names.contains(&"synthetics_location".to_string()));
         assert!(field_names.contains(&"delivery_attempted".to_string()));
+        for f in [
+            "trigger_source",
+            "triggered_by",
+            "recipient_count",
+            "attachment_type",
+            "dashboard_count",
+            "scheduled_for",
+        ] {
+            assert!(field_names.contains(&f.to_string()), "missing {f}");
+        }
 
         // The history filter and the Suppressed tab of a downtime read this column.
         assert!(field_names.contains(&"downtime_id".to_string()));
 
         // Verify count matches struct fields
-        // 37: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value
-        assert_eq!(field_names.len(), 37);
+        // 43: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
+        // report
+        assert_eq!(field_names.len(), 43);
 
         // Verify no duplicate fields
         let unique_count = field_names
@@ -199,5 +215,12 @@ mod tests {
 
         // Verify it's marked as initialized
         assert!(INITIALIZED_ORGS.contains(test_org));
+    }
+
+    #[test]
+    fn test_forget_org_drops_the_setup_mark() {
+        INITIALIZED_ORGS.insert("forget_org_triggers".to_string());
+        forget_org("forget_org_triggers");
+        assert!(!INITIALIZED_ORGS.contains("forget_org_triggers"));
     }
 }

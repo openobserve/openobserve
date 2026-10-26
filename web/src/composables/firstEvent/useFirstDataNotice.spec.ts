@@ -19,6 +19,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import {
   firstDataStorageKey,
   markDetectionSeen,
+  orgHasUserStreams,
   readFirstDataRecord,
   useFirstDataNotice,
   writeFirstDataRecord,
@@ -78,6 +79,18 @@ afterEach(() => {
   queryClient.clear();
   vi.clearAllMocks();
   vi.useRealTimers();
+});
+
+describe("orgHasUserStreams", () => {
+  it("answers null, never throws, when a stream page holds no list", async () => {
+    const real = nameList.getMockImplementation()!;
+    nameList.mockImplementation(async () => ({ data: { list: "unavailable" as never, total: 1 } }));
+    try {
+      await expect(orgHasUserStreams(ORG)).resolves.toBeNull();
+    } finally {
+      nameList.mockImplementation(real);
+    }
+  });
 });
 
 describe("useFirstDataNotice", () => {

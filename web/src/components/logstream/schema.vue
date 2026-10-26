@@ -310,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                             <div>
                               <OButton
+                                :aria-label="t('common.close')"
                                 data-test="add-stream-cancel-btn"
                                 variant="ghost"
                                 size="icon-sm"
@@ -1710,7 +1711,6 @@ export default defineComponent({
           analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             stream_name: indexData.value.name,
             page: "Schema Details",
           });

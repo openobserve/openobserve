@@ -29,10 +29,11 @@ const KIND_SCHEDULE: &str = "schedule";
 /// rotation they are on, and the emitter has no team to name.
 const KIND_ABSENCE: &str = "absence";
 const KIND_ACK_SPENT: &str = "ack-spent";
+const KIND_ORG_DELETED: &str = "org-deleted";
 
 /// An org's ownership rules changed — created, deleted, or replicated in.
 pub async fn emit_ownership_changed(org_id: &str) -> Result<(), Error> {
-    emit(&format!(
+    super::emit_put(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_OWNERSHIP}/{org_id}"
     ))
     .await
@@ -40,7 +41,7 @@ pub async fn emit_ownership_changed(org_id: &str) -> Result<(), Error> {
 
 /// One team's escalation policy changed.
 pub async fn emit_policy_changed(org_id: &str, team_id: &str) -> Result<(), Error> {
-    emit(&format!(
+    super::emit_put(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_POLICY}/{org_id}/{team_id}"
     ))
     .await
@@ -48,7 +49,7 @@ pub async fn emit_policy_changed(org_id: &str, team_id: &str) -> Result<(), Erro
 
 /// One team's own row changed, or the team was deleted.
 pub async fn emit_team_changed(org_id: &str, team_id: &str) -> Result<(), Error> {
-    emit(&format!(
+    super::emit_put(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_TEAM}/{org_id}/{team_id}"
     ))
     .await
@@ -59,7 +60,7 @@ pub async fn emit_team_changed(org_id: &str, team_id: &str) -> Result<(), Error>
 /// would make the emitter and the reader disagree about what identifies a
 /// roster.
 pub async fn emit_members_changed(team_id: &str) -> Result<(), Error> {
-    emit(&format!(
+    super::emit_put(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_MEMBERS}/{team_id}"
     ))
     .await
@@ -67,7 +68,7 @@ pub async fn emit_members_changed(team_id: &str) -> Result<(), Error> {
 
 /// A team's schedule changed — a rotation edited, or a cover added or removed.
 pub async fn emit_schedule_changed(org_id: &str, team_id: &str) -> Result<(), Error> {
-    emit(&format!(
+    super::emit_put(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_SCHEDULE}/{org_id}/{team_id}"
     ))
     .await
@@ -79,8 +80,17 @@ pub async fn emit_schedule_changed(org_id: &str, team_id: &str) -> Result<(), Er
 /// to be looking at. An absence is org-wide by design, so narrowing this to a
 /// team would mean the other teams that person is on keep resolving to them.
 pub async fn emit_absences_changed(org_id: &str) -> Result<(), Error> {
-    emit(&format!(
+    super::emit_put(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/{org_id}"
+    ))
+    .await
+}
+
+/// The org was deleted: every org-keyed on-call cache of it drops.
+pub async fn emit_org_deleted(org_id: &str) -> Result<(), Error> {
+    // Transient: one key per deleted org would otherwise stay in the store forever.
+    super::emit_delete(&format!(
+        "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ORG_DELETED}/{org_id}"
     ))
     .await
 }
@@ -92,35 +102,14 @@ pub async fn emit_absences_changed(org_id: &str) -> Result<(), Error> {
 /// working acknowledgement link sitting in an operator's terminal. The expiry
 /// rides along so a receiving node can drop the entry when the link would have
 /// died anyway.
+///
+/// A delete, not a put: one key per acknowledgement ever made would grow the
+/// coordinator's store forever, and receivers treat both events identically.
 pub async fn emit_ack_token_spent(tag: &str, expires_at: i64) -> Result<(), Error> {
-    emit_transient(&format!(
+    super::emit_delete(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ACK_SPENT}/{tag}/{expires_at}"
     ))
     .await
-}
-
-/// Publishes one invalidation. A `put`, because the key space is bounded: one
-/// key per org, or per team. The store ends up holding one row for every team
-/// that has ever had its schedule edited.
-async fn emit(key: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(key, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
-}
-
-/// Publishes a fact whose key space is NOT bounded.
-///
-/// A spent token is keyed by its own tag, so one key per acknowledgement ever
-/// made — a `put` would grow the coordinator's store forever. A delete carries
-/// the event and leaves nothing behind.
-///
-/// Receivers treat both events identically, so nothing downstream cares which
-/// arrived.
-async fn emit_transient(key: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(key, false, true, None).await
 }
 
 /// Watches on-call configuration events and invalidates the matching cache.
@@ -194,6 +183,10 @@ fn apply<F: Fn(&str, i64)>(key: &str, on_ack_token_spent: &F) {
             Some(org) => crate::table::oncall_schedules::invalidate_org(org),
             None => log::error!("watch_oncall_cache: malformed absence key {key}"),
         },
+        Some(KIND_ORG_DELETED) => match parts.get(2) {
+            Some(org) => crate::table::oncall_teams::invalidate_org(org),
+            None => log::error!("watch_oncall_cache: malformed org-deleted key {key}"),
+        },
         Some(KIND_ACK_SPENT) => match (parts.get(2), parts.get(3).and_then(|e| e.parse().ok())) {
             (Some(tag), Some(expires_at)) => on_ack_token_spent(tag, expires_at),
             // Refused, not guessed: an invented expiry either never lapses or lapses at once.
@@ -219,6 +212,7 @@ mod tests {
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_SCHEDULE}/default/team_1"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/default"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ACK_SPENT}/deadbeef/1700000000000000"),
+            format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ORG_DELETED}/default"),
         ] {
             assert!(k.starts_with(ONCALL_CACHE_WATCHER_PREFIX), "{k}");
         }
@@ -253,6 +247,7 @@ mod tests {
             "/oncall_cache/policy/onlyorg",
             "/oncall_cache/team",
             "/oncall_cache/members",
+            "/oncall_cache/org-deleted",
             "/oncall_cache/nonsense/a/b",
             "/oncall_cache/ack-spent/deadbeef",
             "/oncall_cache/ack-spent/deadbeef/not-a-number",

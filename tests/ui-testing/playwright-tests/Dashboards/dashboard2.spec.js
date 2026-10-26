@@ -10,6 +10,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { answerPanelDraftRestore } from "../../pages/dashboardPages/panel-leave-dialog.js";
 
 // Every test here runs in parallel (the config sets fullyParallel: true), so the
 // dashboard name must be generated fresh per test. A single shared module-scope
@@ -290,17 +291,21 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
+    await expect(pm.chartTypeSelector.getBreakdownItem(1)).toBeVisible();
 
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
 
-    // The panel selections do not survive the reload, so the chart falls back to
-    // its empty state. toBeVisible() retries, which is what the blind 1s sleep
-    // that used to sit here was standing in for.
-    await expect(pm.dashboardPanelActions.getNoDataLocator()).toBeVisible({
+    // The reload keeps the edits as a draft; Start fresh drops them and opens a default new panel.
+    expect(await answerPanelDraftRestore(page, { choice: "fresh", timeout: 30000 })).toBe(true);
+    await expect(page.locator('[data-test="dashboard-y-item-y_axis_1"]')).toBeVisible({
       timeout: 30000,
     });
+    await expect(page.locator('[data-test="dashboard-y-item-y_axis_1"]')).not.toContainText(
+      "kubernetes_container_name"
+    );
+    await expect(pm.chartTypeSelector.getBreakdownItem(1)).toHaveCount(0);
 
     // Leave the editor and delete the dashboard — this test created one and never
     // removed it. NOTE: the dialog handler that used to be registered here

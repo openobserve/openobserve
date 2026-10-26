@@ -40,12 +40,7 @@ pub(crate) async fn read_dbm_instances_body(
     {
         return Err(unauthorized_response());
     }
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return Err(MetaHttpResponse::bad_request(
-            "start_time must be before end_time",
-        ));
-    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time)?;
     // A failed schema read is reported, never absorbed into an empty set: an
     // empty picker and a broken picker must not look alike. Same rule as
     // `read_table_health_body`.

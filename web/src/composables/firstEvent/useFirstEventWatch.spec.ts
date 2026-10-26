@@ -24,7 +24,7 @@ interface FakeRow {
   stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
 }
 
-const rows: Record<string, FakeRow[]> = { logs: [], metrics: [], traces: [] };
+const rows: Record<string, FakeRow[]> = { logs: [], metrics: [], traces: [], profiles: [] };
 const nameList = vi.fn(
   async (_org: string, type: string, _schema: boolean, offset = -1, limit = -1, keyword = "") => {
     const all = (rows[type] ?? []).filter((r) => !keyword || r.name.includes(keyword));
@@ -67,7 +67,7 @@ const storeState = {
   zoConfig,
   API_ENDPOINT: "http://o2.test",
   selectedOrganization: { identifier: "acme" },
-  organizationData: { isDataIngested: false },
+  organizationData: { isDataIngested: false } as { isDataIngested?: boolean | null },
   streams: {
     logs: {},
     metrics: {},
@@ -131,14 +131,17 @@ const setVisibility = (v: "visible" | "hidden") => {
 
 beforeEach(() => {
   storeState.selectedOrganization.identifier = "acme";
+  storeState.organizationData.isDataIngested = false;
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   rows.logs = [];
   rows.metrics = [];
   rows.traces = [];
+  rows.profiles = [];
   for (const k of Object.keys(zoConfig)) delete zoConfig[k];
   setVisibility("visible");
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -253,6 +256,18 @@ describe("useFirstEventWatch — confirmation", () => {
       rangeStart: docMin - 900_000_000,
       rangeEnd: docMin + 900_000_000,
     });
+  });
+
+  it("detects a new profiles stream on the profiles setup page", async () => {
+    const docMin = (NOW - HOUR) * 1000;
+    search.mockImplementation(async () => ({ data: { hits: [{ _timestamp: docMin }] } }));
+    const w = watchOf("profiles");
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.profiles = [{ name: "default", stats: { doc_num: 40, doc_time_min: docMin } }];
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+    expect(w.result.value).toMatchObject({ streamName: "default", streamType: "profiles" });
   });
 
   it("does not count internal streams or non-user types", async () => {
@@ -513,6 +528,7 @@ describe("useFirstEventWatch — a target that already has data waits for the us
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
     expect(w.state.value).toBe("idle");
+    expect(w.targetExists.value).toBe(true);
     const listCalls = nameList.mock.calls.length;
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(w.state.value).toBe("idle");
@@ -526,6 +542,7 @@ describe("useFirstEventWatch — a target that already has data waits for the us
     w.start("open");
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(w.state.value).toBe("idle");
+    expect(w.targetExists.value).toBe(true);
     expect(search).not.toHaveBeenCalled();
   });
 
@@ -608,7 +625,7 @@ describe("useFirstEventWatch — a target that already has data waits for the us
     expect(w.result.value?.sinceUs).toBeUndefined();
   });
 
-  it("probes a changed target from idle and keeps checking when it does not exist", async () => {
+  it("probes a changed target from idle and holds it when it does not exist, since the org has data", async () => {
     rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
     const target = ref<string | undefined>("default");
     const w = watchOf("logs", { targetStream: target });
@@ -616,10 +633,602 @@ describe("useFirstEventWatch — a target that already has data waits for the us
     await vi.advanceTimersByTimeAsync(1);
     expect(w.state.value).toBe("idle");
     target.value = "nginx_access";
+    await vi.advanceTimersByTimeAsync(1);
+    expect(keywordPageCalls("logs", "nginx_access")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(w.state.value).toBe("idle");
+    expect(keywordPageCalls("logs", "nginx_access")).toHaveLength(1);
+    expect(search).not.toHaveBeenCalled();
+  });
+});
+
+describe("useFirstEventWatch — an org with data waits for the user on a missing target", () => {
+  it("goes idle on open when the exact target does not exist, and stops probing", async () => {
+    storeState.organizationData.isDataIngested = true;
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    const listCalls = nameList.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(w.state.value).toBe("idle");
+    expect(nameList.mock.calls.length).toBe(listCalls);
+    expect(search).not.toHaveBeenCalled();
+    expect(recentRejections).not.toHaveBeenCalled();
+    expect(w.targetExists.value).toBe(false);
+  });
+
+  it("goes idle on open when no keyword match exists, and stops probing", async () => {
+    storeState.organizationData.isDataIngested = true;
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(w.targetExists.value).toBe(false);
+    const listCalls = nameList.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(w.state.value).toBe("idle");
+    expect(nameList.mock.calls.length).toBe(listCalls);
+    expect(search).not.toHaveBeenCalled();
+    expect(recentRejections).not.toHaveBeenCalled();
+  });
+
+  it.each(["check", "copy"] as const)(
+    "polls for the missing target once %s starts it from idle, and reports its first record",
+    async (reason) => {
+      storeState.organizationData.isDataIngested = true;
+      const w = watchOf("logs", { targetStream: "syslog_ng" });
+      w.start("open");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(w.state.value).toBe("idle");
+      w.start(reason);
+      expect(w.state.value).toBe("waiting");
+      const before = keywordPageCalls("logs", "syslog_ng").length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(w.state.value).toBe("waiting");
+      expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
+      rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(w.state.value).toBe("received");
+      expect(w.result.value).toMatchObject({ streamName: "syslog_ng", count: 4 });
+      expect(w.result.value?.sinceUs).toBeUndefined();
+      expect(w.scope.value).toBe("new-data");
+    },
+  );
+
+  it("reports the first keyword match once Check now starts it from idle", async () => {
+    storeState.organizationData.isDataIngested = true;
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    await w.probeNow();
+    expect(w.state.value).toBe("waiting");
+    await vi.advanceTimersByTimeAsync(5000);
+    rows.metrics = [{ name: "system_cpu_time", stats: { doc_num: 7, doc_time_min: NOW * 1000 } }];
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+    expect(w.result.value).toMatchObject({ streamName: "system_cpu_time", count: 7 });
+  });
+
+  it.each([false, undefined, null])(
+    "keeps checking on open for a missing target while isDataIngested is %s",
+    async (ingested) => {
+      storeState.organizationData.isDataIngested = ingested;
+      const w = watchOf("logs", { targetStream: "syslog_ng" });
+      w.start("open");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(w.state.value).toBe("waiting");
+      const before = keywordPageCalls("logs", "syslog_ng").length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
+      rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(w.state.value).toBe("received");
+    },
+  );
+
+  it.each([false, undefined])(
+    "keeps checking on open with no keyword match while isDataIngested is %s",
+    async (ingested) => {
+      storeState.organizationData.isDataIngested = ingested;
+      const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+      w.start("open");
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(w.state.value).toBe("waiting");
+      expect(keywordPageCalls("metrics", "system_").length).toBeGreaterThan(1);
+    },
+  );
+});
+
+describe("useFirstEventWatch — org data on a direct load, before the flag is set", () => {
+  const unkeyedCalls = () => nameList.mock.calls.filter((c) => !c[5]);
+  const userStreamIn = (type: string) => {
+    rows[type] = [{ name: "cpu_load", stats: { doc_num: 5, doc_time_min: 1 } }];
+  };
+
+  it.each([false, undefined])(
+    "reads the org's user streams and goes idle on a missing target while isDataIngested is %s",
+    async (ingested) => {
+      storeState.organizationData.isDataIngested = ingested;
+      userStreamIn("metrics");
+      const w = watchOf("logs", { targetStream: "syslog_ng" });
+      w.start("open");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(w.state.value).toBe("idle");
+      expect(dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
+      const listCalls = nameList.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(w.state.value).toBe("idle");
+      expect(nameList.mock.calls.length).toBe(listCalls);
+      expect(search).not.toHaveBeenCalled();
+    },
+  );
+
+  it("goes idle with no keyword match when the org's user streams show data", async () => {
+    userStreamIn("logs");
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    const listCalls = nameList.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(nameList.mock.calls.length).toBe(listCalls);
+  });
+
+  it("reads the org's user streams only after the target lookup finds no target", async () => {
+    userStreamIn("metrics");
+    const lookup = deferred<Awaited<ReturnType<typeof nameList>>>();
+    const real = nameList.getMockImplementation()!;
+    nameList.mockImplementation((...a) => (a[5] ? lookup.promise : real(...a)));
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(unkeyedCalls()).toHaveLength(0);
+    expect(w.deciding.value).toBe(true);
+    lookup.resolve({ data: { list: [], total: 0 } });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(unkeyedCalls().length).toBeGreaterThan(0);
+    expect(w.deciding.value).toBe(false);
+    expect(w.state.value).toBe("idle");
+  });
+
+  it.each([
+    ["an exact target exists", "logs", "syslog_ng", undefined, "syslog_ng"],
+    ["keyword matches exist", "metrics", "system_", "keyword", "system_cpu"],
+  ] as const)("reads no org stream list when %s", async (_label, signal, name, match, row) => {
+    userStreamIn("traces");
+    rows[signal] = [{ name: row, stats: {} }];
+    const w = watchOf(signal, { targetStream: name, match });
+    w.start("open");
     await vi.advanceTimersByTimeAsync(10_000);
     expect(w.state.value).toBe("waiting");
-    expect(keywordPageCalls("logs", "nginx_access").length).toBeGreaterThan(1);
-    expect(search).not.toHaveBeenCalled();
+    expect(unkeyedCalls()).toHaveLength(0);
+  });
+
+  it("ignores the stored flag when it belongs to another selected org", async () => {
+    storeState.organizationData.isDataIngested = true;
+    storeState.selectedOrganization.identifier = "beta";
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    expect(unkeyedCalls().length).toBeGreaterThan(0);
+  });
+
+  it("never sets the shared flag from an earlier visit's record alone", async () => {
+    localStorage.setItem(
+      "o2.onboarding.firstData.acme",
+      JSON.stringify({ lastVisit: NOW, hadData: true }),
+    );
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", true);
+  });
+
+  it("never sets the shared flag from another org's streams", async () => {
+    storeState.selectedOrganization.identifier = "beta";
+    userStreamIn("metrics");
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", true);
+  });
+
+  it("keeps checking when the org holds only internal streams", async () => {
+    rows.logs = [
+      { name: "usage", stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "_o2_pipeline", stats: { doc_num: 9, doc_time_min: 1 } },
+    ];
+    rows.metrics = [{ name: "_anomalies", stats: { doc_num: 9, doc_time_min: 1 } }];
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    const before = keywordPageCalls("logs", "syslog_ng").length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
+    expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", true);
+  });
+
+  it("keeps checking when reading the org's user streams fails", async () => {
+    userStreamIn("metrics");
+    const real = nameList.getMockImplementation()!;
+    nameList.mockImplementation(async (...a) => {
+      if (!a[5]) throw new Error("503");
+      return real(...a);
+    });
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    const before = keywordPageCalls("logs", "syslog_ng").length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
+  });
+
+  it("reads no stream list beyond the target lookup when isDataIngested is already true", async () => {
+    storeState.organizationData.isDataIngested = true;
+    userStreamIn("metrics");
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(unkeyedCalls()).toHaveLength(0);
+  });
+
+  it("reads no stream list beyond the target lookup when an earlier visit recorded user data", async () => {
+    userStreamIn("metrics");
+    localStorage.setItem(
+      "o2.onboarding.firstData.acme",
+      JSON.stringify({ lastVisit: NOW, hadData: true }),
+    );
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(unkeyedCalls()).toHaveLength(0);
+  });
+});
+
+describe("useFirstEventWatch — no claim before the first decision", () => {
+  it.each([
+    [true, "idle"],
+    [false, "waiting"],
+  ] as const)(
+    "decides a missing target only once the lookup answers (org has data: %s)",
+    async (ingested, decided) => {
+      storeState.organizationData.isDataIngested = ingested;
+      const lookup = deferred<Awaited<ReturnType<typeof nameList>>>();
+      const real = nameList.getMockImplementation()!;
+      nameList.mockImplementation((...a) => (a[5] ? lookup.promise : real(...a)));
+      const w = watchOf("logs", { targetStream: "syslog_ng" });
+      w.start("open");
+      expect(w.deciding.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(w.deciding.value).toBe(true);
+      lookup.resolve({ data: { list: [], total: 0 } });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(w.deciding.value).toBe(false);
+      expect(w.state.value).toBe(decided);
+    },
+  );
+
+  it("falls back to waiting when the first lookup fails", async () => {
+    const real = nameList.getMockImplementation()!;
+    nameList.mockImplementation(async (...a) => {
+      if (a[5]) throw new Error("503");
+      return real(...a);
+    });
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.deciding.value).toBe(false);
+    expect(w.state.value).toBe("waiting");
+  });
+
+  it("never decides a watch without a target, and never on Check now from idle", async () => {
+    const any = watchOf("logs");
+    any.start("open");
+    expect(any.deciding.value).toBe(false);
+    scope.stop();
+    storeState.organizationData.isDataIngested = true;
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    w.start("check");
+    expect(w.deciding.value).toBe(false);
+    expect(w.state.value).toBe("waiting");
+  });
+
+  it("keeps checking when an org stream page answers without a list", async () => {
+    const real = nameList.getMockImplementation()!;
+    nameList.mockImplementation(async (...a) =>
+      a[5] ? real(...a) : { data: { list: "unavailable" as never, total: 1 } },
+    );
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.deciding.value).toBe(false);
+    expect(w.state.value).toBe("waiting");
+  });
+
+  it("lifts the placeholder and keeps checking when the first decision throws", async () => {
+    const real = nameList.getMockImplementation()!;
+    nameList.mockImplementation(async (...a) =>
+      a[5] ? { data: { list: {} as never, total: 1 } } : real(...a),
+    );
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.deciding.value).toBe(false);
+    expect(w.state.value).toBe("waiting");
+    const before = keywordPageCalls("logs", "syslog_ng").length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before);
+  });
+});
+
+describe("useFirstEventWatch — engagement survives a reload", () => {
+  const serverNowS = Math.floor(NOW / 1000);
+  const reload = (
+    opts: WatchOpts = { targetStream: "syslog_ng" },
+    signal: StreamSignal = "logs",
+  ) => {
+    scope.stop();
+    const w = watchOf(signal, opts);
+    w.start("open");
+    return w;
+  };
+  const engagedKeys = () =>
+    Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i) ?? "").filter(
+      (k) => k.startsWith("o2.firstEvent.engaged:"),
+    );
+
+  beforeEach(() => {
+    storeState.organizationData.isDataIngested = true;
+  });
+
+  it("resumes a copied watch after a reload instead of holding, timed from the copy", async () => {
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    const copiedAt = w.startedAtMs.value;
+    await vi.advanceTimersByTimeAsync(30_000);
+    const after = reload();
+    expect(after.deciding.value).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(after.state.value).toBe("waiting");
+    expect(after.startedAtMs.value).toBe(copiedAt);
+    rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(after.state.value).toBe("received");
+    expect(engagedKeys()).toHaveLength(0);
+  });
+
+  it("counts a target created between the copy and the reload as new data", async () => {
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("check");
+    await vi.advanceTimersByTimeAsync(10_000);
+    scope.stop();
+    rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
+    const after = watchOf("logs", { targetStream: "syslog_ng" });
+    after.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(after.state.value).toBe("received");
+    expect(after.scope.value).toBe("new-data");
+  });
+
+  it("keeps the server-clock anchor of an existing target across a reload", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(10_000);
+    const anchors = search.mock.calls.filter((c) => c[0].query.query.sql.includes("zo_now")).length;
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS + 600 }]);
+    const after = reload({ targetStream: "default" });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(after.state.value).toBe("waiting");
+    expect(search.mock.calls.filter((c) => c[0].query.query.sql.includes("zo_now")).length).toBe(
+      anchors,
+    );
+    expect(countCalls().at(-1)?.query.query.sql).toContain(
+      `_timestamp >= ${serverNowS * 1_000_000}`,
+    );
+    expect(after.sinceUs.value).toBe(serverNowS * 1_000_000);
+  });
+
+  it("counts a keyword match created between the copy and the reload", async () => {
+    rows.metrics = [{ name: "system_cpu", stats: { doc_num: 9, doc_time_min: 1 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const opts: WatchOpts = { targetStream: "system_", match: "keyword" };
+    const w = watchOf("metrics", opts);
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(10_000);
+    scope.stop();
+    rows.metrics.push({ name: "system_mem", stats: { doc_num: 3, doc_time_min: NOW * 1000 } });
+    const after = watchOf("metrics", opts);
+    after.start("open");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(after.state.value).toBe("received");
+    expect(after.result.value?.streamName).toBe("system_mem");
+  });
+
+  it("reads rejections 120 s after the original copy, not after the reload", async () => {
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(100_000);
+    recentRejections.mockClear();
+    reload();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(recentRejections).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(recentRejections).toHaveBeenCalled();
+  });
+
+  it("holds again after a reload once the copy is past the 60-minute budget", async () => {
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    scope.stop();
+    await vi.advanceTimersByTimeAsync(61 * 60_000);
+    const after = watchOf("logs", { targetStream: "syslog_ng" });
+    after.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(after.state.value).toBe("idle");
+    expect(engagedKeys()).toHaveLength(0);
+  });
+
+  it("forgets the copy when the watch is stopped", async () => {
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    w.stop();
+    const after = reload();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(after.state.value).toBe("idle");
+  });
+
+  it("forgets the copy when the org changes", async () => {
+    const org = ref("acme");
+    const w = watchOf("logs", { org, targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    org.value = "beta";
+    await vi.advanceTimersByTimeAsync(1);
+    const after = reload({ targetStream: "syslog_ng" });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(after.state.value).toBe("idle");
+  });
+
+  it("forgets the copy when the bar remounts for another org", async () => {
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    reload({ org: ref("beta"), targetStream: "syslog_ng" });
+    await vi.advanceTimersByTimeAsync(1);
+    const after = reload();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(after.state.value).toBe("idle");
+  });
+
+  it("forgets the previous target's copy on a target change, so switching back holds", async () => {
+    const target = ref<string | undefined>("syslog_ng");
+    const w = watchOf("logs", { targetStream: target });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    expect(engagedKeys()).toHaveLength(1);
+    target.value = "nginx_access";
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(engagedKeys()).toHaveLength(0);
+    target.value = "syslog_ng";
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+  });
+
+  it.each([
+    ["a non-numeric start", { at: "now" }],
+    ["a target that is not an object", { at: NOW, target: "system_" }],
+    ["a non-boolean existed", { at: NOW, target: { existed: "yes" } }],
+    ["a non-numeric anchor", { at: NOW, target: { existed: true, zoNowUs: "x" } }],
+    ["a baseline that is not a list", { at: NOW, target: { existed: true, baseline: 5 } }],
+    ["a baseline holding a non-name", { at: NOW, target: { existed: true, baseline: ["a", 1] } }],
+    ["matches that are not a list", { at: NOW, target: { existed: true, matches: "system_a" } }],
+  ])("drops a stored copy with %s and holds instead of resuming", async (_label, record) => {
+    const key =
+      "o2.firstEvent.engaged:" + JSON.stringify(["acme", ["metrics"], true, "system_", ""]);
+    sessionStorage.setItem(key, JSON.stringify(record));
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    expect(() => w.start("open")).not.toThrow();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    expect(engagedKeys()).toHaveLength(0);
+  });
+
+  it("sweeps another org's copy past a malformed stored key", async () => {
+    const beta = "o2.firstEvent.engaged:" + JSON.stringify(["beta", ["logs"], false, "x", ""]);
+    sessionStorage.setItem(beta, JSON.stringify({ at: NOW }));
+    sessionStorage.setItem("o2.firstEvent.engaged:5", JSON.stringify({ at: NOW }));
+    const w = watchOf("logs", { targetStream: "syslog_ng" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(engagedKeys()).not.toContain(beta);
+  });
+
+  it("resumes a keyword watch without re-counting matches whose stats never moved", async () => {
+    rows.metrics = ["m0", "m1", "m2", "m3"].map((n, i) => ({
+      name: `system_${n}`,
+      stats: { doc_num: 9, doc_time_min: 1, doc_time_max: 10 - i },
+    }));
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const opts: WatchOpts = { targetStream: "system_", match: "keyword" };
+    const w = watchOf("metrics", opts);
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(1);
+    const before = countCalls().length;
+    reload(opts, "metrics");
+    await vi.advanceTimersByTimeAsync(10_001);
+    const counted = countCalls()
+      .slice(before)
+      .map((r) => /"(system_m\d)"/.exec(r.query.query.sql)?.[1]);
+    expect(counted).toEqual([
+      "system_m0",
+      "system_m1",
+      "system_m0",
+      "system_m2",
+      "system_m0",
+      "system_m3",
+    ]);
+  });
+
+  it("keeps today's behaviour when session storage throws", async () => {
+    const fail = () => {
+      throw new Error("SecurityError");
+    };
+    const spies = [
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(fail),
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(fail),
+      vi.spyOn(Storage.prototype, "removeItem").mockImplementation(fail),
+      vi.spyOn(Storage.prototype, "key").mockImplementation(fail),
+    ];
+    try {
+      const w = watchOf("logs", { targetStream: "syslog_ng" });
+      w.start("open");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(w.state.value).toBe("idle");
+      w.start("copy");
+      expect(w.state.value).toBe("waiting");
+      await vi.advanceTimersByTimeAsync(5000);
+      const after = reload();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(after.state.value).toBe("idle");
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
   });
 });
 
@@ -692,10 +1301,10 @@ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", ()
     target.value = "new";
     pending.resolve({ data: { hits: [{ zo_count: 5, zo_min: serverNowS * 1_000_000 }] } });
     await vi.advanceTimersByTimeAsync(1);
-    expect(w.state.value).toBe("waiting");
+    expect(w.state.value).toBe("idle");
     expect(w.result.value).toBeUndefined();
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(w.state.value).toBe("waiting");
+    expect(w.state.value).toBe("idle");
     expect(w.scope.value).toBe("new-data");
   });
 });

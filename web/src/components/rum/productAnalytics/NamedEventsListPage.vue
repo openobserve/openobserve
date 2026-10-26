@@ -278,7 +278,11 @@ import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { MAX_EVENTS_PER_APP, type NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import {
+  MAX_EVENTS_PER_APP,
+  type NamedEvent,
+  type NamedRule,
+} from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 defineOptions({ name: "NamedEventsListPage" });
@@ -397,22 +401,39 @@ const columns = computed<OTableColumnDef<NamedEvent>[]>(() => [
   },
 ]);
 
-const summary = (ev: NamedEvent): I18nText =>
-  raw(
-    ev.rules
-      .map((r) => {
-        if (r.t === "action") {
-          const targets = raw(r.targets.join(", "));
-          return r.onPage
-            ? t("rum.analytics.events.summaryClickOn", { targets, page: raw(r.onPage) })
-            : t("rum.analytics.events.summaryClick", { targets });
-        }
-        const key =
-          r.op === "eq" ? "summaryEq" : r.op === "prefix" ? "summaryPrefix" : "summaryRegex";
-        return t(`rum.analytics.events.${key}`, { value: raw(r.value) });
-      })
-      .join(" · "),
-  );
+const CLICK_SUMMARY = {
+  prefix: "summaryClickPrefix",
+  contains: "summaryClickContains",
+  regex: "summaryClickRegex",
+} as const;
+const ERROR_SUMMARY = {
+  eq: "summaryErrorEq",
+  prefix: "summaryErrorPrefix",
+  contains: "summaryErrorContains",
+  regex: "summaryErrorRegex",
+} as const;
+const PAGE_SUMMARY = { eq: "summaryEq", prefix: "summaryPrefix", regex: "summaryRegex" } as const;
+
+const ruleSummary = (r: NamedRule): I18nText => {
+  if (r.t === "action") {
+    if (r.op && r.op !== "in")
+      return t(`rum.analytics.events.${CLICK_SUMMARY[r.op]}`, { value: raw(r.value) });
+    const targets = raw((r.targets ?? []).join(", "));
+    return r.onPage
+      ? t("rum.analytics.events.summaryClickOn", { targets, page: raw(r.onPage) })
+      : t("rum.analytics.events.summaryClick", { targets });
+  }
+  if (r.t === "error")
+    return t(`rum.analytics.events.${ERROR_SUMMARY[r.op]}`, { value: raw(r.value) });
+  if (r.op === "param")
+    return r.value
+      ? t("rum.analytics.events.summaryParamValue", { name: raw(r.name), value: raw(r.value) })
+      : t("rum.analytics.events.summaryParam", { name: raw(r.name) });
+  if (r.op === "ref") return t("rum.analytics.events.summaryRef", { value: raw(r.value) });
+  return t(`rum.analytics.events.${PAGE_SUMMARY[r.op]}`, { value: raw(r.value) });
+};
+
+const summary = (ev: NamedEvent): I18nText => raw(ev.rules.map(ruleSummary).join(" · "));
 
 const load = (force = false) => {
   if (!app.value) return;

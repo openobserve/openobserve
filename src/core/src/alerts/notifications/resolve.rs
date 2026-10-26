@@ -52,7 +52,7 @@ pub struct RenderedContent {
     pub links: Vec<(String, String)>,
     /// ≤ `rows.max`, column-ordered per `RowsSpec`.
     pub rows: Vec<Vec<(String, String)>>,
-    /// Present when `RowsSpec.format` is set.
+    /// Present when `RowsSpec.enabled` is true and `RowsSpec.format` is set.
     pub row_lines: Option<Vec<String>>,
     pub severity: Option<AlertLevel>,
     /// Tokens with no context value.
@@ -116,7 +116,11 @@ pub fn resolve_content(
     // default ("View alert" is an i18n/FE concern, Task 12), not this layer.
     links.push((String::new(), ctx.alert_url.clone()));
 
-    let max = spec.rows.max as usize;
+    let max = if spec.rows.enabled {
+        spec.rows.max as usize
+    } else {
+        0
+    };
     let rows: Vec<Vec<(String, String)>> = ctx
         .rows
         .iter()
@@ -135,13 +139,18 @@ pub fn resolve_content(
         })
         .collect();
 
-    let row_lines = spec.rows.format.as_ref().map(|fmt| {
-        ctx.rows
-            .iter()
-            .take(max)
-            .map(|row| substitute_raw_row(fmt, row, &mut unknown_variables))
-            .collect()
-    });
+    let row_lines = spec
+        .rows
+        .format
+        .as_ref()
+        .filter(|_| spec.rows.enabled)
+        .map(|fmt| {
+            ctx.rows
+                .iter()
+                .take(max)
+                .map(|row| substitute_raw_row(fmt, row, &mut unknown_variables))
+                .collect()
+        });
 
     RenderedContent {
         title,
@@ -167,6 +176,21 @@ fn substitute_raw_row(
     row: &config::utils::json::Map<String, config::utils::json::Value>,
     unknown: &mut Vec<String>,
 ) -> String {
+    let spread_enabled = !row.contains_key("...row");
+    if spread_enabled && input.trim() == "{...row}" {
+        return serde_json::to_string(row).unwrap_or_default();
+    }
+
+    if spread_enabled && input.contains("{...row}") {
+        let json = serde_json::to_string(row).unwrap_or_default();
+        // Expand only source tokens, after resolving fields and unknown markers in each segment.
+        return input
+            .split("{...row}")
+            .map(|segment| substitute_raw_row(segment, row, unknown))
+            .collect::<Vec<_>>()
+            .join(&json);
+    }
+
     let mut unk: Vec<String> = scan_unmatched(input)
         .into_iter()
         .filter(|name| !row.contains_key(name))
@@ -580,6 +604,25 @@ mod tests {
     }
 
     #[test]
+    fn rows_disabled_emits_no_rows() {
+        use config::meta::alerts::content_spec::{ContentSpec, RowsSpec};
+
+        for format in [None, Some("{host} at {cpu}".to_string())] {
+            let spec = ContentSpec {
+                rows: RowsSpec {
+                    enabled: false,
+                    format: format.clone(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let r = resolve_content(&spec, &fixture_ctx(), "email");
+            assert!(r.rows.is_empty(), "format {format:?}");
+            assert_eq!(r.row_lines, None, "format {format:?}");
+        }
+    }
+
+    #[test]
     fn no_escaping_in_content_path() {
         // Grep-friendly sentinel: a hostile quote must survive verbatim.
         let ctx = fixture_ctx();
@@ -803,5 +846,138 @@ mod tests {
             crate::alerts::notifications::render::markdown::markdown_to_plaintext(&r.body_markdown),
             r#"CPU "high" fired at 92.5"#
         );
+    }
+
+    #[test]
+    fn spread_row_token_as_sole_format_serializes_full_row() {
+        use config::meta::alerts::content_spec::{ContentSpec, RowsSpec};
+
+        let spec = ContentSpec {
+            rows: RowsSpec {
+                enabled: true,
+                max: 5,
+                columns: None,
+                format: Some("{...row}".into()),
+            },
+            ..Default::default()
+        };
+        let r = resolve_content(&spec, &fixture_ctx(), "webhook");
+        let lines = r.row_lines.as_ref().unwrap();
+        assert_eq!(lines.len(), 2);
+        let v: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
+        assert_eq!(v.get("host").and_then(|v| v.as_str()), Some("web-1"));
+        assert_eq!(v.get("cpu").and_then(|v| v.as_f64()), Some(92.5));
+        let v2: serde_json::Value = serde_json::from_str(&lines[1]).unwrap();
+        assert_eq!(v2.get("host").and_then(|v| v.as_str()), Some("web-2"));
+    }
+
+    #[test]
+    fn spread_row_token_embedded_in_larger_format() {
+        use config::meta::alerts::content_spec::{ContentSpec, RowsSpec};
+
+        let spec = ContentSpec {
+            rows: RowsSpec {
+                enabled: true,
+                max: 5,
+                columns: None,
+                format: Some("row={...row}".into()),
+            },
+            ..Default::default()
+        };
+        let r = resolve_content(&spec, &fixture_ctx(), "webhook");
+        let lines = r.row_lines.as_ref().unwrap();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("row="), "{}", lines[0]);
+        let json_part = lines[0].strip_prefix("row=").unwrap();
+        let v: serde_json::Value = serde_json::from_str(json_part).unwrap();
+        assert!(v.get("host").is_some());
+    }
+
+    #[test]
+    fn spread_row_length_suffix_is_reported_as_unknown() {
+        let row = serde_json::from_value(serde_json::json!({"host": "web-1"})).unwrap();
+        for input in ["{...row:10}", "{...row:1}"] {
+            let mut unknown = Vec::new();
+            assert_eq!(
+                substitute_raw_row(input, &row, &mut unknown),
+                UNMATCHED_MARKER
+            );
+            assert_eq!(unknown, vec!["...row"]);
+        }
+    }
+
+    #[test]
+    fn spread_row_bare_token_does_not_hide_a_length_suffix() {
+        let row = serde_json::from_value(serde_json::json!({"host": "web-1"})).unwrap();
+        let json = serde_json::to_string(&row).unwrap();
+        for input in ["{...row} | {...row:10}", "{...row:10} | {...row}"] {
+            let mut unknown = Vec::new();
+            let expected = input
+                .replace("{...row}", &json)
+                .replace("{...row:10}", UNMATCHED_MARKER);
+            assert_eq!(substitute_raw_row(input, &row, &mut unknown), expected);
+            assert_eq!(unknown, vec!["...row"]);
+        }
+    }
+
+    #[test]
+    fn spread_row_preserves_token_like_data_and_unknown_markers() {
+        let row = serde_json::from_value(serde_json::json!({
+            "message": "{...row}",
+            "nested": {"text": "{missing} {...row:10}", "values": [true, null, 42]}
+        }))
+        .unwrap();
+        let mut unknown = Vec::new();
+        let output = substitute_raw_row(
+            "{message} | {...row} | {missing} | {...row}",
+            &row,
+            &mut unknown,
+        );
+        let json = serde_json::to_string(&row).unwrap();
+        assert_eq!(
+            output,
+            format!("{{...row}} | {json} | {UNMATCHED_MARKER} | {json}")
+        );
+        assert_eq!(unknown, vec!["missing"]);
+    }
+
+    #[test]
+    fn spread_row_serializes_an_empty_row() {
+        let mut unknown = Vec::new();
+        let row = config::utils::json::Map::new();
+        assert_eq!(substitute_raw_row("{...row}", &row, &mut unknown), "{}");
+        assert_eq!(
+            substitute_raw_row("row={...row}", &row, &mut unknown),
+            "row={}"
+        );
+        assert!(unknown.is_empty());
+    }
+
+    #[test]
+    fn spread_row_preserves_literal_field_precedence() {
+        for value in [
+            serde_json::json!("literal value"),
+            serde_json::json!(""),
+            serde_json::json!(null),
+            serde_json::json!({"nested": true}),
+        ] {
+            let row = serde_json::from_value(serde_json::json!({
+                "...row": value,
+                "host": "web-1"
+            }))
+            .unwrap();
+            let field = super::super::custom::stringify_row_value(&value);
+            let short = field.chars().take(4).collect::<String>();
+            for (input, expected) in [
+                ("{...row}", field.clone()),
+                ("  {...row}  ", format!("  {field}  ")),
+                ("{...row:4}", short.clone()),
+                ("{...row} | {...row:4}", format!("{field} | {short}")),
+            ] {
+                let mut unknown = Vec::new();
+                assert_eq!(substitute_raw_row(input, &row, &mut unknown), expected);
+                assert!(unknown.is_empty());
+            }
+        }
     }
 }

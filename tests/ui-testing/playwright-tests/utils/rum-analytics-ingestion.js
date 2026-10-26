@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { rumTestContext } = require('./rum-env.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -373,7 +374,7 @@ async function rumSchemaFields(page, orgId) {
 
 async function ingestJson(page, stream, rows, { orgId = null } = {}) {
   const { orgId: org, baseUrl, headers } = orgApiContext(orgId);
-  const res = await page.request.post(`${baseUrl}/api/${org}/${stream}/_json`, { headers, data: rows });
+  const res = await page.request.post(`${ingestBase(baseUrl)}/api/${org}/${stream}/_json`, { headers, data: rows });
   const body = await res.text();
   if (!res.ok()) throw new Error(`${stream} ingest failed: ${res.status()} ${body}`);
   const parsed = JSON.parse(body);

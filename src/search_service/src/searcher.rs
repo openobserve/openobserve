@@ -13,65 +13,71 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::search::SearchEventContext;
 #[cfg(feature = "enterprise")]
-use {
-    config::meta::search::ScanStats,
-    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
-};
+use o2_enterprise::enterprise::search::{QueryManager, TaskStatus};
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::search::{QueryPhase, QueryRegistration, QueryTracker};
+
+/// What query status shows for a leader query.
+pub struct LeaderInfo<'a> {
+    pub user_id: Option<&'a str>,
+    pub stream_type: &'a str,
+    pub sql: &'a str,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub search_type: Option<String>,
+    pub search_event_context: Option<&'a SearchEventContext>,
+}
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
 pub struct Searcher {
-    pub query_manager: std::sync::Arc<QueryManager>,
+    pub query_manager: QueryManager,
 }
 
 #[cfg(feature = "enterprise")]
 impl Searcher {
     pub fn new() -> Self {
         Self {
-            query_manager: std::sync::Arc::new(QueryManager::new()),
+            query_manager: QueryManager::new(),
         }
     }
 
-    // check is the trace_id in the query_manager
-    pub async fn contain_key(&self, trace_id: &str) -> bool {
-        self.query_manager.contain_key(trace_id).await
-    }
-
-    // insert the trace_id and task_status into the query_manager
-    pub async fn insert(&self, trace_id: String, task_status: TaskStatus) {
-        self.query_manager.insert(trace_id, task_status).await;
-    }
-
-    // remove the trace_id from the query_manager
-    pub async fn remove(
+    pub fn register_leader(
         &self,
+        org_id: &str,
         trace_id: &str,
-        query_cancelled: bool,
-    ) -> Option<Vec<(String, TaskStatus)>> {
-        self.query_manager.remove(trace_id, query_cancelled).await
+        info: LeaderInfo<'_>,
+    ) -> QueryRegistration {
+        let status = TaskStatus::new_leader(
+            vec![],
+            true,
+            info.user_id.map(str::to_string),
+            Some(org_id.to_string()),
+            Some(info.stream_type.to_string()),
+            Some(info.sql.to_string()),
+            Some(info.start_time),
+            Some(info.end_time),
+            info.search_type,
+            info.search_event_context.cloned(),
+        );
+        self.query_manager.register(org_id, trace_id, status)
     }
 
-    // check is the trace_id in the query_manager and is_leader
-    pub async fn is_leader(&self, trace_id: &str) -> bool {
-        self.query_manager.is_leader(trace_id).await
+    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryRegistration {
+        let status = TaskStatus::new_follower(vec![], false);
+        self.query_manager.register(org_id, trace_id, status)
     }
 
-    // insert the sender into the query_manager by trace_id
-    pub async fn insert_sender(
-        &self,
-        trace_id: &str,
-        sender: tokio::sync::oneshot::Sender<()>,
-        query_start: bool,
-    ) -> Result<(), infra::errors::Error> {
-        self.query_manager
-            .insert_sender(trace_id, sender, query_start)
-            .await
+    /// Cancels `id` and its `{id}-` sub-queries in `org_id`, returning how many were cancelled.
+    pub fn cancel(&self, org_id: &str, id: &str) -> usize {
+        self.query_manager.cancel(org_id, id)
     }
 
     // get all task status that is leader
     pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
-        let mut status = self.query_manager.get_task_status().await;
+        let mut status = self.query_manager.get_task_status();
 
         // Enrich dashboard searches submitted without names so query management can display the
         // dashboard and folder instead of only their IDs.
@@ -92,20 +98,6 @@ impl Searcher {
 
         status
     }
-
-    // add file stats
-    pub async fn add_file_stats(&self, trace_id: &str, scan_stats: &ScanStats) {
-        self.query_manager
-            .add_file_stats(trace_id, scan_stats)
-            .await;
-    }
-
-    // add work group
-    pub async fn add_work_group(&self, trace_id: &str, work_group: Option<WorkGroup>) {
-        self.query_manager
-            .add_work_group(trace_id, work_group)
-            .await;
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -117,11 +109,62 @@ impl Searcher {
     pub fn new() -> Self {
         Self
     }
+
+    pub fn register_leader(
+        &self,
+        org_id: &str,
+        trace_id: &str,
+        _info: LeaderInfo<'_>,
+    ) -> QueryRegistration {
+        self.register_follower(org_id, trace_id)
+    }
+
+    pub fn register_follower(&self, _org_id: &str, trace_id: &str) -> QueryRegistration {
+        QueryRegistration(QueryTracker {
+            trace_id: trace_id.to_string(),
+            query_id: config::ider::generate_query_id(trace_id),
+        })
+    }
 }
 
 impl Default for Searcher {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Without enterprise there is no query manager, so a query only carries its ids.
+#[derive(Debug)]
+#[cfg(not(feature = "enterprise"))]
+#[must_use = "dropping the registration removes the query at once"]
+pub struct QueryRegistration(QueryTracker);
+
+#[cfg(not(feature = "enterprise"))]
+impl QueryRegistration {
+    pub fn tracker(&self) -> &QueryTracker {
+        &self.0
+    }
+
+    pub fn finish(self) -> Option<String> {
+        None
+    }
+}
+
+#[derive(Clone, Debug)]
+#[cfg(not(feature = "enterprise"))]
+pub struct QueryTracker {
+    trace_id: String,
+    query_id: String,
+}
+
+#[cfg(not(feature = "enterprise"))]
+impl QueryTracker {
+    pub fn trace_id(&self) -> &str {
+        &self.trace_id
+    }
+
+    pub fn query_id(&self) -> &str {
+        &self.query_id
     }
 }
 

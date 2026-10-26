@@ -4,6 +4,7 @@
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
+      "alerts-help-drawer.spec.js",
       "alerts-ui-operations.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
@@ -30,6 +31,7 @@
       "alerts-destinations-usage.spec.js",
       "alerts-save-query-mode.spec.js",
       "alerts-no-destination.spec.js",
+      "alerts-from-panel.spec.js",
       "alert-calibration.spec.js"
     ],
     "disabled": [
@@ -93,6 +95,7 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
+      "dashboard-sql-autocomplete-values.spec.js",
       "dashboard.spec.js",
       "dashboard2.spec.js",
       "dashboardtype.spec.js",
@@ -112,7 +115,11 @@
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
-      "dashboardPagination.spec.js"
+      "dashboardPagination.spec.js",
+      "dashboard-save-conflict.spec.js",
+      "refreshCancelButtons.spec.js",
+      "dashboard-refresh-button.spec.js",
+      "panelNotices.spec.js"
     ],
     "disabled": [
       {
@@ -139,7 +146,8 @@
       "dashboard-panel-time-url-priority.spec.js",
       "dashboard-panel-time-advanced-edge-cases.spec.js",
       "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js"
+      "dashboard-panel-time-variables-behavior.spec.js",
+      "dashboard-time-range-apply.spec.js"
     ],
     "disabled": []
   },
@@ -242,6 +250,9 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailShortScreen.spec.js",
+      "navRailKeyboard.spec.js",
+      "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
@@ -251,7 +262,8 @@
       "shared-components-form-validation.spec.js",
       "ai-toolsets-form-validation.spec.js",
       "annotationQueueInputPreview.spec.js",
-      "login-form-validation.spec.js"
+      "login-form-validation.spec.js",
+      "runningQueriesCancel.spec.js"
     ],
     "disabled": []
   },
@@ -317,6 +329,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "streamsExploreLogsTypePersistence.spec.js",
       "logspage.spec.js",
       "logstable.spec.js",
       "logsqueries.spec.js",
@@ -345,6 +358,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-autocomplete-quote-enter.spec.js",
       "logs-autocomplete-suggestions.spec.js",
       "logs-sql-autocomplete.spec.js",
       "logsqueries.cte.spec.js",
@@ -357,7 +371,8 @@
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
-      "logsToolbarPins.spec.js"
+      "logsToolbarPins.spec.js",
+      "logs-query-editor-keyboard.spec.js"
     ],
     "disabled": [
       {
@@ -391,6 +406,7 @@
     "actual_folder": "Metrics",
     "browser": "chrome",
     "run_files": [
+      "metrics-explorer-exemplars.spec.js",
       "metrics.spec.js",
       "metrics-queries.spec.js",
       "metrics-aggregations.spec.js",
@@ -454,7 +470,8 @@
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
       "reportCsvMediaType.spec.js",
-      "scheduledReportsDrawer.spec.js"
+      "scheduledReportsDrawer.spec.js",
+      "reportHistory.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -520,7 +537,8 @@
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
-      "schema.spec.js"
+      "schema.spec.js",
+      "first-event-status.spec.js"
     ],
     "disabled": []
   },
@@ -529,6 +547,7 @@
     "actual_folder": "Traces",
     "browser": "chrome",
     "run_files": [
+      "traces-autocomplete-filter-mode.spec.js",
       "service-catalog.spec.js",
       "tracesSearch.spec.js",
       "traceQueryEditor.spec.js",
@@ -541,7 +560,8 @@
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
-      "traces-jk-navigation.spec.js"
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
     ],
     "disabled": []
   },

@@ -168,6 +168,18 @@ describe("ContentTemplateForm", () => {
     );
   });
 
+  it("does NOT show the lint hint when format is the {...row} spread token", async () => {
+    const spec = emptyContentSpec();
+    spec.rows.enabled = true;
+    spec.rows.columns = ["timestamp", "message"];
+    spec.rows.format = "{...row}";
+    const w = await mountForm(spec);
+
+    expect(w.find('[data-test="content-template-form-rows-format-lint-hint"]').exists()).toBe(
+      false,
+    );
+  });
+
   // The reported case: `-{alert_agg_value}` with no space is not a list, so
   // consecutive lines collapse into one paragraph with no explanation.
   it("shows the body lint hint for a list marker with no following space", async () => {

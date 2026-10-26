@@ -13,19 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, NotSet, Order, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, entity::prelude::*, sea_query::OnConflict,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model},
+    ttl_cache::TtlCache,
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
@@ -48,9 +47,8 @@ pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
 ///
 /// `None` is cached too, so an org with no enabled token does not re-query on
 /// every job.
-static DEFAULT_TOKEN_CACHE: LazyLock<
-    RwHashMap<String, (Option<OrgIngestionTokenRecord>, Instant)>,
-> = LazyLock::new(Default::default);
+static DEFAULT_TOKEN_CACHE: TtlCache<Option<OrgIngestionTokenRecord>> =
+    TtlCache::new(DEFAULT_TOKEN_CACHE_TTL);
 
 /// Backstop only. Cross-node invalidation arrives through the existing
 /// `/org_ingestion_tokens/` coordinator watch (see `db::org_ingestion_tokens::watch`),
@@ -73,10 +71,8 @@ pub fn invalidate_default_cache(org_id: &str) {
 pub async fn find_default_enabled(
     org_id: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    if let Some(entry) = DEFAULT_TOKEN_CACHE.get(org_id)
-        && entry.1.elapsed() < DEFAULT_TOKEN_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = DEFAULT_TOKEN_CACHE.get(org_id) {
+        return Ok(cached);
     }
 
     let client = get_orm_client_rw().await;
@@ -90,7 +86,7 @@ pub async fn find_default_enabled(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .map(OrgIngestionTokenRecord::from);
 
-    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), (record.clone(), Instant::now()));
+    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), record.clone());
     Ok(record)
 }
 
@@ -479,17 +475,14 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Er
 }
 
 /// Delete all tokens for an org (cascade on org deletion).
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Option<String>)>, errors::Error> {
     let client = get_orm_client_rw().await;
-
-    Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
-        .exec(client)
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let removed = super::delete_returning(client, delete, &[Column::Token, Column::SplunkToken])
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
     invalidate_default_cache(org_id);
-    Ok(())
+    Ok(removed)
 }
 
 /// Delete a single token row by org_id and token value.
@@ -716,5 +709,47 @@ mod tests {
         assert!(!record.is_default);
         assert!(!record.enabled);
         assert_eq!(record.description, "");
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_each_token_and_its_splunk_guid() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_ingest_tok");
+        let other = format!("{org}_other");
+        let record = |org: &str, name: &str, splunk: Option<&str>| OrgIngestionTokenRecord {
+            id: config::ider::uuid(),
+            org_id: org.to_string(),
+            name: name.to_string(),
+            token: format!("{org}_{name}"),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: "t".to_string(),
+            created_at: 1,
+            updated_at: 1,
+            splunk_token: Some(splunk.map(str::to_string)),
+        };
+        let guid = format!("{org}_guid");
+        for row in [
+            record(&org, "a", Some(&guid)),
+            record(&org, "b", None),
+            record(&other, "a", None),
+        ] {
+            add(&row).await.unwrap();
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
+
+        assert_eq!(
+            removed,
+            [(format!("{org}_a"), Some(guid)), (format!("{org}_b"), None)]
+        );
+        assert!(left.is_empty());
+        assert_eq!(kept.len(), 1, "another org's token went with this org's");
     }
 }

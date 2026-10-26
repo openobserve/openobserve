@@ -6,6 +6,7 @@
  */
 
 const testLogger = require('./test-logger.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Make an authenticated API call using the page's evaluate context
@@ -161,7 +162,7 @@ async function seedAnomalyStream(page, streamName, opts = {}) {
     }
   }
   testLogger.info('Seeding anomaly stream', { streamName, rows: rows.length, hours, buckets: total });
-  const base = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
+  const base = ingestBase(process.env.INGESTION_URL || process.env.ZO_BASE_URL);
   return apiCall(page, 'POST', `/api/${org}/${streamName}/_json`, rows, base);
 }
 

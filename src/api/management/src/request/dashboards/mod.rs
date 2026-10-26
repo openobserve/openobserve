@@ -37,6 +37,7 @@ use crate::{
 };
 
 pub mod reports;
+pub mod reports_history;
 pub mod timed_annotations;
 
 async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
@@ -862,6 +863,22 @@ mod tests {
     fn test_panel_unsupported_version_is_bad_request() {
         assert_eq!(
             status(DashboardError::PanelUnsupportedVersion),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_too_many_annotation_sources_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::TooManyAnnotationSources(10)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_annotation_source_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::InvalidAnnotationSource("bad".to_string())),
             StatusCode::BAD_REQUEST
         );
     }

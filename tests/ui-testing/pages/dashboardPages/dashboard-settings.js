@@ -22,6 +22,9 @@ export default class DashboardSetting {
     this.dynamicFilter = page.locator(
       '[data-test="dashboard-general-setting-dynamic-filter"]'
     );
+    this.dynamicFilterSwitch = page.locator(
+      '[data-test="dashboard-general-setting-dynamic-filter-btn"]'
+    );
     this.newName = page.locator('[data-test="dashboard-general-setting-name-field"]');
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
@@ -164,6 +167,21 @@ export default class DashboardSetting {
   async showDynamicFilter() {
     await this.dynamicFilter.waitFor({ state: "visible" });
     await this.dynamicFilter.click();
+  }
+
+  // New dashboards hide dynamic filters, so tests that use them turn the setting on first.
+  async enableDynamicFilters() {
+    await this.openSetting();
+    await this.dynamicFilterSwitch.waitFor({ state: "visible" });
+    if ((await this.dynamicFilterSwitch.getAttribute("aria-checked")) !== "true") {
+      await this.dynamicFilter.click();
+    }
+    await this.saveSetting();
+    await this.getToastMessageByText("Dashboard updated successfully").waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+    await this.closeSettingDashboard();
   }
   //Add Tabs//
   generateUniqueTabnewName(prefix = "u") {

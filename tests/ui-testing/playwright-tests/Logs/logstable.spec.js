@@ -2,7 +2,12 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData: ingestion } = require('../utils/data-ingestion.js');
+const { ingestBase } = require('../utils/ingest-url.js');
+const {
+  ingestTestData: ingestion,
+  waitForStreamData,
+  waitForStreamListed,
+} = require('../utils/data-ingestion.js');
 
 test.describe("Logs Table Field Management - Complete Test Suite", () => {
   let pageManager;
@@ -709,10 +714,18 @@ test.describe("Severity inference journeys (4c Part A)", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     journeyStream = `severity_journeys_${Date.now()}`;
-    const url = `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${journeyStream}/_json`;
+    const url = `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${journeyStream}/_json`;
     const response = await page.request.post(url, { headers: getAuthHeaders(), data: JOURNEY_ROWS });
     expect(response.ok()).toBe(true);
-    await page.waitForTimeout(3000);
+    // A single search runs in beforeEach, so every journey row must already be queryable.
+    expect(
+      await waitForStreamData(page, journeyStream, JOURNEY_ROWS.length, 60000),
+      `stream ${journeyStream} never returned all ${JOURNEY_ROWS.length} rows within 60s`,
+    ).toBe(true);
+    expect(
+      await waitForStreamListed(page, journeyStream, 'logs'),
+      `stream ${journeyStream} never appeared in the streams list`,
+    ).toBe(true);
     await context.close();
   });
 

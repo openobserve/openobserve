@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h } from "vue";
+import { h, nextTick } from "vue";
 import OButton from "./OButton.vue";
 import type { ButtonVariant } from "./OButton.types";
 
@@ -132,6 +132,33 @@ describe("OButton", () => {
   it("applies ghost-destructive variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost-destructive" } });
     expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
+  });
+
+  it("paints pending as a solid amber fill bordered in its own colour, never warning or the accent", () => {
+    const wrapper = mount(OButton, { props: { variant: "pending" } });
+    const classes = wrapper.classes();
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "bg-button-pending-bg",
+        "text-button-pending-text",
+        "border",
+        "border-button-pending-bg",
+        "enabled:hover:bg-button-pending-hover-bg",
+        "enabled:hover:border-button-pending-hover-bg",
+        "enabled:active:bg-button-pending-active-bg",
+        "enabled:active:border-button-pending-active-bg",
+        "focus-visible:ring-button-pending-focus-ring",
+        "rounded-default",
+      ]),
+    );
+    const paint = classes.filter((value) => /^(enabled:\w+:)?(bg|text|border)-/.test(value));
+    expect(paint.filter((value) => /warning|accent|primary/.test(value))).toEqual([]);
+  });
+
+  it("dims a disabled pending button like warning", () => {
+    const wrapper = mount(OButton, { props: { variant: "pending", disabled: true } });
+    expect(wrapper.classes()).toContain("disabled:opacity-60");
+    expect(wrapper.attributes("data-o2-variant")).toBe("pending");
   });
 
   // Destination previews are fixed-light brand replicas: the label must use the
@@ -377,6 +404,7 @@ describe("OButton", () => {
     "filter-exclude",
     "ghost-warning",
     "warning",
+    "pending",
     "ghost-neutral",
     "outline-destructive",
     "cancel-query",
@@ -396,6 +424,10 @@ describe("OButton", () => {
     "outline-primary",
     "dashed",
     "pricing-chip",
+    "tint-teal",
+    "tint-purple",
+    "tint-blue",
+    "tint-orange",
   ] satisfies ButtonVariant[])(
     "preserves native disabled styling for %s when unavailable",
     (variant) => {
@@ -539,5 +571,55 @@ describe("OButton", () => {
     expect(wrapper.attributes("disabled")).toBeUndefined();
     expect(wrapper.attributes("aria-describedby")).toBe("permission");
     expect(wrapper.find(".sr-only").exists()).toBe(false);
+  });
+
+  describe("unnamed icon-only dev warning", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    const mountIconOnly = (attrs: Record<string, string> = {}) =>
+      mount(OButton, { props: { size: "icon" }, attrs, slots: { default: () => h("svg") } });
+
+    it("schedules nothing under test", () => {
+      vi.useFakeTimers();
+      const wrapper = mountIconOnly();
+      expect(vi.getTimerCount()).toBe(0);
+      wrapper.unmount();
+    });
+
+    it("warns after the delay for a button nothing names", () => {
+      vi.stubEnv("MODE", "development");
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const wrapper = mountIconOnly();
+      expect(warn).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1000);
+      expect(warn).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it("stays quiet for a title, or a name that arrives before the check", async () => {
+      vi.stubEnv("MODE", "development");
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mountIconOnly({ title: "Delete" });
+      const late = mountIconOnly();
+      late.element.setAttribute("aria-label", "Loaded later");
+      await nextTick();
+      vi.advanceTimersByTime(1000);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("does not warn for a button unmounted before the check", () => {
+      vi.stubEnv("MODE", "development");
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mountIconOnly().unmount();
+      vi.advanceTimersByTime(1000);
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 });

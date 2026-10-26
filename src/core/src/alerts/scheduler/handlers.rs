@@ -58,11 +58,16 @@ use crate::{
         },
         derived_streams::DerivedStreamExt,
     },
-    dashboards::reports::SendReport,
+    dashboards::reports::{
+        SendReport, TRIGGER_SOURCE_SCHEDULED, apply_send_result, record_run, run_row,
+    },
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+/// How soon a blocked org's trigger is looked at again when its org's status cannot be read.
+const UNREADABLE_ORG_RECHECK_MICROS: i64 = 60 * 1_000_000;
 
 /// One anomaly detection run as the trigger history records it, scheduled or manual.
 pub(crate) struct AnomalyRunRecord {
@@ -74,6 +79,14 @@ pub(crate) struct AnomalyRunRecord {
     pub(crate) downtime_id: Option<String>,
     pub(crate) start_us: i64,
     pub(crate) end_us: i64,
+}
+
+/// What a report trigger does after a failed attempt.
+#[derive(Debug, PartialEq, Eq)]
+enum RetryOutcome {
+    Retry,
+    Reschedule,
+    FinishOnce,
 }
 
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
@@ -720,27 +733,16 @@ pub async fn handle_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    // Do not execute scheduled work for an org that is soft-deleted (pending_deletion)
-    // or actively deleting: the org is hidden and blocked everywhere, so firing its
-    // scheduled alerts/pipelines/reports would send notifications for an org the user
-    // believes is gone. Keep the trigger alive (reschedule ~1h out) so it resumes if
-    // the org is resurrected; on hard-delete the scheduler rows are purged by cleanup.
-    if crate::db::org_status::is_blocked(&trigger.org) {
+    // Parked, not fired: a blocked org sends nothing, and a resurrect still finds the trigger.
+    if crate::db::org_status::is_blocked(&trigger.org)
+        && park_while_blocked(trace_id, &trigger).await?
+    {
         log::debug!(
             "[scheduler] org={} is pending deletion/deleting; skipping {:?} trigger {}",
             trigger.org,
             trigger.module,
             trigger.module_key
         );
-        let mut trigger = trigger;
-        trigger.next_run_at = config::utils::time::now_micros() + 3600 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        // Fenced and local like its own completion: a broadcast write can clobber a newer claim.
-        if trigger.module.completes_by_claim() {
-            infra::scheduler::complete_claim(trigger).await?;
-        } else {
-            db::scheduler::update_trigger(trigger, false, trace_id).await?;
-        }
         return Ok(());
     }
 
@@ -768,7 +770,114 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::AlertCalibration => {
             super::calibration::handle_triggers(trace_id, trigger).await
         }
+        db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
     }
+}
+
+/// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.
+#[cfg(feature = "enterprise")]
+async fn handle_fleet_rollout_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::fleet::rollouts;
+
+    // §17: the flag off freezes rollouts; the unreleased claim lapses and the job comes back later.
+    if !crate::fleet::enabled() {
+        return Ok(());
+    }
+    // The tick re-arms or deletes its own job row, fenced by this claim.
+    rollouts::tick(&trigger, config::utils::time::now_micros()).await?;
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_fleet_rollout_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // A row can survive a downgrade, so drop it rather than leave it retried forever.
+    infra::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::FleetRollout,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Parks a blocked org's due trigger on its deletion's hourly grid; false once the org is active.
+async fn park_while_blocked(
+    trace_id: &str,
+    trigger: &db::scheduler::Trigger,
+) -> Result<bool, anyhow::Error> {
+    use infra::table::organizations;
+    let org = trigger.org.as_str();
+    park_with(
+        trigger,
+        now_micros(),
+        async {
+            organizations::get_on_writer(org)
+                .await
+                .map(|row| (row.status, row.deleted_at))
+        },
+        |parked, now| async move { infra::scheduler::release_if_org_active(&parked, now).await },
+        |parked| async move {
+            // Fenced and local like its own completion: a broadcast can clobber a newer claim.
+            if parked.module.completes_by_claim() {
+                infra::scheduler::complete_claim(parked).await.map(|_| ())
+            } else {
+                db::scheduler::update_trigger(parked, false, trace_id).await
+            }
+        },
+    )
+    .await
+}
+
+/// `park_while_blocked` with its org read, conditional release and trigger write passed in.
+async fn park_with<R, RF, W, F>(
+    trigger: &db::scheduler::Trigger,
+    now: i64,
+    read_org: impl Future<Output = Result<(String, Option<i64>), infra::errors::Error>>,
+    release: R,
+    write: W,
+) -> Result<bool, anyhow::Error>
+where
+    R: FnOnce(db::scheduler::Trigger, i64) -> RF,
+    RF: Future<Output = Result<bool, infra::errors::Error>>,
+    W: Fn(db::scheduler::Trigger) -> F,
+    F: Future<Output = Result<(), infra::errors::Error>>,
+{
+    let mut parked = trigger.clone();
+    parked.status = db::scheduler::TriggerStatus::Waiting;
+    let deleted_at = match read_org.await {
+        Ok((status, _)) if status == "active" => return Ok(false),
+        Ok((_, deleted_at)) => deleted_at,
+        Err(e) => {
+            // Off the deletion grid a resurrect cannot release it, so it must not wait an hour.
+            log::warn!(
+                "[scheduler] org={} unreadable, trigger rechecked in a minute: {e}",
+                trigger.org
+            );
+            parked.next_run_at = now + UNREADABLE_ORG_RECHECK_MICROS;
+            write(parked).await?;
+            return Ok(true);
+        }
+    };
+    parked.next_run_at = crate::org_cleanup::parked_run_at(deleted_at, now);
+    write(parked.clone()).await?;
+    // Unfenced, a re-release could reset a claim a racing resurrect let another worker take.
+    if trigger.module.completes_by_claim() {
+        return Ok(true);
+    }
+    // A resurrect that released the org's triggers before this write could not release this one.
+    if let Err(e) = release(parked.clone(), now).await {
+        log::warn!(
+            "[scheduler] org={} unreadable after parking, rechecked in a minute: {e}",
+            trigger.org
+        );
+        parked.next_run_at = now + UNREADABLE_ORG_RECHECK_MICROS;
+        write(parked).await?;
+    }
+    Ok(true)
 }
 
 /// Dropped rather than re-armed once the ladder ends: a timer outliving it fires at nobody.
@@ -1193,6 +1302,7 @@ async fn handle_composite_alert_trigger(
                     &rows,
                     now,
                     Some(evaluated.level),
+                    Some(i32::from(evaluated.result) as f64),
                     None,
                 )
                 .await
@@ -1968,46 +2078,33 @@ pub(crate) async fn impacted_services(
 ) -> Result<Vec<String>, config::meta::oncall::NoBlastRadius> {
     use config::meta::oncall::NoBlastRadius;
 
+    use crate::traces::service_graph::{
+        DEFAULT_QUERY_WINDOW_MINUTES,
+        v4::read::{callers_from, instant, q_callers, q_org_requests, scalar_sum},
+    };
+
     let Some(failing) = dimensions.get("service") else {
         return Err(NoBlastRadius::NoServiceDimension);
     };
-    // Wider than the graph view's window: a read between two aggregation writes sees nothing.
+    let range_secs = DEFAULT_QUERY_WINDOW_MINUTES * 60;
     let end = now_micros();
-    let window_micros = (o2_enterprise::enterprise::common::config::get_config()
-        .service_graph
-        .processing_interval_secs as i64)
-        .saturating_mul(2 * 1_000_000)
-        .max(crate::traces::service_graph::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000);
-    let raw = match crate::traces::service_graph::query_edges_from_stream_internal(
-        org_id,
-        None,
-        Some(end - window_micros),
-        Some(end),
-        None,
-    )
-    .await
-    {
-        Ok(e) if !e.is_empty() => e,
-        _ => return Err(NoBlastRadius::NoGraph),
+    let Ok(query) = q_callers(failing, range_secs) else {
+        return Err(NoBlastRadius::NoGraph);
     };
-    let (_, edges) = o2_enterprise::enterprise::service_graph::build_topology(
-        raw,
-        std::collections::HashMap::new(),
-    );
-    let mut callers: Vec<String> = edges
-        .iter()
-        .filter(|e| &e.to == failing)
-        .filter_map(|e| e.from.clone())
-        .filter(|from| from != failing)
-        .collect();
-    callers.sort();
-    callers.dedup();
-    if callers.is_empty() {
-        return Err(NoBlastRadius::NothingCallsIt {
-            service: failing.clone(),
-        });
+    let callers = match instant(org_id, &query, end).await {
+        Ok(rows) => callers_from(&rows, failing),
+        Err(_) => return Err(NoBlastRadius::NoGraph),
+    };
+    if !callers.is_empty() {
+        return Ok(callers);
     }
-    Ok(callers)
+    // No callers means "nothing calls it" only when the org has a graph at all.
+    match instant(org_id, &q_org_requests(range_secs), end).await {
+        Ok(rows) if scalar_sum(&rows) > 0.0 => Err(NoBlastRadius::NothingCallsIt {
+            service: failing.clone(),
+        }),
+        _ => Err(NoBlastRadius::NoGraph),
+    }
 }
 
 /// Shared by the alert and the incident path so the two cannot drift apart.
@@ -2172,11 +2269,7 @@ pub(crate) async fn page_for_alert_identity(
     }
 }
 
-/// I9-I11: one RCA run for a whole firing, guarded by config, agent health and
-/// "no analysis already pending on these records" — the three guards §2.3 says
-/// apply to an alert subject, cooldown and in-flight-via-event-log having no
-/// referent here. Mirrors `create_new_incident`'s spawn shape (guards, spawn,
-/// `tokio::spawn`), but serves every record `opened` rather than one incident.
+/// One RCA run per firing; its finalizer delivers to, or releases, the pending on-call records.
 ///
 /// Blocked by any guard ⇒ `escalation::skip_analysis` for every record, so I9's
 /// removal of the incident-only gate never holds a page with nothing coming to
@@ -2187,9 +2280,14 @@ async fn trigger_rca_for_alert_firing(
     alert: &config::meta::alerts::alert::Alert,
     opened: Vec<o2_enterprise::enterprise::oncall::escalation::PagedGroup>,
 ) {
+    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
     use o2_enterprise::enterprise::{
-        ai::client::get_agent_client, common::config::get_config as get_o2_config,
-        oncall::escalation,
+        alerts::rca_service, common::config::get_config as get_o2_config, oncall::escalation,
+    };
+
+    use crate::alerts::{
+        rca_runs,
+        rca_turn::{RcaPrompt, RcaPromptSubject, RcaTurnRun, start_rca_turn},
     };
 
     let cfg = get_o2_config();
@@ -2210,8 +2308,8 @@ async fn trigger_rca_for_alert_firing(
 
     tokio::spawn(async move {
         // §2.3: the record's own `AnalysisState` is the in-flight marker a retried opener reads.
-        // Asked before the credentials fetch and the health round-trip, so a firing that reopened
-        // nothing pays for neither.
+        // Checked first so a firing that reopened nothing skips the credentials and health
+        // round-trips.
         let mut pending = Vec::new();
         for paged in &opened {
             if escalation::analysis_may_run(&org_id, &paged.response.subject).await {
@@ -2223,27 +2321,44 @@ async fn trigger_rca_for_alert_firing(
             return;
         };
 
-        let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
-            Ok(c) => c,
+        // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
+        let subject_id = alert_id.unwrap_or_else(|| representative.response.subject.subject_id());
+        let subjects: Vec<config::meta::oncall::SubjectRef> =
+            pending.iter().map(|p| p.response.subject.clone()).collect();
+
+        // One `alert` run per firing; every exit below ends it.
+        let run_id = match rca_runs::start_run(rca_runs::StartRun {
+            org_id: org_id.clone(),
+            subject: rca_runs::RunSubject::Alert {
+                alert_id: subject_id.clone(),
+                incident_id: None,
+            },
+            trigger: RunTrigger::OncallPage,
+            mode: RunMode::Fresh,
+            started_by: "system".to_string(),
+            guidance: None,
+            skip_cooldown: true,
+            oncall_subjects: serde_json::to_value(&subjects).ok(),
+            context_used: None,
+        })
+        .await
+        {
+            Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
+            Ok(outcome) => {
+                log::debug!(
+                    "[SCHEDULER trace_id {trace_id}] alert RCA run not started for {org_id}/{alert_name}: {outcome:?}"
+                );
+                release_alert_firing_hold(&org_id, &opened).await;
+                return;
+            }
             Err(e) => {
-                log::warn!("[SCHEDULER trace_id {trace_id}] no RCA credentials for {org_id}: {e}");
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] could not record alert RCA run for {org_id}/{alert_name}: {e}"
+                );
                 release_alert_firing_hold(&org_id, &opened).await;
                 return;
             }
         };
-        let auth_header = crate::auth::build_basic_auth_header(&email, &token);
-
-        let Some(client) = get_agent_client() else {
-            log::warn!("[SCHEDULER trace_id {trace_id}] RCA agent client not initialized");
-            release_alert_firing_hold(&org_id, &opened).await;
-            return;
-        };
-
-        if let Err(e) = client.health(&auth_header).await {
-            log::debug!("[SCHEDULER trace_id {trace_id}] agent health check failed: {e}");
-            release_alert_firing_hold(&org_id, &opened).await;
-            return;
-        }
 
         // One report is written to every record this firing opened, so scoping the prompt to one
         // group's dimensions would mis-describe the others. Sent only when they all agree.
@@ -2256,63 +2371,64 @@ async fn trigger_rca_for_alert_firing(
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
         let context = config::meta::oncall::RcaContext {
             subject_type: config::meta::oncall::SubjectType::Alert,
-            // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
-            subject_id: alert_id.unwrap_or_else(|| representative.response.subject.subject_id()),
+            subject_id: subject_id.clone(),
             // Omitted, never null — the agent routes on `"incident_id" in context`.
             incident_id: None,
             org_id: org_id.clone(),
             previous_analysis: None,
             severity: Some(severity),
-            past_causes: o2_enterprise::enterprise::alerts::rca_service::past_causes_for_record(
-                &org_id,
-                &representative.response.id,
-            )
-            .await,
+            past_causes: rca_service::past_causes_for_record(&org_id, &representative.response.id)
+                .await,
             alert_name: Some(alert_name.clone()),
-            stream: Some(stream_name),
+            stream: Some(stream_name.clone()),
             dimensions,
         };
-        let subjects: Vec<config::meta::oncall::SubjectRef> =
-            pending.iter().map(|p| p.response.subject.clone()).collect();
 
-        match client.analyze_incident(context, &auth_header).await {
-            Ok(content) if !content.is_empty() => {
-                o2_enterprise::enterprise::alerts::rca_service::save_rca_result_for_records(
-                    &org_id, &subjects, &content, None,
-                )
-                .await;
-            }
-            Ok(_) => {
-                release_analysis_without_verdict(&org_id, &subjects).await;
-            }
-            Err(e) => {
-                log::warn!(
-                    "[SCHEDULER trace_id {trace_id}] RCA call failed for {org_id}/{alert_name}: {e}"
+        // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
+        let run = RcaTurnRun {
+            org_id: org_id.clone(),
+            run_id: run_id.clone(),
+            subject: rca_runs::RunSubject::Alert {
+                alert_id: subject_id,
+                incident_id: None,
+            },
+            trigger: RunTrigger::OncallPage,
+            mode: RunMode::Fresh,
+            context: rca_service::rca_context_json(&context),
+            session_id: None,
+        };
+        let prompt = RcaPrompt::Initial {
+            trigger: RunTrigger::OncallPage,
+            subject: RcaPromptSubject::Alert {
+                name: alert_name.clone(),
+                stream: stream_name,
+            },
+            guidance: None,
+        };
+        if let Err(e) = start_rca_turn(run, prompt).await {
+            log::warn!(
+                "[SCHEDULER trace_id {trace_id}] alert RCA run {run_id} for {org_id}/{alert_name} could not start: {}",
+                e.error_code()
+            );
+            let (reason, details) = crate::alerts::incidents::rca_turn_failure(&e);
+            if let Err(err) = rca_runs::fail_run(
+                &org_id,
+                &run_id,
+                RunTrigger::OncallPage,
+                e.error_code(),
+                reason,
+                details,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] could not fail alert RCA run {run_id}: {err}"
                 );
-                release_analysis_without_verdict(&org_id, &subjects).await;
             }
+            // No verdict is coming: every pending record is released at once.
+            rca_service::no_verdict_for_subjects(&org_id, &subjects).await;
         }
     });
-}
-
-/// I10 again, for a run that happened and came back empty: `Failed`, not `Skipped`, because the
-/// agent was asked. Without it the hold serves out the whole triage budget waiting on an answer
-/// that already came back.
-#[cfg(feature = "enterprise")]
-async fn release_analysis_without_verdict(
-    org_id: &str,
-    subjects: &[config::meta::oncall::SubjectRef],
-) {
-    let now = config::utils::time::now_micros();
-    for subject in subjects {
-        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::analysis_produced_no_verdict(
-            org_id, subject, now,
-        )
-        .await
-        {
-            log::warn!("[SCHEDULER] could not release the triage hold on {subject}: {e}");
-        }
-    }
 }
 
 /// I10: nothing is coming, so nothing may go on holding a page for one.
@@ -2692,6 +2808,7 @@ pub(crate) async fn correlate_muted_incident(
         rows,
         triggered_at,
         eval_level,
+        None,
         Some(downtime),
     )
     .await
@@ -2878,7 +2995,7 @@ async fn handle_alert_triggers(
 ) -> Result<(), anyhow::Error> {
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
         trigger.module_key
@@ -3917,6 +4034,7 @@ async fn handle_alert_triggers(
                 correlation_rows,
                 triggered_at,
                 eval_level,
+                trigger_results.actual_value,
                 None,
             )
             .await
@@ -4531,7 +4649,7 @@ async fn handle_report_triggers(
     let conn = get_orm_client_rw().await;
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
         trigger.org,
@@ -4553,15 +4671,39 @@ async fn handle_report_triggers(
         retries: 0,
         ..trigger.clone()
     };
+    // Fills the scheduler's view of the run into a row built from the report.
+    let scheduled_row = |mut row: TriggerData| {
+        row._timestamp = now;
+        row.org = trigger.org.clone();
+        row.next_run_at = now;
+        row.is_realtime = trigger.is_realtime;
+        row.is_silenced = trigger.is_silenced;
+        row.start_time = trigger.start_time.unwrap_or_default();
+        row.end_time = now;
+        row.retries = trigger.retries;
+        row.delay_in_secs = Some(Duration::microseconds(processing_delay).num_seconds());
+        row.scheduler_trace_id = Some(scheduler_trace_id.clone());
+        row.time_in_queue_ms = Some(Duration::microseconds(time_in_queue).num_milliseconds());
+        row.scheduled_for = Some(trigger.next_run_at);
+        row
+    };
 
-    let (_report_folder, mut report) = match db::dashboards::reports::get_by_id(conn, report_id)
-        .await
-    {
+    let (_report_folder, report) = match db::dashboards::reports::get_by_id(conn, report_id).await {
         Ok((folder, report)) => (folder, report),
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error getting report: org: {org_id}, report name: {report_id}, error: {e}"
             );
+            // A deleted report keeps its id with an empty name so history can show it.
+            publish_triggers_usage(scheduled_row(TriggerData {
+                module: TriggerDataType::Report,
+                key: format!("/{report_id}"),
+                status: RunOutcome::Error,
+                error: Some(e.to_string()),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                trigger_source: Some(TRIGGER_SOURCE_SCHEDULED.to_string()),
+                ..Default::default()
+            }));
             // if trigger max retries is reached, update the next run at
             if trigger.retries + 1 >= max_retries {
                 // next run at is after 5mins
@@ -4582,34 +4724,12 @@ async fn handle_report_triggers(
                 )
                 .await?;
             }
-            publish_triggers_usage(TriggerData {
-                _timestamp: now,
-                org: trigger.org.clone(),
-                module: TriggerDataType::Report,
-                key: format!("/{report_id}"),
-                next_run_at: now,
-                is_realtime: trigger.is_realtime,
-                is_silenced: trigger.is_silenced,
-                status: RunOutcome::Error,
-                start_time: trigger.start_time.unwrap_or_default(),
-                end_time: trigger.end_time.unwrap_or_default(),
-                retries: trigger.retries,
-                error: None,
-                success_response: None,
-                is_partial: None,
-                delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
-                evaluation_took_in_secs: None,
-                source_node: Some(LOCAL_NODE.name.clone()),
-                query_took: None,
-                scheduler_trace_id: Some(scheduler_trace_id.clone()),
-                time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-                ..Default::default()
-            });
             return Err(anyhow::anyhow!(
                 "Error getting report: {report_id}, error: {e}"
             ));
         }
     };
+    let base_row = || scheduled_row(run_row(&report, report_id, now));
 
     // The report is fetched by ID alone, so refuse to run one whose org drifted from its trigger.
     if &report.org_id != org_id {
@@ -4617,6 +4737,12 @@ async fn handle_report_triggers(
             "[SCHEDULER trace_id {scheduler_trace_id}] Report {report_id} belongs to org {}, not to its trigger org {org_id}; skipping",
             report.org_id
         );
+        // Published without a last-run write: the report belongs to another org.
+        publish_triggers_usage(TriggerData {
+            status: RunOutcome::Error,
+            error: Some("org mismatch".to_string()),
+            ..base_row()
+        });
         db::scheduler::delete(
             &trigger.org,
             db::scheduler::TriggerModule::Report,
@@ -4638,7 +4764,15 @@ async fn handle_report_triggers(
                 report_name,
                 trigger.org
             );
-            report.enabled = false;
+            record_run(
+                report_id,
+                TriggerData {
+                    status: RunOutcome::Skipped,
+                    error: Some("trial expired, report paused".to_string()),
+                    ..base_row()
+                },
+            )
+            .await;
             if let Err(e) = crate::dashboards::reports::enable(
                 &report.org_id,
                 &_report_folder.folder_id,
@@ -4678,6 +4812,16 @@ async fn handle_report_triggers(
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+        record_run(
+            report_id,
+            TriggerData {
+                next_run_at: new_trigger.next_run_at,
+                status: RunOutcome::Skipped,
+                error: Some("report disabled".to_string()),
+                ..base_row()
+            },
+        )
+        .await;
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
@@ -4700,128 +4844,152 @@ async fn handle_report_triggers(
     }
 
     let mut trigger_data_stream = TriggerData {
-        _timestamp: now,
-        org: trigger.org.clone(),
-        module: if report.destinations.is_empty() {
-            TriggerDataType::CachedReport
-        } else {
-            TriggerDataType::Report
-        },
-        key: format!("{report_name}/{report_id}"),
         next_run_at: new_trigger.next_run_at,
-        is_realtime: trigger.is_realtime,
-        is_silenced: trigger.is_silenced,
-        status: RunOutcome::Succeeded,
-        start_time: trigger.start_time.unwrap_or_default(),
-        end_time: trigger.end_time.unwrap_or_default(),
-        retries: trigger.retries,
-        error: None,
-        success_response: None,
-        is_partial: None,
-        delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
-        evaluation_took_in_secs: None,
-        source_node: Some(LOCAL_NODE.name.clone()),
-        query_took: None,
-        scheduler_trace_id: Some(scheduler_trace_id.clone()),
-        time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-        ..Default::default()
+        ..base_row()
     };
 
     if trigger.retries >= max_retries {
-        // It has been tried the maximum time, just update the
-        // next_run_at to the next expected trigger time
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has passed maximum retries, skipping to next run",
             org_id = new_trigger.org,
             report_name = report_name
         );
+        trigger_data_stream.status = RunOutcome::Skipped;
+        let finish_once = report_retry_outcome(run_once, trigger.retries, max_retries)
+            == RetryOutcome::FinishOnce;
+        trigger_data_stream.error = Some(if finish_once {
+            format!("max retries ({max_retries}) reached, one-time report paused")
+        } else {
+            format!("max retries ({max_retries}) reached, run not attempted")
+        });
+        // Not stored as the last run: the failure that exhausted the retries stays on the list.
+        publish_triggers_usage(trigger_data_stream);
+        if finish_once {
+            finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
+        }
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
-    match report.send_subscribers().await {
+    let started = Instant::now();
+    let result = report.send_subscribers().await;
+    apply_send_result(&mut trigger_data_stream, &result, started);
+    // Published before the trigger update, whose database error would otherwise drop the row.
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
+        trigger_data_stream.key
+    );
+    record_run(report_id, trigger_data_stream).await;
+    match result {
         Ok(_) => {
             log::info!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {report_name} id: {report_id} sent to destination"
             );
             // Report generation successful, update the trigger
             if run_once {
-                new_trigger.status = db::scheduler::TriggerStatus::Completed;
-                // Get the report again from db to pause it
-                match infra::table::reports::get_by_id(conn, report_id).await? {
-                    Some((folder, mut old_report)) => {
-                        // Pause the report as this is the last run
-                        if old_report.enabled {
-                            // Disable the report
-                            old_report.enabled = false;
-                        }
-                        let result = db::dashboards::reports::update_without_updating_trigger(
-                            conn,
-                            &folder.folder_id,
-                            None,
-                            old_report,
-                        )
-                        .await;
-                        if result.is_err() {
-                            log::error!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {}",
-                                result.err().unwrap()
-                            );
-                        }
-                    }
-                    None => {
-                        log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
-                        );
-                    }
-                }
+                finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
             }
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
-            trigger_data_stream.end_time = now_micros();
         }
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error sending report to subscribers: org_id: {org_id}, error: {e}"
             );
-            if trigger.retries + 1 >= max_retries && !run_once {
-                // It has been tried the maximum time, just update the
-                // next_run_at to the next expected trigger time
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
-                );
-                trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-            } else {
-                if run_once {
-                    report.enabled = true;
+            match report_retry_outcome(run_once, trigger.retries, max_retries) {
+                RetryOutcome::Retry => {
+                    db::scheduler::update_status(
+                        &new_trigger.org,
+                        new_trigger.module,
+                        &new_trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                        None,
+                        true,
+                        &query_trace_id,
+                    )
+                    .await?;
                 }
-                // Otherwise update its status only
-                db::scheduler::update_status(
-                    &new_trigger.org,
-                    new_trigger.module,
-                    &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
-                    true,
-                    &query_trace_id,
-                )
-                .await?;
+                RetryOutcome::Reschedule => {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
+                    );
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                }
+                RetryOutcome::FinishOnce => {
+                    // Kept off the last run so the failure that exhausted the retries stays listed.
+                    publish_triggers_usage(exhausted_once_row(
+                        TriggerData {
+                            next_run_at: new_trigger.next_run_at,
+                            ..base_row()
+                        },
+                        max_retries,
+                    ));
+                    finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                }
             }
-            trigger_data_stream.end_time = now_micros();
-            trigger_data_stream.status = RunOutcome::Error;
-            trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
-    log::debug!(
-        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
-        trigger_data_stream.key
-    );
-    publish_triggers_usage(trigger_data_stream);
 
     Ok(())
+}
+
+/// Marks a one-time report's trigger Completed and pauses the report.
+async fn finish_run_once(
+    conn: &sea_orm::DatabaseConnection,
+    report_id: &str,
+    new_trigger: &mut db::scheduler::Trigger,
+    scheduler_trace_id: &str,
+) -> Result<(), anyhow::Error> {
+    new_trigger.status = db::scheduler::TriggerStatus::Completed;
+    let org_id = &new_trigger.org;
+    let Some((folder, mut report)) = infra::table::reports::get_by_id(conn, report_id).await?
+    else {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
+        );
+        return Ok(());
+    };
+    report.enabled = false;
+    let report_name = report.name.clone();
+    if let Err(e) = db::dashboards::reports::update_without_updating_trigger(
+        conn,
+        &folder.folder_id,
+        None,
+        report,
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {e}"
+        );
+    }
+    Ok(())
+}
+
+/// The Skipped row for a one-time report whose retries ran out, published right after the
+/// failure that exhausted them. History identifies a run by `_timestamp` and `retries`, and both
+/// rows share the handler's start time, so this row counts as the attempt that was not made.
+fn exhausted_once_row(mut row: TriggerData, max_retries: i32) -> TriggerData {
+    row.status = RunOutcome::Skipped;
+    row.error = Some(format!(
+        "max retries ({max_retries}) reached, one-time report paused"
+    ));
+    row.retries = row.retries.saturating_add(1);
+    row
+}
+
+/// `retries` counts the attempts that failed before this one.
+fn report_retry_outcome(run_once: bool, retries: i32, max_retries: i32) -> RetryOutcome {
+    if retries.saturating_add(1) < max_retries {
+        RetryOutcome::Retry
+    } else if run_once {
+        RetryOutcome::FinishOnce
+    } else {
+        RetryOutcome::Reschedule
+    }
 }
 
 /// Next run and frequency in seconds of a report schedule; a week out if it cannot be evaluated.
@@ -4867,7 +5035,7 @@ async fn handle_derived_stream_triggers(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
     );
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
     let (org_id, stream_type, pipeline_name, pipeline_id) = match get_pipeline_info_from_module_key(
@@ -5250,10 +5418,7 @@ async fn handle_derived_stream_triggers(
         return Ok(());
     }
 
-    // In case the scheduler background job (watch_timeout) updates the trigger retries
-    // (not through this handler), we need to skip to the next run at but with the same
-    // trigger start time. If we don't handle here, in that case, the `clean_complete`
-    // background job will clear this job as it has reached max retries.
+    // watch_timeout can bump retries outside this handler; past the cap, skip to the next run.
     if trigger.retries >= max_retries {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
@@ -5342,11 +5507,12 @@ async fn handle_derived_stream_triggers(
                     new_trigger.module_key
                 );
 
-                let local_val = trigger_results.data // checked is some
-                        .unwrap()
-                        .into_iter()
-                        .map(json::Value::Object)
-                        .collect::<Vec<_>>();
+                let local_val = trigger_results
+                    .data // checked is some
+                    .unwrap()
+                    .into_iter()
+                    .map(json::Value::Object)
+                    .collect::<Vec<_>>();
 
                 // pass search results to pipeline to get modified results before ingesting
                 let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
@@ -5612,7 +5778,7 @@ async fn handle_backfill_triggers(
         triggers::{DeletionStatus, ScheduledTriggerData},
     };
 
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     let job_id = trigger.module_key.clone();
     let org_id = trigger.org.clone();
     let query_trace_id = ider::generate_trace_id();
@@ -7747,6 +7913,53 @@ mod tests {
     }
 
     #[test]
+    fn report_retry_outcome_finishes_a_one_time_report_when_retries_run_out() {
+        use RetryOutcome::*;
+        assert_eq!(report_retry_outcome(true, 0, 3), Retry);
+        assert_eq!(report_retry_outcome(false, 1, 3), Retry);
+        assert_eq!(report_retry_outcome(true, 2, 3), FinishOnce);
+        assert_eq!(report_retry_outcome(false, 2, 3), Reschedule);
+        assert_eq!(report_retry_outcome(true, 3, 3), FinishOnce);
+        for max_retries in [0, 1] {
+            for retries in [0, 1, i32::MAX] {
+                assert_ne!(report_retry_outcome(true, retries, max_retries), Retry);
+                assert_ne!(report_retry_outcome(false, retries, max_retries), Retry);
+            }
+        }
+    }
+
+    #[test]
+    fn exhausted_once_row_does_not_collide_with_the_failure_before_it() {
+        let failure = TriggerData {
+            _timestamp: 10,
+            retries: 2,
+            status: RunOutcome::Error,
+            error: Some("smtp down".to_string()),
+            ..Default::default()
+        };
+        let skipped = exhausted_once_row(failure.clone(), 3);
+        assert_eq!(skipped._timestamp, failure._timestamp);
+        assert_ne!(skipped.retries, failure.retries);
+        assert_eq!(skipped.retries, 3);
+        assert_eq!(skipped.status, RunOutcome::Skipped);
+        assert_eq!(
+            skipped.error.as_deref(),
+            Some("max retries (3) reached, one-time report paused")
+        );
+        assert_eq!(
+            exhausted_once_row(
+                TriggerData {
+                    retries: i32::MAX,
+                    ..Default::default()
+                },
+                3
+            )
+            .retries,
+            i32::MAX
+        );
+    }
+
+    #[test]
     fn report_next_run_follows_a_valid_schedule() {
         let now = 1640995200000000;
         let hour = Duration::try_hours(1).unwrap().num_microseconds().unwrap();
@@ -7974,29 +8187,9 @@ mod tests {
     // ── parse_detection_interval_to_micros ───────────────────────────────────
 
     #[test]
-    fn test_parse_detection_interval_minutes() {
-        // "5m" → 5 * 60 * 1_000_000
-        let result = parse_detection_interval_to_micros("5m");
-        assert_eq!(result, 5 * 60 * 1_000_000);
-    }
-
-    #[test]
-    fn test_parse_detection_interval_hours() {
-        // "2h" → 2 * 3600 * 1_000_000
-        let result = parse_detection_interval_to_micros("2h");
-        assert_eq!(result, 2 * 3600 * 1_000_000);
-    }
-
-    #[test]
     fn test_parse_detection_interval_one_hour() {
         let result = parse_detection_interval_to_micros("1h");
         assert_eq!(result, 3600 * 1_000_000);
-    }
-
-    #[test]
-    fn test_parse_detection_interval_ten_minutes() {
-        let result = parse_detection_interval_to_micros("10m");
-        assert_eq!(result, 10 * 60 * 1_000_000);
     }
 
     #[test]
@@ -8055,12 +8248,6 @@ mod tests {
         assert_eq!(result, 0);
     }
 
-    #[test]
-    fn test_parse_detection_interval_large_value() {
-        let result = parse_detection_interval_to_micros("100m");
-        assert_eq!(result, 100 * 60 * 1_000_000);
-    }
-
     // ── get_pipeline_info_from_module_key additional edge cases ──────────────
 
     #[test]
@@ -8112,12 +8299,6 @@ mod tests {
     #[test]
     fn test_get_pipeline_info_too_few_parts_two() {
         let result = get_pipeline_info_from_module_key("logs/org");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_get_pipeline_info_too_few_parts_three() {
-        let result = get_pipeline_info_from_module_key("logs/org/pipeline");
         assert!(result.is_err());
     }
 
@@ -9128,5 +9309,122 @@ mod tests {
         let kept =
             record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
         assert_eq!(kept, RunOutcome::NotifyFailed);
+    }
+
+    const PARK_NOW: i64 = 10_000_000_000;
+    const PARK_DELETED_AT: i64 = PARK_NOW - 90 * 60 * 1_000_000;
+
+    /// Runs `park_with` on canned inputs; returns its result and each `next_run_at` it set.
+    async fn park_runs(
+        org: Result<(String, Option<i64>), infra::errors::Error>,
+        active: Result<bool, infra::errors::Error>,
+    ) -> (Result<bool, anyhow::Error>, Vec<i64>) {
+        park_runs_as(db::scheduler::TriggerModule::Alert, org, active).await
+    }
+
+    async fn park_runs_as(
+        module: db::scheduler::TriggerModule,
+        org: Result<(String, Option<i64>), infra::errors::Error>,
+        active: Result<bool, infra::errors::Error>,
+    ) -> (Result<bool, anyhow::Error>, Vec<i64>) {
+        let written = std::sync::Mutex::new(Vec::new());
+        let trigger = db::scheduler::Trigger {
+            org: "park-org".to_string(),
+            module,
+            next_run_at: PARK_NOW - 1,
+            ..Default::default()
+        };
+        let parked = park_with(
+            &trigger,
+            PARK_NOW,
+            async { org },
+            |parked: db::scheduler::Trigger, now| {
+                let written = &written;
+                async move {
+                    assert_eq!(written.lock().unwrap().last(), Some(&parked.next_run_at));
+                    if *active.as_ref().unwrap_or(&false) {
+                        written.lock().unwrap().push(now);
+                    }
+                    active
+                }
+            },
+            |t: db::scheduler::Trigger| {
+                written.lock().unwrap().push(t.next_run_at);
+                async { Ok(()) }
+            },
+        )
+        .await;
+        (parked, written.into_inner().unwrap())
+    }
+
+    fn pending_row() -> Result<(String, Option<i64>), infra::errors::Error> {
+        Ok(("pending_deletion".to_string(), Some(PARK_DELETED_AT)))
+    }
+
+    fn db_down() -> infra::errors::Error {
+        infra::errors::Error::Message("db down".to_string())
+    }
+
+    #[tokio::test]
+    async fn test_active_org_runs_its_trigger_unparked() {
+        let (parked, written) = park_runs(Ok(("active".to_string(), None)), Ok(false)).await;
+        assert!(!parked.unwrap());
+        assert!(written.is_empty(), "{written:?}");
+    }
+
+    #[tokio::test]
+    async fn test_blocked_org_parks_on_its_deletion_grid() {
+        let (parked, written) = park_runs(pending_row(), Ok(false)).await;
+        assert!(parked.unwrap());
+        let grid = crate::org_cleanup::parked_run_at(Some(PARK_DELETED_AT), PARK_NOW);
+        assert_eq!(written, vec![grid]);
+    }
+
+    #[tokio::test]
+    async fn test_resurrect_during_parking_releases_the_trigger() {
+        let (parked, written) = park_runs(pending_row(), Ok(true)).await;
+        assert!(parked.unwrap());
+        assert_eq!(written.last(), Some(&PARK_NOW), "{written:?}");
+    }
+
+    #[tokio::test]
+    async fn test_unreadable_org_row_rechecks_the_trigger_within_a_minute() {
+        let (parked, written) = park_runs(Err(db_down()), Ok(true)).await;
+        assert!(parked.unwrap());
+        assert_eq!(written, vec![PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS]);
+    }
+
+    #[tokio::test]
+    async fn test_claim_module_waits_for_its_grid_slot_instead_of_a_rerelease() {
+        use db::scheduler::TriggerModule::{AlertCalibration, CompositeAlert};
+        let grid = crate::org_cleanup::parked_run_at(Some(PARK_DELETED_AT), PARK_NOW);
+        for module in [CompositeAlert, AlertCalibration] {
+            let (parked, written) = park_runs_as(module.clone(), pending_row(), Ok(true)).await;
+            assert!(parked.unwrap());
+            assert_eq!(written, vec![grid], "{module:?} after a racing resurrect");
+            let (parked, written) =
+                park_runs_as(module.clone(), pending_row(), Err(db_down())).await;
+            assert!(parked.unwrap());
+            assert_eq!(written, vec![grid], "{module:?} after a failed re-read");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_non_claim_module_is_released_after_a_racing_resurrect() {
+        let grid = crate::org_cleanup::parked_run_at(Some(PARK_DELETED_AT), PARK_NOW);
+        let (parked, written) = park_runs(pending_row(), Ok(true)).await;
+        assert!(parked.unwrap());
+        assert_eq!(written, vec![grid, PARK_NOW]);
+    }
+
+    #[tokio::test]
+    async fn test_failed_status_reread_rechecks_the_parked_trigger_within_a_minute() {
+        let (parked, written) = park_runs(pending_row(), Err(db_down())).await;
+        assert!(parked.expect("a failed re-read must not fail the trigger"));
+        assert_eq!(
+            written.last(),
+            Some(&(PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS)),
+            "{written:?}"
+        );
     }
 }

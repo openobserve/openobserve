@@ -2,6 +2,14 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export const VARIABLE_FORMATS = ["csv", "pipe", "doublequote", "singlequote"] as const;
 
+const HTML_ENTITIES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
 export type VariableFormat = (typeof VARIABLE_FORMATS)[number];
 
 export interface VariablePlaceholder {
@@ -236,6 +244,24 @@ const resolveVariablesWithPrecedence = (
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const formatVariableValue = (value: any, format?: VariableFormat): string => {
+  if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+    return SELECT_ALL_VALUE;
+  }
+  if (!Array.isArray(value)) return String(value);
+
+  switch (format) {
+    case "pipe":
+      return value.join("|");
+    case "doublequote":
+      return value.map((v) => `"${v}"`).join(",");
+    case "singlequote":
+      return value.map((v) => `'${v}'`).join(",");
+    default:
+      return value.join(",");
+  }
+};
+
 const buildPlaceholderRegex = (names: Iterable<string>): RegExp | null => {
   const unique = [...new Set(names)].filter((name) => typeof name === "string" && name !== "");
   if (!unique.length) return null;
@@ -327,10 +353,15 @@ export const getVariablesReferencedInQueries = (
   return candidates.filter((it: any) => referenced.has(it.name));
 };
 
+/** Escape a value for HTML text or any attribute; whitespace is encoded too, so an unquoted attribute cannot gain new ones. */
+export const escapeHtmlValue = (value: string): string =>
+  value.replace(/[&<>"'`=\s]/g, (ch) => HTML_ENTITIES[ch] ?? `&#${ch.charCodeAt(0)};`);
+
 export const processVariableContent = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
+  escapeValue: (value: string) => string = (value) => value,
 ) => {
   const processedContent: string = normalizeVariableSyntax(content);
 
@@ -352,22 +383,7 @@ export const processVariableContent = (
     );
   });
 
-  return replaceVariablePlaceholders(processedContent, valuesByName.keys(), ({ name, format }) => {
-    const value = valuesByName.get(name);
-    if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
-      return SELECT_ALL_VALUE;
-    }
-    if (!Array.isArray(value)) return String(value);
-
-    switch (format) {
-      case "pipe":
-        return value.join("|");
-      case "doublequote":
-        return value.map((v) => `"${v}"`).join(",");
-      case "singlequote":
-        return value.map((v) => `'${v}'`).join(",");
-      default:
-        return value.join(",");
-    }
-  });
+  return replaceVariablePlaceholders(processedContent, valuesByName.keys(), (placeholder) =>
+    escapeValue(formatVariableValue(valuesByName.get(placeholder.name), placeholder.format)),
+  );
 };

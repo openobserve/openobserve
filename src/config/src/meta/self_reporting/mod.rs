@@ -400,6 +400,12 @@ mod tests {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let result = queue
@@ -953,6 +959,12 @@ mod tests {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let error_data = error::ErrorData {
@@ -1037,6 +1049,12 @@ mod tests {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1106,6 +1124,12 @@ mod tests {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         // Should succeed when queue has space

@@ -24,7 +24,7 @@ use std::{borrow::Cow, sync::Arc};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
+        EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label,
         value::{Exemplar, Label, Labels, QueryContext, RangeValue},
     },
     utils::{
@@ -134,11 +134,8 @@ pub(super) async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
-                None
-            } else {
-                Some(name.to_string())
-            }
+            // the hash is kept for the scan; the other excluded columns are per-point, not labels
+            (name == HASH_LABEL || !is_metrics_hash_excluded_label(name)).then(|| name.to_string())
         })
         .collect::<Vec<_>>();
     // sort labels to have a consistent order

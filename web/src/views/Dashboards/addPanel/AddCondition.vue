@@ -59,6 +59,7 @@
                   :data-test="`dashboard-add-condition-column-${conditionIndex}`"
                 />
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="outline"
                   size="icon"
                   class="shrink-0"
@@ -145,6 +146,7 @@
         </div>
       </ODropdown>
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon-chip"
         class="!w-4 shrink-0"

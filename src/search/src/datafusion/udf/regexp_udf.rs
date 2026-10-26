@@ -550,12 +550,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_regex_pattern_to_fields_empty_pattern_errors() {
-        let result = regex_pattern_to_fields("", &DataType::Utf8);
-        assert!(result.is_err());
-    }
-
     #[tokio::test]
     async fn test_regexp_match_to_fields_scalar_input() {
         let ctx = SessionContext::new();

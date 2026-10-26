@@ -127,7 +127,7 @@ const position = computed(() => {
 <template>
   <Teleport to="body">
     <div
-      class="rounded-surface bg-surface-overlay border-border-subtle fixed z-9999999 flex w-80 max-w-[min(20rem,calc(100vw-1.5rem))] flex-col gap-2 overflow-x-hidden overflow-y-auto border p-3 shadow-md"
+      class="o2-exemplar-card rounded-surface bg-surface-overlay border-border-subtle fixed z-9999999 flex w-80 max-w-[min(20rem,calc(100vw-1.5rem))] flex-col gap-2 overflow-x-hidden overflow-y-auto border p-3 shadow-md"
       :style="position"
       role="dialog"
       :aria-label="t('dashboard.exemplars.cardTitle')"

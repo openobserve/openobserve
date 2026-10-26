@@ -67,7 +67,7 @@ export interface QueryDataOptions {
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
 
-  let { searchObj, searchObjDebug, notificationMsg } = searchState();
+  let { searchObj, searchObjDebug, notificationMsg, clearFieldValues } = searchState();
 
   const store = useStore();
 
@@ -315,6 +315,8 @@ export const useSearchBar = (t: TranslateFn) => {
 
       autoRun.invalidateExecuted("stream");
       searchObj.data.queryResults = { hits: [] };
+      // Autocomplete reads these values with the new stream's context, so the old stream's must go with its results.
+      clearFieldValues();
       searchObj.data.freeTextBlocked = null;
       pruneFreeTextScan(searchObj);
       // Cleared with the results, else the previous stream's "no events found"

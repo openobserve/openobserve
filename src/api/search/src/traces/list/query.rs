@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use config::{
-    TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Request, Response},
         stream::StreamType,
@@ -24,12 +26,19 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::Error;
+use tokio::time::Instant;
 
 use super::{
     plan::{TraceColumns, TraceListPlan},
     response::TraceBatch,
 };
-use crate::traces::schema_compat;
+use crate::traces::{
+    schema_compat,
+    time_index::{self, TraceTimeRange},
+};
+
+// The lookup only widens summaries, so a slow index must not hold back the page.
+const RANGE_LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct TraceSearchContext {
     pub org_id: String,
@@ -63,7 +72,7 @@ impl TraceSearchContext {
         .await
     }
 
-    /// Swaps each hit's filtered aggregates for its trace's aggregates over every span in `range`.
+    /// Swaps each hit's partial aggregates for its trace's aggregates over every indexed span.
     pub async fn summarize_traces(
         &self,
         plan: &TraceListPlan,
@@ -75,12 +84,40 @@ impl TraceSearchContext {
             hits.iter()
                 .filter_map(|hit| hit.get("trace_id").and_then(json::Value::as_str)),
         );
-        let Some(request) = plan.summary_request(&self.stream_name, base_request, &ids, range)
-        else {
+        if ids.is_empty() {
             return Ok(hits);
+        }
+        let lookup_started = std::time::Instant::now();
+        let indexed = self.index_ranges(&ids, range).await;
+        let lookup_took = lookup_started.elapsed();
+        let scope = summary_scope(&ids, &indexed, range, plan.recompute_all());
+        let summary_window = scope.as_ref().map(|(_, window)| *window);
+        let mut recomputed = 0;
+        let mut summary_took = Duration::ZERO;
+        let hits = match scope {
+            Some((selected, window)) => {
+                recomputed = selected.len();
+                let request =
+                    plan.summary_request(&self.stream_name, base_request, &selected, window);
+                let summary_started = std::time::Instant::now();
+                let response = self.search(&request).await?;
+                summary_took = summary_started.elapsed();
+                merge_summaries(hits, response.hits)
+            }
+            None => hits,
         };
-        let response = self.search(&request).await?;
-        Ok(merge_summaries(hits, response.hits))
+        // Filtered pages ran the summary before the index: only lookup and the widening are new.
+        log::info!(
+            "[TRACES_LIST trace_id {}] page cost: lookup={}ms summary={}ms filtered={} ids={} indexed={} recomputed={} window={range:?} summary_window={summary_window:?}",
+            self.trace_id,
+            lookup_took.as_millis(),
+            summary_took.as_millis(),
+            plan.is_filtered(),
+            ids.len(),
+            indexed.len(),
+            recomputed,
+        );
+        Ok(hits)
     }
 
     pub async fn fill_services(
@@ -97,6 +134,42 @@ impl TraceSearchContext {
         let response = self.search(&request).await?;
         batch.fill_services(response.hits);
         Ok(())
+    }
+
+    // An unanswered lookup degrades to the aggregates already in hand, never to an error.
+    async fn index_ranges(
+        &self,
+        ids: &[String],
+        range: (i64, i64),
+    ) -> HashMap<String, TraceTimeRange> {
+        if !get_config().common.trace_list_time_index_enabled {
+            return HashMap::new();
+        }
+        let around = TraceTimeRange {
+            start_time: range.0,
+            end_time: range.1,
+        };
+        let deadline = Instant::now() + RANGE_LOOKUP_TIMEOUT;
+        match time_index::lookup_trace_ranges(
+            &self.org_id,
+            &self.stream_name,
+            ids,
+            around,
+            deadline,
+        )
+        .await
+        {
+            Ok(ranges) => ranges.unwrap_or_default(),
+            Err(error) => {
+                log::warn!(
+                    "[trace_id {}] trace time index lookup failed for {}/{}: {error}",
+                    self.trace_id,
+                    self.org_id,
+                    self.stream_name
+                );
+                HashMap::new()
+            }
+        }
     }
 }
 
@@ -211,6 +284,33 @@ fn sanitize_trace_ids<'a>(ids: impl Iterator<Item = &'a str>) -> Vec<String> {
     })
     .filter(|id| !id.is_empty())
     .collect()
+}
+
+/// Traces to re-aggregate and the range covering their spans; only crossers unless `all`.
+fn summary_scope(
+    ids: &[String],
+    indexed: &HashMap<String, TraceTimeRange>,
+    range: (i64, i64),
+    all: bool,
+) -> Option<(Vec<String>, (i64, i64))> {
+    let mut scope = range;
+    let mut selected = Vec::new();
+    for id in ids {
+        // max_ts is the last span's end in micros; the search end bound is exclusive.
+        let span = indexed
+            .get(id)
+            .map(|r| (r.start_time, r.end_time.saturating_add(1)));
+        let crossing = span.is_some_and(|(start, end)| start < range.0 || end > range.1);
+        if !all && !crossing {
+            continue;
+        }
+        selected.push(id.clone());
+        if let Some((start, end)) = span {
+            scope.0 = scope.0.min(start);
+            scope.1 = scope.1.max(end);
+        }
+    }
+    (!selected.is_empty()).then_some((selected, scope))
 }
 
 // A hit missing from the full summary keeps its filtered aggregates rather than vanishing.
@@ -360,6 +460,46 @@ mod tests {
         assert_eq!(item["spans"], json::json!([3, 1]));
         assert_eq!(item["duration"], 100);
         assert_eq!(item["first_event"]["service_name"], "gateway");
+    }
+
+    #[test]
+    fn unfiltered_scope_recomputes_only_traces_the_index_places_outside_the_range() {
+        let ids = ["inside", "older", "newer", "unindexed"]
+            .map(String::from)
+            .to_vec();
+        let indexed = HashMap::from_iter([
+            ("inside".to_string(), index_range(110, 140)),
+            ("older".to_string(), index_range(90, 120)),
+            ("newer".to_string(), index_range(130, 170)),
+        ]);
+        let (selected, range) = summary_scope(&ids, &indexed, (100, 150), false).unwrap();
+        assert_eq!(selected, ["older", "newer"]);
+        assert_eq!(range, (90, 171));
+
+        let unindexed = HashMap::new();
+        assert!(summary_scope(&ids, &unindexed, (100, 150), false).is_none());
+        let contained = HashMap::from_iter([("inside".to_string(), index_range(100, 149))]);
+        assert!(summary_scope(&ids, &contained, (100, 150), false).is_none());
+    }
+
+    #[test]
+    fn filtered_scope_recomputes_every_trace_over_the_widened_range() {
+        let ids = ["a", "b"].map(String::from).to_vec();
+        let indexed = HashMap::from_iter([("b".to_string(), index_range(50, 120))]);
+        let (selected, range) = summary_scope(&ids, &indexed, (100, 150), true).unwrap();
+        assert_eq!(selected, ["a", "b"]);
+        assert_eq!(range, (50, 150));
+        let (selected, range) = summary_scope(&ids, &HashMap::new(), (100, 150), true).unwrap();
+        assert_eq!(selected, ["a", "b"]);
+        assert_eq!(range, (100, 150));
+        assert!(summary_scope(&[], &indexed, (100, 150), true).is_none());
+    }
+
+    fn index_range(start_time: i64, end_time: i64) -> TraceTimeRange {
+        TraceTimeRange {
+            start_time,
+            end_time,
+        }
     }
 
     #[test]

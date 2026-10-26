@@ -122,6 +122,13 @@
   --color-button-warning-border: var(--color-warning-400);
   --color-button-warning-focus-ring: var(--color-focus-ring-warning);
 
+  /* Button — pending (stale result: solid amber, never the theme accent) */
+  --color-button-pending-bg: var(--color-amber-400);
+  --color-button-pending-hover-bg: var(--color-amber-500);
+  --color-button-pending-active-bg: var(--color-amber-600);
+  --color-button-pending-text: var(--color-grey-950);
+  --color-button-pending-focus-ring: var(--color-focus-ring-warning);
+
   /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
@@ -613,6 +620,9 @@
   --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-700);
   --color-select-item-disabled: var(--color-text-disabled);
+
+  /* Flame graph (components/common/FlameGraphView.vue): label text on the light series fills, in both themes. */
+  --color-flame-frame-text: var(--color-grey-800);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-text-heading);
@@ -1412,6 +1422,13 @@
   --color-button-warning-border: var(--color-button-warning-border);
   --color-button-warning-focus-ring: var(--color-button-warning-focus-ring);
 
+  /* Button — pending */
+  --color-button-pending-bg: var(--color-button-pending-bg);
+  --color-button-pending-hover-bg: var(--color-button-pending-hover-bg);
+  --color-button-pending-active-bg: var(--color-button-pending-active-bg);
+  --color-button-pending-text: var(--color-button-pending-text);
+  --color-button-pending-focus-ring: var(--color-button-pending-focus-ring);
+
   /* Button — destructive */
   --color-button-destructive: var(--color-button-destructive);
   --color-button-destructive-hover: var(--color-button-destructive-hover);
@@ -1526,6 +1543,9 @@
   --color-select-item-selected-bg: var(--color-select-item-selected-bg);
   --color-select-item-selected-text: var(--color-select-item-selected-text);
   --color-select-item-disabled: var(--color-select-item-disabled);
+
+  /* Flame graph */
+  --color-flame-frame-text: var(--color-flame-frame-text);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-switch-label);

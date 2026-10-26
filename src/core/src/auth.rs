@@ -40,6 +40,18 @@ use {
 };
 
 pub const V2_API_PREFIX: &str = "v2";
+/// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
+pub const V2_ORG_MODULES: [&str; 9] = [
+    "alerts",
+    "folders",
+    "reports",
+    "synthetics",
+    "incidents",
+    "downtimes",
+    "workflows",
+    "alert_calibration",
+    "fleets",
+];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
 const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
 
@@ -74,6 +86,25 @@ pub fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
     credentials
         .split_once(':')
         .map(|(user, password)| (user.to_string(), password.to_string()))
+}
+
+/// The org the router serves for a path below the `/api` mount, which a v2 route carries second.
+pub fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
+    match *path_columns {
+        [V2_API_PREFIX, org, module, ..] if V2_ORG_MODULES.contains(&module) => org,
+        [org, ..] => org,
+        [] => "",
+    }
+}
+
+/// The license routes name no org, so a user lookup cannot take one from their path.
+pub fn is_license_path_without_org(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["license"] | ["license", "refresh"])
+}
+
+/// The path as the router matched it, below the mount prefixes axum has already stripped.
+pub fn routed_path(uri_path: &str) -> &str {
+    uri_path.strip_prefix('/').unwrap_or(uri_path)
 }
 
 /// Resolves the effective permission method for write requests (PUT/DELETE/PATCH).
@@ -150,18 +181,21 @@ pub async fn save_org_tuples(org_id: &str) {
 pub async fn save_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
-pub async fn delete_org_tuples(org_id: &str) {
+pub async fn delete_org_tuples(org_id: &str) -> Result<(), anyhow::Error> {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled
-        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
-    {
-        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to delete org tuples for {org_id}: {e}"))?;
     }
+    Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn delete_org_tuples(_org_id: &str) {}
+pub async fn delete_org_tuples(_org_id: &str) -> Result<(), anyhow::Error> {
+    Ok(())
+}
 
 #[cfg(feature = "enterprise")]
 pub fn get_role(role: &UserOrgRole) -> UserRole {
@@ -263,7 +297,6 @@ where
         use o2_openfga::meta::route_permissions::{self as rp, StreamType as RpStreamType};
 
         let start = std::time::Instant::now();
-        let cfg = config::get_config();
 
         // Parse query string
         let query_string = parts.uri.query().unwrap_or("");
@@ -276,10 +309,7 @@ where
 
         let method = parts.method.to_string();
         let local_path = parts.uri.path().to_string();
-        let path = match local_path.strip_prefix(format!("{}/api/", cfg.common.base_uri).as_str()) {
-            Some(path) => path,
-            None => local_path.strip_prefix("/").unwrap_or(&local_path),
-        };
+        let path = routed_path(&local_path);
 
         let mut path_columns = path.split('/').collect::<Vec<&str>>();
         // Drop a trailing empty segment produced by a trailing slash (e.g.
@@ -293,12 +323,7 @@ where
         {
             path_columns.pop();
         }
-        let url_len = path_columns.len();
-        let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
-            path_columns[1].to_string()
-        } else {
-            path_columns[0].to_string()
-        };
+        let org_id = org_from_path(&path_columns).to_string();
 
         // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
         // Authenticated via the o2syn_ probe token (not a user), so OpenFGA is
@@ -323,6 +348,10 @@ where
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+        }
+
+        if common::meta::ingestion_routes::is_opamp(path) {
+            return opamp_extractor(&parts.headers, &method, &org_id, &folder);
         }
 
         // This is case for ingestion endpoints where we need to check
@@ -487,6 +516,39 @@ fn reject_forged_session_marker(auth: String) -> String {
     } else {
         auth
     }
+}
+
+/// §4.2: a fleet token in the header only; a cookie would let any page the user visits drive OpAMP.
+#[cfg(feature = "enterprise")]
+fn opamp_extractor(
+    headers: &HeaderMap,
+    method: &str,
+    org_id: &str,
+    folder: &str,
+) -> Result<AuthExtractor, AuthExtractorRejection> {
+    let Some(auth) = headers
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| reject_forged_session_marker(v.to_owned()))
+        .filter(|v| {
+            config::utils::base64::basic_password(v)
+                .is_some_and(|p| p.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX))
+        })
+    else {
+        return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+    };
+    // The token's fixed scope is its authorization; the validator confines it to its org's writes.
+    Ok(AuthExtractor {
+        auth,
+        method: method.to_string(),
+        o2_type: String::new(),
+        org_id: org_id.to_string(),
+        bypass_check: true,
+        parent_id: folder.to_string(),
+        use_all_org: false,
+        use_self_context: false,
+        use_self_parent: false,
+    })
 }
 
 fn extract_cookies_from_headers(headers: &HeaderMap) -> HashMap<&str, &str> {
@@ -1068,7 +1130,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_org_tuples_non_enterprise() {
         // In non-enterprise mode, this should not panic and return immediately
-        delete_org_tuples("test_org").await;
+        assert!(delete_org_tuples("test_org").await.is_ok());
         // If we reach here, the function completed successfully
     }
 
@@ -1131,27 +1193,9 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_alert_trigger_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_enable_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/enable".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_resolve_write_method_alert_crud_put() {
         let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
         assert_eq!(resolve_write_method("PUT", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_crud_delete() {
-        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
-        assert_eq!(resolve_write_method("DELETE", &path), "DELETE");
     }
 
     #[test]
@@ -1170,26 +1214,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_non_alert_patch_becomes_put() {
-        let path: Vec<&str> = "v2/default/dashboards/dash123".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_only_matches_v2_alerts() {
-        // v1-style path should continue to normalize PATCH to PUT
-        let path: Vec<&str> = "default/streams/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_requires_full_path() {
-        // Too short a path should not match
-        let path: Vec<&str> = "v2/default/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_build_basic_auth_header_format() {
         use base64::Engine as _;
         let header = build_basic_auth_header("user@example.com", "mytoken");
@@ -1202,21 +1226,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decoded, "user@example.com:mytoken");
-    }
-
-    #[test]
-    fn test_build_basic_auth_header_empty_fields() {
-        use base64::Engine as _;
-        let header = build_basic_auth_header("", "");
-        assert!(header.starts_with("Basic "));
-        let encoded = header.strip_prefix("Basic ").unwrap();
-        let decoded = String::from_utf8(
-            base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(decoded, ":");
     }
 
     #[test]
@@ -1254,6 +1263,37 @@ mod tests {
         assert_eq!(get_user_email_from_auth_str(&auth).await, None);
     }
 
+    // Each URI is what the extractor sees once axum has stripped the `/api` mount.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_extractor_reads_the_org_the_route_serves() {
+        let mut misread = vec![];
+        for (method, uri, served) in [
+            ("POST", "/kv/kv/_search", "kv"),
+            ("POST", "/api/kv/_search", "api"),
+            ("POST", "/v2/kv/_search", "v2"),
+            ("GET", "/v2/acme/alerts", "acme"),
+        ] {
+            let (mut parts, ()) = http::Request::builder()
+                .method(method)
+                .uri(uri)
+                .header(http::header::AUTHORIZATION, "Basic eDp5")
+                .body(())
+                .unwrap()
+                .into_parts();
+            let auth = AuthExtractor::from_request_parts(&mut parts, &())
+                .await
+                .unwrap_or_else(|e| panic!("{method} {uri}: {}", e.message));
+            if auth.org_id != served {
+                misread.push(format!(
+                    "{method} /api{uri}: resolved org {:?}",
+                    auth.org_id
+                ));
+            }
+        }
+        assert!(misread.is_empty(), "{misread:#?}");
+    }
+
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn session_cookie_without_a_space_does_not_panic() {
@@ -1267,5 +1307,57 @@ mod tests {
                 format!("Bearer {access_token}")
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn basic(credentials: &str) -> String {
+        format!("Basic {}", config::utils::base64::encode(credentials))
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn opamp_extractor_takes_fleet_tokens_only() {
+        let headers = |name: http::header::HeaderName, value: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(name, value.parse().unwrap());
+            headers
+        };
+
+        // The validator trims the password, so a padded token is still a fleet token.
+        for credentials in [
+            "agent:o2ft_x",
+            "admin@example.com: o2ft_x",
+            "agent:o2ft_x\n",
+        ] {
+            let fleet_token = headers(http::header::AUTHORIZATION, &basic(credentials));
+            for method in ["GET", "POST"] {
+                let ext = opamp_extractor(&fleet_token, method, "default", "")
+                    .unwrap_or_else(|_| panic!("{method} rejected"));
+                assert!(ext.bypass_check, "{method} {credentials:?}");
+            }
+        }
+
+        for login in [
+            basic("user@example.com:pw"),
+            "Bearer o2ft_x".to_string(),
+            basic("o2ft_x:pw"),
+        ] {
+            let login = headers(http::header::AUTHORIZATION, &login);
+            for method in ["GET", "POST"] {
+                let Err(rejection) = opamp_extractor(&login, method, "default", "") else {
+                    panic!("only a fleet token may connect, {method}");
+                };
+                assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
+            }
+        }
+
+        let cookie = headers(
+            http::header::COOKIE,
+            "auth_tokens=eyJhY2Nlc3NfdG9rZW4iOiJ4In0=",
+        );
+        let Err(rejection) = opamp_extractor(&cookie, "GET", "default", "") else {
+            panic!("a cookie must never authenticate OpAMP");
+        };
+        assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
     }
 }

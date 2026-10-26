@@ -37,7 +37,6 @@ const finding = (overrides: Partial<FindingRecord> = {}): FindingRecord => ({
   coverage_error_clusters_truncated: false,
   coverage_error_clusters_unattributed: 0,
   coverage_stream_substrate_empty: false,
-  coverage_meta_fallback_used: false,
   rule_id: "scheduler_health",
   severity: "Medium",
   confidence: "High",
@@ -63,11 +62,18 @@ describe("AlertCalibrationFindingCard", () => {
   it("lists a cluster finding's worst orgs in place of a single alert", () => {
     const wrapper = mountCard(finding());
     const rows = wrapper.findAll('[data-test="alert-calibration-finding-lag-row"]');
-    expect(rows.map((row) => row.text())).toEqual([
-      "globex3 skipped, 0 of 100 late",
-      "acme0 skipped, 40 of 100 late",
+    expect(
+      rows.map((row) =>
+        row.findAll('[data-test="alert-calibration-finding-lag-cell"]').map((cell) => cell.text()),
+      ),
+    ).toEqual([
+      ["globex", "3", "0", "100"],
+      ["acme", "0", "40", "100"],
     ]);
-    expect(wrapper.text()).toContain("Most affected orgs");
+    const list = wrapper.find('[data-test="alert-calibration-finding-org_id-list"]');
+    expect(list.text()).toContain("Most affected orgs");
+    expect(list.text()).toContain("Skipped windows");
+    expect(list.text()).toContain("Late evaluations");
     expect(
       wrapper.find('[data-test="alert-calibration-finding-hour_start_micros-list"]').exists(),
     ).toBe(false);

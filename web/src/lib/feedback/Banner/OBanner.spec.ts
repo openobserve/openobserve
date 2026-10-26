@@ -53,6 +53,21 @@ describe("OBanner — preserveWhitespace", () => {
 });
 
 describe("OBanner — textSize and colors", () => {
+  it("keeps the message at least 12rem wide on a phone, except for a centred bar", () => {
+    const bar = mount(OBanner, {
+      props: { bar: true },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(bar.html()).toContain("max-md:min-w-48");
+    const centred = mount(OBanner, {
+      props: { bar: true, center: true },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(centred.html()).not.toContain("max-md:min-w-48");
+  });
+
   it("keeps the compact bar scale unless a size is asked for", () => {
     const bar = mount(OBanner, {
       props: { bar: true },

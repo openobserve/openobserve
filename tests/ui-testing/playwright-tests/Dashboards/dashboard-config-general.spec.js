@@ -63,7 +63,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await expect(unitDropdown).toBeVisible();
 
     // Set to Bytes
-    await pm.dashboardPanelConfigs.selectUnit("Bytes");
+    await pm.dashboardPanelConfigs.selectUnit("Bytes (1024)");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Unit set to Bytes");
     await pm.dashboardPanelActions.waitForChartToRender();

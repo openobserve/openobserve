@@ -183,6 +183,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import {
+  ALL_CONDITION_OPERATORS,
   CONDITION_OPERATORS_KEY,
   CONDITION_VALUE_SUGGEST_KEY,
   siblingAndPairs,
@@ -212,22 +213,7 @@ const { t } = useI18nTyped();
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
 
-// Operator `value`s are the backend wire format (serde renames); labels stay
-// raw English like the rest of the list.
-const allOperators: SelectOptionInput[] = [
-  "=",
-  "!=",
-  ">=",
-  "<=",
-  ">",
-  "<",
-  "Contains",
-  "NotContains",
-  { label: raw("Is Null"), value: "is_null" },
-  { label: raw("Is Not Null"), value: "is_not_null" },
-  { label: raw("Is Empty"), value: "is_empty" },
-  { label: raw("Is Not Empty"), value: "is_not_empty" },
-];
+const allOperators: SelectOptionInput[] = ALL_CONDITION_OPERATORS;
 
 const injectedOperators = inject(CONDITION_OPERATORS_KEY, null);
 const triggerOperators = computed<SelectOptionInput[]>(() => {

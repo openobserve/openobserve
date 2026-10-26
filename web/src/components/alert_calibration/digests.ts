@@ -36,7 +36,6 @@ export interface Coverage {
   coverage_error_clusters_truncated: boolean;
   coverage_error_clusters_unattributed: number;
   coverage_stream_substrate_empty: boolean;
-  coverage_meta_fallback_used: boolean;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -79,39 +78,10 @@ export interface LagRow {
   evaluations: number;
 }
 
-const COVERAGE_COLUMNS: (keyof Coverage)[] = [
-  "coverage_unreadable_definitions",
-  "coverage_facts_without_definition",
-  "coverage_definitions_without_facts",
-  "coverage_transitions_truncated",
-  "coverage_counters_truncated",
-  "coverage_error_clusters_truncated",
-  "coverage_error_clusters_unattributed",
-  "coverage_stream_substrate_empty",
-  "coverage_meta_fallback_used",
-];
-
 const SEVERITY_RANK: Record<Severity, number> = { High: 3, Medium: 2, Low: 1, Info: 0 };
-
-const RUN_COLUMNS = [
-  "window_start",
-  "window_end",
-  "finding_count",
-  "skip_count",
-  "alerts_in_scope",
-  "coverage_gap",
-  ...COVERAGE_COLUMNS,
-];
-
-/** One row per emission: a run pulled again writes a second emission with its own `_timestamp`. */
-export const runsSql = () =>
-  `SELECT DISTINCT ${RUN_COLUMNS.join(", ")}, _timestamp AS emitted_at\nFROM "${DIGEST_STREAM}"\nORDER BY emitted_at DESC`;
 
 export const runRecordsSql = (windowStart: number, windowEnd: number) =>
   `SELECT *\nFROM "${DIGEST_STREAM}"\nWHERE window_start = ${Math.trunc(windowStart)} AND window_end = ${Math.trunc(windowEnd)}\nORDER BY _timestamp DESC`;
-
-export const flaggedByRuleSql = () =>
-  `SELECT rule_id, COUNT(DISTINCT alert_id) AS alerts_flagged, COUNT(DISTINCT window_end) AS runs_flagging\nFROM "${DIGEST_STREAM}"\nWHERE rule_id IS NOT NULL\nGROUP BY rule_id`;
 
 /** The range the timeline and the dashboard read; a run emitted before it is not listed. */
 export const lookbackRange = (nowMicros: number) => ({
@@ -149,7 +119,6 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_error_clusters_truncated: record.coverage_error_clusters_truncated,
     coverage_error_clusters_unattributed: record.coverage_error_clusters_unattributed,
     coverage_stream_substrate_empty: record.coverage_stream_substrate_empty,
-    coverage_meta_fallback_used: record.coverage_meta_fallback_used,
   };
 }
 
@@ -249,7 +218,6 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
     ["coverage_transitions_truncated", "alertCalibration.coverage.transitionsTruncated"],
     ["coverage_counters_truncated", "alertCalibration.coverage.countersTruncated"],
     ["coverage_error_clusters_truncated", "alertCalibration.coverage.errorClustersTruncated"],
-    ["coverage_meta_fallback_used", "alertCalibration.coverage.metaFallbackUsed"],
   ];
   for (const [column, key] of counts) {
     const count = Number(row[column]);

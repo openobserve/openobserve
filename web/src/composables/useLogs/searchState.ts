@@ -265,6 +265,18 @@ const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 // Incremented each time extractFields() starts; guards against applying stale schema responses
 const schemaRequestToken = ref(0);
 
+// Values seen in the current results, for autocomplete; shared because one composable fills it and the page reads it.
+const fieldValues = ref<Record<string, Set<unknown>>>({});
+
+// Emptied in place: the query editor keeps a reference to this object between its debounced updates.
+const clearFieldValues = (): void => {
+  if (!fieldValues.value) {
+    fieldValues.value = {};
+    return;
+  }
+  for (const key of Object.keys(fieldValues.value)) delete fieldValues.value[key];
+};
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -273,9 +285,6 @@ export const searchState = () => {
   const store = useStore();
   const router = useRouter();
   // const { t } = useI18nTyped();
-
-  // Field values reference
-  const fieldValues = ref();
 
   // Notification message reference
   const notificationMsg = ref("");
@@ -390,6 +399,7 @@ export const searchState = () => {
 
     // Clear query results
     searchObj.data.queryResults = {};
+    clearFieldValues();
     searchObj.data.sortedQueryResults = [];
 
     // Reset histogram to default state
@@ -483,6 +493,7 @@ export const searchState = () => {
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
+    clearFieldValues();
     // The FTS system-pick marker belongs to the cleared selection.
     searchObj.meta.isFtsDefaultColumn = false;
 
@@ -513,6 +524,7 @@ export const searchState = () => {
     initialQueryPayload,
     streamSchemaFieldsIndexMapping,
     fieldValues,
+    clearFieldValues,
     notificationMsg,
     ftsFields,
     initialLogsState,

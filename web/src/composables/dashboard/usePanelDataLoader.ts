@@ -121,6 +121,7 @@ export const usePanelDataLoader = (
       "scatter",
       "stacked",
       "h-stacked",
+      "state-timeline",
     ].includes(panelSchema.value.type);
   };
 
@@ -466,6 +467,9 @@ export const usePanelDataLoader = (
       log("loadData: now waiting for the panel to become visible");
 
       state.lastTriggeredAt = new Date().getTime();
+
+      // The superseded run was aborted above, so an off-screen panel must not keep reporting it as loading.
+      if (!isVisible.value && forceLoad?.value != true) state.loading = false;
 
       // Wait for visibility BEFORE the cache restore below — restoring first
       // rendered every cached panel on mount, visible or not.

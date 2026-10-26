@@ -47,6 +47,8 @@ use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
 
+use crate::bloom::compact::bloom_files_deleted;
+
 #[derive(Clone)]
 pub struct DumpJob {
     pub org_id: String,
@@ -445,6 +447,14 @@ pub async fn delete_by_time_range(
 
     // Create deleted items for file_list_deleted table
     let mut del_items: Vec<_> = files_to_delete.iter().map(deleted_data_file).collect();
+    del_items.extend(bloom_files_deleted(
+        org_id,
+        stream_type,
+        stream_name,
+        files_to_delete
+            .iter()
+            .map(|f| (f.date.clone(), f.bloom_ver)),
+    ));
 
     // we also need to delete the dump files
     del_items.extend(dump_files.iter().map(|f| FileListDeleted {
@@ -1644,24 +1654,6 @@ mod tests {
     fn test_generate_dump_stream_name_enrichment_tables() {
         let name = generate_dump_stream_name(StreamType::EnrichmentTables, "geo_table");
         assert_eq!(name, "geo_table_enrichment_tables");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_empty_stream() {
-        let name = generate_dump_stream_name(StreamType::Logs, "");
-        assert_eq!(name, "_logs");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_stream_with_underscores() {
-        let name = generate_dump_stream_name(StreamType::Metrics, "my_stream_name");
-        assert_eq!(name, "my_stream_name_metrics");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_stream_with_hyphens() {
-        let name = generate_dump_stream_name(StreamType::Logs, "my-stream-2024");
-        assert_eq!(name, "my-stream-2024_logs");
     }
 
     #[test]

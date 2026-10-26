@@ -19,7 +19,10 @@ use axum::{
     http::HeaderMap,
     response::Response,
 };
-use config::{SIZE_IN_MB, utils::schema::format_stream_name};
+use config::{
+    SIZE_IN_MB,
+    utils::{schema::format_stream_name, ssrf_guard::SsrfGuard},
+};
 use enrichment_data::enrichment_table::{extract_multipart, save_enrichment_data};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -275,7 +278,7 @@ pub async fn save_enrichment_table_from_url(
             return MetaHttpResponse::bad_request("URL cannot be empty");
         }
 
-        if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+        if let Err(err_msg) = SsrfGuard::validate_url_with_config(&request_body.url) {
             return MetaHttpResponse::bad_request(err_msg);
         }
     }
@@ -713,182 +716,48 @@ pub async fn get_all_enrichment_table_statuses(
     }
 }
 
-/// Validates a URL for enrichment table ingestion
-///
-/// Performs security checks including:
-/// - Non-empty URL
-/// - HTTP/HTTPS scheme only
-/// - SSRF protection (blocks localhost and private IPs)
-///
-/// # Returns
-/// - `Ok(())` if validation passes
-/// - `Err(String)` with error message if validation fails
-fn validate_enrichment_url(url: &str) -> Result<(), String> {
-    // Check for empty URL
-    if url.trim().is_empty() {
-        return Err("URL cannot be empty".to_string());
-    }
-
-    // Validate URL scheme
-    if !url.starts_with("http://") && !url.starts_with("https://") {
-        return Err("URL must start with http:// or https://".to_string());
-    }
-
-    // Parse URL for SSRF protection
-    let parsed_url = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
-
-    let host = parsed_url
-        .host_str()
-        .ok_or_else(|| "URL must have a valid host".to_string())?;
-
-    // Block localhost
-    let host = host.trim_start_matches('[').trim_end_matches(']');
-    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-        return Err("Cannot access localhost URLs".to_string());
-    }
-
-    // Block private IP ranges
-    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-        let v4 = match ip {
-            std::net::IpAddr::V4(v4) => Some(v4),
-            std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
-                Some(v4) => Some(v4),
-                None => {
-                    // Native IPv6: block ULA (fc00::/7) and link-local (fe80::/10)
-                    let seg0 = v6.segments()[0];
-                    if v6.is_loopback() || (seg0 & 0xfe00 == 0xfc00) || (seg0 & 0xffc0 == 0xfe80) {
-                        return Err("Cannot access private IP addresses".to_string());
-                    }
-                    None
-                }
-            },
-        };
-        if let Some(ip) = v4
-            && (ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
-        {
-            return Err("Cannot access private IP addresses".to_string());
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_validate_enrichment_url_valid_http() {
-        assert!(validate_enrichment_url("http://example.com/data.csv").is_ok());
+    fn test_url_policy_accepts_public_urls() {
+        for url in [
+            "http://example.com/data.csv",
+            "https://example.com/data.csv",
+            "http://8.8.8.8/data.csv",
+        ] {
+            assert!(SsrfGuard::validate_url_with_config(url).is_ok(), "{url}");
+        }
     }
 
     #[test]
-    fn test_validate_enrichment_url_valid_https() {
-        assert!(validate_enrichment_url("https://example.com/data.csv").is_ok());
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_empty() {
-        let result = validate_enrichment_url("");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "URL cannot be empty");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_whitespace() {
-        let result = validate_enrichment_url("   ");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "URL cannot be empty");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_invalid_scheme() {
-        let result = validate_enrichment_url("ftp://example.com/data.csv");
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "URL must start with http:// or https://"
-        );
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_file_scheme() {
-        let result = validate_enrichment_url("file:///etc/passwd");
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "URL must start with http:// or https://"
-        );
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_localhost() {
-        let result = validate_enrichment_url("http://localhost/data.csv");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot access localhost URLs");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_127_0_0_1() {
-        let result = validate_enrichment_url("http://127.0.0.1/data.csv");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot access localhost URLs");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_private_ip_10() {
-        let result = validate_enrichment_url("http://10.0.0.1/data.csv");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_private_ip_192_168() {
-        let result = validate_enrichment_url("http://192.168.1.1/data.csv");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_private_ip_172() {
-        let result = validate_enrichment_url("http://172.16.0.1/data.csv");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_aws_metadata() {
-        let result = validate_enrichment_url("http://169.254.169.254/latest/meta-data/");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_public_ip() {
-        assert!(validate_enrichment_url("http://8.8.8.8/data.csv").is_ok());
-    }
-
-    #[test]
-    fn test_validate_enrichment_url_github() {
-        assert!(
-            validate_enrichment_url("https://raw.githubusercontent.com/user/repo/main/data.csv")
-                .is_ok()
-        );
-    }
-    #[test]
-    fn test_validate_enrichment_url_ipv6() {
-        let ips = [
-            "http://[::1]/api/{org}/",
-            "http://[::ffff:127.0.0.1]/admin",
-            "http://[::ffff:169.254.169.254]/latest/meta-data/",
-            "http://[::ffff:10.0.0.1]/secret",
-            "http://[fc00::1]/secret",
-            "http://[fe80::1]/secret",
-            "http://169.254.169.254/",
+    fn test_url_policy_rejects_internal_and_reserved_urls() {
+        for url in [
+            "ftp://example.com/data.csv",
+            "file:///etc/passwd",
+            "http://localhost/data.csv",
+            "http://127.0.0.1/data.csv",
+            "http://10.0.0.1/data.csv",
+            "http://172.16.0.1/data.csv",
+            "http://192.168.1.1/data.csv",
+            "http://169.254.169.254/latest/meta-data/",
             "http://0.0.0.0/",
-        ];
-        for ip in ips {
-            assert!(validate_enrichment_url(ip).is_err());
+            "http://0.1.2.3/",
+            "http://100.64.0.1/data.csv",
+            "http://100.100.100.200/data.csv",
+            "http://192.0.0.1/data.csv",
+            "http://198.18.0.1/data.csv",
+            "http://240.0.0.1/data.csv",
+            "http://[::1]/data.csv",
+            "http://[::ffff:127.0.0.1]/data.csv",
+            "http://[fc00::1]/data.csv",
+            "http://[fe80::1]/data.csv",
+            "http://[64:ff9b::7f00:1]/data.csv",
+            "http://[64:ff9b::a9fe:a9fe]/data.csv",
+            "http://[2002:a9fe:a9fe::1]/data.csv",
+        ] {
+            assert!(SsrfGuard::validate_url_with_config(url).is_err(), "{url}");
         }
     }
 }

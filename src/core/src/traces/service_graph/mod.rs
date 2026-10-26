@@ -13,48 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Service Graph Module - Enterprise Feature
-//!
-//! Daemon-based service graph that queries traces periodically.
-//! No inline processing during trace ingestion.
+//! Service graph: the v4 rollup job writes per-minute `traces_service_graph_*` metrics and the
+//! topology API reads them back with PromQL.
 
-// OSS modules
-pub mod aggregator;
 pub mod api;
-pub mod processor;
 pub mod v4;
 
+pub use api::{get_current_topology, get_edge_history};
 use config::meta::stream::StreamType;
 
 /// Default window (in minutes) used when no explicit time range is provided.
 /// The UI has its own time range picker, so this only applies as the server-side fallback.
 pub const DEFAULT_QUERY_WINDOW_MINUTES: i64 = 60;
-
-// Re-export API handler for router
-// Re-export aggregator function (used by processor)
-pub use aggregator::write_sql_aggregated_edges;
-#[cfg(feature = "enterprise")]
-pub use api::query_edges_from_stream_internal;
-pub use api::{get_current_topology, get_edge_history};
-// Re-export enterprise types and functions
-#[cfg(feature = "enterprise")]
-pub use o2_enterprise::enterprise::service_graph::{
-    // Data types
-    ConnectionType,
-    SpanForGraph,
-    SpanKind,
-    // Processing functions
-    span_to_graph_span,
-};
-// Re-export processor for compactor
-pub use processor::process_service_graph;
-
-/// Where the topology API reads from; decided per request by `use_v4_source`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Source {
-    V1,
-    V4,
-}
 
 #[cfg(feature = "enterprise")]
 #[derive(serde::Deserialize)]
@@ -63,45 +33,8 @@ struct RecentIngestedTraceStream {
     stream_name: String,
 }
 
-/// Parses a source spec from the env or `?source=`; `None` is auto, resolved by `use_v4_source`.
-pub fn parse_source(source: &str) -> Option<Source> {
-    match source {
-        "v1" => Some(Source::V1),
-        "v4" => Some(Source::V4),
-        _ => None,
-    }
-}
-
-/// `O2_SERVICE_GRAPH_V1_STOP`; OSS never runs the v1 job, so it has nothing to stop.
-pub fn v1_stopped() -> bool {
-    configured().0
-}
-
-/// A stopped v1 always reads v4; otherwise the request's `source`, then the env, then auto.
-pub async fn use_v4_source(org: &str, requested: Option<&str>) -> bool {
-    let (stopped, configured) = configured();
-    if stopped {
-        return true;
-    }
-    if let Some(source) = requested.and_then(parse_source).or(configured) {
-        return source == Source::V4;
-    }
-    // the gRPC ServiceGraph arm writes through logs::ingest, so the v1 stream lives as a Logs
-    // stream
-    !infra::schema::exists(org, StreamType::Logs, "_o2_service_graph").await
-}
-
-/// `(V1_STOP, SOURCE)` env; both go away next major version, when v4 becomes the only engine.
-fn configured() -> (bool, Option<Source>) {
-    #[cfg(feature = "enterprise")]
-    {
-        let sg = &o2_enterprise::enterprise::common::config::get_config().service_graph;
-        (sg.v1_stop, parse_source(&sg.source))
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        (false, None)
-    }
+pub(crate) fn org_being_deleted(org: &str) -> bool {
+    crate::db::org_status::is_blocked(org)
 }
 
 /// Runs a pre-aggregated graph query against a trace stream and returns the raw hits.
@@ -240,10 +173,20 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_source() {
-        assert_eq!(parse_source("v1"), Some(Source::V1));
-        assert_eq!(parse_source("v4"), Some(Source::V4));
-        assert_eq!(parse_source("auto"), None);
-        assert_eq!(parse_source(""), None);
+    fn test_orgs_being_deleted_get_no_service_graph() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let statuses = [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ];
+        for (i, status) in statuses.into_iter().enumerate() {
+            let org = format!("sg-being-deleted-{i}");
+            ORG_STATUS_CACHE.insert(org.clone(), status);
+            let skipped = org_being_deleted(&org);
+            ORG_STATUS_CACHE.remove(&org);
+            assert!(skipped, "{org} still got service graph work");
+        }
+        assert!(!org_being_deleted("sg-active-org"));
     }
 }
