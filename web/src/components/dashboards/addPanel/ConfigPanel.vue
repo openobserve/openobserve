@@ -98,6 +98,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OInput
+          v-if="shouldShowNoDataText(dashboardPanelData)"
+          v-show="isConfigOptionVisible('general', 'no-data-text')"
+          class="max-w-75"
+          :model-value="dashboardPanelDataModel.data.config.no_data_text ?? ''"
+          :label="t('dashboard.noDataText')"
+          :placeholder="t('panel.noData')"
+          data-test="dashboard-config-no-data-text"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.no_data_text =
+                String(value ?? '').trim() !== '' ? String(value) : null)
+          "
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.noDataTextTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OInput
           v-if="promqlMode"
           v-show="isConfigOptionVisible('general', 'step')"
           v-model="dashboardPanelDataModel.data.config.step_value"
@@ -1265,6 +1284,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
+        <OInput
+          v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-min-interval')"
+          class="max-w-75"
+          :model-value="dashboardPanelDataModel.data.config.y_axis_min_interval ?? ''"
+          type="number"
+          :min="0"
+          :placeholder="t('dashboard.auto')"
+          :label="t('dashboard.yAxisMinInterval')"
+          :help-text="t('dashboard.yAxisMinIntervalHelp')"
+          data-test="dashboard-config-y_axis_min_interval"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.y_axis_min_interval = toMinInterval(value))
+          "
+        />
+
         <OSwitch
           v-if="shouldShowGridlines(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'gridlines')"
@@ -1728,7 +1764,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('open-series-overrides')"
           data-test="dashboard-addpanel-config-series-overrides-add-btn"
         >
-          {{ t("dashboard.addSeriesOverride") }}
+          {{
+            seriesOverrideCount
+              ? t("dashboard.editSeriesOverrides", { count: seriesOverrideCount })
+              : t("dashboard.addSeriesOverride")
+          }}
         </OButton>
       </div>
     </OCollapsible>
@@ -2421,6 +2461,8 @@ import {
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
+  shouldShowNoDataText,
+  toMinInterval,
   shouldShowAxisConfig,
   shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
@@ -3436,6 +3478,8 @@ export default defineComponent({
 
     return {
       raw,
+      shouldShowNoDataText,
+      toMinInterval,
       isHeatmapColorRangeInvalid,
       axisLabelModeModel,
       axisLabelModeOptions,

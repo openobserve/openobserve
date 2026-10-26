@@ -10,6 +10,7 @@ import {
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
+  shouldShowNoDataText,
   shouldShowAxisConfig,
   shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
@@ -155,6 +156,10 @@ export function useConfigPanel(
   const configOptions = computed<ConfigOptions>(() => ({
     general: {
       description: { label: t("dashboard.description") },
+      "no-data-text": {
+        label: t("dashboard.noDataText"),
+        visible: shouldShowNoDataText(dashboardPanelData),
+      },
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
@@ -398,6 +403,10 @@ export function useConfigPanel(
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
+      "y-axis-min-interval": {
+        label: t("dashboard.yAxisMinInterval"),
+        visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
       "axis-label-mode": {
         label: t("dashboard.axisLabelMode"),
         visible: !promqlMode.value && shouldShowCartesianAxisConfig(dashboardPanelData),
@@ -508,6 +517,7 @@ export function useConfigPanel(
         label: [
           t("dashboard.configSectionSeriesOverrides"),
           t("dashboard.addSeriesOverride"),
+          t("dashboard.editSeriesOverridesLabel"),
           t("dashboard.seriesFormattingTitle"),
           ...(typeof tm === "function" &&
           Array.isArray(tm("dashboard.configSectionSeriesOverridesAliases"))
