@@ -32,6 +32,7 @@ import {
   applyPieDonutCenterAdjustment,
   applyLegendConfiguration,
 } from "./legendConfiguration";
+import { calculateWidthText } from "./chartDimensionUtils";
 
 // Mock calculateWidthText
 vi.mock("./chartDimensionUtils", () => ({
@@ -1249,6 +1250,23 @@ describe("pie and donut legend values", () => {
       expect(options.legend.formatter("C")).toBe("{b|C}  0  0%");
     },
   );
+
+  it("reuses the sized legend entries until a slice is hidden", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    vi.mocked(calculateWidthText).mockClear();
+    options.legend.formatter("api");
+    expect(calculateWidthText).not.toHaveBeenCalled();
+
+    options.legend.selected = { api: true, db: false };
+    options.legend.formatter("api");
+    expect(calculateWidthText).toHaveBeenCalled();
+  });
 
   it("gives a name the sum of its drawn slices' rounded percents", () => {
     const options: any = pieOptions([

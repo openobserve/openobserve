@@ -43,6 +43,8 @@ const LEGEND_VALUES_MIN_NAME_WIDTH = 30;
 const LEGEND_ITEM_CHROME_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
 export const MAX_SEATS_PRECISION = 13;
+// Shared so the sizing pass and the first formatter call hit the same cached legend entries.
+const ALL_SLICES_SELECTED: Readonly<Record<string, boolean>> = Object.freeze({});
 
 interface PieLegendEntry {
   name: string;
@@ -547,7 +549,7 @@ const buildPieLegendEntries = (
   data: any[],
   keys: string[],
   textWidth: number,
-  selected?: Record<string, boolean>,
+  selected: Readonly<Record<string, boolean>>,
 ): Map<string, PieLegendEntry> => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
   const panelDecimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
@@ -559,7 +561,7 @@ const buildPieLegendEntries = (
     const value = Number.isFinite(numeric) ? numeric : 0;
     const name = String(item?.name ?? "");
     sums.set(name, (sums.get(name) ?? 0) + value);
-    const share = value > 0 && selected?.[name] !== false ? value : 0;
+    const share = value > 0 && selected[name] !== false ? value : 0;
     shares.set(name, (shares.get(name) ?? 0) + share);
     return share;
   });
@@ -614,7 +616,7 @@ const pieLegendEntriesCache = new WeakMap<
   {
     panelSchema: any;
     textWidth: number;
-    selected?: Record<string, boolean>;
+    selected: Readonly<Record<string, boolean>>;
     entries: Map<string, PieLegendEntry>;
   }
 >();
@@ -624,7 +626,7 @@ const getPieLegendEntries = (
   data: any[],
   keys: string[],
   textWidth: number = LEGEND_VALUES_TEXT_WIDTH,
-  selected?: Record<string, boolean>,
+  selected: Readonly<Record<string, boolean>> = ALL_SLICES_SELECTED,
 ): Map<string, PieLegendEntry> => {
   const cached = pieLegendEntriesCache.get(data);
   if (
@@ -671,7 +673,7 @@ const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState
   };
   options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };
   // An empty map selects every slice; its presence tells ChartRenderer to keep it in step with clicks.
-  options.legend.selected = {};
+  options.legend.selected = ALL_SLICES_SELECTED;
 };
 
 /**
