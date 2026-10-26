@@ -26564,7 +26564,7 @@
       "kubernetesNote": "ينشر DaemonSet يشغّل المشرف والـ Collector في حاوية واحدة. للترقية، غيّر وسم الصورة.",
       "kubernetesAgent": "وكيل (DaemonSet)",
       "kubernetesGateway": "بوابة (StatefulSet)",
-      "kubernetesGatewayNote": "ينشر StatefulSet للبوابة لجمع البيانات على مستوى المجموعة؛ استخدم رمزًا من الأسطول الخاص بالبوابة. تصدّر الوكلاء OTLP إلى {service}. احتفظ بنسخة واحدة ما دام التكوين يجمع مقاييس Prometheus أو يستخدم أخذ العينات الذيلي.",
+      "kubernetesGatewayNote": "ينشر StatefulSet للبوابة لجمع البيانات على مستوى المجموعة؛ استخدم رمزًا من الأسطول الخاص بالبوابة. يستقبل OTLP على {service}. احتفظ بنسخة واحدة ما دام التكوين يجمع مقاييس Prometheus أو يستخدم أخذ العينات الذيلي.",
       "dockerNote": "يشغّل المشرف والـ Collector في حاوية واحدة؛ يحافظ الحجم المسمّى على هوية الـ Collector عبر عمليات إعادة التشغيل. أعد التشغيل بوسم صورة آخر للترقية.",
       "rerunNote": "يثبّت السكربت المشرف والـ Collector وخدمة. أعد تشغيله للترقية أو لتبديل الرموز.",
       "tokenOption": "{name} (بلا Collectors) | {name} ({count} Collector) | {name} ({count} Collectors)",

@@ -20,7 +20,7 @@ export type KubernetesRole = "agent" | "gateway";
 
 export const KUBERNETES_ROLES: KubernetesRole[] = ["agent", "gateway"];
 
-/** The gateway release's name, which is also its Service that agents export OTLP to. */
+/** The gateway release's name, which is also its OTLP Service. */
 export const GATEWAY_RELEASE = "otel-fleet-collector-gateway";
 
 /** Environment every install command gives the collector. */

@@ -26564,7 +26564,7 @@
       "kubernetesNote": "Wdraża DaemonSet, który uruchamia supervisora i kolektor w jednym kontenerze. Aktualizuj, zmieniając tag obrazu.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Brama (StatefulSet)",
-      "kubernetesGatewayNote": "Wdraża StatefulSet bramy do zbierania danych z całego klastra; użyj tokenu własnej floty bramy. Agenty eksportują OTLP do {service}. Zachowaj jedną replikę, dopóki konfiguracja pobiera metryki Prometheus lub używa próbkowania końcowego.",
+      "kubernetesGatewayNote": "Wdraża StatefulSet bramy do zbierania danych z całego klastra; użyj tokenu własnej floty bramy. Odbiera OTLP pod adresem {service}. Zachowaj jedną replikę, dopóki konfiguracja pobiera metryki Prometheus lub używa próbkowania końcowego.",
       "dockerNote": "Uruchamia supervisora i kolektor w jednym kontenerze; nazwany wolumen zachowuje tożsamość kolektora po restartach. Uruchom ponownie z innym tagiem obrazu, aby zaktualizować.",
       "rerunNote": "Skrypt instaluje supervisora, kolektor i usługę. Uruchom go ponownie, aby zaktualizować lub zmienić token.",
       "tokenOption": "{name} (brak kolektorów) | {name} (kolektor: {count}) | {name} (kolektory: {count})",

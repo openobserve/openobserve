@@ -26564,7 +26564,7 @@
       "kubernetesNote": "Implementa um DaemonSet que executa o supervisor e o coletor num só contentor. Atualize alterando a etiqueta da imagem.",
       "kubernetesAgent": "Agente (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",
-      "kubernetesGatewayNote": "Implementa um StatefulSet de gateway para a recolha ao nível do cluster; utilize um token da frota própria do gateway. Os agentes exportam OTLP para {service}. Mantenha uma réplica enquanto a configuração recolher métricas do Prometheus ou usar amostragem de cauda.",
+      "kubernetesGatewayNote": "Implementa um StatefulSet de gateway para a recolha ao nível do cluster; utilize um token da frota própria do gateway. Recebe OTLP em {service}. Mantenha uma réplica enquanto a configuração recolher métricas do Prometheus ou usar amostragem de cauda.",
       "dockerNote": "Executa o supervisor e o coletor num só contentor; o volume nomeado mantém a identidade do coletor entre reinícios. Execute novamente com outra etiqueta de imagem para atualizar.",
       "rerunNote": "O script instala o supervisor, o coletor e um serviço. Execute-o novamente para atualizar ou mudar de token.",
       "tokenOption": "{name} (sem coletores) | {name} ({count} coletor) | {name} ({count} coletores)",

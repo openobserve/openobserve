@@ -31,10 +31,6 @@ export interface MapNode {
   refused: number;
   queue: number | null;
   pipelines: string[];
-  /** A fleet fed by another fleet's exporter sits one stage to the right of it. */
-  stage: number;
-  /** A fleet another fleet exports to. */
-  inbound?: boolean;
   x: number;
   y: number;
 }
@@ -62,8 +58,6 @@ export interface PipelineMap {
 }
 
 const COLUMNS: MapColumn[] = ["fleet", "receiver", "exporter", "destination"];
-/** Fleet, receiver and exporter columns per stage; destinations follow the last stage. */
-const STAGE_COLUMNS = 3;
 const MIN_COLUMN_GAP = 168;
 const PAD = 16;
 export const MIN_WIDTH = 1.5;
@@ -87,45 +81,10 @@ function receiverShare(p: FleetPipeline, rate: number | null): number {
   return total > 0 && rate !== null ? rate / total : 1 / Math.max(p.receivers.length, 1);
 }
 
-/** Each fleet's stage: one past the deepest fleet exporting to it, so a cycle stops at the fleet count. */
-function fleetStages(
-  pipelines: FleetPipeline[],
-  fleetOf: (destination: string) => string | null,
-): Map<string, number> {
-  const feeds = new Map<string, Set<string>>();
-  for (const p of pipelines) {
-    for (const ex of p.exporters) {
-      const target = fleetOf(ex.destination);
-      if (target && target !== p.fleet) {
-        feeds.set(target, (feeds.get(target) ?? new Set()).add(p.fleet));
-      }
-    }
-  }
-  const fleets = new Set([...pipelines.map((p) => p.fleet), ...feeds.keys()]);
-  const stages = new Map([...fleets].map((f) => [f, 0]));
-  for (let pass = 0; pass < fleets.size; pass++) {
-    let moved = false;
-    for (const [target, sources] of feeds) {
-      const stage = Math.max(...[...sources].map((f) => stages.get(f) ?? 0)) + 1;
-      if (stage > (stages.get(target) ?? 0) && stage < fleets.size) {
-        stages.set(target, stage);
-        moved = true;
-      }
-    }
-    if (!moved) break;
-  }
-  return stages;
-}
-
 class MapBuilder {
   nodes = new Map<string, MapNode>();
   edges = new Map<string, MapEdge>();
   receiverRates = new Map<string, Map<Telemetry, number | null>>();
-
-  constructor(
-    private stages: Map<string, number>,
-    private fleetOf: (destination: string) => string | null,
-  ) {}
 
   node(id: string, column: MapColumn, fleet: string, name: string): MapNode {
     const known = this.nodes.get(id);
@@ -141,7 +100,6 @@ class MapBuilder {
       refused: 0,
       queue: null,
       pipelines: [],
-      stage: column === "destination" ? 0 : (this.stages.get(fleet) ?? 0),
       x: 0,
       y: 0,
     };
@@ -171,14 +129,6 @@ class MapBuilder {
       en.failed += ex.failed;
       en.dropped += ex.dropped;
       en.queue = maxRate(en.queue, ex.queue);
-      const target = this.fleetOf(ex.destination);
-      if (target) {
-        const fn = this.node(`f:${target}`, "fleet", target, target);
-        fn.inbound = true;
-        const ef = this.edge(`ef:${p.fleet}|${ex.name}|${target}|${p.signal}`, en.id, fn.id, p);
-        ef.rate = addRate(ef.rate, ex.rate);
-        continue;
-      }
       const dn = this.node(`d:${ex.destination}`, "destination", p.fleet, ex.destination);
       this.touch(dn, p);
       dn.rate = addRate(dn.rate, ex.rate);
@@ -237,19 +187,12 @@ class MapBuilder {
   }
 }
 
-function slotOf(n: MapNode, lastStage: number): number {
-  if (n.column === "destination") return (lastStage + 1) * STAGE_COLUMNS;
-  return n.stage * STAGE_COLUMNS + COLUMNS.indexOf(n.column);
-}
-
 function place(nodes: MapNode[], layout: MapLayout) {
-  const placed = nodes.filter((n) => n.column !== "sink");
-  const lastStage = Math.max(0, ...placed.map((n) => n.stage));
-  const slots = (lastStage + 1) * STAGE_COLUMNS + 1;
-  const gap = Math.max((layout.width - 2 * PAD - layout.nodeWidth) / (slots - 1), MIN_COLUMN_GAP);
-  const columns = Array.from({ length: slots }, (_, slot) =>
-    placed.filter((n) => slotOf(n, lastStage) === slot),
+  const gap = Math.max(
+    (layout.width - 2 * PAD - layout.nodeWidth) / (COLUMNS.length - 1),
+    MIN_COLUMN_GAP,
   );
+  const columns = COLUMNS.map((c) => nodes.filter((n) => n.column === c));
   const tallest = Math.max(...columns.map((c) => c.length));
   // Each column spreads over the tallest one's height, so a short column faces the middle of its neighbours.
   columns.forEach((list, col) => {
@@ -268,13 +211,9 @@ function place(nodes: MapNode[], layout: MapLayout) {
   }
 }
 
-/** Fleet → receiver → exporter → destination, or → the next fleet; nodes keep the order of the pipelines they first appear in. */
-export function buildPipelineMap(
-  pipelines: FleetPipeline[],
-  layout: MapLayout,
-  fleetOf: (destination: string) => string | null = () => null,
-): PipelineMap {
-  const b = new MapBuilder(fleetStages(pipelines, fleetOf), fleetOf);
+/** Fleet → receiver → exporter → destination; nodes keep the order of the pipelines they first appear in. */
+export function buildPipelineMap(pipelines: FleetPipeline[], layout: MapLayout): PipelineMap {
+  const b = new MapBuilder();
   for (const p of pipelines) {
     const fleetNode = b.node(`f:${p.fleet}`, "fleet", p.fleet, p.fleet);
     b.touch(fleetNode, p);
@@ -284,7 +223,7 @@ export function buildPipelineMap(
   for (const p of pipelines) b.addReceivers(p, b.node(`f:${p.fleet}`, "fleet", p.fleet, p.fleet));
   b.addBranches();
   const nodes = [...b.nodes.values()];
-  const order = (n: MapNode) => n.stage * COLUMNS.length + COLUMNS.indexOf(n.column);
+  const order = (n: MapNode) => COLUMNS.indexOf(n.column);
   const sorted = [...nodes].sort((x, y) => order(x) - order(y));
   place(sorted, layout);
   return { nodes: sorted, edges: [...b.edges.values()] };

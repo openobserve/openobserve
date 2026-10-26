@@ -605,8 +605,8 @@ function flowOf(window: FleetPipelines["window"]): FleetPipelines {
       { id: "edge-k8s", name: "edge-k8s", config: "k8s-node", version: 1, collectors: 12 },
     ],
     destinations: [
-      { id: "o2", type: "otlphttp", target: "o2.example.com", exporter: null, fleet_id: null },
-      { id: "s3", type: "awss3", target: "s3://archive-logs", exporter: null, fleet_id: null },
+      { id: "o2", type: "otlphttp", target: "o2.example.com", exporter: null },
+      { id: "s3", type: "awss3", target: "s3://archive-logs", exporter: null },
     ],
     pipelines: [
       pipeline(

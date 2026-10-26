@@ -26564,7 +26564,7 @@
       "kubernetesNote": "Triển khai một DaemonSet chạy supervisor và collector trong một container. Nâng cấp bằng cách đổi image tag.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",
-      "kubernetesGatewayNote": "Triển khai một StatefulSet gateway để thu thập trên toàn cụm; dùng token của fleet riêng của gateway. Các agent xuất OTLP tới {service}. Giữ một bản sao khi cấu hình thu thập Prometheus hoặc dùng lấy mẫu đuôi.",
+      "kubernetesGatewayNote": "Triển khai một StatefulSet gateway để thu thập trên toàn cụm; dùng token của fleet riêng của gateway. Gateway nhận OTLP tại {service}. Giữ một bản sao khi cấu hình thu thập Prometheus hoặc dùng lấy mẫu đuôi.",
       "dockerNote": "Chạy supervisor và collector trong một container; volume có tên giữ danh tính của collector qua các lần khởi động lại. Chạy lại với image tag khác để nâng cấp.",
       "rerunNote": "Script cài đặt supervisor, collector và một service. Chạy lại để nâng cấp hoặc đổi token.",
       "tokenOption": "{name} (không có collector) | {name} ({count} collector) | {name} ({count} collector)",

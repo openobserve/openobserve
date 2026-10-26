@@ -128,7 +128,7 @@ describe("FleetInstallCommand", () => {
     expect(code(w)).toContain("helm upgrade --install otel-fleet-collector openobserve/");
   });
 
-  it("installs a gateway release and names the Service agents export to", async () => {
+  it("installs a gateway release and names its OTLP Service", async () => {
     const w = mountCommand();
     await choose(w, "kubernetes");
     w.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:model-value", "gateway");

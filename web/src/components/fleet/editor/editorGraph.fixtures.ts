@@ -49,8 +49,6 @@ function seed(spec: {
 }
 
 const O2 = "otlphttp/openobserve";
-// The gateway release's Service; an agent sending straight to OpenObserve uses O2 instead.
-const GATEWAY = "otlp";
 const CORE = ["memory_limiter", "k8sattributes", "batch"];
 const LEADER = { k8s_leader_elector: "k8s_leader_elector" };
 
@@ -58,9 +56,8 @@ export const SEEDS: Record<string, () => EditorGraph> = {
   "k8s-cluster-telemetry": () =>
     seed({
       pipelines: [
-        ["metrics", ["kubeletstats", "hostmetrics"], CORE, [GATEWAY]],
-        ["logs", ["filelog"], CORE, [GATEWAY]],
-        ["traces", ["otlp"], CORE, [GATEWAY]],
+        ["metrics", ["kubeletstats", "hostmetrics"], CORE, [O2]],
+        ["logs", ["filelog"], CORE, [O2]],
       ],
       extensions: ["file_storage", "health_check"],
     }),

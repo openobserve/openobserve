@@ -26564,7 +26564,7 @@
       "kubernetesNote": "Supervisor'ı ve toplayıcıyı tek bir kapsayıcıda çalıştıran bir DaemonSet dağıtır. Yükseltmek için imaj etiketini değiştirin.",
       "kubernetesAgent": "Ajan (DaemonSet)",
       "kubernetesGateway": "Ağ geçidi (StatefulSet)",
-      "kubernetesGatewayNote": "Küme genelinde toplama için bir ağ geçidi StatefulSet'i dağıtır; ağ geçidinin kendi filosuna ait bir belirteç kullanın. Ajanlar OTLP'yi {service} adresine aktarır. Yapılandırma Prometheus kazıdığı veya kuyruk örneklemesi kullandığı sürece tek replika tutun.",
+      "kubernetesGatewayNote": "Küme genelinde toplama için bir ağ geçidi StatefulSet'i dağıtır; ağ geçidinin kendi filosuna ait bir belirteç kullanın. OTLP'yi {service} adresinde alır. Yapılandırma Prometheus kazıdığı veya kuyruk örneklemesi kullandığı sürece tek replika tutun.",
       "dockerNote": "Supervisor'ı ve toplayıcıyı tek bir kapsayıcıda çalıştırır; adlandırılmış birim, toplayıcının kimliğini yeniden başlatmalar arasında korur. Yükseltmek için başka bir imaj etiketiyle yeniden çalıştırın.",
       "rerunNote": "Betik supervisor'ı, toplayıcıyı ve bir hizmeti kurar. Yükseltmek veya token değiştirmek için yeniden çalıştırın.",
       "tokenOption": "{name} (toplayıcı yok) | {name} ({count} toplayıcı) | {name} ({count} toplayıcı)",

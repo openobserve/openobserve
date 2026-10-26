@@ -459,7 +459,6 @@ const destinationById = computed(
 // A destination without a target is fleet-scoped, so its fleet tells same-named exporters apart.
 function destinationLabel(id: string): I18nText {
   const d = destinationById.value.get(id);
-  if (d?.fleet_id) return raw(fleetName(d.fleet_id));
   if (d?.target) return raw(d.target.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ""));
   const fleet = pipelines.value.find((p) => p.exporters.some((e) => e.destination === id))?.fleet;
   return raw([d?.exporter, fleet && fleetName(fleet)].filter(Boolean).join(" · "));
@@ -561,7 +560,6 @@ const pipelineMap = computed(() =>
       exporters: p.exporters.filter((e) => destinationShown(e.destination)),
     })),
     { width: canvasWidth.value, nodeWidth: NODE_WIDTH, row: ROW, top: TOP },
-    (id) => destinationById.value.get(id)?.fleet_id ?? null,
   ),
 );
 const mapNodeById = computed(() => new Map(pipelineMap.value.nodes.map((n) => [n.id, n])));
@@ -608,7 +606,6 @@ function nodeData(n: MapNode): FleetFlowNodeData {
       icon: COLUMN_ICON.f,
       sublabel: fleetMeta(fleetById.value.get(n.name)),
       selected: sel?.kind === "fleet" && sel.id === n.name,
-      inbound: n.inbound,
       outbound: true,
       issueSeverity: worstSeverity(issues),
       issueCount: issues.length,

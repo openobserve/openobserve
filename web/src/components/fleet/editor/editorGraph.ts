@@ -210,8 +210,9 @@ export const CATALOG: CatalogItem[] = [
     "detectors[1]": "system",
   }),
   e("otlp", "OTLP", "send", {
-    endpoint: "otel-fleet-collector-gateway:4317",
-    "tls.insecure": "true",
+    endpoint: "otel-gateway:4317",
+    "tls.insecure": "false",
+    "headers.Authorization": "${env:OTLP_TOKEN}",
   }),
   e("otlphttp", "OTLP HTTP", "cloud-upload", {
     endpoint: "https://collector.example.com",

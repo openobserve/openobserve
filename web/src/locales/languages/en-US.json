@@ -26562,7 +26562,7 @@
       "kubernetesNote": "Deploys a DaemonSet that runs the supervisor and the collector in one container. Upgrade by changing the image tag.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",
-      "kubernetesGatewayNote": "Deploys a gateway StatefulSet for cluster-wide collection; use a token of the gateway's own fleet. Agents export OTLP to {service}. Keep one replica while the configuration scrapes Prometheus or uses tail sampling.",
+      "kubernetesGatewayNote": "Deploys a gateway StatefulSet for cluster-wide collection; use a token of the gateway's own fleet. It receives OTLP at {service}. Keep one replica while the configuration scrapes Prometheus or uses tail sampling.",
       "dockerNote": "Runs the supervisor and the collector in one container; the named volume keeps the collector's identity across restarts. Re-run with another image tag to upgrade.",
       "rerunNote": "The script installs the supervisor, the collector and a service. Re-run it to upgrade or to switch tokens.",
       "tokenOption": "{name} (no collectors) | {name} ({count} collector) | {name} ({count} collectors)",
