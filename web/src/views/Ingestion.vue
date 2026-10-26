@@ -437,7 +437,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update Passcode",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
 
@@ -475,7 +474,6 @@ export default defineComponent({
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             page: "Ingestion",
           });
         }
@@ -517,7 +515,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Generate RUM Token",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
 
@@ -551,7 +548,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update RUM Token",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
 

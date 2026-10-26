@@ -9,6 +9,7 @@ import {
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
+import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 
 /**
  * Validates a single condition item
@@ -1097,6 +1098,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }),
     );
   }
+
+  errors.push(...validateAnnotationSources(t, dashboardJson?.annotationSources));
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {

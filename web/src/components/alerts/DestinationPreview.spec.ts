@@ -199,10 +199,15 @@ describe("DestinationPreview", () => {
     expect(subject.text()).toContain("OpenObserve Alert Notification");
   });
 
-  it("should display Email from address", () => {
+  it("shows the entered recipients as To and no hardcoded From", () => {
+    wrapper = mountComponent({ type: "email", recipients: ["a@acme.io", "b@acme.io"] });
+    expect(wrapper.find('[data-test="email-to"]').text()).toBe("To: a@acme.io, b@acme.io");
+    expect(wrapper.find('[data-test="email-from"]').exists()).toBe(false);
+  });
+
+  it("shows no To line before any recipient is picked", () => {
     wrapper = mountComponent({ type: "email" });
-    const from = wrapper.find('[data-test="email-from"]');
-    expect(from.text()).toContain("alerts@openobserve.ai");
+    expect(wrapper.find('[data-test="email-to"]').exists()).toBe(false);
   });
 
   it("should display Email body", () => {

@@ -3869,6 +3869,31 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     describe("Additional comprehensive coverage tests", () => {
+      it("draws annotation bands above the series, so bars and area fills cannot hide them", async () => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type: "line",
+            config: {},
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { __name__: "m" }, values: [[1640435200, "100"]] }],
+            },
+          ],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const helper = result.options.series.find((s) => s.markArea);
+        expect(helper.markArea.z).toBe(4);
+        expect(helper.markArea.z).toBeGreaterThan(3);
+      });
+
       it("should handle chart with trellis layout enabled", async () => {
         const panelSchema = {
           id: "panel1",

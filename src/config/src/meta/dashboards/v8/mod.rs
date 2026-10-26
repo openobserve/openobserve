@@ -22,6 +22,9 @@ use utoipa::ToSchema;
 use super::{OrdF64, datetime_now};
 use crate::meta::stream::StreamType;
 
+/// Caps total defined `annotationSources` (enabled or not), bounding fan-out if all were enabled.
+pub const MAX_ANNOTATION_SOURCES: usize = 10;
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +49,8 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotation_sources: Option<Vec<AnnotationSource>>,
     #[serde(default, skip_serializing)]
     pub updated_at: i64,
 }
@@ -74,6 +79,113 @@ impl From<Dashboard> for super::Dashboard {
             updated_at,
         }
     }
+}
+
+/// A dashboard-level query whose rows are drawn as annotation markers on time-series panels.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationSource {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    pub enabled: bool,
+    pub mode: AnnotationSourceMode,
+    pub stream_type: StreamType,
+    pub stream: String,
+    // Opaque in the doc (like Condition.value): MCP's schema walker rejects any recursive ref.
+    #[schema(value_type = Object)]
+    pub filters: AnnotationConditionGroup,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_time_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panels: Option<Vec<String>>,
+}
+
+impl Default for AnnotationSource {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            color: None,
+            enabled: true,
+            mode: AnnotationSourceMode::default(),
+            stream_type: StreamType::default(),
+            stream: String::new(),
+            filters: AnnotationConditionGroup::default(),
+            query: None,
+            title: String::new(),
+            description: None,
+            end_time_field: None,
+            panels: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AnnotationSourceMode {
+    #[default]
+    Builder,
+    Sql,
+}
+
+/// Mirrors alerts' `ConditionGroup`; separate since alerts' `Value` can't derive `Hash`.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationConditionGroup {
+    pub filter_type: String, // Always "group"
+    pub logical_operator: AnnotationLogicalOperator,
+    pub conditions: Vec<AnnotationConditionItem>,
+}
+
+impl Default for AnnotationConditionGroup {
+    fn default() -> Self {
+        Self {
+            filter_type: "group".to_string(),
+            logical_operator: AnnotationLogicalOperator::And,
+            conditions: Vec::new(),
+        }
+    }
+}
+
+/// A leaf condition or a nested group inside an annotation source's filter tree.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "filterType", rename_all = "lowercase")]
+pub enum AnnotationConditionItem {
+    Condition(AnnotationConditionLeaf),
+    Group {
+        #[serde(rename = "logicalOperator")]
+        logical_operator: AnnotationLogicalOperator,
+        // Self-referential: without this, utoipa's schema walk recurses forever at startup.
+        #[schema(no_recursion)]
+        conditions: Vec<AnnotationConditionItem>,
+    },
+}
+
+/// One leaf condition in an annotation source's filter tree.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct AnnotationConditionLeaf {
+    pub column: String,
+    pub operator: String,
+    pub value: String,
+    #[serde(rename = "logicalOperator")]
+    pub logical_operator: AnnotationLogicalOperator,
+}
+
+/// AND/OR logical operator joining sibling conditions in an annotation source's filter tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum AnnotationLogicalOperator {
+    #[default]
+    And,
+    Or,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1071,6 +1183,118 @@ mod tests {
                 .unwrap()
                 .contains_key("defaultDatetimeDuration")
         );
+    }
+
+    #[test]
+    fn test_annotation_sources_skipped_when_none() {
+        let json = serde_json::to_value(make_dashboard()).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("annotationSources"));
+    }
+
+    #[test]
+    fn test_annotation_sources_serde_roundtrip() {
+        let input = serde_json::json!({
+            "version": 8,
+            "title": "T",
+            "description": "",
+            "annotationSources": [
+                {
+                    "id": "s1",
+                    "name": "Deploys",
+                    "color": "#5b8ef0",
+                    "enabled": false,
+                    "mode": "builder",
+                    "streamType": "logs",
+                    "stream": "k8s_events",
+                    "filters": {
+                        "filterType": "group",
+                        "logicalOperator": "AND",
+                        "conditions": [
+                            {
+                                "filterType": "condition",
+                                "column": "event",
+                                "operator": "=",
+                                "value": "deploy",
+                                "logicalOperator": "AND"
+                            }
+                        ]
+                    },
+                    "title": "{service} deployed",
+                    "description": "by {author}",
+                    "endTimeField": "end_time",
+                    "panels": ["p1", "p2"]
+                },
+                {
+                    "id": "s2",
+                    "name": "Incidents",
+                    "mode": "sql",
+                    "streamType": "traces",
+                    "stream": "",
+                    "query": "SELECT _timestamp FROM \"incidents\"",
+                    "title": "{title}"
+                }
+            ]
+        });
+        let d: Dashboard = serde_json::from_value(input).unwrap();
+        let sources = d.annotation_sources.as_ref().unwrap();
+        assert_eq!(sources.len(), 2);
+        assert!(!sources[0].enabled);
+        assert_eq!(sources[0].mode, AnnotationSourceMode::Builder);
+        assert_eq!(sources[0].filters.filter_type, "group");
+        assert_eq!(sources[0].filters.conditions.len(), 1);
+        match &sources[0].filters.conditions[0] {
+            AnnotationConditionItem::Condition(leaf) => assert_eq!(leaf.column, "event"),
+            AnnotationConditionItem::Group { .. } => panic!("expected a leaf condition"),
+        }
+        assert_eq!(
+            sources[0].panels.as_deref(),
+            Some(&["p1".to_string(), "p2".to_string()][..])
+        );
+        assert!(sources[1].enabled, "enabled defaults to true when omitted");
+        assert_eq!(sources[1].mode, AnnotationSourceMode::Sql);
+        assert_eq!(sources[1].stream_type, StreamType::Traces);
+        assert!(sources[1].panels.is_none());
+
+        let back = serde_json::to_value(&d).unwrap();
+        assert_eq!(back["annotationSources"][0]["endTimeField"], "end_time");
+        assert_eq!(back["annotationSources"][1]["mode"], "sql");
+        assert!(
+            !back["annotationSources"][1]
+                .as_object()
+                .unwrap()
+                .contains_key("panels")
+        );
+        let again: Dashboard = serde_json::from_value(back).unwrap();
+        assert_eq!(again, d);
+    }
+
+    #[test]
+    fn test_annotation_sources_change_the_hash() {
+        let plain: super::super::Dashboard = make_dashboard().into();
+        let mut with_sources = make_dashboard();
+        with_sources.annotation_sources = Some(vec![AnnotationSource::default()]);
+        let with_sources: super::super::Dashboard = with_sources.into();
+        assert_ne!(plain.hash, with_sources.hash);
+    }
+
+    // Regression: without `#[schema(no_recursion)]` this walk recurses forever and aborts.
+    #[test]
+    fn test_annotation_condition_item_schema_walk_terminates() {
+        let mut schemas = Vec::new();
+        AnnotationConditionGroup::schemas(&mut schemas);
+        let names: Vec<&str> = schemas.iter().map(|(name, _)| name.as_str()).collect();
+        assert!(names.contains(&"AnnotationConditionItem"));
+        assert!(names.contains(&"AnnotationConditionLeaf"));
+    }
+
+    // `filters` is opaque in the doc, so MCP's tool-schema walker never reaches the self-reference.
+    #[test]
+    fn test_annotation_filters_opaque_in_dashboard_schema_walk() {
+        let mut schemas = Vec::new();
+        Dashboard::schemas(&mut schemas);
+        let names: Vec<&str> = schemas.iter().map(|(name, _)| name.as_str()).collect();
+        assert!(!names.contains(&"AnnotationConditionGroup"));
+        assert!(!names.contains(&"AnnotationConditionItem"));
     }
 
     #[test]

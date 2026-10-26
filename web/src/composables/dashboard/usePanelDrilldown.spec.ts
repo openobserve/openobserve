@@ -32,6 +32,10 @@ vi.mock("@/services/search", async (importOriginal) => {
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,
   escapeSingleQuotes: (v: string) => v,
+  // Stubs for @/stores' own top-level init, pulled in transitively via commons -> annotationSources -> sqlIdentifiers.
+  useLocalOrganization: () => null,
+  useLocalCurrentUser: () => null,
+  useLocalTimezone: () => null,
 }));
 
 describe("usePanelDrilldown", () => {
@@ -165,6 +169,51 @@ describe("usePanelDrilldown", () => {
 
     expect(deps.editAnnotation).toHaveBeenCalledWith({ id: "anno-1" });
     expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
+  });
+
+  it("never drills down when a query-source band over the bars is clicked outside add mode", async () => {
+    const deps = makeDeps();
+    const api = usePanelDrilldown(deps);
+    const params = {
+      componentType: "markArea",
+      event: { offsetX: 40, offsetY: 50 },
+      data: { annotationDetails: { title: "maint", source: { id: "s2" } } },
+    };
+
+    await api.onChartClick(params);
+
+    expect(deps.editAnnotation).not.toHaveBeenCalled();
+    expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+  });
+
+  it("still places a manual annotation when a query-source band is clicked in add mode", async () => {
+    const deps = makeDeps();
+    deps.allowAnnotationsAdd.value = true;
+    deps.isAddAnnotationMode.value = true;
+    const api = usePanelDrilldown(deps);
+    const params = {
+      componentType: "markArea",
+      event: { offsetX: 40, offsetY: 50 },
+      data: {
+        annotationDetails: {
+          title: "maint",
+          source: { id: "s2" },
+          start_time: Date.parse("2026-03-18T00:30:00.000Z") * 1000,
+        },
+      },
+    };
+
+    await api.onChartClick(params);
+
+    expect(deps.handleAddAnnotation).toHaveBeenCalledWith(
+      new Date("2026-03-18T00:30:00.000Z"),
+      null,
+    );
+    expect(deps.editAnnotation).not.toHaveBeenCalled();
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
   });
 
   it("hands an exemplar marker click to the exemplar handler and never opens the drilldown menu", async () => {

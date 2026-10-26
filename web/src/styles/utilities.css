@@ -100,3 +100,14 @@
     background-color: color-mix(in srgb, currentColor 14%, transparent);
   }
 }
+
+@utility bg-hatched {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1 device pixel */
+  --hatch-line: 1px;
+  background-color: var(--color-surface-subtle);
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-border-strong) 0 var(--hatch-line),
+    transparent var(--hatch-line) 0.3125rem
+  );
+}

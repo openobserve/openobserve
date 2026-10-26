@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "dep:audit",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_ratelimit",
@@ -45,7 +46,7 @@ profiling = ["openobserve-api-management/profiling"]
 
 [dependencies]
 common.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 db.workspace = true
 openobserve-core.workspace = true
 openobserve-tls.workspace = true
