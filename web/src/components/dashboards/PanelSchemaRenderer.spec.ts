@@ -3876,6 +3876,11 @@ describe("PanelSchemaRenderer", () => {
       return chunk;
     };
 
+    it("emits an empty series limit on mount, clearing a previous chart's series chip", async () => {
+      await mountRacing();
+      expect(wrapper.emitted("series-limit-update")?.[0]).toEqual([null]);
+    });
+
     it("emits an empty map notice on mount, clearing a previous chart's chip", async () => {
       await mountRacing();
       expect(wrapper.emitted("region-join-update")?.[0]).toEqual([null]);

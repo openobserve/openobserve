@@ -1971,9 +1971,14 @@ export default defineComponent({
       { deep: true },
     );
 
-    watch(seriesLimit, (value) => {
-      emit("series-limit-update", value);
-    });
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's series chip.
+    watch(
+      seriesLimit,
+      (value) => {
+        emit("series-limit-update", value);
+      },
+      { immediate: true },
+    );
 
     // Immediate, so a renderer remounted for a new chart type clears the previous type's chips.
     watch(

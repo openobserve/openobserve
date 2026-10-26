@@ -39,6 +39,7 @@ import {
   type HostmapEntity,
 } from "./convertHostmapData";
 import { STATE_TIMELINE_ROW_ZOOM_IDS, promqlSeriesCap } from "./convertStateTimelineData";
+import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
 
 // jsdom has no token stylesheet, so each token resolves to its own name and stays distinguishable.
 vi.mock("@/utils/chartTheme", async (importOriginal) => ({
@@ -742,5 +743,33 @@ describe("hostmap round 1 fixes", () => {
     expect(result.options.series[0].renderItem({ dataIndex: 0 }, api()).style.stroke).toBe(
       "--color-border-subtle",
     );
+  });
+});
+
+describe("hostmap PromQL series limit", () => {
+  it("loads and draws 512 series as 512 cells with no truncation notice, past the default 100", () => {
+    const zoConfig = { max_dashboard_series: 100 };
+    const maxSeries = promqlSeriesCap("hostmap", zoConfig);
+    expect(maxSeries).toBe(HOSTMAP_MAX_CELLS);
+    const processor = createPromQLChunkProcessor({ maxSeries, enableLogging: false });
+    const chunk = {
+      resultType: "matrix",
+      result: Array.from({ length: 512 }, (_, i) =>
+        series({ gpu_uuid: `GPU-${i}`, host: `h${Math.floor(i / 8)}`, rack: `r${i % 8}` }, [
+          [1, String(40 + (i % 50))],
+        ]),
+      ),
+    };
+    const loaded = processor.processChunk(null, chunk);
+    expect(loaded.result).toHaveLength(512);
+    const stats = processor.getStats();
+    const result = convertHostmapData(
+      promqlPanel({ hostmap_entity_label: "gpu_uuid", hostmap_group_by: ["rack", "host"] }),
+      [loaded],
+      store(zoConfig),
+      { seriesLimiting: { ...stats, maxSeries } },
+    );
+    expect(cellsOf(result)).toHaveLength(512);
+    expect(result.extras.seriesLimit).toBeUndefined();
   });
 });
