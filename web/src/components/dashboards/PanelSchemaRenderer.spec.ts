@@ -3281,7 +3281,7 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.metricItems).toHaveLength(0);
     });
 
-    it("hides the copy button for zero-valued metrics", async () => {
+    it("keeps the hover zone of a zero value but gives it no copy button", async () => {
       const layout = {
         left: 0,
         top: 0,
@@ -3298,9 +3298,28 @@ describe("PanelSchemaRenderer", () => {
         { _metricText: "0%", _metricLayout: { ...layout } },
         { _metricText: "2.00MB", _metricLayout: { ...layout } },
       ]);
-      // Only the non-zero value survives.
-      expect(wrapper.vm.metricItems).toHaveLength(1);
-      expect(wrapper.vm.metricItems[0]).toMatchObject({ text: "2.00MB" });
+      expect(wrapper.vm.metricItems).toHaveLength(5);
+      expect(wrapper.vm.metricItems.map((m: any) => m.iconStyle !== null)).toEqual([
+        false,
+        false,
+        false,
+        false,
+        true,
+      ]);
+    });
+
+    it("offers a cut series label in full on its hover zone, and only a cut one", async () => {
+      const [first, second] = metricSeries();
+      wrapper = await mountMetric([
+        {
+          ...first,
+          _metricLabel: '{instance="10.0.0.12:9100"}',
+          _metricLayout: { ...first._metricLayout, labelCut: true },
+        },
+        { ...second, _metricLabel: "web" },
+      ]);
+      expect(wrapper.vm.metricItems[0].fullLabel).toBe('{instance="10.0.0.12:9100"}');
+      expect(wrapper.vm.metricItems[1].fullLabel).toBeUndefined();
     });
 
     it("returns no items for non-metric panels", async () => {
@@ -3329,6 +3348,37 @@ describe("PanelSchemaRenderer", () => {
       expect(style.left).toBe(`${100 + textWidth / 2 + 2}px`);
       expect(style.top).toBe("50px");
       expect(style.transform).toBe("translateY(-50%)");
+    });
+
+    const clickZone = async (target: HTMLElement) => {
+      const w = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "metric",
+          config: {
+            ...defaultProps.panelSchema.config,
+            drilldown: [{ name: "Link", type: "byUrl", data: { url: "https://example.com" } }],
+          },
+        },
+      });
+      await flushPromises();
+      w.vm.panelData = { chartType: "metric", options: { series: metricSeries() } };
+      await nextTick();
+      w.vm.onMetricZoneClick(w.vm.metricItems[1], { target, offsetX: 5, offsetY: 6 });
+      await flushPromises();
+      return w;
+    };
+
+    it("opens the drilldown menu from a click on a value's hover zone", async () => {
+      wrapper = await clickZone(document.createElement("div"));
+      expect(wrapper.vm.drilldownArray).toHaveLength(1);
+    });
+
+    it("leaves the drilldown menu closed when the copy button is clicked", async () => {
+      const button = document.createElement("button");
+      button.appendChild(document.createElement("span"));
+      wrapper = await clickZone(button.firstChild as HTMLElement);
+      expect(wrapper.vm.drilldownArray).toHaveLength(0);
     });
 
     it("copies the displayed value and flags the copied state", async () => {

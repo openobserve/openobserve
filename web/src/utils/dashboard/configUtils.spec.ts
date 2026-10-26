@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  allVisibleQueriesInstant,
   shouldApplyChartAlign,
   shouldShowLegendValues,
   shouldShowGridlines,
@@ -1452,6 +1453,28 @@ describe("configUtils", () => {
 
     it("should return false when pageKey is logs", () => {
       expect(shouldShowTimeShift({ data: { type: "area" } }, false, "logs")).toBe(false);
+    });
+  });
+
+  describe("allVisibleQueriesInstant", () => {
+    const panel = (types: string[], hiddenQueries?: number[]) => ({
+      data: { queries: types.map((query_type) => ({ config: { query_type } })) },
+      layout: { hiddenQueries },
+    });
+
+    it("is true only when every visible query is instant", () => {
+      expect(allVisibleQueriesInstant(panel(["instant", "instant"]))).toBe(true);
+      expect(allVisibleQueriesInstant(panel(["instant", "range"]))).toBe(false);
+      expect(allVisibleQueriesInstant(panel(["instant", "range"], [1]))).toBe(true);
+    });
+
+    it("is false with no queries or an unset query type", () => {
+      expect(allVisibleQueriesInstant(panel([]))).toBe(false);
+      expect(allVisibleQueriesInstant({ data: { queries: [{ config: {} }] } })).toBe(false);
+    });
+
+    it("is false when every query is hidden", () => {
+      expect(allVisibleQueriesInstant(panel(["range", "instant"], [0, 1]))).toBe(false);
     });
   });
 

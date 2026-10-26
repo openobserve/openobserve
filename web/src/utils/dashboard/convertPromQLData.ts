@@ -29,6 +29,7 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
@@ -40,7 +41,14 @@ import {
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { PROMQL_MODULAR_CHART_TYPES } from "./promql/shared/types";
-import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
+import {
+  calculateMetricFontSize,
+  buildMetricSparkline,
+  type MetricSparkline,
+  type SparklineConfig,
+} from "./sql/charts/convertSQLMetricChart";
+import { layoutMetricGrid, metricCellsThatFit } from "./metricGrid";
+import { applyAggregation } from "./promql/shared/dataProcessor";
 import {
   buildValueMappingCache,
   lookupDisplayedValueMapping,
@@ -76,13 +84,57 @@ import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
-import { fitAxisBoundsToStacks, stackTotalRows } from "./stackTotals";
+import { fitStackedAxisBounds, stackTotalRows } from "./stackTotals";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
 
+/** Upper bound even on a huge panel, so a label-less query like `up` cannot build thousands of overlays. */
+export const METRIC_MAX_CELLS = 50;
+
 let moment: any;
 let momentInitialized = false;
+
+interface PromQLMetricResult {
+  metric?: Record<string, string>;
+  value?: [number, string];
+  values?: [number, string][];
+}
+
+interface MetricPanelSchema {
+  config?: {
+    aggregation?: string;
+    mappings?: unknown;
+    background?: { value?: { color?: string } } | null;
+    sparkline?: SparklineConfig | null;
+  };
+}
+
+interface MetricCellColors {
+  accent: string;
+  text: string;
+  contrastThreshold: number;
+}
+
+interface MetricRenderParams {
+  coordSys: { cx: number; cy: number };
+}
+
+interface PromQLMetricCell {
+  type: "custom";
+  coordinateSystem: "polar";
+  z: number;
+  _metricText: string;
+  _metricFillColor: string;
+  _metricBgColor: string;
+  _metricLabel: string;
+  _metricName: string;
+  _metricRaw: string | number | null;
+  _metricSparkData: number[] | null;
+  _metricSparkConfig: MetricSparkline["resolved"] | null;
+  renderItem?: (params: MetricRenderParams) => unknown;
+  _metricLayout?: Record<string, number | boolean>;
+}
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -110,6 +162,127 @@ const closeForecastSeam = (twin: any, from: number) => {
   for (let i = from; i < first; i++) {
     twin.data[i] = [twin.data[i][0], start + slope * (times[i] - times[first])];
   }
+};
+
+const buildPromQLMetricCell = (
+  metric: PromQLMetricResult,
+  name: string,
+  panelSchema: MetricPanelSchema,
+  seriesOverrides: ReturnType<typeof createSeriesOverrideLookup>,
+  colors: MetricCellColors,
+): { cell: PromQLMetricCell; sparkline: MetricSparkline | null } => {
+  const values = [...(metric?.values ?? (metric?.value ? [metric.value] : []))].sort(
+    (a, b) => a[0] - b[0],
+  );
+  // An instant sample has nothing to reduce, and the editor hides the reducer for it.
+  const aggregation = metric?.values ? panelSchema.config?.aggregation || "last" : "last";
+  // "last" keeps the sample string, so a value mapping on "NaN" or "+Inf" still matches it.
+  const reduced =
+    aggregation === "last"
+      ? (values[values.length - 1]?.[1] ?? 0)
+      : applyAggregation(values, aggregation);
+  const noFiniteSample = typeof reduced === "number" && !Number.isFinite(reduced);
+  const value = noFiniteSample ? null : reduced;
+  const unitArgs = seriesOverrides.unitArgs(name);
+  const style = resolveMetricValueStyle(value, {
+    mappings: panelSchema.config?.mappings,
+    unit: unitArgs.unit,
+    customUnit: unitArgs.unitCustom,
+    decimals: unitArgs.decimals,
+    // An override colour stands in for the panel Background of this value; mappings and steps still win.
+    panelBackground:
+      seriesOverrides.get(name)?.color ?? panelSchema.config?.background?.value?.color ?? "",
+    thresholds: getSeriesThresholds(panelSchema?.config, name),
+  });
+  const sparkline = panelSchema.config?.sparkline?.enabled
+    ? buildMetricSparkline(
+        values.map((v) => Number(v?.[1])),
+        panelSchema.config.sparkline,
+        colors.accent,
+      )
+    : null;
+  return {
+    sparkline,
+    cell: {
+      type: "custom",
+      coordinateSystem: "polar",
+      z: 2,
+      _metricText: noFiniteSample ? "-" : style.text,
+      // An explicit mapping text colour wins; otherwise the text contrasts with its background.
+      _metricFillColor:
+        style.textColor ?? getContrastColor(style.bgColor, colors.text, colors.contrastThreshold),
+      _metricBgColor: style.bgColor,
+      _metricLabel: seriesOverrides.get(name)?.displayName ?? name,
+      _metricName: name,
+      _metricRaw: value,
+      _metricSparkData: sparkline?.data ?? null,
+      _metricSparkConfig: sparkline?.resolved ?? null,
+    },
+  };
+};
+
+const layoutPromQLMetric = (
+  options: Record<string, unknown>,
+  built: { cell: PromQLMetricCell; sparkline: MetricSparkline | null }[],
+  panelSchema: MetricPanelSchema,
+  panelEl: HTMLElement | null | undefined,
+): unknown[] => {
+  options.dataset = { source: [[]] };
+  options.tooltip = { show: false };
+  options.angleAxis = { show: false };
+  options.radiusAxis = { show: false };
+  options.polar = {};
+  options.xAxis = [];
+  options.yAxis = [];
+  if (built.length !== 1) {
+    const cells = built.map(({ cell }) => cell);
+    if (cells.length && panelEl) {
+      layoutMetricGrid(
+        cells,
+        panelSchema.config?.sparkline,
+        panelEl.offsetWidth,
+        panelEl.offsetHeight,
+      );
+    }
+    options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
+    return cells;
+  }
+  const [{ cell, sparkline }] = built;
+  const text = cell._metricText;
+  options.backgroundColor = cell._metricBgColor;
+  cell.renderItem = (params: MetricRenderParams) => ({
+    type: "text",
+    style: {
+      text,
+      fontSize: calculateMetricFontSize(text, params?.coordSys?.cx * 2, params?.coordSys?.cy * 2),
+      fontWeight: 500,
+      align: "center",
+      verticalAlign: "middle",
+      x: params?.coordSys?.cx,
+      y: params?.coordSys?.cy,
+      fill: cell._metricFillColor,
+    },
+  });
+  if (panelEl) {
+    const w = panelEl.offsetWidth;
+    const h = panelEl.offsetHeight;
+    const valueH = sparkline ? h * sparkline.valueBandFactor : h;
+    cell._metricLayout = {
+      left: 0,
+      top: 0,
+      width: w,
+      height: valueH,
+      cx: w / 2,
+      cy: sparkline ? h * sparkline.valueCenterFactor : h / 2,
+      fontSize: calculateMetricFontSize(text, w, valueH),
+    };
+  }
+  if (!sparkline) return [cell];
+  options.polar = { center: ["50%", sparkline.polarCenterY], radius: 0 };
+  options.grid = sparkline.grid;
+  options.xAxis = sparkline.xAxis;
+  options.yAxis = sparkline.yAxis;
+  return [cell, sparkline.series];
 };
 
 /** Snaps shifted results onto the step grid and their primaries' series; read config via `parentQueryIndex`. */
@@ -267,10 +440,11 @@ export const convertPromQLData = async (
         metadata,
         parentQueryIndex,
         nameSuffixes,
+        stepSeconds,
       });
 
       if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);
-      if (result.options && panelSchema.type === "stacked") fitAxisBoundsToStacks(result.options);
+      if (result.options) fitStackedAxisBounds(panelSchema.type, result.options);
       if (result.options) applyLineAreaThresholds(result.options, panelSchema);
 
       return result;
@@ -483,6 +657,8 @@ export const convertPromQLData = async (
       itemStyle: {
         color: CHART_SELECTION_FILL,
       },
+      // ECharts draws markArea at z 1, under bars (z 2) and line/area fills (z 3); bands must sit on top.
+      z: ANNOTATION_MARK_AREA_Z,
       data: markAreas,
     };
   };
@@ -874,6 +1050,24 @@ export const convertPromQLData = async (
 
   const primaryByMetric = new Map<any, any>();
   const shiftedTwins: [any, any][] = [];
+  // Metric cells past the cap are counted for the notice but never built.
+  let metricCellsSeen = 0;
+  const metricCellCap =
+    panelSchema.type === "metric" && chartPanelRef?.value
+      ? metricCellsThatFit(
+          chartPanelRef.value.offsetWidth,
+          chartPanelRef.value.offsetHeight,
+          METRIC_MAX_CELLS,
+        )
+      : METRIC_MAX_CELLS;
+  const metricColors: MetricCellColors =
+    panelSchema.type === "metric"
+      ? {
+          accent: chartColor("--color-accent"),
+          text: chartColor("--color-chart-metric-text"),
+          contrastThreshold: chartNumber("--chart-metric-contrast-threshold", 0.5),
+        }
+      : { accent: "", text: "", contrastThreshold: 0.5 };
 
   options.series = limitedSearchQueryData.map((it: any, index: number) => {
     // A stream that has not delivered yet is an undefined slot; the gauge fall-through would make it an undefined series.
@@ -1180,126 +1374,21 @@ export const convertPromQLData = async (
       }
       case "metric": {
         isTimeSeriesFlag = false;
-
-        switch (it?.resultType) {
-          // An INSTANT query returns "vector" (one `value` tuple per series) where a
-          // range query returns "matrix" (a `values` array). Normalising the former
-          // into the latter lets ONE branch build the painted series: the vector case
-          // below used to return a bare {name, value} with no renderItem, so a
-          // curated instant tile with a perfectly good scalar painted an empty box.
-          case "vector":
-          case "matrix": {
-            const metric = it?.result?.[0];
-
-            const values = (metric?.values ?? (metric?.value ? [metric.value] : [])).sort(
-              (a: any, b: any) => a[0] - b[0],
-            );
-            const latestValue = values[values.length - 1]?.[1] ?? 0;
-            const metricName = metric ? nameOf(seriesNames, metric.metric, index) : "";
-            const metricUnit = seriesOverrides.unitArgs(metricName);
-
-            const metricStyle = resolveMetricValueStyle(latestValue, {
-              mappings: panelSchema.config?.mappings,
-              unit: metricUnit.unit,
-              customUnit: metricUnit.unitCustom,
-              decimals: metricUnit.decimals,
-              // An override colour stands in for the panel Background of this value; mappings and steps still win.
-              panelBackground:
-                seriesOverrides.get(metricName)?.color ??
-                panelSchema.config?.background?.value?.color ??
-                "",
-              thresholds: getSeriesThresholds(panelSchema?.config, metricName),
-            });
-            options.backgroundColor = metricStyle.bgColor;
-            const metricText = metricStyle.text;
-            // metric value color: explicit mapping text color wins; otherwise auto-contrast.
-            const metricFillColor =
-              metricStyle.textColor ??
-              getContrastColor(
-                metricStyle.bgColor,
-                chartColor("--color-chart-metric-text"),
-                chartNumber("--chart-metric-contrast-threshold", 0.5),
-              );
-            // Optional sparkline: the trend of the full matrix series.
-            const sparkValues = values.map((v: any) => Number(v?.[1]));
-            const sparkline = buildMetricSparkline(
-              sparkValues,
-              panelSchema.config?.sparkline,
-              chartColor("--color-accent"),
-            );
-
-            const textSeries: any = {
-              type: "custom",
-              silent: true,
-              coordinateSystem: "polar",
-              _metricText: metricText,
-              z: 2,
-              renderItem: function (params: any) {
-                return {
-                  type: "text",
-                  style: {
-                    text: metricText,
-                    fontSize: calculateMetricFontSize(
-                      metricText,
-                      params?.coordSys?.cx * 2,
-                      params?.coordSys?.cy * 2,
-                    ), //coordSys is relative. so that we can use it to calculate the dynamic size
-                    fontWeight: 500,
-                    align: "center",
-                    verticalAlign: "middle",
-                    x: params?.coordSys?.cx,
-                    y: params?.coordSys?.cy,
-                    fill: metricFillColor,
-                  },
-                };
-              },
-            };
-            // Text series first; sparkline layered behind via z.
-            const series: any[] = sparkline ? [textSeries, sparkline.series] : [textSeries];
-
-            // Rect for the per-value copy icon overlay (single metric fills the area).
-            const panelEl = chartPanelRef?.value;
-            if (panelEl) {
-              const w = panelEl?.offsetWidth;
-              const h = panelEl?.offsetHeight;
-              const valueH = sparkline ? h * sparkline.valueBandFactor : h;
-              const cy = sparkline ? h * sparkline.valueCenterFactor : h / 2;
-              textSeries._metricLayout = {
-                left: 0,
-                top: 0,
-                width: w,
-                height: valueH,
-                cx: w / 2,
-                cy,
-                fontSize: calculateMetricFontSize(metricText, w, valueH),
-              };
-            }
-
-            options.dataset = { source: [[]] };
-            options.tooltip = {
-              show: false,
-            };
-            options.angleAxis = {
-              show: false,
-            };
-            options.radiusAxis = {
-              show: false,
-            };
-            if (sparkline) {
-              options.polar = { center: ["50%", sparkline.polarCenterY], radius: 0 };
-              options.grid = sparkline.grid;
-              options.xAxis = sparkline.xAxis;
-              options.yAxis = sparkline.yAxis;
-            } else {
-              options.polar = {};
-              options.xAxis = [];
-              options.yAxis = [];
-            }
-
-            return series;
-          }
-        }
-        break;
+        // An instant query returns a "vector" (one `value` per series), a range query a "matrix".
+        if (it?.resultType !== "vector" && it?.resultType !== "matrix") return [];
+        const room = Math.max(0, metricCellCap - metricCellsSeen);
+        metricCellsSeen += it?.result?.length ?? 0;
+        return (it?.result ?? [])
+          .slice(0, room)
+          .map((metric: PromQLMetricResult) =>
+            buildPromQLMetricCell(
+              metric,
+              nameOf(seriesNames, metric.metric, index),
+              panelSchema,
+              seriesOverrides,
+              metricColors,
+            ),
+          );
       }
       default: {
         return [];
@@ -1336,13 +1425,12 @@ export const convertPromQLData = async (
     });
   }
 
-  // For metric chart type, only show one metric value (from the last query with
-  // data). Slice BEFORE flattening: each metric query contributes an array
-  // [textSeries] (+ sparklineSeries when enabled), so keeping the last query's
-  // array preserves both the value and its sparkline. Slicing after flatten would
-  // keep only the trailing element — the sparkline — and drop the value text.
-  if (panelSchema.type === "metric" && options.series.length > 1) {
-    options.series = options.series.slice(-1);
+  if (panelSchema.type === "metric") {
+    const built = options.series.flat();
+    if (metricCellsSeen > metricCellCap) {
+      setSeriesLimit(metricCellCap, extras.seriesLimit?.total ?? metricCellsSeen, metricCellCap);
+    }
+    options.series = layoutPromQLMetric(options, built, panelSchema, chartPanelRef?.value);
   }
 
   options.series = options.series.flat();
@@ -1569,7 +1657,7 @@ export const convertPromQLData = async (
   // console.timeEnd("convertPromQLData");
   // Override colours first: a threshold step outranks them and recolours on top.
   applySeriesOverrides(options, panelSchema, store.state.theme);
-  if (panelSchema.type === "area-stacked") fitAxisBoundsToStacks(options);
+  fitStackedAxisBounds(panelSchema.type, options);
   applyLineAreaThresholds(options, panelSchema);
   // Reserve measured left space so wide y-axis labels don't clip.
   applyMeasuredYAxisLeftInset(options);

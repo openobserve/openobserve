@@ -2126,7 +2126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Sparkline (metric only) -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type == 'metric'"
+      v-if="dashboardPanelData.data.type === 'metric' && !promqlAllInstant"
       v-show="isSectionVisible('sparkline')"
       :model-value="isExpanded('sparkline')"
       :icon="SECTION_ICONS.sparkline"
@@ -2241,6 +2241,7 @@ import {
   shouldShowAxisLabelConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
@@ -3057,6 +3058,12 @@ export default defineComponent({
       PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
     );
     const maxDashboardSeries = computed(() => store.state?.zoConfig?.max_dashboard_series ?? 100);
+    // An instant query returns one sample per series, so a metric has no trend to draw.
+    const promqlAllInstant = computed(
+      () =>
+        dashboardPanelData.data.queryType === "promql" &&
+        allVisibleQueriesInstant(dashboardPanelData),
+    );
 
     const {
       searchQuery,
@@ -3250,6 +3257,7 @@ export default defineComponent({
       isSectionVisible,
       exemplarsSwitchEligible,
       promqlSeriesLimitEligible,
+      promqlAllInstant,
       maxDashboardSeries,
       isConfigOptionVisible,
       anySectionVisible,

@@ -520,6 +520,13 @@ export function usePanelDrilldown({
     isCursorOverPanel.value = false;
   };
 
+  // A metric value is drawn by renderItem, so the click carries no value; the clicked cell holds it.
+  const metricSeriesVariables = (params: { seriesIndex?: number } | undefined) => {
+    if (panelSchema.value.type !== "metric" || params?.seriesIndex === undefined) return {};
+    const cell = panelData.value?.options?.series?.[params.seriesIndex];
+    return cell ? { __name: cell._metricName ?? "", __value: cell._metricRaw ?? "" } : {};
+  };
+
   const onChartClick = async (params: any, ...args: any) => {
     // An exemplar marker opens its trace, never the drilldown menu or an annotation.
     if (params?.seriesId === EXEMPLAR_SERIES_ID) {
@@ -893,6 +900,7 @@ export function usePanelDrilldown({
                 ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
                 : drilldownParams[0].value,
               __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+              ...metricSeriesVariables(drilldownParams[0]),
             };
           }
 
@@ -1011,6 +1019,7 @@ export function usePanelDrilldown({
             ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
             : drilldownParams[0].value,
           __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+          ...metricSeriesVariables(drilldownParams[0]),
         };
       }
 

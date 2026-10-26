@@ -160,8 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="metricZoneStyle(m)"
           @mouseenter="hoveredMetricIdx = m.idx"
           @mouseleave="hoveredMetricIdx = null"
+          @click="onMetricZoneClick(m, $event)"
         >
+          <OTooltip v-if="m.fullLabel" :content="m.fullLabel" />
           <OButton
+            v-if="m.iconStyle"
             :aria-label="t('common.copyToClipboard')"
             class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
@@ -436,6 +439,7 @@ const DashboardLogDrawer = defineAsyncComponent(() => {
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -460,6 +464,7 @@ export default defineComponent({
     LoadingProgress,
     OButton,
     OIcon,
+    OTooltip,
     OEmptyState,
     ODrawer,
     DashboardLogDrawer,
@@ -712,18 +717,19 @@ export default defineComponent({
           idx,
           text: s?._metricText,
           layout: s?._metricLayout,
+          fullLabel: s?._metricLayout?.labelCut ? raw(s?._metricLabel) : undefined,
         }))
-        .filter((m: any) => {
-          if (!m.layout || m.text == null || String(m.text).trim() === "") return false;
+        .filter((m: any) => m.layout && m.text != null && String(m.text).trim() !== "")
+        .map((m: any) => {
           const num = parseFloat(
             String(m.text)
               .replace(/,/g, "")
               .replace(/[^0-9.eE+-]/g, ""),
           );
-          return Number.isNaN(num) || num !== 0;
-        })
-        .map((m: any) => ({ ...m, iconStyle: metricIconStyle(m) }))
-        .filter((m: any) => m?.iconStyle !== null);
+          // The zone is also the drilldown hit area, so only the copy button is withheld for a zero.
+          const copyable = Number.isNaN(num) || num !== 0;
+          return { ...m, iconStyle: copyable ? metricIconStyle(m) : null };
+        });
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
@@ -2225,6 +2231,23 @@ export default defineComponent({
       onExemplarClick: exemplarInteraction.onExemplarClick,
     });
 
+    // The copy hover zone covers its value, so a click there stands in for a click on that cell's series.
+    const onMetricZoneClick = (
+      m: { idx: number; layout?: { left?: number; top?: number } },
+      event: MouseEvent,
+    ) => {
+      if ((event.target as HTMLElement | null)?.closest("button")) return;
+      onChartClick({
+        componentType: "series",
+        seriesType: "custom",
+        seriesIndex: m.idx,
+        event: {
+          offsetX: (m.layout?.left ?? 0) + event.offsetX,
+          offsetY: (m.layout?.top ?? 0) + event.offsetY,
+        },
+      });
+    };
+
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
@@ -2542,6 +2565,7 @@ export default defineComponent({
       hoveredMetricIdx,
       metricCopiedIdx,
       copyMetricItem,
+      onMetricZoneClick,
       downloadDataAsCSV,
       downloadDataAsJSON,
       getPanelCsvData: (title: string) => {

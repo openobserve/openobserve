@@ -30,14 +30,12 @@ export const shouldApplyChartAlign = (dashboardPanelData: any): boolean => {
 
 /** True when every visible query of the panel is a PromQL instant query, which has one sample per series. */
 export const allVisibleQueriesInstant = (dashboardPanelData: PanelQueriesState): boolean => {
-  const queries = dashboardPanelData.data.queries ?? [];
   const hidden = dashboardPanelData.layout?.hiddenQueries ?? [];
-  return (
-    queries.length > 0 &&
-    queries.every(
-      (query, index) => query?.config?.query_type === "instant" || hidden.includes(index),
-    )
+  const visible = (dashboardPanelData.data.queries ?? []).filter(
+    (_, index) => !hidden.includes(index),
   );
+  // With every query hidden the panel may still be range, so its reducer must stay reachable.
+  return visible.length > 0 && visible.every((query) => query?.config?.query_type === "instant");
 };
 
 /** Pie and donut legends can append each slice's value and percent. */
@@ -247,6 +245,10 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "state-timeline"
   );
 };
+
+// The editor stores axis_border_show false by default, so honouring it on heatmaps would strip the axis lines of every saved one.
+export const shouldShowAxisBorderConfig = (dashboardPanelData: any): boolean =>
+  shouldShowAxisConfig(dashboardPanelData) && dashboardPanelData.data.type !== "heatmap";
 
 /**
  * Check if cartesian chart axis/label/markline config should be displayed
