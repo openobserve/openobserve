@@ -711,3 +711,32 @@ describe("convertPromQLData with time-shifted results", () => {
     ]);
   });
 });
+
+describe("PromQL h-stacked category labels in the dashboard timezone", () => {
+  const at = (iso: string) => Date.parse(iso) / 1000;
+  const run = (timezone: string) =>
+    convertPromQLData(
+      { id: "p1", type: "h-stacked", config: {}, queries: [{ config: {} }] },
+      [
+        matrix({
+          metric: { job: "a" },
+          values: [
+            [at("2026-10-24T12:00:00Z"), "1"],
+            [at("2026-10-24T23:30:00Z"), "2"],
+          ],
+        }),
+      ],
+      { state: { zoConfig: { max_dashboard_series: 100 }, timezone, theme: "light" } },
+      { value: { offsetWidth: 500, offsetHeight: 300 } },
+      null,
+      [],
+    );
+
+  it("dates steps that fall on two days only in the zone", async () => {
+    expect((await run("Asia/Kolkata")).options.yAxis.data).toEqual(["10-24 17:30", "10-25 05:00"]);
+  });
+
+  it("keeps time-only labels where both steps share a UTC date", async () => {
+    expect((await run("UTC")).options.yAxis.data).toEqual(["12:00:00", "23:30:00"]);
+  });
+});

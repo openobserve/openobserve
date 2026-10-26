@@ -168,23 +168,32 @@ describe("promqlChartSeriesProps", () => {
       expect((hStacked as any).orientation).toBe("h");
     });
 
+    const lineWidth = (type: string, config?: { line_thickness?: unknown } | null) => {
+      const props: { lineStyle?: { width?: number } } = getPropsByChartTypeForSeries(type, config);
+      return props.lineStyle?.width;
+    };
+
     it.each(["line", "area", "area-stacked"])("%s uses the given line thickness", (type) => {
-      expect((getPropsByChartTypeForSeries(type, 3) as any).lineStyle.width).toBe(3);
-      expect((getPropsByChartTypeForSeries(type, 0) as any).lineStyle.width).toBe(0);
+      expect(lineWidth(type, { line_thickness: 3 })).toBe(3);
+      expect(lineWidth(type, { line_thickness: 0.5 })).toBe(0.5);
     });
 
     it.each(["line", "area", "area-stacked"])(
-      "%s falls back to 1.5 when the thickness is unset",
+      "%s falls back to 1.5 when the thickness is unset, zero or negative",
       (type) => {
-        expect((getPropsByChartTypeForSeries(type) as any).lineStyle.width).toBe(1.5);
-        expect((getPropsByChartTypeForSeries(type, null) as any).lineStyle.width).toBe(1.5);
+        expect(lineWidth(type)).toBe(1.5);
+        expect(lineWidth(type, null)).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: null })).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: 0 })).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: -1 })).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: "3" })).toBe(1.5);
       },
     );
 
     it.each(["bar", "stacked", "h-bar", "h-stacked", "pie", "donut"])(
       "%s ignores the line thickness",
       (type) => {
-        expect((getPropsByChartTypeForSeries(type, 4) as any).lineStyle.width).toBe(1.5);
+        expect(lineWidth(type, { line_thickness: 4 })).toBe(1.5);
       },
     );
 

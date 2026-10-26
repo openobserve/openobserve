@@ -25,6 +25,7 @@ import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { createSeriesOverrideLookup } from "../seriesOverrides";
 import { calculateWidthText } from "../chartDimensionUtils";
+import { buildSeriesMarkLine } from "./shared/markLines";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -37,6 +38,7 @@ export class BarConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const isHorizontal = chartType.startsWith("h-");
     const isStacked = chartType.includes("stacked");
+    const markLine = isStacked ? buildSeriesMarkLine(panelSchema) : null;
     const seriesOverrides = createSeriesOverrideLookup(config);
 
     const series: any[] = [];
@@ -68,25 +70,7 @@ export class BarConverter implements PromQLChartConverter {
       processedData.forEach((queryData) => {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
-          queryData.timestamps.forEach(([, formatted]) => {
-            // Extract just the time portion from the formatted timestamp
-            // formatted can be Date object or ISO string
-            let timeString: string;
-            if (formatted instanceof Date) {
-              // Format as HH:MM:SS
-              const hours = String(formatted.getHours()).padStart(2, "0");
-              const minutes = String(formatted.getMinutes()).padStart(2, "0");
-              const seconds = String(formatted.getSeconds()).padStart(2, "0");
-              timeString = `${hours}:${minutes}:${seconds}`;
-            } else {
-              // ISO string - extract time portion
-              const dateStr = formatted.toString();
-              // Try to extract time (HH:MM:SS) from datetime string
-              const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
-              timeString = timeMatch ? timeMatch[1] : dateStr;
-            }
-            categories.push(timeString);
-          });
+          categoryLabels(queryData.timestamps).forEach((label) => categories.push(label));
         }
 
         queryData.series.forEach((seriesData) => {
@@ -134,6 +118,7 @@ export class BarConverter implements PromQLChartConverter {
               focus: "series",
             },
             ...(config.bar_width && { barWidth: config.bar_width }),
+            ...(markLine && { markLine }),
           });
 
           extras.legends.push(seriesData.name);
@@ -272,4 +257,36 @@ export class BarConverter implements PromQLChartConverter {
       // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)
     };
   }
+}
+
+interface CategoryParts {
+  date: string;
+  time: string;
+}
+
+/** A step's YYYY-MM-DD date (empty when a string label carries none) and HH:MM:SS time; null without a time. */
+function categoryParts(formatted: Date | string): CategoryParts | null {
+  if (formatted instanceof Date) {
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return {
+      date: `${formatted.getFullYear()}-${pad(formatted.getMonth() + 1)}-${pad(formatted.getDate())}`,
+      time: `${pad(formatted.getHours())}:${pad(formatted.getMinutes())}:${pad(formatted.getSeconds())}`,
+    };
+  }
+  const match = formatted.toString().match(/(\d{4}-\d{2}-\d{2})?[T ]?(\d{2}:\d{2}:\d{2})/);
+  return match ? { date: match[1] ?? "", time: match[2] } : null;
+}
+
+/** Stacked category labels: HH:MM:SS, or MM-DD HH:MM[:SS] once the steps fall on more than one date. */
+function categoryLabels(stamps: Array<[number, Date | string]>): string[] {
+  const parts = stamps.map(([, formatted]) => categoryParts(formatted));
+  // Steps on different calendar days repeat HH:MM:SS, however short the span.
+  const withDate = new Set(parts.map((part) => part?.date).filter(Boolean)).size > 1;
+  // MM-DD and no zero seconds keep a dated label inside a narrow axis.
+  const withSeconds = !withDate || parts.some((part) => part && !part.time.endsWith(":00"));
+  return parts.map((part, index) => {
+    if (!part) return stamps[index][1].toString();
+    const time = withSeconds ? part.time : part.time.slice(0, 5);
+    return withDate && part.date ? `${part.date.slice(5)} ${time}` : time;
+  });
 }

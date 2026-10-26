@@ -1629,6 +1629,34 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.options.yAxis.max).toBe(100); // Max of (100, dataMax) = 100
     });
 
+    it.each(["stacked", "area-stacked"])(
+      "widens a %s y_axis_max that would clip the stack total",
+      async (type) => {
+        const series = (job: string) => ({
+          metric: { job },
+          values: [
+            [1640435200, "70"],
+            [1640438800, "70"],
+          ],
+        });
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { y_axis_max: 10 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [{ resultType: "matrix", result: [series("a"), series("b")] }],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options.yAxis.max).toBe(140);
+      },
+    );
+
     it("should use getFinalAxisValue with null config values", async () => {
       const panelSchema = {
         id: "panel1",
@@ -1895,6 +1923,30 @@ describe("Convert PromQL Data Utils", () => {
         expect(series.lineStyle.width).toBe(4);
       },
     );
+
+    it("draws a saved line_thickness of 0 at the default width instead of hiding the line", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "line",
+          config: { line_thickness: 0 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.lineStyle.width).toBe(1.5);
+    });
 
     it("should use getLegendPosition function with bottom position", async () => {
       const panelSchema = {
@@ -2348,7 +2400,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.series[0].data[0].value).toBe("80");
+      expect(result.options.series[0].data[0].value).toBe(80);
     });
 
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {

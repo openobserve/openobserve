@@ -352,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import { allVisibleQueriesInstant } from "@/utils/dashboard/configUtils";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -400,7 +401,14 @@ export default defineComponent({
     // Chart types that support aggregation
     const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
 
-    const showAggregationConfig = computed(() => chartsWithAggregation.includes(props.chartType));
+    // A pie reduces each series to one value, which an instant query already is.
+    const showAggregationConfig = computed(
+      () =>
+        chartsWithAggregation.includes(props.chartType) &&
+        !(
+          ["pie", "donut"].includes(props.chartType) && allVisibleQueriesInstant(dashboardPanelData)
+        ),
+    );
 
     // Aggregation value
     const aggregationValue = computed({
@@ -475,16 +483,6 @@ export default defineComponent({
           dashboardPanelData.data.config = {};
         }
         dashboardPanelData.data.config.map_type = value;
-      },
-    });
-
-    const mapsEnableRoam = computed({
-      get: () => dashboardPanelData.data.config?.enable_roam !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.enable_roam = value;
       },
     });
 
@@ -684,7 +682,6 @@ export default defineComponent({
       geoNameLabel,
       mapsNameLabel,
       mapsMapType,
-      mapsEnableRoam,
       tableAggregations,
       promqlTableMode,
       promqlTableModeOptions,
