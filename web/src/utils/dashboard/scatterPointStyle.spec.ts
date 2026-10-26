@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { getScatterSymbolOpacity, getScatterSymbolSize } from "./scatterPointStyle";
+import {
+  SYMBOL_SIZE_MAX,
+  getScatterBaseOpacity,
+  getScatterSymbolOpacity,
+  getScatterSymbolSize,
+  isScatterSymbolSizeValid,
+} from "./scatterPointStyle";
 
 describe("getScatterSymbolSize", () => {
   it("keeps 5 px when unset, cleared or invalid", () => {
@@ -24,6 +30,7 @@ describe("getScatterSymbolSize", () => {
     expect(getScatterSymbolSize({ symbol_size: 0 })).toBe(5);
     expect(getScatterSymbolSize({ symbol_size: -3 })).toBe(5);
     expect(getScatterSymbolSize({ symbol_size: NaN })).toBe(5);
+    expect(getScatterSymbolSize({ symbol_size: SYMBOL_SIZE_MAX + 1 })).toBe(5);
   });
 
   it("uses a positive symbol_size", () => {
@@ -49,5 +56,27 @@ describe("getScatterSymbolOpacity", () => {
   it("clamps values outside 0-100", () => {
     expect(getScatterSymbolOpacity({ symbol_opacity: 150 })).toBe(1);
     expect(getScatterSymbolOpacity({ symbol_opacity: -20 })).toBe(0);
+  });
+});
+
+describe("isScatterSymbolSizeValid", () => {
+  it("accepts unset and positive sizes up to the max, fractions included", () => {
+    [null, undefined, "", 0.5, 5, SYMBOL_SIZE_MAX].forEach((size) =>
+      expect(isScatterSymbolSizeValid(size)).toBe(true),
+    );
+  });
+
+  it("rejects 0, negatives, sizes above the max and non-numbers", () => {
+    [0, -3, SYMBOL_SIZE_MAX + 1, NaN, "abc"].forEach((size) =>
+      expect(isScatterSymbolSizeValid(size)).toBe(false),
+    );
+  });
+});
+
+describe("getScatterBaseOpacity", () => {
+  it("is the set opacity, else the 0.8 ECharts draws by default", () => {
+    expect(getScatterBaseOpacity({ symbol_opacity: 30 })).toBe(0.3);
+    expect(getScatterBaseOpacity({})).toBe(0.8);
+    expect(getScatterBaseOpacity(undefined)).toBe(0.8);
   });
 });

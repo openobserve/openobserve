@@ -125,16 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="promqlMode && promqlSeriesLimitEligible"
           v-show="isConfigOptionVisible('general', 'promql-series-limit')"
-          v-model.number="dashboardPanelDataModel.data.config.promql_series_limit"
+          :model-value="dashboardPanelDataModel.data.config.promql_series_limit ?? undefined"
           type="number"
           :min="1"
           :max="maxDashboardSeries"
-          @update:model-value="
-            (value: any) =>
-              (dashboardPanelDataModel.data.config.promql_series_limit =
-                value > 0 ? Math.min(Math.floor(value), maxDashboardSeries) : null)
-          "
-          :placeholder="raw('100')"
+          @update:model-value="setPromqlSeriesLimit"
+          :placeholder="raw(String(defaultPromqlSeriesLimit))"
           :label="t('dashboard.promqlSeriesLimit')"
           data-test="dashboard-config-promql-series-limit"
         >
@@ -462,6 +458,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OToggleGroup>
 
+        <OToggleGroup
+          v-if="shouldShowLegendValues(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'legend-values')"
+          type="multiple"
+          label-position="top"
+          :label="t('dashboard.legendValues')"
+          v-model="legendValuesModel"
+          data-test="dashboard-config-legend-values"
+        >
+          <OToggleGroupItem
+            v-for="opt in legendValuesOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-legend-values-option"
+            :data-test-label="opt.value"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
         <div
           v-if="
             promqlMode &&
@@ -591,6 +607,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error-message="t('dashboard.decimalsMustBeBetween')"
           :label="t('dashboard.decimals')"
           data-test="dashboard-config-decimals"
+        />
+
+        <div
+          class="flex gap-2"
+          v-if="dashboardPanelData.data.type === 'heatmap'"
+          v-show="isConfigOptionVisible('data', 'heatmap-color-range')"
+        >
+          <OInput
+            class="min-w-0 flex-1"
+            v-model.number="dashboardPanelDataModel.data.config.heatmap_color_min"
+            type="number"
+            :placeholder="t('dashboard.auto')"
+            :label="t('dashboard.heatmapColorMin')"
+            :error="isHeatmapColorRangeInvalid"
+            @update:model-value="
+              (value: string | number) =>
+                (dashboardPanelDataModel.data.config.heatmap_color_min =
+                  value !== '' ? value : null)
+            "
+            data-test="dashboard-config-heatmap_color_min"
+          >
+            <template #tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <b>{{ t("dashboard.heatmapColorMinTooltipTitle") }}</b>
+                  <br />
+                  {{ t("dashboard.heatmapColorMinTooltipDescription") }}
+                </template>
+              </OTooltip>
+            </template>
+          </OInput>
+          <OInput
+            class="min-w-0 flex-1"
+            v-model.number="dashboardPanelDataModel.data.config.heatmap_color_max"
+            type="number"
+            :placeholder="t('dashboard.auto')"
+            :label="t('dashboard.heatmapColorMax')"
+            :error="isHeatmapColorRangeInvalid"
+            :error-message="t('dashboard.heatmapColorRangeInvalid')"
+            @update:model-value="
+              (value: string | number) =>
+                (dashboardPanelDataModel.data.config.heatmap_color_max =
+                  value !== '' ? value : null)
+            "
+            data-test="dashboard-config-heatmap_color_max"
+          >
+            <template #tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <b>{{ t("dashboard.heatmapColorMaxTooltipTitle") }}</b>
+                  <br />
+                  {{ t("dashboard.heatmapColorMaxTooltipDescription") }}
+                </template>
+              </OTooltip>
+            </template>
+          </OInput>
+        </div>
+
+        <OSelect
+          v-if="dashboardPanelData.data.type === 'heatmap'"
+          v-show="isConfigOptionVisible('data', 'heatmap-palette')"
+          v-model="heatmapPaletteModel"
+          :options="heatmapPaletteOptions"
+          :label="t('dashboard.heatmapPalette')"
+          :valueKey="'value'"
+          :labelKey="'label'"
+          data-test="dashboard-config-heatmap_palette"
+        />
+
+        <OSwitch
+          v-if="dashboardPanelData.data.type === 'heatmap'"
+          v-show="isConfigOptionVisible('data', 'heatmap-palette-reverse')"
+          v-model="dashboardPanelDataModel.data.config.heatmap_palette_reverse"
+          :label="t('dashboard.heatmapPaletteReverse')"
+          data-test="dashboard-config-heatmap_palette_reverse"
+          size="lg"
+        />
+
+        <OToggleGroup
+          v-if="dashboardPanelData.data.type === 'heatmap'"
+          v-show="isConfigOptionVisible('data', 'heatmap-color-scale')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.heatmapColorScale')"
+          v-model="heatmapColorScaleModel"
+          data-test="dashboard-config-heatmap_color_scale"
+          :data-test-selected-value="heatmapColorScaleModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in heatmapColorScaleOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-heatmap_color_scale-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OSwitch
+          v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
+          v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
+          v-model="heatmapHistogramModeModel"
+          :label="t('dashboard.heatmapHistogramMode')"
+          data-test="dashboard-config-heatmap_mode"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.heatmapHistogramModeTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
+        <OSelect
+          v-if="
+            promqlMode && dashboardPanelData.data.type === 'heatmap' && heatmapHistogramModeModel
+          "
+          v-show="isConfigOptionVisible('data', 'bucket-unit')"
+          v-model="dashboardPanelDataModel.data.config.bucket_unit"
+          :options="bucketUnitOptions"
+          :label="t('dashboard.bucketUnit')"
+          :valueKey="'value'"
+          :labelKey="'label'"
+          searchable
+          data-test="dashboard-config-bucket_unit"
+        />
+
+        <OInput
+          v-if="
+            promqlMode &&
+            dashboardPanelData.data.type === 'heatmap' &&
+            heatmapHistogramModeModel &&
+            dashboardPanelData.data.config.bucket_unit === 'custom'
+          "
+          v-show="isConfigOptionVisible('data', 'bucket-unit-custom')"
+          v-model="dashboardPanelDataModel.data.config.bucket_unit_custom"
+          :label="t('dashboard.bucketUnitCustom')"
+          data-test="dashboard-config-bucket_unit_custom"
         />
 
         <!-- Multi-SQL: extra query-tabs visible when SQL has 2+ queries
@@ -926,13 +1079,147 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OSwitch
-          v-if="shouldShowAxisConfig(dashboardPanelData)"
+          v-if="shouldShowAxisBorderConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-border')"
           v-model="dashboardPanelDataModel.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
           data-test="dashboard-config-axis-border"
           size="lg"
         />
+
+        <OToggleGroup
+          v-if="shouldShowHeatmapYSort(dashboardPanelData, promqlMode)"
+          v-show="isConfigOptionVisible('axis', 'heatmap-y-sort')"
+          type="single"
+          label-position="top"
+          v-model="heatmapYSortModel"
+          data-test="dashboard-config-heatmap_y_sort"
+          :data-test-selected-value="heatmapYSortModel"
+        >
+          <template #label>
+            <span class="flex items-center gap-1">
+              {{ t("dashboard.heatmapYSort") }}
+              <OIcon name="info-outline" size="sm" class="cursor-help">
+                <OTooltip :content="t('dashboard.heatmapYSortTooltip')" max-width="15.625rem" />
+              </OIcon>
+            </span>
+          </template>
+          <OToggleGroupItem
+            v-for="opt in heatmapYSortOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-heatmap_y_sort-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <template v-if="shouldShowHeatmapYBucket(dashboardPanelData, promqlMode)">
+          <OToggleGroup
+            v-show="isConfigOptionVisible('axis', 'heatmap-y-bucket')"
+            type="single"
+            label-position="top"
+            v-model="heatmapYBucketModeModel"
+            data-test="dashboard-config-heatmap_y_bucket"
+            :data-test-selected-value="heatmapYBucketModeModel"
+          >
+            <template #label>
+              <span class="flex items-center gap-1">
+                {{ t("dashboard.heatmapYBucket") }}
+                <OIcon name="info-outline" size="sm" class="cursor-help">
+                  <OTooltip :content="t('dashboard.heatmapYBucketTooltip')" max-width="15.625rem" />
+                </OIcon>
+              </span>
+            </template>
+            <OToggleGroupItem
+              v-for="opt in heatmapYBucketModeOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-heatmap_y_bucket-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+
+          <OInput
+            v-if="heatmapYBucketModeModel === 'size'"
+            v-show="isConfigOptionVisible('axis', 'heatmap-y-bucket')"
+            :model-value="dashboardPanelData.data.config.heatmap_y_bucket?.size ?? null"
+            type="number"
+            :label="t('dashboard.heatmapYBucketSize')"
+            :error="!!heatmapYBucketErrorMessage"
+            :error-message="heatmapYBucketErrorMessage"
+            @update:model-value="
+              (value: string | number) => setHeatmapYBucket({ size: toNumberOrNull(value) })
+            "
+            data-test="dashboard-config-heatmap_y_bucket_size"
+          />
+
+          <OToggleGroup
+            v-if="heatmapYBucketModeModel === 'log'"
+            v-show="isConfigOptionVisible('axis', 'heatmap-y-bucket')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.heatmapYBucketBase')"
+            v-model="heatmapYBucketBaseModel"
+            data-test="dashboard-config-heatmap_y_bucket_base"
+            :data-test-selected-value="heatmapYBucketBaseModel"
+          >
+            <OToggleGroupItem
+              v-for="base in heatmapYLogBases"
+              :key="base"
+              :value="String(base)"
+              size="sm"
+              data-test="dashboard-config-heatmap_y_bucket_base-option"
+              :data-test-label="String(base)"
+              >{{ base }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+
+          <div
+            class="flex gap-2"
+            v-if="heatmapYBucketModeModel !== 'none'"
+            v-show="isConfigOptionVisible('axis', 'heatmap-y-range')"
+          >
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.heatmap_y_min ?? null"
+              type="number"
+              :placeholder="t('dashboard.auto')"
+              :label="t('dashboard.heatmapYMin')"
+              :error="isHeatmapYRangeInvalid"
+              @update:model-value="
+                (value: string | number) =>
+                  (dashboardPanelDataModel.data.config.heatmap_y_min = toNumberOrNull(value))
+              "
+              data-test="dashboard-config-heatmap_y_min"
+            >
+              <template #tooltip>
+                <OTooltip :side-offset="8" :content="t('dashboard.heatmapYMinTooltip')" />
+              </template>
+            </OInput>
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.heatmap_y_max ?? null"
+              type="number"
+              :placeholder="t('dashboard.auto')"
+              :label="t('dashboard.heatmapYMax')"
+              :error="isHeatmapYRangeInvalid"
+              :error-message="t('dashboard.heatmapYRangeInvalid')"
+              @update:model-value="
+                (value: string | number) =>
+                  (dashboardPanelDataModel.data.config.heatmap_y_max = toNumberOrNull(value))
+              "
+              data-test="dashboard-config-heatmap_y_max"
+            >
+              <template #tooltip>
+                <OTooltip :side-offset="8" :content="t('dashboard.heatmapYMaxTooltip')" />
+              </template>
+            </OInput>
+          </div>
+        </template>
 
         <OToggleGroup
           v-if="!promqlMode && shouldShowCartesianAxisConfig(dashboardPanelData)"
@@ -1153,7 +1440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.lineStyle = v;
         }
       "
-      :label="t('dashboard.configSectionLineStyle')"
+      :label="
+        shouldShowScatterPointConfig(dashboardPanelData)
+          ? t('dashboard.configSectionPointStyle')
+          : t('dashboard.configSectionLineStyle')
+      "
       class="border-card-glass-border border-t border-solid"
     >
       <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
@@ -1180,20 +1471,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OInput
-          v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
+          v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
-          v-model.number="dashboardPanelDataModel.data.config.line_thickness"
+          :model-value="dashboardPanelData.data.config.line_thickness ?? ''"
           type="number"
           :min="0"
-          @update:model-value="
-            (value: any) =>
-              (dashboardPanelDataModel.data.config.line_thickness =
-                typeof value == 'number' && value >= 0 ? value : null)
-          "
+          :max="MAX_LINE_THICKNESS"
+          :error-message="lineThicknessError"
+          @update:model-value="setLineThickness"
           @blur="
             () => {
-              if (dashboardPanelData.data.config.line_thickness == null)
-                dashboardPanelDataModel.data.config.line_thickness = 1.5;
+              if (dashboardPanelData.data.config.line_thickness === null)
+                dashboardPanelDataModel.data.config.line_thickness = DEFAULT_LINE_THICKNESS;
             }
           "
           :label="t('dashboard.lineThickness')"
@@ -1202,15 +1491,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OInput
+          v-if="shouldShowAreaFillConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'fill-opacity')"
+          :model-value="dashboardPanelData.data.config.fill_opacity ?? ''"
+          type="number"
+          :min="0"
+          :max="100"
+          @update:model-value="setFillOpacity"
+          @blur="clampFillOpacity"
+          :label="t('dashboard.fillOpacity')"
+          :placeholder="t('dashboard.fillOpacityDefault')"
+          data-test="dashboard-config-fill_opacity"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.fillOpacityTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OSwitch
+          v-if="shouldShowAreaFillConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'fill-gradient')"
+          :model-value="dashboardPanelData.data.config.fill_gradient !== false"
+          @update:model-value="
+            (value: unknown) => (dashboardPanelDataModel.data.config.fill_gradient = !!value)
+          "
+          :label="t('dashboard.fillGradient')"
+          data-test="dashboard-config-fill_gradient"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.fillGradientTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
+        <OInput
           v-if="shouldShowScatterPointConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'point-size')"
-          v-model.number="dashboardPanelDataModel.data.config.symbol_size"
+          :model-value="dashboardPanelData.data.config.symbol_size ?? ''"
+          :model-modifiers="{ number: true }"
           type="number"
           :min="1"
+          :max="SYMBOL_SIZE_MAX"
+          :error="!isScatterSymbolSizeValid(dashboardPanelData.data.config.symbol_size)"
+          :error-message="t('dashboard.pointSizeInvalid', { max: SYMBOL_SIZE_MAX })"
           @update:model-value="
-            (value: any) =>
-              (dashboardPanelDataModel.data.config.symbol_size =
-                typeof value == 'number' && value > 0 ? value : null)
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.symbol_size = value === '' ? null : value)
           "
           :label="t('dashboard.pointSize')"
           :placeholder="t('dashboard.pointSizeDefault')"
@@ -1225,9 +1551,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :min="0"
           :max="100"
           @update:model-value="
-            (value: any) =>
+            (value: string | number) =>
               (dashboardPanelDataModel.data.config.symbol_opacity =
-                typeof value == 'number' ? Math.min(100, Math.max(0, value)) : null)
+                typeof value === 'number' ? Math.min(100, Math.max(0, value)) : null)
           "
           :label="t('dashboard.pointOpacity')"
           :placeholder="t('dashboard.pointOpacityDefault')"
@@ -1287,6 +1613,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-table-filtering"
           size="lg"
         />
+
+        <OSwitch
+          v-show="isConfigOptionVisible('table', 'expandable-rows')"
+          v-model="dashboardPanelDataModel.data.config.table_expandable_rows"
+          :label="t('dashboard.tableExpandableRows')"
+          data-test="dashboard-config-table-expandable-rows"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.tableExpandableRowsTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
 
         <OSwitch
           v-show="isConfigOptionVisible('table', 'pagination')"
@@ -1403,7 +1741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="['table', 'metric', 'state-timeline'].includes(dashboardPanelData.data.type)"
+      v-if="['table', 'metric', 'gauge', 'state-timeline'].includes(dashboardPanelData.data.type)"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"
@@ -1550,6 +1888,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSelect>
         </div>
 
+        <OSwitch
+          v-if="dashboardPanelData.data.type === 'maps'"
+          v-show="isConfigOptionVisible('map', 'map-roam')"
+          v-model="mapsEnableRoam"
+          :label="t('dashboard.mapsEnableRoam')"
+          data-test="dashboard-config-map-roam"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.mapsEnableRoamTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
         <OSelect
           v-if="dashboardPanelData.data.type == 'geomap'"
           v-model="dashboardPanelDataModel.data.config.base_map.type"
@@ -1690,6 +2041,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border border-t border-solid"
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OSelect
+          v-show="isConfigOptionVisible('gauge', 'gauge-range-mode')"
+          :model-value="
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .range_mode ?? 'fixed'
+          "
+          :options="gaugeRangeModeOptions"
+          :label="t('dashboard.gaugeRangeMode')"
+          :valueKey="'value'"
+          :labelKey="'label'"
+          @update:model-value="
+            (value: unknown) =>
+              (dashboardPanelDataModel.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].config.range_mode = value === 'auto' ? 'auto' : 'fixed')
+          "
+          data-test="dashboard-config-gauge-range-mode"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.gaugeRangeModeTooltip')" max-width="15.625rem" />
+          </template>
+        </OSelect>
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
@@ -1726,6 +2099,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('dashboard.gaugeMaxValue')"
           :placeholder="t('dashboard.hundredPlaceholder')"
+          :error-message="gaugeRangeError"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.queries[
@@ -1744,6 +2118,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-config-gauge-max"
+        />
+        <OSwitch
+          v-show="isConfigOptionVisible('gauge', 'gauge-end-labels')"
+          v-model="dashboardPanelDataModel.data.config.show_gauge_end_labels"
+          :label="t('dashboard.showGaugeEndLabels')"
+          data-test="dashboard-config-gauge-end-labels"
+          size="lg"
         />
       </div>
     </OCollapsible>
@@ -1879,7 +2260,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <ColorPaletteDropDown />
-        <ColorBySeries :colorBySeriesData="panelData" />
+        <ColorBySeries
+          v-if="dashboardPanelData.data.type !== 'sankey'"
+          :colorBySeriesData="panelData"
+        />
       </div>
     </OCollapsible>
 
@@ -2086,7 +2470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Sparkline (metric only) -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type == 'metric'"
+      v-if="dashboardPanelData.data.type === 'metric' && !promqlAllInstant"
       v-show="isSectionVisible('sparkline')"
       :model-value="isExpanded('sparkline')"
       :icon="SECTION_ICONS.sparkline"
@@ -2108,6 +2492,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
+import {
+  DEFAULT_LINE_THICKNESS,
+  MAX_LINE_THICKNESS,
+  isValidLineThickness,
+} from "@/utils/dashboard/promqlChartSeriesProps";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -2118,6 +2508,24 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
+import { DEFAULT_HEATMAP_PALETTE, HEATMAP_PALETTES } from "@/utils/dashboard/heatmapPalettes";
+import {
+  DEFAULT_HEATMAP_COLOR_SCALE,
+  HEATMAP_COLOR_SCALES,
+  HEATMAP_MAX_ROWS,
+  isHeatmapColorRangeInverted,
+} from "@/utils/dashboard/heatmapDefaults";
+import { addCommasToNumber } from "@/utils/formatters";
+import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
+import {
+  HEATMAP_Y_LOG_BASES,
+  HEATMAP_Y_SORTS,
+  heatmapYBucketCount,
+  heatmapYBucketError,
+  heatmapYBucketing,
+  heatmapYRangeOf,
+  isHeatmapYRangeInverted,
+} from "@/utils/dashboard/heatmapYAxis";
 import {
   computed,
   defineComponent,
@@ -2132,6 +2540,7 @@ import {
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
+import { isGaugeFixedRangeValid } from "@/utils/dashboard/gaugeDial";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -2153,6 +2562,8 @@ import {
 } from "@/composables/dashboard/usePanelEditorFocus";
 import {
   shouldShowSeriesOverrides,
+  shouldShowHeatmapYBucket,
+  shouldShowHeatmapYSort,
   shouldShowThresholds,
   useConfigPanel,
 } from "../../../composables/dashboard/useConfigPanel";
@@ -2184,18 +2595,22 @@ import {
   shouldShowLegendWidthUnitContainer,
   shouldShowLegendHeightUnitContainer,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
+  shouldShowAreaFillConfig,
   shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
+import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
 export default defineComponent({
@@ -2293,6 +2708,39 @@ export default defineComponent({
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
+    const legendValuesModel = computed({
+      get: (): string[] => dashboardPanelData.data.config.legend_values ?? [],
+      set: (v: unknown) => {
+        const selected = Array.isArray(v) ? v : [];
+        dashboardPanelData.data.config.legend_values = LEGEND_VALUE_KEYS.filter((key) =>
+          selected.includes(key),
+        );
+      },
+    });
+    const legendValuesOptions = [
+      { label: t("dashboard.legendValueValue"), value: "value" },
+      { label: t("dashboard.legendValuePercent"), value: "percent" },
+    ];
+    const setLineThickness = (value: string | number) => {
+      const parsed = value === "" ? NaN : Number(value);
+      dashboardPanelData.data.config.line_thickness = Number.isFinite(parsed) ? parsed : null;
+    };
+    const lineThicknessError = computed(() =>
+      isValidLineThickness(dashboardPanelData.data.config.line_thickness)
+        ? undefined
+        : t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }),
+    );
+    const setFillOpacity = (value: string | number) => {
+      const parsed = value === "" ? NaN : Number(value);
+      dashboardPanelData.data.config.fill_opacity = Number.isFinite(parsed) ? parsed : null;
+    };
+    // Clamping only on blur keeps the field showing what was typed until it is committed.
+    const clampFillOpacity = () => {
+      const value = dashboardPanelData.data.config.fill_opacity;
+      if (typeof value === "number") {
+        dashboardPanelData.data.config.fill_opacity = Math.min(Math.max(value, 0), 100);
+      }
+    };
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
@@ -2311,6 +2759,16 @@ export default defineComponent({
         value: "world",
       },
     ];
+
+    // Unset keeps each path's old default: PromQL maps pan and zoom, SQL maps do not.
+    const mapsEnableRoam = computed({
+      get: () =>
+        dashboardPanelData.data.config.enable_roam ??
+        dashboardPanelData.data.queryType === "promql",
+      set: (value: boolean) => {
+        dashboardPanelData.data.config.enable_roam = value;
+      },
+    });
     onBeforeMount(() => {
       // Normalize config fields that default to null but may arrive as undefined
       // when loaded from older panels (backend omits null fields in JSON response).
@@ -2614,6 +3072,116 @@ export default defineComponent({
         label: raw(o.label),
       })),
     );
+    const bucketUnitOptions = computed(() =>
+      getUnitOptions(t, dashboardPanelData.data.config.bucket_unit).map((o) => ({
+        ...o,
+        label: raw(o.label),
+      })),
+    );
+
+    const heatmapPaletteLabels: Record<string, I18nText> = {
+      spectral: t("dashboard.heatmapPaletteSpectral"),
+      viridis: t("dashboard.heatmapPaletteViridis"),
+      magma: t("dashboard.heatmapPaletteMagma"),
+      inferno: t("dashboard.heatmapPaletteInferno"),
+      blues: t("dashboard.heatmapPaletteBlues"),
+      greens: t("dashboard.heatmapPaletteGreens"),
+      reds: t("dashboard.heatmapPaletteReds"),
+      "rd-yl-bu": t("dashboard.heatmapPaletteRdYlBu"),
+    };
+    const heatmapPaletteOptions = Object.keys(HEATMAP_PALETTES).map((value) => ({
+      label: heatmapPaletteLabels[value],
+      value,
+    }));
+    const heatmapPaletteModel = computed({
+      get: () => dashboardPanelData.data.config.heatmap_palette ?? DEFAULT_HEATMAP_PALETTE,
+      set: (value: string) => {
+        dashboardPanelData.data.config.heatmap_palette = value;
+      },
+    });
+    const heatmapColorScaleLabels: Record<string, I18nText> = {
+      linear: t("dashboard.heatmapColorScaleLinear"),
+      sqrt: t("dashboard.heatmapColorScaleSqrt"),
+      log: t("dashboard.heatmapColorScaleLog"),
+    };
+    const heatmapColorScaleOptions = HEATMAP_COLOR_SCALES.map((value) => ({
+      label: heatmapColorScaleLabels[value],
+      value,
+    }));
+    const heatmapColorScaleModel = computed({
+      get: (): string =>
+        dashboardPanelData.data.config.heatmap_color_scale ?? DEFAULT_HEATMAP_COLOR_SCALE,
+      set: (value: string) => {
+        dashboardPanelData.data.config.heatmap_color_scale = value;
+      },
+    });
+    const heatmapHistogramModeModel = computed({
+      get: () => dashboardPanelData.data.config.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE,
+      set: (on: SwitchValue) => {
+        dashboardPanelData.data.config.heatmap_mode = on ? PROMETHEUS_HISTOGRAM_MODE : null;
+      },
+    });
+    const heatmapYSortLabels: Record<string, I18nText> = {
+      data: t("dashboard.heatmapYSortData"),
+      asc: t("dashboard.heatmapYSortAsc"),
+      desc: t("dashboard.heatmapYSortDesc"),
+    };
+    // The converter always orders bucket rows by value, so data order is not on offer then.
+    const heatmapYBucketsActive = computed(
+      () =>
+        shouldShowHeatmapYBucket(dashboardPanelData, !!promqlMode.value) &&
+        !!heatmapYBucketing(dashboardPanelData.data.config),
+    );
+    const heatmapYSortOptions = computed(() =>
+      HEATMAP_Y_SORTS.filter((value) => !(heatmapYBucketsActive.value && value === "data")).map(
+        (value) => ({ label: heatmapYSortLabels[value], value }),
+      ),
+    );
+    const heatmapYSortModel = computed({
+      get: (): string => {
+        const sort = dashboardPanelData.data.config.heatmap_y_sort;
+        if (heatmapYBucketsActive.value) return sort === "desc" ? "desc" : "asc";
+        return sort ?? "data";
+      },
+      set: (value: string) => {
+        dashboardPanelData.data.config.heatmap_y_sort = value === "data" ? null : value;
+      },
+    });
+    const heatmapYBucketModeOptions = [
+      { label: t("dashboard.heatmapYBucketNone"), value: "none" },
+      { label: t("dashboard.heatmapYBucketSizeMode"), value: "size" },
+      { label: t("dashboard.heatmapYBucketLogMode"), value: "log" },
+    ];
+    const toNumberOrNull = (value: unknown): number | null =>
+      value === "" || value === null || value === undefined ? null : Number(value);
+    const setHeatmapYBucket = (patch: Record<string, unknown>) => {
+      dashboardPanelData.data.config.heatmap_y_bucket = {
+        ...(dashboardPanelData.data.config.heatmap_y_bucket ?? {}),
+        ...patch,
+      };
+    };
+    const heatmapYBucketModeModel = computed({
+      get: (): string => dashboardPanelData.data.config.heatmap_y_bucket?.mode ?? "none",
+      set: (mode: string) => {
+        if (mode === "none") {
+          dashboardPanelData.data.config.heatmap_y_bucket = null;
+          dashboardPanelData.data.config.heatmap_y_min = null;
+          dashboardPanelData.data.config.heatmap_y_max = null;
+        } else if (mode === "log") {
+          setHeatmapYBucket({
+            mode,
+            base: dashboardPanelData.data.config.heatmap_y_bucket?.base ?? HEATMAP_Y_LOG_BASES[0],
+          });
+        } else {
+          setHeatmapYBucket({ mode });
+        }
+      },
+    });
+    const heatmapYBucketBaseModel = computed({
+      get: (): string =>
+        String(dashboardPanelData.data.config.heatmap_y_bucket?.base ?? HEATMAP_Y_LOG_BASES[0]),
+      set: (base: string) => setHeatmapYBucket({ base: Number(base) }),
+    });
 
     const labelPositionOptions = [
       {
@@ -2677,6 +3245,20 @@ export default defineComponent({
         value: "outside",
       },
     ];
+
+    const gaugeRangeModeOptions = [
+      { label: t("dashboard.gaugeRangeModeFixed"), value: "fixed" },
+      { label: t("dashboard.gaugeRangeModeAuto"), value: "auto" },
+    ];
+    // Save is blocked on the same rule; this says why beside the field.
+    const gaugeRangeError = computed(() =>
+      dashboardPanelData.data.type === "gauge" &&
+      !isGaugeFixedRangeValid(
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+      )
+        ? t("dashboard.utils.gaugeMinBelowMax")
+        : undefined,
+    );
 
     const showSymbol = [
       {
@@ -2828,6 +3410,7 @@ export default defineComponent({
         "pie",
         "donut",
         "gauge",
+        "sankey",
       ].includes(dashboardPanelData.data.type);
     });
 
@@ -2965,6 +3548,19 @@ export default defineComponent({
       PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
     );
     const maxDashboardSeries = computed(() => store.state?.zoConfig?.max_dashboard_series ?? 100);
+    const defaultPromqlSeriesLimit = computed(() => Math.min(100, maxDashboardSeries.value));
+    const setPromqlSeriesLimit = (value: string | number) => {
+      const limit = value === "" ? NaN : Math.floor(Number(value));
+      dashboardPanelData.data.config.promql_series_limit = Number.isFinite(limit)
+        ? Math.min(Math.max(limit, 1), maxDashboardSeries.value)
+        : null;
+    };
+    // An instant query returns one sample per series, so a metric has no trend to draw.
+    const promqlAllInstant = computed(
+      () =>
+        dashboardPanelData.data.queryType === "promql" &&
+        allVisibleQueriesInstant(dashboardPanelData),
+    );
 
     const {
       searchQuery,
@@ -3043,6 +3639,30 @@ export default defineComponent({
 
     const decimalsTouched = ref(false);
 
+    const isHeatmapColorRangeInvalid = computed(() =>
+      isHeatmapColorRangeInverted(dashboardPanelData.data.config),
+    );
+
+    const isHeatmapYRangeInvalid = computed(() =>
+      isHeatmapYRangeInverted(dashboardPanelData.data.config),
+    );
+
+    // Mirrors the builder, which generates no query while these settings are rejected.
+    const heatmapYBucketErrorMessage = computed(() => {
+      const config = dashboardPanelData.data.config;
+      const error = heatmapYBucketError(config);
+      if (error === "invalidSize") return t("dashboard.heatmapYBucketSizeInvalid");
+      if (error !== "tooManyBuckets") return undefined;
+      const count = heatmapYBucketCount(
+        { mode: "size", size: Number(config.heatmap_y_bucket.size) },
+        heatmapYRangeOf(config),
+      );
+      return t("dashboard.heatmapYBucketTooMany", {
+        count: addCommasToNumber(count ?? 0),
+        max: addCommasToNumber(HEATMAP_MAX_ROWS),
+      });
+    });
+
     const thresholdStepCount = computed(
       () => dashboardPanelData.data.config.thresholds?.steps?.length ?? 0,
     );
@@ -3073,18 +3693,28 @@ export default defineComponent({
 
     return {
       raw,
+      isHeatmapColorRangeInvalid,
       axisLabelModeModel,
       axisLabelModeOptions,
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,
+      legendValuesModel,
+      legendValuesOptions,
       toggleItemValue,
+      setLineThickness,
+      lineThicknessError,
+      DEFAULT_LINE_THICKNESS,
+      MAX_LINE_THICKNESS,
+      setFillOpacity,
+      clampFillOpacity,
       t,
       dashboardPanelData,
       dashboardPanelDataModel,
       promqlMode,
       basemapTypeOptions,
       mapTypeOptions,
+      mapsEnableRoam,
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
@@ -3096,8 +3726,26 @@ export default defineComponent({
       tooltipModeModel,
       tooltipModeOptions,
       unitOptions,
+      bucketUnitOptions,
+      heatmapPaletteOptions,
+      heatmapPaletteModel,
+      heatmapColorScaleOptions,
+      heatmapColorScaleModel,
+      heatmapHistogramModeModel,
+      heatmapYSortOptions,
+      heatmapYSortModel,
+      heatmapYBucketModeOptions,
+      heatmapYBucketModeModel,
+      heatmapYBucketBaseModel,
+      heatmapYLogBases: HEATMAP_Y_LOG_BASES,
+      heatmapYBucketErrorMessage,
+      isHeatmapYRangeInvalid,
+      setHeatmapYBucket,
+      toNumberOrNull,
       labelPositionOptions,
       showSymbol,
+      gaugeRangeModeOptions,
+      gaugeRangeError,
       lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,
@@ -3124,15 +3772,19 @@ export default defineComponent({
       shouldShowLegendWidthUnitContainer,
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
+      shouldShowLegendValues,
       shouldShowGridlines,
       shouldShowTopResultsConfig,
       shouldShowAreaLineStyleConfig,
       shouldShowNoValueReplacement,
       shouldShowAxisConfig,
+      shouldShowAxisBorderConfig,
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
-      shouldShowLineThickness,
+      shouldShowAreaFillConfig,
       shouldShowScatterPointConfig,
+      isScatterSymbolSizeValid,
+      SYMBOL_SIZE_MAX,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)
@@ -3150,7 +3802,10 @@ export default defineComponent({
       isSectionVisible,
       exemplarsSwitchEligible,
       promqlSeriesLimitEligible,
+      promqlAllInstant,
       maxDashboardSeries,
+      defaultPromqlSeriesLimit,
+      setPromqlSeriesLimit,
       isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,
@@ -3158,6 +3813,8 @@ export default defineComponent({
       isPivotMode,
       decimalsTouched,
       SECTION_ICONS,
+      shouldShowHeatmapYBucket,
+      shouldShowHeatmapYSort,
       shouldShowThresholds,
       thresholdStepCount,
       hasColouredValueMappings,

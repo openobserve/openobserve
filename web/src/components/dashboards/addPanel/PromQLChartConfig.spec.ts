@@ -109,6 +109,66 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
     });
+
+    it("hides the pie and donut aggregation only when every query is instant", () => {
+      const instant = { config: { query_type: "instant" } };
+      const range = { config: { query_type: "range" } };
+      const cases: Array<[string, any[], boolean]> = [
+        ["pie", [instant, instant], false],
+        ["donut", [instant], false],
+        ["pie", [instant, range], true],
+        ["donut", [instant, {}], true],
+        ["pie", [], true],
+        ["metric", [instant], false],
+      ];
+      for (const [chartType, queries, shown] of cases) {
+        mockDashboardPanelData.data.queries = queries;
+        mockDashboardPanelData.layout = { hiddenQueries: [] };
+        wrapper = createWrapper({ chartType });
+        expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(shown);
+        wrapper.unmount();
+      }
+      wrapper = null;
+    });
+
+    it("ignores hidden queries when deciding the pie aggregation is moot", () => {
+      mockDashboardPanelData.data.queries = [
+        { config: { query_type: "instant" } },
+        { config: { query_type: "range", hide: true } },
+      ];
+      mockDashboardPanelData.layout = { hiddenQueries: [1] };
+      wrapper = createWrapper({ chartType: "pie" });
+      expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
+    });
+
+    it("hides the metric aggregation only when every query is instant", async () => {
+      const aggregation = () => wrapper.find('[data-test="dashboard-config-aggregation"]').exists();
+      mockDashboardPanelData.data.queries = [
+        { config: { query_type: "instant" } },
+        { config: { query_type: "range" } },
+      ];
+      wrapper = createWrapper({ chartType: "metric" });
+      expect(aggregation()).toBe(true);
+
+      mockDashboardPanelData.data.queries[1].config.query_type = "instant";
+      wrapper.unmount();
+      wrapper = createWrapper({ chartType: "metric" });
+      expect(aggregation()).toBe(false);
+
+      wrapper.unmount();
+      wrapper = createWrapper({ chartType: "gauge" });
+      expect(aggregation()).toBe(true);
+    });
+
+    it("ignores a hidden range query when deciding the metric is all instant", () => {
+      mockDashboardPanelData.data.queries = [
+        { config: { query_type: "instant" } },
+        { config: { query_type: "range" } },
+      ];
+      mockDashboardPanelData.layout = { hiddenQueries: [1] };
+      wrapper = createWrapper({ chartType: "metric" });
+      expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
+    });
   });
 
   describe("Aggregation Function", () => {

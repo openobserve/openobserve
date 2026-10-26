@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="flex h-full flex-col overflow-hidden"
+    :class="kioskFailed ? 'outline-status-error-text outline-2 -outline-offset-2' : undefined"
+    :data-kiosk-failed="kiosk ? (kioskFailed ? 'true' : 'false') : undefined"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
@@ -32,7 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <PanelBar
         class="@container/panelbar w-full flex-nowrap"
-        :class="{ 'border-b-transparent': isPanelLoading }"
+        :class="{
+          'border-b-transparent': isPanelLoading,
+          'bg-status-error-bg!': kioskFailed,
+        }"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -81,7 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTag>
         <OTag
           v-if="
-            exemplarsEligible && exemplarsOn && PanleSchemaRendererRef?.exemplarsStatus === 'empty'
+            !kiosk &&
+            exemplarsEligible &&
+            exemplarsOn &&
+            PanleSchemaRendererRef?.exemplarsStatus === 'empty'
           "
           variant="default-soft"
           size="sm"
@@ -147,11 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
@@ -210,8 +216,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut-id="panelView" />
         </OButton>
+        <OBadge
+          v-if="kioskStale"
+          variant="error-soft"
+          size="sm"
+          icon="cloud-off"
+          class="shrink-0"
+          data-test="dashboard-panel-kiosk-stale"
+          >{{ t("dashboard.kiosk.panelStale") }}</OBadge
+        >
         <OButton
-          v-if="dependentAdHocVariable"
+          v-if="dependentAdHocVariable && !kiosk"
           variant="ghost-warning"
           size="icon"
           @click="showViewPanel = true"
@@ -225,9 +240,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
+          name="error-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-error"
+          :label="failedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="failedAnnotationSourcesLabel"
+          />
+        </OIcon>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-truncated"
+          :label="truncatedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="truncatedAnnotationSourcesLabel"
+          />
+        </OIcon>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
+        <!-- On a wall screen only a failure may draw the eye; the failed panel says so in its body. -->
         <PanelErrorButtons
+          v-if="!kiosk"
           class="min-w-0 shrink-[0.001] overflow-x-clip"
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
@@ -276,12 +323,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
             <OButton
-              :aria-label="t('dashboard.moreActions')"
+              :aria-label="
+                showDraftDot
+                  ? t('dashboard.panelDraft.panelActionsDot')
+                  : t('dashboard.moreActions')
+              "
               variant="ghost"
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
               <OIcon name="more-vert" size="sm" />
+              <span
+                v-if="showDraftDot"
+                class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-0.5 top-0 size-2.5 rounded-full ring-3 in-[.fullscreen]:hidden"
+                aria-hidden="true"
+                data-test="dashboard-panel-draft-dot"
+              />
             </OButton>
           </template>
           <ODropdownItem
@@ -292,6 +349,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon-left><OIcon name="edit" size="sm" /></template>
             {{ t("panel.editPanel") }}
+            <template v-if="showDraftDot" #icon-right>
+              <OTooltip :content="t('dashboard.panelDraft.panelDot')" side="right">
+                <span
+                  role="img"
+                  :aria-label="t('dashboard.panelDraft.panelDot')"
+                  class="bg-button-pending-bg ring-button-pending-bg/30 size-2 shrink-0 rounded-full ring-2"
+                  data-test="dashboard-panel-edit-draft-dot"
+                />
+              </OTooltip>
+            </template>
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
@@ -395,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="drag-cancel relative min-h-0 flex-1"
-      :class="curatedBadge ? 'opacity-60' : undefined"
+      :class="curatedBadge || kioskStale ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
     >
@@ -426,6 +493,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
+        @sankey-notice-update="handleSankeyNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -447,6 +516,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @series-data-update="onCuratedSeriesData"
         @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
+
+      <!-- Until the first result or error lands, an empty body would read as "No Data" on a TV. -->
+      <div
+        v-if="kiosk && !kioskSettled && !kioskFailed"
+        class="bg-surface-base absolute inset-0 z-10 flex flex-col gap-2 p-3"
+        data-test="dashboard-panel-kiosk-loading"
+      >
+        <OSkeleton type="text" class="w-1/3" />
+        <OSkeleton class="min-h-0 flex-1" />
+      </div>
+
+      <!-- On a wall screen a tooltip-only error is invisible, and fallback data would look healthy. -->
+      <div
+        v-if="kioskFailed"
+        class="bg-status-error-bg text-status-error-text absolute inset-0 z-10 flex flex-col justify-center gap-1.5 overflow-hidden p-3 text-xs"
+        role="alert"
+        data-test="dashboard-panel-kiosk-error"
+      >
+        <span class="flex items-center gap-1 text-sm font-semibold">
+          <OIcon name="error" size="sm" />
+          {{ t("dashboard.kiosk.panelFailed") }}
+        </span>
+        <!-- At most three lines on a wall screen; the full server text stays one hover away. -->
+        <span class="min-w-0 break-words" data-test="dashboard-panel-kiosk-error-summary">
+          <OTruncatedText :lines="3" :tooltip="false">{{
+            t("dashboard.kiosk.queryError", { detail: kioskErrorSummary })
+          }}</OTruncatedText>
+          <OTooltip :content="kioskErrorFull" max-width="30rem" />
+        </span>
+      </div>
 
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
            blank tile is read as a zero — so it refuses to imply a number. -->
@@ -513,7 +612,10 @@ import {
   watch,
   onBeforeUnmount,
   onMounted,
+  inject,
 } from "vue";
+import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
+import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -528,6 +630,8 @@ import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -561,6 +665,8 @@ import {
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
+import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -609,9 +715,12 @@ export default defineComponent({
     "showLegendsButton",
     "isTimeRangeWaiting",
     "layoutMode",
+    "kiosk",
   ],
   components: {
     OTag,
+    OBadge,
+    OSkeleton,
     PanelSchemaRenderer,
     PanelBar,
     QueryInspector,
@@ -700,6 +809,22 @@ export default defineComponent({
         ? PanleSchemaRendererRef.value?.exemplarsError || ""
         : "",
     );
+    const failedAnnotationSourcesLabel = computed(() => {
+      const failed = PanleSchemaRendererRef.value?.failedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.failedOnPanel",
+        { names: failed.join(", ") },
+        failed.length,
+      );
+    });
+    const truncatedAnnotationSourcesLabel = computed(() => {
+      const truncated = PanleSchemaRendererRef.value?.truncatedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.truncatedOnPanel",
+        { names: truncated.join(", "), limit: ANNOTATION_SOURCE_ROW_LIMIT },
+        truncated.length,
+      );
+    });
 
     // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
     // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
@@ -755,11 +880,14 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      sankeyNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -834,6 +962,9 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
+        !!sankeyNotice.value?.returnLinks ||
+        !!sankeyNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
@@ -860,6 +991,22 @@ export default defineComponent({
         },
       });
     };
+
+    // Only where the panel can be edited; print mode, layout editing and full screen are for viewing.
+    const showDraftDot = computed(
+      () =>
+        !props.viewOnly &&
+        !props.simplifiedPanelView &&
+        !isLayoutEditing.value &&
+        store.state.printMode !== true &&
+        !!props.data?.id &&
+        hasPanelDraft({
+          userEmail: String(store.state.userInfo?.email ?? ""),
+          org: String(store.state.selectedOrganization?.identifier ?? ""),
+          dashboardId: String(route.query.dashboard ?? props.dashboardId ?? ""),
+          panelId: String(props.data.id),
+        }),
+    );
 
     // A notice's fix action deep-links into the editor on the setting that resolves it.
     const NOTICE_EDITOR_FOCUS: Partial<Record<PanelNoticeActionId, PanelEditorFocusTarget>> = {
@@ -1120,13 +1267,55 @@ export default defineComponent({
     });
 
     const errorData = ref("");
+    const kioskHealth = inject(KIOSK_PANEL_HEALTH_KEY, null);
     const onError = (error: any) => {
       if (typeof error === "string") {
         errorData.value = error;
       } else {
         errorData.value = error?.message ?? "";
       }
+      if (props.data?.id) {
+        kioskHealth?.report(props.data.id, {
+          message: errorData.value,
+          code: typeof error === "string" ? null : error?.code,
+        });
+      }
     };
+    const kioskFailed = computed(() => !!props.kiosk && !!errorData.value);
+    const kioskErrorSummary = computed(() => raw(summarizePanelError(errorData.value)));
+    const kioskErrorFull = computed(() => raw(errorData.value));
+    const kioskStale = computed(() => !!props.kiosk && !!kioskHealth?.outage.value);
+    const kioskSawLoading = ref(false);
+    const kioskSettledTimeout = ref(false);
+    // Latched: once the first result or error is in, later refreshes never bring the skeleton back.
+    const kioskSettledOnce = ref(false);
+    const kioskSettled = computed(() => {
+      if (kioskSettledOnce.value || kioskSettledTimeout.value || errorData.value) return true;
+      // Before any load starts only real data counts; tables report noData "" before they have rows.
+      if (kioskSawLoading.value) return !isPanelLoading.value;
+      return !PanleSchemaRendererRef.value?.noData && props.data?.type !== "table";
+    });
+    watch(isPanelLoading, (loading) => {
+      if (loading) kioskSawLoading.value = true;
+    });
+    watch(kioskSettled, (settled) => {
+      if (settled) kioskSettledOnce.value = true;
+    });
+    // A panel that is genuinely empty and never loads (cache hit) must not keep its skeleton forever.
+    let kioskSettleTimer: ReturnType<typeof setTimeout> | null = null;
+    onMounted(() => {
+      if (props.kiosk)
+        kioskSettleTimer = setTimeout(() => (kioskSettledTimeout.value = true), 15000);
+    });
+    onBeforeUnmount(() => {
+      if (kioskSettleTimer) clearTimeout(kioskSettleTimer);
+    });
+    onMounted(() => {
+      if (props.data?.id) kioskHealth?.register(props.data.id);
+    });
+    onBeforeUnmount(() => {
+      if (props.data?.id) kioskHealth?.unregister(props.data.id);
+    });
 
     const isPartialData = ref(false);
 
@@ -1183,6 +1372,7 @@ export default defineComponent({
     // Direct keydown listener — avoids ShortcutManager conflicts when many
     // panels are mounted at the same time. Only fires when this panel is hovered.
     const handlePanelKeydown = (e: KeyboardEvent) => {
+      if (props.viewOnly || props.kiosk) return;
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
       if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
@@ -1233,6 +1423,8 @@ export default defineComponent({
       setExemplarOverride,
       exemplarToggleAtRest,
       exemplarErrorMessage,
+      failedAnnotationSourcesLabel,
+      truncatedAnnotationSourcesLabel,
       curatedBadge,
       curatedBadgeParams,
       curatedBadgeText,
@@ -1245,6 +1437,7 @@ export default defineComponent({
       alertDisabledReason,
       onEditPanel,
       onNoticeEditPanel,
+      showDraftDot,
       onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,
@@ -1264,6 +1457,11 @@ export default defineComponent({
       refreshTooltip,
       onError,
       errorData,
+      kioskFailed,
+      kioskErrorSummary,
+      kioskErrorFull,
+      kioskStale,
+      kioskSettled,
       isPanelLoading,
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
@@ -1293,6 +1491,8 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       canInspectFromNotice,

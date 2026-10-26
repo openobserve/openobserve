@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="isMetric && hasColouredValueMappings"
+      v-if="(isMetric || chartType === 'gauge') && hasColouredValueMappings"
       class="text-text-secondary flex items-center gap-1.5 text-xs"
       data-test="dashboard-config-thresholds-mapping-note"
     >

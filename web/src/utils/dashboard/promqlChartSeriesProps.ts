@@ -13,16 +13,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { getScatterSymbolOpacity, getScatterSymbolSize } from "./scatterPointStyle";
+import {
+  getScatterBaseOpacity,
+  getScatterSymbolOpacity,
+  getScatterSymbolSize,
+  type SeriesStyleConfig,
+} from "./scatterPointStyle";
+
+export const DEFAULT_LINE_THICKNESS = 1.5;
+export const MAX_LINE_THICKNESS = 10;
+
+/** The line width a panel draws with; a missing, zero or negative thickness would hide the line, so it takes the default. */
+export const lineThicknessOf = (config?: { line_thickness?: unknown } | null): number => {
+  const value = config?.line_thickness;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_LINE_THICKNESS;
+};
+
+/** True for an unset thickness or one the editor accepts: above 0 and at most MAX_LINE_THICKNESS. */
+export const isValidLineThickness = (value: unknown): boolean =>
+  value === null ||
+  value === undefined ||
+  (typeof value === "number" && Number.isFinite(value) && value > 0 && value <= MAX_LINE_THICKNESS);
 
 /**
  * Returns the ECharts series props object based on the given PromQL chart type.
  *
  * @param {string} type - The chart type (e.g. "bar", "line", "area", "gauge", etc.)
- * @param {any} config - The panel config, read for the scatter point size.
+ * @param {SeriesStyleConfig} config - The panel config: line_thickness for line, area and area-stacked, and the scatter point size.
  * @return {object} The series props object for the given chart type.
  */
-export const getPropsByChartTypeForSeries = (type: string, config?: any) => {
+export const getPropsByChartTypeForSeries = (type: string, config?: SeriesStyleConfig | null) => {
+  const lineThickness = lineThicknessOf(config);
   switch (type) {
     case "bar":
       return {
@@ -34,7 +57,7 @@ export const getPropsByChartTypeForSeries = (type: string, config?: any) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: lineThickness },
       };
     case "scatter":
       return {
@@ -66,7 +89,7 @@ export const getPropsByChartTypeForSeries = (type: string, config?: any) => {
         type: "line",
         emphasis: { focus: "series" },
         areaStyle: {},
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: lineThickness },
       };
     case "stacked":
       return {
@@ -82,7 +105,7 @@ export const getPropsByChartTypeForSeries = (type: string, config?: any) => {
         emphasis: {
           focus: "series",
         },
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: lineThickness },
       };
     case "gauge":
       return {
@@ -124,10 +147,11 @@ export const getPropsByChartTypeForSeries = (type: string, config?: any) => {
 /** Item opacity for a PromQL series; a time-shifted bar or scatter twin is drawn at half its base opacity. */
 export const getSeriesItemOpacity = (
   type: string,
-  config: any,
+  config: SeriesStyleConfig | null | undefined,
   isShifted: boolean,
 ): { opacity?: number } => {
+  if (isShifted && type === "scatter") return { opacity: getScatterBaseOpacity(config) * 0.5 };
+  if (isShifted && type === "bar") return { opacity: 0.5 };
   const base = type === "scatter" ? getScatterSymbolOpacity(config) : undefined;
-  if (isShifted && ["bar", "scatter"].includes(type)) return { opacity: (base ?? 1) * 0.5 };
   return base === undefined ? {} : { opacity: base };
 };

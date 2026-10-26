@@ -116,6 +116,65 @@ describe("ColorPaletteDropDown", () => {
     }
   });
 
+  describe("sankey panels", () => {
+    const mountWithItems = () =>
+      mount(ColorPaletteDropDown, {
+        global: {
+          provide: { dashboardPanelDataPageKey: "dashboard" },
+          stubs: {
+            OSelect: { template: "<div><slot /></div>" },
+            OSelectGroup: {
+              template: '<div data-test="select-group"><slot /></div>',
+              props: ["label"],
+            },
+            OSelectItem: {
+              template: '<div data-test="select-item" :data-value="value"><slot /></div>',
+              props: ["value", "label"],
+            },
+          },
+        },
+      });
+    const itemValues = (w: VueWrapper) =>
+      w.findAll('[data-test="select-item"]').map((item) => item.attributes("data-value"));
+
+    it("offers only the categorical palettes for a sankey panel", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      wrapper = mountWithItems();
+      expect(itemValues(wrapper)).toEqual(["palette-classic-by-series", "palette-classic"]);
+      expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(1);
+    });
+
+    it("shows a carried-over non-categorical mode as the by-series palette it renders with", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      mockDashboardPanelData.data.config.color.mode = "continuous-temperature";
+      wrapper = createWrapper();
+      expect((wrapper.vm as any).selectedOptionLabel).toBe(
+        (wrapper.vm as any).colorOptions.find((o: any) => o.value === "palette-classic-by-series")
+          .label,
+      );
+      expect((wrapper.vm as any).selectedOptionPalette).toEqual(mockColorPalette);
+      expect(wrapper.find('[data-test="series-by-toggle"]').exists()).toBe(false);
+    });
+
+    it("hides the single-colour picker carried over from another chart type", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      mockDashboardPanelData.data.config.color.mode = "fixed";
+      (mockDashboardPanelData.data.config.color as any).fixedColor = ["#53ca53"];
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]').exists(),
+      ).toBe(false);
+    });
+
+    it("keeps every palette mode for other chart types", () => {
+      (mockDashboardPanelData.data as any).type = "bar";
+      wrapper = mountWithItems();
+      expect(itemValues(wrapper)).toContain("fixed");
+      expect(itemValues(wrapper)).toContain("continuous-temperature");
+      expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(2);
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should render the component", () => {
       wrapper = createWrapper();

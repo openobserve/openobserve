@@ -363,6 +363,18 @@ describe("convertPromQLData with time-shifted results", () => {
       }
     });
 
+    it("keeps the panel line thickness on the dashed twin", async () => {
+      const result = await convert(
+        { ...panel("line"), config: { line_thickness: 3 } },
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.lineStyle.width).toBe(3);
+      expect(shifted.lineStyle).toMatchObject({ width: 3, type: "dashed" });
+    });
+
     it("in the Explorer, draws it dotted so it reads apart from a dashed forecast", async () => {
       const result = await convert(
         explorer(),
@@ -494,6 +506,17 @@ describe("convertPromQLData with time-shifted results", () => {
         expect(primary.itemStyle.opacity).toBeUndefined();
       },
     );
+
+    it("halves the default 0.8 on an unset scatter twin, as with the placeholder 80", async () => {
+      const result = await convert(
+        panel("scatter"),
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const [, shifted] = pair(result, "api-1");
+      expect(shifted.itemStyle.opacity).toBeCloseTo(0.4);
+    });
 
     it("scales a scatter's point opacity, and halves it on the twin", async () => {
       const result = await convert(
@@ -713,5 +736,34 @@ describe("convertPromQLData with time-shifted results", () => {
       "B api-1 (1 day ago)",
       "B api-2 (1 day ago)",
     ]);
+  });
+});
+
+describe("PromQL h-stacked category labels in the dashboard timezone", () => {
+  const at = (iso: string) => Date.parse(iso) / 1000;
+  const run = (timezone: string) =>
+    convertPromQLData(
+      { id: "p1", type: "h-stacked", config: {}, queries: [{ config: {} }] },
+      [
+        matrix({
+          metric: { job: "a" },
+          values: [
+            [at("2026-10-24T12:00:00Z"), "1"],
+            [at("2026-10-24T23:30:00Z"), "2"],
+          ],
+        }),
+      ],
+      { state: { zoConfig: { max_dashboard_series: 100 }, timezone, theme: "light" } },
+      { value: { offsetWidth: 500, offsetHeight: 300 } },
+      null,
+      [],
+    );
+
+  it("dates steps that fall on two days only in the zone", async () => {
+    expect((await run("Asia/Kolkata")).options.yAxis.data).toEqual(["10-24 17:30", "10-25 05:00"]);
+  });
+
+  it("keeps time-only labels where both steps share a UTC date", async () => {
+    expect((await run("UTC")).options.yAxis.data).toEqual(["12:00:00", "23:30:00"]);
   });
 });

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { colorToRgba } from "./colorPalette";
+import { colorToRgba, getAreaFillOpacity } from "./colorPalette";
 import { createSeriesOverrideLookup, resolveSeriesOverride } from "./seriesOverrides";
 import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
@@ -259,7 +259,13 @@ export const gaugeDialRange = (min: any, max: any, unit: unknown): { min: any; m
   const unset = (value: any, fallback: number) =>
     value === null || value === undefined || value === "" || Number(value) === fallback;
   if (unit === "percent-1" && unset(min, 0) && unset(max, 100)) return { min: 0, max: 1 };
-  return { min: min || 0, max: max || 100 };
+  const blank = (value: any) => value === null || value === undefined || value === "";
+  const low = blank(min) ? 0 : min;
+  const high = blank(max) ? 100 : max;
+  // An empty or inverted span cannot be drawn; keep the 100-wide dial such panels always showed.
+  return Number(high) > Number(low)
+    ? { min: low, max: high }
+    : { min: low, max: Number(low) + 100 };
 };
 
 /** Recolours one gauge series: arc bands from the steps, progress and pointer in the value's step colour. */
@@ -274,8 +280,10 @@ export const applyGaugeThresholds = (
   const max = toNumber(gauge.max) ?? 100;
   const resolved = resolveStepValues(thresholds, { min, max });
   if (!resolved) return;
-  const current: string = item.itemStyle?.color ?? fallbackColor;
-  item.itemStyle = { ...item.itemStyle, color: stepColorFor(item.value, resolved, current) };
+  const current: string = (gauge._mappedColor ? null : item.itemStyle?.color) ?? fallbackColor;
+  // A value-mapping colour outranks the step colour, as on the metric chart.
+  const color = gauge._mappedColor ?? stepColorFor(item.value, resolved, current);
+  item.itemStyle = { ...item.itemStyle, color };
   gauge.axisLine = {
     ...gauge.axisLine,
     lineStyle: {
@@ -511,7 +519,9 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     return percentRange;
   };
   const overrides = createSeriesOverrideLookup(config);
-  const areaFillOpacity = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
+  const areaFillOpacity =
+    getAreaFillOpacity(panelSchema.type, config) ??
+    chartNumber("--chart-area-fill-bottom-opacity", 0.4);
 
   const visualMaps: any[] = [];
   const markerSeries = new Map<string, any>();
@@ -534,6 +544,8 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
       if (color) item.itemStyle = { ...item.itemStyle, color };
     } else if (colours) {
       visualMaps.push(buildThresholdVisualMap(resolved, index, dimension));
+      // Large-mode bars take one colour per series, so a visualMap could not recolour them.
+      if (series.large) series.large = false;
       // An explicit area fill colour outranks the visualMap, so the fill would keep the series colour.
       if (series.areaStyle?.color !== undefined) {
         const { color: _fill, ...areaStyle } = series.areaStyle;

@@ -374,11 +374,41 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     expect(options.legend.formatter("api")).toBe(`{b|${DISPLAY}}`);
   });
 
+  it("recomputes the override label over the slices the legend still shows", async () => {
+    const options = await runSQL(piePanel(overrides), [rows]);
+    const api = options.series[0].data[0];
+    expect(options.legend.selected).toEqual({});
+    expect(api.label.formatter()).toBe("66.7%");
+    options.legend.selected = { api: true, web: false };
+    expect(api.label.formatter()).toBe("100.0%");
+    options.legend.selected = {};
+    expect(api.label.formatter()).toBe("66.7%");
+  });
+
   it("multi-query: applies to the merged slices", async () => {
     const options = await runSQL(piePanel(overrides, 2), [rows, rows]);
     const apis = options.series[0].data.filter((d: any) => d.name === "api");
     expect(apis).toHaveLength(2);
     expect(apis.every((d: any) => d.itemStyle.color === OVERRIDE_COLOR)).toBe(true);
+  });
+
+  it("multi-query: sizes a bottom legend from every query's slices", async () => {
+    const legendConfig = {
+      legends_position: "bottom",
+      legends_type: "plain",
+      legend_values: ["value", "percent"],
+    };
+    const moreRows = Array.from({ length: 40 }, (_, i) => ({
+      x_axis_1: `service-${i}`,
+      y_axis_1: 100 + i,
+    }));
+    const merged = await runSQL(piePanel(legendConfig, 2), [rows, moreRows]);
+    const single = await runSQL(piePanel(legendConfig), [[...rows, ...moreRows]]);
+    const firstOnly = await runSQL(piePanel(legendConfig), [rows]);
+    expect(single.legend.height).toBeGreaterThan(firstOnly.legend.height);
+    expect(merged.legend.top).toBe(single.legend.top);
+    expect(merged.legend.height).toBe(single.legend.height);
+    expect(merged.series[0].center).toEqual(single.series[0].center);
   });
 });
 
@@ -654,13 +684,74 @@ describe("PromQL line/area", () => {
   });
 });
 
+describe("area fill opacity and gradient", () => {
+  const flat = { fill_opacity: 40, fill_gradient: false };
+
+  it("SQL area: unset keys keep today's fill", async () => {
+    const options = await runSQL(lineSQL("area"), [timeRows()]);
+    const api = named(options, "api");
+    const expected = getAreaStyleOverride("area", {}, api.color, "api", "light");
+    expect(api.areaStyle).toEqual(expected.areaStyle);
+  });
+
+  it("SQL area: a flat fill at the set opacity", async () => {
+    const options = await runSQL(lineSQL("area", flat), [timeRows()]);
+    const api = named(options, "api");
+    expect(api.areaStyle.opacity).toBe(0.4);
+    expect(api.areaStyle.color).toBe(api.color);
+  });
+
+  it("SQL area: a colour override keeps the set opacity", async () => {
+    const options = await runSQL(lineSQL("area", { ...flat, ...promOverrides }), [timeRows()]);
+    expect(named(options, "api").areaStyle).toMatchObject({ opacity: 0.4, color: OVERRIDE_COLOR });
+  });
+
+  it("SQL area with thresholds: the recoloured fill takes the set opacity", async () => {
+    const options = await runSQL(lineSQL("area", { ...flat, thresholds: STEPS }), [timeRows()]);
+    expect(named(options, "api").areaStyle).toEqual({ opacity: 0.4 });
+  });
+
+  it("SQL area-stacked ignores the keys", async () => {
+    const plain = await runSQL(lineSQL("area-stacked"), [timeRows()]);
+    const options = await runSQL(lineSQL("area-stacked", flat), [timeRows()]);
+    expect(named(options, "api").areaStyle).toEqual(named(plain, "api").areaStyle);
+  });
+
+  it("PromQL area: a flat fill at the set opacity; a colour override keeps it", async () => {
+    const options = await runPromQL(promPanel("area", { ...flat, ...promOverrides }), two());
+    expect(named(options, "api").areaStyle).toMatchObject({ opacity: 0.4, color: OVERRIDE_COLOR });
+    const web = named(options, "web");
+    expect(web.areaStyle.opacity).toBe(0.4);
+    expect(typeof web.areaStyle.color).toBe("string");
+  });
+
+  it("PromQL area with thresholds: the recoloured fill takes the set opacity", async () => {
+    const options = await runPromQL(promPanel("area", { ...flat, thresholds: STEPS }), two());
+    expect(named(options, "api").areaStyle).toEqual({ opacity: 0.4 });
+  });
+
+  it("PromQL area: a set opacity with the gradient fades to transparent", async () => {
+    const options = await runPromQL(promPanel("area", { fill_opacity: 70 }), two());
+    const fill = named(options, "api").areaStyle;
+    expect(fill.opacity).toBe(0.7);
+    expect(fill.color.colorStops.map((s: any) => s.color.endsWith(", 0)"))).toEqual([false, true]);
+  });
+});
+
 describe.each(["pie", "donut"])("PromQL %s", (type) => {
   it("colours, renames and formats the slice; its data name stays original", async () => {
     const options = await runPromQL(promPanel(type, promOverrides), two());
     const api = options.series[0].data.find((d: any) => d.name === "api");
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
-    const label = options.series[0].label.formatter({ name: "api", value: 1200, percent: 57.14 });
-    expect(label).toBe(`${DISPLAY}: ${apiValue(1200)} (57.1%)`);
+    const params = { name: "api", value: 1200, percent: 57 };
+    expect(api.label.formatter(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (57.14%)`);
+    options.legend.selected = { api: true, web: false };
+    expect(api.label.formatter(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (100.00%)`);
+    const web = options.series[0].data.find((d: any) => d.name === "web");
+    expect(web.label).toBeUndefined();
+    expect(options.series[0].label.formatter({ name: "web", value: 900, percent: 43 })).toBe(
+      `web: ${panelValue(900)} (43%)`,
+    );
     const html = options.tooltip.formatter({
       seriesName: "s",
       name: "api",
