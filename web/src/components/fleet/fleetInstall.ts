@@ -161,6 +161,8 @@ function dockerCommand(t: InstallTarget): string {
     `mkdir -p ${DOCKER_DIR} && cat > ${DOCKER_DIR}/supervisor.yaml <<EOF`,
     ...yaml,
     "EOF",
+    // The state volume survives, so a rerun upgrades or re-tokens the same collector identity.
+    `docker rm -f ${DOCKER_CONTAINER} >/dev/null 2>&1 || true`,
     `docker run -d --name ${DOCKER_CONTAINER} --restart unless-stopped \\`,
     '  --hostname "$(hostname)" \\',
     `  -v "$PWD/${DOCKER_DIR}/supervisor.yaml:/etc/opampsupervisor/supervisor.yaml:ro" \\`,

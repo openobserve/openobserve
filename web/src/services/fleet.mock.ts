@@ -686,7 +686,7 @@ export const fleetMock: FleetApi = {
       target_version: store.settings.target_collector_version ?? "0.163.1",
       rollouts_active: store.rollouts.filter((r) => r.status === "in_progress").length,
     }),
-  listTokens: () => reply({ items: store.tokens }),
+  listTokens: () => reply({ items: store.tokens, total: store.tokens.length }),
   createToken: (_org, body) => {
     const fleet = store.fleets.find((f) => f.id === body.fleet);
     const id = `tok-${store.seq++}`;
@@ -720,6 +720,7 @@ export const fleetMock: FleetApi = {
         const { draft: _draft, versions: _versions, ...item } = c;
         return item;
       }),
+      total: store.configs.length,
     }),
   getConfig: (_org, id) => {
     const c = store.configs.find((x) => x.id === id);

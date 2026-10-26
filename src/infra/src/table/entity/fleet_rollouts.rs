@@ -25,6 +25,7 @@ pub struct Model {
     pub from_version: Option<i64>,
     pub to_version: i64,
     pub fleet_id: String,
+    #[sea_orm(column_type = "Text")]
     pub strategy: String,
     pub status: String,
     #[sea_orm(column_type = "Text")]

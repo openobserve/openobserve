@@ -626,6 +626,18 @@ fn is_secret_field(name: &str) -> bool {
             .any(|word| name.contains(word))
 }
 
+/// A fleet change is published at once, so the Audit tab shows it before the periodic publish.
+#[cfg(feature = "enterprise")]
+fn fleet_mutation(method: &Method, path: &str) -> bool {
+    if matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS) {
+        return false;
+    }
+    let segments: Vec<&str> = path.split('/').collect();
+    let org_at = usize::from(segments.first() == Some(&"api"));
+    let module = segments.get(org_at + 1).copied();
+    module == Some("fleet") || (segments.get(org_at) == Some(&"v2") && module == Some("fleets"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -741,6 +753,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 delegated,
             })
             .await;
+            if fleet_mutation(&http_method, &path) {
+                tokio::spawn(audit::flush());
+            }
         }
         response
     } else {

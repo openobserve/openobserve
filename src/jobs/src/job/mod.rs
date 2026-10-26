@@ -788,6 +788,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         });
+        o2_enterprise::enterprise::fleet::audit::set_flush(|| Box::pin(audit::flush()));
         let rw = infra::db::get_orm_client_rw().await;
         ENROLLMENT
             .hydrate_with(rw)
