@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { number as echartsNumber } from "echarts/core";
 import {
   getChartDimensions,
   getLegendPosition,
@@ -1180,6 +1181,25 @@ describe("pie and donut legend values", () => {
       valueOnly,
     );
     expect(valueOnly.legend.formatter("db")).toBe("{b|db}  10");
+  });
+
+  it("rounds every slice's percent exactly as ECharts' largest-remainder seats do", () => {
+    const many = Array.from({ length: 37 }, (_, i) => ({
+      name: `s${i}`,
+      value: ((i * 7919) % 97) + 0.3,
+    }));
+    const options: any = pieOptions(many);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 1 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    const values = many.map((slice) => slice.value);
+    many.forEach((slice, index) => {
+      const expected = echartsNumber.getPercentWithPrecision(values, index, 1).toFixed(1);
+      expect(options.legend.formatter(slice.name)).toBe(`{b|${slice.name}}  ${expected}%`);
+    });
   });
 
   it("bolds the hovered slice name only", () => {

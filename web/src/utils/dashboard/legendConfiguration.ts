@@ -15,7 +15,6 @@
 
 import { calculateWidthText } from "./chartDimensionUtils";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
-import { number as echartsNumber } from "echarts/core";
 import { escapeHtml } from "@/utils/html";
 
 // Constants for better maintainability
@@ -516,6 +515,32 @@ const truncateLegendName = (text: string, maxWidth: number): string => {
 const overridePercentText = (value: number, positiveTotal: number, decimals: number): string =>
   `${(positiveTotal > 0 ? (value / positiveTotal) * 100 : 0).toFixed(decimals)}%`;
 
+// ECharts' largest-remainder percent rounding (number.getPercentSeats, not exported), run once for every slice.
+const percentSeats = (values: number[], precision: number): number[] => {
+  const sum = values.reduce((acc, value) => acc + (isNaN(value) ? 0 : value), 0);
+  if (sum === 0) return [];
+  const digits = Math.pow(10, precision);
+  const votes = values.map((value) => ((isNaN(value) ? 0 : value) / sum) * digits * 100);
+  const targetSeats = digits * 100;
+  const seats = votes.map((vote) => Math.floor(vote));
+  let currentSum = seats.reduce((acc, seat) => acc + seat, 0);
+  const remainder = votes.map((vote, index) => vote - seats[index]);
+  while (currentSum < targetSeats) {
+    let max = Number.NEGATIVE_INFINITY;
+    let maxId = 0;
+    for (let i = 0; i < remainder.length; i++) {
+      if (remainder[i] > max) {
+        max = remainder[i];
+        maxId = i;
+      }
+    }
+    seats[maxId]++;
+    remainder[maxId] = 0;
+    currentSum++;
+  }
+  return seats.map((seat) => seat / digits);
+};
+
 // Keyed by name like the legend itself, so slices that share a name (merged queries) show their sum.
 const buildPieLegendEntries = (
   panelSchema: any,
@@ -538,6 +563,7 @@ const buildPieLegendEntries = (
   const values = [...sums.values()];
   // Negatives can cancel the sum and spin ECharts' rounding loop; without them it ends within n steps.
   const seatValues = values.map((value) => Math.max(value, 0));
+  let seats: number[] | undefined;
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
     const overrideDecimals = lookup.get(name)?.decimals;
@@ -549,7 +575,8 @@ const buildPieLegendEntries = (
       if (panelDecimals > MAX_SEATS_PRECISION) {
         return overridePercentText(values[index], positiveTotal, panelDecimals);
       }
-      const percent = echartsNumber.getPercentWithPrecision(seatValues, index, panelDecimals);
+      seats ??= percentSeats(seatValues, panelDecimals);
+      const percent = seatValues[index] ? (seats[index] ?? 0) : 0;
       return `${percent.toFixed(panelDecimals)}%`;
     };
     const valueText = keys
