@@ -55,6 +55,7 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
 import { withChartFont } from "@/utils/fonts";
+import { useTheme } from "@/composables/useTheme";
 
 // Register necessary components.
 // echarts' subpath type decls (echarts/components, echarts/renderers) resolve to
@@ -72,8 +73,8 @@ echarts.use([
   SVGRenderer,
 ] as unknown as Parameters<typeof echarts.use>[0]);
 
-// Custom-chart option object. It is user-authored ECharts config that may embed
-// function-strings and an `o2_events` map, so its shape is intentionally open.
+// Custom-chart option object. It is user-authored ECharts config that may carry
+// callbacks and an `o2_events` map, so its shape is intentionally open.
 type CustomChartData = Record<string, unknown> & {
   extras?: { panelId?: string | number };
   o2_events?: Record<string, (params: echarts.ECElementEvent, chart: echarts.EChartsType) => void>;
@@ -111,39 +112,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const chartRef: Ref<HTMLElement | null> = ref(null);
     let chart: echarts.EChartsType | null = null;
+    let chartDark: boolean | null = null;
+    const { isDark } = useTheme();
 
     const hoveredSeriesState = inject<HoveredSeriesState | null>("hoveredSeriesState", null);
-    const convertStringToFunction = (obj: unknown): unknown => {
-      if (typeof obj === "string" && obj.startsWith("function")) {
-        try {
-          return new Function(`return ${obj}`)(); // Convert string to function
-        } catch (error) {
-          // Preserve original runtime read of error.message; catch binds unknown
-          // under strict TS, so narrow the shape without changing the value read.
-          const message = (error as { message?: string }).message;
-          emit({
-            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message }),
-            code: "",
-          } as unknown as EmitEvent);
-        }
-      }
-
-      if (Array.isArray(obj)) {
-        return obj.map((item) => convertStringToFunction(item)); // Recursively handle arrays
-      }
-
-      if (typeof obj === "object" && obj !== null) {
-        const result: Record<string, unknown> = {};
-        for (const key in obj) {
-          if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            result[key] = convertStringToFunction((obj as Record<string, unknown>)[key]); // Recursively handle object properties
-          }
-        }
-        return result;
-      }
-
-      return obj; // If it's not a function string or an object, return it as is
-    };
     function deepSanitize(obj: unknown): unknown {
       if (typeof obj === "string") {
         return DOMPurify.sanitize(obj);
@@ -164,26 +136,40 @@ export default defineComponent({
       // The component can unmount while echarts-gl loads, nulling the ref.
       if (!chartRef.value) return;
 
-      // Initialize chart if it doesn't exist, otherwise reuse existing instance
+      const dark = isDark.value;
+      // ECharts fixes the theme at init, so a theme change needs a fresh instance.
+      if (chart && chartDark !== dark) {
+        chart.dispose();
+        chart = null;
+      }
       if (!chart) {
-        chart = echarts.init(chartRef.value, undefined, {
+        chart = echarts.init(chartRef.value, dark ? "dark" : undefined, {
           renderer: "canvas",
         });
+        chartDark = dark;
+        if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
+          reinitWhenSized();
+        }
       } else {
         // Clear previous chart data to prevent overlay of old and new charts
         chart.clear();
       }
 
       try {
-        const convertedData = convertStringToFunction(props.data) as CustomChartData;
-        const safeChartOptions = deepSanitize(convertedData) as CustomChartData;
-        chart.setOption(withChartFont(safeChartOptions));
+        const safeChartOptions = deepSanitize(props.data) as CustomChartData;
+        // The dark theme paints an opaque background; keep the panel surface unless the code sets one.
+        const themedOptions =
+          dark && safeChartOptions.backgroundColor == null
+            ? { ...safeChartOptions, backgroundColor: "transparent" }
+            : safeChartOptions;
+        chart.setOption(withChartFont(themedOptions));
 
-        const o2Events = convertedData.o2_events;
+        const o2Events = props.data.o2_events;
         if (o2Events) {
           const boundChart = chart;
           // Add event listeners for custom interactions
           for (const event in o2Events) {
+            if (typeof o2Events[event] !== "function") continue;
             chart.off(event);
             chart.on(event, (params) =>
               o2Events[event](params as echarts.ECElementEvent, boundChart),
@@ -197,6 +183,23 @@ export default defineComponent({
         } as unknown as EmitEvent);
       }
     };
+
+    // An instance created at zero size keeps zero-width canvases that resize() cannot repair.
+    let zeroSizeReinitObserver: ResizeObserver | null = null;
+    function reinitWhenSized() {
+      if (!chartRef.value || zeroSizeReinitObserver) return;
+      zeroSizeReinitObserver = new ResizeObserver(() => {
+        const el = chartRef.value;
+        if (el && (el.clientWidth === 0 || el.clientHeight === 0)) return;
+        zeroSizeReinitObserver?.disconnect();
+        zeroSizeReinitObserver = null;
+        if (!el) return;
+        chart?.dispose();
+        chart = null;
+        initChart();
+      });
+      zeroSizeReinitObserver.observe(chartRef.value);
+    }
 
     const handleResize = async () => {
       await nextTick();
@@ -224,9 +227,13 @@ export default defineComponent({
       },
       { deep: true },
     );
+    watch(isDark, () => initChart());
 
     onUnmounted(() => {
+      zeroSizeReinitObserver?.disconnect();
+      zeroSizeReinitObserver = null;
       chart?.dispose();
+      chart = null;
       window.removeEventListener("resize", handleResize);
     });
 

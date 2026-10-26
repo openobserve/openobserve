@@ -438,7 +438,26 @@ describe("PromQLTableChart", () => {
       await tableRenderer.vm.$emit("row-click", mockTableData.rows[0]);
 
       expect(wrapper.emitted("row-click")).toBeTruthy();
-      expect(wrapper.emitted("row-click")[0]).toEqual([mockTableData.rows[0]]);
+      expect(wrapper.emitted("row-click")[0][0]).toEqual(mockTableData.rows[0]);
+    });
+
+    it("keys rows on the label, legend and timestamp columns, never the values or the synthetic id", () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockTableData,
+          columns: [
+            { name: "job", label: "job", field: "job" },
+            { name: "timestamp", label: "Timestamp", field: "timestamp" },
+            { name: "value_max", label: "Max", field: "value_max" },
+            { name: "value", label: "Value", field: "value" },
+          ],
+        },
+      });
+      expect(wrapper.findComponent({ name: "TableRenderer" }).props("rowKeyFields")).toEqual([
+        "job",
+        "timestamp",
+        "__legend__",
+      ]);
     });
 
     it("forwards the clicked row and its index with the click event", async () => {

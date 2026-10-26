@@ -258,14 +258,19 @@ describe("usePanelDrilldown", () => {
   });
 
   describe("table row drilldown", () => {
-    const clickTableRow = async (deps: any, row: any, index: number) => {
+    const clickTableRow = async (
+      deps: any,
+      row: any,
+      index: number,
+      url = "https://example.com/?job=${row.field.job}&i=${row.index}",
+    ) => {
       deps.panelSchema.value.type = "table";
       deps.panelSchema.value.config.drilldown = [
         {
           name: "Row",
           type: "byUrl",
           targetBlank: true,
-          data: { url: "https://example.com/?job=${row.field.job}&i=${row.index}" },
+          data: { url },
         },
       ];
       const api = usePanelDrilldown(deps as any);
@@ -286,6 +291,24 @@ describe("usePanelDrilldown", () => {
         "_blank",
         "noopener,noreferrer",
       );
+      openSpy.mockRestore();
+    });
+
+    it("leaves the PromQL table's synthetic row id out of row.field", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+
+      await clickTableRow(
+        deps,
+        { id: "row_3", job: "api", value: 3, __legend__: "{job=api}" },
+        3,
+        "https://example.com/?id=${row.field.id}&job=${row.field.job}",
+      );
+
+      const opened = String(openSpy.mock.calls[0]?.[0]);
+      expect(opened).toContain("job=api");
+      expect(opened).not.toContain("row_3");
       openSpy.mockRestore();
     });
 

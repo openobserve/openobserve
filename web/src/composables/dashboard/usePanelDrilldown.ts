@@ -621,8 +621,8 @@ export function usePanelDrilldown({
   const getTableRowVariable = () => {
     const [row, index] = drilldownParams[1] ?? [];
     if (panelSchema.value.queryType === "promql") {
-      // PromQL columns come from the series labels, not from query fields.
-      const { __legend__: _legend, ...rowFields } = row ?? {};
+      // PromQL columns come from the series labels; `__legend__` and the table's synthetic `id` are not labels.
+      const { __legend__: _legend, id: _id, ...rowFields } = row ?? {};
       return { field: rowFields, index };
     }
     const fields: any = {};

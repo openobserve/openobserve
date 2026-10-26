@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-cell-copy="false"
       :expansion="rowsExpandable ? 'multiple' : 'none'"
       :row-key="rowsExpandable ? expansionRowKey : undefined"
+      :measure-expanded-rows="rowsExpandable"
       :class="{ 'wrap-enabled': wrapCells }"
       data-test="dashboard-panel-table"
       @row-click="
@@ -93,7 +94,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <dt class="text-text-secondary">{{ col.header }}</dt>
             <dd class="text-text-body min-w-0 wrap-anywhere whitespace-pre-wrap">
               <JsonFieldRenderer v-if="col.showFieldAsJson" :value="row[col.accessorKey]" />
-              <template v-else>{{ formatCellValue(row[col.accessorKey], col, row) }}</template>
+              <a
+                v-else-if="getHttpUrl(row[col.accessorKey])"
+                :href="getHttpUrl(row[col.accessorKey]) || undefined"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-link hover:text-text-link-hover hover:underline"
+                :data-test="`dashboard-table-row-detail-link-${col.id}`"
+                @click.stop
+              >
+                {{ formatCellValue(row[col.accessorKey], col, row) }}
+              </a>
+              <span
+                v-else
+                class="rounded-default px-1"
+                :style="detailValueStyle(col, row)"
+                :data-test="`dashboard-table-row-detail-value-${col.id}`"
+                >{{ formatCellValue(row[col.accessorKey], col, row) }}</span
+              >
             </dd>
           </template>
         </dl>
@@ -177,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, toRaw, watch, type PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -191,7 +209,24 @@ import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
 import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
 import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { useStore } from "vuex";
+
+type TableRow = Record<string, unknown>;
+
+interface TableColumn {
+  field?: string;
+  name?: string;
+  label?: string;
+  header?: string;
+  pinned?: string;
+  size?: number;
+  format?: (value: unknown, row: TableRow) => unknown;
+}
+
+const PINNED_WIDTH_MIN = 60;
+const PINNED_WIDTH_MAX = 320;
+const CELL_PADDING = 24;
 
 // 53-bit string hash (cyrb53): a short key per row instead of keeping every row's JSON alive.
 const contentHash = (text: string): string => {
@@ -205,6 +240,20 @@ const contentHash = (text: string): string => {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+};
+
+// A pinned column needs a fixed size for the sticky offsets after it, so it is sized to its longest value.
+const pinnedColumnWidth = (col: TableColumn, rows: TableRow[]): number => {
+  const field = col.field ?? col.name ?? "";
+  let longest = String(col.label ?? col.header ?? field);
+  for (const row of rows) {
+    const value = col.format ? col.format(row[field], row) : row[field];
+    const text = value == null ? "" : String(value);
+    if (text.length > longest.length) longest = text;
+  }
+  // eslint-disable-next-line local/no-hardcoded-px -- canvas text measurement takes a CSS px font size
+  const textWidth = calculateWidthText(longest, "13px");
+  return Math.min(PINNED_WIDTH_MAX, Math.max(PINNED_WIDTH_MIN, textWidth + CELL_PADDING));
 };
 
 export default defineComponent({
@@ -272,6 +321,12 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Columns that identify a row (its dimensions), so an expanded row stays open when its values change. */
+    rowKeyFields: {
+      required: false,
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
   },
   emits: ["row-click", "format-column", "explore-cell"],
   setup(props, { emit, slots }) {
@@ -316,28 +371,36 @@ export default defineComponent({
     // OTable reads rowKey once at creation, so the expansion toggle re-keys the table too.
     const tableKey = computed(() => `${paginationMode.value}-${rowsExpandable.value}`);
 
-    // Dashboard rows carry no id; a content key, numbered among identical rows, survives sorts and refreshes.
+    // Dashboard rows carry no id; a dimension key, numbered among equal keys, survives sorts and value refreshes.
+    const rowContentKey = (row: TableRow): string => {
+      const fields = props.rowKeyFields;
+      return contentHash(JSON.stringify(fields.length ? fields.map((field) => row[field]) : row));
+    };
     const expansionRowIds = computed(() => {
       const ids = new WeakMap<object, string>();
       if (!rowsExpandable.value) return ids;
       const seen = new Map<string, number>();
-      for (const row of (props.data?.rows as any[]) || []) {
-        const content = contentHash(JSON.stringify(row));
+      for (const row of (props.data?.rows as TableRow[] | undefined) ?? []) {
+        if (!row || typeof row !== "object") continue;
+        const content = rowContentKey(row);
         const count = seen.get(content) ?? 0;
         seen.set(content, count + 1);
-        if (row && typeof row === "object") ids.set(row, count ? `${content}#${count}` : content);
+        ids.set(toRaw(row), count ? `${content}#${count}` : content);
       }
       return ids;
     });
-    const expansionRowKey = (row: any): string =>
-      expansionRowIds.value.get(row) ?? contentHash(JSON.stringify(row));
+    const expansionRowKey = (row: TableRow): string =>
+      expansionRowIds.value.get(toRaw(row)) ?? rowContentKey(row);
 
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
     // Sticky offsets add up the earlier pinned columns' sizes, so only the last pinned one can fit its content.
     const sizedPinnedColumns = computed(() => {
-      const pinned = (tableColumns.value as any[]).filter((c: any) => c.pinned === "left");
-      return new Set(pinned.slice(0, -1));
+      const pinned = (tableColumns.value as TableColumn[]).filter((c) => c.pinned === "left");
+      const rows = (props.data?.rows as TableRow[] | undefined) ?? [];
+      return new Map(
+        pinned.slice(0, -1).map((col) => [col, col.size ?? pinnedColumnWidth(col, rows)]),
+      );
     });
 
     // Map the column config → OTableColumnDef. The original fields stay at the
@@ -349,6 +412,7 @@ export default defineComponent({
         // Key on `field`, not `name`: `name` is the display label, so two columns
         // sharing a label would collide to the same column id.
         id: col.field ?? col.name,
+        ...(sizedPinnedColumns.value.has(col) && { size: sizedPinnedColumns.value.get(col) }),
         header: col.header ?? col.label ?? col.name ?? col.field,
         accessorKey: col.field ?? col.name,
         filterable: props.enableFiltering && !col._isRowField && !col._isTotalColumn,
@@ -566,6 +630,10 @@ export default defineComponent({
         },
     );
 
+    // The detail view shows a value with the same colours its cell has.
+    const detailValueStyle = (col: { id: string; accessorKey: string }, row: TableRow) =>
+      cellStyleFn.value({ columnId: col.id, row, value: row[col.accessorKey] });
+
     // ── Dashboard sort state (parent-managed, passed into TenstackTable) ──────
     const localSortBy = ref<string>("");
     const localSortOrder = ref<"asc" | "desc">("asc");
@@ -688,6 +756,7 @@ export default defineComponent({
       tableKey,
       rowsExpandable,
       expansionRowKey,
+      detailValueStyle,
       sortedRows,
       localSortBy,
       localSortOrder,

@@ -26,7 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows-per-page="panelConfig.table_pagination_rows_per_page"
         :enable-filtering="enableFiltering"
         :expandable-rows="!!panelConfig.table_expandable_rows"
-        @row-click="(...args: any[]) => $emit('row-click', ...args)"
+        :row-key-fields="rowKeyFields"
+        @row-click="
+          (evt: MouseEvent | null, row: Record<string, unknown>, index: number) =>
+            $emit('row-click', evt, row, index)
+        "
       >
         <!-- kube-state omits the metric family entirely when nothing is in that
              state, so an empty triage table means nothing is wrong rather than
@@ -141,6 +145,14 @@ export default defineComponent({
       }));
       return rows;
     });
+
+    // A row is its series plus, in the time-series modes, its timestamp; the values change on every refresh.
+    const rowKeyFields = computed(() => [
+      ...(tableColumns.value as { field?: string; name?: string }[])
+        .map((col) => col.field ?? col.name ?? "")
+        .filter((field) => field && field !== "value" && !field.startsWith("value_")),
+      "__legend__",
+    ]);
 
     // Legend filtering logic
     const selectedLegend = ref<string>("");
@@ -258,6 +270,7 @@ export default defineComponent({
       loading,
       innerTableRef,
       tableColumns,
+      rowKeyFields,
       tableRows,
       filteredTableRows,
       pagination,

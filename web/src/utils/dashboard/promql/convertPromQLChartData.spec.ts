@@ -56,6 +56,8 @@ vi.mock("../legendConfiguration", () => ({
     chartHeight: 600,
   })),
   calculateBottomLegendHeight: vi.fn(() => 50),
+  MAX_SEATS_PRECISION: 13,
+  pieLegendPercentDecimals: vi.fn(() => 2),
   calculateChartDimensions: vi.fn(() => ({
     width: 800,
     height: 600,
@@ -451,8 +453,9 @@ describe("convertPromQLChartData", () => {
         queryConfig: {},
       },
     ];
+    // Stacked data series carry the panel's mark lines too, so the annotation series is the unnamed one.
     const annotationSeries = (options: any) =>
-      options.series.find((s: any) => s.markLine || s.markArea);
+      options.series.find((s: any) => !s.name && (s.markLine || s.markArea));
 
     beforeEach(() => {
       mockContext.panelSchema = { type: "stacked", config: {}, queries: [{ config: {} }] };
