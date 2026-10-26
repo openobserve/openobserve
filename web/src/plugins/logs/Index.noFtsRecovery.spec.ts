@@ -205,7 +205,8 @@ describe("Index no-FTS recovery requests", { timeout: 30000 }, () => {
     expect(wrapper.findComponent(OForm).vm.form.state.values.field).toBe("level");
     const preview = wrapper.get('[data-test="logs-no-fts-preview"]').text();
     await wrapper.get('[data-test="logs-no-fts-field-form"]').trigger("submit");
-    await vi.waitFor(() => expect(results()).toHaveLength(1));
+    // Switching to the UDS stream runs extractFields before the search, which outlasts the 1s default on loaded CI.
+    await vi.waitFor(() => expect(results()).toHaveLength(1), { timeout: 5000 });
     expect(results()[0].queryReq.query.sql.replace(/"level"/g, "level")).toContain(preview);
   });
 
