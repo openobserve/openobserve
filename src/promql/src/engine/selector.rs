@@ -35,7 +35,7 @@ use crate::{
     ast::rewrite::remove_filter_all,
     functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
-    utils::{exemplars_stream_for, metric_name, offset_micros},
+    utils::{absent_label_rejects_all, exemplars_stream_for, metric_name, offset_micros},
 };
 
 pub(super) type SelectorContexts = Vec<ScanContext>;
@@ -97,7 +97,8 @@ impl Engine {
         streaming: bool,
     ) -> Result<SelectorContexts> {
         let mut filters = equal_matcher_filters(&selector.matchers);
-        self.ctx
+        let mut ctxs = self
+            .ctx
             .table_provider
             .create_context(
                 &self.ctx.query_ctx.org_id,
@@ -108,7 +109,16 @@ impl Engine {
                 &mut filters,
                 streaming,
             )
-            .await
+            .await?;
+        // a label the source lacks reads as "", so a matcher rejecting "" selects nothing there
+        ctxs.retain(|ctx| {
+            !selector
+                .matchers
+                .matchers
+                .iter()
+                .any(|mat| absent_label_rejects_all(&ctx.schema, mat))
+        });
+        Ok(ctxs)
     }
 
     /// An instant selector, streamed when the layout allows it; `None` when nothing is selected.
@@ -959,5 +969,37 @@ mod tests {
                 .iter()
                 .any(|l| l.name == "env" && l.value == "prod")
         );
+    }
+
+    #[tokio::test]
+    async fn test_selector_contexts_drop_sources_lacking_a_rejecting_label() {
+        let trace_id = "test_trace_absent_label";
+        let engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, "test_org", 30),
+                ExemplarProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        for (query, contexts) in [
+            (r#"test_metric{uuid="x"}"#, 0),
+            (r#"test_metric{uuid=~"x.+"}"#, 0),
+            (r#"test_metric{uuid!="x"}"#, 1),
+            (r#"test_metric{uuid=""}"#, 1),
+            (r#"test_metric{env="other"}"#, 1),
+        ] {
+            let promql_parser::parser::Expr::VectorSelector(selector) =
+                promql_parser::parser::parse(query).unwrap()
+            else {
+                panic!("expected a vector selector");
+            };
+            let ctxs = engine
+                .create_selector_contexts(&selector, (0, 1), &Default::default(), false)
+                .await
+                .unwrap();
+            assert_eq!(ctxs.len(), contexts, "{query}");
+        }
     }
 }

@@ -283,8 +283,7 @@ pub(super) fn residual_matchers_covered(
     matcher_labels: &[String],
 ) -> bool {
     matchers.matchers.iter().all(|matcher| {
-        (crate::matcher_residual_field(table_schema, matcher).is_none()
-            && !crate::absent_label_rejects_all(table_schema, matcher))
+        crate::matcher_residual_field(table_schema, matcher).is_none()
             || matcher_labels.contains(&matcher.name)
     })
 }
