@@ -14,11 +14,13 @@ name: Playwright E2E Crosscheck
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
 #       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
 #       · PR base is a release line (not main) with a same-named ENT branch → build against THAT branch
-#       · no ENT counterpart                      → build against ENT main
-#     then POLL and mirror pass/fail.
+#       · no ENT counterpart                      → build against ENT main, testing the PR merged into
+#                                                   OSS main (refs/pull/N/merge; branch head if not mergeable)
+#     then POLL and mirror pass/fail. A lost test runner is re-run once before it is reported.
 #
 # A single STICKY comment per PR (found by a hidden marker) reports running → passed / failed, lists the
-# failing specs (or an enterprise build failure), and links the sister ENT PR/branch + the ENT run.
+# failing specs, and links the sister ENT PR/branch + the ENT run. A build failure is attributed by the
+# engine's baseline step: the PR broke it, or the enterprise ref is broken against OSS main (still red).
 #
 # Pure CI — no AI/LLM. Deterministic dispatch + poll of o2-enterprise/oss-pr-ent-gate.yml.
 #
