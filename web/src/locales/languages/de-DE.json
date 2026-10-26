@@ -26325,7 +26325,7 @@
       "remoteStatus": "Remote-Status",
       "remove": "Entfernen",
       "removeManyTitle": "{count} Collector entfernen?",
-      "removeMessage": "Dadurch wird nur die Zeile entfernt. Ein Host, auf dem der Collector noch läuft, erscheint beim nächsten Heartbeat wieder; deinstallieren Sie ihn dort daher zuerst.",
+      "removeMessage": "Dadurch wird nur die Zeile entfernt. Ein Host, auf dem der Collector noch läuft, erscheint beim nächsten Heartbeat wieder; deinstallieren Sie ihn daher zuerst dort.",
       "removeOnlineMessage": "Dadurch wird nur die Zeile entfernt. {count} dieser Collectors ist online und erscheint beim nächsten Heartbeat wieder; deinstallieren Sie ihn zuerst auf seinem Host. | Dadurch werden nur die Zeilen entfernt. {count} dieser Collectors sind online und erscheinen beim nächsten Heartbeat wieder; deinstallieren Sie sie zuerst auf ihren Hosts.",
       "removeTitle": "{name} entfernen?",
       "removedCount": "{count} Collector entfernt | {count} Collector entfernt",
