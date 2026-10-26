@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { stackTotalRows } from "./stackTotals";
+import { fitAxisBoundsToStacks, stackTotalRows } from "./stackTotals";
 import { createSeriesOverrideLookup, toSeriesOverrideEntry } from "./seriesOverrides";
 import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
@@ -381,5 +381,217 @@ describe("tooltip totals in rendered options", () => {
     });
     const html = options.tooltip.formatter([point("api", 200), point("web", 300)]);
     expect(html).toContain("<strong>Total : 500ms</strong>");
+  });
+});
+
+describe("fitAxisBoundsToStacks", () => {
+  const fit = (yAxis: any, series: any[]) => {
+    const options = { yAxis, series };
+    fitAxisBoundsToStacks(options);
+    return options.yAxis;
+  };
+
+  it("raises a user max to the tallest positive stack and lowers a user min to the deepest negative one", () => {
+    const series = [
+      { name: "a", stack: "s", data: [200, -50] },
+      { name: "b", stack: "s", data: [300, -70] },
+    ];
+    expect(fit({ min: -10, max: 100 }, series)).toEqual({ min: -120, max: 500 });
+  });
+
+  it("stacks positives and negatives apart in one bucket", () => {
+    const series = [
+      { name: "a", stack: "s", data: [100] },
+      { name: "b", stack: "s", data: [-40] },
+      { name: "c", stack: "s", data: [60] },
+    ];
+    expect(fit({ min: 0, max: 10 }, series)).toEqual({ min: -40, max: 160 });
+  });
+
+  it("sums time-axis points by time, per stack", () => {
+    const t0 = new Date(1704067200000);
+    const t1 = new Date(1704067800000);
+    const series = [
+      {
+        name: "a",
+        stack: "s0",
+        data: [
+          [t0, 200],
+          [t1, 30],
+        ],
+      },
+      {
+        name: "b",
+        stack: "s0",
+        data: [
+          [new Date(t0.getTime()), 300],
+          [t1, 90],
+        ],
+      },
+      { name: "c", stack: "s1", data: [[t0, 450]] },
+    ];
+    expect(fit({ max: 100 }, series).max).toBe(500);
+  });
+
+  it("counts an unstacked series on its own and skips unnamed and null points", () => {
+    const series = [
+      { name: "a", data: [70, null, "-"] },
+      { name: "b", data: [80] },
+      { type: "line", data: [[0, 9999]] },
+    ];
+    expect(fit({ max: 50 }, series).max).toBe(80);
+  });
+
+  it("keeps a user bound that already clears every stack", () => {
+    const series = [
+      { name: "a", stack: "s", data: [1] },
+      { name: "b", stack: "s", data: [2] },
+    ];
+    expect(fit({ min: -5, max: 1000 }, series)).toEqual({ min: -5, max: 1000 });
+  });
+
+  it("leaves unset bounds alone", () => {
+    expect(fit({}, [{ name: "a", stack: "s", data: [500] }])).toEqual({});
+  });
+});
+
+describe("SQL stacked y-axis bounds", () => {
+  const withBounds = (type: string, x: any, bounds: any) => {
+    const panel = sqlPanel(type, x);
+    panel.config = { ...panel.config, ...bounds };
+    return panel;
+  };
+
+  it.each([
+    ["stacked", "categories", endpointX, ["/a", "/b"]],
+    ["stacked", "time", timeX, TIMES],
+    ["area-stacked", "categories", endpointX, ["/a", "/b"]],
+    ["area-stacked", "time", timeX, TIMES],
+  ])("%s on %s: a y max below the stack top rises to the stack sum", async (type, _, x, xs) => {
+    const options = await runSQL(withBounds(type, x, { y_axis_max: 100 }), stackRows(xs));
+    expect(options.yAxis.max).toBe(500);
+  });
+
+  it.each(["stacked", "area-stacked"])(
+    "%s: a y min above the deepest negative stack drops to its sum",
+    async (type) => {
+      const rows = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: -row.y_axis_1 }));
+      const options = await runSQL(withBounds(type, endpointX, { y_axis_min: -10 }), rows);
+      expect(options.yAxis.min).toBe(-500);
+    },
+  );
+
+  it.each(["stacked", "area-stacked"])(
+    "%s without user bounds keeps the automatic extent",
+    async (type) => {
+      const options = await runSQL(sqlPanel(type, endpointX), stackRows(["/a", "/b"]));
+      expect(options.yAxis.max).toBeUndefined();
+      expect(options.yAxis.min).toBeUndefined();
+    },
+  );
+
+  it("area keeps today's single-value bound", async () => {
+    const options = await runSQL(
+      withBounds("area", endpointX, { y_axis_max: 100 }),
+      stackRows(["/a", "/b"]),
+    );
+    expect(options.yAxis.max).toBe(300);
+  });
+
+  it("bar keeps today's single-value bound", async () => {
+    const options = await runSQL(
+      withBounds("bar", endpointX, { y_axis_max: 100 }),
+      stackRows(["/a", "/b"]),
+    );
+    expect(options.yAxis.max).toBe(300);
+  });
+
+  it("stacked multi-query: a later query's taller stack lifts the bound", async () => {
+    const panel = withBounds("stacked", endpointX, { y_axis_max: 100 });
+    panel.queries = [panel.queries[0], panel.queries[0]];
+    const tall = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 * 4 }));
+    const result: any = await convertMultiSQLData(
+      panel,
+      [stackRows(["/a", "/b"]), tall],
+      store,
+      panelRef(),
+      { value: null },
+      { value: [[], []] },
+      {
+        queries: [0, 1].map((i) => ({
+          query: "SELECT 1",
+          startTime: 1704067200000000,
+          endTime: 1704068400000000,
+          timeRangeGap: { seconds: 0, periodAsStr: "" },
+          panelQueryIndex: i,
+        })),
+      },
+      { height: "400px" },
+      { value: [] },
+      false,
+    );
+    expect(result.options.yAxis.max).toBe(2000);
+  });
+
+  const runShiftedSQL = async (panel: any, current: any[], past: any[]) => {
+    const result: any = await convertMultiSQLData(
+      panel,
+      [current, past],
+      store,
+      panelRef(),
+      { value: null },
+      { value: [[], []] },
+      {
+        queries: [
+          { seconds: 0, periodAsStr: "" },
+          { seconds: 86400, periodAsStr: "1 day ago" },
+        ].map((timeRangeGap) => ({
+          query: "SELECT 1",
+          startTime: 1704067200000000,
+          endTime: 1704068400000000,
+          timeRangeGap,
+          panelQueryIndex: 0,
+        })),
+      },
+      { height: "400px" },
+      { value: [] },
+      false,
+    );
+    return result.options;
+  };
+  const tall = () => stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 * 4 }));
+
+  it("area-stacked time shift: the past period's stack lifts the bound on its own, never on top", async () => {
+    const options = await runShiftedSQL(
+      withBounds("area-stacked", endpointX, { y_axis_max: 100 }),
+      stackRows(["/a", "/b"]),
+      tall(),
+    );
+    expect(options.yAxis.max).toBe(2000);
+  });
+
+  it("area-stacked time shift: the tooltip totals each period apart", async () => {
+    const options = await runShiftedSQL(
+      sqlPanel("area-stacked", endpointX),
+      stackRows(["/a", "/b"]),
+      tall(),
+    );
+    const point = (name: string, value: number) => ({
+      seriesName: name,
+      seriesIndex: indexOf(options, name),
+      name: "/a",
+      marker: "",
+      value,
+      data: value,
+    });
+    const html = options.tooltip.formatter([
+      point("api", 200),
+      point("web", 300),
+      point("api (1 day ago)", 800),
+      point("web (1 day ago)", 1200),
+    ]);
+    expect(html).toContain("<strong>Total : 500ms</strong>");
+    expect(html).toContain("<strong>Total (1 day ago) : 2s</strong>");
+    expect(html).not.toContain(": 2.5s");
   });
 });
