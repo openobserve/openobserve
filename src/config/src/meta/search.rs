@@ -359,7 +359,7 @@ impl ResponseChunkIterator {
                 * mb
         });
 
-        let hits = response.hits.drain(..).collect::<Vec<_>>();
+        let hits = std::mem::take(&mut response.hits);
 
         Self {
             response,
@@ -1064,7 +1064,9 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
+                value
+                    .parse::<SearchEventType>()
+                    .map_err(serde::de::Error::custom)
             }
         }
 
@@ -1090,9 +1092,9 @@ impl std::fmt::Display for SearchEventType {
     }
 }
 
-impl TryFrom<&str> for SearchEventType {
-    type Error = String;
-    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+impl std::str::FromStr for SearchEventType {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "ui" => Ok(Self::UI),
             "dashboards" => Ok(Self::Dashboards),
@@ -2484,19 +2486,19 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from() {
         type Set = SearchEventType; // Saving line too long
-        assert_eq!(Set::try_from("ui").unwrap(), Set::UI);
-        assert_eq!(Set::try_from("dashboards").unwrap(), Set::Dashboards);
-        assert_eq!(Set::try_from("reports").unwrap(), Set::Reports);
-        assert_eq!(Set::try_from("alerts").unwrap(), Set::Alerts);
-        assert_eq!(Set::try_from("values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("_values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("other").unwrap(), Set::Other);
-        assert_eq!(Set::try_from("rum").unwrap(), Set::RUM);
-        assert_eq!(Set::try_from("derived_stream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("derivedstream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("search_job").unwrap(), Set::SearchJob);
-        assert_eq!(Set::try_from("searchjob").unwrap(), Set::SearchJob);
-        assert!(SearchEventType::try_from("invalid").is_err());
+        assert_eq!("ui".parse::<Set>().unwrap(), Set::UI);
+        assert_eq!("dashboards".parse::<Set>().unwrap(), Set::Dashboards);
+        assert_eq!("reports".parse::<Set>().unwrap(), Set::Reports);
+        assert_eq!("alerts".parse::<Set>().unwrap(), Set::Alerts);
+        assert_eq!("values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("_values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("other".parse::<Set>().unwrap(), Set::Other);
+        assert_eq!("rum".parse::<Set>().unwrap(), Set::RUM);
+        assert_eq!("derived_stream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("derivedstream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("search_job".parse::<Set>().unwrap(), Set::SearchJob);
+        assert_eq!("searchjob".parse::<Set>().unwrap(), Set::SearchJob);
+        assert!("invalid".parse::<SearchEventType>().is_err());
     }
 
     #[test]
@@ -3443,11 +3445,11 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from_download_and_insights() {
         assert_eq!(
-            SearchEventType::try_from("download").unwrap(),
+            "download".parse::<SearchEventType>().unwrap(),
             SearchEventType::Download
         );
         assert_eq!(
-            SearchEventType::try_from("insights").unwrap(),
+            "insights".parse::<SearchEventType>().unwrap(),
             SearchEventType::Insights
         );
     }

@@ -724,6 +724,10 @@ pub async fn check_ingestion_allowed(
     stream_type: StreamType,
     stream_name: Option<&str>,
 ) -> Result<()> {
+    if db::org_status::is_blocked(org_id) {
+        return Err(infra::errors::IngestionError::OrgBlocked(org_id.to_string()).into());
+    }
+
     if !LOCAL_NODE.is_ingester() {
         return Err(Error::IngestionError("not an ingester".to_string()));
     }
@@ -1885,5 +1889,28 @@ mod tests {
             row.error.as_deref(),
             Some("error sending notification for alert: http 500")
         );
+    }
+
+    #[tokio::test]
+    async fn test_check_ingestion_allowed_rejects_blocked_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let org = "ingest-blocked-org";
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status.clone());
+            let res = check_ingestion_allowed(org, StreamType::Logs, Some("default")).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(
+                matches!(
+                    res,
+                    Err(Error::Ingestion(infra::errors::IngestionError::OrgBlocked(ref o))) if o == org
+                ),
+                "{status:?}: {res:?}"
+            );
+        }
     }
 }

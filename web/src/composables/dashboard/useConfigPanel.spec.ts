@@ -181,6 +181,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "geographic",
     "legend",
     "data",
+    "stateTimeline",
     "axis",
     "labels",
     "lineStyle",
@@ -188,6 +189,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "pivotTable",
     "valueTransformations",
     "fieldOverrides",
+    "seriesOverrides",
     "map",
     "gauge",
     "layout",
@@ -195,12 +197,13 @@ describe("ORDERED_SECTION_IDS", () => {
     "drilldown",
     "comparison",
     "markLines",
+    "thresholds",
     "background",
     "sparkline",
   ];
 
-  it("contains all 21 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(21);
+  it("contains all 24 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(24);
   });
 
   it("contains every expected section id", () => {
@@ -614,6 +617,25 @@ describe("useConfigPanel – data section", () => {
   });
 });
 
+describe("useConfigPanel – state timeline section", () => {
+  const options = ["merge-gaps", "row-size", "show-state-text", "row-sort", "tooltip-mode"];
+
+  it("shows the state timeline options and hides unit and decimals for that type", () => {
+    const c = makeComposable(makePanelData("state-timeline"));
+    for (const option of options) {
+      expect(c.isConfigOptionVisible("stateTimeline", option)).toBe(true);
+    }
+    expect(c.isConfigOptionVisible("data", "unit")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "decimals")).toBe(false);
+    expect(c.isSectionVisible("thresholds")).toBe(true);
+  });
+
+  it("hides the state timeline options for other types", () => {
+    const c = makeComposable(makePanelData("line"));
+    expect(c.isSectionVisible("stateTimeline")).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // useConfigPanel — axis section
 // ---------------------------------------------------------------------------
@@ -1016,6 +1038,60 @@ describe("useConfigPanel – markLines section", () => {
 });
 
 // ---------------------------------------------------------------------------
+// useConfigPanel — thresholds section
+// ---------------------------------------------------------------------------
+
+describe("useConfigPanel – thresholds section", () => {
+  it.each(["line", "area", "area-stacked", "bar", "h-bar", "scatter", "gauge", "metric"])(
+    "is visible for %s",
+    (type) => {
+      const c = makeComposable(makePanelData(type));
+      expect(c.isSectionVisible("thresholds")).toBe(true);
+    },
+  );
+
+  it.each(["stacked", "h-stacked", "pie", "donut", "heatmap", "table", "geomap"])(
+    "is hidden for %s",
+    (type) => {
+      const c = makeComposable(makePanelData(type));
+      expect(c.isSectionVisible("thresholds")).toBe(false);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// useConfigPanel — series overrides section
+// ---------------------------------------------------------------------------
+
+describe("useConfigPanel – series overrides section", () => {
+  it.each([
+    "line",
+    "area",
+    "area-stacked",
+    "bar",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "scatter",
+    "pie",
+    "donut",
+    "gauge",
+    "metric",
+  ])("is visible for %s", (type) => {
+    const c = makeComposable(makePanelData(type));
+    expect(c.isSectionVisible("seriesOverrides")).toBe(true);
+  });
+
+  it.each(["table", "heatmap", "geomap", "maps", "sankey", "html", "markdown", "custom_chart"])(
+    "is hidden for %s",
+    (type) => {
+      const c = makeComposable(makePanelData(type));
+      expect(c.isSectionVisible("seriesOverrides")).toBe(false);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // useConfigPanel — background section
 // ---------------------------------------------------------------------------
 
@@ -1112,5 +1188,24 @@ describe("useConfigPanel – show exemplars option", () => {
   ])("stays hidden for %s/%s with promqlMode=%s", (type, queryType, promql) => {
     const c = makeComposable(promqlPanel(type, queryType), ref(promql));
     expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(false);
+  });
+});
+
+describe("filterOption – plural queries", () => {
+  it.each([
+    ["limits", "Limit line only"],
+    ["units", "Unit"],
+    ["thresholds", "Thresholds"],
+    ["labels", "Label position"],
+  ])("%j finds %j", (query, label) => {
+    expect(filterOption({ label }, query)).toBe(true);
+  });
+
+  it.each([
+    ["axis", "Max value"],
+    ["units", "Unity"],
+    ["gas", "Ga"],
+  ])("%j does not widen to %j", (query, label) => {
+    expect(filterOption({ label }, query)).toBe(false);
   });
 });

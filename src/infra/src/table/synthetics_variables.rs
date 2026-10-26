@@ -346,6 +346,19 @@ pub async fn delete_by_env<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
+/// Deletes every shared variable of an org and drops its cache entry on every node.
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    invalidate_and_publish(org_id).await;
+    Ok(())
+}
+
 /// Invalidates locally **and** tells every other node.
 pub async fn invalidate_and_publish(org_id: &str) {
     invalidate_cache(org_id);

@@ -41,6 +41,7 @@ pub mod downtimes;
 pub mod eval_jobs;
 #[cfg(feature = "enterprise")]
 pub mod experiments;
+pub mod fleet;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;

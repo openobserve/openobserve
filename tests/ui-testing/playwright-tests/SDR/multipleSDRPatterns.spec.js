@@ -2,6 +2,7 @@ const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // Helper function to ingest a SINGLE log entry with retry logic
 async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetries = 5) {
@@ -37,7 +38,7 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
         body: responseJson
       };
     }, {
-      url: process.env.INGESTION_URL,
+      url: ingestBase(process.env.INGESTION_URL),
       headers: headers,
       orgId: orgId,
       streamName: streamName,

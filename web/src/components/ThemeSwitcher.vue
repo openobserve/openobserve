@@ -93,7 +93,8 @@ export default defineComponent({
 
     const setTheme = (theme: any) => {
       try {
-        localStorage.setItem("theme", theme);
+        // A kiosk ?theme= is for that screen only and must not become the saved preference.
+        if (!store.state.themeOverride) localStorage.setItem("theme", theme);
       } catch (error) {
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);

@@ -66,6 +66,9 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// How soon a blocked org's trigger is looked at again when its org's status cannot be read.
+const UNREADABLE_ORG_RECHECK_MICROS: i64 = 60 * 1_000_000;
+
 /// One anomaly detection run as the trigger history records it, scheduled or manual.
 pub(crate) struct AnomalyRunRecord {
     pub(crate) status: RunOutcome,
@@ -76,6 +79,14 @@ pub(crate) struct AnomalyRunRecord {
     pub(crate) downtime_id: Option<String>,
     pub(crate) start_us: i64,
     pub(crate) end_us: i64,
+}
+
+/// What a report trigger does after a failed attempt.
+#[derive(Debug, PartialEq, Eq)]
+enum RetryOutcome {
+    Retry,
+    Reschedule,
+    FinishOnce,
 }
 
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
@@ -722,27 +733,16 @@ pub async fn handle_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    // Do not execute scheduled work for an org that is soft-deleted (pending_deletion)
-    // or actively deleting: the org is hidden and blocked everywhere, so firing its
-    // scheduled alerts/pipelines/reports would send notifications for an org the user
-    // believes is gone. Keep the trigger alive (reschedule ~1h out) so it resumes if
-    // the org is resurrected; on hard-delete the scheduler rows are purged by cleanup.
-    if crate::db::org_status::is_blocked(&trigger.org) {
+    // Parked, not fired: a blocked org sends nothing, and a resurrect still finds the trigger.
+    if crate::db::org_status::is_blocked(&trigger.org)
+        && park_while_blocked(trace_id, &trigger).await?
+    {
         log::debug!(
             "[scheduler] org={} is pending deletion/deleting; skipping {:?} trigger {}",
             trigger.org,
             trigger.module,
             trigger.module_key
         );
-        let mut trigger = trigger;
-        trigger.next_run_at = config::utils::time::now_micros() + 3600 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        // Fenced and local like its own completion: a broadcast write can clobber a newer claim.
-        if trigger.module.completes_by_claim() {
-            infra::scheduler::complete_claim(trigger).await?;
-        } else {
-            db::scheduler::update_trigger(trigger, false, trace_id).await?;
-        }
         return Ok(());
     }
 
@@ -770,7 +770,114 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::AlertCalibration => {
             super::calibration::handle_triggers(trace_id, trigger).await
         }
+        db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
     }
+}
+
+/// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.
+#[cfg(feature = "enterprise")]
+async fn handle_fleet_rollout_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::fleet::rollouts;
+
+    // §17: the flag off freezes rollouts; the unreleased claim lapses and the job comes back later.
+    if !crate::fleet::enabled() {
+        return Ok(());
+    }
+    // The tick re-arms or deletes its own job row, fenced by this claim.
+    rollouts::tick(&trigger, config::utils::time::now_micros()).await?;
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_fleet_rollout_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // A row can survive a downgrade, so drop it rather than leave it retried forever.
+    infra::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::FleetRollout,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Parks a blocked org's due trigger on its deletion's hourly grid; false once the org is active.
+async fn park_while_blocked(
+    trace_id: &str,
+    trigger: &db::scheduler::Trigger,
+) -> Result<bool, anyhow::Error> {
+    use infra::table::organizations;
+    let org = trigger.org.as_str();
+    park_with(
+        trigger,
+        now_micros(),
+        async {
+            organizations::get_on_writer(org)
+                .await
+                .map(|row| (row.status, row.deleted_at))
+        },
+        |parked, now| async move { infra::scheduler::release_if_org_active(&parked, now).await },
+        |parked| async move {
+            // Fenced and local like its own completion: a broadcast can clobber a newer claim.
+            if parked.module.completes_by_claim() {
+                infra::scheduler::complete_claim(parked).await.map(|_| ())
+            } else {
+                db::scheduler::update_trigger(parked, false, trace_id).await
+            }
+        },
+    )
+    .await
+}
+
+/// `park_while_blocked` with its org read, conditional release and trigger write passed in.
+async fn park_with<R, RF, W, F>(
+    trigger: &db::scheduler::Trigger,
+    now: i64,
+    read_org: impl Future<Output = Result<(String, Option<i64>), infra::errors::Error>>,
+    release: R,
+    write: W,
+) -> Result<bool, anyhow::Error>
+where
+    R: FnOnce(db::scheduler::Trigger, i64) -> RF,
+    RF: Future<Output = Result<bool, infra::errors::Error>>,
+    W: Fn(db::scheduler::Trigger) -> F,
+    F: Future<Output = Result<(), infra::errors::Error>>,
+{
+    let mut parked = trigger.clone();
+    parked.status = db::scheduler::TriggerStatus::Waiting;
+    let deleted_at = match read_org.await {
+        Ok((status, _)) if status == "active" => return Ok(false),
+        Ok((_, deleted_at)) => deleted_at,
+        Err(e) => {
+            // Off the deletion grid a resurrect cannot release it, so it must not wait an hour.
+            log::warn!(
+                "[scheduler] org={} unreadable, trigger rechecked in a minute: {e}",
+                trigger.org
+            );
+            parked.next_run_at = now + UNREADABLE_ORG_RECHECK_MICROS;
+            write(parked).await?;
+            return Ok(true);
+        }
+    };
+    parked.next_run_at = crate::org_cleanup::parked_run_at(deleted_at, now);
+    write(parked.clone()).await?;
+    // Unfenced, a re-release could reset a claim a racing resurrect let another worker take.
+    if trigger.module.completes_by_claim() {
+        return Ok(true);
+    }
+    // A resurrect that released the org's triggers before this write could not release this one.
+    if let Err(e) = release(parked.clone(), now).await {
+        log::warn!(
+            "[scheduler] org={} unreadable after parking, rechecked in a minute: {e}",
+            trigger.org
+        );
+        parked.next_run_at = now + UNREADABLE_ORG_RECHECK_MICROS;
+        write(parked).await?;
+    }
+    Ok(true)
 }
 
 /// Dropped rather than re-armed once the ladder ends: a timer outliving it fires at nobody.
@@ -4742,19 +4849,24 @@ async fn handle_report_triggers(
     };
 
     if trigger.retries >= max_retries {
-        // It has been tried the maximum time, just update the
-        // next_run_at to the next expected trigger time
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has passed maximum retries, skipping to next run",
             org_id = new_trigger.org,
             report_name = report_name
         );
         trigger_data_stream.status = RunOutcome::Skipped;
-        trigger_data_stream.error = Some(format!(
-            "max retries ({max_retries}) reached, run not attempted"
-        ));
+        let finish_once = report_retry_outcome(run_once, trigger.retries, max_retries)
+            == RetryOutcome::FinishOnce;
+        trigger_data_stream.error = Some(if finish_once {
+            format!("max retries ({max_retries}) reached, one-time report paused")
+        } else {
+            format!("max retries ({max_retries}) reached, run not attempted")
+        });
         // Not stored as the last run: the failure that exhausted the retries stays on the list.
         publish_triggers_usage(trigger_data_stream);
+        if finish_once {
+            finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
+        }
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
@@ -4774,35 +4886,7 @@ async fn handle_report_triggers(
             );
             // Report generation successful, update the trigger
             if run_once {
-                new_trigger.status = db::scheduler::TriggerStatus::Completed;
-                // Get the report again from db to pause it
-                match infra::table::reports::get_by_id(conn, report_id).await? {
-                    Some((folder, mut old_report)) => {
-                        // Pause the report as this is the last run
-                        if old_report.enabled {
-                            // Disable the report
-                            old_report.enabled = false;
-                        }
-                        let result = db::dashboards::reports::update_without_updating_trigger(
-                            conn,
-                            &folder.folder_id,
-                            None,
-                            old_report,
-                        )
-                        .await;
-                        if result.is_err() {
-                            log::error!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {}",
-                                result.err().unwrap()
-                            );
-                        }
-                    }
-                    None => {
-                        log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
-                        );
-                    }
-                }
+                finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
             }
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
@@ -4813,31 +4897,99 @@ async fn handle_report_triggers(
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error sending report to subscribers: org_id: {org_id}, error: {e}"
             );
-            if trigger.retries + 1 >= max_retries && !run_once {
-                // It has been tried the maximum time, just update the
-                // next_run_at to the next expected trigger time
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
-                );
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-            } else {
-                // Otherwise update its status only
-                db::scheduler::update_status(
-                    &new_trigger.org,
-                    new_trigger.module,
-                    &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
-                    true,
-                    &query_trace_id,
-                )
-                .await?;
+            match report_retry_outcome(run_once, trigger.retries, max_retries) {
+                RetryOutcome::Retry => {
+                    db::scheduler::update_status(
+                        &new_trigger.org,
+                        new_trigger.module,
+                        &new_trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                        None,
+                        true,
+                        &query_trace_id,
+                    )
+                    .await?;
+                }
+                RetryOutcome::Reschedule => {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
+                    );
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                }
+                RetryOutcome::FinishOnce => {
+                    // Kept off the last run so the failure that exhausted the retries stays listed.
+                    publish_triggers_usage(exhausted_once_row(
+                        TriggerData {
+                            next_run_at: new_trigger.next_run_at,
+                            ..base_row()
+                        },
+                        max_retries,
+                    ));
+                    finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                }
             }
         }
     }
 
     Ok(())
+}
+
+/// Marks a one-time report's trigger Completed and pauses the report.
+async fn finish_run_once(
+    conn: &sea_orm::DatabaseConnection,
+    report_id: &str,
+    new_trigger: &mut db::scheduler::Trigger,
+    scheduler_trace_id: &str,
+) -> Result<(), anyhow::Error> {
+    new_trigger.status = db::scheduler::TriggerStatus::Completed;
+    let org_id = &new_trigger.org;
+    let Some((folder, mut report)) = infra::table::reports::get_by_id(conn, report_id).await?
+    else {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
+        );
+        return Ok(());
+    };
+    report.enabled = false;
+    let report_name = report.name.clone();
+    if let Err(e) = db::dashboards::reports::update_without_updating_trigger(
+        conn,
+        &folder.folder_id,
+        None,
+        report,
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {e}"
+        );
+    }
+    Ok(())
+}
+
+/// The Skipped row for a one-time report whose retries ran out, published right after the
+/// failure that exhausted them. History identifies a run by `_timestamp` and `retries`, and both
+/// rows share the handler's start time, so this row counts as the attempt that was not made.
+fn exhausted_once_row(mut row: TriggerData, max_retries: i32) -> TriggerData {
+    row.status = RunOutcome::Skipped;
+    row.error = Some(format!(
+        "max retries ({max_retries}) reached, one-time report paused"
+    ));
+    row.retries = row.retries.saturating_add(1);
+    row
+}
+
+/// `retries` counts the attempts that failed before this one.
+fn report_retry_outcome(run_once: bool, retries: i32, max_retries: i32) -> RetryOutcome {
+    if retries.saturating_add(1) < max_retries {
+        RetryOutcome::Retry
+    } else if run_once {
+        RetryOutcome::FinishOnce
+    } else {
+        RetryOutcome::Reschedule
+    }
 }
 
 /// Next run and frequency in seconds of a report schedule; a week out if it cannot be evaluated.
@@ -5355,11 +5507,12 @@ async fn handle_derived_stream_triggers(
                     new_trigger.module_key
                 );
 
-                let local_val = trigger_results.data // checked is some
-                        .unwrap()
-                        .into_iter()
-                        .map(json::Value::Object)
-                        .collect::<Vec<_>>();
+                let local_val = trigger_results
+                    .data // checked is some
+                    .unwrap()
+                    .into_iter()
+                    .map(json::Value::Object)
+                    .collect::<Vec<_>>();
 
                 // pass search results to pipeline to get modified results before ingesting
                 let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
@@ -7760,6 +7913,53 @@ mod tests {
     }
 
     #[test]
+    fn report_retry_outcome_finishes_a_one_time_report_when_retries_run_out() {
+        use RetryOutcome::*;
+        assert_eq!(report_retry_outcome(true, 0, 3), Retry);
+        assert_eq!(report_retry_outcome(false, 1, 3), Retry);
+        assert_eq!(report_retry_outcome(true, 2, 3), FinishOnce);
+        assert_eq!(report_retry_outcome(false, 2, 3), Reschedule);
+        assert_eq!(report_retry_outcome(true, 3, 3), FinishOnce);
+        for max_retries in [0, 1] {
+            for retries in [0, 1, i32::MAX] {
+                assert_ne!(report_retry_outcome(true, retries, max_retries), Retry);
+                assert_ne!(report_retry_outcome(false, retries, max_retries), Retry);
+            }
+        }
+    }
+
+    #[test]
+    fn exhausted_once_row_does_not_collide_with_the_failure_before_it() {
+        let failure = TriggerData {
+            _timestamp: 10,
+            retries: 2,
+            status: RunOutcome::Error,
+            error: Some("smtp down".to_string()),
+            ..Default::default()
+        };
+        let skipped = exhausted_once_row(failure.clone(), 3);
+        assert_eq!(skipped._timestamp, failure._timestamp);
+        assert_ne!(skipped.retries, failure.retries);
+        assert_eq!(skipped.retries, 3);
+        assert_eq!(skipped.status, RunOutcome::Skipped);
+        assert_eq!(
+            skipped.error.as_deref(),
+            Some("max retries (3) reached, one-time report paused")
+        );
+        assert_eq!(
+            exhausted_once_row(
+                TriggerData {
+                    retries: i32::MAX,
+                    ..Default::default()
+                },
+                3
+            )
+            .retries,
+            i32::MAX
+        );
+    }
+
+    #[test]
     fn report_next_run_follows_a_valid_schedule() {
         let now = 1640995200000000;
         let hour = Duration::try_hours(1).unwrap().num_microseconds().unwrap();
@@ -9109,5 +9309,122 @@ mod tests {
         let kept =
             record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
         assert_eq!(kept, RunOutcome::NotifyFailed);
+    }
+
+    const PARK_NOW: i64 = 10_000_000_000;
+    const PARK_DELETED_AT: i64 = PARK_NOW - 90 * 60 * 1_000_000;
+
+    /// Runs `park_with` on canned inputs; returns its result and each `next_run_at` it set.
+    async fn park_runs(
+        org: Result<(String, Option<i64>), infra::errors::Error>,
+        active: Result<bool, infra::errors::Error>,
+    ) -> (Result<bool, anyhow::Error>, Vec<i64>) {
+        park_runs_as(db::scheduler::TriggerModule::Alert, org, active).await
+    }
+
+    async fn park_runs_as(
+        module: db::scheduler::TriggerModule,
+        org: Result<(String, Option<i64>), infra::errors::Error>,
+        active: Result<bool, infra::errors::Error>,
+    ) -> (Result<bool, anyhow::Error>, Vec<i64>) {
+        let written = std::sync::Mutex::new(Vec::new());
+        let trigger = db::scheduler::Trigger {
+            org: "park-org".to_string(),
+            module,
+            next_run_at: PARK_NOW - 1,
+            ..Default::default()
+        };
+        let parked = park_with(
+            &trigger,
+            PARK_NOW,
+            async { org },
+            |parked: db::scheduler::Trigger, now| {
+                let written = &written;
+                async move {
+                    assert_eq!(written.lock().unwrap().last(), Some(&parked.next_run_at));
+                    if *active.as_ref().unwrap_or(&false) {
+                        written.lock().unwrap().push(now);
+                    }
+                    active
+                }
+            },
+            |t: db::scheduler::Trigger| {
+                written.lock().unwrap().push(t.next_run_at);
+                async { Ok(()) }
+            },
+        )
+        .await;
+        (parked, written.into_inner().unwrap())
+    }
+
+    fn pending_row() -> Result<(String, Option<i64>), infra::errors::Error> {
+        Ok(("pending_deletion".to_string(), Some(PARK_DELETED_AT)))
+    }
+
+    fn db_down() -> infra::errors::Error {
+        infra::errors::Error::Message("db down".to_string())
+    }
+
+    #[tokio::test]
+    async fn test_active_org_runs_its_trigger_unparked() {
+        let (parked, written) = park_runs(Ok(("active".to_string(), None)), Ok(false)).await;
+        assert!(!parked.unwrap());
+        assert!(written.is_empty(), "{written:?}");
+    }
+
+    #[tokio::test]
+    async fn test_blocked_org_parks_on_its_deletion_grid() {
+        let (parked, written) = park_runs(pending_row(), Ok(false)).await;
+        assert!(parked.unwrap());
+        let grid = crate::org_cleanup::parked_run_at(Some(PARK_DELETED_AT), PARK_NOW);
+        assert_eq!(written, vec![grid]);
+    }
+
+    #[tokio::test]
+    async fn test_resurrect_during_parking_releases_the_trigger() {
+        let (parked, written) = park_runs(pending_row(), Ok(true)).await;
+        assert!(parked.unwrap());
+        assert_eq!(written.last(), Some(&PARK_NOW), "{written:?}");
+    }
+
+    #[tokio::test]
+    async fn test_unreadable_org_row_rechecks_the_trigger_within_a_minute() {
+        let (parked, written) = park_runs(Err(db_down()), Ok(true)).await;
+        assert!(parked.unwrap());
+        assert_eq!(written, vec![PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS]);
+    }
+
+    #[tokio::test]
+    async fn test_claim_module_waits_for_its_grid_slot_instead_of_a_rerelease() {
+        use db::scheduler::TriggerModule::{AlertCalibration, CompositeAlert};
+        let grid = crate::org_cleanup::parked_run_at(Some(PARK_DELETED_AT), PARK_NOW);
+        for module in [CompositeAlert, AlertCalibration] {
+            let (parked, written) = park_runs_as(module.clone(), pending_row(), Ok(true)).await;
+            assert!(parked.unwrap());
+            assert_eq!(written, vec![grid], "{module:?} after a racing resurrect");
+            let (parked, written) =
+                park_runs_as(module.clone(), pending_row(), Err(db_down())).await;
+            assert!(parked.unwrap());
+            assert_eq!(written, vec![grid], "{module:?} after a failed re-read");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_non_claim_module_is_released_after_a_racing_resurrect() {
+        let grid = crate::org_cleanup::parked_run_at(Some(PARK_DELETED_AT), PARK_NOW);
+        let (parked, written) = park_runs(pending_row(), Ok(true)).await;
+        assert!(parked.unwrap());
+        assert_eq!(written, vec![grid, PARK_NOW]);
+    }
+
+    #[tokio::test]
+    async fn test_failed_status_reread_rechecks_the_parked_trigger_within_a_minute() {
+        let (parked, written) = park_runs(pending_row(), Err(db_down())).await;
+        assert!(parked.expect("a failed re-read must not fail the trigger"));
+        assert_eq!(
+            written.last(),
+            Some(&(PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS)),
+            "{written:?}"
+        );
     }
 }

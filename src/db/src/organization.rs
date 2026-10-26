@@ -23,6 +23,7 @@ use common::{
 };
 use config::utils::json;
 use infra::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
@@ -404,8 +405,51 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Turns a `deleting` org row into a `deleted` tombstone; true only for the call that flipped it.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    let won = organizations::set_status_if(org_id, STATUS_DELETING, STATUS_DELETED)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?;
+    if !won {
+        // A retry after a later failure finds the tombstone already written.
+        organizations::invalidate_cache(Some(org_id)).await;
+        let status = organizations::get(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?
+            .status;
+        if status != STATUS_DELETED {
+            return Err(anyhow::anyhow!(
+                "Cannot tombstone org {org_id} in status {status}"
+            ));
+        }
+    }
+    Ok(won)
+}
+
+/// Drops a tombstoned org from every node's org caches; safe to repeat on a step retry.
+pub async fn evict_org(org_id: &str) -> Result<(), anyhow::Error> {
+    organizations::invalidate_cache(Some(org_id)).await;
+    ORGANIZATIONS.clone().write().await.remove(org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_delete(&key).await?;
+    Ok(())
+}
+
 /// Lists live orgs; tombstones stay out so caches, jobs and the org list never see them.
 pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_with_created_at(limit)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list`], paired with each org's creation time in microseconds.
+pub async fn list_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let filter = organizations::ListFilter {
         exclude_deleted: true,
         ..organizations::ListFilter::with_limit(limit)
@@ -415,12 +459,30 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
     Ok(orgs
         .into_iter()
-        .map(|org| Organization {
-            identifier: org.identifier,
-            name: org.org_name,
-            org_type: org.org_type.to_string(),
-            service_account: None,
+        .map(|org| {
+            let created_at = org.created_at;
+            (to_organization(org), created_at)
         })
+        .collect())
+}
+
+/// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.
+pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
+    let filter = organizations::ListFilter {
+        exclude_deleted: true,
+        ..organizations::ListFilter::default()
+    };
+    let orgs = organizations::list(filter)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
+    Ok(orgs
+        .into_iter()
+        .filter(|org| {
+            ![STATUS_PENDING_DELETION, STATUS_DELETING, STATUS_DELETED]
+                .contains(&org.status.as_str())
+                && !crate::org_status::is_blocked(&org.identifier)
+        })
+        .map(to_organization)
         .collect())
 }
 
@@ -476,6 +538,15 @@ mod super_cluster {
             .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
         }
         Ok(())
+    }
+}
+
+fn to_organization(org: organizations::OrganizationRecord) -> Organization {
+    Organization {
+        identifier: org.identifier,
+        name: org.org_name,
+        org_type: org.org_type.to_string(),
+        service_account: None,
     }
 }
 
@@ -540,7 +611,17 @@ async fn apply_event(ev: db::Event) {
                     }
                 }
             } else {
-                json::from_slice(&ev.value.unwrap()).unwrap()
+                match ev.value.as_deref().map(json::from_slice::<Organization>) {
+                    Some(Ok(val)) => val,
+                    Some(Err(e)) => {
+                        log::error!("[ORGANIZATION] bad value for {item_key}: {e}");
+                        return;
+                    }
+                    None => {
+                        log::error!("[ORGANIZATION] put event for {item_key} has no value");
+                        return;
+                    }
+                }
             };
             ORGANIZATIONS
                 .clone()
@@ -827,10 +908,77 @@ mod tests {
         assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
     }
 
+    #[tokio::test]
+    async fn test_org_watch_put_without_a_readable_value_is_skipped() {
+        if !config::get_config().common.local_mode {
+            return;
+        }
+        let org_id = "watchbadputorg";
+        for value in [None, Some(Bytes::from_static(b"not json"))] {
+            apply_event(db::Event::Put(infra::db::EventData {
+                key: format!("{ORG_KEY_PREFIX}{org_id}"),
+                value,
+                start_dt: None,
+            }))
+            .await;
+        }
+        assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
+    }
+
     #[test]
     fn test_org_key_format() {
         let org_id = "myorg";
         let key = format!("{ORG_KEY_PREFIX}{org_id}");
         assert_eq!(key, "/organization/org/myorg");
+    }
+
+    #[tokio::test]
+    async fn test_backfills_list_only_orgs_neither_their_row_nor_the_cache_blocks() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        let base = format!("t_unblocked_{}", config::utils::time::now_micros());
+        let orgs = [
+            ("active", "active"),
+            ("pending", "pending_deletion"),
+            ("deleting", "deleting"),
+            ("deleted", "deleted"),
+            ("cached", "active"),
+        ]
+        .map(|(suffix, status)| (format!("{base}_{suffix}"), status));
+        for (org, status) in &orgs {
+            organizations::add(
+                org,
+                org,
+                config::meta::organization::OrganizationType::Custom,
+            )
+            .await
+            .unwrap();
+            organizations::set_status(org, status).await.unwrap();
+        }
+        // Another node's broadcast reached this node before its row read caught up.
+        ORG_STATUS_CACHE.insert(orgs[4].0.clone(), OrgStatus::PendingDeletion);
+
+        let listed: Vec<String> = list_unblocked()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|org| org.identifier)
+            .filter(|id| id.starts_with(&base))
+            .collect();
+        ORG_STATUS_CACHE.remove(&orgs[4].0);
+        for (org, _) in &orgs {
+            organizations::remove(org).await.unwrap();
+        }
+
+        assert_eq!(listed, [orgs[0].0.clone()]);
     }
 }

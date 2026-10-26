@@ -1711,7 +1711,6 @@ export default defineComponent({
           analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             stream_name: indexData.value.name,
             page: "Schema Details",
           });

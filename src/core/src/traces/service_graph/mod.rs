@@ -33,6 +33,10 @@ struct RecentIngestedTraceStream {
     stream_name: String,
 }
 
+pub(crate) fn org_being_deleted(org: &str) -> bool {
+    crate::db::org_status::is_blocked(org)
+}
+
 /// Runs a pre-aggregated graph query against a trace stream and returns the raw hits.
 pub(crate) async fn run_graph_search(
     org_id: &str,
@@ -166,5 +170,23 @@ mod tests {
                 data.org_id == "random" && data.stream_name == "random-stream"
             })
         );
+    }
+
+    #[test]
+    fn test_orgs_being_deleted_get_no_service_graph() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let statuses = [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ];
+        for (i, status) in statuses.into_iter().enumerate() {
+            let org = format!("sg-being-deleted-{i}");
+            ORG_STATUS_CACHE.insert(org.clone(), status);
+            let skipped = org_being_deleted(&org);
+            ORG_STATUS_CACHE.remove(&org);
+            assert!(skipped, "{org} still got service graph work");
+        }
+        assert!(!org_being_deleted("sg-active-org"));
     }
 }

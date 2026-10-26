@@ -13,9 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
-use common::infra::config::{ALERTS, ALERTS_CONTENT_SPECS, ALERTS_TEMPLATES, DESTINATIONS};
+use common::{
+    infra::config::{ALERTS, ALERTS_CONTENT_SPECS, ALERTS_TEMPLATES, DESTINATIONS},
+    meta::authz::Authz,
+};
 use config::{
     DEFAULT_ORG,
     meta::{
@@ -26,7 +32,7 @@ use config::{
 use infra::table;
 use itertools::Itertools;
 
-use crate as db;
+use crate::{self as db, authz::remove_ownership};
 
 // db cache watcher prefix
 const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
@@ -93,7 +99,7 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
     // trigger watch event to update in-memory cache
     let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name);
     // in-cluster
-    infra::coordinator::destinations::emit_put_event(&event_key).await?;
+    infra::coordinator::emit_put(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -124,7 +130,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
 
     // trigger watch event to update in-memory cache
     // in-cluster
-    infra::coordinator::destinations::emit_delete_event(&event_key).await?;
+    infra::coordinator::emit_delete(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -141,6 +147,55 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     }
 
     Ok(())
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), TemplateError> {
+    let owned = table::templates::list_ids_by_org(org_id).await?;
+    let names: Vec<String> = owned.iter().map(|(_, name)| name.clone()).collect();
+    let owners = &tuple_owners(org_id, &names).await?;
+    let local = |name: String| async move {
+        apply_template_cache_event(&format!("{org_id}/{name}"), None);
+    };
+    let broadcast = |name: String| async move {
+        let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{org_id}/{name}");
+        infra::coordinator::emit_delete(&event_key).await?;
+        Ok::<(), TemplateError>(())
+    };
+    // Org deletion is refused while super-cluster replication is enabled.
+    db::teardown::evict_then_delete(
+        owned,
+        |(_, name): (String, String)| local(name),
+        |(_, name): (String, String)| broadcast(name),
+        |(id, name): (String, String)| async move {
+            for owner in owners.get(&name).into_iter().flatten() {
+                remove_ownership(owner, "templates", Authz::new(&name)).await;
+            }
+            table::templates::delete_by_id(org_id, &id).await?;
+            Ok(())
+        },
+    )
+    .await?;
+    let missed = table::templates::delete_by_org_returning(org_id).await?;
+    let names: Vec<String> = missed.iter().map(|(_, name)| name.clone()).collect();
+    let owners = tuple_owners(org_id, &names).await?;
+    for (_, name) in missed {
+        for owner in owners.get(&name).into_iter().flatten() {
+            remove_ownership(owner, "templates", Authz::new(&name)).await;
+        }
+        db::teardown::evict(local(name.clone()), broadcast(name)).await?;
+    }
+    Ok(())
+}
+
+/// For each name, the owners of its `template:{name}` tuples; none when no tuples are kept.
+pub async fn tuple_owners(
+    org_id: &str,
+    names: &[String],
+) -> Result<HashMap<String, Vec<String>>, TemplateError> {
+    if !db::authz::tracks_ownership() {
+        return Ok(HashMap::new());
+    }
+    owners_by_name(org_id, names).await
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
@@ -316,6 +371,42 @@ fn references_from(org_id: &str, cache_key: &str) -> bool {
         || cache_key
             .strip_prefix(org_id)
             .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// For each name, the owners of its `template:{name}` tuples: the org, and the name if unshared.
+async fn owners_by_name(
+    org_id: &str,
+    names: &[String],
+) -> Result<HashMap<String, Vec<String>>, TemplateError> {
+    let shared = names_shared_with_live_orgs(org_id, names).await?;
+    Ok(names
+        .iter()
+        .map(|name| {
+            let owners = ownership_owners(org_id, name, shared.contains(name));
+            (name.clone(), owners.into_iter().map(String::from).collect())
+        })
+        .collect())
+}
+
+/// The names another org that is not deleting also holds; an org without a row counts as live.
+async fn names_shared_with_live_orgs(
+    org_id: &str,
+    names: &[String],
+) -> Result<HashSet<String>, TemplateError> {
+    Ok(table::templates::names_held_by_live_orgs(org_id, names)
+        .await?
+        .into_iter()
+        .collect())
+}
+
+/// The owners of the template's tuples: the org, and the name, which older releases wrote as org.
+fn ownership_owners<'a>(org_id: &'a str, name: &'a str, name_shared: bool) -> Vec<&'a str> {
+    let mut owners = vec![org_id];
+    // Every org holding a same-named template shares that one legacy tuple.
+    if !name_shared && name != org_id {
+        owners.push(name);
+    }
+    owners
 }
 
 #[cfg(test)]
@@ -605,5 +696,134 @@ mod tests {
             "Delete must remove the content-spec entry"
         );
         assert_caches_agree(&key);
+    }
+
+    #[test]
+    fn test_teardown_removes_the_org_tuple_and_the_legacy_name_tuple() {
+        assert_eq!(ownership_owners("acme", "tpl", false), ["acme", "tpl"]);
+        assert_eq!(ownership_owners("acme", "tpl", true), ["acme"]);
+        assert_eq!(ownership_owners("acme", "acme", false), ["acme"]);
+    }
+
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    async fn put_template(org_id: &str, name: &str) {
+        table::templates::put(Template {
+            id: None,
+            org_id: org_id.to_string(),
+            name: name.to_string(),
+            is_default: false,
+            template_type: config::meta::destinations::TemplateType::Http,
+            body: r#"{"text":"{alert_name}"}"#.to_string(),
+            kind: TemplateKind::Custom,
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_tuple_owners_reads_nothing_when_ownership_is_untracked() {
+        if db::authz::tracks_ownership() {
+            return;
+        }
+        let names = ["t_tpl_untracked".to_string()];
+        let owners = tuple_owners("t_tpl_untracked_org", &names).await.unwrap();
+        assert!(owners.is_empty(), "{owners:?}");
+    }
+
+    #[tokio::test]
+    async fn test_a_name_another_live_org_holds_keeps_the_legacy_tuple() {
+        use table::organizations;
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let gone = format!("t_tpl_gone_{suffix}");
+        let other = format!("t_tpl_other_{suffix}");
+        let solo = format!("t_tpl_solo_{suffix}");
+        let shared = format!("t_tpl_{suffix}");
+        // The shared name sits in the second IN-list batch.
+        let mut names: Vec<String> = (0..500).map(|i| format!("t_tpl_absent_{i}")).collect();
+        names.extend([solo.clone(), shared.clone()]);
+        let owners_of = |owners: HashMap<String, Vec<String>>, name: &str| owners[name].clone();
+        put_template(&gone, &solo).await;
+        put_template(&gone, &shared).await;
+        let alone = owners_by_name(&gone, &names).await.unwrap();
+        put_template(&other, &shared).await;
+        let unknown_org = owners_by_name(&gone, &names).await.unwrap();
+        organizations::add(
+            &other,
+            &other,
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await
+        .unwrap();
+        let mut by_status = vec![];
+        for status in ["active", "pending_deletion", "deleting", "deleted"] {
+            organizations::set_status(&other, status).await.unwrap();
+            let owners = owners_by_name(&gone, &names).await.unwrap();
+            by_status.push((status, owners_of(owners, &shared).len()));
+        }
+        table::templates::delete_by_org(&gone).await.unwrap();
+        table::templates::delete_by_org(&other).await.unwrap();
+        organizations::remove(&other).await.unwrap();
+
+        assert_eq!(
+            owners_of(alone.clone(), &shared),
+            [gone.as_str(), shared.as_str()]
+        );
+        assert_eq!(owners_of(alone, &solo), [gone.as_str(), solo.as_str()]);
+        assert_eq!(
+            owners_of(unknown_org.clone(), &shared),
+            [gone.as_str()],
+            "no row: live"
+        );
+        assert_eq!(
+            owners_of(unknown_org, &solo),
+            [gone.as_str(), solo.as_str()]
+        );
+        assert_eq!(
+            by_status,
+            [
+                ("active", 1),
+                ("pending_deletion", 1),
+                ("deleting", 2),
+                ("deleted", 2),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_a_name_many_live_orgs_hold_comes_back_once() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let name = format!("t_tpl_many_{suffix}");
+        let orgs: Vec<String> = (0..3).map(|i| format!("t_tpl_many_{i}_{suffix}")).collect();
+        for org in &orgs {
+            put_template(org, &name).await;
+        }
+        let held = table::templates::names_held_by_live_orgs(&orgs[0], std::slice::from_ref(&name))
+            .await
+            .unwrap();
+        for org in &orgs {
+            table::templates::delete_by_org(org).await.unwrap();
+        }
+
+        assert_eq!(held, [name]);
     }
 }

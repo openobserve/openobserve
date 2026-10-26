@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { CancelledError } from "@tanstack/vue-query";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import Dashboards from "./Dashboards.vue";
@@ -28,6 +29,7 @@ vi.mock("@/utils/commons", () => ({
   deleteFolderById: vi.fn().mockResolvedValue({}),
   getAllDashboards: vi.fn().mockResolvedValue([]),
   getAllDashboardsByFolderId: vi.fn().mockResolvedValue([]),
+  loadDashboardsByFolderId: vi.fn().mockResolvedValue(undefined),
   getDashboard: vi.fn().mockResolvedValue({}),
   getFoldersList: vi.fn().mockImplementation((store) => {
     // Mock implementation that populates the store's folders
@@ -41,10 +43,11 @@ vi.mock("@/utils/commons", () => ({
   moveModuleToAnotherFolder: vi.fn().mockResolvedValue({}),
 }));
 
+const notifications = vi.hoisted(() => ({ showErrorNotification: vi.fn() }));
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: vi.fn(),
-    showErrorNotification: vi.fn(),
+    showErrorNotification: notifications.showErrorNotification,
   }),
 }));
 
@@ -755,6 +758,69 @@ describe("Dashboards.vue", () => {
       expect(columnIds).toContain("folder");
     });
 
+    it("TV playlist takes the selected favorites from several folders, in the order they were ticked", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "remote1", folderId: "folder1", label: "Remote Dash" },
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper.vm.updateActiveFolderId("__favorites__");
+      await nextTick();
+      wrapper.vm.selectedIds = ["dash1"];
+      wrapper.vm.selectedIds = ["remote1", "dash1"];
+
+      const button = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.vm.$attrs["data-test"] === "dashboard-list-tv-playlist-btn");
+      button.vm.$emit("click");
+      await nextTick();
+
+      const dialog = wrapper.findComponent({ name: "PlaylistDialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("entries")).toEqual([
+        { dashboardId: "dash1", folderId: "default", title: "Dashboard 1", folderName: "Default" },
+        {
+          dashboardId: "remote1",
+          folderId: "folder1",
+          title: "Remote Dash",
+          folderName: "Folder 1",
+        },
+      ]);
+      // Opening the dialog leaves the bulk selection as it was.
+      expect(wrapper.vm.selectedIds).toEqual(["remote1", "dash1"]);
+
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const push = vi.spyOn(router, "push");
+      dialog.vm.$emit("open", {
+        org: "default",
+        entries: [{ dashboardId: "remote1", folderId: "folder1" }],
+        intervalSeconds: 60,
+        slideIndex: 0,
+        period: "1h",
+        theme: "current",
+        fit: true,
+        timezone: null,
+      });
+      const [href, target] = open.mock.calls[0];
+      expect(target).toBe("_blank");
+      const url = new URL(String(href), window.location.origin);
+      expect(url.pathname).toBe("/dashboards/tv");
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        org_identifier: "default",
+        playlist: "remote1:folder1",
+        interval: "1m",
+        slide: "1",
+        period: "1h",
+        fit: "true",
+      });
+      expect(push).not.toHaveBeenCalled();
+      open.mockRestore();
+    });
+
     it("selecting a folder exits the favorites view and shows that folder", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(storeWithTwo(), router, i18n),
@@ -1387,6 +1453,71 @@ describe("Dashboards.vue", () => {
 
       expect(dashboardService.bulkDelete).toHaveBeenCalled();
       expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
+    });
+  });
+  describe("Cross-folder search failure", () => {
+    it("keeps the list renderable when the debounced search fails", async () => {
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      vi.mocked(dashboardService.list).mockRejectedValueOnce(new Error("boom"));
+      wrapper.vm.searchAcrossFolders = true;
+      wrapper.vm.searchQuery = "cpu";
+      await flushPromises();
+      vi.mocked(dashboardService.list).mockRejectedValueOnce(new Error("boom"));
+
+      wrapper.vm.debouncedSearch("cpu");
+      await wrapper.vm.debouncedSearch.flush();
+      await flushPromises();
+
+      expect(wrapper.vm.filteredResults).toEqual([]);
+      expect(() => wrapper.vm.dashboards).not.toThrow();
+    });
+
+    it("keeps the list renderable when the across-folders search fails", async () => {
+      const errorHandler = vi.fn();
+      const global = buildGlobalConfig(store, router, i18n);
+      wrapper = shallowMount(Dashboards, { global: { ...global, config: { errorHandler } } });
+      await flushPromises();
+      vi.mocked(dashboardService.list).mockRejectedValue(new Error("boom"));
+      wrapper.vm.searchQuery = "cpu";
+      await flushPromises();
+
+      wrapper.vm.searchAcrossFolders = true;
+      await flushPromises();
+
+      expect(errorHandler).not.toHaveBeenCalled();
+      expect(wrapper.vm.filteredResults).toEqual([]);
+      expect(() => wrapper.vm.dashboards).not.toThrow();
+      vi.mocked(dashboardService.list).mockResolvedValue([] as any);
+    });
+  });
+  describe("Folder load cancellation", () => {
+    it("stays silent when a folder load is cancelled by a newer one", async () => {
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      notifications.showErrorNotification.mockClear();
+      vi.mocked(commons.loadDashboardsByFolderId).mockRejectedValueOnce(new CancelledError());
+
+      wrapper.vm.activeFolderId = "folder1";
+      await flushPromises();
+
+      expect(commons.loadDashboardsByFolderId).toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalledWith("Error loading dashboards:", expect.anything());
+      expect(notifications.showErrorNotification).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it("still reports a real folder load failure", async () => {
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      notifications.showErrorNotification.mockClear();
+      vi.mocked(commons.loadDashboardsByFolderId).mockRejectedValueOnce(new Error("boom"));
+
+      wrapper.vm.activeFolderId = "folder1";
+      await flushPromises();
+
+      expect(notifications.showErrorNotification).toHaveBeenCalled();
     });
   });
 });

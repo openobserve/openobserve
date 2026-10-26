@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use hashbrown::HashMap;
+use tokio::sync::Mutex;
 
 use crate::get_config;
+
+/// Held across each metadata.json read-modify-write, or a concurrent writer's entries get lost.
+static METADATA_LOCK: Mutex<()> = Mutex::const_new(());
 
 pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
     let key = get_key(org_id, table_name);
@@ -34,20 +38,19 @@ pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
             .map_err(|e| anyhow!("Failed to remove enrichment table file: {}", e))?;
     }
 
-    let mut metadata_content = get_metadata_content().await?;
-    metadata_content.remove(&key);
-
-    // Serialize the metadata content
-    let metadata_json = serde_json::to_string_pretty(&metadata_content)
-        .map_err(|e| anyhow!("Failed to serialize metadata: {}", e))?;
-
-    // Serialize and write metadata
-    tokio::fs::write(&metadata_path, metadata_json)
-        .await
-        .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
+    update_metadata_at(&metadata_path, |metadata| metadata.remove(&key).is_some()).await?;
 
     log::debug!("Deleted enrichment table {key} from local storage");
     Ok(())
+}
+
+/// Removes every local table of the org by its org directory, so no table name is needed.
+pub async fn delete_org(org_id: &str) -> Result<()> {
+    let metadata_path = get_metadata_path();
+    let cache_dir = metadata_path
+        .parent()
+        .ok_or_else(|| anyhow!("enrichment table cache dir has no parent"))?;
+    delete_org_in(cache_dir, org_id).await
 }
 
 pub fn get_key(org_id: &str, table_name: &str) -> String {
@@ -81,17 +84,12 @@ pub fn get_metadata_path() -> PathBuf {
 }
 
 pub async fn get_metadata_content() -> Result<HashMap<String, i64>> {
-    let metadata_path = get_metadata_path();
-    if metadata_path.exists() {
-        let existing_metadata = tokio::fs::read_to_string(&metadata_path)
-            .await
-            .map_err(|e| anyhow!("Failed to read metadata file: {}", e))?;
-        let existing_metadata: HashMap<String, i64> = serde_json::from_str(&existing_metadata)
-            .map_err(|e| anyhow!("Failed to parse metadata JSON: {}", e))?;
-        Ok(existing_metadata)
-    } else {
-        Ok(HashMap::new())
-    }
+    read_metadata(&get_metadata_path()).await
+}
+
+/// Applies `update` to metadata.json under the lock, writing it back when `update` returns true.
+pub async fn update_metadata(update: impl FnOnce(&mut HashMap<String, i64>) -> bool) -> Result<()> {
+    update_metadata_at(&get_metadata_path(), update).await
 }
 
 /// Clean up old JSON format enrichment tables from disk
@@ -180,6 +178,48 @@ pub async fn cleanup_old_json_format() -> Result<()> {
     Ok(())
 }
 
+async fn delete_org_in(cache_dir: &Path, org_id: &str) -> Result<()> {
+    let org_dir = cache_dir.join(org_id);
+    if let Err(e) = tokio::fs::remove_dir_all(&org_dir).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        return Err(anyhow!("Failed to remove {}: {e}", org_dir.display()));
+    }
+    let owned = format!("{org_id}/");
+    update_metadata_at(&cache_dir.join("metadata.json"), |metadata| {
+        let before = metadata.len();
+        metadata.retain(|key, _| !key.starts_with(&owned));
+        metadata.len() != before
+    })
+    .await
+}
+
+async fn read_metadata(path: &Path) -> Result<HashMap<String, i64>> {
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+    let metadata = tokio::fs::read_to_string(path)
+        .await
+        .map_err(|e| anyhow!("Failed to read metadata file: {e}"))?;
+    serde_json::from_str(&metadata).map_err(|e| anyhow!("Failed to parse metadata JSON: {e}"))
+}
+
+async fn update_metadata_at(
+    path: &Path,
+    update: impl FnOnce(&mut HashMap<String, i64>) -> bool,
+) -> Result<()> {
+    let _guard = METADATA_LOCK.lock().await;
+    let mut metadata = read_metadata(path).await?;
+    if !update(&mut metadata) {
+        return Ok(());
+    }
+    let metadata = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| anyhow!("Failed to serialize metadata: {e}"))?;
+    tokio::fs::write(path, metadata)
+        .await
+        .map_err(|e| anyhow!("Failed to write metadata file: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +274,82 @@ mod tests {
                 .contains("enrichment_table_cache")
         );
         assert!(metadata_path.to_string_lossy().contains("metadata.json"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_org_fails_while_its_directory_cannot_be_removed() {
+        let cache_dir = scratch_dir("org");
+        std::fs::create_dir_all(cache_dir.join("t10/tbl")).unwrap();
+        std::fs::write(cache_dir.join("t1"), b"not a directory").unwrap();
+        std::fs::write(
+            cache_dir.join("metadata.json"),
+            r#"{"t1/tbl": 1, "t10/tbl": 2}"#,
+        )
+        .unwrap();
+        let failed = delete_org_in(&cache_dir, "t1").await;
+        let metadata_after_failure =
+            std::fs::read_to_string(cache_dir.join("metadata.json")).unwrap();
+        std::fs::remove_file(cache_dir.join("t1")).unwrap();
+        std::fs::create_dir_all(cache_dir.join("t1/tbl")).unwrap();
+        std::fs::write(cache_dir.join("t1/tbl/1.parquet"), b"x").unwrap();
+        let retried = delete_org_in(&cache_dir, "t1").await;
+        let metadata = std::fs::read_to_string(cache_dir.join("metadata.json")).unwrap();
+        let t1_gone = !cache_dir.join("t1").exists();
+        let t10_kept = cache_dir.join("t10/tbl").exists();
+        std::fs::remove_dir_all(&cache_dir).unwrap();
+        assert!(
+            failed.is_err(),
+            "a directory that cannot be removed fails the delete"
+        );
+        assert!(
+            metadata_after_failure.contains("t1/tbl"),
+            "a failed delete keeps the entry for the retry: {metadata_after_failure}"
+        );
+        retried.unwrap();
+        assert!(
+            t1_gone && t10_kept,
+            "t1 gone: {t1_gone}, t10 kept: {t10_kept}"
+        );
+        assert!(
+            !metadata.contains("\"t1/tbl\"") && metadata.contains("t10/tbl"),
+            "{metadata}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_concurrent_metadata_updates_keep_every_entry() {
+        let cache_dir = scratch_dir("lock");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        let path = cache_dir.join("metadata.json");
+        let writers: Vec<_> = (0..32i64)
+            .map(|i| {
+                let path = path.clone();
+                tokio::spawn(async move {
+                    update_metadata_at(&path, |metadata| {
+                        metadata.insert(format!("org{i}/tbl"), i);
+                        true
+                    })
+                    .await
+                })
+            })
+            .collect();
+        let mut results = Vec::new();
+        for writer in writers {
+            results.push(writer.await.unwrap());
+        }
+        let metadata = read_metadata(&path).await;
+        std::fs::remove_dir_all(&cache_dir).unwrap();
+        for result in results {
+            result.unwrap();
+        }
+        assert_eq!(metadata.unwrap().len(), 32, "a concurrent update was lost");
+    }
+
+    fn scratch_dir(tag: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "o2-enrichment-{tag}-{}-{}",
+            std::process::id(),
+            crate::utils::time::now_micros()
+        ))
     }
 }

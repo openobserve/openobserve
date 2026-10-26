@@ -364,6 +364,17 @@ pub async fn list(
     Ok(alerts)
 }
 
+/// Every alert of the org in every folder; `list` reads only the default folder.
+pub async fn list_all_for_cleanup(org_id: &str) -> Result<Vec<Alert>, infra::errors::Error> {
+    let client = get_orm_client_ro().await;
+    let alerts = table::list(client, ListAlertsParams::new(org_id))
+        .await?
+        .into_iter()
+        .map(|(_f, a)| a)
+        .collect();
+    Ok(alerts)
+}
+
 pub async fn list_with_folders<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,

@@ -638,4 +638,25 @@ describe("list view state", () => {
       sortOrder: "desc",
     });
   });
+  describe("templates load denied", () => {
+    it("falls back to no templates without an unhandled rejection on a 403", async () => {
+      const { queryClient } = await import("@/composables/query/queryClient");
+      queryClient.clear();
+      (templateService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (destinationService.list as any).mockResolvedValue({ data: [] });
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const w: any = mountComponent();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled.mock.calls.map(([reason]) => reason)).not.toContainEqual({
+        response: { status: 403 },
+      });
+      expect(w.vm.templates).toEqual([]);
+      w.unmount();
+    });
+  });
 });

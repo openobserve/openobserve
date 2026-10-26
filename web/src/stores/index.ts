@@ -103,6 +103,9 @@ export default createStore({
     searchCollapsibleSection: 20,
     theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
     printMode: false,
+    kioskMode: false,
+    // A per-screen theme forced by a kiosk URL; never persisted as the user's preference.
+    themeOverride: null,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
     timezone: useLocalTimezone()
@@ -190,7 +193,9 @@ export default createStore({
       state.selectedOrganization = payload;
     },
     setOrganizations(state, payload) {
-      state.organizations = payload;
+      // Callers read .length unguarded; a failed org fetch must not store undefined.
+      const organizations: any = Array.isArray(payload) ? payload : [];
+      state.organizations = organizations;
     },
     setCurrentUser(state, payload) {
       state.currentuser = payload;
@@ -294,6 +299,12 @@ export default createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setKioskMode(state, payload) {
+      state.kioskMode = payload;
+    },
+    setThemeOverride(state, payload) {
+      state.themeOverride = payload;
     },
     setTimezone(state, payload) {
       state.timezone = payload;
@@ -541,6 +552,9 @@ export default createStore({
     },
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);
+    },
+    setKioskMode(context, payload) {
+      context.commit("setKioskMode", payload);
     },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);
