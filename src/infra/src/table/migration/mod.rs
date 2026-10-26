@@ -209,6 +209,7 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261005_000001_create_fleet;
 mod m20261006_000001_create_ai_chat_shares;
 mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
@@ -224,11 +225,34 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261017_000001_add_rca_run_progress_columns;
+mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261021_000001_status_pages_add_favicon_img;
+mod m20261024_000001_add_lease_to_org_cleanup_tasks;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_fleet_collectors_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let manager = SchemaManager::new(db);
+    m20261005_000001_create_fleet::Migration
+        .up(&manager)
+        .await?;
+    // Folder rows are what fleet writes lock, so the fleet tests need the shared table too.
+    let backend = db.get_database_backend();
+    let mut folders =
+        sea_orm::Schema::new(backend).create_table_from_entity(super::entity::folders::Entity);
+    db.execute(backend.build(folders.if_not_exists())).await?;
+    Ok(())
+}
 
 #[cfg(test)]
 pub(crate) async fn create_llm_prompt_schema_for_test(
@@ -592,6 +616,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
             Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
             Box::new(m20261018_000001_create_slack_tables::Migration),
+            Box::new(m20261016_000001_create_rca_runs::Migration),
+            Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
+            Box::new(m20261018_000001_create_rca_steering::Migration),
+            Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
+            Box::new(m20261005_000001_create_fleet::Migration),
+            Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
         ]
     }
 }
@@ -663,6 +693,12 @@ mod tests {
         (110, "m20261016_000001_create_rum_pa_app_settings"),
         (111, "m20261020_000001_create_eval_job_states_tables"),
         (112, "m20261018_000001_create_slack_tables"),
+        (113, "m20261016_000001_create_rca_runs"),
+        (114, "m20261017_000001_add_rca_run_progress_columns"),
+        (115, "m20261018_000001_create_rca_steering"),
+        (116, "m20261021_000001_status_pages_add_favicon_img"),
+        (117, "m20261005_000001_create_fleet"),
+        (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -796,6 +832,18 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261007_000001_create_ai_chat_turns",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261016_000001_create_rca_runs",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261017_000001_add_rca_run_progress_columns",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261018_000001_create_rca_steering",
             ),
         ] {
             assert!(

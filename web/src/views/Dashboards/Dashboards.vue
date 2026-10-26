@@ -414,6 +414,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="sm"
+                icon-left="tv"
+                data-test="dashboard-list-tv-playlist-btn"
+                @click="openPlaylistDialog"
+              >
+                {{ t("dashboard.playlist.action") }}
+                <OTooltip :content="t('dashboard.playlist.actionTooltip')" />
+              </OButton>
+              <OButton
+                variant="outline"
+                size="sm"
                 data-test="dashboard-list-move-across-folders-btn"
                 @click="moveMultipleDashboards"
                 icon-left="drive-file-move"
@@ -524,6 +534,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
+
+    <PlaylistDialog
+      v-model:open="showPlaylistDialog"
+      :entries="playlistEntries"
+      @open="openPlaylist"
+    />
   </OPageLayout>
 </template>
 
@@ -553,6 +569,7 @@ import {
   toRaw,
 } from "vue";
 import { useStore } from "vuex";
+import { isCancelledError } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
@@ -597,6 +614,13 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import PlaylistDialog from "@/components/dashboards/kiosk/PlaylistDialog.vue";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  type PlaylistConfig,
+  type PlaylistDialogEntry,
+} from "@/utils/dashboard/playlist";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -668,6 +692,7 @@ export default defineComponent({
     FolderList,
     OToggleGroup,
     OToggleGroupItem,
+    PlaylistDialog,
   },
   setup() {
     const store = useStore();
@@ -1017,6 +1042,8 @@ export default defineComponent({
           // A folder switched away from mid-flight must not stamp over the one now active.
           if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
+          // A newer folder switch cancelled this load; the newer one reports its own outcome.
+          if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
           forbidden.value = asCaughtError(error).response?.status === 403;
           // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -1066,7 +1093,8 @@ export default defineComponent({
         }
         currentSearchAbortController = new AbortController();
         const searchResults = await fetchSearchResults.execute(searchQuery.value);
-        filteredResults.value = toRaw(searchResults);
+        // fetchSearchResults resolves undefined when the request fails.
+        filteredResults.value = toRaw(searchResults ?? []);
       } catch (error) {
         if (asCaughtError(error).name !== "AbortError") {
           filteredResults.value = [];
@@ -1578,7 +1606,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const results = await fetchSearchResults.execute(query);
-        filteredResults.value = toRaw(results);
+        filteredResults.value = toRaw(results ?? []);
       } finally {
         loading.value = false;
       }
@@ -1658,6 +1686,51 @@ export default defineComponent({
 
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
+
+    const showPlaylistDialog = ref(false);
+    const playlistEntries = ref<PlaylistDialogEntry[]>([]);
+
+    // The table reports selection in row order; a playlist follows the order rows were ticked in.
+    const selectionOrder = ref<string[]>([]);
+    watch(
+      selectedIds,
+      (ids) => {
+        const selected = new Set(ids);
+        const kept = selectionOrder.value.filter((id) => selected.has(id));
+        const known = new Set(kept);
+        selectionOrder.value = [...kept, ...ids.filter((id) => !known.has(id))];
+      },
+      { flush: "sync" },
+    );
+
+    const openPlaylistDialog = () => {
+      const folderNames = new Map<string, string>(
+        (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
+      );
+      const rows = new Map<string, any>(dashboards.value.map((row: any) => [row.id, row]));
+      playlistEntries.value = selectionOrder.value
+        .filter((id) => rows.has(id))
+        .map((id) => {
+          const row = rows.get(id);
+          const folderId = row.folder_id || activeFolderId.value || "default";
+          return {
+            dashboardId: row.id,
+            folderId,
+            title: row.name,
+            folderName: row.folder || folderNames.get(folderId) || null,
+          };
+        });
+      showPlaylistDialog.value = true;
+    };
+
+    // A new tab keeps the list where it was; the TV tab is the one that goes full screen.
+    const openPlaylist = (config: PlaylistConfig) => {
+      const href = router.resolve({
+        path: PLAYLIST_TV_PATH,
+        query: buildPlaylistQuery(config),
+      }).href;
+      window.open(href, "_blank", "noopener");
+    };
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -1917,6 +1990,10 @@ export default defineComponent({
       moveMultipleDashboards,
       openBulkDeleteDialog,
       bulkDeleteDashboards,
+      showPlaylistDialog,
+      playlistEntries,
+      openPlaylistDialog,
+      openPlaylist,
       confirmBulkDelete,
       bulkDeleteLoading,
       isHome,

@@ -466,10 +466,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
     });
 
-    // Both the Agent Graph page (agentHighlight) and the Service Graph tab read
-    // the pre-aggregated _o2_service_graph stream via /topology/current — a cheap
-    // small-stream read that scales to TB-level trace volumes. We deliberately do
-    // NOT re-scan raw traces per load.
+    // Both graph pages read /topology/current (the rollup metrics), never raw traces.
     it("reads the persisted /current topology on the Agent Graph page (agentHighlight)", async () => {
       wrapper = createWrapper({}, { streamFilter: "fw_crewai", agentHighlight: true });
       await flushPromises();

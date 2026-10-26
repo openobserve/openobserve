@@ -13,11 +13,15 @@ default = []
 enterprise = [
     "db/enterprise",
     "audit/enterprise",
+    "dep:jsonwebtoken",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
+    "dep:o2_ratelimit",
+    "dep:version-compare",
     "common/enterprise",
     "config/enterprise",
+    "enrichment-data/enterprise",
     "promql/enterprise",
     "promql-service/enterprise",
     "search/enterprise",
@@ -35,6 +39,7 @@ cloud = [
 ]
 vectorscan = [
     "db/vectorscan",
+    "enrichment-data/vectorscan",
     "o2_enterprise/vectorscan",
     "search/vectorscan",
     "search_service/vectorscan",
@@ -51,8 +56,9 @@ profiling = [
 
 [dependencies]
 db.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 common.workspace = true
+enrichment-data.workspace = true
 openobserve-node.workspace = true
 transform.workspace = true
 vector-enrichment.workspace = true
@@ -87,7 +93,7 @@ itoa = "1.0"
 hmac.workspace = true
 image.workspace = true
 itertools.workspace = true
-jsonwebtoken.workspace = true
+jsonwebtoken = { workspace = true, optional = true }
 log.workspace = true
 # Direct (non-workspace) dep on purpose: already in Cargo.lock transitively, and
 # keeping it out of the root [workspace.dependencies] avoids the enterprise-CI
@@ -97,6 +103,7 @@ md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
+o2_ratelimit = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
@@ -127,7 +134,7 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
-version-compare.workspace = true
+version-compare = { workspace = true, optional = true }
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true

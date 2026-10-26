@@ -83,7 +83,10 @@ pub(crate) fn apply_custom_template_plain(
         .replace("{alert_status}", &ctx.alert_status)
         // The key that pairs a resolve with its trigger. Empty when the alert
         // does not notify on recovery, which is when nothing will resolve.
-        .replace("{episode_id}", ctx.episode_id.as_deref().unwrap_or_default())
+        .replace(
+            "{episode_id}",
+            ctx.episode_id.as_deref().unwrap_or_default(),
+        )
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and

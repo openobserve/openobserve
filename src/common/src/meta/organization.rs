@@ -30,6 +30,7 @@ pub enum OrgStatus {
     Active,
     PendingDeletion,
     Deleting,
+    Deleted,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};
@@ -177,6 +178,9 @@ pub struct OrgDetails {
     /// to the local part of `owner_email` when this is empty.
     #[serde(default)]
     pub owner_first_name: String,
+    /// When the organization was created, as a Unix timestamp in microseconds; 0 when unknown.
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -526,6 +530,8 @@ pub struct OrganizationSettingPayload {
     pub usage_stream_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub red_insights_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_rca_thread_tool_output: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -569,6 +575,9 @@ pub struct OrganizationSetting {
     pub usage_stream_enabled: bool,
     #[serde(default)]
     pub red_insights_enabled: bool,
+    /// Show raw tool input and output in incident investigation threads.
+    #[serde(default)]
+    pub ai_rca_thread_tool_output: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -612,6 +621,7 @@ impl Default for OrganizationSetting {
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
@@ -901,6 +911,7 @@ mod tests {
             plan: 0,
             owner_email: "admin1@example.com".to_string(),
             owner_first_name: "Admin".to_string(),
+            created_at: 1_700_000_000_000_000,
         };
 
         let response = OrganizationResponse {
@@ -910,6 +921,8 @@ mod tests {
         assert_eq!(response.data.len(), 1);
         assert_eq!(response.data[0].identifier, "org-1");
         assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["data"][0]["created_at"], 1_700_000_000_000_000_i64);
     }
 
     #[test]
@@ -1455,6 +1468,7 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: None,
             red_insights_enabled: None,
+            ai_rca_thread_tool_output: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
@@ -1534,6 +1548,7 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
@@ -1567,6 +1582,7 @@ mod tests {
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],

@@ -60,11 +60,7 @@ fn create_statement() -> TableCreateStatement {
         )
         // Version 0 is the head's single mutable draft; 1..N are the immutable
         // published versions an Experiment may pin.
-        .col(
-            ColumnDef::new(LlmRemoteTasks::Version)
-                .integer()
-                .not_null(),
-        )
+        .col(ColumnDef::new(LlmRemoteTasks::Version).integer().not_null())
         .col(ColumnDef::new(LlmRemoteTasks::Description).text().null())
         .col(ColumnDef::new(LlmRemoteTasks::Endpoint).text().not_null())
         .col(
@@ -85,7 +81,11 @@ fn create_statement() -> TableCreateStatement {
                 .string_len(128)
                 .not_null(),
         )
-        .col(ColumnDef::new(LlmRemoteTasks::RequestTemplate).text().null())
+        .col(
+            ColumnDef::new(LlmRemoteTasks::RequestTemplate)
+                .text()
+                .null(),
+        )
         .col(
             ColumnDef::new(LlmRemoteTasks::ResponseSchema)
                 .string_len(512)
@@ -96,7 +96,11 @@ fn create_statement() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(LlmRemoteTasks::RetryPolicy).json().not_null())
+        .col(
+            ColumnDef::new(LlmRemoteTasks::RetryPolicy)
+                .json()
+                .not_null(),
+        )
         .col(
             ColumnDef::new(LlmRemoteTasks::MaxConcurrency)
                 .integer()

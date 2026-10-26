@@ -36,6 +36,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-text-heading": "#262626",
   "--color-text-body": "#404040",
   "--color-text-secondary": "#737373",
+  "--color-text-inverse": "#ffffff",
   "--color-border-default": "#d4d4d4",
   "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
@@ -134,6 +135,10 @@ const FALLBACKS: Record<string, string> = {
   "--color-status-success-bg": "#f2fcf3",
   "--color-status-success-text": "#20883b",
   "--color-success-200": "#bbf7d0",
+  // Threshold step presets (light values from base.css).
+  "--color-success-500": "#22c55e",
+  "--color-amber-500": "#f59e0b",
+  "--color-error-500": "#ef4444",
   // JSON syntax highlighting in dashboard field renderers (light values from base.css).
   "--color-json-boolean": "#6d28d9",
   "--color-json-key": "#b71c1c",

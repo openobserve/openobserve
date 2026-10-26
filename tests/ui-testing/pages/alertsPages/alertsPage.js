@@ -275,15 +275,6 @@ export class AlertsPage {
             // Telemetry tab state selectors
             loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
 
-            // RCA Analysis locators (inside incident detail)
-            rcaAnalysisContainer: '[data-test="rca-analysis-container"]',
-            triggerRcaButton: '[data-test="trigger-rca-btn"]',
-            rcaStreamContent: '[data-test="rca-stream-content"]',
-            rcaExistingContent: '[data-test="rca-existing-content"]',
-            rcaEmptyState: '[data-test="rca-empty-state"]',
-
-            // Table of contents locators (inside incident detail)
-            tocContainer: '[data-test="toc-container"]',
 
             // Import/Export locators
             alertImportButton: '[data-test="alert-import"]',
@@ -753,8 +744,8 @@ export class AlertsPage {
         return result;
     }
 
-    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
-        const result = await this.creationWizard.createScheduledAlertWithSQL(streamName, destinationName, randomValue);
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery = null) {
+        const result = await this.creationWizard.createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery);
         this.currentAlertName = result;
         return result;
     }
@@ -1474,8 +1465,10 @@ export class AlertsPage {
     async waitForEvaluationHistoryRow({ attempts = 8 } = {}) {
         const row = this.getAlertHistoryDataRowLocator().first();
         const refresh = this.page.locator(this.locators.alertDetailsRefreshButton).first();
+        // isVisible() ignores its timeout and returns at once, so waitFor is what gives each attempt its 5s.
+        const rowShows = () => row.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
         for (let i = 0; i < attempts; i++) {
-            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return true;
+            if (await rowShows()) return true;
             // The history fetch is single-shot on load, so re-issue it; a reload is the fallback when the toolbar is absent.
             if (await refresh.isVisible().catch(() => false)) {
                 await refresh.click().catch(() => {});
@@ -1483,7 +1476,7 @@ export class AlertsPage {
                 await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
             }
         }
-        return await row.isVisible({ timeout: 5000 }).catch(() => false);
+        return await rowShows();
     }
 
     /**
@@ -2921,41 +2914,6 @@ export class AlertsPage {
         testLogger.info('No triggers message visible');
     }
 
-    /**
-     * Verify RCA analysis container is visible in detail view
-     */
-    async expectRcaContainerVisible() {
-        await expect(this.page.locator(this.locators.rcaAnalysisContainer)).toBeVisible({ timeout: 10000 });
-        testLogger.info('RCA analysis container visible');
-    }
-
-    /**
-     * Check if RCA has existing content or is in empty state
-     * @returns {Promise<'content'|'empty'|'hidden'>}
-     */
-    async getRcaState() {
-        const existing = this.page.locator(this.locators.rcaExistingContent);
-        const empty = this.page.locator(this.locators.rcaEmptyState);
-
-        if (await existing.isVisible({ timeout: 3000 }).catch(() => false)) {
-            testLogger.info('RCA state: content');
-            return 'content';
-        }
-        if (await empty.isVisible({ timeout: 3000 }).catch(() => false)) {
-            testLogger.info('RCA state: empty');
-            return 'empty';
-        }
-        testLogger.info('RCA state: hidden');
-        return 'hidden';
-    }
-
-    /**
-     * Verify TOC container is visible in incident detail
-     */
-    async expectTocContainerVisible() {
-        await expect(this.page.locator(this.locators.tocContainer)).toBeVisible({ timeout: 10000 });
-        testLogger.info('TOC container visible');
-    }
 
     /**
      * Click refresh button on incidents list
@@ -3297,6 +3255,11 @@ export class AlertsPage {
         const valueEl = this.page.locator('[data-test="add-alert-name-input-value"]').first();
         await valueEl.waitFor({ state: 'visible', timeout: 30000 });
         return ((await valueEl.textContent()) ?? '').trim();
+    }
+
+    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    getAlertNameValueLocator() {
+        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
     }
 
     /**
@@ -4281,6 +4244,40 @@ export class AlertsPage {
     }
 
     /**
+     * Click Run Query and return the status of the validating search it issues.
+     *
+     * Run Query sends `validate=true`, so a field-validation failure is a server
+     * 400 the dialog surfaces only as a transient toast. The response is awaited
+     * from BEFORE the click: clickRunQueryAndWait() syncs on the rendered preview,
+     * and a refused query renders nothing, so reading afterwards races the reply.
+     */
+    async runQueryAndGetValidationStatus() {
+        const response = this.page.waitForResponse(
+            (res) => res.request().method() === 'POST'
+                && res.url().includes('/_search')
+                && /[?&]validate=true/.test(res.url()),
+            { timeout: 45000 },
+        );
+        await this.page.locator(this.locators.runQueryButton).click();
+        const status = (await response).status();
+        testLogger.info('Validating search responded', { status });
+        return status;
+    }
+
+    /**
+     * The query editor's result pane rendered rows.
+     *
+     * `sql-output-editor` mounts only once `outputEvents` is non-empty, so its
+     * presence separates a query that returned data from one the server refused:
+     * a refusal leaves the pane on its empty-state icon.
+     */
+    async expectSqlOutputRendered() {
+        const output = this.page.locator('[data-test="sql-output-editor"]').first();
+        await expect(output).toBeVisible({ timeout: 30000 });
+        testLogger.info('Query editor rendered SQL results');
+    }
+
+    /**
      * The Query Result pane shows no all-windows chip.
      *
      * Asserted on the rendered copy, not on a styling class — the chip carries
@@ -4902,5 +4899,62 @@ export class AlertsPage {
     /** "Alert deleted" toast text */
     getAlertDeletedText() {
         return this.page.getByText(this.locators.alertDeletedMessage);
+    }
+
+    // ===== DOWNTIMES: row mute, Muted chip and last outcome =====
+
+    /** A fresh load, which the Muted chip needs after a mute. */
+    async gotoAlertListFolder(folderId, { tab = null } = {}) {
+        const org = process.env.ORGNAME || 'default';
+        const tabQuery = tab ? `&tab=${tab}` : '';
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=${folderId}${tabQuery}`);
+        await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    _alertRowByName(name) {
+        return this.page.locator('[data-test^="o2-table-row-"]').filter({ has: this.page.locator(`[data-test="alert-list-${name}-name-cell"]`) });
+    }
+
+    async muteAlertPreset(name, preset) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-${preset}"]`).click();
+    }
+
+    async openMuteUntil(name) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-until"]`).click();
+    }
+
+    async bulkMute(names, preset) {
+        for (const name of names) {
+            const box = this._alertRowByName(name).locator(this.locators.tableCheckbox);
+            await box.click();
+            await expect(box).toHaveAttribute('data-state', 'checked');
+        }
+        await this.page.locator('[data-test="alert-list-mute-alerts-btn"]').click();
+        await this.page.locator(`[data-test="alert-list-bulk-mute-${preset}"]`).click();
+    }
+
+    async expectMutedChip(name, visible = true, pattern = /^Muted · ends in /) {
+        const chip = this.page.locator(`[data-test="alert-list-${name}-muted"]`);
+        if (visible) await expect(chip).toHaveText(pattern, { timeout: 20000 });
+        else {
+            // Absence only means something once the row itself has rendered.
+            await expect(this.page.locator(`[data-test="alert-list-${name}-name-cell"]`)).toBeVisible({ timeout: 20000 });
+            await expect(chip).toHaveCount(0, { timeout: 20000 });
+        }
+    }
+
+    async expectLastOutcome(name, text) {
+        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+    }
+
+    /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */
+    async isAlertNameClipped(name) {
+        return this.page.locator(`[data-test="alert-list-${name}-name-cell"]`).evaluate((cell, n) => {
+            const el = [...cell.querySelectorAll('*')].find((e) => e.textContent.trim() === n && [...e.children].every((c) => c.textContent.trim() !== n));
+            if (!el) throw new Error(`no element in the name cell of "${n}" renders its full name`);
+            return el.scrollWidth > el.clientWidth;
+        }, name);
     }
 }

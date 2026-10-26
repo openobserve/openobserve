@@ -1728,6 +1728,9 @@ test.describe("Logs Regression Bugs", () => {
     expect(result.rowCount).toBeGreaterThan(0);
     // Must be values of kubernetes_container_name, not a cached list from another field.
     expect(result.firstFew.some((row) => row.includes('ziox'))).toBe(true);
+    // A row count alone passed on keyword/function rows before #15344, so the
+    // value context must also be proven to exclude functions.
+    expect(result.hasFunctions, 'Functions must not be suggested inside an open quote').toBe(false);
     testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
 
     testLogger.info("Test passed: Mixed quote handling verified");

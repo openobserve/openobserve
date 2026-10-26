@@ -85,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ run.triggered_by || t("reports.history.triggerManual") }}
           </ODescriptionItem>
           <ODescriptionItem :label="t('reports.history.scheduledFor')">
-            <template v-if="run.scheduled_for">
+            <span v-if="run.scheduled_for" data-test="reports-reportrundrawer-scheduled-for">
               {{ inReportZone(run.scheduled_for) }}
-            </template>
+            </span>
           </ODescriptionItem>
           <ODescriptionItem :label="t('reports.history.pickedUp')">
             <template v-if="run.delay_in_secs != null">
@@ -184,7 +184,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import type { ReportRunHit } from "@/services/reports";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { microsToSeconds, runChip } from "@/utils/reports/reportRun";
+import { RUN_TIME_FORMAT, microsToSeconds, runChip } from "@/utils/reports/reportRun";
 
 interface RenderedDashboard {
   dashboard: string;
@@ -218,18 +218,17 @@ const orgId = useOrgId();
 
 const timezone = computed(() => props.report?.timezone || undefined);
 
-const inReportZone = (us: number) =>
-  raw(
-    formatTimestampInTimezone(us, "ddd D MMM, HH:mm", timezone.value ?? "UTC") +
-      (timezone.value ? ` (${timezone.value})` : ""),
-  );
+const inReportZone = (us: number) => {
+  const zone = timezone.value ?? "UTC";
+  return raw(`${formatTimestampInTimezone(us, RUN_TIME_FORMAT, zone)} (${zone})`);
+};
 
 const title = computed(() =>
   props.run
     ? t("reports.history.drawerTitle", {
         time: formatTimestampInTimezone(
           props.run.timestamp,
-          "ddd D MMM, HH:mm",
+          RUN_TIME_FORMAT,
           Intl.DateTimeFormat().resolvedOptions().timeZone,
         ),
       })

@@ -182,6 +182,25 @@ describe("AddDestination - rendering", () => {
     expect(wrapper.find('[data-test="add-destination-cancel-btn"]').exists()).toBe(true);
   });
 
+  it("labels method and output-format options in uppercase but keeps lowercase values", async () => {
+    wrapper = mountComp({ isAlerts: false });
+    await toCustomHttp(wrapper);
+    const optionsOf = (name: string) =>
+      wrapper
+        .findAllComponents({ name: "OFormSelect" })
+        .find((c: any) => c.props("name") === name)
+        .props("options");
+    expect(optionsOf("method")).toEqual([
+      { label: "GET", value: "get" },
+      { label: "POST", value: "post" },
+      { label: "PUT", value: "put" },
+    ]);
+    expect(optionsOf("output_format")).toEqual([
+      { label: "JSON", value: "json" },
+      { label: "NDJSON", value: "ndjson" },
+    ]);
+  });
+
   it("Save button stays enabled (R3 — no :disabled)", async () => {
     wrapper = mountComp();
     await toCustomHttp(wrapper);

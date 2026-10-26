@@ -37,6 +37,7 @@
 const { randomBytes } = require('node:crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /** Every on-call timestamp is microseconds. Named so the call sites read. */
 const MICROS = 1_000_000;
@@ -614,7 +615,7 @@ async function seedOnCallStream(page, streamName, {
     });
   }
 
-  const res = await api(page, 'post', `${ingestUrl()}/api/${orgId()}/${streamName}/_json`, rows);
+  const res = await api(page, 'post', `${ingestBase(ingestUrl())}/api/${orgId()}/${streamName}/_json`, rows);
   await must(res, `On-call stream ingest "${streamName}"`);
   await waitForStreamSearchable(page, streamName, rows.length);
   testLogger.info('On-call stream seeded', { streamName, records: rows.length });
@@ -1109,6 +1110,7 @@ module.exports = {
   MICROS,
   HOUR_MICROS,
   DAY_MICROS,
+  api,
   FIRST_RUNG_MICROS,
   SECOND_RUNG_MICROS,
   SEED_SERVICES,

@@ -213,6 +213,20 @@ describe("useStreams Composable", () => {
       expect(result).toHaveProperty("list");
     });
 
+    it("caches a profiles stream list like any other type", async () => {
+      vi.mocked(StreamService.nameList).mockResolvedValueOnce({
+        data: { list: [{ name: "prof1", stream_type: "profiles" }] },
+      } as any);
+
+      const result = await streamsInstance.getStreams("profiles", false, false);
+
+      expect(result).toHaveProperty("list", [{ name: "prof1", stream_type: "profiles" }]);
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
+        expect.objectContaining({ streamType: "profiles" }),
+      );
+    });
+
     it("should get all streams when streamName is 'all'", async () => {
       mockStore.state.streams.areStreamsFetched = false;
 
@@ -316,6 +330,40 @@ describe("useStreams Composable", () => {
   });
 
   // Test 11-15: Individual Stream Functions
+  describe("Stream error messages", () => {
+    beforeEach(() => {
+      queryClient.clear();
+      mockStore.state.streams.logs = null;
+    });
+
+    it("uses the server message when the failure carries no message of its own", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce({
+        response: { status: 404, data: { message: "Stream _sessionreplay not found" } },
+      });
+
+      await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow(
+        "Stream _sessionreplay not found",
+      );
+    });
+
+    it.each([undefined, null, {}])(
+      "falls back to a readable message instead of stringifying %s",
+      async (failure) => {
+        vi.mocked(StreamService.nameList).mockRejectedValueOnce(failure);
+
+        await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow(
+          /^Stream request failed$/,
+        );
+      },
+    );
+
+    it("never rejects with an empty message for a bare string failure", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce("boom");
+
+      await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow("boom");
+    });
+  });
+
   describe("Individual Stream Functions", () => {
     it("should return null for getStream with empty parameters", async () => {
       const result = await streamsInstance.getStream("", "logs", false);
@@ -735,6 +783,13 @@ describe("useStreams Composable", () => {
       expect(result.name).toBe("all");
       expect(result.schema).toBe(false);
       expect(result.list).toEqual([{ name: "log1" }, { name: "metric1" }]);
+    });
+
+    it("leaves cached profiles streams out of the all-streams payload", () => {
+      mockStore.state.streams.logs = { list: [{ name: "log1" }] };
+      (mockStore.state.streams as any).profiles = { list: [{ name: "prof1" }] };
+
+      expect(streamsInstance.getAllStreamsPayload().list).toEqual([{ name: "log1" }]);
     });
 
     it("should add new streams only if they don't exist", () => {

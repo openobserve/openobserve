@@ -1,4 +1,4 @@
-import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick, reactive, ref, watch } from "vue";
 import Profiles from "@/plugins/profiles/Index.vue";
@@ -105,6 +105,13 @@ const mergeResponse = {
 };
 
 // Lets requests resolve, then waits out OTable's minimum skeleton time (50 ms) so rows are drawn.
+/** The row menu button of a Top Table function, found by name: rows sort by Self, so the order varies per test. */
+const topRowMenu = (wrapper: VueWrapper, name: string) =>
+  wrapper
+    .findAll("tbody tr")
+    .find((row) => row.find("td").text().includes(name))!
+    .find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+
 const settle = async () => {
   await flushPromises();
   await new Promise((resolve) => setTimeout(resolve, 60));
@@ -452,6 +459,26 @@ describe("Profiles page", () => {
     expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
   });
 
+  it("keeps one filter per label, because the server joins filters with AND", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+
+    for (const value of ["pod-a", "pod-b"]) {
+      await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
+      await nextTick();
+      await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+      await flushPromises();
+      await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue(value);
+      await flushPromises();
+      await nextTick();
+    }
+
+    expect(wrapper.findAll('[data-test="profiles-filter-chip-k8s_pod_name"]')).toHaveLength(1);
+    const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
+    expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-b" }]);
+  });
+
   it("edits a filter chip in place, without narrowing its own value list", async () => {
     mocks.merge.mockResolvedValue(mergeResponse);
     const wrapper = mountPage();
@@ -515,6 +542,68 @@ describe("Profiles page", () => {
     expect(yAxis.axisLabel.formatter(5 * gib)).toBe("5.00GB");
     expect(yAxis.name).toBeUndefined();
     expect(chart.props("data").options.tooltip.textStyle.fontSize).toBe(12);
+  });
+
+  it("draws CPU as cores per second of profiled time when the server sends a rate", async () => {
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        series: [
+          { timestamp: 1_000_000, value: 6e9, rate: 4.2e8 },
+          { timestamp: 61_000_000, value: 60e9 },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const data = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0].data;
+    // 0.42 cores while profiled; the point without a rate falls back to the 60 s step.
+    expect(data.map(([, value]: number[]) => value)).toEqual([0.42, 1]);
+  });
+
+  it("breaks the chart down by a label and filters to a value from its legend chip", async () => {
+    const wrapper = mountPage();
+    await settle();
+    mocks.series.mockResolvedValueOnce({
+      data: {
+        ...seriesResponse.data,
+        groups: [
+          { value: "pod-a", total: 9, others: false, series: [{ timestamp: 1_000_000, value: 9 }] },
+          { value: "", total: 1, others: true, series: [{ timestamp: 1_000_000, value: 1 }] },
+        ],
+      },
+    });
+
+    await wrapper.find('[data-test="profiles-breakdown-select"] select').setValue("k8s_pod_name");
+    await flushPromises();
+    await nextTick();
+
+    expect(mocks.series).toHaveBeenLastCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ group_by: "k8s_pod_name", group_limit: 10 }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data")
+      .options.series;
+    expect(series.map((line: { name: string }) => line.name)).toEqual(["pod-a", "Others"]);
+    expect(route.query.breakdown ?? router.replace.mock.calls.at(-1)?.[0].query.breakdown).toBe(
+      "k8s_pod_name",
+    );
+
+    mocks.merge.mockClear();
+    await wrapper.find('[data-test="profiles-breakdown-chip-0"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="profiles-filter-chip-k8s_pod_name"]').exists()).toBe(true);
+    expect(mocks.merge).toHaveBeenCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ filters: [{ key: "k8s_pod_name", op: "=", value: "pod-a" }] }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
   });
 
   it("says how much of the samples the views show when the result is cut", async () => {
@@ -641,7 +730,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     // The button stops click propagation (rows must not react); the real menu opens on pointerdown.
     (firstRow.element.parentElement as HTMLElement).click();
@@ -686,8 +775,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    // Top Table rows sort by total, so the first row is fn-b.
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     (firstRow.element.parentElement as HTMLElement).click();
     await nextTick();
@@ -736,7 +824,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     (firstRow.element.parentElement as HTMLElement).click();
     await nextTick();
@@ -775,7 +863,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    const firstRow = wrapper.find('[data-test^="profiles-top-row-"][data-test$="-menu"]');
+    const firstRow = topRowMenu(wrapper, "fn-b");
     const prefix = firstRow.attributes("data-test")!.replace(/-menu$/, "");
     (firstRow.element.parentElement as HTMLElement).click();
     await nextTick();
@@ -1178,7 +1266,7 @@ describe("Profiles page", () => {
     expect(wrapper.text()).not.toContain("stale-pod");
   });
 
-  it("sorts the top table by Self when the column header is clicked", async () => {
+  it("opens the top table sorted by Self, and sorts by Total on a header click", async () => {
     mocks.merge.mockResolvedValue(mergeResponse);
     const wrapper = mountPage();
     await settle();
@@ -1190,12 +1278,12 @@ describe("Profiles page", () => {
       .findAll("tbody tr")
       .map((row) => row.find("td").text())
       .filter(Boolean);
-    expect(namesBefore[0]).toBe("fn-b");
+    expect(namesBefore[0]).toBe("fn-c");
     // One scrolling list, no pager (as on Traces).
     expect(wrapper.find('[data-test="o2-table-pagination-info"]').exists()).toBe(false);
 
     await wrapper
-      .find('[data-test="o2-table-th-self"] [data-test="o2-table-th-sort-trigger"]')
+      .find('[data-test="o2-table-th-total"] [data-test="o2-table-th-sort-trigger"]')
       .trigger("click");
     await nextTick();
 
@@ -1203,7 +1291,7 @@ describe("Profiles page", () => {
       .findAll("tbody tr")
       .map((row) => row.find("td").text())
       .filter(Boolean);
-    expect(namesAfter[0]).toBe("fn-c");
+    expect(namesAfter[0]).toBe("fn-b");
   });
 
   it("opens the Call Tree with the root expanded, children by total, and their counts", async () => {
@@ -1382,6 +1470,38 @@ describe("Profiles page", () => {
         start_time: FROM,
         end_time: TO,
       });
+    });
+
+    it("starts the seeded query without waiting for metadata", async () => {
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      mountSeeded();
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      meta.resolve({
+        data: {
+          ...profileMetaResponse.data,
+          services: ["service-a", "service-b"],
+          profile_types: [{ type: "cpu", unit: "nanoseconds" }],
+        },
+      });
+      await flushPromises();
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs again when metadata replaces a seeded service that has no data", async () => {
+      route.query = { ...seedQuery, service_name: "service-gone" };
+      mountSeeded();
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(2);
+      expect(mocks.merge).toHaveBeenLastCalledWith(
+        orgIdentifier,
+        "profiles-b",
+        expect.objectContaining({ service_name: "service-a" }),
+        expect.objectContaining({ signal: expect.anything() }),
+      );
     });
 
     it("loads metadata once and queries once, even with delayed responses", async () => {

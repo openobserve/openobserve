@@ -1323,7 +1323,7 @@ describe("ViewPanel", () => {
       await flushPromises();
       await changeAppliedVariables();
       expect(wrapper.vm.showApplyHint).toBe(true);
-      expect(refreshButton().props("variant")).toBe("warning");
+      expect(refreshButton().props("variant")).toBe("pending");
       expect(refreshTooltipWrapper().props("disabled")).toBe(false);
 
       wrapper.vm.disable = false;

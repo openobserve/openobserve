@@ -68,7 +68,11 @@ fn create_eval_job_states_statement() -> TableCreateStatement {
         )
         .col(ColumnDef::new(EvalJobStates::Health).integer().not_null())
         // When health last changed, not when it was last measured.
-        .col(ColumnDef::new(EvalJobStates::Since).big_integer().not_null())
+        .col(
+            ColumnDef::new(EvalJobStates::Since)
+                .big_integer()
+                .not_null(),
+        )
         .col(
             ColumnDef::new(EvalJobStates::EvaluatedAt)
                 .big_integer()
@@ -99,7 +103,11 @@ fn create_eval_job_states_statement() -> TableCreateStatement {
                 .string_len(64)
                 .null(),
         )
-        .col(ColumnDef::new(EvalJobStates::LastErrorMessage).text().null())
+        .col(
+            ColumnDef::new(EvalJobStates::LastErrorMessage)
+                .text()
+                .null(),
+        )
         .col(
             ColumnDef::new(EvalJobStates::LastErrorAt)
                 .big_integer()

@@ -199,6 +199,7 @@ const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
   xs: "px-1.5 py-0.5 text-3xs gap-0.5",
   sm: "px-2.5 py-1.5 text-2xs gap-1",
   md: "px-2.5 py-2 text-xs gap-1.5",
+  lg: "px-3 py-1.5 text-sm gap-2",
 };
 
 // ── Shape (corner radius) class map ───────────────────────────────────────
@@ -209,7 +210,9 @@ const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
 };
 
 // ── Trailing segment padding per size ────────────────────────────────────
-const trailingSizeClasses = computed(() => (props.size === "md" ? "ps-1.5 ms-1" : "ps-1 ms-0.5"));
+const trailingSizeClasses = computed(() =>
+  props.size === "md" || props.size === "lg" ? "ps-1.5 ms-1" : "ps-1 ms-0.5",
+);
 
 // ── Root element classes ──────────────────────────────────────────────────
 const classes = computed(() => [
@@ -274,8 +277,8 @@ function handleRemove(e: MouseEvent): void {
     <span
       v-if="dot"
       :class="[
-        'inline-block size-1.75 shrink-0 rounded-full bg-current',
-        size === 'sm' ? 'me-0' : 'me-0',
+        'inline-block shrink-0 rounded-full bg-current',
+        size === 'lg' ? 'size-2.5' : 'size-1.75',
       ]"
       aria-hidden="true"
     />

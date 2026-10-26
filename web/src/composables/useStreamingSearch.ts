@@ -33,6 +33,11 @@ const createStreamWorker = () => {
   return streamWorker;
 };
 
+// Chrome, Safari and Firefox wordings of a fetch body read that lost its connection.
+const NETWORK_FAILURE_PATTERN = /network error|Load failed|Failed to fetch|NetworkError/i;
+const isNetworkFailure = (error: unknown): boolean =>
+  error instanceof TypeError && NETWORK_FAILURE_PATTERN.test(error.message);
+
 // Type definitions similar to WebSocket but for HTTP/2 streaming
 type StreamHandler = (data: any, traceId: string) => void;
 type ErrorHandler = (error: any, traceId: string) => void;
@@ -422,7 +427,9 @@ const useHttpStreaming = () => {
                 // Refresh failed — logout/reload already handled inside attemptTokenRefresh
               }
             } else {
-              console.error("Error reading stream:", error);
+              // A dropped connection (offline, sleep, tab freeze) is not an app fault.
+              if (isNetworkFailure(error)) console.warn("Error reading stream:", error);
+              else console.error("Error reading stream:", error);
               onError(traceId, error);
             }
           } finally {

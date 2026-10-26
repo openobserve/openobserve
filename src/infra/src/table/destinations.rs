@@ -18,7 +18,7 @@ use std::str::FromStr;
 use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -225,14 +225,24 @@ async fn list_models(
         .collect())
 }
 
-/// Deletes all destinations belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+/// Deletes all destinations of the org and returns their names.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
+}
+
+/// Names of the org's destinations.
+pub async fn list_names_by_org(org_id: &str) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_ro().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
         .filter(Column::Org.eq(org_id))
-        .exec(client)
+        .into_tuple::<String>()
+        .all(client)
         .await?;
-    Ok(())
+    Ok(names)
 }
 
 #[cfg(test)]

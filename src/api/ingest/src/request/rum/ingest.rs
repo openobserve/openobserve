@@ -16,7 +16,7 @@
 use std::io::prelude::*;
 
 use axum::{
-    Extension, Json,
+    Extension,
     body::Bytes,
     extract::{Multipart, Path},
     http::StatusCode,
@@ -121,7 +121,7 @@ pub struct View {
     ),
     request_body(content = String, description = "Ingest data (NDJSON, one JSON object per line)", content_type = "text/plain", example = json!("{\"type\":\"view\",\"date\":1759222800000,\"view\":{\"url\":\"https://example.com/\"}}\n{\"type\":\"error\",\"date\":1759222801000,\"error\":{\"message\":\"Script error\"}}")),
     responses(
-        (status = 202, description = "Accepted", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 202, description = "Accepted, empty body"),
         (status = 400, description = "Bad request: a line is not valid JSON or is not a JSON object", content_type = "application/json", body = Object, example = json!({"code": 400, "message": "Error# Failed processing: each line must be a JSON object"})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
@@ -146,9 +146,10 @@ pub async fn data(
     .await
     {
         // 202 Accepted: the RUM SDKs treat any non-202 intake response as an unexpected error
-        // and drop the batch instead of retrying, so the status must be 202 even though the
-        // body still carries `code: 200` from the shared ingestion response.
-        Ok(v) => (StatusCode::ACCEPTED, Json(v)).into_response(),
+        // and drop the batch instead of retrying, so the status must be 202. The body is empty:
+        // the SDKs read only the status, and the shared ingestion response would show every
+        // browser the internal stream names and counts.
+        Ok(_) => StatusCode::ACCEPTED.into_response(),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -176,7 +177,7 @@ pub async fn data(
     ),
     request_body(content = String, description = "Ingest data (NDJSON, one JSON object per line)", content_type = "text/plain", example = json!("{\"date\":1759222800000,\"status\":\"error\",\"message\":\"Uncaught TypeError\"}\n{\"date\":1759222801000,\"status\":\"info\",\"message\":\"Page loaded\"}")),
     responses(
-        (status = 202, description = "Accepted", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 202, description = "Accepted, empty body"),
         (status = 400, description = "Bad request: a line is not valid JSON or is not a JSON object", content_type = "application/json", body = Object, example = json!({"code": 400, "message": "Error# Failed processing: each line must be a JSON object"})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
@@ -201,9 +202,10 @@ pub async fn log(
     .await
     {
         // 202 Accepted: the RUM SDKs treat any non-202 intake response as an unexpected error
-        // and drop the batch instead of retrying, so the status must be 202 even though the
-        // body still carries `code: 200` from the shared ingestion response.
-        Ok(v) => (StatusCode::ACCEPTED, Json(v)).into_response(),
+        // and drop the batch instead of retrying, so the status must be 202. The body is empty:
+        // the SDKs read only the status, and the shared ingestion response would show every
+        // browser the internal stream names and counts.
+        Ok(_) => StatusCode::ACCEPTED.into_response(),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -305,9 +307,7 @@ fn build_replay_rows(segments: &[Vec<u8>], events: &[Event]) -> Result<Vec<u8>, 
         content = inline(SegmentEvent), content_type = "multipart/form-data",
         description = "Multipart form data containing compressed session replay segment and event metadata"),
     responses(
-        (status = 202, description = "Accepted", content_type = "application/json",
-            body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]}),
-    ),
+        (status = 202, description = "Accepted, empty body"),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -386,9 +386,10 @@ pub async fn sessionreplay(
     .await
     {
         // 202 Accepted: the RUM SDKs treat any non-202 intake response as an unexpected error
-        // and drop the batch instead of retrying, so the status must be 202 even though the
-        // body still carries `code: 200` from the shared ingestion response.
-        Ok(v) => (StatusCode::ACCEPTED, Json(v)).into_response(),
+        // and drop the batch instead of retrying, so the status must be 202. The body is empty:
+        // the SDKs read only the status, and the shared ingestion response would show every
+        // browser the internal stream names and counts.
+        Ok(_) => StatusCode::ACCEPTED.into_response(),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
