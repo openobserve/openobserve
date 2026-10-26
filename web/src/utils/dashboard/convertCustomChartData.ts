@@ -15,13 +15,13 @@
 
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
-import { ref } from "vue";
 
 import { gt } from "@/types/i18n";
 import echartsUrl from "echarts/dist/echarts.min.js?url";
 import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
-export const panelIdToBeRefreshed = ref<string | null>(null);
+// Single-panel refresh targets, each mapped to whether its load has settled; emptied once all have.
+export const panelRefreshTargets = new Map<string, boolean>();
 
 // import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
 const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
@@ -41,6 +41,17 @@ export interface CustomChartContext {
 /** Rejects a run skipped because another panel is being refreshed; the caller keeps its current chart. */
 export class CustomChartSkippedError extends Error {}
 
+/** True while a single-panel refresh is in flight that did not target this panel. */
+export const isSkippedByPanelRefresh = (panelId: string | undefined) =>
+  panelRefreshTargets.size > 0 && !(panelId && panelRefreshTargets.has(panelId));
+
+/** Marks a target's load as settled; the refresh ends once every target has settled. */
+export const settlePanelRefresh = (panelId: string | undefined) => {
+  if (!panelId || !panelRefreshTargets.has(panelId)) return;
+  panelRefreshTargets.set(panelId, true);
+  if ([...panelRefreshTargets.values()].every(Boolean)) panelRefreshTargets.clear();
+};
+
 /** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
 export const runJavaScriptCode = (
   panelSchema: any,
@@ -48,8 +59,7 @@ export const runJavaScriptCode = (
   context?: CustomChartContext,
 ) => {
   return new Promise((resolve, reject) => {
-    // Skip if this panel is not the one to be refreshed
-    if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+    if (isSkippedByPanelRefresh(panelSchema.id)) {
       reject(new CustomChartSkippedError());
       return;
     }
@@ -191,14 +201,6 @@ export const runJavaScriptCode = (
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
 
-      // Double check if this is still the panel to be refreshed
-      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
-        window.removeEventListener("message", handler);
-        document.body.removeChild(iframe);
-        reject(new CustomChartSkippedError());
-        return;
-      }
-
       window.removeEventListener("message", handler);
       setTimeout(() => {
         document.body.removeChild(iframe);
@@ -209,10 +211,6 @@ export const runJavaScriptCode = (
           resolve(rehydrateFunctions(JSON.parse(event.data.result), fnTag, trusted));
         } catch (error) {
           reject(error);
-        }
-        // Clear the panelIdToBeRefreshed after success
-        if (panelIdToBeRefreshed.value === panelSchema.id) {
-          panelIdToBeRefreshed.value = null;
         }
       } else if (event.data.type === "error") {
         console.error("Error executing code", event.data.message);

@@ -23,7 +23,10 @@ import {
   type DashboardFreshOnOpen,
 } from "./dashboardFreshOnOpen";
 import { isEffectivePanelTimeRelative } from "@/utils/dashboard/panelTimeUtils";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import {
+  isSkippedByPanelRefresh,
+  panelRefreshTargets,
+} from "@/utils/dashboard/convertCustomChartData";
 
 // Real loader, executors and search handlers; only the cache, the stream transport and the network are fakes.
 const fakes = vi.hoisted(() => ({
@@ -777,13 +780,13 @@ describe("usePanelDataLoader: fresh on open", () => {
   });
   describe("a single-panel refresh target", () => {
     const refreshPanel = async (selectedTimeObj: any, id = "panel-1") => {
-      panelIdToBeRefreshed.value = id;
+      panelRefreshTargets.set(id, false);
       selectedTimeObj.value = windowEndingAt(NOW + 60_000);
       await settle();
     };
 
     afterEach(() => {
-      panelIdToBeRefreshed.value = null;
+      panelRefreshTargets.clear();
     });
 
     it("is cleared once its load finishes", async () => {
@@ -793,11 +796,11 @@ describe("usePanelDataLoader: fresh on open", () => {
 
       await refreshPanel(selectedTimeObj);
       expect(fakes.streams).toHaveLength(2);
-      expect(panelIdToBeRefreshed.value).toBe("panel-1");
+      expect(panelRefreshTargets.get("panel-1")).toBe(false);
 
       endStream(1);
 
-      expect(panelIdToBeRefreshed.value).toBeNull();
+      expect(panelRefreshTargets.size).toBe(0);
     });
 
     it("is cleared when its load fails", async () => {
@@ -809,7 +812,7 @@ describe("usePanelDataLoader: fresh on open", () => {
       const { payload, handlers } = fakes.streams[1];
       handlers.error(payload, { content: { message: "querier timed out", code: 504 } });
 
-      expect(panelIdToBeRefreshed.value).toBeNull();
+      expect(panelRefreshTargets.size).toBe(0);
     });
 
     it("is cleared when it has nothing to query", async () => {
@@ -820,7 +823,7 @@ describe("usePanelDataLoader: fresh on open", () => {
       await refreshPanel(selectedTimeObj);
 
       expect(fakes.streams).toHaveLength(0);
-      expect(panelIdToBeRefreshed.value).toBeNull();
+      expect(panelRefreshTargets.size).toBe(0);
     });
 
     it("is cleared when it unmounts mid-load", async () => {
@@ -831,17 +834,45 @@ describe("usePanelDataLoader: fresh on open", () => {
 
       wrapper.unmount();
 
-      expect(panelIdToBeRefreshed.value).toBeNull();
+      expect(panelRefreshTargets.size).toBe(0);
+    });
+
+    it("is settled while off screen, since it loads only once shown", async () => {
+      global.IntersectionObserver = vi.fn(function (this: any, callback: any) {
+        this.observe = () => callback([{ isIntersecting: false }]);
+        this.disconnect = vi.fn();
+      }) as any;
+      const { loader, selectedTimeObj } = mountPanel({ visit: createVisit() });
+      await settle();
+
+      await refreshPanel(selectedTimeObj);
+
+      expect(fakes.streams).toHaveLength(0);
+      expect(panelRefreshTargets.size).toBe(0);
+      expect(loader.isFirstLoadSettled.value).toBe(false);
     });
 
     it("is kept when another panel's load finishes", async () => {
       mountPanel({ visit: createVisit() });
-      panelIdToBeRefreshed.value = "panel-2";
+      panelRefreshTargets.set("panel-2", false);
       await settle();
 
       endStream(0);
 
-      expect(panelIdToBeRefreshed.value).toBe("panel-2");
+      expect([...panelRefreshTargets]).toEqual([["panel-2", false]]);
+    });
+
+    it("still runs once its load finishes after another panel's refresh started", async () => {
+      const { selectedTimeObj } = mountPanel({ visit: createVisit() });
+      await settle();
+      endStream(0);
+      await refreshPanel(selectedTimeObj);
+      panelRefreshTargets.set("panel-2", false);
+
+      endStream(1);
+
+      expect(isSkippedByPanelRefresh("panel-1")).toBe(false);
+      expect(isSkippedByPanelRefresh("panel-3")).toBe(true);
     });
   });
 });

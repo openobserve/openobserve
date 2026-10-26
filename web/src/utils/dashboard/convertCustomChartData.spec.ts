@@ -17,7 +17,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   CustomChartSkippedError,
   runJavaScriptCode,
-  panelIdToBeRefreshed,
+  panelRefreshTargets,
+  settlePanelRefresh,
   trustCustomChartCode,
 } from "./convertCustomChartData";
 
@@ -38,7 +39,7 @@ vi.mock("acorn-walk", () => ({
 describe("convertCustomChartData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    panelIdToBeRefreshed.value = null;
+    panelRefreshTargets.clear();
 
     // Mock DOM methods
     Object.defineProperty(document, "createElement", {
@@ -85,7 +86,7 @@ describe("convertCustomChartData", () => {
 
   describe("Basic functionality", () => {
     it("rejects with CustomChartSkippedError when another panel is being refreshed", async () => {
-      panelIdToBeRefreshed.value = "panel1";
+      panelRefreshTargets.set("panel1", false);
 
       const panelSchema = {
         id: "panel2",
@@ -363,7 +364,7 @@ describe("convertCustomChartData", () => {
       expect(result).toEqual({ real: "data" });
     });
 
-    it("rejects with CustomChartSkippedError when the refresh target changes mid-run", async () => {
+    it("still resolves when another panel's refresh starts mid-run", async () => {
       const acorn = await import("acorn");
       const walk = await import("acorn-walk");
 
@@ -387,8 +388,7 @@ describe("convertCustomChartData", () => {
 
       const promise = runJavaScriptCode(panelSchema, []);
 
-      // Change the panel ID to be refreshed before message handling
-      panelIdToBeRefreshed.value = "panel2";
+      panelRefreshTargets.set("panel2", false);
 
       // Simulate message from iframe
       const mockEvent = {
@@ -407,20 +407,13 @@ describe("convertCustomChartData", () => {
         messageHandler(mockEvent as any);
       }
 
-      // Verify event listener and iframe cleanup happened
       expect(window.removeEventListener).toHaveBeenCalledWith("message", messageHandler);
-      expect(document.body.removeChild).toHaveBeenCalledWith(mockIframe);
-
-      await expect(promise).rejects.toBeInstanceOf(CustomChartSkippedError);
+      await expect(promise).resolves.toEqual({ data: "test" });
     });
 
-    it("should clear panelIdToBeRefreshed on successful completion", async () => {
+    it("runs a refreshed panel's code after its load settles while a later refresh is in flight", async () => {
       const acorn = await import("acorn");
-      const walk = await import("acorn-walk");
-
       vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
-      vi.mocked(walk.simple).mockImplementation(() => {});
-
       const mockIframe = {
         style: { display: "" },
         setAttribute: vi.fn(),
@@ -428,46 +421,51 @@ describe("convertCustomChartData", () => {
         srcdoc: "",
         contentWindow: { postMessage: vi.fn() },
       };
-
       vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      panelRefreshTargets.set("panel1", false);
+      panelRefreshTargets.set("panel2", false);
+      settlePanelRefresh("panel1");
 
-      const panelSchema = {
-        id: "panel1",
-        customChartContent: "var option = {};",
-      };
-
-      // Set the panel ID to be refreshed
-      panelIdToBeRefreshed.value = "panel1";
-
-      const promise = runJavaScriptCode(panelSchema, []);
-
-      // Trigger onload
-      if (mockIframe.onload) {
-        mockIframe.onload();
-      }
-
-      // Simulate successful response
-      const mockEvent = {
+      const promise = runJavaScriptCode(
+        { id: "panel1", customChartContent: "var option = {};" },
+        [],
+      );
+      const messageHandler = vi
+        .mocked(window.addEventListener)
+        .mock.calls.find((call) => call[0] === "message")?.[1] as (event: any) => void;
+      messageHandler({
         source: mockIframe.contentWindow,
-        data: {
-          type: "success",
-          result: JSON.stringify({ data: "test" }),
-        },
-      };
+        data: { type: "success", result: JSON.stringify({ data: "test" }) },
+      });
 
-      // Get and trigger message handler
-      const addEventListenerCalls = vi.mocked(window.addEventListener).mock.calls;
-      const messageHandler = addEventListenerCalls.find((call) => call[0] === "message")?.[1];
+      await expect(promise).resolves.toEqual({ data: "test" });
+      await expect(
+        runJavaScriptCode({ id: "panel3", customChartContent: "var option = {};" }, []),
+      ).rejects.toBeInstanceOf(CustomChartSkippedError);
+    });
+  });
 
-      if (messageHandler && typeof messageHandler === "function") {
-        messageHandler(mockEvent as any);
-      }
+  describe("settlePanelRefresh", () => {
+    it("ends the refresh only once every target has settled", () => {
+      panelRefreshTargets.set("panel1", false);
+      panelRefreshTargets.set("panel2", false);
 
-      const result = await promise;
-      expect(result).toEqual({ data: "test" });
+      settlePanelRefresh("panel1");
+      expect([...panelRefreshTargets]).toEqual([
+        ["panel1", true],
+        ["panel2", false],
+      ]);
 
-      // Verify panelIdToBeRefreshed was cleared after success
-      expect(panelIdToBeRefreshed.value).toBe(null);
+      settlePanelRefresh("panel2");
+      expect(panelRefreshTargets.size).toBe(0);
+    });
+
+    it("ignores a panel that is not a target", () => {
+      panelRefreshTargets.set("panel1", false);
+
+      settlePanelRefresh("panel2");
+
+      expect([...panelRefreshTargets]).toEqual([["panel1", false]]);
     });
   });
 
