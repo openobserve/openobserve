@@ -148,6 +148,7 @@ export function heatmapYBucketLabel(lower: number, bucket: HeatmapYBucket): stri
   return `${tidyNumber(lower)}–${tidyNumber(bucketUpper(lower, bucket))}`;
 }
 
+/** The log-mode bucket at 0 holds every value <= 0, so it overlaps any range reaching 0. */
 export function heatmapYBucketInRange(
   lower: number,
   bucket: HeatmapYBucket,
