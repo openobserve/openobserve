@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { buildDataLookupMap } from "@/utils/dashboard/sql/shared/seriesBuilder";
+import {
+  buildDataLookupMap,
+  createSeriesBuilders,
+} from "@/utils/dashboard/sql/shared/seriesBuilder";
 
 // Mock heavy dependencies
 vi.mock("@/utils/dashboard/aliasUtils", () => ({
@@ -109,6 +112,33 @@ describe("seriesBuilder", () => {
       // Only first x-axis key "time" is used
       expect(result.has("A||2024-01")).toBe(true);
       expect(result.has("A||Jan")).toBe(false);
+    });
+  });
+
+  describe("getSeriesMarkArea", () => {
+    it("puts annotation bands above bars and area fills but below annotation lines", () => {
+      const { getSeriesMarkArea, getAnnotationMarkLine } = createSeriesBuilders({
+        options: { xAxis: [{ data: [] }] },
+        panelSchema: { config: {} },
+        store: { state: { timezone: "UTC", theme: "light" } },
+        missingValueData: [],
+        xAxisKeys: [],
+        yAxisKeys: [],
+        breakDownKeys: [],
+        defaultSeriesProps: {},
+        chartMin: 0,
+        chartMax: 0,
+        dataLookupMap: new Map(),
+        annotations: { value: [] },
+        getMarkLineData: () => [],
+        getAxisDataFromKey: () => [],
+      });
+
+      const band = getSeriesMarkArea();
+      expect(band.z).toBe(4);
+      // ECharts draws a bar at z 2 and a line or area fill at z 3.
+      expect(band.z).toBeGreaterThan(3);
+      expect(getAnnotationMarkLine().zlevel).toBe(1);
     });
   });
 });

@@ -630,6 +630,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
+import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashboardAnnotationSources";
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -962,6 +963,10 @@ export default defineComponent({
     // A wall screen has no Refresh button to apply a variable change, so kiosk applies it live.
     const applyVariablesLive = computed(() => isAutoRunOn.value || kioskMode.value);
     provide("dashboardAutoRun", applyVariablesLive);
+    provide(ANNOTATION_PREVIEW_CONTEXT_KEY, {
+      timeRange: () => currentTimeObjPerPanel.value?.__global,
+      variables: () => variablesManager.value?.committedVariablesData?.global ?? [],
+    });
 
     const showRangeInPicker = (value: any) =>
       dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));

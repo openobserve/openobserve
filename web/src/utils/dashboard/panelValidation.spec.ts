@@ -21,6 +21,7 @@ import {
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
 import { gt } from "@/types/i18n";
+import { MAX_ANNOTATION_SOURCES } from "@/utils/dashboard/annotationSources";
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3",
@@ -68,6 +69,62 @@ describe("panelValidation", () => {
       ];
       const errors = validateDashboardJson(gt, { ...validDashboard, tabs });
       expect(errors).toEqual([]);
+    });
+
+    it("accepts valid annotationSources and reports broken ones", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: [source] })).toEqual(
+        [],
+      );
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [{ ...source, mode: "sql", query: "" }],
+        }),
+      ).toEqual(["Annotation source 1: Enter a query"]);
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: "x" })).toEqual([
+        "annotationSources must be an array",
+      ]);
+    });
+
+    it("rejects annotationSources over the cap and a duplicate id", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      const atCap = Array.from({ length: MAX_ANNOTATION_SOURCES }, (_, i) => ({
+        ...source,
+        id: `s${i}`,
+        name: `Source ${i}`,
+      }));
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: atCap })).toEqual(
+        [],
+      );
+
+      const overCap = [...atCap, { ...source, id: "over", name: "Over" }];
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: overCap })).toEqual([
+        `A dashboard can have at most ${MAX_ANNOTATION_SOURCES} annotation sources.`,
+      ]);
+
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [source, { ...source, name: "Deploys again" }],
+        }),
+      ).toEqual(["Annotation source 2: ID s1 is used more than once"]);
     });
 
     it("returns error for null dashboard", () => {

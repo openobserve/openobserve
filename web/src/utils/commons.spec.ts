@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AxiosResponse } from "axios";
 import {
   modifySQLQuery,
   getConsumableDateTime,
@@ -1227,6 +1228,42 @@ describe("Commons Utility Functions", () => {
 
       expect(mockDashboard.tabs[0].panels).toHaveLength(1);
       expect(mockDashboard.tabs[0].panels[0].id).toBe("panel-2");
+    });
+
+    it("drops the deleted panel from annotation sources limited to it", async () => {
+      const dashboardId = "dashboard-2";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", title: "Panel 1" },
+              { id: "panel-2", title: "Panel 2" },
+            ],
+          },
+        ],
+        annotationSources: [
+          { id: "a", panels: ["panel-1"] },
+          { id: "b", panels: ["panel-1", "panel-2"] },
+          { id: "c" },
+        ],
+      };
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      vi.mocked(dashboardService.save).mockResolvedValue({
+        data: { success: true },
+      } as unknown as AxiosResponse);
+      vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      } as unknown as AxiosResponse);
+
+      await deletePanel(mockStore, dashboardId, "panel-1", "f", "tab-1");
+
+      const saved = vi.mocked(dashboardService.save).mock.calls.at(-1)![2];
+      expect(saved.annotationSources.map((it: { panels?: string[] }) => it.panels)).toEqual([
+        [],
+        ["panel-2"],
+        undefined,
+      ]);
     });
 
     it("removes the deleted panel's browser draft and keeps the others", async () => {
