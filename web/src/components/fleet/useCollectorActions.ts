@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { shallowRef } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -27,7 +28,16 @@ import {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { serverMessage, type CollectorRow } from "./useFleetApi";
 
-type Target = Pick<CollectorRow, "id" | "name" | "status">;
+// One FleetRemoveDialog renders the request the table and the drawer raise.
+const removeRequest = shallowRef<RemoveRequest | null>(null);
+
+type Target = Pick<CollectorRow, "id" | "name" | "status" | "os">;
+
+export interface RemoveRequest {
+  targets: Target[];
+  online: number;
+  resolve: (ok: boolean) => void;
+}
 
 /** Confirm, call and toast for the per-collector writes the table and the drawer share. */
 export function useCollectorActions() {
@@ -65,17 +75,9 @@ export function useCollectorActions() {
     if (!targets.length) return [];
     const org = orgId.value;
     const online = targets.filter((c) => c.status === "online" || c.status === "degraded").length;
-    const ok = await confirm({
-      title:
-        targets.length === 1
-          ? t("fleet.collectors.removeTitle", { name: raw(targets[0].name) })
-          : t("fleet.collectors.removeManyTitle", { count: targets.length }),
-      message: online
-        ? t("fleet.collectors.removeOnlineMessage", { count: online }, online)
-        : t("fleet.collectors.removeMessage"),
-      confirmLabel: t("fleet.collectors.remove"),
-      confirmVariant: "destructive",
-      focusCancel: true,
+    const ok = await new Promise<boolean>((resolve) => {
+      removeRequest.value?.resolve(false);
+      removeRequest.value = { targets, online, resolve };
     });
     // The rows belong to the org the confirm was opened in; the mutation follows the current one.
     if (!ok || orgId.value !== org) return [];
@@ -140,4 +142,14 @@ export function useCollectorActions() {
     restarting: restartMutation.isPending,
     redelivering: redeliverMutation.isPending,
   };
+}
+
+/** The pending remove confirmation and its answer. */
+export function useRemoveRequest() {
+  const answer = (ok: boolean) => {
+    const req = removeRequest.value;
+    removeRequest.value = null;
+    req?.resolve(ok);
+  };
+  return { request: removeRequest, answer };
 }
