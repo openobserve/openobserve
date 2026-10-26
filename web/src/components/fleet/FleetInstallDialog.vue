@@ -266,6 +266,8 @@ const collectors = useQuery(() =>
       props.open && selectedId.value && !query.state.error && !findConnected(query.state.data)
         ? POLL_MS
         : false,
+    // The user is in a terminal while this runs, so the tab is usually hidden.
+    refetchIntervalInBackground: true,
   }),
 );
 const collectorsForbidden = computed(() => isForbidden(collectors.error.value));
