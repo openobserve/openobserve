@@ -335,6 +335,25 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="table-renderer"]').exists()).toBe(true);
     });
 
+    it("keys SQL table rows on the x and breakdown aliases of every query", () => {
+      const field = (alias: string) => ({ alias, column: alias });
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "table",
+          queries: [
+            { query: "", fields: { x: [field("host")], y: [field("count")], breakdown: [] } },
+            {
+              query: "",
+              fields: { x: [field("host")], y: [field("p95")], breakdown: [field("region")] },
+            },
+          ],
+        },
+      });
+
+      expect((wrapper.vm as any).tableRowKeyFields).toEqual(["host", "region"]);
+    });
+
     it("should render MapsRenderer for maps type", () => {
       wrapper = createWrapper({
         panelSchema: { ...defaultProps.panelSchema, type: "maps" },

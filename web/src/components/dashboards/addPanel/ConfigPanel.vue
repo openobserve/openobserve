@@ -1276,6 +1276,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OSwitch
+          v-show="isConfigOptionVisible('table', 'expandable-rows')"
+          v-model="dashboardPanelDataModel.data.config.table_expandable_rows"
+          :label="t('dashboard.tableExpandableRows')"
+          data-test="dashboard-config-table-expandable-rows"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.tableExpandableRowsTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
+        <OSwitch
           v-show="isConfigOptionVisible('table', 'pagination')"
           v-model="dashboardPanelDataModel.data.config.table_pagination"
           :label="t('dashboard.pagination')"

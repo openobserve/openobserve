@@ -6489,6 +6489,8 @@
     "totalLegends": "المجموع: {count}",
     "noLegendsAvailable": "لا توجد وسائل إيضاح متاحة",
     "tableFiltering": "تصفية الأعمدة",
+    "tableExpandableRows": "صفوف قابلة للتوسيع",
+    "tableExpandableRowsTooltip": "يحصل كل صف على زر توسيع يعرض جميع حقوله.",
     "columnFormattingTitle": "تنسيق الأعمدة",
     "columnFormattingSubtitle": "أضف الحقول التي تريد تنسيقها، ثم قم بتنسيق كل واحدة بمعاينة مباشرة.",
     "columnFormattingPick": "اختر عمودا",

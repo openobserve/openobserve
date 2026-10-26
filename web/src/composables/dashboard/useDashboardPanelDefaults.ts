@@ -113,6 +113,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       column_order: [],
       table_pagination: false,
       table_pagination_rows_per_page: null,
+      table_expandable_rows: false,
       // Pivot table config
       table_pivot_show_row_totals: false,
       table_pivot_show_col_totals: false,

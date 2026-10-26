@@ -393,6 +393,10 @@ export function useConfigPanel(
         label: t("dashboard.tableFiltering"),
         visible: dashboardPanelData.data.type === "table",
       },
+      "expandable-rows": {
+        label: t("dashboard.tableExpandableRows"),
+        visible: dashboardPanelData.data.type === "table" && !isPivotMode.value,
+      },
       pagination: {
         label: t("dashboard.pagination"),
         visible: dashboardPanelData.data.type === "table",

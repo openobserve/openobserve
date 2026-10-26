@@ -50,6 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :expandable-rows="!!panelSchema.config?.table_expandable_rows"
+          :row-key-fields="tableRowKeyFields"
           :enable-column-format="enableColumnFormat"
           :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
           :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
@@ -2003,6 +2005,16 @@ export default defineComponent({
 
     const onFormatColumn = (field: string) => emit("format-column", field);
 
+    // A SQL table row is identified by its x and breakdown fields; the y values change on refresh.
+    const tableRowKeyFields = computed(() => {
+      const queries: { fields?: { x?: { alias?: string }[]; breakdown?: { alias?: string }[] } }[] =
+        panelSchema.value?.queries ?? [];
+      const aliases = queries.flatMap((query) =>
+        [...(query.fields?.x ?? []), ...(query.fields?.breakdown ?? [])].map((f) => f.alias ?? ""),
+      );
+      return [...new Set(aliases.filter(Boolean))];
+    });
+
     const {
       drilldownArray,
       onChartClick,
@@ -2312,6 +2324,7 @@ export default defineComponent({
       onFormatColumn,
       onDataZoom,
       drilldownColumnAliases,
+      tableRowKeyFields,
       drilldownAllColumns,
       drilldownArray,
       selectedAnnotationData,
