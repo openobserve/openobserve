@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
-  formatVariableValue,
   getReferencedVariableNames,
   processVariableContent,
-  type VariableFormat,
 } from "@/utils/dashboard/variables/variablesUtils";
 
 export interface PanelTitleContext {
@@ -33,25 +30,7 @@ const MAX_FILE_NAME_LENGTH = 100;
 // eslint-disable-next-line no-control-regex -- control characters are invalid in file names
 const UNSAFE_FILE_NAME_CHARS = /[\\/:*?"<>|\u0000-\u001f]+/g;
 
-const isAllValue = (value: any) =>
-  value === SELECT_ALL_VALUE || (Array.isArray(value) && value.includes(SELECT_ALL_VALUE));
-
-const isEmptyValue = (value: any) =>
-  value === null ||
-  value === undefined ||
-  value === "" ||
-  (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === ""));
-
-const formatTitleValue =
-  (allLabel: string) =>
-  (value: any, format?: VariableFormat): string => {
-    if (isAllValue(value)) return allLabel;
-    if (isEmptyValue(value)) return EMPTY_MARK;
-    if (Array.isArray(value) && !format) {
-      return value.filter((v) => v !== null && v !== undefined && v !== "").join(", ");
-    }
-    return formatVariableValue(value, format);
-  };
+const markEmpty = (value: string) => (value === "" ? EMPTY_MARK : value);
 
 const removeEmptyValues = (title: string): string => {
   if (!title.includes(EMPTY_MARK)) return title;
@@ -74,7 +53,11 @@ export const resolvePanelTitle = (
   if (typeof title !== "string" || title === "") return title ?? "";
   if (!title.includes("$") && !title.includes("{{")) return title;
   return removeEmptyValues(
-    processVariableContent(title, variablesData, context, undefined, formatTitleValue(allLabel)),
+    processVariableContent(title, variablesData, context, {
+      allLabel,
+      escapeValue: markEmpty,
+      listSeparator: ", ",
+    }),
   );
 };
 

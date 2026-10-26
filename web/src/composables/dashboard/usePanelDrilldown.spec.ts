@@ -923,4 +923,186 @@ describe("usePanelDrilldown", () => {
     expect(resultSchemaMock).toHaveBeenCalledTimes(2);
     expect(api.panelBaseWhere.value).toBe("level = 'error'");
   });
+
+  describe("table row drilldown", () => {
+    const clickTableRow = async (
+      deps: any,
+      row: any,
+      index: number,
+      url = "https://example.com/?job=${row.field.job}&i=${row.index}",
+    ) => {
+      deps.panelSchema.value.type = "table";
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Row",
+          type: "byUrl",
+          targetBlank: true,
+          data: { url },
+        },
+      ];
+      const api = usePanelDrilldown(deps as any);
+      const target = { getBoundingClientRect: () => ({ left: 0, top: 0 }) };
+      await api.onChartClick({ offsetX: 1, offsetY: 1, target }, row, index);
+      await api.openDrilldown(0);
+    };
+
+    it("fills row.field from the clicked PromQL row's labels, without the legend marker", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+
+      await clickTableRow(deps, { job: "api", value: 3, __legend__: "{job=api}" }, 2);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/?job=api&i=2",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("leaves the PromQL table's synthetic row id out of row.field", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+
+      await clickTableRow(
+        deps,
+        { id: "row_3", job: "api", value: 3, __legend__: "{job=api}" },
+        3,
+        "https://example.com/?id=${row.field.id}&job=${row.field.job}",
+      );
+
+      const opened = String(openSpy.mock.calls[0]?.[0]);
+      expect(opened).toContain("job=api");
+      expect(opened).not.toContain("row_3");
+      openSpy.mockRestore();
+    });
+
+    it("keeps reading SQL rows through the query fields", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = makeDeps();
+      deps.panelSchema.value.queries[0].fields.x = [{ alias: "job", label: "Job" }] as any;
+
+      await clickTableRow(deps, { job: "web", other: "x" }, 0);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/?job=web&i=0",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+  });
+
+  it("hands a metric cell's own name and raw value to a URL drilldown", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "metric";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Link",
+        type: "byUrl",
+        targetBlank: true,
+        data: { url: "https://example.com/?n=${series.__name}&v=${series.__value}" },
+      } as any,
+    ];
+    deps.panelData.value.options.series = [
+      { _metricName: "api", _metricRaw: "12.5" },
+      { _metricName: "web", _metricRaw: 7 },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      seriesIndex: 1,
+      event: { offsetX: 1, offsetY: 1 },
+      value: [],
+    });
+    await api.openDrilldown(0);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://example.com/?n=web&v=7",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
+  });
+
+  describe("sankey return nodes", () => {
+    const sankeyDeps = (drilldown: any) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "sankey";
+      deps.panelSchema.value.config.drilldown = [drilldown];
+      return deps;
+    };
+    const returnEdge = {
+      componentType: "series",
+      componentSubType: "sankey",
+      dataType: "edge",
+      event: { offsetX: 40, offsetY: 50 },
+      data: {
+        source: "B",
+        target: "\u0000\u21a9A",
+        rawSource: "B",
+        rawTarget: "A",
+        value: 4,
+      },
+    };
+    const returnNode = {
+      componentType: "series",
+      componentSubType: "sankey",
+      dataType: "node",
+      event: { offsetX: 40, offsetY: 50 },
+      name: "\u0000\u21a9A",
+      value: 4,
+      data: { name: "\u0000\u21a9A", rawName: "A", isReturn: true },
+    };
+
+    it("passes the real names of a return link to a URL drilldown", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = sankeyDeps({
+        name: "Edge",
+        type: "byUrl",
+        data: { url: "https://example.com/?s=${edge.__source}&t=${edge.__target}" },
+      });
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(returnEdge);
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?s=B&t=A",
+        expect.anything(),
+        expect.anything(),
+      );
+      open.mockRestore();
+    });
+
+    it("passes the real name of a return node to a custom logs drilldown", async () => {
+      const deps = sankeyDeps({
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE svc = \${node.__name}`,
+        },
+      });
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(returnNode);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              query: `b64(SELECT * FROM "default" WHERE svc = 'A')`,
+            }),
+          }),
+        ),
+      );
+    });
+  });
 });

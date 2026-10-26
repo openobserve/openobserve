@@ -370,7 +370,7 @@ import {
 } from "@/utils/dashboard/panelValidation";
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
@@ -1476,9 +1476,9 @@ export default defineComponent({
 
     const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
-        // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+        // CRITICAL: Clear panelRefreshTargets to ensure panel refreshes
         // In add/edit panel mode, when time changes, this panel should always refresh
-        panelIdToBeRefreshed.value = null;
+        panelRefreshTargets.clear();
 
         // In add/edit panel mode, ALWAYS use global date time picker for chart rendering.
         // Config date time (panel_time_range) is ONLY saved for view mode default.

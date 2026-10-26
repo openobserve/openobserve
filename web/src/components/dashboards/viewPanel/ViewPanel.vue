@@ -225,6 +225,8 @@
                   @result-metadata-update="handleResultMetadataUpdate"
                   @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                   @series-limit-update="handleSeriesLimitUpdate"
+                  @region-join-update="handleRegionJoinUpdate"
+                  @sankey-notice-update="handleSankeyNoticeUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
@@ -302,7 +304,7 @@ import {
   DASHBOARD_FRESH_PANEL_TIME,
   freshTimeFromAppliedRange,
 } from "@/composables/dashboard/dashboardFreshPanelTime";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -467,6 +469,8 @@ export default defineComponent({
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -833,9 +837,9 @@ export default defineComponent({
       const appliedTime = pickerValueToTimeObj(selectedDate.value);
       if (!appliedTime) return;
 
-      // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+      // CRITICAL: Clear panelRefreshTargets to ensure panel refreshes
       // In view panel mode, when time changes, this panel should always refresh
-      panelIdToBeRefreshed.value = null;
+      panelRefreshTargets.clear();
 
       dashboardPanelData.meta.dateTime = appliedTime;
 
@@ -1064,6 +1068,8 @@ export default defineComponent({
       noticeProps,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,
