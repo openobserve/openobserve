@@ -534,6 +534,8 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
       if (color) item.itemStyle = { ...item.itemStyle, color };
     } else if (colours) {
       visualMaps.push(buildThresholdVisualMap(resolved, index, dimension));
+      // Large-mode bars take one colour per series, so a visualMap could not recolour them.
+      if (series.large) series.large = false;
       // An explicit area fill colour outranks the visualMap, so the fill would keep the series colour.
       if (series.areaStyle?.color !== undefined) {
         const { color: _fill, ...areaStyle } = series.areaStyle;
