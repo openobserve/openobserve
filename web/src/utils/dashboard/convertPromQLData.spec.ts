@@ -1629,30 +1629,33 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.options.yAxis.max).toBe(100); // Max of (100, dataMax) = 100
     });
 
-    it.each(["stacked"])("widens a %s y_axis_max that would clip the stack total", async (type) => {
-      const series = (job: string) => ({
-        metric: { job },
-        values: [
-          [1640435200, "70"],
-          [1640438800, "70"],
-        ],
-      });
-      const result = await convertPromQLData(
-        {
-          id: "panel1",
-          type,
-          config: { y_axis_max: 10 },
-          queries: [{ config: { promql_legend: "" } }],
-        },
-        [{ resultType: "matrix", result: [series("a"), series("b")] }],
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockAnnotations,
-      );
+    it.each(["stacked", "area-stacked"])(
+      "widens a %s y_axis_max that would clip the stack total",
+      async (type) => {
+        const series = (job: string) => ({
+          metric: { job },
+          values: [
+            [1640435200, "70"],
+            [1640438800, "70"],
+          ],
+        });
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { y_axis_max: 10 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [{ resultType: "matrix", result: [series("a"), series("b")] }],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
 
-      expect(result.options.yAxis.max).toBe(140);
-    });
+        expect(result.options.yAxis.max).toBe(140);
+      },
+    );
 
     it("should use getFinalAxisValue with null config values", async () => {
       const panelSchema = {

@@ -866,7 +866,8 @@ export const convertMultiSQLData = async (
     }
     // Override colours first: a threshold step outranks them and recolours on top.
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
-    if (chartType === "stacked") fitAxisBoundsToStacks(options[0].options);
+    if (chartType === "stacked" || chartType === "area-stacked")
+      fitAxisBoundsToStacks(options[0].options);
     applyLineAreaThresholds(options[0].options, panelSchema);
   }
 

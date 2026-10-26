@@ -1575,6 +1575,7 @@ export const convertPromQLData = async (
   // console.timeEnd("convertPromQLData");
   // Override colours first: a threshold step outranks them and recolours on top.
   applySeriesOverrides(options, panelSchema, store.state.theme);
+  if (panelSchema.type === "area-stacked") fitAxisBoundsToStacks(options);
   applyLineAreaThresholds(options, panelSchema);
   // Reserve measured left space so wide y-axis labels don't clip.
   applyMeasuredYAxisLeftInset(options);

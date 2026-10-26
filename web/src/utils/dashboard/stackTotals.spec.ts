@@ -463,23 +463,39 @@ describe("SQL stacked y-axis bounds", () => {
   };
 
   it.each([
-    ["categories", endpointX, ["/a", "/b"]],
-    ["time", timeX, TIMES],
-  ])("stacked on %s: a y max below the stack top rises to the stack sum", async (_, x, xs) => {
-    const options = await runSQL(withBounds("stacked", x, { y_axis_max: 100 }), stackRows(xs));
+    ["stacked", "categories", endpointX, ["/a", "/b"]],
+    ["stacked", "time", timeX, TIMES],
+    ["area-stacked", "categories", endpointX, ["/a", "/b"]],
+    ["area-stacked", "time", timeX, TIMES],
+  ])("%s on %s: a y max below the stack top rises to the stack sum", async (type, _, x, xs) => {
+    const options = await runSQL(withBounds(type, x, { y_axis_max: 100 }), stackRows(xs));
     expect(options.yAxis.max).toBe(500);
   });
 
-  it("stacked: a y min above the deepest negative stack drops to its sum", async () => {
-    const rows = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: -row.y_axis_1 }));
-    const options = await runSQL(withBounds("stacked", endpointX, { y_axis_min: -10 }), rows);
-    expect(options.yAxis.min).toBe(-500);
-  });
+  it.each(["stacked", "area-stacked"])(
+    "%s: a y min above the deepest negative stack drops to its sum",
+    async (type) => {
+      const rows = stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: -row.y_axis_1 }));
+      const options = await runSQL(withBounds(type, endpointX, { y_axis_min: -10 }), rows);
+      expect(options.yAxis.min).toBe(-500);
+    },
+  );
 
-  it("stacked without user bounds keeps the automatic extent", async () => {
-    const options = await runSQL(sqlPanel("stacked", endpointX), stackRows(["/a", "/b"]));
-    expect(options.yAxis.max).toBeUndefined();
-    expect(options.yAxis.min).toBeUndefined();
+  it.each(["stacked", "area-stacked"])(
+    "%s without user bounds keeps the automatic extent",
+    async (type) => {
+      const options = await runSQL(sqlPanel(type, endpointX), stackRows(["/a", "/b"]));
+      expect(options.yAxis.max).toBeUndefined();
+      expect(options.yAxis.min).toBeUndefined();
+    },
+  );
+
+  it("area keeps today's single-value bound", async () => {
+    const options = await runSQL(
+      withBounds("area", endpointX, { y_axis_max: 100 }),
+      stackRows(["/a", "/b"]),
+    );
+    expect(options.yAxis.max).toBe(300);
   });
 
   it("bar keeps today's single-value bound", async () => {
@@ -515,5 +531,67 @@ describe("SQL stacked y-axis bounds", () => {
       false,
     );
     expect(result.options.yAxis.max).toBe(2000);
+  });
+
+  const runShiftedSQL = async (panel: any, current: any[], past: any[]) => {
+    const result: any = await convertMultiSQLData(
+      panel,
+      [current, past],
+      store,
+      panelRef(),
+      { value: null },
+      { value: [[], []] },
+      {
+        queries: [
+          { seconds: 0, periodAsStr: "" },
+          { seconds: 86400, periodAsStr: "1 day ago" },
+        ].map((timeRangeGap) => ({
+          query: "SELECT 1",
+          startTime: 1704067200000000,
+          endTime: 1704068400000000,
+          timeRangeGap,
+          panelQueryIndex: 0,
+        })),
+      },
+      { height: "400px" },
+      { value: [] },
+      false,
+    );
+    return result.options;
+  };
+  const tall = () => stackRows(["/a", "/b"]).map((row) => ({ ...row, y_axis_1: row.y_axis_1 * 4 }));
+
+  it("area-stacked time shift: the past period's stack lifts the bound on its own, never on top", async () => {
+    const options = await runShiftedSQL(
+      withBounds("area-stacked", endpointX, { y_axis_max: 100 }),
+      stackRows(["/a", "/b"]),
+      tall(),
+    );
+    expect(options.yAxis.max).toBe(2000);
+  });
+
+  it("area-stacked time shift: the tooltip totals each period apart", async () => {
+    const options = await runShiftedSQL(
+      sqlPanel("area-stacked", endpointX),
+      stackRows(["/a", "/b"]),
+      tall(),
+    );
+    const point = (name: string, value: number) => ({
+      seriesName: name,
+      seriesIndex: indexOf(options, name),
+      name: "/a",
+      marker: "",
+      value,
+      data: value,
+    });
+    const html = options.tooltip.formatter([
+      point("api", 200),
+      point("web", 300),
+      point("api (1 day ago)", 800),
+      point("web (1 day ago)", 1200),
+    ]);
+    expect(html).toContain("<strong>Total : 500ms</strong>");
+    expect(html).toContain("<strong>Total (1 day ago) : 2s</strong>");
+    expect(html).not.toContain(": 2.5s");
   });
 });
