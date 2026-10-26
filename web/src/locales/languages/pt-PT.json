@@ -26325,8 +26325,8 @@
       "remoteStatus": "Estado remoto",
       "remove": "Remover",
       "removeManyTitle": "Remover {count} coletores?",
-      "removeMessage": "Isto remove apenas a linha. Um anfitrião ativo reaparece no próximo heartbeat; pare o supervisor no anfitrião para deixar de o gerir.",
-      "removeOnlineMessage": "Isto remove apenas a linha. {count} destes coletores está online e reaparece no próximo heartbeat; pare o supervisor no anfitrião para deixar de o gerir. | Isto remove apenas as linhas. {count} destes coletores estão online e reaparecem no próximo heartbeat; pare o supervisor nesses anfitriões para deixar de os gerir.",
+      "removeMessage": "Isto remove apenas a linha. Um anfitrião que ainda executa o coletor reaparece no próximo heartbeat, por isso desinstale-o primeiro aí.",
+      "removeOnlineMessage": "Isto remove apenas a linha. {count} destes coletores está online e reaparece no próximo heartbeat; desinstale-o primeiro no respetivo anfitrião. | Isto remove apenas as linhas. {count} destes coletores estão online e reaparecem no próximo heartbeat; desinstale-os primeiro nos respetivos anfitriões.",
       "removeTitle": "Remover {name}?",
       "removedCount": "{count} coletor removido | {count} coletores removidos",
       "rename": "Mudar o nome",
@@ -26595,6 +26595,13 @@
       "versionLine": "Instala a versão {version} do coletor",
       "revealToken": "Mostrar token",
       "hideToken": "Ocultar token"
+    },
+    "uninstall": {
+      "howTo": "Como desinstalar",
+      "scriptNote": "Para e remove o serviço, os binários e a configuração. O estado do coletor fica em {state} e os seus registos em {logs}; apague-os manualmente se já não precisar deles.",
+      "windowsNote": "Execute-o a partir de um PowerShell com privilégios de administrador. Para e remove o serviço, os binários e a configuração. O estado do coletor fica em {state}; apague-o manualmente se já não precisar dele.",
+      "dockerNote": "Execute-o no diretório a partir do qual instalou. Remove o contentor, o respetivo volume de estado e o diretório com a configuração do supervisor.",
+      "kubernetesNote": "Remove o DaemonSet e os outros recursos criados pelo chart. O namespace mantém-se; apague-o se nada mais estiver a correr nele."
     },
     "settings": {
       "governance": "Governação",

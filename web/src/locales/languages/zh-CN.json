@@ -26325,8 +26325,8 @@
       "remoteStatus": "远程状态",
       "remove": "移除",
       "removeManyTitle": "移除 {count} 个 Collector？",
-      "removeMessage": "此操作仅移除该行。在线主机会在下次心跳时重新出现；请在主机上停止 supervisor 以停止对其管理。",
-      "removeOnlineMessage": "此操作仅移除该行。这 {count} 个 Collector 中有 1 个在线，将在下次心跳时重新出现；请在该主机上停止 supervisor 以停止对其管理。 | 此操作仅移除这些行。这些 Collector 中有 {count} 个在线，将在下次心跳时重新出现；请在这些主机上停止 supervisor 以停止对其管理。",
+      "removeMessage": "此操作仅移除该行。仍在运行 collector 的主机会在下次心跳时重新出现，因此请先在主机上卸载。",
+      "removeOnlineMessage": "此操作仅移除该行。其中 {count} 个 collector 在线，会在下次心跳时重新出现；请先在其主机上卸载。 | 此操作仅移除这些行。其中 {count} 个 collector 在线，会在下次心跳时重新出现；请先在对应主机上卸载。",
       "removeTitle": "移除 {name}？",
       "removedCount": "已移除 {count} 个 Collector | 已移除 {count} 个 Collector",
       "rename": "重命名",
@@ -26595,6 +26595,13 @@
       "versionLine": "安装 Collector 版本 {version}",
       "revealToken": "显示令牌",
       "hideToken": "隐藏令牌"
+    },
+    "uninstall": {
+      "howTo": "如何卸载",
+      "scriptNote": "停止并移除服务、二进制文件和配置。collector 的状态保留在 {state}，日志保留在 {logs}；如不再需要，请手动删除。",
+      "windowsNote": "请在以管理员身份运行的 PowerShell 中执行。停止并移除服务、二进制文件和配置。collector 的状态保留在 {state}；如不再需要，请手动删除。",
+      "dockerNote": "请在安装时所在的目录中执行。移除容器、其状态卷以及存放 supervisor 配置的目录。",
+      "kubernetesNote": "移除 DaemonSet 以及该 chart 创建的其他资源。命名空间会保留；如其中没有其他工作负载，可将其删除。"
     },
     "settings": {
       "governance": "治理",

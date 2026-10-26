@@ -26325,8 +26325,8 @@
       "remoteStatus": "Stan zdalny",
       "remove": "Usuń",
       "removeManyTitle": "Usunąć kolektory ({count})?",
-      "removeMessage": "Usuwa tylko wiersz. Działający host pojawi się ponownie przy następnym heartbeacie; zatrzymaj supervisora na hoście, aby przestać nim zarządzać.",
-      "removeOnlineMessage": "Usuwa tylko wiersz. Liczba kolektorów online: {count}; pojawi się ponownie przy następnym heartbeacie. Zatrzymaj supervisora na hoście, aby przestać nim zarządzać. | Usuwa tylko wiersze. Liczba kolektorów online: {count}; pojawią się ponownie przy kolejnym heartbeacie. Zatrzymaj supervisorów na tych hostach, aby przestać nimi zarządzać.",
+      "removeMessage": "Usuwa tylko wiersz. Host, na którym collector nadal działa, pojawi się ponownie przy następnym heartbeacie, więc najpierw odinstaluj go na tym hoście.",
+      "removeOnlineMessage": "Usuwa tylko wiersz. {count} z tych collectorów jest online i pojawi się ponownie przy następnym heartbeacie; najpierw odinstaluj go na jego hoście. | Usuwa tylko wiersze. {count} z tych collectorów jest online i pojawią się ponownie przy następnym heartbeacie; najpierw odinstaluj je na ich hostach.",
       "removeTitle": "Usunąć {name}?",
       "removedCount": "Usunięto kolektor: {count} | Usunięto kolektory: {count}",
       "rename": "Zmień nazwę",
@@ -26595,6 +26595,13 @@
       "versionLine": "Instaluje kolektor w wersji {version}",
       "revealToken": "Pokaż token",
       "hideToken": "Ukryj token"
+    },
+    "uninstall": {
+      "howTo": "Jak odinstalować",
+      "scriptNote": "Zatrzymuje i usuwa usługę, pliki binarne oraz konfigurację. Stan collectora pozostaje w {state}, a jego logi w {logs}; usuń je ręcznie, jeśli nie są już potrzebne.",
+      "windowsNote": "Uruchom w PowerShell z uprawnieniami administratora. Zatrzymuje i usuwa usługę, pliki binarne oraz konfigurację. Stan collectora pozostaje w {state}; usuń go ręcznie, jeśli nie jest już potrzebny.",
+      "dockerNote": "Uruchom w katalogu, z którego instalowano. Usuwa kontener, jego wolumen stanu oraz katalog z konfiguracją supervisora.",
+      "kubernetesNote": "Usuwa DaemonSet i pozostałe zasoby utworzone przez chart. Przestrzeń nazw pozostaje; usuń ją, jeśli nic więcej w niej nie działa."
     },
     "settings": {
       "governance": "Zarządzanie i zgodność",
