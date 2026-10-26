@@ -235,3 +235,35 @@ it("viewers see the same waiver details and ask an administrator to refresh", as
   await w.setProps({ canUpdate: true });
   expect(w.find("[data-test=license-waivers-ask-admin]").exists()).toBe(false);
 });
+
+describe("LicenseWaiversCard boundary events", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("reports each reached boundary once and not the re-arm steps before a far one", async () => {
+    const endsUs = (NOW + 1000) * 1000;
+    const far = (NOW + 2 ** 31 + 5000) * 1000;
+    const w = mountCard([
+      waiver({ id: "near", starts_at: (NOW - 1000) * 1000, ends_at: endsUs }),
+      waiver({ id: "far", starts_at: (NOW - 1000) * 1000, ends_at: far }),
+    ]);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(w.emitted("boundary")).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.emitted("boundary")).toEqual([[endsUs]]);
+    await vi.advanceTimersByTimeAsync(2 ** 31 - 1);
+    expect(w.emitted("boundary")).toEqual([[endsUs]]);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.emitted("boundary")).toEqual([[endsUs], [far]]);
+  });
+
+  it("stops reporting once unmounted", async () => {
+    const w = mountCard([waiver({ starts_at: (NOW - 1000) * 1000, ends_at: (NOW + 1000) * 1000 })]);
+    w.unmount();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.emitted("boundary")).toBeUndefined();
+  });
+});

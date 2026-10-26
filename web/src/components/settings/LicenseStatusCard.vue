@@ -134,15 +134,23 @@ const props = defineProps<{
   canUpdateLicense?: boolean;
 }>();
 
-const emit = defineEmits<{ "add-license-key": [] }>();
+const emit = defineEmits<{ "add-license-key": []; boundary: [atUs: number] }>();
 const { t, locale } = useI18nTyped();
 
 const nowUs = ref(Date.now() * 1000);
 const relief = computed(() => statusWaiverRelief(props.waivers, nowUs.value));
 let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
+let armedBoundary: number | undefined;
 const clearBoundaryTimer = () => {
   if (boundaryTimer !== undefined) clearTimeout(boundaryTimer);
   boundaryTimer = undefined;
+  armedBoundary = undefined;
+};
+// far boundaries re-arm in steps, so only a timer that reached its boundary reports it
+const onBoundaryTimer = () => {
+  const reached = armedBoundary;
+  armBoundaryTimer();
+  if (reached !== undefined && reached <= nowUs.value) emit("boundary", reached);
 };
 const armBoundaryTimer = () => {
   clearBoundaryTimer();
@@ -160,9 +168,10 @@ const armBoundaryTimer = () => {
     ])
     .filter((boundary) => Number.isFinite(boundary) && boundary > nowUs.value);
   if (!upcoming.length) return;
+  armedBoundary = Math.min(...upcoming);
   boundaryTimer = setTimeout(
-    armBoundaryTimer,
-    Math.min(Math.ceil((Math.min(...upcoming) - nowUs.value) / 1000), MAX_TIMEOUT_MS),
+    onBoundaryTimer,
+    Math.min(Math.ceil((armedBoundary - nowUs.value) / 1000), MAX_TIMEOUT_MS),
   );
 };
 watch(() => props.waivers, armBoundaryTimer, { immediate: true, deep: true });
