@@ -1597,6 +1597,7 @@ describe("pie and donut legend values", () => {
       );
       expect(options.legend.formatter("A")).toBe("{b|A}  25.00%");
       expect(options.legend.formatter("B")).toBe("{b|B}  75.00%");
+      expect(calculateWidthText("A  25.00%")).toBeLessThanOrEqual(options.legend.textStyle.width);
     },
   );
 
@@ -1643,16 +1644,18 @@ describe("pie outside labels beside a right legend", () => {
   };
 
   it.each([
-    ["donut", "scroll", ["40%", "70%"]],
-    ["donut", "plain", ["40%", "70%"]],
-    ["pie", "scroll", "70%"],
+    ["donut", { legends_type: "scroll" }, ["40%", "70%"]],
+    ["donut", { legends_type: "plain" }, ["40%", "70%"]],
+    ["pie", { legends_type: "scroll" }, "70%"],
+    ["pie", { legends_type: "plain" }, "70%"],
+    ["pie", { legends_type: "plain", chart_align: "left" }, "70%"],
   ])(
-    "ends the %s series box at a %s legend without moving the pie",
-    (type, legendsType, radius) => {
+    "ends the %s series box at a right legend %o without moving the pie",
+    (type, config, radius) => {
       const fitted: any = { series: [pieSeries(radius)] };
-      applyLegendConfiguration(schema(type, { legends_type: legendsType }), panel, hovered, fitted);
+      applyLegendConfiguration(schema(type, config), panel, hovered, fitted);
       const inside: any = { series: [pieSeries(radius, { show: true, position: "inside" })] };
-      applyLegendConfiguration(schema(type, { legends_type: legendsType }), panel, hovered, inside);
+      applyLegendConfiguration(schema(type, config), panel, hovered, inside);
 
       const series = fitted.series[0];
       expect(series.right).toBeGreaterThan(0);

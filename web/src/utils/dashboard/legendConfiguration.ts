@@ -509,7 +509,7 @@ const truncateLegendName = (text: string, maxWidth: number): string => {
     if (calculateWidthText(`${text.slice(0, mid)}...`, LEGEND_TEXT_FONT) <= maxWidth) low = mid;
     else high = mid - 1;
   }
-  return `${text.slice(0, low)}...`;
+  return low >= text.length ? text : `${text.slice(0, low)}...`;
 };
 
 // Mirrors applyPieOverrides: a slice with its own decimals gets a plain share of the positive total.
