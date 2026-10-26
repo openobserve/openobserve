@@ -169,6 +169,7 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
+import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
 import {
@@ -225,9 +226,24 @@ interface DetectionPanel {
   schema: unknown;
 }
 
-const selectedTimeObj = ref<any>(null);
 const windowUs = ref({ startUs: 0, endUs: 0 });
 const range = ref<string>("1h");
+const cursorUs = ref<number | null>(props.alert?.last_processed_timestamp ?? null);
+
+// Rows exist only below the detector's cursor; a query past it would result-cache the unwritten tail as empty.
+const queryEndUs = computed(() => {
+  const { startUs, endUs } = windowUs.value;
+  const cursor = cursorUs.value;
+  return cursor && cursor > startUs && cursor < endUs ? cursor : endUs;
+});
+
+// MICROSECONDS into `new Date(...)`, the convention every other alert chart
+// feeds the renderer — honest milliseconds draw an empty chart.
+const selectedTimeObj = computed<any>(() =>
+  windowUs.value.endUs
+    ? { start_time: new Date(windowUs.value.startUs), end_time: new Date(queryEndUs.value) }
+    : null,
+);
 
 const rangeOptions = computed(() => [
   { value: "1h", label: t("alerts.groups.range1h") },
@@ -447,7 +463,7 @@ async function loadMetric() {
           query: {
             sql,
             start_time: windowUs.value.startUs,
-            end_time: windowUs.value.endUs,
+            end_time: queryEndUs.value,
             from: 0,
             size: -1,
           },
@@ -469,25 +485,38 @@ async function loadMetric() {
   }
 }
 
-// MICROSECONDS into `new Date(...)`, the convention every other alert chart
-// feeds the renderer — honest milliseconds draw an empty chart.
 function setTimeRange() {
   const endUs = Date.now() * 1000;
   const startUs = endUs - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-  selectedTimeObj.value = {
-    start_time: new Date(startUs),
-    end_time: new Date(endUs),
-  };
   windowUs.value = { startUs, endUs };
 }
 
-const onRangeChange = (value: unknown) => {
+// The page loads the config once, so a run since then has moved the cursor past the prop's copy.
+async function refreshCursor() {
+  const org = store.state.selectedOrganization?.identifier;
+  if (!org || !props.anomalyId) return;
+  try {
+    const res = await alertsService.get_by_alert_id(org, props.anomalyId);
+    cursorUs.value = res?.data?.last_processed_timestamp ?? null;
+  } catch {
+    // A failed refresh keeps the older cursor, which only under-queries.
+  }
+}
+
+const onRangeChange = async (value: unknown) => {
   if (!value) return;
   range.value = String(value);
+  await refreshCursor();
   // The renderer watches `selectedTimeObj` and refetches itself.
   setTimeRange();
 };
 
+watch(
+  () => props.alert?.last_processed_timestamp,
+  (cursor) => {
+    cursorUs.value = cursor ?? null;
+  },
+);
 watch(
   () => props.anomalyId,
   () => {
@@ -495,7 +524,7 @@ watch(
     loadKindColumns();
   },
 );
-watch([metricQuery, windowUs, kindColumnsReady], loadMetric);
+watch([metricQuery, windowUs, queryEndUs, kindColumnsReady], loadMetric);
 onMounted(() => {
   setTimeRange();
   loadKindColumns();
