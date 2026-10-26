@@ -255,7 +255,7 @@ jobs:
   ui_unit_test_shards:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
-    timeout-minutes: 55
+    timeout-minutes: 45
     runs-on:
       labels: ubicloud-standard-8
     strategy:
@@ -264,24 +264,29 @@ jobs:
         shard: [1, 2, 3, 4]
     permissions:
       contents: read
+
     steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark-ui-unit-tests') && github.event.pull_request.head.sha || github.sha }}
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
       - uses: ./.github/actions/github-auth
-      - uses: actions/setup-node@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
-          node-version: "24.22.0"
-          cache: npm
+          node-version: 24
+          cache: 'npm'
           cache-dependency-path: web/package-lock.json
+
       - name: Install dependencies
         working-directory: web
         timeout-minutes: 5
         run: npm ci
-      - name: Run shard with coverage
-        run: node web/scripts/benchmark-unit-tests.mjs shard web "$RUNNER_TEMP/ui-shard" "${{ matrix.shard }}/4"
-      - name: Upload coverage blob
-        if: always()
+
+      - name: Run frontend unit test shard with coverage
+        working-directory: web
+        run: ./coverage.sh shard ${{ matrix.shard }}
+
+      - name: Upload shard coverage
         uses: actions/upload-artifact@v4
         with:
           name: ui-unit-blob-${{ matrix.shard }}
@@ -289,129 +294,52 @@ jobs:
           include-hidden-files: true
           overwrite: true
           retention-days: 3
-          if-no-files-found: warn
-      - name: Upload shard diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-unit-shard-${{ matrix.shard }}
-          path: ${{ runner.temp }}/ui-shard
-          overwrite: true
-          retention-days: 3
-          if-no-files-found: warn
+          if-no-files-found: error
 
+  # Runs even when a shard fails, so the ui_unit_tests check fails instead of being skipped.
   ui_unit_tests:
     needs: [check_changes, ui_unit_test_shards]
-    if: ${{ always() && !cancelled() && needs.check_changes.outputs.has_ui_changes == 'true' }}
+    if: ${{ !cancelled() && needs.check_changes.outputs.has_ui_changes == 'true' }}
     timeout-minutes: 20
     runs-on:
       labels: ubicloud-standard-8
     permissions:
       contents: read
+
     steps:
       - name: Require every shard to pass
-        env:
-          SHARD_RESULT: ${{ needs.ui_unit_test_shards.result }}
-        run: test "$SHARD_RESULT" = success
-      - uses: actions/checkout@v5
+        run: |
+          if [ "${{ needs.ui_unit_test_shards.result }}" != "success" ]; then
+            echo "A UI unit test shard failed or was skipped: ${{ needs.ui_unit_test_shards.result }}"
+            exit 1
+          fi
+
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/github-auth
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
-          ref: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark-ui-unit-tests') && github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24.22.0"
-          cache: npm
+          node-version: 24
+          cache: 'npm'
           cache-dependency-path: web/package-lock.json
+
       - name: Install dependencies
         working-directory: web
         timeout-minutes: 5
         run: npm ci
-      - uses: actions/download-artifact@v4
+
+      - name: Download shard coverage
+        uses: actions/download-artifact@v4
         with:
           pattern: ui-unit-blob-*
           path: web/.vitest-reports
           merge-multiple: true
-      - name: Merge complete coverage and enforce thresholds
-        run: node web/scripts/benchmark-unit-tests.mjs merge web "$RUNNER_TEMP/ui-merged"
-      - name: Upload merged coverage and diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-unit-merged
-          path: ${{ runner.temp }}/ui-merged
-          overwrite: true
-          retention-days: 3
-          if-no-files-found: warn
 
-  ui_unit_test_baseline:
-    needs: [check_changes]
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.check_changes.outputs.has_ui_changes == 'true' && contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && contains(github.event.pull_request.labels.*.name, 'benchmark-ui-unit-tests') }}
-    timeout-minutes: 55
-    runs-on:
-      labels: ubicloud-standard-8
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark-ui-unit-tests') && github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/checkout@v5
-        with:
-          ref: 9e6066e6d6f567729c7213a5c2ba4e3f5657347a
-          path: baseline
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24.22.0"
-          cache: npm
-          cache-dependency-path: baseline/web/package-lock.json
-      - name: Require identical dependencies
-        run: |
-          test "$(npm --version)" = "11.19.1"
-          cmp web/package-lock.json baseline/web/package-lock.json
-      - name: Install baseline dependencies
-        working-directory: baseline/web
-        timeout-minutes: 5
-        run: npm ci
-      - name: Measure original full suite
-        run: node web/scripts/benchmark-unit-tests.mjs baseline baseline/web "$RUNNER_TEMP/ui-baseline"
-      - name: Upload baseline coverage and diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-unit-baseline
-          path: ${{ runner.temp }}/ui-baseline
-          overwrite: true
-          retention-days: 3
-          if-no-files-found: warn
-
-  ui_unit_test_benchmark:
-    needs: [ui_unit_test_baseline, ui_unit_tests]
-    if: ${{ always() && !cancelled() && needs.ui_unit_test_baseline.result != 'skipped' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark-ui-unit-tests') && github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24.22.0"
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: ui-unit-*
-          path: benchmark-data
-      - name: Compare complete suites and runner occupancy
-        run: node web/scripts/benchmark-unit-tests.mjs compare benchmark-data "$RUNNER_TEMP/ui-comparison"
-      - name: Upload comparison
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-unit-comparison
-          path: ${{ runner.temp }}/ui-comparison
-          overwrite: true
-          retention-days: 7
-          if-no-files-found: warn
+      - name: Merge shard coverage and check thresholds
+        working-directory: web
+        run: ./coverage.sh merge
 
   ui_code_quality:
     needs: [check_changes]
@@ -429,7 +357,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: "npm"
+          cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
