@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
+import i18n from "@/locales";
 
 // Mock external dependencies.
 // Mutable hoisted state so individual tests can drive the theme that
@@ -42,10 +43,8 @@ vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
   }),
 }));
 
-vi.mock("dompurify", () => ({
-  default: {
-    sanitize: vi.fn((content) => content), // Pass through for testing
-  },
+vi.mock("@/utils/dashboard/markdownPanelSanitizer", () => ({
+  sanitizeMarkdownPanel: vi.fn((content) => content),
 }));
 
 vi.mock("marked", () => ({
@@ -71,7 +70,7 @@ describe("MarkdownRenderer", () => {
     return mount(MarkdownRenderer, {
       props,
       global: {
-        plugins: [],
+        plugins: [i18n],
       },
     });
   };
@@ -209,7 +208,7 @@ describe("MarkdownRenderer", () => {
         "# {{title}}\n\nWelcome {{userName}}!",
         { title: "Dashboard", userName: "John" },
         { panelId: undefined, tabId: undefined },
-        expect.any(Function),
+        { allLabel: "All", escapeValue: expect.any(Function) },
       );
     });
 
@@ -355,29 +354,30 @@ describe("MarkdownRenderer", () => {
     });
   });
 
-  describe("DOMPurify Integration", () => {
-    it("should sanitize converted HTML using DOMPurify", async () => {
-      const DOMPurify = (await import("dompurify")).default;
+  describe("Sanitizer Integration", () => {
+    it("should sanitize converted HTML with the Markdown panel sanitizer", async () => {
+      const { sanitizeMarkdownPanel } = await import("@/utils/dashboard/markdownPanelSanitizer");
 
       wrapper = createWrapper({
         markdownContent: "# Safe Heading\n\n[Link](javascript:alert('xss'))",
       });
 
-      expect(DOMPurify.sanitize).toHaveBeenCalled();
+      expect(sanitizeMarkdownPanel).toHaveBeenCalled();
     });
 
     it("should sanitize content on every render", async () => {
-      const DOMPurify = (await import("dompurify")).default;
+      const { sanitizeMarkdownPanel } = await import("@/utils/dashboard/markdownPanelSanitizer");
+      const sanitize = vi.mocked(sanitizeMarkdownPanel);
 
       wrapper = createWrapper({
         markdownContent: "# Initial",
       });
 
-      const initialCallCount = DOMPurify.sanitize.mock.calls.length;
+      const initialCallCount = sanitize.mock.calls.length;
 
       await wrapper.setProps({ markdownContent: "# Updated" });
 
-      expect(DOMPurify.sanitize.mock.calls.length).toBeGreaterThan(initialCallCount);
+      expect(sanitize.mock.calls.length).toBeGreaterThan(initialCallCount);
     });
   });
 

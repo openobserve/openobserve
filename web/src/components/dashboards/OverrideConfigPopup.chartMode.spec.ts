@@ -319,27 +319,32 @@ describe("OverrideConfigPopup in chart mode", () => {
     expect(wrapper.emitted("save")[0][0]).toEqual([]);
   });
 
-  it.each(["line", "area", "area-stacked", "bar", "h-bar", "scatter", "gauge", "metric"])(
-    "shows the Thresholds field on %s",
-    async (chartType) => {
-      await mountChart({ chartType, entries: [series("cart")] });
-      expect($('[data-test="dashboard-series-format-thresholds"]')).not.toBeNull();
-      expect($('[data-test="dashboard-series-format-thresholds-inherit"]')!.textContent).toBe(
-        "Inherits panel",
-      );
-    },
-  );
+  it.each([
+    "line",
+    "area",
+    "area-stacked",
+    "bar",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "scatter",
+    "gauge",
+    "metric",
+  ])("shows the Thresholds field on %s", async (chartType) => {
+    await mountChart({ chartType, entries: [series("cart")] });
+    expect($('[data-test="dashboard-series-format-thresholds"]')).not.toBeNull();
+    expect($('[data-test="dashboard-series-format-thresholds-inherit"]')!.textContent).toBe(
+      "Inherits panel",
+    );
+  });
 
-  it.each(["stacked", "h-stacked", "pie", "donut"])(
-    "hides the Thresholds field on %s",
-    async (chartType) => {
-      await mountChart({ chartType, entries: [series("cart")] });
-      expect($('[data-test="dashboard-series-format-thresholds"]')).toBeNull();
-      expect($('[data-test="dashboard-series-format-rule"]')!.textContent).toContain(
-        "Later overrides win. An override beats the panel setting and Color by series.",
-      );
-    },
-  );
+  it.each(["pie", "donut"])("hides the Thresholds field on %s", async (chartType) => {
+    await mountChart({ chartType, entries: [series("cart")] });
+    expect($('[data-test="dashboard-series-format-thresholds"]')).toBeNull();
+    expect($('[data-test="dashboard-series-format-rule"]')!.textContent).toContain(
+      "Later overrides win. An override beats the panel setting and Color by series.",
+    );
+  });
 
   it("shows display name, thresholds and value mappings on a state timeline, and saves the mappings", async () => {
     const mapping = { type: "value", value: "thermal", text: "Hot", color: null };

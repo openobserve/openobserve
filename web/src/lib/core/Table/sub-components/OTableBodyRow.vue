@@ -2,7 +2,7 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, useSlots } from "vue";
+import { computed, inject, ref, onBeforeUnmount, onMounted, useSlots, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
@@ -107,6 +107,28 @@ onMounted(() => {
     props.measureEl(rowRef.value);
   }
 });
+
+// The virtualizer observes only the data row, so the detail row's mount, unmount and reflow re-measure it.
+const expansionRowRef = ref<HTMLElement | null>(null);
+let expansionObserver: ResizeObserver | null = null;
+watch(
+  expansionRowRef,
+  (el) => {
+    expansionObserver?.disconnect();
+    expansionObserver = null;
+    if (!props.dynamicRowHeight || !props.measureRowElement || !rowRef.value) return;
+    if (!el || typeof ResizeObserver === "undefined") {
+      props.measureRowElement(rowRef.value);
+      return;
+    }
+    expansionObserver = new ResizeObserver(() => {
+      if (rowRef.value) props.measureRowElement?.(rowRef.value);
+    });
+    expansionObserver.observe(el);
+  },
+  { flush: "post" },
+);
+onBeforeUnmount(() => expansionObserver?.disconnect());
 
 const rowClass = computed(() => {
   if (typeof props.rowClassFn === "function") {
@@ -351,6 +373,8 @@ function onRowMouseleave() {
   <!-- Expanded row content -->
   <tr
     v-if="hasExpansionSlot && isExpanded"
+    ref="expansionRowRef"
+    data-row-expansion
     :data-test="`o2-table-expanded-row-${row.index}`"
     class="bg-table-row-expanded-bg"
   >

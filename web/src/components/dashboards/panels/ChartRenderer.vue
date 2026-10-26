@@ -77,6 +77,7 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  toRaw,
   type PropType,
 } from "vue";
 import type { I18nText } from "@/types/i18n";
@@ -341,6 +342,14 @@ export default defineComponent({
       throttledSetHoveredSeriesName("");
     };
 
+    // A pie legend that shows percents reads its selection from the source option, so keep it in step.
+    const syncPieLegendSelection = (selected: Record<string, boolean>) => {
+      const sourceOptions = toRaw(props.data?.options);
+      if (sourceOptions?.legend?.selected && sourceOptions.series?.[0]?.type === "pie") {
+        sourceOptions.legend.selected = selected;
+      }
+    };
+
     const legendSelectChangedFn = (params: any) => {
       // check if all series are selected (all will be false)
       if (Object.values(params.selected).every((value: any) => value === false)) {
@@ -364,6 +373,8 @@ export default defineComponent({
         }
       }
 
+      syncPieLegendSelection({ ...params.selected });
+
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
 
@@ -381,6 +392,8 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
+      // Restore returns to the last full option, which may carry an isolated slice, not to all visible.
+      syncPieLegendSelection({ ...(chart?.getOption()?.legend?.[0]?.selected ?? {}) });
       // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
