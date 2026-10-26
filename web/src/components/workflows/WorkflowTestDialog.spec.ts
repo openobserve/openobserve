@@ -18,7 +18,7 @@
 // the SAVED workflow through executeTestRun (the /test endpoint is a validator:
 // it returns per-node ERRORS only).
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
@@ -46,6 +46,7 @@ vi.mock("@/services/workflows", async (importOriginal) => {
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import { workflowObj, LAST_TEST_RUN } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
+import { INCIDENT_EVENT_TYPES } from "@/plugins/workflows/incidentSample";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 const ODrawerStub = {
@@ -755,5 +756,93 @@ describe("destination suppression (P0 safety)", () => {
     await primary(wrapper).trigger("click");
     await flushPromises();
     expect(mockTestWorkflow.mock.calls[0][0].suppress_destinations).toBe(false);
+  });
+});
+
+describe("WorkflowTestDialog Payload from", () => {
+  const payloadSelect = (w: any) =>
+    w
+      .findAllComponents(OSelectStub as any)
+      .find((s: any) => s.attributes("data-test") === "workflow-test-payload-from");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetState();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+  });
+
+  it("Payload from offers the kind samples and HTTP request", async () => {
+    const w = mountDialog();
+    const select = payloadSelect(w);
+    expect(select.props("options").map((o: any) => o.value)).toEqual(["trigger", "http"]);
+    await select.vm.$emit("update:modelValue", "http");
+    const [{ meta }] = JSON.parse(workflowObj.testRun.input);
+    expect(meta).toMatchObject({ trigger_source: "http", trigger_id: "test" });
+    expect(workflowObj.testRun.inputSource).toBe("sample");
+    await select.vm.$emit("update:modelValue", "trigger");
+    expect(JSON.parse(workflowObj.testRun.input)[0].meta.trigger_source).toBeUndefined();
+  });
+
+  it("HTTP request posts to /workflows/test with the in-memory graph", async () => {
+    mockTestWorkflow.mockResolvedValue({ data: { errors: {} } });
+    const w = mountDialog();
+    await payloadSelect(w).vm.$emit("update:modelValue", "http");
+    await primary(w).trigger("click");
+    await flushPromises();
+    expect(mockTestWorkflow).toHaveBeenCalled();
+    const body = JSON.stringify(mockTestWorkflow.mock.calls[0]);
+    expect(body).toContain("trigger_source");
+    expect(body).toContain("f1");
+  });
+
+  it("seed prefills the input", () => {
+    const seed = [{ meta: { trigger_source: "http", trigger_id: "test" }, data: [{ k: 1 }] }];
+    mount(WorkflowTestDialog, { props: { seed, payloadFrom: "http" }, global: globalConfig });
+    expect(JSON.parse(workflowObj.testRun.input)).toEqual(seed);
+  });
+
+  it("a seed from the latest HTTP run is labelled as that run, not as a sample", () => {
+    const seed = [{ meta: { trigger_source: "http", trigger_id: "t9" }, data: [{ k: 1 }] }];
+    mount(WorkflowTestDialog, {
+      props: { seed, payloadFrom: "http", seedRunAt: 1_700_000_000_000_000 },
+      global: globalConfig,
+    });
+    expect(workflowObj.testRun.inputSource).toBe("run");
+    expect(workflowObj.testRun.inputRunLabel).not.toBe("");
+  });
+
+  it("an Incident Event workflow offers each event's sample and HTTP request", async () => {
+    setWorkflow(
+      [
+        { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: "incident_event" } },
+        destNode,
+      ],
+      [{ source: "t1", target: "d1" }],
+    );
+    const w = mountDialog();
+    const values = payloadSelect(w)
+      .props("options")
+      .map((o: any) => o.value);
+    expect(values).toEqual([...INCIDENT_EVENT_TYPES, "http"]);
+    await payloadSelect(w).vm.$emit("update:modelValue", "resolved");
+    expect(JSON.parse(workflowObj.testRun.input)[0].meta.event_type).toBe("resolved");
+  });
+
+  it("an HTTP run used as test input selects HTTP request", () => {
+    workflowObj.testRun.input = JSON.stringify([
+      { meta: { trigger_source: "http", trigger_id: "t9" }, data: [] },
+    ]);
+    workflowObj.testRun.inputSource = "run";
+    const w = mountDialog();
+    expect(payloadSelect(w).props("modelValue")).toBe("http");
+  });
+
+  it("offers no HTTP payload when hooks are off", () => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    const w = mountDialog();
+    expect(payloadSelect(w)).toBeUndefined();
   });
 });

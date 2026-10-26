@@ -16,6 +16,7 @@
 pub mod search_job_partitions;
 pub mod search_job_results;
 pub mod search_jobs;
+mod workflow_http_triggers;
 
 use config::utils::json;
 use db::{
@@ -174,6 +175,16 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 Err(e) => {
                     log::error!("error while deleting workflow from db {id} : {e}");
                 }
+            }
+            if let Some(trigger_id) = infra::table::workflow_http_triggers::tombstone_for_workflow(
+                infra::db::get_orm_client_rw().await,
+                &id,
+                config::utils::time::now_micros(),
+            )
+            .await?
+                && let Err(e) = db::workflow_http_triggers::notify_local(&trigger_id).await
+            {
+                log::error!("error while evicting workflow http trigger {trigger_id} : {e}");
             }
             log::info!("successfully handled workflow delete for {id}");
             // trigger watch event by putting value to cluster coordinator
@@ -335,6 +346,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 }
             }
         }
+        MessageType::WorkflowHttpTriggerPut => workflow_http_triggers::process(msg).await?,
 
         _ => {
             log::error!(

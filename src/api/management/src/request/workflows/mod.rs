@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod hook_limits;
+pub mod hooks;
+pub mod http_trigger;
+
 use std::collections::HashMap;
 
 use axum::{
     Json,
     extract::{Path, Query},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use common::utils::sql::escape_like;
 use config::{
@@ -33,8 +37,10 @@ use config::{
     utils::time::now_micros,
 };
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
-use infra::table::workflows::{
-    Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity,
+use infra::table::{
+    entity::workflow_http_trigger_requests as ledger_rows,
+    workflow_http_trigger_requests as ledger, workflow_http_triggers,
+    workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity},
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
@@ -49,7 +55,7 @@ use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     service::{
         auth::check_folder_write_permissions,
-        workflows::{self, InputMap},
+        workflows::{self, InputMap, TriggerWorkflowError},
     },
 };
 
@@ -85,6 +91,13 @@ pub struct WorkflowRetryDetails {
     from_node: Option<String>,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct WorkflowTriggerResponse {
+    #[serde(flatten)]
+    pub base: MetaHttpResponse,
+    pub run_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowHistoryQuery {
     /// Start time in Unix timestamp microseconds
@@ -110,6 +123,21 @@ struct WorkflowHistoryRow {
     source_id: String,
     #[serde(default)]
     run_id: String,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    http_request: Option<HttpRequestFacts>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct HttpRequestFacts {
+    credential_prefix: String,
+    caller_ip: String,
+    idempotency_key: Option<String>,
+    content_type: Option<String>,
+    body_bytes: i64,
+    status: String,
+    error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -132,6 +160,7 @@ pub struct WorkflowListItem {
     /// is meaningless to a client, so the name is resolved here.
     #[serde(skip_serializing_if = "Option::is_none")]
     folder_name: Option<String>,
+    http_endpoint_enabled: bool,
 }
 
 /// Resolves a folder primary key to its `(slug, display name)`, memoized so a
@@ -375,6 +404,7 @@ pub async fn list_workflows(
     let mut ret = Vec::with_capacity(workflows.len());
     // Resolved once per distinct folder rather than per row.
     let mut folders: HashMap<String, Option<(String, String)>> = HashMap::new();
+    let endpoints = http_endpoint_workflows(&org_id).await;
 
     for w in workflows {
         let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
@@ -390,12 +420,14 @@ pub async fn list_workflows(
 
         let folder = resolve_folder(&mut folders, &w.folder_id).await;
 
+        let http_endpoint_enabled = endpoints.contains(&w.id);
         ret.push(WorkflowListItem {
             workflow: w,
             associations,
             is_draft: false,
             folder_id: folder.as_ref().map(|(slug, _)| slug.clone()),
             folder_name: folder.map(|(_, display)| display),
+            http_endpoint_enabled,
         });
     }
 
@@ -419,12 +451,14 @@ pub async fn list_workflows(
             continue;
         }
         let folder = resolve_folder(&mut folders, &draft.folder_id).await;
+        let http_endpoint_enabled = endpoints.contains(&draft.id);
         ret.push(WorkflowListItem {
             workflow: draft,
             associations: vec![],
             is_draft: true,
             folder_id: folder.as_ref().map(|(slug, _)| slug.clone()),
             folder_name: folder.map(|(_, display)| display),
+            http_endpoint_enabled,
         });
     }
 
@@ -715,10 +749,7 @@ pub async fn update_workflows(
             .iter()
             .any(|v| v.trigger_type == WorkflowTriggerType::IncidentEvent.to_string());
 
-        // this means that originally this was a incident workflow and now we have made it an alert
-        // workflow
-        if incident_association_exists
-            && payload.trigger_type == WorkflowTriggerType::AlertFired
+        if drops_incident_association(incident_association_exists, &payload.trigger_type)
             && let Err(e) = db::workflows::delete_workflow_association(
                 AssociationDeleteEvent::TriggerWorkflow {
                     org_id: org_id.clone(),
@@ -875,8 +906,9 @@ pub async fn test_workflow(
     ),
     request_body(content = Vec<serde_json::Value>, description = "Workflow inputs, one JSON value per input event", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = WorkflowTriggerResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "The workflow is disabled", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
@@ -888,11 +920,27 @@ pub async fn trigger_workflow(
     Json(inputs): Json<Vec<serde_json::Value>>,
 ) -> Response {
     match workflows::trigger_workflow(&org_id, &workflow_id, inputs, &user_email.user_id).await {
-        Ok(trace_id) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully")
-                .with_trace_id(trace_id),
-        ),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Ok(run) => {
+            let mut base =
+                MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully");
+            base.with_trace_id(run.trace_id);
+            MetaHttpResponse::json(WorkflowTriggerResponse {
+                base,
+                run_id: run.run_id,
+            })
+        }
+        Err(TriggerWorkflowError::Disabled) => {
+            let mut body = MetaHttpResponse::error(
+                StatusCode::CONFLICT,
+                "workflow is disabled, enable it before triggering a run",
+            );
+            body.error_detail = Some("workflow_disabled".to_string());
+            body.into_response()
+        }
+        Err(TriggerWorkflowError::NotFound) => {
+            MetaHttpResponse::bad_request(format!("workflow with id {workflow_id} not found"))
+        }
+        Err(TriggerWorkflowError::Other(e)) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -1110,18 +1158,25 @@ pub async fn get_workflow_history(
     }
 
     let trace_id = get_or_create_trace_id(req.headers(), &tracing::Span::current());
+    let cap = usize::try_from(config::get_config().limit.query_default_limit).unwrap_or(1000);
+    let hook_runs = match ledger::list_for_workflow(
+        infra::db::get_orm_client_rw().await,
+        &org_id,
+        &workflow_id,
+        start_time,
+        end_time,
+        cap as u64,
+    )
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::error!("error reading the HTTP run ledger of {org_id}/{workflow_id} : {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
 
-    let data_sql = format!(
-        "SELECT _timestamp, org, key,  \
-         start_time, end_time, \
-         evaluation_took_in_secs, \
-         source_node, error \
-         FROM \"{TRIGGERS_STREAM}\" \
-         WHERE module = 'workflow' AND org = '{org_id}' \
-         AND key like '{}/%'\
-         AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
-        escape_like(&workflow_id).replace("'", "''")
-    );
+    let data_sql = history_sql(&org_id, &workflow_id, start_time, end_time);
 
     let data_req = SearchRequest {
         query: SearchQuery {
@@ -1150,7 +1205,7 @@ pub async fn get_workflow_history(
         Err(e) => {
             let msg = e.to_string().to_lowercase();
             if msg.contains("not found") || msg.contains("stream not found") {
-                return MetaHttpResponse::json(Vec::<WorkflowHistoryRow>::new());
+                return MetaHttpResponse::json(merge_ledger_rows(vec![], hook_runs, cap));
             }
             log::error!("Failed to search alert history: {}", e);
             return MetaHttpResponse::internal_error(format!(
@@ -1177,22 +1232,22 @@ pub async fn get_workflow_history(
     let ret: Vec<_> = parsed_results
         .into_iter()
         .map(|mut v| {
-            let Some((event_type, source_id, run_id)) = parse_workflow_history_key(&v.key) else {
+            if let Some((event_type, source_id, run_id)) = parse_workflow_history_key(&v.key) {
+                v.run_id = run_id;
+                v.source_id = source_id;
+                v.event_type = event_type;
+            } else {
                 log::warn!(
                     "unexpected key for workflow history of {org_id}/{workflow_id} : {}",
                     v.key
                 );
-                return v;
-            };
-
-            v.run_id = run_id;
-            v.source_id = source_id;
-            v.event_type = event_type;
+            }
+            normalise_history_status(&mut v);
             v
         })
         .collect();
 
-    MetaHttpResponse::json(ret)
+    MetaHttpResponse::json(merge_ledger_rows(ret, hook_runs, cap))
 }
 
 /// PromoteDraftWorkflow
@@ -1308,6 +1363,126 @@ pub async fn promote_draft(
     MetaHttpResponse::created("converted to workflow successfully")
 }
 
+/// Empty when hooks are off, so a stored trigger never advertises an endpoint that 404s.
+async fn http_endpoint_workflows(org_id: &str) -> std::collections::HashSet<String> {
+    if !openobserve_core::workflows::http_trigger::hooks_enabled() {
+        return Default::default();
+    }
+    workflow_http_triggers::enabled_workflow_ids(infra::db::get_orm_client_rw().await, org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::error!("error listing the HTTP endpoints of {org_id} : {e}");
+            Default::default()
+        })
+}
+
+/// Any trigger type but `IncidentEvent` drops the association, or incidents keep running it.
+fn drops_incident_association(exists: bool, trigger_type: &WorkflowTriggerType) -> bool {
+    exists && *trigger_type != WorkflowTriggerType::IncidentEvent
+}
+
+/// Stream rows win for timing; the ledger adds runs not yet streamed and the request facts.
+fn merge_ledger_rows(
+    stream: Vec<WorkflowHistoryRow>,
+    ledger: Vec<ledger_rows::Model>,
+    cap: usize,
+) -> Vec<WorkflowHistoryRow> {
+    let mut by_run: HashMap<String, ledger_rows::Model> = ledger
+        .into_iter()
+        .map(|row| (row.run_id.clone(), row))
+        .collect();
+    let mut merged: Vec<WorkflowHistoryRow> = stream
+        .into_iter()
+        .map(|mut row| {
+            if let Some(request) = by_run.remove(&row.run_id) {
+                row.http_request = Some(http_request_facts(&request));
+            }
+            row
+        })
+        .collect();
+    merged.extend(by_run.into_values().map(ledger_history_row));
+    merged.sort_by(|a, b| {
+        b._timestamp
+            .cmp(&a._timestamp)
+            .then_with(|| b.run_id.cmp(&a.run_id))
+    });
+    merged.truncate(cap);
+    merged
+}
+
+fn http_request_facts(row: &ledger_rows::Model) -> HttpRequestFacts {
+    HttpRequestFacts {
+        credential_prefix: row.credential_prefix.clone(),
+        caller_ip: row.caller_ip.clone(),
+        idempotency_key: row.idem_key.clone(),
+        content_type: row.content_type.clone(),
+        body_bytes: row.body_bytes,
+        status: row.status.clone(),
+        error: row.error.clone(),
+    }
+}
+
+/// Keyed like the worker's stream row, so the client parses both the same way.
+fn ledger_history_row(row: ledger_rows::Model) -> WorkflowHistoryRow {
+    let start_time = row.claimed_at.unwrap_or(row.received_at);
+    let end_time = row.finished_at.unwrap_or(start_time);
+    let source_id = format!("hook:{}", row.trigger_id);
+    let mut history = WorkflowHistoryRow {
+        _timestamp: row.received_at,
+        org: row.org_id.clone(),
+        start_time,
+        end_time,
+        evaluation_took_in_secs: (end_time - start_time).max(0) as f64 / 1_000_000.0,
+        source_node: row.claimed_by.clone().unwrap_or_default(),
+        key: format!(
+            "{}/{}/{source_id}/{}",
+            row.workflow_id,
+            WorkflowTriggerType::Webhook,
+            row.run_id
+        ),
+        error: row.error.clone(),
+        event_type: WorkflowTriggerType::Webhook,
+        source_id,
+        run_id: row.run_id.clone(),
+        status: Some(row.status.clone()),
+        http_request: Some(http_request_facts(&row)),
+    };
+    normalise_history_status(&mut history);
+    history
+}
+
+fn history_sql(org_id: &str, workflow_id: &str, start_time: i64, end_time: i64) -> String {
+    format!(
+        "SELECT _timestamp, org, key,  \
+         start_time, end_time, \
+         evaluation_took_in_secs, \
+         source_node, error, status \
+         FROM \"{TRIGGERS_STREAM}\" \
+         WHERE module = 'workflow' AND org = '{org_id}' \
+         AND key like '{}/%'\
+         AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
+        escape_like(workflow_id).replace("'", "''")
+    )
+}
+
+/// Rows written before the stored-status fix say `succeeded` even when the run errored.
+fn normalise_history_status(row: &mut WorkflowHistoryRow) {
+    let errored = row.error.is_some();
+    let status = match row.status.as_deref() {
+        Some("queued" | "running" | "expired" | "failed") => return,
+        Some("error") => "failed",
+        Some("succeeded" | "completed")
+            if errored && row.event_type != WorkflowTriggerType::Webhook =>
+        {
+            "failed"
+        }
+        Some("succeeded" | "completed") => "succeeded",
+        _ if errored => "failed",
+        _ => "succeeded",
+    };
+    row.status = Some(status.to_string());
+}
+
 /// Splits the 4-part run-history key. `rsplit_once` on the tail, not a
 /// left-to-right split: a source_id may itself contain '/' (a user email or an
 /// org/name pair), which would otherwise shift run_id into a source fragment.
@@ -1414,6 +1589,236 @@ mod tests {
         assert_eq!(
             workflow_delete_outcome(true, true),
             WorkflowDeleteOutcome::DeletePublished
+        );
+    }
+
+    fn history_row(
+        event_type: WorkflowTriggerType,
+        status: Option<&str>,
+        error: Option<&str>,
+    ) -> WorkflowHistoryRow {
+        WorkflowHistoryRow {
+            _timestamp: 0,
+            org: "org1".to_string(),
+            start_time: 0,
+            end_time: 0,
+            evaluation_took_in_secs: 0.0,
+            source_node: String::new(),
+            key: String::new(),
+            error: error.map(str::to_string),
+            event_type,
+            source_id: String::new(),
+            run_id: String::new(),
+            status: status.map(str::to_string),
+            http_request: None,
+        }
+    }
+
+    fn stream_row(run_id: &str, at: i64) -> WorkflowHistoryRow {
+        let mut row = history_row(WorkflowTriggerType::Webhook, Some("succeeded"), None);
+        row._timestamp = at;
+        row.start_time = at + 10;
+        row.end_time = at + 20;
+        row.run_id = run_id.to_string();
+        row.key = format!("wf1/Webhook/hook:t1/{run_id}");
+        row
+    }
+
+    fn ledger_row(run_id: &str, status: &str, at: i64) -> ledger_rows::Model {
+        ledger_rows::Model {
+            id: 0,
+            trigger_id: "t1".to_string(),
+            org_id: "org1".to_string(),
+            workflow_id: "wf1".to_string(),
+            run_id: run_id.to_string(),
+            idem_key: Some(format!("key-{run_id}")),
+            body_sha256: "ab".repeat(32),
+            body_bytes: 42,
+            content_type: Some("application/json".to_string()),
+            meta: "{}".to_string(),
+            status: status.to_string(),
+            claimed_by: None,
+            claimed_at: None,
+            error: None,
+            credential_id: "c1".to_string(),
+            credential_prefix: "o2wh_abcd…wxyz".to_string(),
+            caller_ip: "203.0.113.7".to_string(),
+            received_at: at,
+            finished_at: None,
+        }
+    }
+
+    #[test]
+    fn ledger_rows_merge_into_history_by_run_id() {
+        let merged = merge_ledger_rows(
+            vec![stream_row("done", 100)],
+            vec![
+                ledger_row("done", "succeeded", 90),
+                ledger_row("waiting", "queued", 300),
+                ledger_row("busy", "running", 200),
+            ],
+            1000,
+        );
+        let runs: Vec<(&str, Option<&str>)> = merged
+            .iter()
+            .map(|r| (r.run_id.as_str(), r.status.as_deref()))
+            .collect();
+        assert_eq!(
+            runs,
+            vec![
+                ("waiting", Some("queued")),
+                ("busy", Some("running")),
+                ("done", Some("succeeded")),
+            ]
+        );
+        let facts = merged[2].http_request.as_ref().unwrap();
+        assert_eq!(facts.credential_prefix, "o2wh_abcd…wxyz");
+        assert_eq!(facts.caller_ip, "203.0.113.7");
+        assert_eq!(facts.idempotency_key.as_deref(), Some("key-done"));
+        assert_eq!(facts.body_bytes, 42);
+        let queued = &merged[0];
+        assert_eq!(queued.event_type, WorkflowTriggerType::Webhook);
+        assert_eq!(
+            parse_workflow_history_key(&queued.key),
+            Some((
+                WorkflowTriggerType::Webhook,
+                "hook:t1".to_string(),
+                "waiting".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn the_stream_row_wins_for_timing() {
+        let mut ledger = ledger_row("done", "succeeded", 90);
+        ledger.claimed_at = Some(1);
+        ledger.finished_at = Some(2);
+        let merged = merge_ledger_rows(vec![stream_row("done", 100)], vec![ledger], 1000);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            (
+                merged[0]._timestamp,
+                merged[0].start_time,
+                merged[0].end_time
+            ),
+            (100, 110, 120)
+        );
+        assert!(merged[0].http_request.is_some());
+    }
+
+    #[test]
+    fn merged_history_is_truncated_to_the_cap() {
+        let stream = (0..3).map(|i| stream_row(&format!("s{i}"), i)).collect();
+        let ledger = (0..3)
+            .map(|i| ledger_row(&format!("l{i}"), "queued", 10 + i))
+            .collect();
+        let merged = merge_ledger_rows(stream, ledger, 4);
+        let runs: Vec<&str> = merged.iter().map(|r| r.run_id.as_str()).collect();
+        assert_eq!(runs, vec!["l2", "l1", "l0", "s2"]);
+    }
+
+    #[test]
+    fn ledger_only_rows_keep_their_stored_status() {
+        let mut lost = ledger_row("lost", "failed", 5);
+        lost.error = Some("worker_lost".to_string());
+        let merged = merge_ledger_rows(vec![], vec![lost, ledger_row("late", "expired", 6)], 1000);
+        let runs: Vec<(&str, Option<&str>, Option<&str>)> = merged
+            .iter()
+            .map(|r| (r.run_id.as_str(), r.status.as_deref(), r.error.as_deref()))
+            .collect();
+        assert_eq!(
+            runs,
+            vec![
+                ("late", Some("expired"), None),
+                ("lost", Some("failed"), Some("worker_lost")),
+            ]
+        );
+    }
+
+    #[test]
+    fn switching_an_incident_workflow_to_another_trigger_type_drops_the_incident_association() {
+        for trigger_type in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::AlertResolved,
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Webhook,
+        ] {
+            assert!(
+                drops_incident_association(true, &trigger_type),
+                "{trigger_type:?}"
+            );
+        }
+        assert!(!drops_incident_association(
+            true,
+            &WorkflowTriggerType::IncidentEvent
+        ));
+        assert!(!drops_incident_association(
+            false,
+            &WorkflowTriggerType::Webhook
+        ));
+    }
+
+    #[test]
+    fn an_errored_row_stored_as_succeeded_renders_failed() {
+        let mut row = history_row(
+            WorkflowTriggerType::AlertFired,
+            Some("succeeded"),
+            Some("some node errored during execution"),
+        );
+        normalise_history_status(&mut row);
+        assert_eq!(row.status.as_deref(), Some("failed"));
+    }
+
+    #[test]
+    fn stream_error_maps_to_failed() {
+        let mut row = history_row(WorkflowTriggerType::Manual, Some("error"), Some("boom"));
+        normalise_history_status(&mut row);
+        assert_eq!(row.status.as_deref(), Some("failed"));
+    }
+
+    #[test]
+    fn a_clean_row_stays_succeeded() {
+        let mut row = history_row(WorkflowTriggerType::AlertFired, Some("succeeded"), None);
+        normalise_history_status(&mut row);
+        assert_eq!(row.status.as_deref(), Some("succeeded"));
+    }
+
+    #[test]
+    fn every_normalised_status_is_in_the_history_vocabulary() {
+        let vocabulary = ["queued", "running", "succeeded", "failed", "expired"];
+        let stored = [
+            None,
+            Some("succeeded"),
+            Some("completed"),
+            Some("error"),
+            Some("failed"),
+            Some("skipped"),
+            Some("queued"),
+            Some("running"),
+            Some("expired"),
+        ];
+        for event_type in ["AlertFired", "Webhook"] {
+            for status in stored {
+                for error in [None, Some("boom")] {
+                    let mut row = history_row(WorkflowTriggerType::from(event_type), status, error);
+                    normalise_history_status(&mut row);
+                    let got = row.status.as_deref().unwrap_or("<none>");
+                    assert!(
+                        vocabulary.contains(&got),
+                        "{status:?} with error {error:?} on {event_type} normalised to {got}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_history_query_selects_the_stored_status() {
+        let sql = history_sql("org1", "wf1", 1, 2);
+        let select = sql.split(" FROM ").next().unwrap();
+        assert!(
+            select.split(',').any(|column| column.trim() == "status"),
+            "the history SELECT must return status, got {select}"
         );
     }
 }

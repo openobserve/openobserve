@@ -260,6 +260,7 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+    workflow_hooks_enabled: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -568,6 +569,10 @@ pub async fn zo_config(
 
     #[cfg(feature = "enterprise")]
     let workflows_enabled = o2cfg.common.workflows_enabled;
+    #[cfg(feature = "enterprise")]
+    let workflow_hooks_enabled = openobserve_core::workflows::http_trigger::hooks_enabled();
+    #[cfg(not(feature = "enterprise"))]
+    let workflow_hooks_enabled = false;
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -678,6 +683,7 @@ pub async fn zo_config(
         billing_group_allowed_orgs,
         #[cfg(feature = "enterprise")]
         workflows_enabled,
+        workflow_hooks_enabled,
     })
 }
 

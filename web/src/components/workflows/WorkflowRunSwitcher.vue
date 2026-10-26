@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="run.start_time"
                 unit="us"
                 mode="absolute"
+                :format="RUN_TIME_LONG"
                 :timezone="store.state.timezone"
                 :empty-label="raw('—')"
               />
@@ -76,14 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge v-if="isTestRun(run)" variant="default-soft" size="xs">
                 {{ t("workflow.history.testRun") }}
               </OBadge>
-              <OBadge :variant="run.error ? 'error-soft' : 'success-soft'" size="xs">
-                {{ run.error ? t("workflow.history.failed") : t("workflow.history.success") }}
-              </OBadge>
+              <OTag type="hookRunStatus" :value="run.status" size="xs" />
             </span>
           </div>
           <!-- Hover a failed run to read WHY it failed without leaving the menu. -->
           <OTooltip
-            v-if="run.error"
+            v-if="run.status === 'failed' && run.error"
             :content="raw(String(run.error))"
             side="left"
             max-width="22rem"
@@ -130,9 +129,11 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import { RUN_TIME_LONG } from "@/plugins/workflows/runStatus";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { isTestRun, useTestRunVisibility } from "@/plugins/workflows/useWorkflowCanvas";
 import { workflowObj, loadRunsHistory } from "@/plugins/workflows/useWorkflowCanvas";

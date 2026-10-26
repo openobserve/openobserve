@@ -84,6 +84,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="absolute -top-2.5 left-1 z-10 flex max-w-[calc(100%-2.25rem)] flex-wrap items-center gap-1"
       >
         <OBadge
+          v-if="showHttpBadge"
+          variant="blue-soft"
+          size="xs"
+          icon="webhook"
+          clickable
+          class="nodrag"
+          data-test="workflow-trigger-http-badge"
+          @click.stop="openHttpPanel"
+        >
+          {{ t("workflow.http.nodeBadge") }}
+        </OBadge>
+        <OBadge
           v-if="isDisabled"
           variant="default"
           size="xs"
@@ -294,6 +306,7 @@ import useWorkflowCanvas, {
   branchUnwiredHandles,
   isTestEarnedResult,
 } from "./useWorkflowCanvas";
+import { httpEditorState, openHttpPanel } from "./httpEndpointUi";
 
 const props = defineProps<{
   id: string;
@@ -315,6 +328,12 @@ const isDisabled = computed(() => isNodeDisabled(node.value));
 // Placeholder / "Configure Later" — e.g. a Destination saved with no destination.
 const isIncomplete = computed(() => isNodeIncomplete(node.value));
 const onToggleDisabled = () => toggleNodeDisabled(props.id);
+const showHttpBadge = computed(
+  () =>
+    props.data?.node_type === "workflow_trigger" &&
+    httpEditorState.endpointOn &&
+    !workflowObj.readOnly,
+);
 // Fan-out (Branch) nodes render one source handle per arm; every other type is
 // single-output and passes nothing so the card keeps its lone "output" handle.
 const outputHandles = computed(() => branchHandles(node.value).map((id) => ({ id })));
