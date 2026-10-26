@@ -131,6 +131,7 @@ function dockerCommand(t: InstallTarget): string {
     "  reports_available_components: true",
     "agent:",
     "  executable: /usr/local/bin/otelcol-contrib",
+    "  config_apply_timeout: 30s",
     "  env:",
     `    O2_ENDPOINT: ${reachable.baseUrl.replace(/\/+$/, "")}/api/${t.org}`,
     '    O2_TOKEN: "Basic $AUTH"',
