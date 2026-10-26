@@ -600,4 +600,38 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
     });
   });
+
+  describe("sunburst, funnel, box plot and node graph slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it.each([
+      ["sunburst", 1, 1, 1],
+      ["funnel", 1, 1, 0],
+      ["boxplot", 1, 1, 0],
+      ["node-graph", 0, 0, 0],
+    ])("%s takes %i x, %i y and %i breakdown fields", (type, maxX, maxY, maxB) => {
+      panelData.data.type = type;
+      expect(addMany("x", 3)).toBe(maxX);
+      expect(addMany("y", 3)).toBe(maxY);
+      expect(addMany("breakdown", 3)).toBe(maxB);
+    });
+
+    it("a box plot y field keeps raw values, a funnel y field counts", () => {
+      panelData.data.type = "boxplot";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+      panelData.data.queries[0].fields.y = [];
+      panelData.data.type = "funnel";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+  });
 });

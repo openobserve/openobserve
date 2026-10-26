@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !promqlBuilderMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
-      dashboardPanelData.data.type != 'sankey'
+      !isFlowChart(dashboardPanelData.data.type)
     "
   >
     <!-- x axis container -->
@@ -181,7 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'state-timeline' ||
           dashboardPanelData.data.type == 'status-history' ||
           dashboardPanelData.data.type == 'distribution' ||
-          dashboardPanelData.data.type == 'treemap'
+          dashboardPanelData.data.type == 'treemap' ||
+          dashboardPanelData.data.type == 'sunburst'
         "
       >
         <div
@@ -227,6 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <span v-else-if="dashboardPanelData.data.type == 'treemap'">{{
                   t("panel.breakdownTooltipTreemap")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'sunburst'">{{
+                  t("panel.breakdownTooltipSunburst")
                 }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
@@ -461,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       .fields.y[index]
                   "
                   :allowAggregation="
-                    !['heatmap', 'distribution'].includes(dashboardPanelData.data.type)
+                    !['heatmap', 'distribution', 'boxplot'].includes(dashboardPanelData.data.type)
                   "
                   :customQuery="
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -682,6 +686,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { useStore } from "vuex";
 import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
@@ -1154,6 +1159,8 @@ export default defineComponent({
         case "pie":
         case "donut":
         case "treemap":
+        case "sunburst":
+        case "funnel":
           return t("dashboard.oneLabelFieldMessage");
         case "metric":
         case "distribution":
@@ -1175,6 +1182,7 @@ export default defineComponent({
           return t("dashboard.oneFieldMessage");
         case "gauge":
         case "bar-gauge":
+        case "boxplot":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
@@ -1199,12 +1207,15 @@ export default defineComponent({
         case "gauge":
         case "bar-gauge":
         case "treemap":
+        case "sunburst":
+        case "funnel":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
         case "state-timeline":
         case "status-history":
+        case "boxplot":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1554,6 +1565,7 @@ export default defineComponent({
 
     return {
       showXAxis,
+      isFlowChart,
       t,
       FIELD_FUNCTION_MENU_WIDTH,
       panelName,

@@ -16,6 +16,7 @@
 import { computed } from "vue";
 import { generateLabelFromName } from "@/utils/dashboard/fieldLabel";
 import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+import { isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
 
 const colors = [
   "#5960b2",
@@ -64,6 +65,9 @@ export const usePanelFields = ({
       case "state-timeline":
       case "status-history":
       case "treemap":
+      case "sunburst":
+      case "funnel":
+      case "boxplot":
       case "area":
       case "bar":
       case "h-bar":
@@ -78,6 +82,7 @@ export const usePanelFields = ({
         );
       case "metric":
       case "distribution":
+      case "node-graph":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -106,10 +111,15 @@ export const usePanelFields = ({
       case "status-history":
       case "distribution":
       case "treemap":
+      case "sunburst":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
         );
+      case "funnel":
+      case "boxplot":
+      case "node-graph":
+        return true;
       case "table":
         // Allow up to 3 breakdown fields for table charts
         return (
@@ -128,10 +138,15 @@ export const usePanelFields = ({
       case "gauge":
       case "bar-gauge":
       case "treemap":
+      case "sunburst":
+      case "funnel":
+      case "boxplot":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
         );
+      case "node-graph":
+        return true;
       case "metric":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
@@ -342,7 +357,7 @@ export const usePanelFields = ({
       type: "build",
       functionName:
         dashboardPanelData.data.type == "heatmap" ||
-        dashboardPanelData.data.type == "distribution" ||
+        isRawValueChart(dashboardPanelData.data.type) ||
         isDerived
           ? null
           : dashboardPanelData.data.type == "state-timeline"

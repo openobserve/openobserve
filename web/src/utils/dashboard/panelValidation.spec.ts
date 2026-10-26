@@ -780,3 +780,107 @@ describe("validatePanel on bar gauge, distribution, status history and treemap",
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+
+describe("validatePanel on sunburst, funnel, box plot and node graph", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts the builder slots each chart reads", () => {
+    expect(
+      run("sunburst", { x: [field("region")], y: [field("count")], breakdown: [field("s")] }),
+    ).toEqual([]);
+    expect(run("funnel", { x: [field("stage")], y: [field("count")] })).toEqual([]);
+    expect(run("boxplot", { y: [field("latency")] })).toEqual([]);
+    expect(run("boxplot", { x: [field("service")], y: [field("latency")] })).toEqual([]);
+    expect(
+      run("node-graph", {
+        source: field("source"),
+        target: field("target"),
+        value: field("value"),
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects the slots each chart cannot use", () => {
+    expect(run("sunburst", { x: [], y: [field("c")] })).toHaveLength(1);
+    expect(run("funnel", { x: [field("stage")], y: [] })).toHaveLength(1);
+    expect(run("boxplot", { x: [field("a"), field("b")], y: [field("v")] })[0]).toMatch(
+      /at most one field/,
+    );
+    expect(run("boxplot", { y: [] })).toHaveLength(1);
+    expect(run("node-graph", { source: field("source") })).toHaveLength(2);
+  });
+
+  it("does not allow the new types on PromQL", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    for (const type of ["sunburst", "funnel", "boxplot", "node-graph"]) {
+      expect(run(type, {}, {}, "promql"), type).toContain(unsupported);
+    }
+  });
+
+  it("checks the allowed values of the new keys", () => {
+    const funnel = { x: [field("stage")], y: [field("v")] };
+    expect(run("funnel", funnel, { funnel_sort: "none", funnel_orient: "horizontal" })).toEqual([]);
+    expect(run("funnel", funnel, { funnel_sort: "random" })).toHaveLength(1);
+    expect(run("funnel", funnel, { funnel_orient: "diagonal" })).toHaveLength(1);
+    expect(run("boxplot", { y: [field("v")] }, { boxplot_whisker: "iqr" })).toEqual([]);
+    expect(run("boxplot", { y: [field("v")] }, { boxplot_whisker: "p99" })).toHaveLength(1);
+    const edges = { source: field("s"), target: field("t"), value: field("v") };
+    expect(run("node-graph", edges, { node_graph_layout: "circular" })).toEqual([]);
+    expect(run("node-graph", edges, { node_graph_layout: "tree" })).toHaveLength(1);
+  });
+
+  it("lists the new types as importable panel types", () => {
+    const panel = (type: string) => ({
+      type,
+      id: "p",
+      title: "t",
+      layout: { x: 0, y: 0, w: 1, h: 1 },
+    });
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: ["sunburst", "funnel", "boxplot", "node-graph"].map(panel),
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

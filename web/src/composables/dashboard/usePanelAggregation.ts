@@ -62,6 +62,33 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
 
+      case "boxplot":
+        // A box plot summarises the raw values of one y field per x category, so nothing is aggregated.
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.isDerived) return;
+            itemY.functionName = null;
+            itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
+          });
+          query.fields.x = query.fields.x.slice(0, 1);
+          query.fields.y = query.fields.y.slice(0, 1);
+          query.fields.z = [];
+          query.fields.breakdown = [];
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        break;
+
       case "heatmap":
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.y.forEach((itemY: any) => {
@@ -189,6 +216,7 @@ export const usePanelAggregation = ({
       case "donut":
       case "gauge":
       case "bar-gauge":
+      case "funnel":
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -229,6 +257,7 @@ export const usePanelAggregation = ({
         ].config.time_shift = [];
         break;
       case "treemap":
+      case "sunburst":
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.y.forEach((itemY: any) => {
             if (itemY.functionName === null && !itemY.isDerived) {
@@ -437,6 +466,7 @@ export const usePanelAggregation = ({
         });
         break;
       case "sankey":
+      case "node-graph":
         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x = [];
         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z = [];

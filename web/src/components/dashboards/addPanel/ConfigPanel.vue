@@ -807,6 +807,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OSwitch
+          v-if="dashboardPanelData.data.type === 'sunburst'"
+          v-show="isConfigOptionVisible('data', 'sunburst-labels')"
+          :model-value="dashboardPanelData.data.config.sunburst_show_labels !== false"
+          :label="t('dashboard.sunburstShowLabels')"
+          data-test="dashboard-config-sunburst_show_labels"
+          size="lg"
+          @update:model-value="(value: any) => setDefaultOnFlag('sunburst_show_labels', value)"
+        />
+
+        <template v-if="dashboardPanelData.data.type === 'funnel'">
+          <OToggleGroup
+            v-show="isConfigOptionVisible('data', 'funnel-sort')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.funnelSort')"
+            v-model="funnelSortModel"
+            data-test="dashboard-config-funnel_sort"
+            :data-test-selected-value="funnelSortModel"
+          >
+            <OToggleGroupItem
+              v-for="opt in funnelSortOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-funnel_sort-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OToggleGroup
+            v-show="isConfigOptionVisible('data', 'funnel-orient')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.barGaugeOrientation')"
+            v-model="funnelOrientModel"
+            data-test="dashboard-config-funnel_orient"
+            :data-test-selected-value="funnelOrientModel"
+          >
+            <OToggleGroupItem
+              v-for="opt in funnelOrientOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-funnel_orient-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSwitch
+            v-show="isConfigOptionVisible('data', 'funnel-show-percent')"
+            :model-value="dashboardPanelData.data.config.funnel_show_percent === true"
+            :label="t('dashboard.funnelShowPercent')"
+            data-test="dashboard-config-funnel_show_percent"
+            size="lg"
+            @update:model-value="(value: any) => setFlagConfig('funnel_show_percent', value)"
+          />
+        </template>
+
+        <template v-if="dashboardPanelData.data.type === 'boxplot'">
+          <OToggleGroup
+            v-show="isConfigOptionVisible('data', 'boxplot-whisker')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.boxplotWhisker')"
+            v-model="boxplotWhiskerModel"
+            data-test="dashboard-config-boxplot_whisker"
+            :data-test-selected-value="boxplotWhiskerModel"
+          >
+            <OToggleGroupItem
+              v-for="opt in boxplotWhiskerOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-boxplot_whisker-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+        </template>
+
+        <template v-if="dashboardPanelData.data.type === 'node-graph'">
+          <OToggleGroup
+            v-show="isConfigOptionVisible('data', 'node-graph-layout')"
+            type="single"
+            label-position="top"
+            :label="t('dashboard.nodeGraphLayout')"
+            v-model="nodeGraphLayoutModel"
+            data-test="dashboard-config-node_graph_layout"
+            :data-test-selected-value="nodeGraphLayoutModel"
+          >
+            <OToggleGroupItem
+              v-for="opt in nodeGraphLayoutOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              data-test="dashboard-config-node_graph_layout-option"
+              :data-test-label="opt.label"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSwitch
+            v-show="isConfigOptionVisible('data', 'node-graph-edge-labels')"
+            :model-value="dashboardPanelData.data.config.node_graph_show_edge_labels === true"
+            :label="t('dashboard.nodeGraphShowEdgeLabels')"
+            data-test="dashboard-config-node_graph_show_edge_labels"
+            size="lg"
+            @update:model-value="
+              (value: any) => setFlagConfig('node_graph_show_edge_labels', value)
+            "
+          />
+        </template>
+
+        <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
           v-model="heatmapHistogramModeModel"
@@ -3075,6 +3188,9 @@ import {
 } from "@/utils/dashboard/metricOptions";
 import { GAUGE_STYLES, STATE_VALUE_ALIGNS } from "@/utils/dashboard/panelTypeOptions";
 import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
+import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
+import { BOXPLOT_WHISKERS } from "@/utils/dashboard/convertBoxplotData";
+import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
 import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { TABLE_DENSITIES } from "@/utils/dashboard/tableOptions";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
@@ -3410,6 +3526,27 @@ export default defineComponent({
     const barGaugeOrientationOptions: { label: I18nText; value: string }[] = [
       { label: t("dashboard.barGaugeOrientationHorizontal"), value: "horizontal" },
       { label: t("dashboard.barGaugeOrientationVertical"), value: "vertical" },
+    ];
+    const funnelSortModel = choiceModel("funnel_sort", FUNNEL_SORTS, "descending");
+    const funnelSortOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.funnelSortDescending"), value: "descending" },
+      { label: t("dashboard.funnelSortAscending"), value: "ascending" },
+      { label: t("dashboard.funnelSortNone"), value: "none" },
+    ];
+    const funnelOrientModel = choiceModel("funnel_orient", FUNNEL_ORIENTS, "vertical");
+    const funnelOrientOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.barGaugeOrientationVertical"), value: "vertical" },
+      { label: t("dashboard.barGaugeOrientationHorizontal"), value: "horizontal" },
+    ];
+    const boxplotWhiskerModel = choiceModel("boxplot_whisker", BOXPLOT_WHISKERS, "minmax");
+    const boxplotWhiskerOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.boxplotWhiskerMinMax"), value: "minmax" },
+      { label: t("dashboard.boxplotWhiskerIqr"), value: "iqr" },
+    ];
+    const nodeGraphLayoutModel = choiceModel("node_graph_layout", NODE_GRAPH_LAYOUTS, "force");
+    const nodeGraphLayoutOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.nodeGraphLayoutForce"), value: "force" },
+      { label: t("dashboard.nodeGraphLayoutCircular"), value: "circular" },
     ];
     const pieLabelContentModel = listModel("pie_label_content");
     const pieLabelContentOptions: { label: I18nText; value: string }[] = [
@@ -4103,6 +4240,10 @@ export default defineComponent({
         "bar-gauge",
         "distribution",
         "treemap",
+        "sunburst",
+        "funnel",
+        "boxplot",
+        "node-graph",
       ].includes(dashboardPanelData.data.type);
     });
 
@@ -4407,6 +4548,14 @@ export default defineComponent({
       barGaugeModeOptions,
       barGaugeOrientationModel,
       barGaugeOrientationOptions,
+      funnelSortModel,
+      funnelSortOptions,
+      funnelOrientModel,
+      funnelOrientOptions,
+      boxplotWhiskerModel,
+      boxplotWhiskerOptions,
+      nodeGraphLayoutModel,
+      nodeGraphLayoutOptions,
       pieLabelContentModel,
       pieLabelContentOptions,
       tableDensityModel,

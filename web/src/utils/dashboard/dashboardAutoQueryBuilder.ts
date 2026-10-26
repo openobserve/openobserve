@@ -1,7 +1,7 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
-import { DISTRIBUTION_ROW_LIMIT } from "@/utils/dashboard/chartTypeGroups";
+import { DISTRIBUTION_ROW_LIMIT, isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
 import {
   heatmapYBucketError,
   heatmapYBucketing,
@@ -428,7 +428,8 @@ export function buildSQLChartQuery(config: {
     yAxisAliases.length === 0 &&
     !breakdownAliases?.length;
 
-  if (!tableTypeWithXFieldOnly) {
+  // A box plot reads every raw value per category, so its x field must not collapse rows.
+  if (!tableTypeWithXFieldOnly && chartType !== "boxplot") {
     if (chartType === "heatmap") {
       if (xAxisAliases.length && yAxisAliases.length) {
         query += ` GROUP BY ${xAxisAliases.join(", ")}, ${yAxisAliases.join(", ")}`;
@@ -496,7 +497,7 @@ export function buildSQLChartQuery(config: {
 
   // LIMIT clause
   const queryLimit =
-    queryData.config.limit || (chartType === "distribution" ? DISTRIBUTION_ROW_LIMIT : 0);
+    queryData.config.limit || (isRawValueChart(chartType) ? DISTRIBUTION_ROW_LIMIT : 0);
   if (queryLimit > 0) {
     query += ` LIMIT ${queryLimit}`;
   }

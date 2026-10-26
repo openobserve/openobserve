@@ -19,5 +19,17 @@ export const ROW_TIMELINE_TYPES: readonly string[] = ["state-timeline", "status-
 export const isRowTimeline = (type: unknown): boolean =>
   typeof type === "string" && ROW_TIMELINE_TYPES.includes(type);
 
-/** Rows a builder distribution asks for when the query sets no limit; the search API otherwise caps raw rows far lower. */
+/** Panel types built from source, target and value fields instead of x/y/breakdown. */
+export const FLOW_TYPES: readonly string[] = ["sankey", "node-graph"];
+
+export const isFlowChart = (type: unknown): boolean =>
+  typeof type === "string" && FLOW_TYPES.includes(type);
+
+/** Panel types that read raw, unaggregated y values and summarise them client-side. */
+export const RAW_VALUE_TYPES: readonly string[] = ["distribution", "boxplot"];
+
+export const isRawValueChart = (type: unknown): boolean =>
+  typeof type === "string" && RAW_VALUE_TYPES.includes(type);
+
+/** Rows a builder raw-value chart asks for when the query sets no limit; the search API otherwise caps raw rows far lower. */
 export const DISTRIBUTION_ROW_LIMIT = 10000;

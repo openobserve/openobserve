@@ -1448,3 +1448,29 @@ describe("useConfigPanel – bar gauge, distribution, status history and treemap
     expect(shouldShowThresholds({ data: { type: "treemap", config: {} } })).toBe(false);
   });
 });
+
+describe("useConfigPanel – sunburst, funnel, box plot and node graph options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    expect(visible("sunburst", "data", "sunburst-labels")).toBe(true);
+    expect(visible("treemap", "data", "sunburst-labels")).toBe(false);
+    for (const option of ["funnel-sort", "funnel-orient", "funnel-show-percent"]) {
+      expect(visible("funnel", "data", option), option).toBe(true);
+      expect(visible("pie", "data", option), option).toBe(false);
+    }
+    expect(visible("boxplot", "data", "boxplot-whisker")).toBe(true);
+    expect(visible("distribution", "data", "boxplot-whisker")).toBe(false);
+    expect(visible("node-graph", "data", "node-graph-layout")).toBe(true);
+    expect(visible("node-graph", "data", "node-graph-edge-labels")).toBe(true);
+    expect(visible("sankey", "data", "node-graph-layout")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on the new types", () => {
+    for (const type of ["sunburst", "funnel", "boxplot", "node-graph"]) {
+      expect(shouldShowThresholds({ data: { type, config: {} } }), type).toBe(false);
+      expect(shouldShowSeriesOverrides({ data: { type } }), type).toBe(false);
+    }
+  });
+});

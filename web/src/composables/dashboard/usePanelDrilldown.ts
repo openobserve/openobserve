@@ -39,10 +39,11 @@ import {
   stateTimelineDrilldownSeries,
   stateTimelineSourceRecord,
 } from "@/utils/dashboard/convertStateTimelineData";
-import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { boxplotDrilldownSeries } from "@/utils/dashboard/convertBoxplotData";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
-const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap"];
+const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
 
 export function usePanelDrilldown({
   panelSchema,
@@ -239,6 +240,9 @@ export function usePanelDrilldown({
     if (panelSchema.value.type === "heatmap") {
       const { column, row } = heatmapCellValues(params);
       return { __name: row ?? params?.name, __value: value, __axisValue: column };
+    }
+    if (panelSchema.value.type === "boxplot") {
+      return boxplotDrilldownSeries(panelData?.value?.options, params);
     }
     return {
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
@@ -922,7 +926,7 @@ export function usePanelDrilldown({
               field: fields,
               index: drilldownParams[1][1],
             };
-          } else if (panelSchema.value.type == "sankey") {
+          } else if (isFlowChart(panelSchema.value.type)) {
             if (drilldownParams[0].dataType == "node") {
               drilldownVariables.node = {
                 __name: drilldownParams[0]?.name ?? "",
@@ -1041,7 +1045,7 @@ export function usePanelDrilldown({
           field: fields,
           index: drilldownParams[1][1],
         };
-      } else if (panelSchema.value.type == "sankey") {
+      } else if (isFlowChart(panelSchema.value.type)) {
         // if dataType is node then set node data
         // else set edge data
         if (drilldownParams[0].dataType == "node") {

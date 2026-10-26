@@ -96,6 +96,7 @@ export const buildDefaultSqlFields = (
 export const SKIP_SEED_TYPES = [
   "geomap",
   "sankey",
+  "node-graph",
   "maps",
   "custom_chart",
   "html",
@@ -121,9 +122,9 @@ export const buildDefaultBuilderFields = (
   if (chartType === "metric") return { x: [], y };
   // A count is not a state; the user picks the state column.
   if (chartType === "state-timeline") return { x, y: [] };
-  // A histogram needs a numeric field the user picks; a count of rows has nothing to bucket.
-  if (chartType === "distribution") return { x: [], y: [] };
-  // One bar or tile per label, so a time bucket is not a useful default label.
-  if (chartType === "bar-gauge" || chartType === "treemap") return { x: [], y };
+  // A histogram or box plot needs a numeric field the user picks; a count of rows has nothing to summarise.
+  if (chartType === "distribution" || chartType === "boxplot") return { x: [], y: [] };
+  // One bar, tile, ring segment or stage per label, so a time bucket is not a useful default label.
+  if (["bar-gauge", "treemap", "sunburst", "funnel"].includes(chartType)) return { x: [], y };
   return { x, y };
 };

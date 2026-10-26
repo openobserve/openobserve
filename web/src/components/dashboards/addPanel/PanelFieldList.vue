@@ -142,7 +142,8 @@
                   dashboardPanelData.data.type == 'state-timeline' ||
                   dashboardPanelData.data.type == 'status-history' ||
                   dashboardPanelData.data.type == 'distribution' ||
-                  dashboardPanelData.data.type == 'treemap'
+                  dashboardPanelData.data.type == 'treemap' ||
+                  dashboardPanelData.data.type == 'sunburst'
                 "
                 variant="ghost-neutral"
                 size="chip"
@@ -426,6 +427,7 @@ import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 
 const props = defineProps<{
   editMode?: boolean;
@@ -1024,7 +1026,7 @@ function showStandardActions(row: FieldItem): boolean {
     chartType === "geomap" ||
     chartType === "maps" ||
     chartType === "custom_chart" ||
-    chartType === "sankey"
+    isFlowChart(chartType)
   ) {
     return false;
   }
@@ -1068,7 +1070,7 @@ function showSankeyActions(row: FieldItem): boolean {
     return false;
   }
 
-  return dashboardPanelData.data.type === "sankey";
+  return isFlowChart(dashboardPanelData.data.type);
 }
 
 // ── Stream list fetch ──────────────────────────────────────────────────

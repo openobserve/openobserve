@@ -192,5 +192,14 @@ describe("defaultFields", () => {
       expect(seed("status-history").x[0].functionName).toBe("histogram");
       expect(seed("status-history").y[0].functionName).toBe("count");
     });
+
+    it("sunburst and funnel seed a count with no time label; box plot and node graph seed nothing", () => {
+      for (const type of ["sunburst", "funnel"]) {
+        expect(seed(type).x, type).toEqual([]);
+        expect(seed(type).y[0].functionName, type).toBe("count");
+      }
+      expect(seed("boxplot")).toEqual({ x: [], y: [] });
+      expect(seed("node-graph")).toEqual({ x: [], y: [] });
+    });
   });
 });

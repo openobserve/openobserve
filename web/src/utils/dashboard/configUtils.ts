@@ -5,9 +5,20 @@
 import { isRowTimeline } from "./chartTypeGroups";
 
 // These draw no axes and no legend.
-const NO_AXIS_TYPES = ["bar-gauge", "treemap"];
+const NO_AXIS_TYPES = ["bar-gauge", "treemap", "sunburst", "funnel", "node-graph"];
+// One series per panel, so a legend has nothing to tell apart.
+const NO_LEGEND_TYPES = [...NO_AXIS_TYPES, "boxplot"];
 // These lay out their own legend and axes, so the shared legend layout and axis width do not apply.
-const OWN_LAYOUT_TYPES = ["status-history", "distribution", "bar-gauge", "treemap"];
+const OWN_LAYOUT_TYPES = [
+  "status-history",
+  "distribution",
+  "bar-gauge",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "boxplot",
+  "node-graph",
+];
 
 /**
  * Check that chart align option should be applied
@@ -60,7 +71,7 @@ export const shouldShowLegendsToggle = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "geomap" &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
-    !NO_AXIS_TYPES.includes(dashboardPanelData.data.type) &&
+    !NO_LEGEND_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };

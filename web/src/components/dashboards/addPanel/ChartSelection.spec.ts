@@ -193,4 +193,26 @@ describe("ChartSelection", () => {
     expect(disabled("treemap")).toBe(true);
     dashboardPanelData.data.queryType = previous;
   });
+
+  it("lists sunburst, funnel, box plot and node graph, each with its own icon", async () => {
+    for (const id of ["sunburst", "funnel", "boxplot", "node-graph"]) {
+      const item = wrapper.find(`[data-test='selected-chart-${id}-item']`);
+      expect(item.exists(), id).toBe(true);
+      expect(item.find("img").attributes("src"), id).toContain(`charts/${id}.svg`);
+    }
+    await wrapper.find("[data-test='selected-chart-node-graph-item']").trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["node-graph"]);
+  });
+
+  it("in PromQL mode disables sunburst, funnel, box plot and node graph", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    for (const id of ["sunburst", "funnel", "boxplot", "node-graph"]) {
+      const li = wrapper.find(`[data-test='selected-chart-${id}-item']`).element.closest("li");
+      expect(li.className.includes("cursor-not-allowed"), id).toBe(true);
+    }
+    dashboardPanelData.data.queryType = previous;
+  });
 });

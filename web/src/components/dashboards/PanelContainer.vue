@@ -132,6 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'gauge',
               'bar-gauge',
               'treemap',
+              'sunburst',
+              'funnel',
+              'boxplot',
+              'node-graph',
             ].includes(props.data.type)
           "
           variant="ghost"

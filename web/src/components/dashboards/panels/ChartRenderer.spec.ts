@@ -20,7 +20,14 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
-import { PictorialBarChart, TreemapChart } from "echarts/charts";
+import {
+  BoxplotChart,
+  FunnelChart,
+  GraphChart,
+  PictorialBarChart,
+  SunburstChart,
+  TreemapChart,
+} from "echarts/charts";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -66,6 +73,9 @@ vi.mock("echarts/charts", () => ({
   GraphChart: vi.fn(),
   TreemapChart: vi.fn(),
   PictorialBarChart: vi.fn(),
+  SunburstChart: vi.fn(),
+  FunnelChart: vi.fn(),
+  BoxplotChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -121,6 +131,13 @@ describe("ChartRenderer series registration", () => {
   it("registers the treemap and pictorial bar series the new chart types draw", () => {
     expect(registeredAtImport).toContain(TreemapChart);
     expect(registeredAtImport).toContain(PictorialBarChart);
+  });
+
+  it("registers the sunburst, funnel, box plot and graph series", () => {
+    expect(registeredAtImport).toContain(SunburstChart);
+    expect(registeredAtImport).toContain(FunnelChart);
+    expect(registeredAtImport).toContain(BoxplotChart);
+    expect(registeredAtImport).toContain(GraphChart);
   });
 });
 

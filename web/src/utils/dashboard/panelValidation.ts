@@ -34,6 +34,9 @@ import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOpti
 import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
 import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
 import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
+import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
+import { BOXPLOT_WHISKERS } from "@/utils/dashboard/convertBoxplotData";
+import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
 
 /**
  * Validates a single condition item
@@ -540,7 +543,9 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
-    case "treemap": {
+    case "treemap":
+    case "sunburst":
+    case "funnel": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
           pageKey === "logs"
@@ -609,7 +614,25 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
-    case "sankey": {
+    case "boxplot": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length > 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addAtMostOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
+    case "sankey":
+    case "node-graph": {
       if (fields?.source == null) {
         const errorMsg =
           pageKey === "logs"
@@ -920,7 +943,10 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "state-timeline",
     "status-history",
     "distribution",
+    "boxplot",
     "treemap",
+    "sunburst",
+    "funnel",
     "metric",
     "gauge",
     "bar-gauge",
@@ -928,6 +954,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "maps",
     "table",
     "sankey",
+    "node-graph",
     "custom_chart",
     "html",
     "markdown",
@@ -1111,6 +1138,10 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["bar_gauge_mode", ["bar-gauge"], BAR_GAUGE_MODES],
   ["bar_gauge_orientation", ["bar-gauge"], BAR_GAUGE_ORIENTATIONS],
   ["sort_order", ["pie", "donut"], SORT_ORDERS],
+  ["funnel_sort", ["funnel"], FUNNEL_SORTS],
+  ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
+  ["boxplot_whisker", ["boxplot"], BOXPLOT_WHISKERS],
+  ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],
 ];
 
 const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [

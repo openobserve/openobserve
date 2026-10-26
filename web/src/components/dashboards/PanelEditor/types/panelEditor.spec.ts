@@ -320,10 +320,14 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("markdown");
         expect(ALL_CHART_TYPES).toContain("custom_chart");
         expect(ALL_CHART_TYPES).toContain("state-timeline");
+        expect(ALL_CHART_TYPES).toContain("sunburst");
+        expect(ALL_CHART_TYPES).toContain("funnel");
+        expect(ALL_CHART_TYPES).toContain("boxplot");
+        expect(ALL_CHART_TYPES).toContain("node-graph");
       });
 
       it("should have 24 chart types", () => {
-        expect(ALL_CHART_TYPES.length).toBe(24);
+        expect(ALL_CHART_TYPES.length).toBe(28);
       });
     });
 
@@ -367,7 +371,7 @@ describe("panelEditor types and utilities", () => {
       });
 
       it("should have 19 chart types", () => {
-        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(19);
+        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(22);
       });
     });
 
@@ -380,9 +384,9 @@ describe("panelEditor types and utilities", () => {
       });
 
       it("all chart types should be accounted for", () => {
-        // A distribution buckets raw values, so it neither aggregates nor reads SELECT *.
+        // Distribution and box plot summarise raw values, so they neither aggregate nor read SELECT *.
         const regularChartTypes = ALL_CHART_TYPES.filter(
-          (type) => !["html", "markdown", "custom_chart", "distribution"].includes(type),
+          (type) => !["html", "markdown", "custom_chart", "distribution", "boxplot"].includes(type),
         );
 
         regularChartTypes.forEach((type) => {

@@ -1558,4 +1558,32 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(panel("bar-gauge"), true)).toBe(true);
     });
   });
+
+  describe("sunburst, funnel, box plot and node graph", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it.each(["sunburst", "funnel", "node-graph"])("%s has no axes, gridlines or legend", (type) => {
+      expect(shouldShowGridlines(panel(type))).toBe(false);
+      expect(shouldShowLegendsToggle(panel(type))).toBe(false);
+      expect(shouldShowAxisConfig(panel(type))).toBe(false);
+    });
+
+    it("box plot keeps gridlines but has no legend or axis width", () => {
+      expect(shouldShowGridlines(panel("boxplot"))).toBe(true);
+      expect(shouldShowLegendsToggle(panel("boxplot"))).toBe(false);
+      expect(shouldShowLegendPosition(panel("boxplot"))).toBe(false);
+      expect(shouldShowAxisConfig(panel("boxplot"))).toBe(false);
+    });
+  });
 });

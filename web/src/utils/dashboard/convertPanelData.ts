@@ -31,6 +31,10 @@ import { applyTableOptions } from "./tableOptions";
 import { convertBarGaugeData } from "./convertBarGaugeData";
 import { convertDistributionData } from "./convertDistributionData";
 import { convertTreemapData } from "./convertTreemapData";
+import { convertSunburstData } from "./convertSunburstData";
+import { convertFunnelData } from "./convertFunnelData";
+import { convertBoxplotData } from "./convertBoxplotData";
+import { convertNodeGraphData } from "./convertNodeGraphData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -210,6 +214,30 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertTreemapData(panelSchema, data, store),
+      };
+    }
+    case "sunburst": {
+      return {
+        chartType: panelSchema.type,
+        ...convertSunburstData(panelSchema, data, store),
+      };
+    }
+    case "funnel": {
+      return {
+        chartType: panelSchema.type,
+        ...convertFunnelData(panelSchema, data, store),
+      };
+    }
+    case "boxplot": {
+      return {
+        chartType: panelSchema.type,
+        ...convertBoxplotData(panelSchema, data, store),
+      };
+    }
+    case "node-graph": {
+      return {
+        chartType: panelSchema.type,
+        ...convertNodeGraphData(panelSchema, data, store),
       };
     }
     case "table": {

@@ -533,6 +533,53 @@ describe("usePanelAggregation", () => {
         expect(fields.y).toHaveLength(1);
         expect(fields.breakdown).toEqual([]);
       });
+
+      it("box plot drops aggregation and keeps one x, one y and no breakdown", () => {
+        const panelData = makePanelData("boxplot");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }, { alias: "x2" }];
+        fields.y = [yField("avg"), yField("sum")];
+        fields.breakdown = [{ alias: "b1" }];
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([{ alias: "x1" }]);
+        expect(fields.y.map((item: any) => item.functionName)).toEqual([null]);
+        expect(fields.y[0].args).toHaveLength(1);
+        expect(fields.breakdown).toEqual([]);
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+
+      it("sunburst resets like a treemap and funnel like a pie", () => {
+        const sunburst = makePanelData("sunburst");
+        const ring = sunburst.data.queries[0].fields;
+        ring.x = [{ alias: "x1" }, { alias: "x2" }];
+        ring.y = [yField(null), yField("sum")];
+        ring.breakdown = [{ alias: "b1" }, { alias: "b2" }];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.x).toEqual([{ alias: "x1" }]);
+        expect(ring.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(ring.breakdown).toEqual([{ alias: "b1" }]);
+
+        const funnel = makePanelData("funnel");
+        const stages = funnel.data.queries[0].fields;
+        stages.x = [{ alias: "x1" }, { alias: "x2" }];
+        stages.y = [yField(null), yField("sum")];
+        stages.breakdown = [{ alias: "b1" }];
+        makeAggregation(funnel).resetAggregationFunction();
+        expect(stages.x).toHaveLength(1);
+        expect(stages.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(stages.breakdown).toEqual([]);
+      });
+
+      it("node graph clears the x/y slots like a sankey", () => {
+        const panelData = makePanelData("node-graph");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }];
+        fields.y = [yField("count")];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([]);
+        expect(fields.y).toEqual([]);
+      });
     });
   });
 });

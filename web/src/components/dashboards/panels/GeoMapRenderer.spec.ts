@@ -83,6 +83,9 @@ vi.mock("echarts/charts", () => ({
   GraphChart: vi.fn(),
   TreemapChart: vi.fn(),
   PictorialBarChart: vi.fn(),
+  SunburstChart: vi.fn(),
+  FunnelChart: vi.fn(),
+  BoxplotChart: vi.fn(),
 }));
 
 // Mock ECharts components

@@ -35,6 +35,7 @@ import {
   mapChart,
   sankeyChartQuery,
 } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { usePanelFields } from "@/composables/dashboard/usePanelFields";
 import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
 import {
@@ -1005,7 +1006,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       let query = "";
       if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
-      } else if (dashboardPanelData.data.type == "sankey") {
+      } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);
       } else if (dashboardPanelData.data.type == "maps") {
         query = mapChart(dashboardPanelData);

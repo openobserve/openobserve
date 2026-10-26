@@ -81,30 +81,39 @@ export const buildTreemapNodes = (panelSchema: any, data: any[]): TreemapNode[] 
   return tidy(root.children!);
 };
 
+/** Colours each named item from the panel Color palette, shading by value range; a classic palette falls back to the chart colours. */
+export const paintByPalette = (
+  items: { name: string; value: number; itemStyle?: { color: string } }[],
+  config: any,
+  theme: string,
+) => {
+  const values = items.map((item) => item.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  items.forEach((item, index) => {
+    item.itemStyle = {
+      color:
+        getSeriesColor(
+          config?.color ?? null,
+          item.name,
+          [item.value],
+          min,
+          max,
+          theme,
+          config?.color?.colorBySeries,
+          config,
+        ) ?? echartsPaletteColor(index),
+    };
+  });
+};
+
 /** Converts SQL rows into a treemap: the x field names the outer tiles, the breakdown splits them. */
 export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
   const config = panelSchema?.config ?? {};
   const nodes = buildTreemapNodes(panelSchema, Array.isArray(data) ? data : []);
   if (!nodes.length) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
 
-  const values = nodes.map((node) => node.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  nodes.forEach((node, index) => {
-    node.itemStyle = {
-      color:
-        getSeriesColor(
-          config.color ?? null,
-          node.name,
-          [node.value],
-          min,
-          max,
-          store?.state?.theme,
-          config.color?.colorBySeries,
-          config,
-        ) ?? echartsPaletteColor(index),
-    };
-  });
+  paintByPalette(nodes, config, store?.state?.theme);
   const format = (value: unknown) =>
     formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, config.decimals));
   const nested = nodes.some((node) => node.children?.length);

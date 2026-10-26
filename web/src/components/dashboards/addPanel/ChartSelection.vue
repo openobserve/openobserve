@@ -136,6 +136,11 @@ export default defineComponent({
         id: "treemap",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/sunburst.svg"),
+        title: t("dashboard.chartSelection.sunburst"),
+        id: "sunburst",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
@@ -144,6 +149,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/distribution.svg"),
         title: t("dashboard.chartSelection.distribution"),
         id: "distribution",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/boxplot.svg"),
+        title: t("dashboard.chartSelection.boxplot"),
+        id: "boxplot",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/state-timeline.svg"),
@@ -176,6 +186,11 @@ export default defineComponent({
         id: "bar-gauge",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/funnel.svg"),
+        title: t("dashboard.chartSelection.funnel"),
+        id: "funnel",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
         title: t("dashboard.chartSelection.html"),
         id: "html",
@@ -189,6 +204,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
         title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/node-graph.svg"),
+        title: t("dashboard.chartSelection.nodeGraph"),
+        id: "node-graph",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/chart.svg"),
