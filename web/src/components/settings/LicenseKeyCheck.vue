@@ -42,6 +42,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   boundaryDelayMs,
+  breachRetentionEndUs,
   issuedOn,
   knownWaivers,
   waiverKindLabel,
@@ -79,7 +80,11 @@ const armBoundaryTimer = () => {
   clearBoundaryTimer();
   nowUs.value = Date.now() * 1000;
   const upcoming = rows.value
-    .flatMap((waiver) => [waiver.starts_at, waiver.ends_at])
+    .flatMap((waiver) => [
+      waiver.starts_at,
+      waiver.ends_at,
+      ...(waiver.type === "breach_days" ? [breachRetentionEndUs(waiver)] : []),
+    ])
     .filter((boundary) => boundary > nowUs.value);
   if (!upcoming.length) return;
   boundaryTimer = setTimeout(armBoundaryTimer, boundaryDelayMs(Math.min(...upcoming), nowUs.value));

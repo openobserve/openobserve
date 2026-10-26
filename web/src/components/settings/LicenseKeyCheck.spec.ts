@@ -145,4 +145,31 @@ describe("LicenseKeyCheck waiver status clock", () => {
     expect(removed()).toContain("Past days");
     w.unmount();
   });
+  it("ends a breach waiver's monthly relief at the month rollover", async () => {
+    const monthEnd = Date.UTC(2026, 10, 1);
+    const w = render({
+      result: {
+        ...result,
+        waivers_added: [
+          {
+            id: "breach",
+            type: "breach_days",
+            extra: 2,
+            starts_at: Date.UTC(2026, 9, 1) * 1000,
+            ends_at: Date.UTC(2026, 9, 10) * 1000,
+            note: "Breach relief",
+          },
+        ],
+      },
+      refusal: null,
+    });
+    const added = () => w.find('[data-test="license-key-check-added"]').text();
+    expect(added()).toContain("Past days");
+    await vi.advanceTimersByTimeAsync(monthEnd - now - 1);
+    expect(added()).toContain("Past days");
+    await vi.advanceTimersByTimeAsync(2);
+    expect(added()).toContain("Ended");
+    expect(added()).not.toContain("Past days");
+    w.unmount();
+  });
 });
