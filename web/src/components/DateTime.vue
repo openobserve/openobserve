@@ -419,7 +419,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
@@ -433,6 +433,11 @@ const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   w: 520,
   M: 120,
 };
+
+interface CalendarPresetState {
+  tooltip: I18nText | undefined;
+  disabled: boolean;
+}
 
 interface ConsumableDateTime {
   startTime: number;
@@ -704,19 +709,68 @@ export default defineComponent({
       );
     };
 
-    const calendarRailItems = computed<TimeRangeRailItem[] | null>(() => {
+    // Each token is resolved once; tooltip and restriction both read that one range.
+    const resolvePresetState = (token: string, nowMs: number): CalendarPresetState => {
+      const range = resolveCalendarPeriod(token, store.state.timezone, nowMs);
+      if (!range) return { tooltip: undefined, disabled: false };
+      return {
+        tooltip: formatRangeTooltip(range.startTime, range.endTime, store.state.timezone),
+        disabled: exceedsRangeRestriction(
+          range.startTime,
+          range.endTime,
+          props.queryRangeRestrictionInHour,
+        ),
+      };
+    };
+
+    // A finished period only moves when the picker's day changes, so a hover that bumps the clock keeps it cached.
+    const pickerDay = computed(() =>
+      timestampToTimezoneDate(tooltipNow.value, store.state.timezone, "yyyy/MM/dd"),
+    );
+
+    const pastPresetStates = computed(() => {
+      void pickerDay.value;
+      const now = Date.now();
+      return new Map(
+        CALENDAR_RAIL_ITEMS.filter((preset) => !preset.soFar).map((preset) => [
+          preset.id,
+          resolvePresetState(preset.token, now),
+        ]),
+      );
+    });
+
+    const currentPresetStates = computed(
+      () =>
+        new Map(
+          CALENDAR_RAIL_ITEMS.filter((preset) => preset.soFar).map((preset) => [
+            preset.id,
+            resolvePresetState(preset.token, tooltipNow.value),
+          ]),
+        ),
+    );
+
+    const visibleCalendarPresets = computed(() => {
       if (!props.calendarPresets) return null;
       const query = relativeSearchTerm.value.trim().toLowerCase();
-      return CALENDAR_RAIL_ITEMS.map((preset) => ({ preset, label: t(preset.labelKey) }))
-        .filter(({ label }) => !query || label.toLowerCase().includes(query))
-        .map(({ preset, label }) => ({
+      return CALENDAR_RAIL_ITEMS.map((preset) => ({ preset, label: t(preset.labelKey) })).filter(
+        ({ label }) => !query || label.toLowerCase().includes(query),
+      );
+    });
+
+    const calendarRailItems = computed<TimeRangeRailItem[] | null>(() => {
+      const visible = visibleCalendarPresets.value;
+      if (visible === null) return null;
+      return visible.map(({ preset, label }) => {
+        const state = (preset.soFar ? currentPresetStates : pastPresetStates).value.get(preset.id);
+        return {
           id: preset.id,
           label,
           suffix: preset.soFar ? t("common.calendarSoFar") : null,
-          tooltip: calendarTooltip(preset.token),
+          tooltip: state?.tooltip,
           selected: selectedType.value === "relative" && calendarToken.value === preset.token,
-          disabled: calendarExceedsRestriction(preset.token),
-        }));
+          disabled: state?.disabled ?? false,
+        };
+      });
     });
 
     const recentRailItems = computed<TimeRangeRailItem[]>(() => {

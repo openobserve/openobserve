@@ -73,6 +73,7 @@ export const shiftCalendarToken = (token: string, step: number): string | null =
   return parseCalendarToken(next) ? next : null;
 };
 
+/** Resolves a calendar token to a microsecond range, in the given zone or else the stored picker zone, then the browser's. */
 export const resolveCalendarPeriod = (
   token: unknown,
   timezone?: string | null,

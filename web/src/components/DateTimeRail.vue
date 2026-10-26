@@ -141,6 +141,7 @@ const props = defineProps<{
   recent: TimeRangeRailItem[];
   /** Null hides the calendar section, for pages whose backend only takes rolling periods. */
   calendar: TimeRangeRailItem[] | null;
+  /** Shown instead of the range tooltip on items disabled by the query-range limit. */
   restrictionMsg?: I18nText;
 }>();
 
@@ -148,6 +149,7 @@ const emit = defineEmits<{
   "select-recent": [id: string];
   "remove-recent": [id: string];
   "select-calendar": [id: string];
+  /** Fires on pointer enter and on focus, so the parent can refresh the clock "so far" tooltips end at. */
   hover: [];
 }>();
 
