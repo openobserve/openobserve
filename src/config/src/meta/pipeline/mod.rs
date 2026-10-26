@@ -272,6 +272,24 @@ impl Pipeline {
         }
     }
 
+    /// First Stream/Query node id, else "source", naming another org; empty org is this one. [pure]
+    pub fn cross_org_node(&self) -> Option<&str> {
+        let foreign = |org: &str| !org.is_empty() && org != self.org;
+        let node = self.nodes.iter().find(|node| match &node.data {
+            NodeData::Stream(params) => foreign(params.org_id.as_ref()),
+            NodeData::Query(derived_stream) => foreign(&derived_stream.org_id),
+            _ => false,
+        });
+        if let Some(node) = node {
+            return Some(node.id.as_str());
+        }
+        let source_org: &str = match &self.source {
+            PipelineSource::Realtime(params) => params.org_id.as_ref(),
+            PipelineSource::Scheduled(derived_stream) => &derived_stream.org_id,
+        };
+        foreign(source_org).then_some("source")
+    }
+
     /// Verifies the pipeline is valid by:
     /// 0. non-empty name
     /// 1. non-empty nodes list
@@ -2074,5 +2092,74 @@ mod tests {
             false
         ));
         assert!(!is_forbidden_destination("app", "app_copy", true));
+    }
+
+    #[test]
+    fn test_cross_org_node() {
+        let stream = |id: &str, org: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new(org, "s", StreamType::Logs)),
+                0.0,
+                0.0,
+                "default".to_string(),
+            )
+        };
+        let query = |id: &str, org: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Query(DerivedStream {
+                    org_id: org.to_string(),
+                    ..Default::default()
+                }),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let cases = [
+            (vec![stream("src", "a"), stream("dst", "a")], None),
+            (vec![stream("src", ""), stream("dst", "")], None),
+            (vec![query("src", ""), stream("dst", "a")], None),
+            (vec![stream("src", "b"), stream("dst", "a")], Some("src")),
+            (vec![stream("src", "a"), stream("dst", "b")], Some("dst")),
+            (vec![query("src", "b"), stream("dst", "a")], Some("src")),
+            (vec![function_node("f"), stream("dst", "a")], None),
+        ];
+        let pipeline = |source: PipelineSource, nodes| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "a".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source,
+            kind: PipelineKind::User,
+            nodes,
+            edges: vec![],
+        };
+        for (nodes, expected) in cases {
+            let pipeline = pipeline(PipelineSource::default(), nodes);
+            assert_eq!(pipeline.cross_org_node(), expected, "{:?}", pipeline.nodes);
+        }
+        let scheduled = |org: &str| {
+            PipelineSource::Scheduled(DerivedStream {
+                org_id: org.to_string(),
+                ..Default::default()
+            })
+        };
+        let realtime =
+            |org: &str| PipelineSource::Realtime(StreamParams::new(org, "s", StreamType::Logs));
+        let sources = [
+            (scheduled("a"), None),
+            (scheduled(""), None),
+            (scheduled("b"), Some("source")),
+            (realtime("a"), None),
+            (realtime("b"), Some("source")),
+        ];
+        for (source, expected) in sources {
+            let pipeline = pipeline(source, vec![query("src", "a"), stream("dst", "a")]);
+            assert_eq!(pipeline.cross_org_node(), expected, "{:?}", pipeline.source);
+        }
     }
 }

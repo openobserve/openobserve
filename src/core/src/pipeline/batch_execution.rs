@@ -317,6 +317,13 @@ impl ExecutablePipeline {
     }
 
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
+        // No publish_error here: its stream params would name the other org.
+        if let Some(node_id) = pipeline.cross_org_node() {
+            return Err(anyhow!(
+                "Init error: node {node_id} belongs to an organization other than {}",
+                pipeline.org
+            ));
+        }
         let node_map = pipeline
             .nodes
             .iter()

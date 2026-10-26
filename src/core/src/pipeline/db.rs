@@ -379,6 +379,11 @@ async fn compile_realtime_pipeline(
 ) -> anyhow::Result<ExecutablePipeline> {
     let compiled = ExecutablePipeline::new(pipeline).await;
     let mut broken = BROKEN_REALTIME_PIPELINES.write().await;
+    // A broken entry is reported on the source stream, which here belongs to another org.
+    if pipeline.cross_org_node().is_some() {
+        broken.remove(&pipeline.id);
+        return compiled;
+    }
     match &compiled {
         Ok(_) => {
             broken.remove(&pipeline.id);
@@ -1086,5 +1091,27 @@ mod tests {
             &stream_a,
             start + BROKEN_PIPELINE_LOG_INTERVAL
         ));
+    }
+
+    #[tokio::test]
+    async fn a_pipeline_with_a_node_in_another_org_does_not_compile() {
+        let foreign = StreamParams::new("exec_org_b", "exec_stream", StreamType::Logs);
+        let mut pipeline = realtime_pipeline("exec_cross_org", &foreign);
+        pipeline.org = "exec_org_a".to_string();
+        assert!(ExecutablePipeline::new(&pipeline).await.is_err());
+        assert!(
+            compile_realtime_pipeline(&pipeline, &foreign)
+                .await
+                .is_err()
+        );
+        assert!(
+            broken_on_node("exec_org_b").await.is_empty(),
+            "a cross-org pipeline must not be reported on the other org's stream"
+        );
+
+        let legacy = StreamParams::new("", "exec_stream", StreamType::Logs);
+        let mut pipeline = realtime_pipeline("exec_legacy", &legacy);
+        pipeline.org = "exec_org_a".to_string();
+        assert!(ExecutablePipeline::new(&pipeline).await.is_ok());
     }
 }

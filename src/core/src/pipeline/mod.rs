@@ -21,7 +21,7 @@ use common::meta::authz::Authz;
 use config::meta::{
     pipeline::{
         Pipeline, PipelineKind,
-        components::{NodeData, PipelineSource},
+        components::{DerivedStream, NodeData, PipelineSource},
     },
     search::SearchEventType,
     stream::{ListStreamParams, StreamParams},
@@ -64,7 +64,7 @@ async fn validate_no_javascript_functions(pipeline: &Pipeline) -> Result<(), Pip
 
 /// An absent source org_id would slip past the realtime exclusivity check and never
 /// match the execution cache key, both of which compare fully-qualified StreamParams.
-fn default_source_org(pipeline: &mut Pipeline) {
+fn default_node_orgs(pipeline: &mut Pipeline) {
     let org = pipeline.org.clone();
     if let PipelineSource::Realtime(stream) = &mut pipeline.source
         && stream.org_id.is_empty()
@@ -72,12 +72,38 @@ fn default_source_org(pipeline: &mut Pipeline) {
         stream.org_id = org.clone().into();
     }
     // validate() rebuilds source from the first node, discarding the line above.
-    if let Some(node) = pipeline.nodes.first_mut()
-        && let NodeData::Stream(stream) = &mut node.data
-        && stream.org_id.is_empty()
-    {
-        stream.org_id = org.into();
+    for node in pipeline.nodes.iter_mut() {
+        match &mut node.data {
+            NodeData::Stream(stream) if stream.org_id.is_empty() => {
+                stream.org_id = org.clone().into();
+            }
+            NodeData::Query(derived_stream) if derived_stream.org_id.is_empty() => {
+                derived_stream.org_id = org.clone();
+            }
+            _ => {}
+        }
     }
+}
+
+/// A node's org is where runs read and write, so it must be the request's org.
+fn refuse_cross_org_node(pipeline: &Pipeline) -> Result<(), PipelineError> {
+    match pipeline.cross_org_node() {
+        Some(node_id) => Err(PipelineError::InvalidPipeline(format!(
+            "Node {node_id} belongs to another organization; pipeline nodes must use organization {}",
+            pipeline.org
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// The scheduled source to save; a run searches its org, so it is the pipeline's org.
+fn bind_scheduled_source(pipeline: &mut Pipeline) -> Option<DerivedStream> {
+    let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source else {
+        return None;
+    };
+    derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
+    derived_stream.org_id = pipeline.org.clone();
+    Some(derived_stream.clone())
 }
 
 async fn run_check(
@@ -120,7 +146,8 @@ pub async fn save_pipeline_checked(
             "Missing pipeline ID".to_string(),
         ));
     }
-    default_source_org(&mut pipeline);
+    refuse_cross_org_node(&pipeline)?;
+    default_node_orgs(&mut pipeline);
 
     // validate pipeline
     if let Err(e) = pipeline.validate() {
@@ -151,20 +178,12 @@ pub async fn save_pipeline_checked(
     run_check(check, &pipeline).await?;
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
-        derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        derived_stream.org_id = pipeline.org.clone();
-        // save derived_stream to triggers table
-        if let Err(e) = super::alerts::derived_streams::save(
-            derived_stream.clone(),
-            &pipeline.name,
-            &pipeline.id,
-            true,
-        )
-        .await
-        {
-            return Err(PipelineError::InvalidDerivedStream(e.to_string()));
-        }
+    if let Some(derived_stream) = bind_scheduled_source(&mut pipeline)
+        && let Err(e) =
+            super::alerts::derived_streams::save(derived_stream, &pipeline.name, &pipeline.id, true)
+                .await
+    {
+        return Err(PipelineError::InvalidDerivedStream(e.to_string()));
     }
 
     if let Err(e) = pipeline::set(&pipeline).await {
@@ -207,13 +226,14 @@ pub async fn update_pipeline_checked(
     mut pipeline: Pipeline,
     check: Option<&dyn WriteCheck<Pipeline>>,
 ) -> Result<(), PipelineError> {
-    default_source_org(&mut pipeline);
+    refuse_cross_org_node(&pipeline)?;
+    default_node_orgs(&mut pipeline);
 
     let Ok(mut existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
         return Err(PipelineError::NotFound(pipeline.id));
     };
     // Both sides, or a legacy row's empty org reads as a source change on every edit.
-    default_source_org(&mut existing_pipeline);
+    default_node_orgs(&mut existing_pipeline);
 
     if existing_pipeline == pipeline {
         return Ok(());
@@ -272,18 +292,12 @@ pub async fn update_pipeline_checked(
     pipeline.version += 1;
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
-        derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        if let Err(e) = super::alerts::derived_streams::save(
-            derived_stream.clone(),
-            &pipeline.name,
-            &pipeline.id,
-            true,
-        )
-        .await
-        {
-            return Err(PipelineError::InvalidDerivedStream(e.to_string()));
-        }
+    if let Some(derived_stream) = bind_scheduled_source(&mut pipeline)
+        && let Err(e) =
+            super::alerts::derived_streams::save(derived_stream, &pipeline.name, &pipeline.id, true)
+                .await
+    {
+        return Err(PipelineError::InvalidDerivedStream(e.to_string()));
     }
 
     pipeline::update(&pipeline, prev_source_stream).await?;
@@ -394,6 +408,9 @@ pub async fn enable_pipeline(
     let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
+    if enable {
+        refuse_cross_org_node(&pipeline)?;
+    }
 
     pipeline.enabled = enable;
     // add or remove trigger if it's a scheduled pipeline
@@ -500,7 +517,7 @@ mod tests {
     use config::meta::{
         pipeline::{
             Pipeline, PipelineKind,
-            components::{DerivedStream, PipelineSource},
+            components::{DerivedStream, NodeData, PipelineSource},
         },
         stream::StreamParams,
     };
@@ -597,5 +614,112 @@ mod tests {
             !matches!(updated, Ok(()) | Err(PipelineError::Refused(_))),
             "{updated:?}"
         );
+    }
+
+    fn scheduled_pipeline(id: &str, org: &str, source_org: &str, dest_org: &str) -> Pipeline {
+        let mut pipeline: Pipeline = serde_json::from_value(serde_json::json!({
+            "pipeline_id": id,
+            "name": id,
+            "nodes": [
+                {
+                    "id": "src",
+                    "data": {
+                        "node_type": "query",
+                        "org_id": source_org,
+                        "stream_type": "logs",
+                        "query_condition": {"type": "sql", "sql": "SELECT _timestamp FROM src_stream"},
+                        "trigger_condition": {"period": 5, "frequency": 5}
+                    },
+                    "position": {"x": 0.0, "y": 0.0},
+                    "io_type": "input"
+                },
+                {
+                    "id": "dst",
+                    "data": {
+                        "node_type": "stream",
+                        "org_id": dest_org,
+                        "stream_name": "dst_stream",
+                        "stream_type": "logs"
+                    },
+                    "position": {"x": 0.0, "y": 100.0},
+                    "io_type": "output"
+                }
+            ],
+            "edges": [{"id": "esrc-dst", "source": "src", "target": "dst"}]
+        }))
+        .unwrap();
+        pipeline.org = org.to_string();
+        pipeline
+    }
+
+    #[tokio::test]
+    async fn save_and_update_refuse_a_node_in_another_org() {
+        use super::{PipelineError, save_pipeline_checked, update_pipeline_checked};
+
+        for (source_org, dest_org, node) in [("b", "a", "src"), ("a", "b", "dst")] {
+            let pipeline = scheduled_pipeline("cross_org_pl", "a", source_org, dest_org);
+            for result in [
+                save_pipeline_checked(pipeline.clone(), Some(&Unreached)).await,
+                update_pipeline_checked(pipeline, Some(&Unreached)).await,
+            ] {
+                assert!(
+                    matches!(&result, Err(PipelineError::InvalidPipeline(msg)) if msg.contains(node)),
+                    "{source_org}->{dest_org}: {result:?}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn enabling_a_stored_cross_org_pipeline_is_refused() {
+        use super::PipelineError;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        let mut stored = scheduled_pipeline("enable_cross_org_pl", "enable_org_a", "", "");
+        stored.enabled = false;
+        stored.source = PipelineSource::Scheduled(DerivedStream {
+            org_id: "enable_org_b".to_string(),
+            ..Default::default()
+        });
+        super::db::set(&stored).await.unwrap();
+
+        let enabled = super::enable_pipeline("enable_org_a", &stored.id, true, false).await;
+        assert!(
+            matches!(&enabled, Err(PipelineError::InvalidPipeline(_))),
+            "{enabled:?}"
+        );
+        assert!(!super::db::get_by_id(&stored.id).await.unwrap().enabled);
+        super::delete_pipeline(&stored.id).await.unwrap();
+    }
+
+    #[test]
+    fn the_saved_scheduled_source_is_bound_to_the_pipeline_org() {
+        let mut pipeline = scheduled_pipeline("bind_src", "a", "", "");
+        pipeline.source = PipelineSource::Scheduled(DerivedStream::default());
+        let saved = super::bind_scheduled_source(&mut pipeline).unwrap();
+        assert_eq!(saved.org_id, "a");
+        assert_eq!(pipeline.get_derived_stream(), Some(saved));
+
+        pipeline.source = PipelineSource::Realtime(StreamParams::default());
+        assert_eq!(super::bind_scheduled_source(&mut pipeline), None);
+    }
+
+    #[test]
+    fn an_org_less_stream_or_query_node_gets_the_pipeline_org() {
+        let mut pipeline = scheduled_pipeline("bind_pl", "a", "", "");
+        super::default_node_orgs(&mut pipeline);
+        for node in &pipeline.nodes {
+            let node_org = match &node.data {
+                NodeData::Query(derived_stream) => derived_stream.org_id.clone(),
+                NodeData::Stream(params) => params.org_id.to_string(),
+                other => panic!("unexpected node {other:?}"),
+            };
+            assert_eq!(node_org, "a", "{}", node.id);
+        }
     }
 }
