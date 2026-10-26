@@ -379,6 +379,11 @@ import {
   useDashboardTimeGate,
   type DashboardTimeGate,
 } from "@/composables/dashboard/useDashboardTimeGate";
+import useStreams from "@/composables/useStreams";
+import {
+  DASHBOARD_ANNOTATION_SOURCES_KEY,
+  useDashboardAnnotationSources,
+} from "@/composables/dashboard/useDashboardAnnotationSources";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import { computeFitCellHeight } from "@/utils/dashboard/kiosk";
@@ -621,6 +626,20 @@ export default defineComponent({
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
 
+    const { getStream } = useStreams(t);
+    const annotationSources = useDashboardAnnotationSources({
+      dashboardData: () => props.dashboardData,
+      timeRange: () => props.currentTimeObj?.__global,
+      variables: () => variablesManager.committedVariablesData.global,
+      store,
+      folderId: () => props.folderId,
+      schemaFields: async (stream: string, streamType: string) =>
+        ((await getStream(stream, streamType, true))?.schema ?? []).map(
+          (field: { name: string }) => field.name,
+        ),
+    });
+    provide(DASHBOARD_ANNOTATION_SOURCES_KEY, annotationSources);
+
     const dashboardAutoRun = inject<Ref<boolean>>("dashboardAutoRun", ref(false));
     watch(dashboardAutoRun, (on) => variablesManager.setLiveMode(on === true), {
       immediate: true,
@@ -783,9 +802,11 @@ export default defineComponent({
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
 
       // Check if every value in both variablesData and panels is false
+      // Annotation sources count too, so a captured report already has its markers drawn.
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
-        panelsValues.every((value) => value === false);
+        panelsValues.every((value) => value === false) &&
+        !annotationSources.loading.value;
 
       return isAllVariablesAndPanelsDataLoaded;
     });

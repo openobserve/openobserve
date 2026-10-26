@@ -36,6 +36,7 @@ import { findPanelById } from "./dashboard/findPanel";
 import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { toRaw, type Ref } from "vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { pruneAnnotationSourcePanels } from "@/utils/dashboard/pruneAnnotationSourcePanels";
 
 let moment: any;
 let momentInitialized = false;
@@ -605,6 +606,8 @@ export const updateDashboard = async (
   folderId: any,
   hash?: string,
 ) => {
+  // Every panel deletion path ends here, so a deleted panel never lingers in an annotation source.
+  pruneAnnotationSourcePanels(currentDashboardData);
   const isObject = !!currentDashboardData && typeof currentDashboardData === "object";
   // The server only stamps updatedAt on create and stores the client's value on update, so the save carries its own time.
   const body = isObject

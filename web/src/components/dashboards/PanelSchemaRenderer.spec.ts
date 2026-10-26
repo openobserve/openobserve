@@ -167,6 +167,7 @@ import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
+import { DASHBOARD_ANNOTATION_SOURCES_KEY } from "@/composables/dashboard/usePanelAnnotationSources";
 import {
   alertCreationDialog,
   closeAlertCreationDialog,
@@ -3455,6 +3456,189 @@ describe("PanelSchemaRenderer", () => {
       chunk.resolve(optionsWith("late"));
       await flushPromises();
       expect(errorDetail.value.message).toBe("stream failed");
+    });
+  });
+
+  describe("dashboard annotation sources", () => {
+    const manual = { title: "rollback", text: "", start_time: 1_704_067_200_000_000 };
+    const queryMarker = {
+      start_time: 1_704_070_800_000_000,
+      end_time: null,
+      title: "checkout deployed",
+      text: "by alice",
+      source: { id: "deploys", name: "Deploys", color: "#34d399" },
+    };
+    const chartApi = { dispatchAction: vi.fn(), setOption: vi.fn() };
+    const ChartRendererStub = {
+      name: "ChartRenderer",
+      emits: ["mouseover", "mouseout", "click"],
+      template: '<div data-test="chart-renderer"></div>',
+      setup: () => ({ chart: chartApi }),
+    };
+
+    const mountWithSources = async (failed: string[] = []) => {
+      const entry = { resultType: "matrix", result: [{ metric: { q: "A" } }] };
+      const manualAnnotations = ref<unknown[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([entry]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [{ panelQueryIndex: 0 }] }),
+        resultMetaData: ref([[{ step: 1 }]]),
+        annotations: manualAnnotations,
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as unknown as ReturnType<typeof usePanelDataLoader>);
+      const markersForPanel = vi.fn(() => [queryMarker]);
+      const w = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-ts",
+            type: "line",
+            queryType: "promql",
+            queries: [{ query: "a", fields: {}, config: {} }],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+            [DASHBOARD_ANNOTATION_SOURCES_KEY as symbol]: {
+              loading: ref(false),
+              markersForPanel,
+              failedSourcesForPanel: () => failed,
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: ChartRendererStub,
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      return { w, markersForPanel, manualAnnotations };
+    };
+
+    it("draws the panel's own annotations first, then the dashboard's source markers", async () => {
+      const { w, markersForPanel, manualAnnotations } = await mountWithSources();
+      wrapper = w;
+      manualAnnotations.value = [manual];
+      await flushPromises();
+
+      expect(markersForPanel).toHaveBeenCalledWith("panel-ts", "line");
+      const annotations = vi.mocked(convertPanelData).mock.calls.at(-1)![8] as { value: unknown[] };
+      expect(annotations.value).toEqual([manual, queryMarker]);
+    });
+
+    const tooltipEl = () =>
+      document.body.querySelector<HTMLElement>('[data-test="dashboard-query-annotation-tooltip"]');
+    const hover = (
+      w: ReturnType<typeof mount>,
+      annotationDetails: object,
+      clientX: number,
+      clientY: number,
+    ) =>
+      w.findComponent(ChartRendererStub).vm.$emit("mouseover", {
+        componentType: "markLine",
+        data: { annotationDetails },
+        event: { event: { clientX, clientY } },
+      });
+
+    it("shows the source, title, description and time when a query marker is hovered", async () => {
+      const { w } = await mountWithSources();
+      wrapper = w;
+
+      hover(w, queryMarker, 10, 20);
+      await nextTick();
+
+      const tooltip = tooltipEl();
+      expect(tooltip).not.toBeNull();
+      expect(tooltip!.textContent).toContain("Deploys");
+      expect(tooltip!.textContent).toContain("checkout deployed");
+      expect(tooltip!.textContent).toContain("by alice");
+      expect(
+        tooltip!
+          .querySelector('[data-test="dashboard-query-annotation-tooltip-time"]')!
+          .textContent!.trim(),
+      ).toMatch(/^2024-01-01 \d{2}:\d{2}$/);
+
+      w.findComponent(ChartRendererStub).vm.$emit("mouseout", {});
+      await nextTick();
+      expect(tooltipEl()).toBeNull();
+    });
+
+    it("renders the tooltip outside the panel card and clamps it at the viewport edges", async () => {
+      const { w } = await mountWithSources();
+      wrapper = w;
+
+      hover(w, queryMarker, 10, 20);
+      await nextTick();
+      expect(tooltipEl()!.parentElement).toBe(document.body);
+      expect(tooltipEl()!.style.left).toBe("10px");
+      expect(tooltipEl()!.style.top).toBe("20px");
+
+      hover(w, queryMarker, window.innerWidth - 5, window.innerHeight - 5);
+      await nextTick();
+      expect(tooltipEl()!.style.left).toBe(`${window.innerWidth - 8}px`);
+      expect(tooltipEl()!.style.top).toBe(`${window.innerHeight - 8}px`);
+    });
+
+    it("pauses the chart's axis tooltip while a query marker shows its own, and resumes after", async () => {
+      chartApi.dispatchAction.mockClear();
+      chartApi.setOption.mockClear();
+      const { w } = await mountWithSources();
+      wrapper = w;
+
+      hover(w, queryMarker, 10, 20);
+      await nextTick();
+      expect(chartApi.dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+      expect(chartApi.setOption).toHaveBeenLastCalledWith({ tooltip: { triggerOn: "none" } });
+
+      w.findComponent(ChartRendererStub).vm.$emit("mouseout", {});
+      await nextTick();
+      expect(chartApi.setOption).toHaveBeenLastCalledWith({
+        tooltip: { triggerOn: "mousemove|click" },
+      });
+    });
+
+    it("leaves the axis tooltip alone for manual markers and plain mouseouts", async () => {
+      chartApi.dispatchAction.mockClear();
+      chartApi.setOption.mockClear();
+      const { w } = await mountWithSources();
+      wrapper = w;
+
+      hover(w, manual, 10, 20);
+      w.findComponent(ChartRendererStub).vm.$emit("mouseout", {});
+      await nextTick();
+      expect(chartApi.dispatchAction).not.toHaveBeenCalled();
+      expect(chartApi.setOption).not.toHaveBeenCalled();
+    });
+
+    it("shows no tooltip for a manual annotation", async () => {
+      const { w } = await mountWithSources();
+      wrapper = w;
+
+      hover(w, manual, 10, 20);
+      await nextTick();
+      expect(tooltipEl()).toBeNull();
+    });
+
+    it("exposes the failed sources aimed at the panel", async () => {
+      const { w } = await mountWithSources(["Incidents"]);
+      wrapper = w;
+      expect(w.vm.failedAnnotationSources).toEqual(["Incidents"]);
     });
   });
 });

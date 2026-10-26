@@ -17,6 +17,7 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import { raw } from "@/types/i18n";
 import type {
   OpenToken,
+  TemplateDelimiter,
   TemplateSuggestion,
   UseTemplateSuggestOptions,
   UseTemplateSuggestReturn,
@@ -28,14 +29,25 @@ export const CLOSED_TOKEN_RE = /\{\{\s*([A-Za-z_]\w*)\s*\}\}/g;
 /** An open `{{` with no closing braces yet, anchored to the caret so a later `{{` wins. */
 export const OPEN_TOKEN_RE = /\{\{\s*([A-Za-z0-9_]*)$/;
 
+/** A closed `{name}` token that is neither part of `{{name}}` nor a `${name}` variable. */
+export const SINGLE_CLOSED_TOKEN_RE = /(?<![{$])\{\s*([A-Za-z_]\w*)\s*\}(?!\})/g;
+
+/** An open single `{`, with the same exclusions as the closed form. */
+export const SINGLE_OPEN_TOKEN_RE = /(?<![{$])\{\s*([A-Za-z0-9_]*)$/;
+
 // Long enough that passing through a token on the way elsewhere does not flash the peek.
 const PEEK_DELAY_MS = 300;
 
 type NativeField = HTMLInputElement | HTMLTextAreaElement;
 
 /** The name of the closed token the caret sits inside (either edge counts), or `null`. */
-export function tokenAtCaret(text: string, caret: number): string | null {
-  for (const found of text.matchAll(CLOSED_TOKEN_RE)) {
+export function tokenAtCaret(
+  text: string,
+  caret: number,
+  delimiter: TemplateDelimiter = "double",
+): string | null {
+  const closed = delimiter === "single" ? SINGLE_CLOSED_TOKEN_RE : CLOSED_TOKEN_RE;
+  for (const found of text.matchAll(closed)) {
     const start = found.index;
     const end = start + found[0].length;
     if (caret >= start && caret <= end) return found[1];
@@ -44,15 +56,20 @@ export function tokenAtCaret(text: string, caret: number): string | null {
 }
 
 /** Finds the open token that ends at `caret`, or `null` when the list must close. */
-export function openTokenAt(text: string, caret: number): OpenToken | null {
-  const found = OPEN_TOKEN_RE.exec(text.slice(0, caret));
+export function openTokenAt(
+  text: string,
+  caret: number,
+  delimiter: TemplateDelimiter = "double",
+): OpenToken | null {
+  const open = delimiter === "single" ? SINGLE_OPEN_TOKEN_RE : OPEN_TOKEN_RE;
+  const found = open.exec(text.slice(0, caret));
   if (!found) return null;
   return { query: found[1], start: caret - found[0].length };
 }
 
-/** The `{{name}}` text the list and the peek both render. */
-export function tokenFor(name: string) {
-  return raw(`{{${name}}}`);
+/** The `{{name}}` (or `{name}`) text the list and the peek both render. */
+export function tokenFor(name: string, delimiter: TemplateDelimiter = "double") {
+  return raw(delimiter === "single" ? `{${name}}` : `{{${name}}}`);
 }
 
 function isNativeField(target: EventTarget | null): target is NativeField {
@@ -67,6 +84,8 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
   const highlightedIndex = ref(0);
   const peekName = ref<string | null>(null);
   let peekTimer: ReturnType<typeof setTimeout> | null = null;
+  const delimiter = (): TemplateDelimiter => options.delimiter?.() ?? "double";
+  const format = (name: string) => tokenFor(name, delimiter());
 
   const matches = computed<T[]>(() => {
     const token = open.value;
@@ -103,7 +122,7 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
   function updatePeek() {
     const el = element.value;
     if (!el || !options.values()) return;
-    const name = tokenAtCaret(el.value, el.selectionStart ?? 0);
+    const name = tokenAtCaret(el.value, el.selectionStart ?? 0, delimiter());
     clearPeekTimer();
     if (peekName.value === name) return;
     peekName.value = null;
@@ -116,7 +135,7 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
 
   // Resetting the highlight on an unchanged token would undo the arrow key that fired this keyup.
   function checkOpenToken(text: string, caret: number) {
-    const token = openTokenAt(text, caret);
+    const token = openTokenAt(text, caret, delimiter());
     if (!token) return close();
     const previous = open.value;
     open.value = token;
@@ -172,7 +191,7 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
     if (!token || !el) return;
     const text = el.value;
     const caret = el.selectionStart ?? text.length;
-    const inserted = `{{${name}}}`;
+    const inserted = format(name);
     options.emit("update:modelValue", text.slice(0, token.start) + inserted + text.slice(caret));
     options.emit("select", name);
     close();
@@ -196,7 +215,9 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
       event.preventDefault();
       accept(matches.value[highlightedIndex.value].name);
     } else if (event.key === "Escape") {
+      // Only the list closes; an ancestor (e.g. a drawer) must not also react to this Escape.
       event.preventDefault();
+      event.stopPropagation();
       close();
     }
   }
@@ -222,5 +243,6 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
     accept,
     close,
     highlight,
+    format,
   };
 }
