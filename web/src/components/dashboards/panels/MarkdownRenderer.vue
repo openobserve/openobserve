@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scroll h-full w-full overflow-auto" data-test="markdown-renderer-scroll-container">
     <div
       :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
-      v-html="DOMPurify.sanitize(marked(processedContent))"
+      v-html="sanitizeMarkdownPanel(marked(processedContent))"
       data-test="markdown-renderer"
     ></div>
   </div>
@@ -29,7 +29,7 @@ import { computed, defineComponent } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import { useI18nTyped } from "@/types/i18n";
 import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
-import DOMPurify from "dompurify";
+import { sanitizeMarkdownPanel } from "@/utils/dashboard/markdownPanelSanitizer";
 import { marked } from "marked";
 
 export default defineComponent({
@@ -67,7 +67,7 @@ export default defineComponent({
     });
 
     return {
-      DOMPurify,
+      sanitizeMarkdownPanel,
       marked,
       isDark,
       processedContent,

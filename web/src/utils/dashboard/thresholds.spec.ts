@@ -374,16 +374,13 @@ describe("applyLineAreaThresholds", () => {
   });
 
   it("turns off large mode only on bars it recolours with a visualMap", () => {
-    const limitsOnly: any = lineOptions();
-    limitsOnly.series[0].large = true;
+    const limitsOnly = lineOptions({ type: "bar", large: true });
     applyLineAreaThresholds(limitsOnly, panel("bar", { ...steps, showAs: "line" }));
     expect(limitsOnly.series[0].large).toBe(true);
-    const stacked: any = lineOptions();
-    stacked.series[0].large = true;
+    const stacked = lineOptions({ type: "bar", large: true });
     applyLineAreaThresholds(stacked, panel("stacked", { ...steps, showAs: "color" }));
     expect(stacked.series[0].large).toBe(true);
-    const coloured: any = lineOptions();
-    coloured.series[0].large = true;
+    const coloured = lineOptions({ type: "bar", large: true });
     applyLineAreaThresholds(coloured, panel("bar", { ...steps, showAs: "color" }));
     expect(coloured.series[0].large).toBe(false);
   });

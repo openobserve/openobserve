@@ -7,6 +7,7 @@ import {
   shouldShowLegendWidth,
   shouldShowLegendHeight,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
@@ -244,6 +245,10 @@ export function useConfigPanel(
       "chart-align": {
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
+      },
+      "legend-values": {
+        label: t("dashboard.legendValues"),
+        visible: shouldShowLegendValues(dashboardPanelData),
       },
       "promql-legend": {
         label: t("dashboard.query"),

@@ -204,13 +204,15 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       ...defaultSeriesProps,
       ...areaStyle,
       label,
+      // Without large mode every label draws, so a dense series would print one unreadable band.
+      ...(label.show && { labelLayout: { hideOverlap: true } }),
       originalSeriesName: seriesName,
       // markLine if exist
       markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
-      // Large mode draws bars as one path, which drops value labels past 400 points.
+      // Large mode draws a bar or scatter series as one path, which drops value labels past its threshold.
       large: !label.show,
       color: seriesColor,
       data: seriesData,

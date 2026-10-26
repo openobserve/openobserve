@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildDataLookupMap,
   createSeriesBuilders,
+  type SeriesDeps,
 } from "@/utils/dashboard/sql/shared/seriesBuilder";
 
 // Mock heavy dependencies
@@ -116,33 +117,65 @@ describe("seriesBuilder", () => {
     });
   });
 
-  describe("getSeriesObj large mode", () => {
-    const build = (config: Record<string, any>) =>
-      createSeriesBuilders({
-        options: { xAxis: [{ data: [] }] },
-        panelSchema: { type: "bar", config, queries: [{ fields: { y: [] } }] },
-        store: { state: { theme: "light", timezone: "UTC" } },
-        missingValueData: [],
-        yAxisKeys: [],
-        breakDownKeys: [],
-        defaultSeriesProps: { type: "bar" },
-        chartMin: 0,
-        chartMax: 1,
-        dataLookupMap: new Map(),
-        annotations: [],
-        getMarkLineData: () => [],
-        getAxisDataFromKey: () => [],
-      } as any).getSeriesObj("count", [1, 2], {});
+  describe("large mode and value labels", () => {
+    const deps = (
+      type: string,
+      config: Record<string, unknown>,
+      extra: Partial<SeriesDeps> = {},
+    ): SeriesDeps => ({
+      options: { xAxis: [{ data: [] }] },
+      panelSchema: { type, config, queries: [{ fields: { y: [], breakdown: [] } }] },
+      store: { state: { theme: "light", timezone: "UTC" } },
+      missingValueData: [],
+      xAxisKeys: [],
+      yAxisKeys: [],
+      breakDownKeys: [],
+      defaultSeriesProps: { type: "bar" },
+      chartMin: 0,
+      chartMax: 1,
+      dataLookupMap: new Map(),
+      annotations: [],
+      getMarkLineData: () => [],
+      getAxisDataFromKey: () => [],
+      ...extra,
+    });
+    const build = (config: Record<string, unknown>) =>
+      createSeriesBuilders(deps("bar", config)).getSeriesObj("count", [1, 2], {}, "");
 
     it("keeps large mode when value labels are hidden", () => {
       expect(build({}).large).toBe(true);
       expect(build({ label_option: { position: null, rotate: 0 } }).large).toBe(true);
+      expect(build({}).labelLayout).toBeUndefined();
     });
 
-    it("turns large mode off when value labels are shown", () => {
-      const series: any = build({ label_option: { position: "top" } });
+    it("turns large mode off and hides overlapping labels when value labels are shown", () => {
+      const series = build({ label_option: { position: "top" } });
       expect(series.label.show).toBe(true);
       expect(series.large).toBe(false);
+      expect(series.labelLayout).toEqual({ hideOverlap: true });
+    });
+
+    it("h-bar with a breakdown: every breakdown series follows the label setting", () => {
+      const rows = [
+        { x: "/a", service: "api", y: 1 },
+        { x: "/a", service: "web", y: 2 },
+      ];
+      const build = (config: Record<string, unknown>) =>
+        createSeriesBuilders(
+          deps("h-bar", config, {
+            options: { xAxis: [{ data: ["/a"] }] },
+            missingValueData: rows,
+            xAxisKeys: ["x"],
+            yAxisKeys: ["y"],
+            breakDownKeys: ["service"],
+            dataLookupMap: buildDataLookupMap(rows, ["service"], ["x"]),
+          }),
+        ).getSeries();
+
+      const labelled = build({ label_option: { position: "right" } });
+      expect(labelled.map((series) => series.originalSeriesName)).toEqual(["api", "web"]);
+      expect(labelled.every((series) => series.large === false)).toBe(true);
+      expect(build({}).every((series) => series.large === true)).toBe(true);
     });
   });
 });
