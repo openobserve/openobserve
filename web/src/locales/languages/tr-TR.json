@@ -26869,7 +26869,7 @@
       "scriptNote": "Hizmeti, ikili dosyaları ve yapılandırmayı durdurur ve kaldırır. Collector'ın durumu {state} içinde, günlükleri {logs} içinde kalır; artık gerekmiyorsa bunları elle silin.",
       "windowsNote": "Yönetici olarak açılmış bir PowerShell'de çalıştırın. Hizmeti, ikili dosyaları ve yapılandırmayı durdurur ve kaldırır. Collector'ın durumu {state} içinde kalır; artık gerekmiyorsa elle silin.",
       "dockerNote": "Kurulumu yaptığınız dizinde çalıştırın. Konteyneri, durum birimini ve supervisor yapılandırmasının bulunduğu dizini kaldırır.",
-      "kubernetesNote": "DaemonSet'i ve chart'ın oluşturduğu diğer kaynakları kaldırır. Ad alanı kalır; içinde başka bir şey çalışmıyorsa silin."
+      "kubernetesNote": "Sürümü ve chart tarafından oluşturulan kaynakları kaldırır. Ad alanı kalır; orada başka bir şey çalışmıyorsa silin."
     },
     "settings": {
       "governance": "Yönetişim",

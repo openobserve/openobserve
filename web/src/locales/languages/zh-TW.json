@@ -26864,7 +26864,7 @@
       "scriptNote": "停止並移除服務、二進位檔與設定。collector 的狀態會保留在 {state}，日誌保留在 {logs}；若不再需要，請手動刪除。",
       "windowsNote": "請在以系統管理員身分執行的 PowerShell 中執行。停止並移除服務、二進位檔與設定。collector 的狀態會保留在 {state}；若不再需要，請手動刪除。",
       "dockerNote": "請在安裝時所在的目錄中執行。移除容器、其狀態磁碟區，以及存放 supervisor 設定的目錄。",
-      "kubernetesNote": "移除 DaemonSet 以及該 chart 建立的其他資源。命名空間會保留；若其中沒有其他工作負載，可將其刪除。"
+      "kubernetesNote": "移除 Release 與 Chart 建立的資源。命名空間會保留；若其中沒有其他東西執行，請將其刪除。"
     },
     "settings": {
       "governance": "治理",

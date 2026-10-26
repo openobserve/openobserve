@@ -26869,7 +26869,7 @@
       "scriptNote": "Zatrzymuje i usuwa usługę, pliki binarne oraz konfigurację. Stan collectora pozostaje w {state}, a jego logi w {logs}; usuń je ręcznie, jeśli nie są już potrzebne.",
       "windowsNote": "Uruchom w PowerShell z uprawnieniami administratora. Zatrzymuje i usuwa usługę, pliki binarne oraz konfigurację. Stan collectora pozostaje w {state}; usuń go ręcznie, jeśli nie jest już potrzebny.",
       "dockerNote": "Uruchom w katalogu, z którego instalowano. Usuwa kontener, jego wolumen stanu oraz katalog z konfiguracją supervisora.",
-      "kubernetesNote": "Usuwa DaemonSet i pozostałe zasoby utworzone przez chart. Przestrzeń nazw pozostaje; usuń ją, jeśli nic więcej w niej nie działa."
+      "kubernetesNote": "Usuwa wydanie i zasoby utworzone przez wykres. Przestrzeń nazw pozostaje; usuń ją, jeśli nie działają w niej inne zasoby."
     },
     "settings": {
       "governance": "Zarządzanie i zgodność",

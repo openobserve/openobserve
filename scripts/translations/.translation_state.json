@@ -12641,7 +12641,7 @@
     "uninstall": {
       "dockerNote": "069bec9bc5a28a4a",
       "howTo": "ee9e8e18d9faf8c2",
-      "kubernetesNote": "f31f9b1595ab862d",
+      "kubernetesNote": "1f72984932232d58",
       "scriptNote": "c1dab82c9ea3453b",
       "windowsNote": "1fe990ae091fb478"
     },

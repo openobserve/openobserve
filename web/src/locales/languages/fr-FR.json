@@ -26869,7 +26869,7 @@
       "scriptNote": "Arrête et supprime le service, les binaires et la configuration. L'état du collecteur reste dans {state} et ses journaux dans {logs} ; supprimez-les à la main si vous n'en avez plus besoin.",
       "windowsNote": "Exécutez-la depuis un PowerShell élevé. Arrête et supprime le service, les binaires et la configuration. L'état du collecteur reste dans {state} ; supprimez-le à la main si vous n'en avez plus besoin.",
       "dockerNote": "Exécutez-la dans le répertoire d'installation. Supprime le conteneur, son volume d'état et le répertoire contenant la configuration du superviseur.",
-      "kubernetesNote": "Supprime le DaemonSet et les autres ressources créées par le chart. L'espace de noms reste ; supprimez-le si rien d'autre n'y tourne."
+      "kubernetesNote": "Supprime la release et les ressources créées par le chart. Le namespace est conservé ; supprimez-le si rien d'autre n'y s'exécute."
     },
     "settings": {
       "governance": "Gouvernance",

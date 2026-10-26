@@ -26869,7 +26869,7 @@
       "scriptNote": "停止并移除服务、二进制文件和配置。collector 的状态保留在 {state}，日志保留在 {logs}；如不再需要，请手动删除。",
       "windowsNote": "请在以管理员身份运行的 PowerShell 中执行。停止并移除服务、二进制文件和配置。collector 的状态保留在 {state}；如不再需要，请手动删除。",
       "dockerNote": "请在安装时所在的目录中执行。移除容器、其状态卷以及存放 supervisor 配置的目录。",
-      "kubernetesNote": "移除 DaemonSet 以及该 chart 创建的其他资源。命名空间会保留；如其中没有其他工作负载，可将其删除。"
+      "kubernetesNote": "移除该 release 以及 chart 创建的资源。命名空间会保留；如果其中没有其他内容在运行，可以将其删除。"
     },
     "settings": {
       "governance": "治理",

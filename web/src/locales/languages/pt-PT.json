@@ -26869,7 +26869,7 @@
       "scriptNote": "Para e remove o serviço, os binários e a configuração. O estado do coletor fica em {state} e os seus registos em {logs}; apague-os manualmente se já não precisar deles.",
       "windowsNote": "Execute-o a partir de um PowerShell com privilégios de administrador. Para e remove o serviço, os binários e a configuração. O estado do coletor fica em {state}; apague-o manualmente se já não precisar dele.",
       "dockerNote": "Execute-o no diretório a partir do qual instalou. Remove o contentor, o respetivo volume de estado e o diretório com a configuração do supervisor.",
-      "kubernetesNote": "Remove o DaemonSet e os outros recursos criados pelo chart. O namespace mantém-se; apague-o se nada mais estiver a correr nele."
+      "kubernetesNote": "Remove a release e os recursos criados pelo chart. O namespace permanece; elimine-o se nele não estiver mais nada a ser executado."
     },
     "settings": {
       "governance": "Governação",

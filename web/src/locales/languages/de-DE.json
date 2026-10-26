@@ -26869,7 +26869,7 @@
       "scriptNote": "Stoppt und entfernt den Dienst, die Binärdateien und die Konfiguration. Der Zustand des Collectors bleibt in {state} und seine Logs in {logs}; löschen Sie sie manuell, wenn Sie sie nicht mehr benötigen.",
       "windowsNote": "Führen Sie den Befehl in einer PowerShell mit Administratorrechten aus. Stoppt und entfernt den Dienst, die Binärdateien und die Konfiguration. Der Zustand des Collectors bleibt in {state}; löschen Sie ihn manuell, wenn Sie ihn nicht mehr benötigen.",
       "dockerNote": "Führen Sie den Befehl in dem Verzeichnis aus, in dem Sie installiert haben. Entfernt den Container, sein Zustands-Volume und das Verzeichnis mit der Supervisor-Konfiguration.",
-      "kubernetesNote": "Entfernt das DaemonSet und die übrigen Ressourcen, die das Chart erstellt hat. Der Namespace bleibt bestehen; löschen Sie ihn, wenn dort nichts anderes läuft."
+      "kubernetesNote": "Entfernt das Release und die vom Chart erstellten Ressourcen. Der Namespace bleibt erhalten; löschen Sie ihn, falls dort nichts anderes ausgeführt wird."
     },
     "settings": {
       "governance": "Governance",

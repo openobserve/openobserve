@@ -26869,7 +26869,7 @@
       "scriptNote": "Dừng và gỡ dịch vụ, các tệp nhị phân và cấu hình. Trạng thái của collector được giữ ở {state} và nhật ký ở {logs}; hãy xóa thủ công nếu không còn cần.",
       "windowsNote": "Chạy trong PowerShell với quyền quản trị viên. Dừng và gỡ dịch vụ, các tệp nhị phân và cấu hình. Trạng thái của collector được giữ ở {state}; hãy xóa thủ công nếu không còn cần.",
       "dockerNote": "Chạy trong thư mục bạn đã cài đặt. Gỡ container, volume trạng thái của nó và thư mục chứa cấu hình supervisor.",
-      "kubernetesNote": "Gỡ DaemonSet và các tài nguyên khác mà chart đã tạo. Namespace vẫn được giữ; hãy xóa nếu không còn gì chạy trong đó."
+      "kubernetesNote": "Xóa bản phát hành và các tài nguyên do chart tạo ra. Namespace vẫn được giữ lại; hãy xóa nó nếu không còn gì khác chạy ở đó."
     },
     "settings": {
       "governance": "Quản trị",

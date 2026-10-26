@@ -26869,7 +26869,7 @@
       "scriptNote": "Detiene y quita el servicio, los binarios y la configuración. El estado del recolector se conserva en {state} y sus registros en {logs}; bórralos a mano si ya no los necesitas.",
       "windowsNote": "Ejecútalo desde un PowerShell con privilegios de administrador. Detiene y quita el servicio, los binarios y la configuración. El estado del recolector se conserva en {state}; bórralo a mano si ya no lo necesitas.",
       "dockerNote": "Ejecútalo en el directorio desde el que instalaste. Quita el contenedor, su volumen de estado y el directorio con la configuración del supervisor.",
-      "kubernetesNote": "Quita el DaemonSet y los demás recursos que creó el chart. El espacio de nombres se conserva; bórralo si no se ejecuta nada más en él."
+      "kubernetesNote": "Elimina la versión desplegada y los recursos que creó el chart. El espacio de nombres se conserva; elimínalo si no se ejecuta nada más en él."
     },
     "settings": {
       "governance": "Gobernanza",
