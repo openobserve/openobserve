@@ -202,9 +202,7 @@ export const convertSQLChartData = async (
   options.toolbox.show = options.toolbox.show && (isTimeSeriesFlag || heatmapTimeX);
 
   if (
-    ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"].includes(
-      panelSchema.type,
-    ) &&
+    ["area", "area-stacked", "bar", "line", "scatter", "stacked"].includes(panelSchema.type) &&
     isTimeSeriesFlag &&
     !panelSchema.config.trellis?.layout
   ) {

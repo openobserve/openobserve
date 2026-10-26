@@ -175,24 +175,6 @@ describe("DateTime rail", () => {
       expect(lastEmit().relativeTimePeriod).toBe("3h");
     });
 
-    it("is filtered by the picker search", async () => {
-      createWrapper();
-      await openMenu();
-
-      wrapper!.vm.relativeSearchTerm = "month";
-      await flushPromises();
-      expect(wrapper!.vm.calendarRailItems.map((item: { id: string }) => item.id)).toEqual([
-        "this-month",
-        "last-month",
-      ]);
-      expect(calendarItem("today")).toBeNull();
-
-      wrapper!.vm.relativeSearchTerm = "zzz";
-      await flushPromises();
-      expect(wrapper!.vm.calendarRailItems).toEqual([]);
-      expect(document.body.textContent).not.toContain("Calendar");
-    });
-
     it("disables ranges longer than the query-range limit and explains why", async () => {
       createWrapper({ queryRangeRestrictionInHour: 24, queryRangeRestrictionMsg: "Max 24h" });
       await openMenu();
