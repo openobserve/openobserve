@@ -17,7 +17,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { computed, ref } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
-import { HTTP_ENDPOINT_KEY, type WorkflowHttpEndpoint } from "@/plugins/workflows/httpEndpointUi";
+import {
+  HTTP_ENDPOINT_KEY,
+  HttpEndpointError,
+  type WorkflowHttpEndpoint,
+} from "@/plugins/workflows/httpEndpointUi";
 import type { HttpTriggerConfig, HttpTriggerPermissions } from "@/services/workflows";
 import { httpConfig, httpCredential, OTooltipStub } from "@/test/unit/helpers/workflowHttp";
 import WorkflowHttpExample from "./WorkflowHttpExample.vue";
@@ -107,17 +111,17 @@ describe("WorkflowHttpExample", () => {
     expect(codeOf(wrapper)).not.toContain(ROW_VALUE);
   });
 
-  it("copy goes through copyExample and toasts like the row copy", async () => {
+  it("copy goes through copyExample and toasts that the command was copied", async () => {
     const { wrapper, endpoint } = mountExample();
     await wrapper.find('[data-test="workflow-http-example-copy"]').trigger("click");
     await flushPromises();
     expect(endpoint.copyExample).toHaveBeenCalledTimes(1);
     expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", message: "Token copied" }),
+      expect.objectContaining({ variant: "success", message: "Command copied" }),
     );
   });
 
-  it("uses the copied mode for the toast after a mode switch", async () => {
+  it("still says the command was copied after a mode switch", async () => {
     const { wrapper, endpoint } = mountExample();
     let finish!: (value: boolean) => void;
     endpoint.copyExample.mockImplementationOnce(
@@ -131,7 +135,31 @@ describe("WorkflowHttpExample", () => {
     finish(true);
     await flushPromises();
     expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", message: "Token copied" }),
+      expect.objectContaining({ variant: "success", message: "Command copied" }),
+    );
+  });
+
+  it("a credential that changed mid-copy says the command was not copied", async () => {
+    const { wrapper, endpoint } = mountExample();
+    endpoint.copyExample.mockRejectedValueOnce(
+      new HttpEndpointError("workflow.http.copyCredentialChanged"),
+    );
+    await wrapper.find('[data-test="workflow-http-example-copy"]').trigger("click");
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: "Couldn't copy the command. Credential changed. Copy again.",
+      }),
+    );
+  });
+
+  it("without reveal permission the placeholder command copies with the same toast", async () => {
+    const { wrapper } = mountExample({}, { edit: false, test: false, reveal: false });
+    await wrapper.find('[data-test="workflow-http-example-copy"]').trigger("click");
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "success", message: "Command copied" }),
     );
   });
 

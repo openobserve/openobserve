@@ -160,30 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </button>
           </template>
         </WorkflowRunSwitcher>
-        <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
-        <OTooltip
+        <WorkflowHttpEndpointButton
           v-if="showHttpButton"
-          side="bottom"
-          :content="httpTooltip"
-          :disabled="!httpTooltip"
-        >
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="webhook"
-            data-test="workflow-editor-http-endpoint"
-            @click="httpEditorState.panelOpen = true"
-          >
-            {{ t("workflow.http.editorButton") }}
-            <OTag
-              v-if="httpChip"
-              :variant="httpChip === 'success' ? 'success-soft' : 'warning-soft'"
-              size="sm"
-              :label="t('workflow.http.editorButtonOn')"
-              data-test="workflow-editor-http-endpoint-chip"
-            />
-          </OButton>
-        </OTooltip>
+          :chip="httpChip"
+          :tooltip-key="httpTooltipKey"
+          size="sm-action"
+          data-test="workflow-editor-http-endpoint"
+          @click="httpEditorState.panelOpen = true"
+        />
         <OButton
           variant="outline"
           size="sm-action"
@@ -354,7 +338,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
@@ -366,11 +349,10 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import WorkflowHttpEndpointPanel from "./WorkflowHttpEndpointPanel.vue";
-import { workflowHttpTriggerQuery } from "@/services/workflows.queries";
-import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import WorkflowHttpEndpointButton from "./WorkflowHttpEndpointButton.vue";
+import { useWorkflowHttpButton } from "@/plugins/workflows/useWorkflowHttpButton";
 import {
   httpEditorState,
   resetHttpEditorState,
@@ -560,31 +542,20 @@ const onStepPick = (item: any) => {
 const orgId = () => store.state.selectedOrganization.identifier as string;
 
 // ── HTTP endpoint ───────────────────────────────────────────────────────────
-const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
 const httpKind = computed(() => currentTriggerKind());
 const httpTriggerNodeId = computed(() => currentTriggerNodeId());
-const httpTrigger = useQuery(() =>
-  workflowHttpTriggerQuery(
-    orgId(),
-    hooksOn.value ? workflowObj.currentSelectedWorkflow.id || "" : "",
-  ),
-);
-const httpEndpointOn = computed(() => {
-  const data = httpTrigger.data.value;
-  return hooksOn.value && !!data?.configured && data.enabled;
+const {
+  visible: hooksOn,
+  endpointOn: httpEndpointOn,
+  chip: httpChip,
+  tooltipKey: httpTooltipKey,
+} = useWorkflowHttpButton({
+  workflowId: computed(() => workflowObj.currentSelectedWorkflow.id || ""),
+  isDraft: computed(() => !!workflowObj.currentSelectedWorkflow.isDraft),
+  workflowEnabled: computed(() => workflowObj.currentSelectedWorkflow.enabled !== false),
 });
 watch(httpEndpointOn, (on) => (httpEditorState.endpointOn = on), { immediate: true });
 const showHttpButton = computed(() => hooksOn.value && !workflowObj.readOnly);
-// A draft or paused workflow refuses calls, so its chip warns instead of reading live.
-const httpChip = computed<"success" | "warning" | null>(() => {
-  if (!httpEndpointOn.value) return null;
-  const wf = workflowObj.currentSelectedWorkflow;
-  return wf.isDraft || wf.enabled === false ? "warning" : "success";
-});
-const httpTooltip = computed(() => {
-  if (httpChip.value === "warning") return t("workflow.http.editorButtonRefused");
-  return httpChip.value ? undefined : t("workflow.http.editorButtonTooltip");
-});
 const pickerFootnote = computed(() =>
   isTriggerStep.value && hooksOn.value ? t("workflow.http.pickerCue") : undefined,
 );

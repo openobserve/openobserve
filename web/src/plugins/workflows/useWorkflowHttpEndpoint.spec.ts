@@ -985,7 +985,9 @@ describe("useWorkflowHttpEndpoint", () => {
 
     it("both run test hints exist in en-US", async () => {
       const en = (await import("@/locales/languages/en-US.json")).default;
-      expect(en.workflow.http.runTestHint).toBe("Opens Test with an HTTP request payload");
+      expect(en.workflow.http.runTestHint).toBe(
+        "Runs the steps with a sample HTTP payload; doesn't call the URL",
+      );
       expect(en.workflow.http.runTestHintList).toBe("Open the workflow to run a test");
     });
   });
