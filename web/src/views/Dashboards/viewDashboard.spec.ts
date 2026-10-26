@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
+import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { inject, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
@@ -1986,6 +1987,38 @@ describe("ViewDashboard", () => {
       expect(has("dashboard-panel-add")).toBe(true);
       expect(has("dashboard-edit-save-btn")).toBe(false);
       expect(has("dashboard-edit-badge")).toBe(false);
+    });
+
+    it("marks Add panel with a dot while this dashboard has a new-panel draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "panel.add",
+      );
+
+      writePanelDraft(
+        { userEmail: "", org: "test-org", dashboardId: "test-dashboard-1" },
+        {
+          tabId: "tab-1",
+          data: {},
+          layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+          sessionVariables: [],
+          variablesWithCurrentPanel: [],
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "dashboard.panelDraft.addPanelDot",
+      );
+
+      // The dot lives inside the Add panel button, which layout editing removes.
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+      expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
     });
 
     it("swaps the header actions when entering edit mode", async () => {

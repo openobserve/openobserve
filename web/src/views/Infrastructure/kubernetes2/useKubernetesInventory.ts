@@ -56,8 +56,10 @@ import {
 import {
   clusterFallbackSql,
   detailEventsSql,
+  eventCountsSql,
   eventsSql,
   parseEvents,
+  parseEventCounts,
   parseWarnings,
   warningSql,
   type EventRow,
@@ -65,6 +67,7 @@ import {
 import {
   LIST_OBJECT_KINDS,
   MAP_COLUMNS,
+  OVERVIEW_COLUMNS,
   joinObjects,
   objectDetailSql,
   objectListSql,
@@ -338,6 +341,7 @@ export function useKubernetesInventory(
     }
     if (!cluster) return out;
     const scope = { cluster, namespaces: s.namespaces };
+    out.push({ name: "EC", sql: eventCountsSql(cluster), ...window });
     const warn = (kind: DetailKind | null) => {
       const info = kind ? KIND_INFO[kind] : null;
       out.push({
@@ -354,7 +358,14 @@ export function useKubernetesInventory(
     };
     const viewKind = LIST_VIEW_KIND[s.view];
     if (!anchorMissing(s.view)) {
-      if (s.view === "cluster") warn(null);
+      if (s.view === "cluster") {
+        warn(null);
+        // The Needs attention rows read how long a pod or node has been in its state from the object.
+        for (const kind of ["pod", "node"] as const) {
+          const sql = objectListSql(kind, cluster, [], OVERVIEW_COLUMNS[kind]);
+          out.push({ name: `O:${kind}`, sql, ...day });
+        }
+      }
       if (s.view === "map") {
         const kind = s.entity === "nodes" ? "node" : "pod";
         warn(kind);
@@ -549,6 +560,8 @@ export function useKubernetesInventory(
     return { rows: [...seen.values()], truncated };
   });
 
+  const eventCounts = computed(() => parseEventCounts(sql.value.get("EC")));
+
   // Parsed once per hits array: the inventory, banners and drawer all read them, across drawer merges.
   const parsed = new WeakMap<any[], ObjectRecord[]>();
   const objectRecords = computed(() => {
@@ -684,10 +697,12 @@ export function useKubernetesInventory(
     failed,
     forbidden,
     clusters,
+    clusterResults,
     metricClusters,
     effectiveCluster,
     inventory,
     warnings,
+    eventCounts,
     events,
     eventsCapped,
     detailEvents,
