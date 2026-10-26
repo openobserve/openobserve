@@ -259,6 +259,64 @@ describe("ModelPricingEditor.vue", () => {
     });
   });
 
+  describe("Layout and explanatory copy", () => {
+    it("renders the form in a left-aligned reading column", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const column = wrapper.find('[data-test="constrained-page"] > div');
+      expect(column.classes()).toContain("me-auto");
+      expect(column.classes()).not.toContain("mx-auto");
+    });
+
+    it("opens the pricing tiers explanation from an About popover instead of inline", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const desc = String(i18n.global.t("modelPricing.pricingTiersDesc"));
+      const trigger = wrapper.find('[data-test="model-pricing-tiers-hint-trigger"]');
+      expect(trigger.exists()).toBe(true);
+      expect(trigger.text()).toBe("About pricing tiers");
+      expect(wrapper.text()).not.toContain(desc);
+
+      (wrapper.vm as any).tiersHintOpen = true;
+      await flushPromises();
+      const hint = document.body.querySelector('[data-test="model-pricing-tiers-hint"]');
+      expect(hint?.textContent).toContain(desc);
+      wrapper.unmount();
+    });
+
+    it("opens the priority explanation from an About popover instead of help text", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      (wrapper.vm as any).addTier();
+      await flushPromises();
+      const hintText = String(i18n.global.t("modelPricing.tierPriorityHint"));
+      expect(wrapper.text()).not.toContain(hintText);
+      const trigger = wrapper.find('[data-test="model-pricing-tier-priority-hint-trigger-1"]');
+      expect(trigger.exists()).toBe(true);
+      expect(trigger.attributes("aria-label")).toBe("About priority");
+      const field = wrapper.find('[data-test="model-pricing-tier-priority-input-1"]');
+      const label = field.find("label");
+      expect(label.text()).toBe("Priority");
+      expect(label.attributes("for")).toBe(field.find("input").attributes("id"));
+
+      (wrapper.vm as any).priorityHintOpenIdx = 1;
+      await flushPromises();
+      const hint = document.body.querySelector('[data-test="model-pricing-tier-priority-hint-1"]');
+      expect(hint?.textContent).toContain(hintText);
+      wrapper.unmount();
+    });
+
+    it("does not repeat the prices in a preview table", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-price-value-input-0-0"]').exists()).toBe(true);
+      expect(wrapper.find("table").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("per 1K");
+    });
+  });
+
   describe("Initial state", () => {
     it("initializes the form with a single default tier (no prices, no condition)", async () => {
       const wrapper = createWrapper();
@@ -1460,48 +1518,6 @@ describe("ModelPricingEditor.vue", () => {
       expect((wrapper.vm as any).fromPerMillion(1)).toBeCloseTo(0.000001);
       expect((wrapper.vm as any).toPerMillion(0)).toBe(0);
       expect((wrapper.vm as any).fromPerMillion(0)).toBe(0);
-    });
-
-    it("formatPreviewCost returns '0' for zero cost", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect((wrapper.vm as any).formatPreviewCost(0, 1000)).toBe("0");
-    });
-
-    it("formatPreviewCost uses exponential for very small numbers", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const out = (wrapper.vm as any).formatPreviewCost(0.000000001, 1);
-      expect(out).toMatch(/e-/i);
-    });
-
-    it("formatPreviewCost trims trailing zeros", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const out = (wrapper.vm as any).formatPreviewCost(0.001, 1000);
-      // 0.001 * 1000 = 1 -> trimmed
-      expect(out).toBe("1");
-    });
-  });
-
-  describe("previewEntries (field-array)", () => {
-    it("appends a pending row when the draft has a key", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const t = tier({ prices: [row("input", 1)], draftKey: "output", draftValue: 2 });
-      const preview = (wrapper.vm as any).previewEntries(t);
-      expect(preview).toHaveLength(2);
-      const pending = preview.find((p: any) => p.key === "output");
-      expect(pending.pending).toBe(true);
-    });
-
-    it("does not duplicate when the draft key already exists in the rows", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const t = tier({ prices: [row("input", 1)], draftKey: "input", draftValue: 99 });
-      const preview = (wrapper.vm as any).previewEntries(t);
-      expect(preview).toHaveLength(1);
-      expect(preview[0].key).toBe("input");
     });
   });
 

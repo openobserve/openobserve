@@ -26,6 +26,7 @@ pub mod errors;
 pub mod file_list;
 pub mod idempotency;
 pub mod local_lock;
+pub mod org_lifecycle;
 pub mod outbound_http;
 pub mod pipeline;
 pub mod queue;

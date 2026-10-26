@@ -140,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Additional Settings for Prebuilt Destinations -->
+            <!-- None of these settings apply to email destinations -->
             <div
-              v-if="showPrebuiltAdvancedSettings"
+              v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
               class="mt-3 w-full"
               data-test="prebuilt-additional-settings"
             >
@@ -150,8 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alert_destinations.additional_settings") }}
               </div>
 
-              <!-- Custom Headers (hidden for email destinations) -->
-              <div v-if="dtVal !== 'email'" class="py-2">
+              <!-- Custom Headers -->
+              <div class="py-2">
                 <div class="pb-1 text-sm font-medium">
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
@@ -479,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="showPreviewModal"
       :type="dtVal"
       :template-content="previewContent"
+      :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
   </OPageLayout>
@@ -543,8 +544,11 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const apiMethods = ["get", "post", "put"];
-const outputFormats = ["json", "ndjson"];
+const apiMethods = ["get", "post", "put"].map((m) => ({ label: raw(m.toUpperCase()), value: m }));
+const outputFormats = ["json", "ndjson"].map((f) => ({
+  label: raw(f.toUpperCase()),
+  value: f,
+}));
 const store = useStore();
 const { t } = useI18nTyped();
 
@@ -706,6 +710,9 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+const previewRecipients = computed(() =>
+  Array.isArray(prebuiltCredentials.value.recipients) ? prebuiltCredentials.value.recipients : [],
+);
 
 // A test result is stale once anything it was sent with changes; an in-flight
 // test is discarded too.
@@ -1147,7 +1154,8 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 const getFormattedTemplates = computed(() =>
   props.templates
     .filter((template) => {
-      if (typeVal.value === "email" && template.type === "email") return true;
+      if (typeVal.value === "email" && (template.type === "email" || template.kind === "content"))
+        return true;
       else if (typeVal.value !== "email") return true;
       return false;
     })
@@ -1168,13 +1176,13 @@ const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value))
 
 // Template choices for a prebuilt destination: the API-sourced prebuilt
 // template for this type as the first (default) option, followed by any
-// user-created custom templates of the matching kind (email vs http).
+// user-created templates that fit the channel (email or content for email).
 // Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
   const matching = props.templates.filter((template) => {
     if (template.isPrebuilt) return false;
-    if (isEmailType) return template.type === "email";
+    if (isEmailType) return template.type === "email" || template.kind === "content";
     return template.type !== "email";
   });
 

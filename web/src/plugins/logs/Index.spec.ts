@@ -1118,13 +1118,52 @@ describe("Logs Index", async () => {
         reason: "run",
         kind: "explicit",
       });
-      expect((analytics as any).track).toHaveBeenCalledWith(
-        "Button Click",
-        expect.objectContaining({ button: "Search Data" }),
-      );
+      expect((analytics as any).track).toHaveBeenCalledWith("logs_search_run", {
+        stream_name: "s1",
+        show_query: true,
+        show_histogram: true,
+        sql_mode: false,
+        show_fields: true,
+      });
+      expect((analytics as any).track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     } finally {
       (config as any).isCloud = originalIsCloud;
     }
+  });
+
+  describe("paging analytics", () => {
+    beforeEach(() => {
+      (analytics as any).track = vi.fn();
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.searchObj.meta.jobId = "";
+      wrapper.vm.searchObj.data.stream.selectedStream = ["s1", "s2"];
+    });
+
+    it("tracks logs_more_rows_loaded with only the stream name on scroll", async () => {
+      await wrapper.vm.getMoreData();
+      expect((analytics as any).track).toHaveBeenCalledWith("logs_more_rows_loaded", {
+        stream_name: "s1,s2",
+      });
+      expect((analytics as any).track).not.toHaveBeenCalledWith("Button Click", expect.anything());
+    });
+
+    it("does not track a Button Click when the page size changes", async () => {
+      await wrapper.vm.getMoreDataRecordsPerPage();
+      expect((analytics as any).track).not.toHaveBeenCalled();
+    });
+
+    it("tracks Get Less Data without the user's email", async () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults = { total: 100, from: 0, size: 10, hits: [] };
+      wrapper.vm.searchObj.data.resultGrid.currentPage = 2;
+      await wrapper.vm.getLessData();
+      expect((analytics as any).track).toHaveBeenCalledWith("Button Click", {
+        button: "Get Less Data",
+        user_org: wrapper.vm.store.state.selectedOrganization.identifier,
+        stream_name: "s1,s2",
+        page: "Search Logs",
+      });
+    });
   });
 
   it("Should emit sendToAiChat event with payload", async () => {

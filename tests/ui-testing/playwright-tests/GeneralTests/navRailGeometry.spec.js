@@ -112,9 +112,10 @@ test.describe('nav rail geometry and screenshots', () => {
           await rail.goto('/');
           await rail.setDir(dir);
           expect(await rail.nav.evaluate((nav) => getComputedStyle(nav).width)).toBe('88px');
+          const growth = await lineGrowthOf(rail);
 
           // Resting state (fade drawn at 1000x600).
-          compareFrame(await measure(page), expected, `${key} rest`);
+          compareFrame(await measure(page), expected, `${key} rest`, growth);
           if (h === 600) expect((await rail.railState()).overflowBottom).toBe('true');
           await shot(page, `rail-rest-${key}`);
 
@@ -122,21 +123,21 @@ test.describe('nav rail geometry and screenshots', () => {
           await rail.tile('/').focus();
           await page.keyboard.press('ArrowDown');
           await page.waitForTimeout(200);
-          compareFrame(await measure(page), expected, `${key} keyboard focus`);
+          compareFrame(await measure(page), expected, `${key} keyboard focus`, growth);
           await shot(page, `rail-keyboard-focus-${key}`);
           await page.keyboard.press('Escape');
 
           // Hover label colour state (tooltip shown only when a label truncates; English fits).
           await rail.tile('/logs').hover();
           await page.waitForTimeout(400);
-          compareFrame(await measure(page), expected, `${key} hover`);
+          compareFrame(await measure(page), expected, `${key} hover`, growth);
           await shot(page, `rail-hover-${key}`);
           await rail.resetPointer();
 
           // Flyout open (an overlay: nothing in the rail moves).
           await rail.restOn(rail.groupTile('reliability'));
           expect(await rail.openFlyoutKeys()).toEqual(['reliability']);
-          compareFrame(await measure(page), expected, `${key} flyout`);
+          compareFrame(await measure(page), expected, `${key} flyout`, growth);
           await shot(page, `rail-flyout-${key}`);
           await rail.resetPointer();
           await page.waitForTimeout(400);
@@ -151,12 +152,12 @@ test.describe('nav rail geometry and screenshots', () => {
             expectBoxEqual(m.rail, expected.rail, `${key} scrolled rail`);
             expectBoxEqual(m.header, expected.header, `${key} scrolled header`);
             expectBoxEqual(m.content, expected.content, `${key} scrolled content`);
-            // Tiles moved by exactly the rail scroll, nothing else.
+            // Tiles moved by the rail scroll plus the label growth above them, nothing else.
+            let shift = 0;
             for (const [k, b] of Object.entries(expected.tiles)) {
-              expect(Math.abs(m.tiles[k].y - (b.y - s.scrollTop)), `${key} scrolled ${k}.y`).toBeLessThanOrEqual(TOLERANCE);
-              expect(Math.abs(m.tiles[k].x - b.x)).toBeLessThanOrEqual(TOLERANCE);
-              expect(Math.abs(m.tiles[k].w - b.w)).toBeLessThanOrEqual(TOLERANCE);
-              expect(Math.abs(m.tiles[k].h - b.h)).toBeLessThanOrEqual(TOLERANCE);
+              const grown = growth[k] || 0;
+              expectBoxEqual(m.tiles[k], { x: b.x, y: b.y + shift - s.scrollTop, w: b.w, h: b.h + grown }, `${key} scrolled ${k}`);
+              shift += grown;
             }
             await shot(page, `rail-scrolled-settings-${key}`);
           }

@@ -129,17 +129,30 @@ pub async fn delete(org: &str, id: &str, stored: table::RowVersion) -> Result<bo
 
 /// Org deletion: every row, every node cache, every region and every OpenFGA tuple.
 pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
-    let rows = table::list(org, None).await?;
-    let ids = table::delete_by_org(org).await?;
-    for id in &ids {
-        coordinator::emit_delete_event(org, id).await?;
-        // Org deletion removes the rows outright, so no region may keep a tombstone for them.
-        #[cfg(feature = "enterprise")]
-        super_cluster::emit_delete(org, id, 0, 0).await;
+    let conn = infra::db::get_orm_client_ro().await;
+    let rows = table::list_references_by_org_with(conn, org).await?;
+    let ids: Vec<String> = rows.iter().map(|(id, _)| id.clone()).collect();
+    // A retry lists no deleted row, so every side effect runs while the rows still exist.
+    evict_org(org, &ids).await?;
+    for (id, folder) in &rows {
+        crate::authz::remove_ownership(org, "downtimes", ownership_ref(id, folder)).await;
     }
-    remove_org(org);
-    for row in &rows {
-        crate::authz::remove_ownership(org, "downtimes", ownership(row)).await;
+    let removed = table::delete_by_org(org).await?;
+    // The delete names each row the listing missed, whose tuple and copies go after it.
+    let missed: Vec<(String, String)> = removed
+        .iter()
+        .filter(|(id, _)| !ids.contains(id))
+        .cloned()
+        .collect();
+    for (id, folder_id) in &missed {
+        crate::authz::remove_ownership(org, "downtimes", ownership_ref(id, folder_id)).await;
+    }
+    let missed: Vec<String> = missed.into_iter().map(|(id, _)| id).collect();
+    evict_org(org, &missed).await?;
+    let removed = removed.into_iter().map(|(id, _)| id).collect();
+    // A cache reload before the delete can refill the caches, and no retry lists a deleted row.
+    if let Err(e) = evict_org(org, &with_removed(ids, removed)).await {
+        log::warn!("[DOWNTIMES] eviction of org {org} after the row delete failed: {e}");
     }
     Ok(())
 }
@@ -217,11 +230,7 @@ pub fn all_cached() -> Vec<Arc<Vec<Downtime>>> {
 
 /// The OpenFGA object of a downtime, parented by its folder so folder grants reach it.
 pub fn ownership(downtime: &Downtime) -> Authz {
-    Authz {
-        obj_id: downtime.id.clone(),
-        parent_type: "downtime_folders".to_string(),
-        parent: downtime.folder_id.clone(),
-    }
+    ownership_ref(&downtime.id, &downtime.folder_id)
 }
 
 /// Reloads one org from the table so the cache never holds half a row.
@@ -262,7 +271,14 @@ async fn on_delete(org: String, id: String) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// `(org, tuple)` for every row, each parented by the folder it is filed in.
+fn ownership_ref(id: &str, folder_id: &str) -> Authz {
+    Authz {
+        obj_id: id.to_string(),
+        parent_type: "downtime_folders".to_string(),
+        parent: folder_id.to_string(),
+    }
+}
+
 fn ownership_backfill(orgs: &[Arc<Vec<Downtime>>]) -> Vec<(String, Authz)> {
     orgs.iter()
         .flat_map(|rows| rows.iter())
@@ -300,6 +316,31 @@ fn remove_org(org: &str) {
         .write()
         .unwrap_or_else(|e| e.into_inner())
         .remove(org);
+}
+
+/// Drops this node's rows of the org, then every node's and region's copy of each id.
+async fn evict_org(org: &str, ids: &[String]) -> Result<(), anyhow::Error> {
+    let local = async { remove_org(org) };
+    let broadcast = async {
+        for id in ids {
+            coordinator::emit_delete_event(org, id).await?;
+            // Org deletion removes the rows outright, so no region may keep a tombstone for them.
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_delete(org, id, 0, 0).await;
+        }
+        Ok::<(), anyhow::Error>(())
+    };
+    crate::teardown::evict(local, broadcast).await
+}
+
+/// The listed ids plus any the delete removed that were written after the listing.
+fn with_removed(mut listed: Vec<String>, removed: Vec<String>) -> Vec<String> {
+    for id in removed {
+        if !listed.contains(&id) {
+            listed.push(id);
+        }
+    }
+    listed
 }
 
 /// Best effort: the local write happened, and the next edit repairs a lost message (`put` upserts).
@@ -461,6 +502,17 @@ mod tests {
             ]
         );
         assert!(ownership_backfill(&[]).is_empty());
+    }
+
+    #[test]
+    fn the_post_delete_eviction_also_names_rows_written_after_the_listing() {
+        let owned = |ids: &[&str]| ids.iter().map(|id| id.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            with_removed(owned(&["a", "b"]), owned(&["b", "late", "a"])),
+            ["a", "b", "late"]
+        );
+        assert_eq!(with_removed(owned(&["a"]), vec![]), ["a"]);
+        assert_eq!(with_removed(vec![], owned(&["late"])), ["late"]);
     }
 
     #[cfg(feature = "enterprise")]

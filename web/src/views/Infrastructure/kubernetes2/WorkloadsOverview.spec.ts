@@ -122,51 +122,58 @@ describe("WorkloadsOverview", () => {
 
   const find = (testId: string) => wrapper.find(`[data-test="${testId}"]`);
 
-  const bars = (kind: string) =>
-    wrapper
-      .findAllComponents({ name: "OProgressBar" })
-      .filter((c) => String(c.attributes("data-test")).startsWith(`k8s2-workloads-bar-${kind}-`));
+  const segments = (kind: string) =>
+    find(`k8s2-workloads-bar-${kind}`)
+      .findAll('[data-test^="o-segmented-bar-segment-"]')
+      .map((s) => s.attributes("data-test")?.replace("o-segmented-bar-segment-", ""));
 
   const statusRows = (kind: string) =>
     wrapper
       .findAll(`[data-test^="k8s2-workloads-status-${kind}-"]`)
-      .map((row) => row.find('[data-test="k8s2-workloads-status-label"]').text());
+      .map(
+        (row) =>
+          `${row.find('[data-test="k8s2-workloads-status-label"]').text()}: ${row.find('[data-test="k8s2-workloads-status-count"]').text()}`,
+      );
 
   afterEach(() => wrapper?.unmount());
 
   describe("status cards (AC 36, 41)", () => {
-    it("renders the cards in Lens order with linked '<Kind> (n)' titles", async () => {
+    it("renders the cards in Lens order with a linked title and a total", async () => {
       await mountView();
       const titles = wrapper.findAll('[data-test^="k8s2-workloads-title-"]').map((b) => b.text());
       expect(titles).toEqual([
-        "Pods (4)",
-        "Deployments (2)",
-        "DaemonSets (0)",
-        "StatefulSets (0)",
-        "ReplicaSets (1)",
-        "Jobs (0)",
-        "CronJobs (1)",
+        "Pods",
+        "Deployments",
+        "DaemonSets",
+        "StatefulSets",
+        "ReplicaSets",
+        "Jobs",
+        "CronJobs",
       ]);
+      const totals = wrapper.findAll('[data-test^="k8s2-workloads-total-"]').map((b) => b.text());
+      expect(totals).toEqual(["4", "2", "0", "0", "1", "0", "1"]);
       await find("k8s2-workloads-title-deployment").trigger("click");
       expect(wrapper.emitted("view")?.[0]).toEqual(["deployments"]);
     });
 
-    it("builds each card from one OProgressBar row per non-zero status at n / total", async () => {
+    it("draws one bar segment and legend entry per non-zero status", async () => {
       await mountView();
-      expect(statusRows("pod")).toEqual(["Running: 2", "Pending: 1", "Unknown: 1"]);
-      expect(bars("pod").map((b) => [b.props("value"), b.props("variant")])).toEqual([
-        [0.5, "success"],
-        [0.25, "warning"],
-        [0.25, "default"],
-      ]);
+      expect(statusRows("pod")).toEqual(["Ready: 2", "Pending: 1", "Unknown: 1"]);
+      expect(segments("pod")).toEqual(["ready", "pending", "unknown"]);
+      const widths = find("k8s2-workloads-bar-pod")
+        .findAll('[data-test^="o-segmented-bar-segment-"]')
+        .map((s) => s.attributes("style"));
+      expect(widths).toEqual(["width: 50%;", "width: 25%;", "width: 25%;"]);
       expect(statusRows("cronjob")).toEqual(["Suspended: 1"]);
-      expect(bars("cronjob")[0].props("variant")).toBe("warning");
+      expect(find("o-segmented-bar-segment-suspended").classes()).toContain(
+        "bg-status-warning-text",
+      );
     });
 
     it("shows None for a kind with no objects, and mounts no chart component", async () => {
       await mountView();
       expect(find("k8s2-workloads-card-statefulset").text()).toContain("None");
-      expect(bars("statefulset")).toHaveLength(0);
+      expect(find("k8s2-workloads-bar-statefulset").exists()).toBe(false);
       expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(false);
       expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(false);
     });
@@ -175,19 +182,27 @@ describe("WorkloadsOverview", () => {
       await mountView();
       const tip = (testId: string) => find(testId).find('[data-test="tooltip"]');
       expect(tip("k8s2-workloads-status-pod-unknown").text()).toContain("OpenObserve rule");
-      expect(tip("k8s2-workloads-status-pod-running").exists()).toBe(false);
+      expect(tip("k8s2-workloads-status-pod-ready").exists()).toBe(false);
       // `idle` is scaled to zero with no pods, so the Deployment running row used the zero-pod rule.
-      expect(statusRows("deployment")).toEqual(["Running: 2"]);
+      expect(statusRows("deployment")).toEqual(["Healthy: 2"]);
       expect(tip("k8s2-workloads-status-deployment-running").exists()).toBe(true);
       expect(tip("k8s2-workloads-status-replicaset-running").exists()).toBe(false);
     });
 
     it("the namespace selection changes the counts", async () => {
       await mountView({ namespaces: ["shop"] });
-      expect(find("k8s2-workloads-title-pod").text()).toBe("Pods (3)");
-      expect(statusRows("pod")).toEqual(["Running: 2", "Pending: 1"]);
-      expect(find("k8s2-workloads-title-deployment").text()).toBe("Deployments (1)");
+      expect(find("k8s2-workloads-total-pod").text()).toBe("3");
+      expect(statusRows("pod")).toEqual(["Ready: 2", "Pending: 1"]);
+      expect(find("k8s2-workloads-total-deployment").text()).toBe("1");
       expect(find("k8s2-workloads-card-cronjob").text()).toContain("None");
+    });
+
+    it("names the pods in the header count, filtered or not", async () => {
+      await mountView();
+      const count = () => find("k8s2-list-count").text().replace(/\s+/g, " ");
+      expect(count()).toBe("4 pods");
+      await wrapper.setProps({ namespaces: ["shop"] });
+      expect(count()).toMatch(/^Filtered:? 3 \/ 4 pods$/);
     });
 
     it("writes the namespace selection back as an update", async () => {
@@ -200,6 +215,36 @@ describe("WorkloadsOverview", () => {
       await mountView();
       await find("k8s2-workloads-refresh").trigger("click");
       expect(wrapper.emitted("refresh")).toHaveLength(1);
+    });
+  });
+
+  describe("workloads with problems", () => {
+    it("lists a workload with a not-ready pod, opens its drawer and emits logs for that pod", async () => {
+      const results = {
+        ...RESULTS,
+        P4: [...RESULTS.P4!, owned("shop", "web-3", "ReplicaSet", "web-abc")],
+      };
+      await mountView({
+        inventory: buildInventory(new Map(Object.entries(results) as [QueryId, Series[]][])),
+      });
+      const names = wrapper
+        .findAll('[data-test^="k8s2-workloads-problem-name-"]')
+        .map((n) => n.text());
+      expect(names).toEqual(["web"]);
+      expect(wrapper.find('[data-test^="k8s2-workloads-problem-status-"]').text()).toBe("Degraded");
+      await find("k8s2-workloads-problems-table").find("tbody tr").trigger("click");
+      expect(wrapper.emitted("open")?.[0]).toEqual([
+        { kind: "deployment", cluster: "prod", namespace: "shop", name: "web" },
+      ]);
+      await wrapper.find('[data-test^="k8s2-workloads-problem-logs-"]').trigger("click");
+      expect(wrapper.emitted("action")?.[0]).toEqual([
+        { type: "logs", ref: { kind: "pod", cluster: "prod", namespace: "shop", name: "web-3" } },
+      ]);
+    });
+
+    it("says so when nothing is failing", async () => {
+      await mountView({ namespaces: ["data"] });
+      expect(find("k8s2-workloads-problems-empty").exists()).toBe(true);
     });
   });
 

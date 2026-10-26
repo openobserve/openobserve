@@ -16,7 +16,7 @@
 use std::sync::{Arc, LazyLock as Lazy};
 
 use config::SOURCEMAP_MEM_CACHE_SIZE;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use hashlink::lru_cache::LruCache;
 use infra::{
     coordinator::get_coordinator,
@@ -43,6 +43,9 @@ type SourceMapKey = (
     Option<String>,
     String,
 );
+
+/// `(service, env, version)`: the rows one [`delete_group`] call removes.
+type GroupKey = (Option<String>, Option<String>, Option<String>);
 
 #[derive(Serialize, Clone)]
 pub struct ParamValues {
@@ -193,83 +196,21 @@ pub async fn delete_group(
     if let Err(e) = delete_stored_files(&deleted).await {
         log::error!("error deleting sourcemap files from storage for org_id {org} : {e}");
     }
+    release_group(org, service, env, version).await
+}
 
-    {
-        let mut cache = CACHE.write().await;
-        let mut keys = Vec::new();
-        for (k, _) in cache.iter() {
-            let (org_id, s, e, v, _) = &k;
-            if org_id == org && s == &service && e == &env && v == &version {
-                keys.push(k.clone());
-            }
-        }
-        for k in keys {
-            cache.remove(&k);
-        }
-    }
-
-    {
-        let mut cache = VALUES_CACHE.write().await;
-        cache.remove(org);
-        drop(cache);
-    }
-
-    // trigger watch event by putting value to cluster coordinator
-    let cluster_coordinator = get_coordinator().await;
-    cluster_coordinator
-        .delete(
-            &format!(
-                "{SOURCEMAP_PREFIX}{org}/{}/{}/{}",
-                service.as_deref().unwrap_or(""),
-                env.as_deref().unwrap_or(""),
-                version.as_deref().unwrap_or("")
-            ),
-            false,
-            true,
-            None,
-        )
-        .await?;
-
-    #[cfg(feature = "enterprise")]
-    {
-        let config = o2_enterprise::enterprise::common::config::get_config();
-        if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::delete_sourcemaps(
-                org,
-                service.clone(),
-                env.clone(),
-                version.clone(),
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::info!(
-                        "successfully sent sourcemap delete notification to super cluster queue for {org}/{}/{}/{}",
-                        service.unwrap_or_default(),
-                        env.unwrap_or_default(),
-                        version.unwrap_or_default()
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "error in sending sourcemap delete notification to super cluster queue for {org}/{}/{}/{} : {e}",
-                        service.unwrap_or_default(),
-                        env.unwrap_or_default(),
-                        version.unwrap_or_default()
-                    );
-                }
-            }
-        }
-    }
-
-    Ok(())
+/// Org teardown: listed rows retry until their files go; rows the listing missed get one try.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let listed = infra::table::source_maps::list_files(org, None, None, None).await?;
+    release_org_rows(org, &listed).await?;
+    let mut missed = infra::table::source_maps::delete_by_org(org).await?;
+    // A replica-read listing can miss a fresh row; the delete still returns it.
+    missed.retain(|row| listed.iter().all(|seen| seen.id != row.id));
+    release_org_rows(org, &missed).await
 }
 
 pub async fn delete_stored_files(files: &[SourceMap]) -> Result<(), errors::Error> {
-    let paths: Vec<String> = files
-        .iter()
-        .map(|f| get_file_path(&f.org, &f.file_store_id))
-        .collect();
+    let paths = stored_paths(files);
     storage::del(paths.iter().map(|p| ("", p.as_str())).collect())
         .await
         .map_err(Into::into)
@@ -399,6 +340,105 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Empty => {}
         }
     }
+}
+
+fn stored_paths(files: &[SourceMap]) -> Vec<String> {
+    files
+        .iter()
+        .map(|f| get_file_path(&f.org, &f.file_store_id))
+        .collect()
+}
+
+/// Strictly deletes the rows' stored files, then releases each of their groups.
+async fn release_org_rows(org: &str, rows: &[SourceMap]) -> Result<(), errors::Error> {
+    let paths = stored_paths(rows);
+    storage::del_strict(paths.iter().map(|p| ("", p.as_str())).collect()).await?;
+    let groups: HashSet<GroupKey> = rows
+        .iter()
+        .map(|row| (row.service.clone(), row.env.clone(), row.version.clone()))
+        .collect();
+    for (service, env, version) in groups {
+        release_group(org, service, env, version).await?;
+    }
+    Ok(())
+}
+
+/// Releases a group's caches and cluster copies.
+async fn release_group(
+    org: &str,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+) -> Result<(), errors::Error> {
+    {
+        let mut cache = CACHE.write().await;
+        let mut keys = Vec::new();
+        for (k, _) in cache.iter() {
+            let (org_id, s, e, v, _) = &k;
+            if org_id == org && s == &service && e == &env && v == &version {
+                keys.push(k.clone());
+            }
+        }
+        for k in keys {
+            cache.remove(&k);
+        }
+    }
+
+    {
+        let mut cache = VALUES_CACHE.write().await;
+        cache.remove(org);
+        drop(cache);
+    }
+
+    // trigger watch event by putting value to cluster coordinator
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .delete(
+            &format!(
+                "{SOURCEMAP_PREFIX}{org}/{}/{}/{}",
+                service.as_deref().unwrap_or(""),
+                env.as_deref().unwrap_or(""),
+                version.as_deref().unwrap_or("")
+            ),
+            false,
+            true,
+            None,
+        )
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::delete_sourcemaps(
+                org,
+                service.clone(),
+                env.clone(),
+                version.clone(),
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent sourcemap delete notification to super cluster queue for {org}/{}/{}/{}",
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending sourcemap delete notification to super cluster queue for {org}/{}/{}/{} : {e}",
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

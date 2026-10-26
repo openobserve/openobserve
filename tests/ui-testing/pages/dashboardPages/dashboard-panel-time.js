@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { applyPickedDateTime } from "./dashboard-time.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 /**
  * Page Object for Panel Time Range operations
@@ -98,11 +99,6 @@ export default class DashboardPanelTime {
   /** Apply the range picked in the open date-time picker (Apply, or close + Refresh on dashboards) */
   async clickDateTimeApplyBtn() {
     await applyPickedDateTime(this.page);
-  }
-
-  /** Click the panel discard button (swallows errors; does not accept the dialog) */
-  async clickPanelDiscard() {
-    await this.panelDiscardBtn.click().catch(() => {});
   }
 
   // =========================================
@@ -649,13 +645,11 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Discard panel changes (click discard button and accept confirmation dialog)
+   * Discard panel changes, answering the in-app leave dialog with Discard when edits are pending
    */
   async discardPanelChanges() {
-    this.page.once("dialog", async (dialog) => {
-      await dialog.accept();
-    });
     await this.panelDiscardBtn.click().catch(() => {});
+    await settlePanelLeave(this.page, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
   }
 
@@ -709,5 +703,19 @@ export default class DashboardPanelTime {
     // Wait for the re-query response triggered by the time change
     await queryDone;
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Pick a relative time in the view panel WITHOUT applying it.
+   * With Auto Run off the pick is deferred (view refresh turns pending) until Refresh is clicked.
+   * @param {string} timeRange - e.g., "6-d", "1-w"
+   */
+  async selectViewPanelTimeWithoutApply(timeRange) {
+    await this.clickViewPanelDateTimePicker();
+    await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
+    const timeOptionBtn = this.timeRangeBtn(timeRange);
+    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
+    await timeOptionBtn.click();
+    await this.dismissDateTimePicker();
   }
 }

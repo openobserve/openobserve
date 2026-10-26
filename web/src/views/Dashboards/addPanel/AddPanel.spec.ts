@@ -237,6 +237,8 @@ describe("AddPanel.vue", () => {
   let i18n: any;
 
   beforeEach(() => {
+    // A draft left by one test would open the restore dialog and block the next mount.
+    localStorage.clear();
     store = createMockStore();
     router = createMockRouter();
     i18n = createMockI18n();
@@ -4633,14 +4635,23 @@ describe("AddPanel.vue", () => {
       expect(next).toHaveBeenCalledWith();
     });
 
-    it("prompts when the user edited the panel", async () => {
+    it("opens the leave dialog instead of the native confirm when the user edited the panel", async () => {
       window.dispatchEvent(new Event("keydown"));
       wrapper.vm.dashboardPanelData.data.title = "edited by the user";
       await nextTick();
 
-      const next = leaveEditor();
+      const next = vi.fn();
+      const done = leaveGuard(
+        { path: "/dashboards/view" },
+        { path: "/dashboards/add_panel" },
+        next,
+      ) as unknown as Promise<void>;
+      await nextTick();
 
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(wrapper.vm.leaveDialogOpen).toBe(true);
+      wrapper.vm.onLeaveChoice("stay");
+      await done;
       expect(next).toHaveBeenCalledWith(false);
     });
 

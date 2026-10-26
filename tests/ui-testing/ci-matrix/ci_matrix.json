@@ -114,7 +114,11 @@
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
-      "dashboardPagination.spec.js"
+      "dashboardPagination.spec.js",
+      "dashboard-save-conflict.spec.js",
+      "refreshCancelButtons.spec.js",
+      "dashboard-refresh-button.spec.js",
+      "panelNotices.spec.js"
     ],
     "disabled": [
       {
@@ -141,7 +145,8 @@
       "dashboard-panel-time-url-priority.spec.js",
       "dashboard-panel-time-advanced-edge-cases.spec.js",
       "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js"
+      "dashboard-panel-time-variables-behavior.spec.js",
+      "dashboard-time-range-apply.spec.js"
     ],
     "disabled": []
   },
@@ -244,6 +249,8 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailShortScreen.spec.js",
+      "navRailKeyboard.spec.js",
       "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
@@ -363,7 +370,8 @@
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
-      "logsToolbarPins.spec.js"
+      "logsToolbarPins.spec.js",
+      "logs-query-editor-keyboard.spec.js"
     ],
     "disabled": [
       {
@@ -461,7 +469,8 @@
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
       "reportCsvMediaType.spec.js",
-      "scheduledReportsDrawer.spec.js"
+      "scheduledReportsDrawer.spec.js",
+      "reportHistory.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -527,7 +536,8 @@
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
-      "schema.spec.js"
+      "schema.spec.js",
+      "first-event-status.spec.js"
     ],
     "disabled": []
   },
@@ -549,7 +559,8 @@
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
-      "traces-jk-navigation.spec.js"
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
     ],
     "disabled": []
   },

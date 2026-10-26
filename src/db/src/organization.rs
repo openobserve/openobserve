@@ -23,6 +23,7 @@ use common::{
 };
 use config::utils::json;
 use infra::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
@@ -86,29 +87,31 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
         }
     };
 
+    let mut settings = read_org_setting(org_id, OrganizationSetting::clone).await?;
+    settings.free_trial_expiry = trial_period_expiry;
+    Ok(settings)
+}
+
+/// Picks from the org's cached settings, caching the stored or default settings on a miss.
+pub async fn read_org_setting<T>(
+    org_id: &str,
+    pick: impl FnOnce(&OrganizationSetting) -> T,
+) -> Result<T, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        let mut ret = v.clone();
-        ret.free_trial_expiry = trial_period_expiry;
-        return Ok(ret);
+        return Ok(pick(v));
     }
 
-    // Try to get settings from DB, but use default if not found
-    let mut settings: OrganizationSetting = match db::get(&key).await {
+    let settings: OrganizationSetting = match db::get(&key).await {
         Ok(settings) => json::from_slice(&settings)?,
         Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
             OrganizationSetting::default()
         }
         Err(e) => return Err(e),
     };
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings.clone());
-    settings.free_trial_expiry = trial_period_expiry;
-    Ok(settings)
+    let picked = pick(&settings);
+    ORGANIZATION_SETTING.write().await.insert(key, settings);
+    Ok(picked)
 }
 
 /// Applies `apply` to the settings in the store's `get_for_update`; true if it wrote them.
@@ -117,105 +120,6 @@ where
     F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
 {
     update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await
-}
-
-/// Get the toggle ingestion logs setting for an org
-/// If the setting is not found, return false
-/// we add a separate function for avoid clone the setting
-pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.toggle_ingestion_logs);
-    }
-
-    // Try to get settings from DB, but use default if not found
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let toggle_ingestion_logs = settings.toggle_ingestion_logs;
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(toggle_ingestion_logs)
-}
-
-/// Get the usage stream enabled setting for an org.
-/// Without a stored setting this falls back to `default_usage_stream_enabled`, which is off.
-pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.usage_stream_enabled);
-    }
-
-    // Try to get settings from DB, but use default if not found
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let usage_stream_enabled = settings.usage_stream_enabled;
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(usage_stream_enabled)
-}
-
-/// Whether automatic RED anomaly insights are on for an org; absent settings mean off.
-pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.red_insights_enabled);
-    }
-
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let red_insights_enabled = settings.red_insights_enabled;
-
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(red_insights_enabled)
-}
-
-/// Whether investigation threads show raw tool input and output; absent settings mean off.
-pub async fn get_org_setting_ai_rca_thread_tool_output(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.ai_rca_thread_tool_output);
-    }
-
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let ai_rca_thread_tool_output = settings.ai_rca_thread_tool_output;
-
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(ai_rca_thread_tool_output)
 }
 
 /// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.
@@ -404,8 +308,51 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Turns a `deleting` org row into a `deleted` tombstone; true only for the call that flipped it.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    let won = organizations::set_status_if(org_id, STATUS_DELETING, STATUS_DELETED)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?;
+    if !won {
+        // A retry after a later failure finds the tombstone already written.
+        organizations::invalidate_cache(Some(org_id)).await;
+        let status = organizations::get(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?
+            .status;
+        if status != STATUS_DELETED {
+            return Err(anyhow::anyhow!(
+                "Cannot tombstone org {org_id} in status {status}"
+            ));
+        }
+    }
+    Ok(won)
+}
+
+/// Drops a tombstoned org from every node's org caches; safe to repeat on a step retry.
+pub async fn evict_org(org_id: &str) -> Result<(), anyhow::Error> {
+    organizations::invalidate_cache(Some(org_id)).await;
+    ORGANIZATIONS.clone().write().await.remove(org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_delete(&key).await?;
+    Ok(())
+}
+
 /// Lists live orgs; tombstones stay out so caches, jobs and the org list never see them.
 pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_with_created_at(limit)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list`], paired with each org's creation time in microseconds.
+pub async fn list_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let filter = organizations::ListFilter {
         exclude_deleted: true,
         ..organizations::ListFilter::with_limit(limit)
@@ -415,12 +362,30 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
     Ok(orgs
         .into_iter()
-        .map(|org| Organization {
-            identifier: org.identifier,
-            name: org.org_name,
-            org_type: org.org_type.to_string(),
-            service_account: None,
+        .map(|org| {
+            let created_at = org.created_at;
+            (to_organization(org), created_at)
         })
+        .collect())
+}
+
+/// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.
+pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
+    let filter = organizations::ListFilter {
+        exclude_deleted: true,
+        ..organizations::ListFilter::default()
+    };
+    let orgs = organizations::list(filter)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
+    Ok(orgs
+        .into_iter()
+        .filter(|org| {
+            ![STATUS_PENDING_DELETION, STATUS_DELETING, STATUS_DELETED]
+                .contains(&org.status.as_str())
+                && !crate::org_status::is_blocked(&org.identifier)
+        })
+        .map(to_organization)
         .collect())
 }
 
@@ -476,6 +441,15 @@ mod super_cluster {
             .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
         }
         Ok(())
+    }
+}
+
+fn to_organization(org: organizations::OrganizationRecord) -> Organization {
+    Organization {
+        identifier: org.identifier,
+        name: org.org_name,
+        org_type: org.org_type.to_string(),
+        service_account: None,
     }
 }
 
@@ -540,7 +514,17 @@ async fn apply_event(ev: db::Event) {
                     }
                 }
             } else {
-                json::from_slice(&ev.value.unwrap()).unwrap()
+                match ev.value.as_deref().map(json::from_slice::<Organization>) {
+                    Some(Ok(val)) => val,
+                    Some(Err(e)) => {
+                        log::error!("[ORGANIZATION] bad value for {item_key}: {e}");
+                        return;
+                    }
+                    None => {
+                        log::error!("[ORGANIZATION] put event for {item_key} has no value");
+                        return;
+                    }
+                }
             };
             ORGANIZATIONS
                 .clone()
@@ -827,10 +811,77 @@ mod tests {
         assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
     }
 
+    #[tokio::test]
+    async fn test_org_watch_put_without_a_readable_value_is_skipped() {
+        if !config::get_config().common.local_mode {
+            return;
+        }
+        let org_id = "watchbadputorg";
+        for value in [None, Some(Bytes::from_static(b"not json"))] {
+            apply_event(db::Event::Put(infra::db::EventData {
+                key: format!("{ORG_KEY_PREFIX}{org_id}"),
+                value,
+                start_dt: None,
+            }))
+            .await;
+        }
+        assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
+    }
+
     #[test]
     fn test_org_key_format() {
         let org_id = "myorg";
         let key = format!("{ORG_KEY_PREFIX}{org_id}");
         assert_eq!(key, "/organization/org/myorg");
+    }
+
+    #[tokio::test]
+    async fn test_backfills_list_only_orgs_neither_their_row_nor_the_cache_blocks() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        let base = format!("t_unblocked_{}", config::utils::time::now_micros());
+        let orgs = [
+            ("active", "active"),
+            ("pending", "pending_deletion"),
+            ("deleting", "deleting"),
+            ("deleted", "deleted"),
+            ("cached", "active"),
+        ]
+        .map(|(suffix, status)| (format!("{base}_{suffix}"), status));
+        for (org, status) in &orgs {
+            organizations::add(
+                org,
+                org,
+                config::meta::organization::OrganizationType::Custom,
+            )
+            .await
+            .unwrap();
+            organizations::set_status(org, status).await.unwrap();
+        }
+        // Another node's broadcast reached this node before its row read caught up.
+        ORG_STATUS_CACHE.insert(orgs[4].0.clone(), OrgStatus::PendingDeletion);
+
+        let listed: Vec<String> = list_unblocked()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|org| org.identifier)
+            .filter(|id| id.starts_with(&base))
+            .collect();
+        ORG_STATUS_CACHE.remove(&orgs[4].0);
+        for (org, _) in &orgs {
+            organizations::remove(org).await.unwrap();
+        }
+
+        assert_eq!(listed, [orgs[0].0.clone()]);
     }
 }

@@ -28,6 +28,15 @@ import { calculateMetricFontSize, METRIC_SPARKLINE } from "./sql/charts/convertS
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
+import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
+import { applySeriesOverrides } from "./seriesOverrides";
+import {
+  HEATMAP_MAX_CELLS,
+  addHeatmapWarning,
+  heatmapColorRange,
+  heatmapColorScale,
+} from "./heatmapDefaults";
+import { sharedHeatmapTimeAxis } from "./heatmapTimeAxis";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -240,6 +249,10 @@ export const convertMultiSQLData = async (
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
       ...(isMultiQuery ? { config: { ...panelSchema.config, trellis: undefined } } : {}),
+      // Heatmap tiles draw side by side in one panel, so they split its cell budget.
+      ...(isMultiQuery && panelSchema.type === "heatmap"
+        ? { heatmapCellBudget: Math.floor(HEATMAP_MAX_CELLS / searchQueryData.length) }
+        : {}),
     };
 
     options.push(
@@ -309,6 +322,7 @@ export const convertMultiSQLData = async (
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applySeriesOverrides(options[0]?.options, panelSchema, store.state.theme);
     return options[0];
   }
 
@@ -562,6 +576,8 @@ export const convertMultiSQLData = async (
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applyGaugeSeriesThresholds(allSeries, panelSchema?.config);
+    applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
     return options[0];
   }
 
@@ -656,6 +672,30 @@ export const convertMultiSQLData = async (
       }
     });
 
+    // Each tile reports its own cell-limit and duplicate warnings; only options[0] reaches the panel.
+    options.slice(1).forEach((opt: any) => {
+      const message = opt?.extras?.limitNumberOfSeriesWarningMessage;
+      if (message) {
+        options[0].extras = options[0].extras ?? {};
+        addHeatmapWarning(options[0].extras, message);
+      }
+    });
+
+    options[0].extras = options[0].extras ?? {};
+    options[0].extras.heatmapRowValues = options.map(
+      (opt: any) => opt?.extras?.heatmapRowValues?.[0] ?? null,
+    );
+
+    // One zoom box or hovered time maps through a single column list, so tiles must share it.
+    if (
+      options[0].extras?.heatmapTimeAxis &&
+      !sharedHeatmapTimeAxis(options.map((opt: any) => opt?.extras?.heatmapTimeAxis))
+    ) {
+      delete options[0].extras.heatmapTimeAxis;
+      options[0].extras.isTimeSeries = false;
+      if (options[0].options.toolbox) options[0].options.toolbox.show = false;
+    }
+
     options[0].options.grid = allGrids;
     options[0].options.xAxis = allXAxes;
     options[0].options.yAxis = allYAxes;
@@ -669,8 +709,9 @@ export const convertMultiSQLData = async (
       trigger: "item",
       formatter: (params: any) => {
         try {
-          const yLabel =
-            allYAxes[params.seriesIndex]?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
+          // An empty tile keeps its axis but loses its series, so series and axis indices can differ.
+          const yAxis = allYAxes[allSeries[params.seriesIndex]?.yAxisIndex];
+          const yLabel = yAxis?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
           const rawVal = params?.value?.[2];
           const formatted =
             formatUnitValue(
@@ -689,8 +730,17 @@ export const convertMultiSQLData = async (
     };
 
     if (options[0].options.visualMap) {
-      options[0].options.visualMap.min = isFinite(globalMin) ? globalMin : 0;
-      options[0].options.visualMap.max = isFinite(globalMax) ? globalMax : 0;
+      // Re-resolved over the shared range: a pin one query rejected may still hold for the panel.
+      const { color, ...sharedRange } = heatmapColorScale(
+        panelSchema?.config,
+        heatmapColorRange(panelSchema?.config, {
+          min: isFinite(globalMin) ? globalMin : 0,
+          max: isFinite(globalMax) ? globalMax : 0,
+        }),
+        allSeries.map((series: any) => series.data ?? []),
+      );
+      Object.assign(options[0].options.visualMap, sharedRange);
+      options[0].options.visualMap.inRange = { color };
       options[0].options.visualMap.bottom = VISUAL_MAP_BOTTOM;
     }
 
@@ -838,6 +888,15 @@ export const convertMultiSQLData = async (
   // series from different queries share the same subplot.
   if (isMultiQuery && isTrellis && options[0]?.options && chartPanelRef?.value) {
     reapplyTrellisLayout(options[0].options, panelSchema, chartPanelRef, chartPanelStyle);
+  }
+
+  if (options[0]?.options) {
+    if (chartType === "gauge") {
+      applyGaugeSeriesThresholds(options[0].options.series ?? [], panelSchema?.config);
+    }
+    // Override colours first: a threshold step outranks them and recolours on top.
+    applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    applyLineAreaThresholds(options[0].options, panelSchema);
   }
 
   return options[0];

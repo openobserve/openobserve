@@ -7,6 +7,7 @@ const nodeFetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 const { generateHexId } = require('../utils/trace-ingestion.js');
 const fs = require('fs');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
@@ -297,12 +298,12 @@ test.describe("Model Pricing — Edit, Cancel & Delete", () => {
             createdId = models.find(m => m.name === updatedName)?.id ?? createdId;
 
             // Delete → cancel → model still there
-            await pm.modelPricingPage.deleteBtnForModel(updatedName).click();
+            await pm.modelPricingPage.clickDeleteForModel(updatedName);
             await pm.modelPricingPage.confirmCancelBtn.click();
             await pm.modelPricingPage.verifyModelInList(updatedName);
 
             // Delete → confirm → model gone
-            await pm.modelPricingPage.deleteBtnForModel(updatedName).click();
+            await pm.modelPricingPage.clickDeleteForModel(updatedName);
             await pm.modelPricingPage.confirmOkBtn.click();
             await pm.modelPricingPage.verifyModelNotInList(updatedName);
             createdId = null;
@@ -892,7 +893,7 @@ function buildLlmOtlpPayload({ traceId, spanId, modelName, inputTokens, outputTo
 /** Ingest a single OTLP span via the traces HTTP endpoint. */
 async function ingestLlmSpan(page, payload) {
     const res = await page.request.post(
-        `${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/v1/traces`,
+        `${ingestBase(process.env.ZO_BASE_URL)}/api/${getOrgIdentifier()}/v1/traces`,
         { headers: getAuthHeaders(), data: payload },
     );
     if (res.status() !== 200) {

@@ -20,20 +20,13 @@ pub const AI_PROMPTS_WATCH_PREFIX: &str = "/ai_prompts/";
 /// Sends event to the cluster coordinator indicating that an AI prompt has been put
 /// into the database.
 pub async fn emit_put_event() -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(AI_PROMPTS_WATCH_PREFIX, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
+    super::emit_put(AI_PROMPTS_WATCH_PREFIX).await
 }
 
 /// Sends event to the cluster coordinator indicating that AI prompt
 /// has been rolled back to default system prompt
 pub async fn emit_rollback_event() -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .delete(AI_PROMPTS_WATCH_PREFIX, false, true, None)
-        .await
+    super::emit_delete(AI_PROMPTS_WATCH_PREFIX).await
 }
 
 #[cfg(test)]

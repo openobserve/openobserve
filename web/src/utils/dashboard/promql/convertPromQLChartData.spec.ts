@@ -251,6 +251,30 @@ describe("convertPromQLChartData", () => {
       expect(result.options.grid.left).toBe(100);
     });
 
+    it("applies axis_width to every grid of a stacked heatmap", async () => {
+      const { processPromQLData } = await import("./shared/dataProcessor");
+      const bucket = (pod: string, le: string, value: string) => ({
+        metric: { pod, le },
+        name: `${pod} ${le}`,
+        data: { 1: value },
+        values: [[1, value]],
+      });
+      vi.mocked(processPromQLData).mockResolvedValueOnce([
+        {
+          series: [bucket("a", "1", "1"), bucket("a", "+Inf", "2"), bucket("b", "1", "3")],
+          timestamps: [[1, "00:00:01"]],
+          queryIndex: 0,
+        },
+      ] as any);
+      mockContext.panelSchema.type = "heatmap";
+      mockContext.panelSchema.config = { axis_width: 100, heatmap_mode: "prometheus_histogram" };
+
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
+
+      expect(result.options.grid).toHaveLength(2);
+      expect(result.options.grid.map((grid: any) => grid.left)).toEqual([100, 100]);
+    });
+
     it("should preserve existing grid configuration when applying axis_width", async () => {
       mockContext.panelSchema.config = {
         axis_width: 100,

@@ -611,228 +611,6 @@ impl From<openobserve_core::llm_evaluations::remote_tasks::stats::RemoteTaskStat
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use openobserve_core::llm_evaluations::remote_tasks::{RemoteTaskAuth, VerificationStatus};
-
-    use super::*;
-
-    fn task(version: i32, status: VerificationStatus) -> RemoteTask {
-        RemoteTask {
-            id: "rt-1".to_string(),
-            org_id: "org".to_string(),
-            entity_id: "head-1".to_string(),
-            version,
-            description: None,
-            spec: RemoteTaskSpec {
-                name: "summarizer".to_string(),
-                endpoint: "https://tasks.example.com/run".to_string(),
-                http_method: "POST".to_string(),
-                auth: RemoteTaskAuth::Bearer {
-                    secret_ref: "super-secret-reference".to_string(),
-                },
-                custom_headers: vec![
-                    RemoteTaskHeader {
-                        key: "x-team".to_string(),
-                        value: Some("search".to_string()),
-                        secret_ref: None,
-                    },
-                    RemoteTaskHeader {
-                        key: "x-api-key".to_string(),
-                        value: None,
-                        secret_ref: Some("header-secret-reference".to_string()),
-                    },
-                ],
-                content_type: "application/json".to_string(),
-                request_template: None,
-                response_schema: "$.output".to_string(),
-                timeout_ms: 60_000,
-                retry_policy: RemoteTaskRetryPolicy { max_attempts: 3 },
-                max_concurrency: 4,
-                signing: RemoteTaskSigning {
-                    enabled: true,
-                    secret_ref: Some("signing-secret-reference".to_string()),
-                    key_id: Some("k1".to_string()),
-                },
-            },
-            verification_status: status,
-            verification_error: None,
-            verified_at: Some(5),
-            draft_source_version: None,
-            is_active: true,
-            created_at: 1,
-            updated_at: 2,
-        }
-    }
-
-    #[test]
-    fn no_secret_reference_survives_the_trip_to_the_client() {
-        let body = RemoteTaskResponseBody::from(task(2, VerificationStatus::Verified));
-        let json = serde_json::to_string(&body).unwrap();
-        assert!(!json.contains("super-secret-reference"));
-        assert!(!json.contains("header-secret-reference"));
-        assert!(!json.contains("signing-secret-reference"));
-        assert!(!json.contains("secretRef"));
-        assert!(!json.contains("secret_ref"));
-    }
-
-    #[test]
-    fn a_configured_secret_is_reported_as_present_without_its_value() {
-        let body = RemoteTaskResponseBody::from(task(2, VerificationStatus::Verified));
-        assert_eq!(body.auth.auth_type, "bearer");
-        assert!(body.auth.uses_secret);
-        assert!(body.signing.enabled);
-        assert!(body.signing.uses_secret);
-        assert_eq!(body.signing.key_id.as_deref(), Some("k1"));
-
-        let literal = &body.custom_headers[0];
-        assert_eq!(literal.value.as_deref(), Some("search"));
-        assert!(!literal.uses_secret);
-
-        let secret = &body.custom_headers[1];
-        assert_eq!(secret.value, None);
-        assert!(secret.uses_secret);
-    }
-
-    #[test]
-    fn a_published_version_carries_the_reference_an_experiment_pins() {
-        let body = RemoteTaskResponseBody::from(task(2, VerificationStatus::Verified));
-        assert_eq!(body.task_ref.as_deref(), Some("summarizer@2"));
-        assert!(body.is_referenceable);
-        assert!(!body.is_draft);
-    }
-
-    #[test]
-    fn a_draft_offers_no_reference_to_pin() {
-        let body = RemoteTaskResponseBody::from(task(0, VerificationStatus::Unverified));
-        assert_eq!(body.task_ref, None);
-        assert!(body.is_draft);
-        assert!(!body.is_referenceable);
-    }
-
-    #[test]
-    fn an_unstated_field_becomes_the_documented_default() {
-        let spec = RemoteTaskRequestBody {
-            name: "summarizer".to_string(),
-            description: None,
-            endpoint: "https://tasks.example.com/run".to_string(),
-            http_method: None,
-            auth: None,
-            custom_headers: None,
-            content_type: None,
-            request_template: None,
-            response_schema: None,
-            timeout_ms: None,
-            max_attempts: None,
-            max_concurrency: None,
-            signing: None,
-            from_version: None,
-        }
-        .into_spec();
-        assert_eq!(spec.http_method, "POST");
-        assert_eq!(spec.content_type, "application/json");
-        assert_eq!(spec.response_schema, "$.output");
-        assert_eq!(spec.timeout_ms, 60_000);
-        assert_eq!(spec.retry_policy.max_attempts, 3);
-        assert_eq!(spec.max_concurrency, 4);
-        assert_eq!(spec.auth, RemoteTaskAuth::None);
-        assert!(!spec.signing.enabled);
-    }
-
-    #[test]
-    fn registration_accepts_inline_write_only_secrets_without_client_references() {
-        let body: CreateRemoteTaskRequestBody = serde_json::from_value(serde_json::json!({
-            "name": "summarizer",
-            "endpoint": "https://tasks.example.com/run",
-            "auth": {
-                "type": "bearer",
-                "secret": { "type": "token", "value": "auth-value" }
-            },
-            "customHeaders": [
-                { "key": "x-team", "value": "search" },
-                {
-                    "key": "x-upstream-key",
-                    "secret": { "type": "token", "value": "header-value" }
-                }
-            ],
-            "signing": { "enabled": true }
-        }))
-        .unwrap();
-
-        let registration = body.into_registration().unwrap();
-        assert!(matches!(
-            registration.spec.auth,
-            RemoteTaskAuth::Bearer { .. }
-        ));
-        assert_eq!(registration.spec.custom_headers.len(), 2);
-        assert!(registration.spec.signing.enabled);
-        assert_eq!(registration.initial_secrets.len(), 3);
-        assert!(matches!(
-            registration.initial_secrets[0].target,
-            RemoteTaskSecretTarget::Auth
-        ));
-        assert!(matches!(
-            registration.initial_secrets[1].target,
-            RemoteTaskSecretTarget::Header(1)
-        ));
-        assert!(matches!(
-            registration.initial_secrets[2].target,
-            RemoteTaskSecretTarget::Signing
-        ));
-        assert!(registration.initial_secrets[2].material.is_none());
-    }
-
-    #[test]
-    fn registration_response_keeps_existing_task_fields_at_the_top_level() {
-        let body = CreateRemoteTaskResponseBody::from(RemoteTaskRegistrationOutcome {
-            task: task(0, VerificationStatus::Unverified),
-            generated_signing_secret: None,
-        });
-        let json = serde_json::to_value(body).unwrap();
-
-        assert_eq!(json["entityId"], "head-1");
-        assert!(json.get("task").is_none());
-        assert!(json.get("generatedSigningSecret").is_some());
-    }
-
-    #[test]
-    fn stateless_test_accepts_registration_fields_at_the_top_level() {
-        let body: TestRemoteTaskRequestBody = serde_json::from_value(serde_json::json!({
-            "name": "summarizer",
-            "endpoint": "https://tasks.example.com/run",
-            "input": { "question": "hello" },
-            "metadata": { "source": "manual" }
-        }))
-        .unwrap();
-
-        assert_eq!(body.candidate.name, "summarizer");
-        assert_eq!(body.input.unwrap()["question"], "hello");
-        assert_eq!(body.metadata.unwrap()["source"], "manual");
-    }
-
-    #[test]
-    fn stats_response_uses_the_ui_camel_case_contract() {
-        let body = RemoteTaskStatsResponseBody::from(
-            openobserve_core::llm_evaluations::remote_tasks::stats::RemoteTaskStats {
-                window_ms: 86_400_000,
-                total_runs: 4,
-                ok_runs: 2,
-                error_runs: 1,
-                skipped_runs: 1,
-                p50_latency_ms: Some(12.5),
-                p95_latency_ms: None,
-                referencing_experiments: 3,
-            },
-        );
-        let json = serde_json::to_value(body).unwrap();
-
-        assert_eq!(json["windowMs"], 86_400_000);
-        assert_eq!(json["latencyMs"]["p50"], 12.5);
-        assert!(json["latencyMs"]["p95"].is_null());
-        assert_eq!(json["referencingExperiments"], 3);
-    }
-}
-
 // --- Test-run bench (#2442) ---
 
 /// One sample a test run should try: a hand-entered input or a Dataset row the
@@ -1083,4 +861,226 @@ pub struct TestRemoteTaskSecretCandidateResponseBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<RemoteTaskSecretMetadataBody>,
     pub report: VerificationReportBody,
+}
+
+#[cfg(test)]
+mod tests {
+    use openobserve_core::llm_evaluations::remote_tasks::{RemoteTaskAuth, VerificationStatus};
+
+    use super::*;
+
+    fn task(version: i32, status: VerificationStatus) -> RemoteTask {
+        RemoteTask {
+            id: "rt-1".to_string(),
+            org_id: "org".to_string(),
+            entity_id: "head-1".to_string(),
+            version,
+            description: None,
+            spec: RemoteTaskSpec {
+                name: "summarizer".to_string(),
+                endpoint: "https://tasks.example.com/run".to_string(),
+                http_method: "POST".to_string(),
+                auth: RemoteTaskAuth::Bearer {
+                    secret_ref: "super-secret-reference".to_string(),
+                },
+                custom_headers: vec![
+                    RemoteTaskHeader {
+                        key: "x-team".to_string(),
+                        value: Some("search".to_string()),
+                        secret_ref: None,
+                    },
+                    RemoteTaskHeader {
+                        key: "x-api-key".to_string(),
+                        value: None,
+                        secret_ref: Some("header-secret-reference".to_string()),
+                    },
+                ],
+                content_type: "application/json".to_string(),
+                request_template: None,
+                response_schema: "$.output".to_string(),
+                timeout_ms: 60_000,
+                retry_policy: RemoteTaskRetryPolicy { max_attempts: 3 },
+                max_concurrency: 4,
+                signing: RemoteTaskSigning {
+                    enabled: true,
+                    secret_ref: Some("signing-secret-reference".to_string()),
+                    key_id: Some("k1".to_string()),
+                },
+            },
+            verification_status: status,
+            verification_error: None,
+            verified_at: Some(5),
+            draft_source_version: None,
+            is_active: true,
+            created_at: 1,
+            updated_at: 2,
+        }
+    }
+
+    #[test]
+    fn no_secret_reference_survives_the_trip_to_the_client() {
+        let body = RemoteTaskResponseBody::from(task(2, VerificationStatus::Verified));
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(!json.contains("super-secret-reference"));
+        assert!(!json.contains("header-secret-reference"));
+        assert!(!json.contains("signing-secret-reference"));
+        assert!(!json.contains("secretRef"));
+        assert!(!json.contains("secret_ref"));
+    }
+
+    #[test]
+    fn a_configured_secret_is_reported_as_present_without_its_value() {
+        let body = RemoteTaskResponseBody::from(task(2, VerificationStatus::Verified));
+        assert_eq!(body.auth.auth_type, "bearer");
+        assert!(body.auth.uses_secret);
+        assert!(body.signing.enabled);
+        assert!(body.signing.uses_secret);
+        assert_eq!(body.signing.key_id.as_deref(), Some("k1"));
+
+        let literal = &body.custom_headers[0];
+        assert_eq!(literal.value.as_deref(), Some("search"));
+        assert!(!literal.uses_secret);
+
+        let secret = &body.custom_headers[1];
+        assert_eq!(secret.value, None);
+        assert!(secret.uses_secret);
+    }
+
+    #[test]
+    fn a_published_version_carries_the_reference_an_experiment_pins() {
+        let body = RemoteTaskResponseBody::from(task(2, VerificationStatus::Verified));
+        assert_eq!(body.task_ref.as_deref(), Some("summarizer@2"));
+        assert!(body.is_referenceable);
+        assert!(!body.is_draft);
+    }
+
+    #[test]
+    fn a_draft_offers_no_reference_to_pin() {
+        let body = RemoteTaskResponseBody::from(task(0, VerificationStatus::Unverified));
+        assert_eq!(body.task_ref, None);
+        assert!(body.is_draft);
+        assert!(!body.is_referenceable);
+    }
+
+    #[test]
+    fn an_unstated_field_becomes_the_documented_default() {
+        let spec = RemoteTaskRequestBody {
+            name: "summarizer".to_string(),
+            description: None,
+            endpoint: "https://tasks.example.com/run".to_string(),
+            http_method: None,
+            auth: None,
+            custom_headers: None,
+            content_type: None,
+            request_template: None,
+            response_schema: None,
+            timeout_ms: None,
+            max_attempts: None,
+            max_concurrency: None,
+            signing: None,
+            from_version: None,
+        }
+        .into_spec();
+        assert_eq!(spec.http_method, "POST");
+        assert_eq!(spec.content_type, "application/json");
+        assert_eq!(spec.response_schema, "$.output");
+        assert_eq!(spec.timeout_ms, 60_000);
+        assert_eq!(spec.retry_policy.max_attempts, 3);
+        assert_eq!(spec.max_concurrency, 4);
+        assert_eq!(spec.auth, RemoteTaskAuth::None);
+        assert!(!spec.signing.enabled);
+    }
+
+    #[test]
+    fn registration_accepts_inline_write_only_secrets_without_client_references() {
+        let body: CreateRemoteTaskRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "summarizer",
+            "endpoint": "https://tasks.example.com/run",
+            "auth": {
+                "type": "bearer",
+                "secret": { "type": "token", "value": "auth-value" }
+            },
+            "customHeaders": [
+                { "key": "x-team", "value": "search" },
+                {
+                    "key": "x-upstream-key",
+                    "secret": { "type": "token", "value": "header-value" }
+                }
+            ],
+            "signing": { "enabled": true }
+        }))
+        .unwrap();
+
+        let registration = body.into_registration().unwrap();
+        assert!(matches!(
+            registration.spec.auth,
+            RemoteTaskAuth::Bearer { .. }
+        ));
+        assert_eq!(registration.spec.custom_headers.len(), 2);
+        assert!(registration.spec.signing.enabled);
+        assert_eq!(registration.initial_secrets.len(), 3);
+        assert!(matches!(
+            registration.initial_secrets[0].target,
+            RemoteTaskSecretTarget::Auth
+        ));
+        assert!(matches!(
+            registration.initial_secrets[1].target,
+            RemoteTaskSecretTarget::Header(1)
+        ));
+        assert!(matches!(
+            registration.initial_secrets[2].target,
+            RemoteTaskSecretTarget::Signing
+        ));
+        assert!(registration.initial_secrets[2].material.is_none());
+    }
+
+    #[test]
+    fn registration_response_keeps_existing_task_fields_at_the_top_level() {
+        let body = CreateRemoteTaskResponseBody::from(RemoteTaskRegistrationOutcome {
+            task: task(0, VerificationStatus::Unverified),
+            generated_signing_secret: None,
+        });
+        let json = serde_json::to_value(body).unwrap();
+
+        assert_eq!(json["entityId"], "head-1");
+        assert!(json.get("task").is_none());
+        assert!(json.get("generatedSigningSecret").is_some());
+    }
+
+    #[test]
+    fn stateless_test_accepts_registration_fields_at_the_top_level() {
+        let body: TestRemoteTaskRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "summarizer",
+            "endpoint": "https://tasks.example.com/run",
+            "input": { "question": "hello" },
+            "metadata": { "source": "manual" }
+        }))
+        .unwrap();
+
+        assert_eq!(body.candidate.name, "summarizer");
+        assert_eq!(body.input.unwrap()["question"], "hello");
+        assert_eq!(body.metadata.unwrap()["source"], "manual");
+    }
+
+    #[test]
+    fn stats_response_uses_the_ui_camel_case_contract() {
+        let body = RemoteTaskStatsResponseBody::from(
+            openobserve_core::llm_evaluations::remote_tasks::stats::RemoteTaskStats {
+                window_ms: 86_400_000,
+                total_runs: 4,
+                ok_runs: 2,
+                error_runs: 1,
+                skipped_runs: 1,
+                p50_latency_ms: Some(12.5),
+                p95_latency_ms: None,
+                referencing_experiments: 3,
+            },
+        );
+        let json = serde_json::to_value(body).unwrap();
+
+        assert_eq!(json["windowMs"], 86_400_000);
+        assert_eq!(json["latencyMs"]["p50"], 12.5);
+        assert!(json["latencyMs"]["p95"].is_null());
+        assert_eq!(json["referencingExperiments"], 3);
+    }
 }

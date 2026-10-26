@@ -41,7 +41,7 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 /// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-pub const V2_ORG_MODULES: [&str; 8] = [
+pub const V2_ORG_MODULES: [&str; 9] = [
     "alerts",
     "folders",
     "reports",
@@ -50,6 +50,7 @@ pub const V2_ORG_MODULES: [&str; 8] = [
     "downtimes",
     "workflows",
     "alert_calibration",
+    "fleets",
 ];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
 const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
@@ -180,18 +181,21 @@ pub async fn save_org_tuples(org_id: &str) {
 pub async fn save_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
-pub async fn delete_org_tuples(org_id: &str) {
+pub async fn delete_org_tuples(org_id: &str) -> Result<(), anyhow::Error> {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled
-        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
-    {
-        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to delete org tuples for {org_id}: {e}"))?;
     }
+    Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn delete_org_tuples(_org_id: &str) {}
+pub async fn delete_org_tuples(_org_id: &str) -> Result<(), anyhow::Error> {
+    Ok(())
+}
 
 #[cfg(feature = "enterprise")]
 pub fn get_role(role: &UserOrgRole) -> UserRole {
@@ -344,6 +348,10 @@ where
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+        }
+
+        if common::meta::ingestion_routes::is_opamp(path) {
+            return opamp_extractor(&parts.headers, &method, &org_id, &folder);
         }
 
         // This is case for ingestion endpoints where we need to check
@@ -508,6 +516,39 @@ fn reject_forged_session_marker(auth: String) -> String {
     } else {
         auth
     }
+}
+
+/// §4.2: a fleet token in the header only; a cookie would let any page the user visits drive OpAMP.
+#[cfg(feature = "enterprise")]
+fn opamp_extractor(
+    headers: &HeaderMap,
+    method: &str,
+    org_id: &str,
+    folder: &str,
+) -> Result<AuthExtractor, AuthExtractorRejection> {
+    let Some(auth) = headers
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| reject_forged_session_marker(v.to_owned()))
+        .filter(|v| {
+            config::utils::base64::basic_password(v)
+                .is_some_and(|p| p.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX))
+        })
+    else {
+        return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+    };
+    // The token's fixed scope is its authorization; the validator confines it to its org's writes.
+    Ok(AuthExtractor {
+        auth,
+        method: method.to_string(),
+        o2_type: String::new(),
+        org_id: org_id.to_string(),
+        bypass_check: true,
+        parent_id: folder.to_string(),
+        use_all_org: false,
+        use_self_context: false,
+        use_self_parent: false,
+    })
 }
 
 fn extract_cookies_from_headers(headers: &HeaderMap) -> HashMap<&str, &str> {
@@ -1089,7 +1130,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_org_tuples_non_enterprise() {
         // In non-enterprise mode, this should not panic and return immediately
-        delete_org_tuples("test_org").await;
+        assert!(delete_org_tuples("test_org").await.is_ok());
         // If we reach here, the function completed successfully
     }
 
@@ -1266,5 +1307,57 @@ mod tests {
                 format!("Bearer {access_token}")
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn basic(credentials: &str) -> String {
+        format!("Basic {}", config::utils::base64::encode(credentials))
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn opamp_extractor_takes_fleet_tokens_only() {
+        let headers = |name: http::header::HeaderName, value: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(name, value.parse().unwrap());
+            headers
+        };
+
+        // The validator trims the password, so a padded token is still a fleet token.
+        for credentials in [
+            "agent:o2ft_x",
+            "admin@example.com: o2ft_x",
+            "agent:o2ft_x\n",
+        ] {
+            let fleet_token = headers(http::header::AUTHORIZATION, &basic(credentials));
+            for method in ["GET", "POST"] {
+                let ext = opamp_extractor(&fleet_token, method, "default", "")
+                    .unwrap_or_else(|_| panic!("{method} rejected"));
+                assert!(ext.bypass_check, "{method} {credentials:?}");
+            }
+        }
+
+        for login in [
+            basic("user@example.com:pw"),
+            "Bearer o2ft_x".to_string(),
+            basic("o2ft_x:pw"),
+        ] {
+            let login = headers(http::header::AUTHORIZATION, &login);
+            for method in ["GET", "POST"] {
+                let Err(rejection) = opamp_extractor(&login, method, "default", "") else {
+                    panic!("only a fleet token may connect, {method}");
+                };
+                assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
+            }
+        }
+
+        let cookie = headers(
+            http::header::COOKIE,
+            "auth_tokens=eyJhY2Nlc3NfdG9rZW4iOiJ4In0=",
+        );
+        let Err(rejection) = opamp_extractor(&cookie, "GET", "default", "") else {
+            panic!("a cookie must never authenticate OpAMP");
+        };
+        assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
     }
 }

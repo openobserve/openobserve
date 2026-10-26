@@ -538,15 +538,21 @@ describe("LogStream Component", () => {
   });
 
   describe("explore a profiles stream", () => {
-    it("opens the Profiles page on that stream, not Logs", async () => {
+    it("opens the Logs search on that stream, like metrics and traces", async () => {
       const routerPushSpy = vi.spyOn(router, "push");
 
       await wrapper.vm.exploreStream({ row: { name: "prof_stream", stream_type: "profiles" } });
 
-      expect(routerPushSpy).toHaveBeenCalledWith({
-        name: "profiles",
-        query: { org_identifier: "default", stream: "prof_stream", period: "15m" },
-      });
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "logs",
+          query: expect.objectContaining({
+            stream_type: "profiles",
+            stream: "prof_stream",
+            org_identifier: "default",
+          }),
+        }),
+      );
     });
   });
 
@@ -587,8 +593,54 @@ describe("LogStream Component", () => {
       await dialog.vm.$emit("click:primary");
       await flushPromises();
 
-      expect(mockStreamService.delete).toHaveBeenCalledWith("default", "test_stream", "logs", true);
+      expect(mockStreamService.delete).toHaveBeenCalledWith(
+        "default",
+        "test_stream",
+        "logs",
+        false,
+      );
       expect(wrapper.vm.confirmDelete).toBe(false);
+    });
+
+    it("names the stream being deleted in the dialog message", () => {
+      const message = wrapper.find('[data-test="log-stream-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete the test_stream stream?");
+      expect(message.find("span.text-text-heading.font-semibold").text()).toBe("test_stream");
+    });
+
+    it("starts with the delete-associated checkbox unticked", () => {
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
+      const dialog = wrapper.find('[data-test="log-stream-delete-dialog-message"]').element
+        .parentElement!;
+      expect(dialog.querySelector('[role="checkbox"], input[type="checkbox"]')).toBeTruthy();
+    });
+
+    it("sends delete_all=true when the checkbox is ticked, then resets it", async () => {
+      wrapper.vm.deleteAssociatedAlertsPipelines = true;
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d: any) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(mockStreamService.delete).toHaveBeenCalledWith("default", "test_stream", "logs", true);
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
+    });
+
+    it("resets a tick left by a cancelled dialog", async () => {
+      wrapper.vm.deleteAssociatedAlertsPipelines = true;
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d: any) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:secondary");
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
+
+      wrapper.vm.deleteAssociatedAlertsPipelines = true;
+      wrapper.vm.confirmDelete = false;
+      await wrapper.vm.confirmDeleteAction({ row: { name: "other", stream_type: "logs" } });
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
     });
 
     it("should propagate v-model:open update from ODialog to confirmDelete state", async () => {
@@ -647,9 +699,36 @@ describe("LogStream Component", () => {
       await flushPromises();
 
       expect(mockStreamService.delete).toHaveBeenCalledTimes(2);
+      expect(mockStreamService.delete).toHaveBeenCalledWith("default", "stream1", "logs", false);
+      expect(mockStreamService.delete).toHaveBeenCalledWith("default", "stream2", "metrics", false);
+      expect(wrapper.vm.confirmBatchDelete).toBe(false);
+    });
+
+    it("sends delete_all=true for every stream when ticked, then resets it", async () => {
+      wrapper.vm.deleteAssociatedAlertsPipelines = true;
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d: any) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
       expect(mockStreamService.delete).toHaveBeenCalledWith("default", "stream1", "logs", true);
       expect(mockStreamService.delete).toHaveBeenCalledWith("default", "stream2", "metrics", true);
-      expect(wrapper.vm.confirmBatchDelete).toBe(false);
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
+    });
+
+    it("opens with the checkbox unticked even after a cancelled tick", async () => {
+      wrapper.vm.deleteAssociatedAlertsPipelines = true;
+      await wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d: any) => d.props("open") === true)!
+        .vm.$emit("click:secondary");
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
+
+      wrapper.vm.deleteAssociatedAlertsPipelines = true;
+      await wrapper.vm.confirmBatchDeleteAction();
+      expect(wrapper.vm.deleteAssociatedAlertsPipelines).toBe(false);
     });
 
     it("should propagate v-model:open update to confirmBatchDelete state", async () => {

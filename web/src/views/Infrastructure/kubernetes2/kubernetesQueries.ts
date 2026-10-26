@@ -83,6 +83,10 @@ const POD = `${C}, namespace, pod, uid`;
 
 const KUBELET_POD = `${C}, k8s_namespace_name, k8s_pod_name, k8s_pod_uid`;
 
+// Mirrors isProblemPod; the reasons are kubernetesModel's ERROR_REASONS, which imports this file.
+const ERROR_WAITING =
+  'reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|ErrImageNeverPull|CreateContainerConfigError"';
+
 const CPU_MEMORY = 'resource=~"cpu|memory"';
 
 const QUERIES = {
@@ -188,13 +192,40 @@ const QUERIES = {
     `count by (k8s_cluster, k8s_cluster_name) (${L("kube_deployment_spec_replicas", null)})`,
   CL2N: () => `count by (k8s_cluster, k8s_cluster_name) (k8s_node_cpu_usage)`,
   CL2P: () => `count by (k8s_cluster, k8s_cluster_name) (k8s_pod_cpu_usage)`,
+  // Cluster-wide health and totals in one request, so the cluster strip and tree need no view's data.
+  CST: () =>
+    clusterStatList()
+      .map(([stat, expr]) => statSeries(stat, expr))
+      .join(" or "),
 } satisfies Record<string, (m: M) => string>;
 
 type M = string | null;
 
+export type ClusterStat =
+  | "nodes"
+  | "nodesBad"
+  | "pods"
+  | "podsBad"
+  | "namespaces"
+  | "deployments"
+  | "deploymentsBad"
+  | "daemonsets"
+  | "daemonsetsBad"
+  | "statefulsets"
+  | "statefulsetsBad"
+  | "replicasets"
+  | "replicasetsBad"
+  | "jobs"
+  | "jobsBad"
+  | "cronjobs"
+  | "pvcs"
+  | "pvcsBad"
+  | "hpas"
+  | "hpasBad";
+
 export type QueryId = keyof typeof QUERIES;
 
-export const CLUSTER_QUERIES: readonly QueryId[] = ["CL1N", "CL1P", "CL1D", "CL2N", "CL2P"];
+export const CLUSTER_QUERIES: readonly QueryId[] = ["CL1N", "CL1P", "CL1D", "CL2N", "CL2P", "CST"];
 
 export const KIND_INFO: Record<DetailKind, KindInfo> = {
   pod: {
@@ -439,7 +470,7 @@ const STREAM_OF = /\b(kube_[a-z_]+|k8s_[a-z_]+)\b/;
 
 export const QUERY_STREAM = Object.fromEntries(
   (Object.keys(QUERIES) as QueryId[]).map((id) => {
-    const text = QUERIES[id](null).replace(/^[a-z]+ by \([^)]*\) /, "");
+    const text = QUERIES[id](null).replace(/\b[a-z]+ by \([^)]*\) /g, "");
     return [id, STREAM_OF.exec(text)?.[1] ?? ""];
   }),
 ) as Record<QueryId, string>;
@@ -491,6 +522,87 @@ export const podMatchers = (target: TrendTarget) => {
 function sel(metric: string, m: M, inner = "") {
   const parts = [inner, m].filter(Boolean);
   return parts.length ? `${metric}{${parts.join(",")}}` : metric;
+}
+
+// A function, not a const: QUERY_STREAM below runs every query at module load.
+function clusterStatList(): Array<readonly [ClusterStat, string]> {
+  return [
+    ["nodes", L("kube_node_info", null)],
+    [
+      "nodesBad",
+      `${L("kube_node_status_condition", null, 'condition="Ready",status=~"false|unknown"')} == 1`,
+    ],
+    ["pods", `${L("kube_pod_status_phase", null)} == 1`],
+    ["podsBad", problemPods()],
+    ["namespaces", L("kube_namespace_created", null)],
+    ["deployments", L("kube_deployment_spec_replicas", null)],
+    ["deploymentsBad", `${L("kube_deployment_status_replicas_unavailable", null)} > 0`],
+    ["daemonsets", L("kube_daemonset_created", null)],
+    [
+      "daemonsetsBad",
+      shortOfDesired(
+        "daemonset",
+        "kube_daemonset_status_desired_number_scheduled",
+        "kube_daemonset_status_number_ready",
+      ),
+    ],
+    ["statefulsets", L("kube_statefulset_created", null)],
+    [
+      "statefulsetsBad",
+      shortOfDesired(
+        "statefulset",
+        "kube_statefulset_replicas",
+        "kube_statefulset_status_replicas_ready",
+      ),
+    ],
+    ["replicasets", L("kube_replicaset_created", null)],
+    [
+      "replicasetsBad",
+      shortOfDesired(
+        "replicaset",
+        "kube_replicaset_spec_replicas",
+        "kube_replicaset_status_ready_replicas",
+      ),
+    ],
+    ["jobs", L("kube_job_created", null)],
+    [
+      "jobsBad",
+      `${perKind("job_name", "kube_job_status_failed")} > 0 unless on(${C}, namespace, job_name) ${perKind("job_name", "kube_job_complete", 'condition="true"')} >= 1`,
+    ],
+    ["cronjobs", L("kube_cronjob_created", null)],
+    ["pvcs", L("kube_persistentvolumeclaim_info", null)],
+    ["pvcsBad", `${L("kube_persistentvolumeclaim_status_phase", null, 'phase!="Bound"')} == 1`],
+    ["hpas", L("kube_horizontalpodautoscaler_info", null)],
+    [
+      "hpasBad",
+      `${L("kube_horizontalpodautoscaler_status_condition", null, 'condition="ScalingLimited",status="true"')} == 1`,
+    ],
+  ];
+}
+
+// One series per object, so `on(...)` matches stay one-to-one when several ksm replicas report.
+function perKind(kind: string, metric: string, inner = "") {
+  return `max by (${C}, namespace, ${kind}) (${L(metric, null, inner)})`;
+}
+
+// Mirrors isProblemPod: a bad phase, an error waiting reason, or Running without a true Ready, once per pod.
+function problemPods() {
+  const key = `${C}, namespace, pod`;
+  const phase = `${L("kube_pod_status_phase", null, 'phase=~"Failed|Pending|Unknown"')} == 1`;
+  const waiting = `${L("kube_pod_container_status_waiting_reason", null, ERROR_WAITING)} == 1`;
+  const running = L("kube_pod_status_phase", null, 'phase="Running"');
+  const ready = L("kube_pod_status_ready", null, 'condition="true"');
+  return `max by (${key}) ((${phase}) or (${waiting}) or (${running} == 1 unless on(${key}) ${ready} == 1))`;
+}
+
+// Mirrors rowIsBad: wanted above 0 and ready below it (a missing ready series counts as 0).
+function shortOfDesired(kind: string, desired: string, ready: string) {
+  return `${perKind(kind, desired)} > 0 unless on(${C}, namespace, ${kind}) ${perKind(kind, ready)} >= on(${C}, namespace, ${kind}) ${perKind(kind, desired)}`;
+}
+
+// A missing metric only drops its own series, so one absent family never blanks the rest.
+function statSeries(stat: ClusterStat, expr: string) {
+  return `label_replace(count by (k8s_cluster, k8s_cluster_name) (${expr}), "stat", "${stat}", "", "")`;
 }
 
 function L(metric: string, m: M, inner = "") {

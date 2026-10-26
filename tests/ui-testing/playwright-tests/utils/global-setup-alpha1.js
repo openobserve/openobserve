@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
+const { generateTrace } = require('./trace-ingestion.js');
+const { ingestBase } = require('./ingest-url.js');
 
 // Auth storage paths. Filenames stay canonical (user.json / cloud-config.json)
 // because ~20 spec files and shared utils (cloud-auth.js, enhanced-baseFixtures.js)
@@ -116,7 +118,7 @@ async function globalSetup() {
       if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
         testLogger.info('[alpha1] Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
       } else {
-        await performGlobalIngestion(page);
+        await performGlobalIngestionWithFetch();
       }
 
       testLogger.info('[alpha1] Global setup completed successfully');
@@ -181,15 +183,16 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
   // Check if already logged in (valid session from previous attempt or shared cookies)
   // If the main menu is visible, skip the entire Dex flow
   const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-  const alreadyLoggedIn = await menuItem.isVisible().catch(() => false);
-  if (alreadyLoggedIn) {
+  const continueWithEmail = page.getByText('Continue with Email');
+  // A one-shot isVisible() misses a still-loading app, then waits for a Dex button that never comes.
+  await menuItem.or(continueWithEmail).first().waitFor({ state: 'visible', timeout: 30000 });
+  if (await menuItem.isVisible().catch(() => false)) {
     testLogger.info('[alpha1] Already logged in — skipping Dex flow');
     return;
   }
 
   // Step 2: Click "Continue with Email" on the Dex page
   // The page may be at /web/login (app login page with Dex button) or already on Dex
-  const continueWithEmail = page.getByText('Continue with Email');
   await continueWithEmail.waitFor({ state: 'visible', timeout: 20000 });
   testLogger.info('[alpha1] Clicking "Continue with Email"...');
   await continueWithEmail.click();
@@ -332,8 +335,20 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
     throw new Error(`Login failed — redirected back to Dex after token exchange: ${page.url()}`);
   }
 
-  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 15000 });
+  await waitForAppMenu(page, 15000);
   testLogger.info('[alpha1] Login successful — main menu visible');
+}
+
+// A blank page is usually a JS chunk that never downloaded, not a failed login; reload once before giving up.
+async function waitForAppMenu(page, timeout) {
+  const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
+  try {
+    await menuItem.waitFor({ state: 'visible', timeout });
+  } catch (e) {
+    testLogger.warn('[alpha1] Main menu not visible — reloading once', { error: e.message });
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+    await menuItem.waitFor({ state: 'visible', timeout });
+  }
 }
 
 /**
@@ -392,7 +407,7 @@ async function switchOrgViaDropdown(page, targetOrgId) {
   // Land on /web/ so the navbar (and its org dropdown) renders
   const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
   await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 20000 });
+  await waitForAppMenu(page, 20000);
   await page.waitForTimeout(2000); // navbar dropdown needs SPA hydration
 
   // Map identifier → org name (dropdown options are by name, not identifier)
@@ -502,101 +517,24 @@ async function fetchCloudConfig(page) {
 }
 
 /**
- * Ingest test data into streams so they appear in UI dropdowns.
- * Uses cloud auth (email:passcode) from cloud-config.json.
+ * Seed the default traces stream the way the OSS global setup does, for the Traces specs that query it.
  */
-async function performGlobalIngestion(page) {
-  let headers;
-  let orgId;
-
-  try {
-    const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
-    // cloud-config.json by the shared-auth barrier. The passcode is user-level
-    // (identity), so it authorizes any org the user is a member of — only the
-    // target org differs per shard. Enables per-shard org isolation.
-    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
-    const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
-    headers = {
-      'Authorization': `Basic ${basicAuth}`,
-      'Content-Type': 'application/json',
-    };
-  } catch (e) {
-    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
-    return;
-  }
-
-  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
-  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
-  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
-  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
-  const streams = [
-    { name: 'e2e_automate', data: logsdata },
-  ];
-
-  for (const stream of streams) {
+async function seedTraces(baseUrl, orgId, headers, count = 20) {
+  let ingested = 0;
+  for (let i = 1; i <= count; i++) {
     try {
-      const response = await page.evaluate(async ({ headers, orgId, streamName, data }) => {
-        const r = await fetch(`/api/${orgId}/${streamName}/_json`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(data),
-        });
-        return { status: r.status, text: await r.text() };
-      }, { headers, orgId, streamName: stream.name, data: stream.data });
-
-      if (response.status === 200) {
-        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
-      } else {
-        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${response.status}`, { body: response.text.substring(0, 200) });
-      }
+      const r = await fetch(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(generateTrace(i)),
+      });
+      if (r.ok) ingested++;
+      else testLogger.warn(`[alpha1] Trace ${i} ingestion returned ${r.status}`);
     } catch (e) {
-      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+      testLogger.warn(`[alpha1] Trace ${i} ingestion failed`, { error: e.message });
     }
   }
-
-  // Wait for streams to be indexed
-  testLogger.info('[alpha1] Waiting for streams to be indexed...');
-  const maxWaitMs = 90000;
-  const pollIntervalMs = 3000;
-  const startTime = Date.now();
-  let lastSeen = 'no response';
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const streamsResult = await page.evaluate(async ({ orgId, headers }) => {
-        const r = await fetch(`/api/${orgId}/streams?type=logs&keyword=e2e_automate`, { headers });
-        if (!r.ok) return { ok: false, status: r.status };
-        const data = await r.json();
-        const names = (data.list || []).map(s => s.name);
-        return { ok: true, status: r.status, names };
-      }, { orgId, headers });
-      lastSeen = `HTTP ${streamsResult.status}, names=[${(streamsResult.names || []).join(',')}]`;
-
-      if (streamsResult.ok) {
-        const hasE2e = streamsResult.names.includes('e2e_automate');
-        if (hasE2e) {
-          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
-          break;
-        }
-        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
-      } else if (streamsResult.status === 401 || streamsResult.status === 403) {
-        // The ingestion passcode is not authorized for the streams list; retrying cannot succeed.
-        testLogger.warn(`[alpha1] Streams API returned ${streamsResult.status} — cannot verify e2e_automate here; tests wait for their own streams`);
-        return;
-      } else {
-        testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
-      }
-    } catch (e) {
-      testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
-    }
-
-    await page.waitForTimeout(pollIntervalMs);
-  }
-
-  if (Date.now() - startTime >= maxWaitMs) {
-    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms (last: ${lastSeen}) — tests may fail on stream selection`);
-  }
+  testLogger.info(`[alpha1] Ingested ${ingested}/${count} traces into the default traces stream`);
 }
 
 /**
@@ -630,8 +568,7 @@ async function verifySharedAuth(baseUrl) {
     }
 
     // Verify the main menu is visible
-    const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-    await menuItem.waitFor({ state: 'visible', timeout: 15000 });
+    await waitForAppMenu(page, 15000);
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
     // Note: no dropdown org-switch needed here. Each test pins its own org by
@@ -680,8 +617,7 @@ async function performGlobalIngestionWithFetch() {
     };
     baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
   } catch (e) {
-    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
-    return;
+    throw new Error(`[alpha1] Cannot read cloud-config.json for seed ingestion: ${e.message}`);
   }
 
   // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
@@ -692,23 +628,34 @@ async function performGlobalIngestionWithFetch() {
     { name: 'e2e_automate', data: logsdata },
   ];
 
+  // Specs assume e2e_automate exists, so a failed seed must fail setup rather than surface later as missing data.
   for (const stream of streams) {
-    try {
-      const r = await fetch(`${baseUrl}/api/${orgId}/${stream.name}/_json`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(stream.data),
-      });
-      if (r.ok) {
-        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: r.status });
-      } else {
-        const text = await r.text();
-        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${r.status}`, { body: text.substring(0, 200) });
+    let lastError = '';
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const r = await fetch(`${ingestBase(baseUrl)}/api/${orgId}/${stream.name}/_json`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(stream.data),
+        });
+        if (r.ok) {
+          testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: r.status });
+          lastError = '';
+          break;
+        }
+        lastError = `HTTP ${r.status}: ${(await r.text()).substring(0, 200)}`;
+      } catch (e) {
+        lastError = e.message;
       }
-    } catch (e) {
-      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+      testLogger.warn(`[alpha1] Ingestion into '${stream.name}' failed (attempt ${attempt}/2)`, { error: lastError });
+    }
+    if (lastError) {
+      throw new Error(`[alpha1] Could not seed '${stream.name}' at ${ingestBase(baseUrl)}: ${lastError}`);
     }
   }
+
+  // Only service-graph.spec.js used to ingest traces on alpha, so the other Traces specs had data only while it ran.
+  await seedTraces(baseUrl, orgId, headers);
 
   // Wait for streams to be indexed
   testLogger.info('[alpha1] Waiting for streams to be indexed...');

@@ -44,6 +44,8 @@ import type { DetailsRef } from "./kubernetesUrlState";
 
 export type CellRender =
   | "text"
+  | "mono"
+  | "muted"
   | "name"
   | "warn"
   | "namespace"
@@ -53,7 +55,8 @@ export type CellRender =
   | "bar"
   | "badges"
   | "conditions"
-  | "containers";
+  | "containers"
+  | "actions";
 
 export interface CellLink {
   label: I18nText;
@@ -78,7 +81,8 @@ export interface K8sCellMeta {
   tone?: (row: any) => Tone | null;
   tip?: (row: any) => I18nText | null;
   links?: (row: any) => CellLink[];
-  bar?: (row: any) => { pct: number | null; tip: I18nText };
+  bar?: (row: any) => { pct: number | null; tip: I18nText; label?: I18nText; none?: I18nText };
+  sub?: (row: any) => I18nText | null;
   words?: (row: any) => CellWord[];
   badges?: (row: any) => CellBadge[] | null;
   at?: (row: any) => number | null;
@@ -185,12 +189,12 @@ function col(
   };
 }
 
-function nameCol(ctx: ColumnContext): K8sColumn {
+function nameCol(ctx: ColumnContext, sub?: (r: any) => I18nText | null): K8sColumn {
   return col(
     "name",
     ctx.t("infra.k8s2.columnName"),
-    { render: "name", text: (r: AnyRow) => raw(r.name) },
-    { accessorFn: (r: AnyRow) => r.name, size: 260, minSize: 160, meta: { isName: true } },
+    { render: "name", text: (r: AnyRow) => raw(r.name), sub },
+    { accessorFn: (r: AnyRow) => r.name, size: 220, minSize: 160, meta: { isName: true } },
   );
 }
 
@@ -291,29 +295,40 @@ function podColumns(ctx: ColumnContext): K8sColumn[] {
       { render: "containers" },
       {
         accessorFn: (r: PodRow) => r.containers.length,
-        size: 110,
+        size: 90,
       },
     ),
     col(
       "cpu",
       t("infra.k8s2.columnCpu"),
       {
-        render: "text",
-        text: (r: PodRow) => raw(formatCores(r.cpuCores)),
-        tip: (r: PodRow) => usageTip(ctx, r.cpuPctOfRequest, r.cpuPctOfLimit, r.cpuRequest),
+        render: "bar",
+        bar: (r: PodRow) => ({
+          pct: r.cpuPctOfRequest,
+          label: raw(formatCores(r.cpuCores)),
+          none:
+            r.cpuCores != null && noAmount(r.cpuRequest) ? t("infra.k8s2.noRequest") : undefined,
+          tip: usageTip(ctx, r.cpuPctOfRequest, r.cpuPctOfLimit, r.cpuRequest) ?? raw(""),
+        }),
       },
-      { accessorFn: (r: PodRow) => sortable(r.cpuCores), size: 80 },
+      { accessorFn: (r: PodRow) => sortable(r.cpuCores), size: 150 },
     ),
     col(
       "memory",
       t("infra.k8s2.columnMemory"),
       {
-        render: "text",
-        text: (r: PodRow) => raw(formatBytes(r.memoryBytes)),
-        tip: (r: PodRow) =>
-          usageTip(ctx, r.memoryPctOfRequest, r.memoryPctOfLimit, r.memoryRequest),
+        render: "bar",
+        bar: (r: PodRow) => ({
+          pct: r.memoryPctOfRequest,
+          label: raw(formatBytes(r.memoryBytes)),
+          none:
+            r.memoryBytes != null && noAmount(r.memoryRequest)
+              ? t("infra.k8s2.noRequest")
+              : undefined,
+          tip: usageTip(ctx, r.memoryPctOfRequest, r.memoryPctOfLimit, r.memoryRequest) ?? raw(""),
+        }),
       },
-      { accessorFn: (r: PodRow) => sortable(r.memoryBytes), size: 90 },
+      { accessorFn: (r: PodRow) => sortable(r.memoryBytes), size: 150 },
     ),
     col(
       "restarts",
@@ -346,7 +361,7 @@ function podColumns(ctx: ColumnContext): K8sColumn[] {
               ]
             : [],
       },
-      { accessorFn: (r: PodRow) => r.node || undefined, size: 200 },
+      { accessorFn: (r: PodRow) => r.node || undefined, size: 170 },
     ),
     col(
       "qos",
@@ -382,7 +397,7 @@ function podColumns(ctx: ColumnContext): K8sColumn[] {
     col(
       "ip",
       t("infra.k8s2.columnIp"),
-      { render: "text", text: (r: PodRow) => (r.ip ? raw(r.ip) : DASH) },
+      { render: "mono", text: (r: PodRow) => (r.ip ? raw(r.ip) : DASH) },
       { accessorFn: (r: PodRow) => r.ip ?? undefined, hideable: true, size: 120 },
     ),
     pctCol(
@@ -421,19 +436,45 @@ function nodeBar(
   header: I18nText,
   pick: (r: NodeRow) => number | null,
   tip: (r: NodeRow) => I18nText,
+  label: (r: NodeRow) => I18nText,
 ) {
   return col(
     id,
     header,
-    { render: "bar", bar: (r: NodeRow) => ({ pct: pick(r), tip: tip(r) }) },
-    { accessorFn: (r: NodeRow) => sortable(pick(r)), size: 130 },
+    { render: "bar", bar: (r: NodeRow) => ({ pct: pick(r), tip: tip(r), label: label(r) }) },
+    { accessorFn: (r: NodeRow) => sortable(pick(r)), size: 150 },
   );
+}
+
+const NODE_POOL_LABELS = [
+  "eks.amazonaws.com/nodegroup",
+  "cloud.google.com/gke-nodepool",
+  "kubernetes.azure.com/agentpool",
+  "karpenter.sh/nodepool",
+  "node.kubernetes.io/instance-type",
+];
+
+const NODE_ZONE_LABELS = ["topology.kubernetes.io/zone", "failure-domain.beta.kubernetes.io/zone"];
+
+const firstLabel = (labels: Record<string, string>, keys: string[]) =>
+  keys.map((k) => labels[k]).find((v) => typeof v === "string" && v !== "") ?? null;
+
+/** "<pool> · <zone>" from the observed node labels, else the internal IP. */
+export function nodeSub(r: NodeRow): I18nText | null {
+  const labels = labelsOf(r.object);
+  const parts = labels
+    ? [firstLabel(labels, NODE_POOL_LABELS), firstLabel(labels, NODE_ZONE_LABELS)].filter(
+        (v): v is string => v != null,
+      )
+    : [];
+  if (parts.length) return raw(parts.join(" · "));
+  return r.info?.internal_ip ? raw(r.info.internal_ip) : null;
 }
 
 function nodeColumns(ctx: ColumnContext): K8sColumn[] {
   const t = ctx.t;
   return [
-    nameCol(ctx),
+    nameCol(ctx, nodeSub),
     warnCol(),
     nodeBar(
       "cpu",
@@ -444,6 +485,7 @@ function nodeColumns(ctx: ColumnContext): K8sColumn[] {
           pct: formatPct(r.cpuPct),
           cores: formatCores(r.allocatable.cpu ?? null),
         }),
+      (r) => raw(formatCores(r.cpuCores)),
     ),
     nodeBar(
       "memory",
@@ -454,6 +496,7 @@ function nodeColumns(ctx: ColumnContext): K8sColumn[] {
           pct: formatPct(r.memoryPct),
           bytes: formatBytes(r.memoryBytes),
         }),
+      (r) => raw(formatBytes(r.memoryBytes)),
     ),
     nodeBar(
       "disk",
@@ -465,6 +508,7 @@ function nodeColumns(ctx: ColumnContext): K8sColumn[] {
           used: formatBytes(r.diskUsed),
           capacity: formatBytes(r.diskCapacity),
         }),
+      (r) => raw(formatBytes(r.diskUsed)),
     ),
     col(
       "taints",
@@ -698,7 +742,7 @@ function cronJobColumns(ctx: ColumnContext): K8sColumn[] {
     col(
       "schedule",
       t("infra.k8s2.columnSchedule"),
-      { render: "text", text: (r: CronJobRow) => (r.schedule ? raw(r.schedule) : DASH) },
+      { render: "mono", text: (r: CronJobRow) => (r.schedule ? raw(r.schedule) : DASH) },
       { accessorFn: (r: CronJobRow) => r.schedule ?? undefined, size: 120 },
     ),
     col(
@@ -891,7 +935,7 @@ function eventColumns(ctx: ColumnContext): K8sColumn[] {
       "message",
       t("infra.k8s2.columnMessage"),
       {
-        render: "status",
+        render: "text",
         text: (e: EventRow) => raw(e.note),
         tone: (e: EventRow) => (e.type === "Warning" ? "error" : null),
         tip: (e: EventRow) => (e.note ? raw(e.note) : null),

@@ -71,6 +71,7 @@ export const shouldShowLegendPosition = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.show_legends &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
+    dashboardPanelData.data.type !== "state-timeline" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -90,6 +91,7 @@ export const shouldShowLegendType = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.show_legends &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
+    dashboardPanelData.data.type !== "state-timeline" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -110,6 +112,7 @@ export const shouldShowLegendWidth = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.legends_type === "plain" &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
+    dashboardPanelData.data.type !== "state-timeline" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -132,6 +135,7 @@ export const shouldShowLegendHeight = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.legends_type === "plain" &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
+    dashboardPanelData.data.type !== "state-timeline" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -213,9 +217,14 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "pie" &&
     dashboardPanelData.data.type != "donut" &&
     dashboardPanelData.data.type != "sankey" &&
-    dashboardPanelData.data.type != "maps"
+    dashboardPanelData.data.type != "maps" &&
+    dashboardPanelData.data.type != "state-timeline"
   );
 };
+
+// The editor stores axis_border_show false by default, so honouring it on heatmaps would strip the axis lines of every saved one.
+export const shouldShowAxisBorderConfig = (dashboardPanelData: any): boolean =>
+  shouldShowAxisConfig(dashboardPanelData) && dashboardPanelData.data.type !== "heatmap";
 
 /**
  * Check if cartesian chart axis/label/markline config should be displayed
@@ -306,4 +315,9 @@ export const shouldShowTimeShift = (
     ) &&
     dashboardPanelDataPageKey !== "logs"
   );
+};
+
+/** Whether the PromQL range/instant selector applies; a state timeline always runs a range query. */
+export const shouldShowPromQLQueryType = (dashboardPanelData: any): boolean => {
+  return dashboardPanelData.data.type !== "state-timeline";
 };

@@ -47,6 +47,7 @@ const Host = defineComponent({
   props: {
     initial: { type: String, default: "" },
     suggestions: { type: Array, default: undefined },
+    delimiter: { type: String, default: "double" },
   },
   emits: ["select", "blur", "keydown"],
   setup(props) {
@@ -60,6 +61,7 @@ const Host = defineComponent({
       type="url"
       label="Starting URL"
       :suggestions="suggestions"
+      :delimiter="delimiter"
       @select="(name) => $emit('select', name)"
       @blur="(event) => $emit('blur', event)"
       @keydown="(event) => $emit('keydown', event)"
@@ -133,6 +135,49 @@ describe("OTemplateInput", { timeout: 20_000 }, () => {
     press("Enter");
     await flushPromises();
     expect(hostText()).toBe("https://{{BASE_URL}}/path");
+    expect(wrapper.emitted("select")).toEqual([["BASE_URL"]]);
+    expect(list()).toBeNull();
+  });
+
+  it("closes the list on Escape without the keystroke bubbling to an ancestor (e.g. a drawer)", async () => {
+    mountHost();
+    await type("{{ba");
+    expect(list()).not.toBeNull();
+    const onAncestorKeydown = vi.fn();
+    document.addEventListener("keydown", onAncestorKeydown);
+    let escape: KeyboardEvent;
+    try {
+      escape = press("Escape");
+      await flushPromises();
+      expect(onAncestorKeydown).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("keydown", onAncestorKeydown);
+    }
+    expect(escape.defaultPrevented).toBe(true);
+    expect(list()).toBeNull();
+  });
+
+  it("leaves Escape alone when the list is closed", async () => {
+    mountHost();
+    await type("plain");
+    const onAncestorKeydown = vi.fn();
+    document.addEventListener("keydown", onAncestorKeydown);
+    try {
+      const escape = press("Escape");
+      expect(escape.defaultPrevented).toBe(false);
+      expect(onAncestorKeydown).toHaveBeenCalledTimes(1);
+    } finally {
+      document.removeEventListener("keydown", onAncestorKeydown);
+    }
+  });
+
+  it("with delimiter=single, opens the list on a lone { and inserts a single-brace token", async () => {
+    mountHost({ delimiter: "single" });
+    await type("https://{ba/path", 11);
+    expect(list()).not.toBeNull();
+    press("Enter");
+    await flushPromises();
+    expect(hostText()).toBe("https://{BASE_URL}/path");
     expect(wrapper.emitted("select")).toEqual([["BASE_URL"]]);
     expect(list()).toBeNull();
   });

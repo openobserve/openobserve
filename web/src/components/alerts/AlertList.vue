@@ -884,7 +884,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('alerts.cloneTitle')"
         :secondary-button-label="t('alerts.cancel')"
         :primary-button-label="t('alerts.save')"
-        :primary-button-disabled="isSubmitting || !toBeCloneAlertName.trim()"
+        :primary-button-disabled="
+          isSubmitting || isCloneSourceLoading || !toBeCloneAlertName.trim()
+        "
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
@@ -977,6 +979,7 @@ import {
   computed,
   reactive,
   nextTick,
+  toRaw,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
@@ -1129,7 +1132,10 @@ export default defineComponent({
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
-    const toBeClonedAlert: Ref<any> = ref({});
+    const toBeClonedAlert: Ref<any> = ref(null);
+    // Save waits on this: an alert cloned before it loads is posted without destinations or conditions.
+    const isCloneSourceLoading = ref(false);
+    let cloneSourceRequest = 0;
     // Flag to skip clearing search state on the first folder emission after mount.
     // When returning from add/edit screens, the FolderList emits the active folder
     // which would normally clear restored search filters. This flag prevents that.
@@ -2473,7 +2479,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: action,
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
           page: "Alerts",
         });
         track("Button Click", {
@@ -2617,6 +2622,10 @@ export default defineComponent({
         toBeClonedIsComposite.value || !row.stream_name || row.stream_name === "--"
           ? ""
           : row.stream_name;
+      const needsSource = !toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value;
+      const request = ++cloneSourceRequest;
+      toBeClonedAlert.value = null;
+      isCloneSourceLoading.value = needsSource;
       showForm.value = true;
       // Load the stream-name options for the pre-filled stream type so the
       // dialog's dropdown reflects it instead of showing an empty list. A
@@ -2631,8 +2640,15 @@ export default defineComponent({
         }
       }
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
-      if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
-        toBeClonedAlert.value = await getAlertById(row.alert_id);
+      if (needsSource) {
+        try {
+          const source = await getAlertById(row.alert_id);
+          // getAlertById hands back the cached detail, and submitForm renames the copy and drops its id.
+          if (request === cloneSourceRequest)
+            toBeClonedAlert.value = structuredClone(toRaw(source));
+        } finally {
+          if (request === cloneSourceRequest) isCloneSourceLoading.value = false;
+        }
       }
     };
     const submitForm = async () => {
@@ -3016,7 +3032,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Alert",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         alert_name: selectedDelete.value.name,
         page: "Alerts",
       });
@@ -3909,6 +3924,8 @@ export default defineComponent({
       showAddAlertDialog,
       showForm,
       toBeCloneAlertName,
+      toBeClonedAlert,
+      isCloneSourceLoading,
       toBeClonedIsAnomaly,
       toBeClonedIsComposite,
       toBeClonestreamType,
