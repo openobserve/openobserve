@@ -30,10 +30,13 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowTopResultsConfig,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowAreaFillConfig,
   shouldShowScatterPointConfig,
+  shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1257,6 +1260,14 @@ describe("configUtils", () => {
     });
   });
 
+  describe("shouldShowAxisBorderConfig", () => {
+    it("offers the axis border toggle where axis config shows, except on heatmaps", () => {
+      expect(shouldShowAxisBorderConfig({ data: { type: "line" } })).toBe(true);
+      expect(shouldShowAxisBorderConfig({ data: { type: "heatmap" } })).toBe(false);
+      expect(shouldShowAxisBorderConfig({ data: { type: "table" } })).toBe(false);
+    });
+  });
+
   describe("shouldShowAxisConfig", () => {
     it("should return true for line chart", () => {
       expect(shouldShowAxisConfig({ data: { type: "line" } })).toBe(true);
@@ -1383,6 +1394,26 @@ describe("configUtils", () => {
       expect(shouldShowScatterPointConfig({ data: { type: "scatter" } })).toBe(true);
       expect(shouldShowScatterPointConfig({ data: { type: "line" } })).toBe(false);
       expect(shouldShowScatterPointConfig({ data: { type: "bar" } })).toBe(false);
+    });
+  });
+
+  describe("shouldShowBarStyleConfig", () => {
+    it("is true only for h-bar", () => {
+      expect(shouldShowBarStyleConfig({ data: { type: "h-bar" } })).toBe(true);
+      ["bar", "h-stacked", "stacked", "line"].forEach((type) =>
+        expect(shouldShowBarStyleConfig({ data: { type } })).toBe(false),
+      );
+    });
+  });
+
+  describe("shouldShowBarWidthConfig", () => {
+    it("is true for h-bar, and for PromQL bar, stacked and h-stacked", () => {
+      expect(shouldShowBarWidthConfig({ data: { type: "h-bar" } }, false)).toBe(true);
+      ["bar", "stacked", "h-stacked"].forEach((type) => {
+        expect(shouldShowBarWidthConfig({ data: { type } }, true)).toBe(true);
+        expect(shouldShowBarWidthConfig({ data: { type } }, false)).toBe(false);
+      });
+      expect(shouldShowBarWidthConfig({ data: { type: "line" } }, true)).toBe(false);
     });
   });
 

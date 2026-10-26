@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- color by button group -->
-    <div class="pt-3" v-if="shownMode.startsWith('continuous')">
+    <div class="pt-3" v-if="showSeriesBy">
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
@@ -305,6 +305,13 @@ export default defineComponent({
       return option?.colorPalette ?? [];
     });
 
+    // A PromQL h-bar is coloured by the reduced value it shows, so last/min/max does not apply.
+    const showSeriesBy = computed(
+      () =>
+        shownMode.value.startsWith("continuous") &&
+        !(promqlMode.value && dashboardPanelData.data.type === "h-bar"),
+    );
+
     const onColorModeChange = (modelValue: SelectModelValue) => {
       // Single-string select: OSelect always emits a string mode value here.
       const value = modelValue as string;
@@ -333,6 +340,7 @@ export default defineComponent({
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,
+      showSeriesBy,
     };
   },
 });

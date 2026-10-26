@@ -573,3 +573,40 @@ describe("validatePanel scatter point size", () => {
     expect(run("line", 0)).toEqual([]);
   });
 });
+
+describe("validatePanel bar width", () => {
+  const run = (type: string, queryType: string, barWidth: unknown) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config: { bar_width: barWidth },
+          queries: [{ query: "up", config: {}, fields: { x: [], y: [], filter: {} } }],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors.filter((e) => e.includes(gt("dashboard.barWidth")));
+  };
+
+  it("blocks save for an invalid width where the input is shown", () => {
+    expect(run("h-bar", "sql", 0)).toHaveLength(1);
+    expect(run("h-bar", "sql", 12.6)).toHaveLength(1);
+    expect(run("stacked", "promql", 5000)).toHaveLength(1);
+  });
+
+  it("accepts an unset or valid width, and ignores a width the chart type does not use", () => {
+    expect(run("h-bar", "sql", null)).toEqual([]);
+    expect(run("h-bar", "sql", 13)).toEqual([]);
+    expect(run("stacked", "sql", -3)).toEqual([]);
+  });
+});

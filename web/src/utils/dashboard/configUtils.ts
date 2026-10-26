@@ -299,6 +299,26 @@ export const shouldShowScatterPointConfig = (dashboardPanelData: {
 };
 
 /**
+ * Check if the bar track switch should be displayed
+ * Used by: show_bar_track switch
+ * @param dashboardPanelData - The dashboard panel data
+ * @returns boolean indicating if the bar track switch should be displayed
+ */
+export const shouldShowBarStyleConfig = (dashboardPanelData: any): boolean =>
+  dashboardPanelData.data.type === "h-bar";
+
+/**
+ * Check if the bar width input should be displayed: wherever a converter reads bar_width
+ * Used by: bar_width input
+ * @param dashboardPanelData - The dashboard panel data
+ * @param promqlMode - Whether promql mode is active
+ * @returns boolean indicating if the bar width input should be displayed
+ */
+export const shouldShowBarWidthConfig = (dashboardPanelData: any, promqlMode: boolean): boolean =>
+  dashboardPanelData.data.type === "h-bar" ||
+  (promqlMode && ["bar", "stacked", "h-stacked"].includes(dashboardPanelData.data.type));
+
+/**
  * Check if Drilldown component should be displayed
  * Used by: Drilldown component
  * @param dashboardPanelData - The dashboard panel data

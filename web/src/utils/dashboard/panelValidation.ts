@@ -12,8 +12,12 @@ import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
 import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
-import { shouldShowScatterPointConfig } from "@/utils/dashboard/configUtils";
+import {
+  shouldShowBarWidthConfig,
+  shouldShowScatterPointConfig,
+} from "@/utils/dashboard/configUtils";
 import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
+import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 
 /**
  * Validates a single condition item
@@ -987,6 +991,14 @@ export const validatePanel = (
     !isScatterSymbolSizeValid(panelData.data.config?.symbol_size)
   ) {
     errors.push(t("dashboard.pointSizeInvalid", { max: SYMBOL_SIZE_MAX }));
+  }
+
+  if (
+    panelData?.data &&
+    shouldShowBarWidthConfig(panelData, isPromQLMode) &&
+    !isBarWidthValid(panelData.data.config?.bar_width)
+  ) {
+    errors.push(t("dashboard.barWidthInvalid", { max: BAR_WIDTH_MAX }));
   }
 
   // Validate timestamp alias for SQL queries with custom query mode

@@ -3527,4 +3527,52 @@ describe("ConfigPanel", () => {
       expect(opacityInput().exists()).toBe(false);
     });
   });
+
+  describe("Bar width and bar track", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const widthInput = () => wrapper.findComponent('[data-test="dashboard-config-bar-width"]');
+
+    it("stores what was typed, and stores an empty input as auto", async () => {
+      const panel = panelOf("h-bar");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await widthInput().vm.$emit("update:modelValue", 24);
+      expect(panel.data.config.bar_width).toBe(24);
+      await widthInput().vm.$emit("update:modelValue", -3);
+      expect(panel.data.config.bar_width).toBe(-3);
+      await widthInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.bar_width).toBeNull();
+    });
+
+    it("flags a width below 1, above the max or with a fraction", async () => {
+      const panel = reactive(panelOf("h-bar"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(widthInput().props("error")).toBe(false);
+      for (const bad of [0, -3, 12.6, 5000]) {
+        await widthInput().vm.$emit("update:modelValue", bad);
+        expect(widthInput().props("error")).toBe(true);
+      }
+      await widthInput().vm.$emit("update:modelValue", 13);
+      expect(widthInput().props("error")).toBe(false);
+    });
+
+    it("shows the track for h-bar only and the width wherever a converter reads it", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("h-bar") });
+      expect(widthInput().exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(true);
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(widthInput().exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
+      wrapper = createWrapper({ dashboardPanelData: panelOf("stacked") }, { promqlMode: true });
+      expect(widthInput().exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
+    });
+  });
 });

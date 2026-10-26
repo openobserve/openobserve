@@ -23,6 +23,7 @@ import { lineThicknessOf } from "../promqlChartSeriesProps";
 import { chartColor } from "@/utils/chartTheme";
 import { getScatterSymbolSize } from "../scatterPointStyle";
 import { getSeriesItemOpacity } from "../promqlChartSeriesProps";
+import { barStyleSeriesProps } from "../barTrack";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -185,7 +186,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           emphasis: {
             focus: "series",
           },
-          ...(config.bar_width && { barWidth: config.bar_width }),
+          ...barStyleSeriesProps(config, { withTrack: false }),
         };
 
       case "scatter":

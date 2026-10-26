@@ -1319,3 +1319,66 @@ describe("BarConverter", () => {
     });
   });
 });
+
+describe("BarConverter h-bar reducer colour, bar width and bar track", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const data = (): ProcessedPromQLData[] => [
+    {
+      series: [
+        {
+          name: "series1",
+          values: [
+            [1, "10"],
+            [2, "90"],
+          ],
+          data: {},
+        },
+        { name: "series2", values: [[1, "40"]], data: {} },
+      ],
+      timestamps: [[1, "00:00:00"]],
+      queryIndex: 0,
+    },
+  ];
+  const convert = (config: any, type = "h-bar") =>
+    new BarConverter().convert(data(), { type, config }, store, { legends: [] });
+
+  it("colours each bar by its reduced value, not by the raw samples", async () => {
+    const { getSeriesColor } = await import("../colorPalette");
+    vi.mocked(getSeriesColor).mockClear();
+    convert({ aggregation: "min" });
+    expect(vi.mocked(getSeriesColor).mock.calls.map((call) => call[2])).toEqual([[10], [40]]);
+  });
+
+  it("leaves bar width, track and axis max unset by default", () => {
+    const result: any = convert({});
+    expect(result.series[0].barWidth).toBeUndefined();
+    expect(result.series[0].showBackground).toBeUndefined();
+    expect(result.xAxis.max).toBeUndefined();
+  });
+
+  it("draws the track and pins the value axis to the largest reduced bar", () => {
+    const result: any = convert({ show_bar_track: true, bar_width: 14, aggregation: "min" });
+    expect(result.series[0].showBackground).toBe(true);
+    expect(result.series[0].barWidth).toBe(14);
+    expect(result.series[0].backgroundStyle.color).toBeTruthy();
+    expect(result.xAxis.max).toBe(40);
+    expect(result.xAxis.axisLabel.hideOverlap).toBe(true);
+  });
+
+  it("pins the track to y_axis_max when set, even below the largest bar", () => {
+    expect(convert({ show_bar_track: true, y_axis_max: 25 }).xAxis.max).toBe(25);
+    expect(convert({ show_bar_track: true, y_axis_max: "150" }).xAxis.max).toBe(150);
+  });
+
+  it("drops an invalid bar width on h-bar and stacked bars", () => {
+    expect(convert({ bar_width: -3 }).series[0].barWidth).toBeUndefined();
+    expect(convert({ bar_width: 12.6 }, "h-stacked").series[0].barWidth).toBeUndefined();
+    expect(convert({ bar_width: 16 }, "h-stacked").series[0].barWidth).toBe(16);
+  });
+
+  it("ignores the track on stacked bars", () => {
+    const result: any = convert({ show_bar_track: true }, "h-stacked");
+    expect(result.series[0].showBackground).toBeUndefined();
+    expect(result.xAxis.max).toBeUndefined();
+  });
+});

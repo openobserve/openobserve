@@ -32,12 +32,13 @@ const createMockDashboardPanelData = () =>
   });
 
 let mockDashboardPanelData = createMockDashboardPanelData();
+const mockPromqlMode = { value: false };
 
 // Mock the useDashboardPanel composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
-    promqlMode: { value: false },
+    promqlMode: mockPromqlMode,
   }),
 }));
 
@@ -107,6 +108,7 @@ describe("ColorPaletteDropDown", () => {
 
     // Reset mock data to default state
     mockDashboardPanelData = createMockDashboardPanelData();
+    mockPromqlMode.value = false;
     mockStore.state.theme = "light";
   });
 
@@ -774,6 +776,33 @@ describe("ColorPaletteDropDown", () => {
         '[data-test="dashboard-color-palette-color-input-wrapper"]',
       );
       expect(colorWrapper.exists()).toBeTruthy();
+    });
+  });
+
+  describe("Color series by", () => {
+    const seriesBy = () => wrapper.find("[data-test='series-by-toggle']");
+
+    it("hides the toggle for a PromQL h-bar, which is coloured by its reduced value", async () => {
+      Object.assign(mockDashboardPanelData.data, { type: "h-bar" });
+      mockDashboardPanelData.data.config.color.mode = "continuous-positive";
+      mockPromqlMode.value = true;
+      wrapper = createWrapper();
+      await nextTick();
+      expect(seriesBy().exists()).toBe(false);
+    });
+
+    it("keeps the toggle for a SQL h-bar and for other PromQL charts", async () => {
+      Object.assign(mockDashboardPanelData.data, { type: "h-bar" });
+      mockDashboardPanelData.data.config.color.mode = "continuous-positive";
+      wrapper = createWrapper();
+      await nextTick();
+      expect(seriesBy().exists()).toBe(true);
+
+      Object.assign(mockDashboardPanelData.data, { type: "bar" });
+      mockPromqlMode.value = true;
+      wrapper = createWrapper();
+      await nextTick();
+      expect(seriesBy().exists()).toBe(true);
     });
   });
 });

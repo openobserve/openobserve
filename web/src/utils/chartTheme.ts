@@ -148,6 +148,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-latency-p95": "#0a4ce8",
   "--color-progress-bar-default": "#3f7994",
   "--color-progress-bar-neutral": "#a3a3a3",
+  "--color-progress-bar-track": "#e5e5e5",
 };
 
 /**

@@ -1313,6 +1313,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-show-gridlines"
           size="lg"
         />
+
+        <OInput
+          v-if="shouldShowBarWidthConfig(dashboardPanelData, promqlMode)"
+          v-show="isConfigOptionVisible('axis', 'bar-width')"
+          :model-value="dashboardPanelData.data.config.bar_width ?? ''"
+          :model-modifiers="{ number: true }"
+          type="number"
+          :min="1"
+          :max="BAR_WIDTH_MAX"
+          :label="t('dashboard.barWidth')"
+          :placeholder="t('dashboard.auto')"
+          :error="!isBarWidthValid(dashboardPanelData.data.config.bar_width)"
+          :error-message="t('dashboard.barWidthInvalid', { max: BAR_WIDTH_MAX })"
+          @update:model-value="
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.bar_width = value === '' ? null : value)
+          "
+          data-test="dashboard-config-bar-width"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.barWidthTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OSwitch
+          v-if="shouldShowBarStyleConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'bar-track')"
+          v-model="dashboardPanelDataModel.data.config.show_bar_track"
+          :label="t('dashboard.showBarTrack')"
+          data-test="dashboard-config-show-bar-track"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.showBarTrackTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
       </div>
     </OCollapsible>
 
@@ -2606,11 +2642,14 @@ import {
   shouldShowAxisLabelConfig,
   shouldShowAreaFillConfig,
   shouldShowScatterPointConfig,
+  shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
+import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
 export default defineComponent({
@@ -3785,6 +3824,10 @@ export default defineComponent({
       shouldShowScatterPointConfig,
       isScatterSymbolSizeValid,
       SYMBOL_SIZE_MAX,
+      shouldShowBarStyleConfig,
+      shouldShowBarWidthConfig,
+      isBarWidthValid,
+      BAR_WIDTH_MAX,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)
