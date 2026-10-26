@@ -710,7 +710,7 @@ describe("convertSankeyData", () => {
 
       expect(series(result).links).toHaveLength(1);
       expect(series(result).links[0].value).toBe(17);
-      expect(result.extras.sankeyReturnLinks).toBe(0);
+      expect(result.extras.sankeyNotice.returnLinks).toBe(0);
     });
 
     it("redirects the closing link of an A-B cycle to a return node and keeps the real names", () => {
@@ -718,7 +718,7 @@ describe("convertSankeyData", () => {
       const back = series(result).links.find((link: any) => link.isReturn);
       const returnNode = series(result).data.find((node: any) => node.isReturn);
 
-      expect(result.extras.sankeyReturnLinks).toBe(1);
+      expect(result.extras.sankeyNotice.returnLinks).toBe(1);
       expect(back).toMatchObject({ source: "B", rawSource: "B", rawTarget: "A", value: 4 });
       expect(back.target).toBe(returnNode.name);
       expect(returnNode.name).not.toBe("A");
@@ -730,7 +730,7 @@ describe("convertSankeyData", () => {
       const result: any = convertSankeyData(schema(), rows(["A", "A", 3], ["A", "B", 1]));
       const loop = series(result).links.find((link: any) => link.rawTarget === "A");
 
-      expect(result.extras.sankeyReturnLinks).toBe(1);
+      expect(result.extras.sankeyNotice.returnLinks).toBe(1);
       expect(loop.isReturn).toBe(true);
       expect(loop.source).toBe("A");
       expect(loop.target).not.toBe("A");
@@ -750,11 +750,11 @@ describe("convertSankeyData", () => {
     it("finds cycles with no zero in-degree entry point and shares one return node per target", () => {
       const result: any = convertSankeyData(
         schema(),
-        rows(["A", "B", 1], ["B", "C", 1], ["C", "A", 1], ["B", "A", 2]),
+        rows(["A", "B", 5], ["B", "C", 5], ["C", "A", 1], ["B", "A", 1]),
       );
       const back = series(result).links.filter((link: any) => link.isReturn);
 
-      expect(result.extras.sankeyReturnLinks).toBe(2);
+      expect(result.extras.sankeyNotice.returnLinks).toBe(2);
       expect(back.map((link: any) => link.rawTarget)).toEqual(["A", "A"]);
       expect(new Set(back.map((link: any) => link.target)).size).toBe(1);
       expect(series(result).data.filter((node: any) => node.isReturn)).toHaveLength(1);
@@ -766,7 +766,7 @@ describe("convertSankeyData", () => {
         rows(["A", "B", 1], ["B", "C", 1], ["A", "C", 1]),
       );
 
-      expect(result.extras.sankeyReturnLinks).toBe(0);
+      expect(result.extras.sankeyNotice.returnLinks).toBe(0);
       expect(series(result).data.map((node: any) => node.name)).toEqual(["A", "B", "C"]);
       expect(series(result).links.every((link: any) => link.source === link.rawSource)).toBe(true);
       expect(series(result).links.every((link: any) => link.target === link.rawTarget)).toBe(true);
@@ -784,10 +784,61 @@ describe("convertSankeyData", () => {
         ["0", "B", 2],
         ["A", "D", 3],
       ]);
+      expect(result.extras.sankeyNotice.skippedRows).toBe(2);
     });
 
-    it("returns null options when no link survives", () => {
-      expect(convertSankeyData(schema(), rows(["A", "B", 0]))).toEqual({ options: null });
+    it("returns null options but reports the skipped rows when no link survives", () => {
+      expect(convertSankeyData(schema(), rows(["A", "B", 0], [null, "B", 1]))).toEqual({
+        options: null,
+        extras: { sankeyNotice: { returnLinks: 0, skippedRows: 2 } },
+      });
+    });
+
+    it("gives the same layout, return links and colours whatever the row order", () => {
+      const flows: [any, any, any][] = [
+        ["A", "B", 10],
+        ["B", "C", 10],
+        ["C", "A", 5],
+        ["X", "Y", 8],
+        ["Y", "X", 6],
+        ["P", "X", 3],
+        ["Q", "Y", 2],
+      ];
+      const ascending = convertSankeyData(
+        schema({ color: { mode: "palette-classic" } }),
+        rows(...flows),
+      );
+      const descending = convertSankeyData(
+        schema({ color: { mode: "palette-classic" } }),
+        rows(...[...flows].reverse()),
+      );
+      const shape = (result: any) => ({
+        nodes: series(result).data,
+        links: series(result).links,
+        notice: result.extras.sankeyNotice,
+      });
+
+      expect(shape(descending)).toEqual(shape(ascending));
+      expect(
+        series(ascending)
+          .links.filter((link: any) => link.isReturn)
+          .map((link: any) => [link.rawSource, link.rawTarget]),
+      ).toEqual([
+        ["C", "A"],
+        ["Y", "X"],
+      ]);
+    });
+
+    it("redirects the lighter link of a two-node loop, whichever row comes first", () => {
+      for (const order of [
+        rows(["A", "B", 4], ["B", "A", 10]),
+        rows(["B", "A", 10], ["A", "B", 4]),
+      ]) {
+        const back = series(convertSankeyData(schema(), order)).links.filter(
+          (link: any) => link.isReturn,
+        );
+        expect(back.map((link: any) => [link.rawSource, link.rawTarget])).toEqual([["A", "B"]]);
+      }
     });
 
     it("produces a graph the sankey layout accepts", async () => {
@@ -796,7 +847,7 @@ describe("convertSankeyData", () => {
         schema(),
         rows(["A", "B", 10], ["B", "A", 4], ["B", "B", 1], ["B", "C", 3], ["C", "A", 2]),
       );
-      const chart = echarts.init(null as any, null, {
+      const chart = echarts.init(null, null, {
         renderer: "svg",
         ssr: true,
         width: 400,

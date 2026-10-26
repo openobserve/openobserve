@@ -15,9 +15,35 @@
 
 import { getDataValue } from "./aliasUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { getColorPalette, getSeriesColor } from "./colorPalette";
+import { getColorPalette, getSeriesHash } from "./colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
+
+/** What the sankey could not draw as given: loops redirected to return nodes, and rows it skipped. */
+export interface SankeyNotice {
+  returnLinks: number;
+  skippedRows: number;
+}
+
+interface SankeyQuery {
+  fields?: {
+    source?: { alias: string };
+    target?: { alias: string };
+    value?: { alias: string };
+  };
+}
+
+interface SankeyConfig {
+  unit?: string;
+  unit_custom?: string;
+  decimals?: number;
+  color?: { mode?: string };
+}
+
+interface SankeyPanelSchema {
+  queries?: SankeyQuery[];
+  config?: SankeyConfig;
+}
 
 interface SankeyLink {
   source: string;
@@ -33,6 +59,19 @@ interface SankeyNode {
   label?: { position: "left" };
 }
 
+interface SankeyItemData {
+  rawName?: string;
+  rawSource?: string;
+  rawTarget?: string;
+  isReturn?: boolean;
+}
+
+interface SankeyFormatterParams {
+  dataType?: string;
+  data?: SankeyItemData;
+  value?: unknown;
+}
+
 // The NUL prefix keeps a return node's id from colliding with any real node name.
 const RETURN_NODE_PREFIX = "\u0000↩";
 const RETURN_MARK = "↩";
@@ -40,49 +79,61 @@ const LINK_OPACITY = 0.4;
 
 const returnNodeId = (name: string) => `${RETURN_NODE_PREFIX}${name}`;
 
-/** Sums rows per source→target pair, keeping only named endpoints and finite positive weights. */
-const collectLinks = (panelSchema: any, searchQueryData: any[]): Map<string, SankeyLink> => {
+// Code-point order, so the layout does not vary with the browser locale.
+const compareNames = (a: string, b: string) => {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+};
+
+// Heaviest first, so the DFS keeps big flows as forward links and a lighter one closes the loop.
+const compareOutgoing = (a: SankeyLink, b: SankeyLink) =>
+  b.value - a.value || compareNames(a.target, b.target);
+
+const collectLinks = (panelSchema: SankeyPanelSchema, searchQueryData: unknown[]) => {
   const links = new Map<string, SankeyLink>();
-  panelSchema.queries.forEach((query: any, index: number) => {
+  let skippedRows = 0;
+  (panelSchema.queries ?? []).forEach((query, index) => {
     const rows = searchQueryData[index];
-    const fields = query?.fields;
-    if (!Array.isArray(rows) || !fields?.source || !fields?.target || !fields?.value) return;
-    rows.forEach((row: any) => {
-      const source = getDataValue(row, fields.source.alias);
-      const target = getDataValue(row, fields.target.alias);
-      const value = Number(getDataValue(row, fields.value.alias));
-      if (source == null || target == null || !Number.isFinite(value) || value <= 0) return;
-      const sourceName = String(source);
-      const targetName = String(target);
-      if (sourceName === "" || targetName === "") return;
+    const sourceAlias = query?.fields?.source?.alias;
+    const targetAlias = query?.fields?.target?.alias;
+    const valueAlias = query?.fields?.value?.alias;
+    if (!Array.isArray(rows) || !sourceAlias || !targetAlias || !valueAlias) return;
+    rows.forEach((row: Record<string, unknown>) => {
+      const source = getDataValue(row, sourceAlias);
+      const target = getDataValue(row, targetAlias);
+      const value = Number(getDataValue(row, valueAlias));
+      const sourceName = source === null || source === undefined ? "" : String(source);
+      const targetName = target === null || target === undefined ? "" : String(target);
+      if (sourceName === "" || targetName === "" || !Number.isFinite(value) || value <= 0) {
+        skippedRows++;
+        return;
+      }
       const key = JSON.stringify([sourceName, targetName]);
       const existing = links.get(key);
       if (existing) existing.value += value;
       else links.set(key, { source: sourceName, target: targetName, value });
     });
   });
-  return links;
+  return { links, skippedRows };
 };
 
-/** Finds links that close a cycle, self-loops included, starting the DFS at natural sources. */
 const findBackEdges = (nodes: string[], links: SankeyLink[]): Set<SankeyLink> => {
   const outgoing = new Map<string, SankeyLink[]>();
-  const inDegree = new Map<string, number>();
+  const inflow = new Map<string, number>();
   nodes.forEach((node) => {
     outgoing.set(node, []);
-    inDegree.set(node, 0);
+    inflow.set(node, 0);
   });
   links.forEach((link) => {
     outgoing.get(link.source)!.push(link);
-    inDegree.set(link.target, inDegree.get(link.target)! + 1);
+    inflow.set(link.target, inflow.get(link.target)! + link.value);
   });
+  outgoing.forEach((edges) => edges.sort(compareOutgoing));
 
   const state = new Map<string, "active" | "done">();
   const backEdges = new Set<SankeyLink>();
-  const roots = [
-    ...nodes.filter((node) => inDegree.get(node) === 0),
-    ...nodes.filter((node) => inDegree.get(node) !== 0),
-  ];
+  // Links into a DFS root become the return links, so a loop is entered where the least flows in.
+  const roots = [...nodes].sort((a, b) => inflow.get(a)! - inflow.get(b)! || compareNames(a, b));
 
   roots.forEach((root) => {
     if (state.has(root)) return;
@@ -108,11 +159,12 @@ const findBackEdges = (nodes: string[], links: SankeyLink[]): Set<SankeyLink> =>
   return backEdges;
 };
 
-const formatValue = (value: any, config: any) =>
-  formatUnitValue(getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals));
+const formatValue = (value: unknown, config?: SankeyConfig) =>
+  formatUnitValue(
+    getUnitValue(value, config?.unit as string, config?.unit_custom as string, config?.decimals),
+  );
 
-/** Categorical node colours: hashed by name, or by first appearance for the classic palette. */
-const nodeColorResolver = (config: any) => {
+const nodeColorResolver = (config?: SankeyConfig) => {
   const palette = getColorPalette();
   const byIndex = config?.color?.mode === "palette-classic";
   const colors = new Map<string, string>();
@@ -121,17 +173,17 @@ const nodeColorResolver = (config: any) => {
     if (color === undefined) {
       color = byIndex
         ? palette[colors.size % palette.length]
-        : (getSeriesColor(null, name, 0, 0, 0, "") ?? palette[0]);
+        : palette[getSeriesHash(name, palette)];
       colors.set(name, color);
     }
     return color;
   };
 };
 
-/** Builds the sankey chart; links that close a cycle end at a return node, as the layout needs a DAG. */
-export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
+// ECharts' sankey layout rejects cycles, so a link that closes one ends at a return node instead.
+export const convertSankeyData = (panelSchema: SankeyPanelSchema, searchQueryData: unknown) => {
   const hasValidQuery = panelSchema.queries?.some(
-    (query: any) => query.fields?.source && query.fields?.target && query.fields?.value,
+    (query) => query.fields?.source && query.fields?.target && query.fields?.value,
   );
 
   if (
@@ -143,18 +195,25 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
     return { options: null };
   }
 
-  const summed = [...collectLinks(panelSchema, searchQueryData).values()];
-  if (!summed.length) return { options: null };
+  const collected = collectLinks(panelSchema, searchQueryData);
+  const summed = [...collected.links.values()].sort(
+    (a, b) => compareNames(a.source, b.source) || compareNames(a.target, b.target),
+  );
+  if (!summed.length) {
+    const sankeyNotice: SankeyNotice = { returnLinks: 0, skippedRows: collected.skippedRows };
+    return { options: null, extras: { sankeyNotice } };
+  }
 
   const nodeNames = new Set<string>();
   summed.forEach((link) => {
     nodeNames.add(link.source);
     nodeNames.add(link.target);
   });
-  const backEdges = findBackEdges([...nodeNames], summed);
+  const sortedNames = [...nodeNames].sort(compareNames);
+  const backEdges = findBackEdges(sortedNames, summed);
 
   const colorOf = nodeColorResolver(panelSchema.config);
-  const nodes: SankeyNode[] = [...nodeNames].map((name) => ({
+  const nodes: SankeyNode[] = sortedNames.map((name) => ({
     name,
     rawName: name,
     itemStyle: { color: colorOf(name) },
@@ -189,13 +248,13 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   });
 
   const config = panelSchema.config;
-  const displayName = (data: any) =>
+  const displayName = (data?: SankeyItemData) =>
     data?.isReturn ? `${data.rawName} ${RETURN_MARK}` : String(data?.rawName ?? "");
 
   const options = {
     tooltip: {
       trigger: "item",
-      formatter: function (params: any) {
+      formatter: function (params: SankeyFormatterParams) {
         const name =
           params.dataType === "edge"
             ? `${params.data?.rawSource} > ${params.data?.rawTarget}${params.data?.isReturn ? ` ${RETURN_MARK}` : ""}`
@@ -218,12 +277,16 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
           color: chartColor("--color-text-body"),
           textBorderColor: chartColor("--color-surface-base"),
           textBorderWidth: 3,
-          formatter: (params: any) =>
+          formatter: (params: SankeyFormatterParams) =>
             `${displayName(params.data)}: ${formatValue(params.value, config)}`,
         },
       },
     ],
   };
 
-  return { options, extras: { sankeyReturnLinks: backEdges.size } };
+  const sankeyNotice: SankeyNotice = {
+    returnLinks: backEdges.size,
+    skippedRows: collected.skippedRows,
+  };
+  return { options, extras: { sankeyNotice } };
 };

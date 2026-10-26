@@ -6489,6 +6489,8 @@
     "totalLegends": "總計：{count}",
     "noLegendsAvailable": "無可用圖例",
     "tableFiltering": "欄位篩選",
+    "tableExpandableRows": "可展開列",
+    "tableExpandableRowsTooltip": "每列都有一個展開按鈕，可顯示該列的所有欄位。",
     "columnFormattingTitle": "欄位格式化",
     "columnFormattingSubtitle": "新增您要格式化的欄位，然後使用即時預覽為每個欄位設定樣式。",
     "columnFormattingPick": "選擇欄位",

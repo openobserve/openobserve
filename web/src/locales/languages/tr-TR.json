@@ -6489,6 +6489,8 @@
     "totalLegends": "Toplam: {count}",
     "noLegendsAvailable": "Lejant yok",
     "tableFiltering": "Sütun Filtreleme",
+    "tableExpandableRows": "Genişletilebilir satırlar",
+    "tableExpandableRowsTooltip": "Her satırda tüm alanlarını gösteren bir genişletme düğmesi bulunur.",
     "columnFormattingTitle": "Sütun Biçimlendirme",
     "columnFormattingSubtitle": "Solda kontroller, sağda sütunun canlı bir örneği, böylece bağlam içinde görürsünüz.",
     "columnFormattingPick": "Bir sütun seçin",

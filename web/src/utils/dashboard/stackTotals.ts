@@ -46,6 +46,15 @@ const toFinite = (value: unknown): number | null => {
   return null;
 };
 
+// A time-axis point is [time, value]; a category point sits at its category's index.
+const pointOf = (point: unknown, index: number): [unknown, number | null] => {
+  if (Array.isArray(point)) {
+    const time = point[0] instanceof Date ? point[0].getTime() : point[0];
+    return [time, toFinite(point[1])];
+  }
+  return [index, toFinite(point)];
+};
+
 const sharedSuffix = (names: string[]): string => {
   const suffix = names[0]?.match(NAME_SUFFIX)?.[1];
   return suffix && names.every((name) => name.endsWith(` ${suffix}`)) ? suffix : "";
@@ -127,4 +136,35 @@ export const stackTotalRows = (
     rows.push(`<strong>${escapeHtml(name)} : ${escapeHtml(value)}</strong>`);
   });
   return rows;
+};
+
+/** Widens a user-set value-axis min/max so it never cuts into a stack; positives and negatives stack apart. */
+export const fitAxisBoundsToStacks = (options: any): void => {
+  const axis = options?.yAxis;
+  if (!axis || !Array.isArray(options.series)) return;
+  const hasMax = typeof axis.max === "number";
+  const hasMin = typeof axis.min === "number";
+  if (!hasMax && !hasMin) return;
+  const sums = new Map<string, number>();
+  let hi = -Infinity;
+  let lo = Infinity;
+  options.series.forEach((series: any, seriesIndex: number) => {
+    // Unnamed series carry annotations and limit lines, not stacked data.
+    if (!series?.name || !Array.isArray(series.data)) return;
+    const stack =
+      series.stack === null || series.stack === undefined || series.stack === ""
+        ? `series:${seriesIndex}`
+        : `stack:${series.stack}`;
+    series.data.forEach((point: unknown, index: number) => {
+      const [bucket, value] = pointOf(point, index);
+      if (value === null) return;
+      const key = `${stack}|${value < 0 ? "-" : "+"}|${String(bucket)}`;
+      const sum = (sums.get(key) ?? 0) + value;
+      sums.set(key, sum);
+      hi = Math.max(hi, value, sum);
+      lo = Math.min(lo, value, sum);
+    });
+  });
+  if (hasMax && Number.isFinite(hi)) axis.max = Math.max(axis.max, hi);
+  if (hasMin && Number.isFinite(lo)) axis.min = Math.min(axis.min, lo);
 };

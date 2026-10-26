@@ -6489,6 +6489,8 @@
     "totalLegends": "Tổng: {count}",
     "noLegendsAvailable": "Không có chú thích nào",
     "tableFiltering": "Lọc cột",
+    "tableExpandableRows": "Hàng có thể mở rộng",
+    "tableExpandableRowsTooltip": "Mỗi hàng có một nút mở rộng để hiển thị tất cả các trường của hàng đó.",
     "columnFormattingTitle": "Định dạng cột",
     "columnFormattingSubtitle": "Thêm các trường bạn muốn định dạng, sau đó tạo kiểu cho từng trường với bản xem trước trực tiếp.",
     "columnFormattingPick": "Chọn một cột",

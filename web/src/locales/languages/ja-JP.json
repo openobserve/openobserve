@@ -6489,6 +6489,8 @@
     "totalLegends": "合計:{count}",
     "noLegendsAvailable": "凡例はありません",
     "tableFiltering": "列フィルタリング",
+    "tableExpandableRows": "展開可能な行",
+    "tableExpandableRowsTooltip": "各行に展開ボタンが付き、その行のすべてのフィールドを表示します。",
     "columnFormattingTitle": "列のフォーマット",
     "columnFormattingSubtitle": "書式設定するフィールドを追加し、ライブプレビューを見ながらそれぞれのスタイルを設定します。",
     "columnFormattingPick": "列を選択",

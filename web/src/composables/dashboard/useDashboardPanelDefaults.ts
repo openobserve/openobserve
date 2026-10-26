@@ -113,6 +113,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       column_order: [],
       table_pagination: false,
       table_pagination_rows_per_page: null,
+      table_expandable_rows: false,
       // Pivot table config
       table_pivot_show_row_totals: false,
       table_pivot_show_col_totals: false,
@@ -123,7 +124,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
     },
     htmlContent: "",
     markdownContent: "",
-    customChartContent: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+    customChartContent: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\n// 'context' is read-only: variables (null when All), timeRange {start, end} in microseconds, timezone and theme ('light' or 'dark').\noption = {  \n \n};
   `,
     customChartResult: {},
     queryType: "sql",
@@ -225,6 +226,6 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
 });
 
 export const getDefaultCustomChartText = () => {
-  return ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  return ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\n// 'context' is read-only: variables (null when All), timeRange {start, end} in microseconds, timezone and theme ('light' or 'dark').\noption = {  \n \n};
   `;
 };
