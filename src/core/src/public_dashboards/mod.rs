@@ -3391,7 +3391,11 @@ mod tests {
     #[tokio::test]
     async fn gate12_a_downgrade_stops_new_links_and_keeps_existing_ones() {
         let db = replication::tests::db().await;
-        let paid = create_gate(None).unwrap();
+        // A paid org's row holds its plan limit; Cloud reads a missing row as free.
+        let row = pd_table::upsert_settings(&db, "o", true, Some(50), "plan_sync", 10)
+            .await
+            .unwrap();
+        let paid = create_gate(Some(&row)).unwrap();
         for i in 0..5 {
             let link = replication::tests::link(&format!("l{i}"));
             let made = pd_table::insert_capped(&db, &link, paid, 10, false)
@@ -3399,7 +3403,7 @@ mod tests {
                 .unwrap();
             assert_eq!(made, CreateOutcome::Created);
         }
-        let row = pd_table::upsert_settings(&db, "o", true, Some(3), "admin", 10)
+        let row = pd_table::upsert_settings(&db, "o", true, Some(3), "admin", 11)
             .await
             .unwrap();
         let free = create_gate(Some(&row)).unwrap();
