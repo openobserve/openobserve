@@ -39,6 +39,7 @@ import {
   stateTimelineDrilldownSeries,
   stateTimelineSourceRecord,
 } from "@/utils/dashboard/convertStateTimelineData";
+import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -575,6 +576,8 @@ export function usePanelDrilldown({
       await onExemplarClick?.(params);
       return;
     }
+    // A host map group header has a tooltip but is no cell to drill into.
+    if (panelSchema.value.type === "hostmap" && params?.seriesIndex !== 0) return;
     const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
     // Query-source markers are read-only and explain themselves on hover.
     const isQueryMarker = isMarker && !!params?.data?.annotationDetails?.source;
@@ -729,6 +732,8 @@ export function usePanelDrilldown({
               record,
               stateTimelineSourceRecord(panelSchema.value, data.value, drilldownParams[0]),
             );
+          } else if (chartType === "hostmap") {
+            Object.assign(record, hostmapDrilldownSeries(drilldownParams[0]).labels);
           } else if (queryResult?.length > 0) {
             for (const row of queryResult) {
               let matches = true;
@@ -817,13 +822,17 @@ export function usePanelDrilldown({
         if (!originalQuery || !streamName) return;
 
         const isHeatmap = panelSchema.value.type === "heatmap";
-        const hoveredTime = isHeatmap ? null : drilldownParams[0]?.value?.[0];
+        // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
+        const hoveredTime =
+          isHeatmap || queryDetails.type === "hostmap" ? null : drilldownParams[0]?.value?.[0];
         const hoveredTimestamp = hoveredTime
           ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
         const isStateTimeline = queryDetails.type === "state-timeline";
+        const cell =
+          queryDetails.type === "hostmap" ? hostmapDrilldownSeries(drilldownParams[0]) : null;
         const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
         const calculatedTimeRange = segment
           ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
@@ -849,19 +858,23 @@ export function usePanelDrilldown({
 
           const aliasClause = tableAliases?.length ? ` AS ${tableAliases.join(", ")}` : "";
 
-          const breakdownColumn =
-            segment && breakdown[0]
+          // A host map cell is one entity, so the logs are filtered to it by its entity column.
+          const breakdownColumn = cell
+            ? hostmapEntityColumn(queryDetails)
+            : segment && breakdown[0]
               ? stateTimelineBreakdownColumn(breakdown[0])
               : breakdown[0]?.column;
 
           const seriesIndex = drilldownParams[0]?.seriesIndex;
           const breakdownSeriesName =
             seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
-          const uniqueSeriesName = segment
-            ? segment.__name
-            : breakdownSeriesName
-              ? breakdownSeriesName.originalSeriesName
-              : drilldownParams[0]?.seriesName;
+          const uniqueSeriesName = cell
+            ? cell.__name
+            : segment
+              ? segment.__name
+              : breakdownSeriesName
+                ? breakdownSeriesName.originalSeriesName
+                : drilldownParams[0]?.seriesName;
           const breakdownValue = uniqueSeriesName;
 
           const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
@@ -932,6 +945,8 @@ export function usePanelDrilldown({
             }
           } else if (isStateTimeline) {
             drilldownVariables.series = segment;
+          } else if (cell) {
+            drilldownVariables.series = cell;
           } else {
             drilldownVariables.series = seriesDrilldownVariables(drilldownParams[0]);
           }
@@ -1055,6 +1070,8 @@ export function usePanelDrilldown({
         }
       } else if (panelSchema.value.type == "state-timeline") {
         drilldownVariables.series = stateTimelineDrilldownSeries(drilldownParams[0]);
+      } else if (panelSchema.value.type == "hostmap") {
+        drilldownVariables.series = hostmapDrilldownSeries(drilldownParams[0]);
       } else {
         drilldownVariables.series = seriesDrilldownVariables(drilldownParams[0]);
       }
