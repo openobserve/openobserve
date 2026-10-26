@@ -1,6 +1,7 @@
 // methods: createDashboard, searchDashboard, AddPanel, applyButton
 
 import testLogger from "../../playwright-tests/utils/test-logger.js";
+import { answerPanelLeaveIfShown } from "./panel-leave-dialog.js";
 
 export default class DashboardCreate {
   /**
@@ -415,13 +416,9 @@ export default class DashboardCreate {
     // silently no-op. Click, re-check the URL, and repeat with a fresh locator
     // lookup until we're on the list.
     //
-    // Leaving add_panel with unsaved panel edits fires AddPanel.vue's
-    // onBeforeRouteLeave native window.confirm. Playwright auto-dismisses
-    // dialogs by default, and a dismissed confirm means next(false) — the
-    // route change is cancelled, so every back click no-ops and the loop
-    // burns all its attempts still sitting on add_panel. Accept the dialog
-    // for the duration of the navigation (same handling as
-    // dashboard-multi-sql.js discardPanel()).
+    // Back from the panel editor with unsaved edits opens the in-app leave
+    // dialog, answered with Discard so the route continues and no browser
+    // draft lingers. Native dialogs (e.g. beforeunload) are still accepted.
     const LIST_URL = /\/dashboards(?:\?|$)/;
     const maxClicks = 4;
     let lastError;
@@ -435,7 +432,9 @@ export default class DashboardCreate {
         const backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
         try {
           await backBtn.waitFor({ state: "visible", timeout: 20000 });
+          const fromEditor = this.page.url().includes("add_panel");
           await backBtn.click({ timeout: 10000 });
+          if (fromEditor) await answerPanelLeaveIfShown(this.page);
         } catch (e) {
           // Header may be remounting between the editor and view pages — fall
           // through to the URL check and try again with a fresh lookup.

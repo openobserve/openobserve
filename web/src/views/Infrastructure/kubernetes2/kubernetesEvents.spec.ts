@@ -17,7 +17,9 @@ import { describe, expect, it } from "vitest";
 import {
   clusterFallbackSql,
   detailEventsSql,
+  eventCountsSql,
   eventsSql,
+  parseEventCounts,
   parseEvents,
   parseWarnings,
   warningListRows,
@@ -414,5 +416,22 @@ describe("Cluster overview warnings", () => {
       "prod",
     );
     expect(rows.some((r) => r.object.kind === "Service")).toBe(true);
+  });
+});
+
+describe("event counts", () => {
+  it("counts the latest row per event for one cluster, warnings apart", () => {
+    const sql = eventCountsSql("it's");
+    expect(sql).toContain("k8s_cluster = 'it''s'");
+    expect(sql).toContain("ROW_NUMBER() OVER (PARTITION BY");
+    expect(sql).toContain("count(CASE WHEN type = 'Warning' THEN 1 END) AS warnings");
+    expect(sql).toContain("WHERE rn = 1");
+  });
+
+  it("parses the single count row, coercing strings, and is null without one", () => {
+    expect(parseEventCounts([{ total: 14, warnings: "8" }])).toEqual({ total: 14, warnings: 8 });
+    expect(parseEventCounts([{}])).toEqual({ total: 0, warnings: 0 });
+    expect(parseEventCounts([])).toBeNull();
+    expect(parseEventCounts(undefined)).toBeNull();
   });
 });

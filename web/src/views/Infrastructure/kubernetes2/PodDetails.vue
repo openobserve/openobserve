@@ -26,9 +26,9 @@ import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import ContainerSquares from "./ContainerSquares.vue";
+import { TONE_PILL } from "./k8sTone";
 import type { DetailsRef } from "./kubernetesUrlState";
 import {
-  TONE_TEXT_CLASS,
   chipLabel,
   formatBytes,
   formatCores,
@@ -261,9 +261,13 @@ const sections = computed(() => [
   <div class="flex flex-col gap-4">
     <ODescriptionList dense>
       <ODescriptionItem :label="t('infra.k8s2.columnStatus')" data-test="k8s2-pod-status">
-        <span v-if="row.status" :class="TONE_TEXT_CLASS[toneOf(row.status.variant)]">{{
-          chipLabel(row.status, t)
-        }}</span>
+        <OTag
+          v-if="row.status"
+          size="sm"
+          :variant="TONE_PILL[toneOf(row.status.variant)].variant"
+          :icon="TONE_PILL[toneOf(row.status.variant)].icon"
+          >{{ chipLabel(row.status, t) }}</OTag
+        >
       </ODescriptionItem>
       <ODescriptionItem :label="t('infra.k8s2.columnNode')">
         <OButton
@@ -303,6 +307,7 @@ const sections = computed(() => [
             :key="c.type"
             :variant="c.active ? 'success-soft' : 'default-soft'"
             size="sm"
+            :icon="c.active ? 'check' : 'close'"
             :class="{ 'opacity-50': !c.active }"
             :data-test="`k8s2-pod-condition-${c.type}`"
             :data-active="String(c.active)"
@@ -344,7 +349,7 @@ const sections = computed(() => [
         <div
           v-for="v in section.items"
           :key="v.row.name"
-          class="flex flex-col gap-1"
+          class="border-border-default rounded-default flex flex-col gap-1 border p-2"
           :data-test="`k8s2-pod-container-${v.row.name}`"
         >
           <div class="flex items-center gap-2">
@@ -356,6 +361,11 @@ const sections = computed(() => [
               :label="t('infra.k8s2.columnStatus')"
               :data-test="`k8s2-pod-container-${v.row.name}-status`"
               >{{ stateText(v.row) }}</ODescriptionItem
+            >
+            <ODescriptionItem
+              :label="t('infra.k8s2.columnRestarts')"
+              :data-test="`k8s2-pod-container-${v.row.name}-restarts`"
+              >{{ raw(v.row.restarts == null ? "—" : String(v.row.restarts)) }}</ODescriptionItem
             >
             <ODescriptionItem
               :label="t('infra.k8s2.drawerLastStatus')"
