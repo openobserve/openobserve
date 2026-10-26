@@ -1262,18 +1262,6 @@ export default defineComponent({
     };
 
     const exploreStream = async (props: any) => {
-      // Profiles have their own explorer; Logs cannot read a profiles stream.
-      if (props.row.stream_type === "profiles") {
-        router.push({
-          name: "profiles",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream: props.row.name,
-            period: "15m",
-          },
-        });
-        return;
-      }
       store.dispatch("logs/setIsInitialized", false);
 
       // We need to check if stream is present in store, if not then we need to fetch the stream
