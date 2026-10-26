@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import DOMPurify from "dompurify";
 import { marked } from "marked";
+import { sanitizeMarkdownPanel } from "@/utils/dashboard/markdownPanelSanitizer";
 import {
   escapeHtmlValue,
   processVariableContent,
@@ -25,16 +25,20 @@ export const renderMarkdownPanel = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
+  options?: { allLabel?: string },
 ): string => {
   const nonce = Math.random().toString(36).slice(2);
   const values: string[] = [];
-  const withTokens = processVariableContent(content, variablesData, context, (value) => {
-    values.push(escapeHtmlValue(value));
-    return `o2var${nonce}x${values.length - 1}x`;
+  const withTokens = processVariableContent(content, variablesData, context, {
+    allLabel: options?.allLabel,
+    escapeValue: (value) => {
+      values.push(escapeHtmlValue(value));
+      return `o2var${nonce}x${values.length - 1}x`;
+    },
   });
   const html = (marked(withTokens ?? "") as string).replace(
     new RegExp(`o2var${nonce}x(\\d+)x`, "g"),
     (_, index) => values[Number(index)],
   );
-  return DOMPurify.sanitize(html, { FORBID_TAGS: ["style"] });
+  return sanitizeMarkdownPanel(html);
 };

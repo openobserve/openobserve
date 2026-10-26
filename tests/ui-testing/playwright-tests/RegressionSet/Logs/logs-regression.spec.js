@@ -1628,6 +1628,8 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.triggerEditorSuggestions();
     await pm.logsPage.waitForSuggestionWidgetVisible(5000);
     testLogger.info('✅ Suggestion widget appeared');
+    // Checking for functions before the values load would pass on an empty list.
+    await pm.logsPage.waitForSuggestionRows();
 
     // Verify the suggestion widget does NOT contain function names
     const result = await pm.logsPage.checkSuggestionForFunctions();
@@ -1714,6 +1716,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.triggerEditorSuggestions();
     await pm.logsPage.waitForSuggestionWidgetVisible(5000);
     testLogger.info('✅ Suggestion widget appeared in mixed quote context');
+    await pm.logsPage.waitForSuggestionRows();
 
     // Verify functions are NOT in suggestions (value context filtering).
     // The suggestion engine SHOULD filter functions when cursor is in a value

@@ -674,16 +674,7 @@ describe("useAnnotationsData", () => {
         t,
       );
 
-      const supportedTypes = [
-        "area",
-        "area-stacked",
-        "bar",
-        "h-bar",
-        "line",
-        "scatter",
-        "stacked",
-        "h-stacked",
-      ];
+      const supportedTypes = ["area", "area-stacked", "bar", "line", "scatter", "stacked"];
       const mockDashboardData = {
         tabs: [
           {
@@ -703,6 +694,34 @@ describe("useAnnotationsData", () => {
 
       expect(composable.panelsList.value).toHaveLength(supportedTypes.length);
       expect(composable.panelsList.value.map((p) => p.type)).toEqual(supportedTypes);
+    });
+
+    it("should not offer h-bar or h-stacked panels as annotation targets", async () => {
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+        t,
+      );
+
+      mockGetDashboard.mockResolvedValue({
+        tabs: [
+          {
+            tabId: "tab1",
+            name: "Tab 1",
+            panels: [
+              { id: "panel1", type: "h-bar", title: "H Bar" },
+              { id: "panel2", type: "h-stacked", title: "H Stacked" },
+              { id: "panel3", type: "stacked", title: "Stacked" },
+            ],
+          },
+        ],
+      });
+
+      await composable.fetchAllPanels();
+
+      expect(composable.panelsList.value.map((p) => p.type)).toEqual(["stacked"]);
     });
 
     it("should handle getDashboard error", async () => {

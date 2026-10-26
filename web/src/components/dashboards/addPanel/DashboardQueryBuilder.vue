@@ -649,6 +649,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <PromQLBuilderOptions :dashboardPanelData="dashboardPanelData" />
   </div>
+  <PromQLBuilderOptions
+    v-else-if="promqlMode && shouldShowPromQLQueryType(dashboardPanelData)"
+    :dashboardPanelData="dashboardPanelData"
+    query-type-only
+  />
 
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardMapsQueryBuilder :dashboardData="dashboardData" />
@@ -675,6 +680,7 @@ import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
+import { shouldShowPromQLQueryType } from "@/utils/dashboard/configUtils";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import {
   applyPromqlSeed,
@@ -1544,6 +1550,7 @@ export default defineComponent({
     );
 
     return {
+      shouldShowPromQLQueryType,
       showXAxis,
       t,
       FIELD_FUNCTION_MENU_WIDTH,

@@ -172,7 +172,7 @@
           </ODropdownItem>
         </ODropdown>
 
-        <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
+        <span class="min-w-0 ps-1" :data-test="`log-expand-detail-key-${key}`">
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span

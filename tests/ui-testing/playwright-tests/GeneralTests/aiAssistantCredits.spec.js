@@ -49,10 +49,7 @@ test.describe('AI Assistant credits & paid-usage consent', () => {
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        testLogger.info('Test setup completed');
     });
 
     // A pinned route still in flight when the test ends must not fail it.
@@ -60,14 +57,22 @@ test.describe('AI Assistant credits & paid-usage consent', () => {
         await page.unrouteAll({ behavior: 'ignoreErrors' });
     });
 
+    // The credits notice can fetch ai/usage once while the page loads and not again, so the stub must exist before navigating.
+    async function openChat(page, usage) {
+        if (usage) await pm.aiAssistantCreditsPage.mockAiUsage(usage);
+        await navigateToBase(page);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        testLogger.info('Test setup completed');
+        return pm.aiAssistantCreditsPage.openChat();
+    }
+
     test('should show the exhausted credits notice with Plans and Refresh actions', {
         tag: ['@ai-assistant-credits', '@all', '@cloud', '@P0'],
     }, async ({ page }) => {
         test.skip(!isCloudEnvironment(), 'Credits notice is Cloud-only');
         testLogger.info('Testing exhausted credits notice');
 
-        await pm.aiAssistantCreditsPage.mockAiUsage(exhaustedUsage);
-        const opened = await pm.aiAssistantCreditsPage.openChat();
+        const opened = await openChat(page, exhaustedUsage);
         test.skip(!opened, 'AI Assistant chat is not enabled in this build');
 
         await expect(pm.aiAssistantCreditsPage.getCreditsExhaustedLocator()).toBeVisible({ timeout: 15000 });
@@ -87,8 +92,7 @@ test.describe('AI Assistant credits & paid-usage consent', () => {
         test.skip(!isCloudEnvironment(), 'Credits notice is Cloud-only');
         testLogger.info('Testing low credits notice');
 
-        await pm.aiAssistantCreditsPage.mockAiUsage(lowUsage);
-        const opened = await pm.aiAssistantCreditsPage.openChat();
+        const opened = await openChat(page, lowUsage);
         test.skip(!opened, 'AI Assistant chat is not enabled in this build');
 
         await expect(pm.aiAssistantCreditsPage.getCreditsLowLocator()).toBeVisible({ timeout: 15000 });
@@ -107,8 +111,7 @@ test.describe('AI Assistant credits & paid-usage consent', () => {
         test.skip(!isCloudEnvironment(), 'Credits notice is Cloud-only');
         testLogger.info('Testing Contact Sales swap for contract org');
 
-        await pm.aiAssistantCreditsPage.mockAiUsage(contractExhaustedUsage);
-        const opened = await pm.aiAssistantCreditsPage.openChat();
+        const opened = await openChat(page, contractExhaustedUsage);
         test.skip(!opened, 'AI Assistant chat is not enabled in this build');
 
         await expect(pm.aiAssistantCreditsPage.getCreditsExhaustedLocator()).toBeVisible({ timeout: 15000 });
@@ -125,8 +128,7 @@ test.describe('AI Assistant credits & paid-usage consent', () => {
         test.skip(!isCloudEnvironment(), 'Credits notice is Cloud-only');
         testLogger.info('Testing credits refresh transitions exhausted to low');
 
-        await pm.aiAssistantCreditsPage.mockAiUsage(exhaustedUsage);
-        const opened = await pm.aiAssistantCreditsPage.openChat();
+        const opened = await openChat(page, exhaustedUsage);
         test.skip(!opened, 'AI Assistant chat is not enabled in this build');
         await expect(pm.aiAssistantCreditsPage.getCreditsExhaustedLocator()).toBeVisible({ timeout: 15000 });
 
@@ -144,7 +146,7 @@ test.describe('AI Assistant credits & paid-usage consent', () => {
     }, async ({ page }) => {
         testLogger.info('Testing paid-usage consent gate and declined notice');
 
-        const opened = await pm.aiAssistantCreditsPage.openChat();
+        const opened = await openChat(page);
         test.skip(!opened, 'AI Assistant chat is not enabled in this build');
 
         await pm.aiAssistantCreditsPage.mockChatTurn(412, {
