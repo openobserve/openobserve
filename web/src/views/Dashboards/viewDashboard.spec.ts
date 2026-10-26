@@ -1808,6 +1808,101 @@ describe("ViewDashboard", () => {
     });
   });
 
+  describe("calendar time ranges", () => {
+    const NOW = new Date("2026-10-08T03:00:00Z");
+    const baseDashboard = {
+      dashboardId: "test-dashboard-1",
+      title: "Test Dashboard",
+      variables: { list: [] },
+      tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+    };
+
+    const mountWithPicker = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.currentDashboardData.data = baseDashboard;
+      wrapper.vm.dateTimePicker = { getConsumableDateTime: () => ({}) };
+    };
+
+    beforeEach(() => {
+      store.state.timezone = "UTC";
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("turns the calendar presets on for the header picker", async () => {
+      await mountWithPicker();
+      const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+      expect(picker.props("calendarPresets")).toBe(true);
+    });
+
+    it("reads a calendar token from the URL period and writes it back", async () => {
+      Object.assign(mockExtraRouteQuery, { period: "calendar:month:-1" });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toMatchObject({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:month:-1",
+      });
+      expect(wrapper.vm.getQueryParamsForDuration(wrapper.vm.selectedDate)).toEqual({
+        period: "calendar:month:-1",
+      });
+    });
+
+    it("opens on the dashboard's default calendar period when the URL has no time", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        ...baseDashboard,
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "calendar:week:0" },
+      });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toEqual({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:week:0",
+      });
+    });
+
+    it("keeps __global while an offset-0 period only grows with now", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(settled.start_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00Z") * 1000);
+
+      vi.setSystemTime(new Date("2026-10-08T04:00:00Z"));
+      wrapper.vm.computeAllPanelTimes();
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(settled);
+
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:-1" };
+      wrapper.vm.computeAllPanelTimes();
+      const moved = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(moved).not.toBe(settled);
+      expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-07T00:00:00Z") * 1000);
+      expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-07T23:59:59.999Z") * 1000);
+    });
+
+    it("still refreshes __global on a forced recompute", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+
+      wrapper.vm.computeAllPanelTimes(true);
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).not.toBe(settled);
+    });
+  });
+
   describe("product analytics", () => {
     const mountWithOverflowActions = () =>
       createWrapper({

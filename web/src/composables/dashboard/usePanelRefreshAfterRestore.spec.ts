@@ -35,11 +35,12 @@ const restoredState = () =>
     isOperationCancelled: false,
   });
 
-const setup = ({ autoRun = true, relative = true } = {}) => {
+const setup = ({ autoRun = true, relative = true, calendar = false } = {}) => {
   const state = restoredState();
   const visit = createDashboardFreshOnOpen({
     isAutoRunOn: () => autoRun,
     isRelativeRange: () => relative,
+    isCalendarRange: () => calendar,
   });
   let refresh: any;
   const Panel = defineComponent({
@@ -145,6 +146,18 @@ describe("usePanelRefreshAfterRestore", () => {
     expect(refresh.acceptsCachedWindow(sameWindow, WINDOW)).toBe(true);
     expect(refresh.acceptsCachedWindow(sameLengthLater, WINDOW)).toBe(false);
     expect(refresh.acceptsCachedWindow(undefined, WINDOW)).toBe(false);
+  });
+
+  it("accepts a cached window for a calendar period only when it starts with that period", () => {
+    const { refresh } = setup({ autoRun: false, calendar: true });
+    const periodStart = WINDOW.start_time.getTime();
+
+    expect(
+      refresh.acceptsCachedWindow({ start_time: periodStart, end_time: 1_500_000 }, WINDOW),
+    ).toBe(true);
+    expect(
+      refresh.acceptsCachedWindow({ start_time: 1_800_000, end_time: 1_900_000 }, WINDOW),
+    ).toBe(false);
   });
 
   it("marks only a complete, error-free result as refreshed", () => {

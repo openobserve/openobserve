@@ -70,9 +70,16 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   const heldResult = ref<Pick<S, HeldKey> | null>(null);
 
   // The cache key has no time range, so another absolute window of the same length would pass for this one.
-  const acceptsCachedWindow = (cachedWindow: TimeWindow, selectedWindow: TimeWindow) =>
-    freshOnOpen?.isRelativeRange(panelSchema.value) !== false ||
-    isSameWindow(cachedWindow, selectedWindow);
+  const acceptsCachedWindow = (cachedWindow: TimeWindow, selectedWindow: TimeWindow) => {
+    if (freshOnOpen?.isRelativeRange(panelSchema.value) === false) {
+      return isSameWindow(cachedWindow, selectedWindow);
+    }
+    // A calendar period has fixed bounds, so data from any other window is not that period's data.
+    if (freshOnOpen?.isCalendarRange?.(panelSchema.value)) {
+      return toMs(cachedWindow?.start_time) === toMs(selectedWindow?.start_time);
+    }
+    return true;
+  };
 
   // A restore from another window length is not fresh, even for a panel already refreshed this visit.
   const queueRefresh = () => {

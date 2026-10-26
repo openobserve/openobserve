@@ -15,6 +15,7 @@
 
 import type { LocationQuery } from "vue-router";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
 const RELATIVE_PERIOD_PATTERN = /^[1-9]\d*[smhdwM]$/;
@@ -227,7 +228,8 @@ export const arePickerValuesEqual = (first: any, second: any): boolean => {
 export const isUsablePickerValue = (value: any): boolean => {
   if (!value) return false;
   if (pickerValueType(value) === "relative") {
-    return RELATIVE_PERIOD_PATTERN.test(String(value.relativeTimePeriod ?? ""));
+    const period = String(value.relativeTimePeriod ?? "");
+    return RELATIVE_PERIOD_PATTERN.test(period) || parseCalendarToken(period) !== null;
   }
 
   const start = Number(value.startTime);
@@ -288,6 +290,20 @@ export const isEffectivePanelTimeRelative = (
       convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
     : null;
   return (ownTime?.valueType ?? globalTime?.valueType) === "relative";
+};
+
+/** Whether the range a panel loads with is a calendar period, by the same precedence as isEffectivePanelTimeRelative. */
+export const isEffectivePanelTimeCalendar = (
+  panel: any,
+  query: LocationQuery | undefined,
+  globalTime: { valueType?: string; relativeTimePeriod?: string } | null | undefined,
+): boolean => {
+  const ownTime = hasPanelTime(panel)
+    ? (getPanelTimeFromURL(panel.id, query) ??
+      convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
+    : null;
+  const time = ownTime ?? globalTime;
+  return time?.valueType === "relative" && parseCalendarToken(time.relativeTimePeriod) !== null;
 };
 
 /** Whether a dashboard URL change can move any panel's time; var-, pt- and cell_ params cannot. */

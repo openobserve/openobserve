@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="dateTimePickerRef"
               :disable="disable"
               :auto-apply-dashboard="true"
+              calendar-presets
               class="max-md:[&_.date-time-label]:hidden"
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"

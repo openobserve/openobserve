@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"

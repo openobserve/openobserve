@@ -60,8 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
-          icon-left="schedule"
+          @mouseenter="refreshTooltipNow"
         >
+          <template #icon-left>
+            <OTooltip v-if="triggerTooltip" :content="triggerTooltip" />
+            <OIcon name="schedule" size="sm" />
+          </template>
           <OTruncatedText class="date-time-label flex-1 text-left font-semibold">{{
             triggerLabel
           }}</OTruncatedText>
@@ -75,116 +79,189 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog z-10001 max-h-(--reka-popper-available-height,37.5rem) w-81.25 overflow-y-auto"
+        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] max-sm:flex-col max-sm:overflow-y-auto"
+        :class="showRail ? 'w-131.25 max-sm:w-81.25' : 'w-81.25'"
         @keydown.capture="onPickerKeydown"
       >
-        <div class="flex items-center gap-1 px-3 py-2">
-          <div v-if="!disableRelative" class="flex flex-1 gap-1">
-            <OButton
-              data-test="date-time-relative-tab"
-              class="flex-1"
-              :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
-              size="sm"
-              @click="setDateType('relative')"
-            >
-              {{ t("common.relative") }}
-            </OButton>
-            <OButton
-              data-test="date-time-absolute-tab"
-              class="flex-1"
-              :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
-              size="sm"
-              @click="setDateType('absolute')"
-            >
-              {{ t("common.absolute") }}
-            </OButton>
-          </div>
-          <div v-else class="flex-1" />
-          <OTooltip :content="t('common.copyRange')">
-            <OButton
-              data-test="date-time-copy-btn"
-              variant="ghost"
-              size="icon-xs-sq"
-              icon-left="content-copy"
-              :aria-label="t('common.copyRange')"
-              @click="copyRange"
-            />
-          </OTooltip>
-          <OTooltip :content="t('common.pasteRange')">
-            <OButton
-              data-test="date-time-paste-btn"
-              variant="ghost"
-              size="icon-xs-sq"
-              icon-left="content-paste"
-              :aria-label="t('common.pasteRange')"
-              @click="pasteRange"
-            />
-          </OTooltip>
+        <div
+          v-if="showRail"
+          class="border-border-default relative w-50 shrink-0 border-e max-sm:w-full max-sm:border-e-0 max-sm:border-b"
+          data-test="date-time-rail-frame"
+        >
+          <DateTimeRail
+            :recent="recentRailItems"
+            :calendar="calendarRailItems"
+            :restriction-msg="raw(queryRangeRestrictionMsg)"
+            class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:max-h-36"
+            @hover="refreshTooltipNow"
+            @select-recent="applyRecentRange"
+            @remove-recent="removeRecentRange"
+            @select-calendar="applyCalendarItem"
+          />
         </div>
-        <OSeparator />
-        <div class="overflow-y-visible">
-          <OTabPanels v-model="selectedType" animated>
-            <OTabPanel v-if="!disableRelative" name="relative">
-              <div class="date-time-table relative flex flex-col">
-                <div class="border-border-default border-b px-3 py-2">
-                  <OSearchInput
-                    v-model="relativeSearchTerm"
-                    data-test="date-time-relative-search"
-                  />
-                </div>
-                <div
-                  v-if="filteredRelativePeriods.length === 0"
-                  class="text-text-secondary px-3 py-4 text-center text-sm"
-                >
-                  {{ t("common.noMatchingRelativePresets") }}
-                </div>
-                <div
-                  class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
-                  v-for="(period, index) in filteredRelativePeriods"
-                  :key="'date_' + index"
-                >
-                  <div class="min-w-18.75 text-sm font-semibold">
-                    {{ period.label }}
+        <div
+          class="flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] min-h-0 w-81.25 max-w-full min-w-0 shrink-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
+        >
+          <div class="flex shrink-0 items-center gap-1 px-3 py-2">
+            <div v-if="!disableRelative" class="flex flex-1 gap-1">
+              <OButton
+                data-test="date-time-relative-tab"
+                class="flex-1"
+                :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
+                size="sm"
+                @click="selectTab('relative')"
+              >
+                {{ t("common.relative") }}
+              </OButton>
+              <OButton
+                data-test="date-time-absolute-tab"
+                class="flex-1"
+                :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
+                size="sm"
+                @click="selectTab('absolute')"
+              >
+                {{ t("common.absolute") }}
+              </OButton>
+            </div>
+            <div v-else class="flex-1" />
+            <OTooltip :content="t('common.copyRange')">
+              <OButton
+                data-test="date-time-copy-btn"
+                variant="ghost"
+                size="icon-xs-sq"
+                icon-left="content-copy"
+                :aria-label="t('common.copyRange')"
+                @click="copyRange"
+              />
+            </OTooltip>
+            <OTooltip :content="t('common.pasteRange')">
+              <OButton
+                data-test="date-time-paste-btn"
+                variant="ghost"
+                size="icon-xs-sq"
+                icon-left="content-paste"
+                :aria-label="t('common.pasteRange')"
+                @click="pasteRange"
+              />
+            </OTooltip>
+          </div>
+          <OSeparator class="shrink-0" />
+          <div class="flex min-h-0 flex-1 flex-col max-sm:flex-none">
+            <OTabPanels
+              v-model="selectedType"
+              animated
+              scroll="y"
+              grow
+              class="min-h-0 max-sm:flex-none max-sm:overflow-visible"
+            >
+              <OTabPanel v-if="!disableRelative" name="relative">
+                <div class="date-time-table relative flex flex-col">
+                  <div
+                    class="border-border-default bg-dropdown-bg sticky top-0 z-1 border-b px-3 py-2"
+                  >
+                    <OSearchInput
+                      v-model="relativeSearchTerm"
+                      data-test="date-time-relative-search"
+                    />
                   </div>
-                  <div v-for="(item, item_index) in visibleRelativeItems(period)" :key="item">
-                    <OButton
-                      :disabled="
-                        relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
-                        queryRangeRestrictionInHour > 0
-                      "
-                      :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                      class="h-8! w-8! font-bold! disabled:opacity-35"
-                      :class="
-                        selectedType == 'relative' &&
-                        relativePeriod == period.value &&
-                        relativeValue == item
-                          ? 'bg-button-primary! text-button-primary-foreground!'
-                          : `bg-text-heading/7! ${relativePeriod}`
-                      "
-                      variant="ghost"
-                      size="xs"
-                      @click="setRelativeDate(period.value, item)"
-                      :key="'period_' + item_index"
-                    >
-                      {{ item }}
-                      <OTooltip
-                        v-if="
+                  <div
+                    v-if="filteredRelativePeriods.length === 0"
+                    class="text-text-secondary px-3 py-4 text-center text-sm"
+                  >
+                    {{ t("common.noMatchingRelativePresets") }}
+                  </div>
+                  <div
+                    class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
+                    v-for="(period, index) in filteredRelativePeriods"
+                    :key="'date_' + index"
+                  >
+                    <div class="min-w-18.75 text-sm font-semibold">
+                      {{ period.label }}
+                    </div>
+                    <div v-for="(item, item_index) in visibleRelativeItems(period)" :key="item">
+                      <OButton
+                        :disabled="
                           relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
                           queryRangeRestrictionInHour > 0
                         "
-                        side="right"
-                        align="center"
-                        max-width="18.75rem"
-                        :content="raw(queryRangeRestrictionMsg)"
-                      />
-                    </OButton>
+                        :data-test="`date-time-relative-${item}-${period.value}-btn`"
+                        class="h-8! w-8! font-bold! disabled:opacity-35"
+                        :class="
+                          selectedType == 'relative' &&
+                          calendarToken === null &&
+                          relativePeriod == period.value &&
+                          relativeValue == item
+                            ? 'bg-button-primary! text-button-primary-foreground!'
+                            : `bg-text-heading/7! ${relativePeriod}`
+                        "
+                        variant="ghost"
+                        size="xs"
+                        @click="setRelativeDate(period.value, item)"
+                        :key="'period_' + item_index"
+                      >
+                        {{ item }}
+                        <OTooltip
+                          v-if="
+                            relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
+                            queryRangeRestrictionInHour > 0
+                          "
+                          side="right"
+                          align="center"
+                          max-width="18.75rem"
+                          :content="raw(queryRangeRestrictionMsg)"
+                        />
+                      </OButton>
+                    </div>
+                  </div>
+
+                  <div
+                    class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
+                  >
+                    <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
+                    <OTooltip
+                      side="right"
+                      align="center"
+                      max-width="18.75rem"
+                      v-if="queryRangeRestrictionInHour > 0"
+                      :content="raw(queryRangeRestrictionMsg)"
+                    />
+
+                    <div class="flex min-w-0 flex-1 gap-2">
+                      <div class="flex w-20 flex-col">
+                        <OInput
+                          v-model.number="relativeValue"
+                          :aria-label="t('common.timeAmount')"
+                          type="number"
+                          :min="1"
+                          :step="1"
+                          :max="
+                            relativePeriodsMaxValue[relativePeriod] > 0
+                              ? relativePeriodsMaxValue[relativePeriod]
+                              : undefined
+                          "
+                          @update:model-value="onCustomPeriodSelect"
+                          @focus="onCustomValueFocus"
+                          @blur="onCustomValueBlur"
+                        />
+                      </div>
+                      <div class="flex min-w-0 flex-1 flex-col">
+                        <OSelect
+                          v-model="relativePeriod"
+                          :aria-label="t('common.timeUnit')"
+                          :options="relativePeriodsSelect"
+                          @update:model-value="onCustomPeriodSelect"
+                        >
+                          <template v-slot:selected-item>
+                            <div>{{ getPeriodLabel }}</div>
+                          </template>
+                        </OSelect>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div
-                  class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
-                >
-                  <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
+              </OTabPanel>
+              <OTabPanel name="absolute">
+                <div class="date-time-table flex flex-col">
                   <OTooltip
                     side="right"
                     align="center"
@@ -192,133 +269,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="queryRangeRestrictionInHour > 0"
                     :content="raw(queryRangeRestrictionMsg)"
                   />
-
-                  <div class="flex min-w-0 flex-1 gap-2">
-                    <div class="flex w-20 flex-col">
-                      <OInput
-                        v-model.number="relativeValue"
-                        :aria-label="t('common.timeAmount')"
-                        type="number"
-                        :min="1"
-                        :step="1"
-                        :max="
-                          relativePeriodsMaxValue[relativePeriod] > 0
-                            ? relativePeriodsMaxValue[relativePeriod]
-                            : undefined
-                        "
-                        @update:model-value="onCustomPeriodSelect"
-                        @focus="onCustomValueFocus"
-                        @blur="onCustomValueBlur"
-                      />
-                    </div>
-                    <div class="flex min-w-0 flex-1 flex-col">
-                      <OSelect
-                        v-model="relativePeriod"
-                        :aria-label="t('common.timeUnit')"
-                        :options="relativePeriodsSelect"
-                        @update:model-value="onCustomPeriodSelect"
-                      >
-                        <template v-slot:selected-item>
-                          <div>{{ getPeriodLabel }}</div>
-                        </template>
-                      </OSelect>
-                    </div>
+                  <div class="flex justify-center px-3 py-2">
+                    <ODateRangeCalendar
+                      :start-date="selectedDate.from"
+                      :end-date="selectedDate.to"
+                      :min-date="calendarMinDate"
+                      :max-date="calendarMaxDate"
+                      @update:start-date="selectedDate.from = $event"
+                      @update:end-date="selectedDate.to = $event"
+                    />
                   </div>
-                </div>
-              </div>
-            </OTabPanel>
-            <OTabPanel name="absolute">
-              <div class="date-time-table flex flex-col">
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  v-if="queryRangeRestrictionInHour > 0"
-                  :content="raw(queryRangeRestrictionMsg)"
-                />
-                <div class="flex justify-center px-3 py-2">
-                  <ODateRangeCalendar
-                    :start-date="selectedDate.from"
-                    :end-date="selectedDate.to"
-                    :min-date="calendarMinDate"
-                    :max-date="calendarMaxDate"
-                    @update:start-date="selectedDate.from = $event"
-                    @update:end-date="selectedDate.to = $event"
-                  />
-                </div>
-                <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
-                <OSeparator v-if="!disableRelative" class="my-2" />
+                  <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
+                  <OSeparator v-if="!disableRelative" class="my-2" />
 
-                <table
-                  v-if="!hideRelativeTime"
-                  class="startEndTime mx-[0.4rem] mt-2 mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
-                >
-                  <tbody>
-                    <tr>
-                      <td
-                        class="label o-input-label text-compact text-input-label-text w-1/2 pe-1.5 leading-tight font-medium"
-                      >
-                        {{ t("common.startTime") }}
-                      </td>
-                      <td
-                        class="label o-input-label text-compact text-input-label-text w-1/2 ps-1.5 leading-tight font-medium"
-                      >
-                        {{ t("common.endTime") }}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="w-1/2 pe-1.5">
-                        <OTime
-                          class="w-full"
-                          v-model="selectedTime.startTime"
-                          with-seconds
-                          data-test="datetime-start-time"
-                          @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
-                        />
-                      </td>
-                      <td class="w-1/2 ps-1.5">
-                        <OTime
-                          class="w-full"
-                          v-model="selectedTime.endTime"
-                          :with-seconds="true"
-                          data-test="datetime-end-time"
-                          @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </OTabPanel>
-          </OTabPanels>
-        </div>
-        <div v-if="!hideRelativeTimezone" class="pe-3">
-          <OSelect
-            data-test="datetime-timezone-select"
-            v-model="timezone"
-            :options="timezoneSelectOptions"
-            searchable
-            :label="t('logStream.timezone')"
-            @update:model-value="onTimezoneChange"
-            @open="isTimezoneSelectOpen = true"
-            @close="isTimezoneSelectOpen = false"
-            class="mx-[0.4rem] my-2"
-          />
-        </div>
-        <div v-if="!autoApply" class="border-border-default flex items-center border-t px-3 py-2">
-          <div class="flex-1" />
-          <OButton
-            data-test="date-time-apply-btn"
-            variant="primary"
-            size="xs"
-            class="element-box-shadow"
-            @click="
-              saveDate(null);
-              menuOpen = false;
-            "
+                  <table
+                    v-if="!hideRelativeTime"
+                    class="startEndTime mx-[0.4rem] mt-2 mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
+                  >
+                    <tbody>
+                      <tr>
+                        <td
+                          class="label o-input-label text-compact text-input-label-text w-1/2 pe-1.5 leading-tight font-medium"
+                        >
+                          {{ t("common.startTime") }}
+                        </td>
+                        <td
+                          class="label o-input-label text-compact text-input-label-text w-1/2 ps-1.5 leading-tight font-medium"
+                        >
+                          {{ t("common.endTime") }}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="w-1/2 pe-1.5">
+                          <OTime
+                            class="w-full"
+                            v-model="selectedTime.startTime"
+                            with-seconds
+                            data-test="datetime-start-time"
+                            @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
+                          />
+                        </td>
+                        <td class="w-1/2 ps-1.5">
+                          <OTime
+                            class="w-full"
+                            v-model="selectedTime.endTime"
+                            :with-seconds="true"
+                            data-test="datetime-end-time"
+                            @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </OTabPanel>
+            </OTabPanels>
+          </div>
+          <div v-if="!hideRelativeTimezone" class="shrink-0 pe-3">
+            <OSelect
+              data-test="datetime-timezone-select"
+              v-model="timezone"
+              :options="timezoneSelectOptions"
+              searchable
+              :label="t('logStream.timezone')"
+              @update:model-value="onTimezoneChange"
+              @open="isTimezoneSelectOpen = true"
+              @close="isTimezoneSelectOpen = false"
+              class="mx-[0.4rem] my-2"
+            />
+          </div>
+          <div
+            v-if="!autoApply"
+            class="border-border-default flex shrink-0 items-center border-t px-3 py-2"
           >
-            {{ t("common.apply") }}
-          </OButton>
+            <div class="flex-1" />
+            <OButton
+              data-test="date-time-apply-btn"
+              variant="primary"
+              size="xs"
+              class="element-box-shadow"
+              @click="applyAndClose"
+            >
+              {{ t("common.apply") }}
+            </OButton>
+          </div>
         </div>
       </div>
     </OPopover>
@@ -351,6 +385,7 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import DateTimeRail from "@/components/DateTimeRail.vue";
 import { ref, defineComponent, computed, onMounted, watch, nextTick, type PropType } from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import {
@@ -360,6 +395,22 @@ import {
   timestampToTimezoneDate,
 } from "../utils/zincutils";
 import { subtractRelativeTime } from "@/utils/date";
+import {
+  formatCalendarLabel,
+  formatCalendarTooltip,
+  formatRangeTooltip,
+  parseCalendarToken,
+  resolveCalendarPeriod,
+  shiftCalendarToken,
+} from "@/utils/dashboard/calendarPeriods";
+import {
+  CALENDAR_RAIL_ITEMS,
+  exceedsRangeRestriction,
+  formatRecentRange,
+  type TimeRangeRailItem,
+} from "@/utils/timeRangeRail";
+import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
+import { localeFileMap } from "@/locales";
 import {
   parseDateRangeString,
   parseSingleDateTime,
@@ -408,6 +459,7 @@ export default defineComponent({
     OTime,
     ODateRangeCalendar,
     OPopover,
+    DateTimeRail,
   },
   props: {
     defaultType: {
@@ -480,13 +532,18 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
       default: "outline",
     },
+    /** Offers Today … Last year; off where the backend only parses rolling `<n><unit>` periods. */
+    calendarPresets: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
 
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
@@ -498,6 +555,23 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
+    // A selected calendar period overrides relativePeriod/relativeValue while the type is relative.
+    const calendarToken = ref<string | null>(null);
+    const appliedCalendarToken = ref<string | null>(null);
+    // The relative selection last applied; closing the panel without Apply returns to it so the arrows never act on a pending pick.
+    let appliedSelection = {
+      selectedType: "relative",
+      calendarToken: null as string | null,
+      relativePeriod: "m",
+      relativeValue: 15,
+    };
+    // Offset-0 tooltips end at now, so they read a clock refreshed on hover rather than a stale render time.
+    const tooltipNow = ref(Date.now());
+    const timeRangeHistory = useTimeRangeHistory();
+    // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
+    let isSeedingAbsolute = false;
+    // Date-only pickers cannot show the times a recent range carries.
+    const showRail = computed(() => !props.disableRelative);
     const lastValidCustomValue = ref(15);
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(currentTimezone);
@@ -613,6 +687,66 @@ export default defineComponent({
       relativePeriods.filter((period) => visibleRelativeItems(period).length > 0),
     );
 
+    const intlLocale = computed(() => localeFileMap[String(locale.value)] ?? "en-US");
+
+    const refreshTooltipNow = () => {
+      tooltipNow.value = Date.now();
+    };
+
+    const calendarTooltip = (token: string | null) =>
+      formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined;
+
+    const calendarExceedsRestriction = (token: string | null) => {
+      const range = resolveCalendarPeriod(token, store.state.timezone, tooltipNow.value);
+      return (
+        !!range &&
+        exceedsRangeRestriction(range.startTime, range.endTime, props.queryRangeRestrictionInHour)
+      );
+    };
+
+    const calendarRailItems = computed<TimeRangeRailItem[] | null>(() => {
+      if (!props.calendarPresets) return null;
+      const query = relativeSearchTerm.value.trim().toLowerCase();
+      return CALENDAR_RAIL_ITEMS.map((preset) => ({ preset, label: t(preset.labelKey) }))
+        .filter(({ label }) => !query || label.toLowerCase().includes(query))
+        .map(({ preset, label }) => ({
+          id: preset.id,
+          label,
+          suffix: preset.soFar ? t("common.calendarSoFar") : null,
+          tooltip: calendarTooltip(preset.token),
+          selected: selectedType.value === "relative" && calendarToken.value === preset.token,
+          disabled: calendarExceedsRestriction(preset.token),
+        }));
+    });
+
+    const recentRailItems = computed<TimeRangeRailItem[]>(() => {
+      const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
+      return timeRangeHistory.entries.value.map((entry, index) => {
+        const { label, extraDays } = formatRecentRange(
+          entry.startUs,
+          entry.endUs,
+          store.state.timezone,
+          intlLocale.value,
+          tooltipNow.value,
+        );
+        return {
+          id: String(index),
+          label,
+          suffix: extraDays > 0 ? t("common.plusDays", { count: extraDays }) : null,
+          tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
+          selected:
+            current !== null &&
+            current.startUTC === entry.startUs &&
+            current.endUTC === entry.endUs,
+          disabled: exceedsRangeRestriction(
+            entry.startUs,
+            entry.endUs,
+            props.queryRangeRestrictionInHour,
+          ),
+        };
+      });
+    });
+
     const relativeItemHours = (periodValue: string, item: number) =>
       relativeDatesInHour[periodValue][relativeDates[periodValue].indexOf(item)];
 
@@ -698,6 +832,7 @@ export default defineComponent({
         if (
           props.autoApply &&
           selectedType.value === "absolute" &&
+          !isSeedingAbsolute &&
           store.state.savedViewFlag == false
         ) {
           saveDate("absolute");
@@ -717,6 +852,7 @@ export default defineComponent({
 
     const setRelativeDate = (period: string, value: number) => {
       selectedType.value = "relative";
+      calendarToken.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
       if (props.autoApply) saveDate("relative");
@@ -743,6 +879,7 @@ export default defineComponent({
         MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
       );
       lastValidCustomValue.value = relativeValue.value;
+      calendarToken.value = null;
 
       if (props.autoApply) saveDate("relative-custom");
     };
@@ -755,10 +892,22 @@ export default defineComponent({
         relativeValue.value = lastValidCustomValue.value;
     };
 
+    const setCalendarPeriod = (token: string) => {
+      selectedType.value = "relative";
+      calendarToken.value = token;
+      if (props.autoApply) saveDate("relative");
+    };
+
     const setRelativeTime = (period: string) => {
+      if (props.calendarPresets && resolveCalendarPeriod(period, store.state.timezone)) {
+        calendarToken.value = period;
+        return;
+      }
+
       const periodString = period?.match(/(\d+)([smhdwM])/);
 
       if (periodString) {
+        calendarToken.value = null;
         const periodValue = periodString[1];
         const periodUnit = periodString[2];
 
@@ -863,6 +1012,20 @@ export default defineComponent({
      */
     const markApplied = () => {
       appliedDisplayValue.value = getDisplayValue.value;
+      appliedCalendarToken.value = selectedType.value === "relative" ? calendarToken.value : null;
+      appliedSelection = {
+        selectedType: selectedType.value,
+        calendarToken: calendarToken.value,
+        relativePeriod: relativePeriod.value,
+        relativeValue: relativeValue.value,
+      };
+    };
+
+    const restoreAppliedSelection = () => {
+      selectedType.value = appliedSelection.selectedType;
+      calendarToken.value = appliedSelection.calendarToken;
+      relativePeriod.value = appliedSelection.relativePeriod;
+      relativeValue.value = appliedSelection.relativeValue;
     };
 
     const saveDate = (dateType?: string | null) => {
@@ -894,8 +1057,7 @@ export default defineComponent({
       };
     }
 
-    const setCustomDate = (dateType: string, dateobj: { start: number; end: number }) => {
-      // Parent-invoked setter (e.g. metrics-brush time range) — programmatic.
+    const applyCustomDate = (dateType: string, dateobj: { start: number; end: number }) => {
       var start_date = new Date(Math.floor(dateobj.start));
       const startObj = formatDate(start_date);
 
@@ -910,6 +1072,12 @@ export default defineComponent({
       selectedType.value = dateType;
       markProgrammaticDateChange();
       markApplied();
+    };
+
+    // Parent-invoked setter for a chart drag-zoom — programmatic, but a range the user picked.
+    const setCustomDate = (dateType: string, dateobj: { start: number; end: number }) => {
+      applyCustomDate(dateType, dateobj);
+      recordAbsoluteRange();
     };
 
     const onBeforeShow = () => {
@@ -965,6 +1133,13 @@ export default defineComponent({
     }
 
     const getConsumableDateTime = (): ConsumableDateTime => {
+      const calendarRange =
+        selectedType.value === "relative"
+          ? resolveCalendarPeriod(calendarToken.value, store.state.timezone)
+          : null;
+      if (calendarRange) {
+        return { ...calendarRange, relativeTimePeriod: calendarToken.value };
+      }
       if (selectedType.value == "relative") {
         let period = PERIOD_ARITHMETIC_UNIT[relativePeriod.value];
         let periodValue = relativeValue.value;
@@ -1068,7 +1243,7 @@ export default defineComponent({
           selectedDate.value = dateobj.selectedDate;
           selectedTime.value = dateobj.selectedTime;
         } else {
-          setCustomDate(dateobj.type, {
+          applyCustomDate(dateobj.type, {
             start: dateobj.startTime / 1000,
             end: dateobj.endTime / 1000,
           });
@@ -1112,6 +1287,12 @@ export default defineComponent({
      * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
+    // Mirrors triggerLabel: the live selection while it is in force or being edited, else the applied one.
+    const triggerTooltip = computed(() => {
+      if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
+      return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
+    });
+
     const triggerLabel = computed(() => {
       const label =
         props.autoApply || menuOpen.value
@@ -1121,6 +1302,11 @@ export default defineComponent({
     });
 
     const getDisplayValue = computed(() => {
+      const calendarLabel =
+        !props.disableRelative && selectedType.value === "relative"
+          ? formatCalendarLabel(calendarToken.value, store.state.timezone, t, intlLocale.value)
+          : null;
+      if (calendarLabel) return calendarLabel;
       if (!props.disableRelative && selectedType.value === "relative") {
         const count = isValidCustomValue(relativeValue.value)
           ? relativeValue.value
@@ -1169,8 +1355,12 @@ export default defineComponent({
 
     const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
       selectedType.value = "absolute";
+      calendarToken.value = null;
       setAbsoluteTime(startMicros, endMicros);
-      if (props.autoApply) saveDate(null);
+      if (props.autoApply) {
+        saveDate(null);
+        recordAbsoluteRange();
+      }
     };
 
     const applyParsedRange = (text: string): boolean => {
@@ -1263,6 +1453,28 @@ export default defineComponent({
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
+    const seedAbsoluteFromSelection = () => {
+      const { startTime, endTime } = getConsumableDateTime();
+      if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return;
+      const start = convertUnixTime(startTime);
+      const end = convertUnixTime(endTime);
+      isSeedingAbsolute = true;
+      selectedDate.value.from = start.date;
+      selectedDate.value.to = end.date;
+      selectedTime.value.startTime = start.time;
+      selectedTime.value.endTime = end.time;
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+    };
+
+    // A tab only shows its panel; the range changes once the user picks or edits in it.
+    const selectTab = (type: string) => {
+      if (type === selectedType.value) return;
+      if (type === "absolute" && selectedType.value === "relative") seedAbsoluteFromSelection();
+      selectedType.value = type;
+    };
+
     const setDateType = (type: string) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
@@ -1284,6 +1496,14 @@ export default defineComponent({
      * range; otherwise we save and emit directly.
      */
     const shiftTimeRange = (direction: "prev" | "next") => {
+      if (selectedType.value === "relative" && calendarToken.value !== null) {
+        const shifted = shiftCalendarToken(calendarToken.value, direction === "prev" ? -1 : 1);
+        if (shifted === null || !resolveCalendarPeriod(shifted, store.state.timezone)) return;
+        calendarToken.value = shifted;
+        menuOpen.value = false;
+        saveDate("relative");
+        return;
+      }
       const { startTime, endTime } = getConsumableDateTime();
       const duration = endTime - startTime;
       if (!(duration > 0)) return;
@@ -1308,7 +1528,9 @@ export default defineComponent({
     };
 
     const isNextShiftDisabled = () => {
-      if (selectedType.value === "relative") return true;
+      if (selectedType.value === "relative") {
+        return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
+      }
       const { endUTC } = getUTCTimeStamp();
       return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
     };
@@ -1323,6 +1545,20 @@ export default defineComponent({
       const target = event.target as HTMLElement;
       if (!panel || !target) return;
 
+      const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
+      if (railItem) {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        event.preventDefault();
+        event.stopPropagation();
+        const items = Array.from(
+          panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-item]:not([disabled])"),
+        );
+        const index = items.indexOf(railItem);
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        items[index + step]?.focus();
+        return;
+      }
+
       const tab = target.closest(
         "[data-test='date-time-relative-tab'], [data-test='date-time-absolute-tab']",
       );
@@ -1331,7 +1567,7 @@ export default defineComponent({
           event.preventDefault();
           event.stopPropagation();
           const next = event.key === "ArrowRight" ? "absolute" : "relative";
-          setDateType(next);
+          selectTab(next);
           panel.querySelector<HTMLElement>(`[data-test='date-time-${next}-tab']`)?.focus();
         } else if (event.key === "ArrowDown") {
           event.preventDefault();
@@ -1453,6 +1689,11 @@ export default defineComponent({
           return undefined;
         });
 
+        if (calendarExceedsRestriction(calendarToken.value)) {
+          calendarToken.value = null;
+          if (props.autoApply) saveDate("relative");
+        }
+
         if (props.queryRangeRestrictionInHour > 0) {
           const maxRelativeValue = relativePeriodsMaxValue.value[relativePeriod.value];
 
@@ -1492,15 +1733,85 @@ export default defineComponent({
       emit("show");
     };
 
+    const absoluteRangeKey = () => {
+      if (selectedType.value !== "absolute") return null;
+      const { startUTC, endUTC } = getUTCTimeStamp();
+      return `${startUTC}-${endUTC}`;
+    };
+
+    const recordAbsoluteRange = () => {
+      if (!showRail.value || selectedType.value !== "absolute") return;
+      const { startUTC, endUTC } = getUTCTimeStamp();
+      timeRangeHistory.add(startUTC, endUTC);
+    };
+
+    // An auto-applied absolute range is final only when the panel closes, not after every edit.
+    let rangeKeyAtOpen: string | null = null;
     const menuOpen = ref(false);
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
+        refreshTooltipNow();
+        rangeKeyAtOpen = absoluteRangeKey();
         onBeforeShow();
         onShow();
       } else {
+        if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
+          restoreAppliedSelection();
+        } else if (absoluteRangeKey() !== rangeKeyAtOpen) {
+          recordAbsoluteRange();
+        }
         onBeforeHide();
         onHide();
       }
+    };
+
+    // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
+    const closeMenu = () => {
+      if (!menuOpen.value) return;
+      menuOpen.value = false;
+      onMenuOpenChange(false);
+    };
+
+    const applyAndClose = () => {
+      saveDate(null);
+      recordAbsoluteRange();
+      menuOpen.value = false;
+    };
+
+    const applyCalendarItem = (id: string) => {
+      const preset = CALENDAR_RAIL_ITEMS.find((item) => item.id === id);
+      if (!preset) return;
+      selectedType.value = "relative";
+      calendarToken.value = preset.token;
+      saveDate("relative");
+      closeMenu();
+    };
+
+    const applyRecentRange = (id: string) => {
+      const entry = timeRangeHistory.entries.value[Number(id)];
+      if (!entry) return;
+      const start = convertUnixTime(entry.startUs);
+      const end = convertUnixTime(entry.endUs);
+      // Saved once below, so the auto-apply date watcher must not save it a second time.
+      isSeedingAbsolute = true;
+      selectedDate.value.from = start.date;
+      selectedDate.value.to = end.date;
+      selectedTime.value.startTime = start.time;
+      selectedTime.value.endTime = end.time;
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+      selectedType.value = "absolute";
+      calendarToken.value = null;
+      saveDate("absolute");
+      timeRangeHistory.add(entry.startUs, entry.endUs);
+      rangeKeyAtOpen = absoluteRangeKey();
+      closeMenu();
+    };
+
+    const removeRecentRange = (id: string) => {
+      const entry = timeRangeHistory.entries.value[Number(id)];
+      if (entry) timeRangeHistory.remove(entry);
     };
 
     return {
@@ -1519,6 +1830,18 @@ export default defineComponent({
       relativeSearchTerm,
       visibleRelativeItems,
       filteredRelativePeriods,
+      showRail,
+      calendarRailItems,
+      recentRailItems,
+      applyCalendarItem,
+      applyRecentRange,
+      removeRecentRange,
+      applyAndClose,
+      calendarToken,
+      setCalendarPeriod,
+      calendarTooltip,
+      triggerTooltip,
+      refreshTooltipNow,
       relativeItemHours,
       saveDate,
       onBeforeShow,
@@ -1543,6 +1866,7 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
+      selectTab,
       shiftTimeRange,
       isNextShiftDisabled,
       onPickerKeydown,

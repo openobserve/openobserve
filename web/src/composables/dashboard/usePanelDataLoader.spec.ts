@@ -1837,6 +1837,62 @@ describe("usePanelDataLoader", () => {
         expect(loader.data.value).toBeDefined();
       });
 
+      it.each([
+        ["a calendar period so far, cached earlier from the same start", 0, false],
+        ["a window of another length and start", 30 * 60_000, true],
+      ])("flags restored data from %s as different: %s", async (_label, startShift, differs) => {
+        const panelSchema = createMockPanelSchema();
+        const start = new Date(Date.now() - 3_600_000);
+        const selectedTimeObj = ref({ start_time: start, end_time: new Date() });
+        mockCacheData = {
+          key: {
+            panelSchema: panelSchema.value,
+            variablesData: [],
+            forceLoad: false,
+            dashboardId: "test-dashboard",
+            folderId: "test-folder",
+          },
+          value: {
+            data: [{ test: "cached_data" }],
+            loading: false,
+            errorDetail: { message: "", code: "" },
+            metadata: { queries: [] },
+            annotations: [],
+            resultMetaData: [],
+            lastTriggeredAt: Date.now(),
+            isPartialData: false,
+            isOperationCancelled: false,
+          },
+          cacheTimeRange: {
+            start_time: start.getTime() + startShift,
+            end_time: Date.now() - 600_000,
+          },
+        };
+
+        allowPanelToBecomeVisible();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          createMockVariablesData(),
+          ref({ offsetWidth: 1000 }),
+          ref(false),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+
+        await loader.loadData();
+
+        expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBe(differs);
+      });
+
       it("restores the server diagnostics with the cached result, so a first view shows its notices", async () => {
         const panelSchema = createMockPanelSchema({
           queryConfig: { vrlFunctionQuery: ".parsed = parse_json!(.log)" },

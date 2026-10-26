@@ -942,6 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"

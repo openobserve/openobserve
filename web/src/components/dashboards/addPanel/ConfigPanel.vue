@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :auto-apply-dashboard="true"
                   :hide-relative-timezone="true"
                   :hide-range-shift="true"
+                  calendar-presets
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"

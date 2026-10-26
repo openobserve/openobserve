@@ -918,10 +918,11 @@ export const usePanelDataLoader = (
         };
       }
 
-      // if selected time range is not matched with the cache time range
+      // A calendar period so far keeps its start while its span grows, so a shared start is the same range.
       if (
         selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
+          cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time &&
+        selectedTimeObj?.value?.start_time?.getTime?.() !== cache?.cacheTimeRange?.start_time
       ) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }

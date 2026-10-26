@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nText } from "@/types/i18n";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 import {
   evaluateScanPolicy,
@@ -410,6 +411,8 @@ function timeBounds(
   sinceUs = nowUs,
 ): { startUs: number; endUs: number } | null {
   if (time.type === "absolute") return { startUs: time.startUs, endUs: time.endUs };
+  const calendar = resolveCalendarPeriod(time.period, null, Math.floor(nowUs / 1000));
+  if (calendar) return { startUs: calendar.startTime, endUs: calendar.endTime };
   const duration = periodToMicros(time.period);
   return duration === null ? null : { startUs: sinceUs - duration, endUs: nowUs };
 }

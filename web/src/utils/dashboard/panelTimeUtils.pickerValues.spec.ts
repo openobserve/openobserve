@@ -72,6 +72,8 @@ describe("isUsablePickerValue", () => {
     [{ valueType: "relative", relativeTimePeriod: "2w" }, true],
     [{ valueType: "relative", relativeTimePeriod: "0m" }, false],
     [{ valueType: "relative", relativeTimePeriod: "" }, false],
+    [{ valueType: "relative", relativeTimePeriod: "calendar:month:-1" }, true],
+    [{ valueType: "relative", relativeTimePeriod: "calendar:month:1" }, false],
     [{ valueType: "absolute", startTime: 100, endTime: 200 }, true],
     [{ valueType: "absolute", startTime: "100", endTime: "200" }, true],
     [{ valueType: "absolute", startTime: NaN, endTime: 200 }, false],

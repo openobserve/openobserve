@@ -27,6 +27,7 @@ import {
   type AlertPrefill,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 /**
  * Upper bound on the rolling window we will hand the alert form. A user looking
@@ -104,8 +105,14 @@ export const periodMinutesFromRange = (
   if (!range) return { minutes: DEFAULT_MINUTES, warnings };
 
   let raw = DEFAULT_MINUTES;
+  // Alerts only run rolling periods, so a calendar range keeps its length like an absolute one.
+  const calendarRange =
+    range.type === "relative" ? resolveCalendarPeriod(range.relativeTimePeriod) : null;
 
-  if (range.type === "relative" && range.relativeTimePeriod) {
+  if (calendarRange) {
+    raw = (calendarRange.endTime - calendarRange.startTime) / MICROS_PER_MINUTE;
+    warnings.push(warn("absoluteToRolling", "warning", { minutes: clampPeriodMinutes(raw) }));
+  } else if (range.type === "relative" && range.relativeTimePeriod) {
     const match = /^(\d+)\s*([smhdwM])$/.exec(range.relativeTimePeriod.trim());
     if (match) {
       raw = Number(match[1]) * RELATIVE_UNIT_MINUTES[match[2]];

@@ -15,6 +15,7 @@
 
 import type { LocationQuery, LocationQueryValue } from "vue-router";
 import { generateDurationLabel, parseDuration } from "@/utils/date";
+import { formatCalendarLabel } from "@/utils/dashboard/calendarPeriods";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 
 export type KioskTheme = "light" | "dark";
@@ -171,8 +172,10 @@ export const formatAge = (elapsedMs: number, t: TranslateFn): I18nText => {
   return t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
 };
 
-/** "Past 15 Minutes" for a relative period such as `15m`, or null when it is not one. */
+/** "Past 15 Minutes" for `15m`, "Last month" for a calendar token, or null when it is neither. */
 export const formatRelativePeriod = (period: string | null | undefined, t: TranslateFn) => {
+  const calendarLabel = formatCalendarLabel(period, null, t);
+  if (calendarLabel) return calendarLabel;
   const match = /^(\d+)([smhdwM])$/.exec(period ?? "");
   if (!match) return null;
   const count = Number(match[1]);
