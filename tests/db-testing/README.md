@@ -108,8 +108,17 @@ def test_my_validation(ingest_test_data, db_cursor, test_org, test_stream):
 - `query_api` - Function to query OpenObserve search API
 - `openobserve_base_url` - OpenObserve API base URL
 - `auth_credentials` - Authentication credentials tuple
+- `api` - Call `/api/{org}/...` (or `/api/v2/...` with `v2=True`) as root
+- `destination` - An http template + webhook destination for alert tests
 - `test_org` - Test organization name (default: "default")
 - `test_stream` - Test stream name (default: "db_test_stream")
+
+### Postgres-only drift checks
+
+Cloud runs on Postgres; SQLite (local CI) accepts any value in any column, so type drift only shows up here.
+
+- **Entity vs schema** (`test_entity_column_types.py`): parses every SeaORM entity under `src/infra/src/table` and checks each column's Postgres type and nullability against the migrated schema. No server data needed. `ENTITY_DIRS` adds entity roots and `BUILD_FEATURES` resolves `#[cfg(feature)]` fields (o2-enterprise reuses it for cloud builds).
+- **API round-trips** (`test_alert_roundtrip.py`, `test_object_roundtrips.py`): create an object with every optional field filled, read it back, update it. Empty optional fields are stored as NULL, which skips sqlx's type check, so only filled values exercise every column.
 
 ## CI Integration
 

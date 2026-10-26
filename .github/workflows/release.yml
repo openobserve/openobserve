@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  RUST_TOOLCHAIN: nightly-2026-05-20
+  RUST_TOOLCHAIN: nightly-2026-10-24
 jobs:
   build:
     name: Build binary

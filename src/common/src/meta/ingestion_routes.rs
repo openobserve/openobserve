@@ -30,8 +30,7 @@
 //! else.
 //!
 //! Paths are matched against the request path with the `/api/` (and base-uri)
-//! prefix already stripped, so segment 0 is `{org_id}`. The optional `/v2/`
-//! prefix is normalised away by [`classify`] before matching.
+//! prefix already stripped, so segment 0 is `{org_id}`.
 
 use axum::http::Method;
 
@@ -190,6 +189,12 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
         methods: &["POST"],
         kind: IngestionKind::Write,
     },
+    // `/{org}/v1/opamp` (OpAMP); GET is the WS upgrade and must stay a Write (header-only auth).
+    IngestionRoute {
+        segments: &[Param, Lit("v1"), Lit("opamp")],
+        methods: &["GET", "POST"],
+        kind: IngestionKind::Write,
+    },
     // ---- Elasticsearch-compatibility handshake / template stubs ----
     // NOTE: the ES root version ping `GET /{org}/` is matched directly in
     // `classify` (on its mandatory trailing slash) rather than as a table row,
@@ -232,10 +237,6 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
     },
 ];
 
-/// The `/v2/...` API prefix, stripped before matching so `/v2/{org}/_bulk`
-/// classifies identically to `/{org}/_bulk`.
-const V2_API_PREFIX: &str = "v2";
-
 /// Does this segment pattern list match these path segments?
 fn segments_match(patterns: &[Seg], columns: &[&str]) -> bool {
     if patterns.len() != columns.len() {
@@ -251,9 +252,8 @@ fn segments_match(patterns: &[Seg], columns: &[&str]) -> bool {
 /// Classify a request against the ingestion-route table.
 ///
 /// `path` is the request path with the `/api/` and base-uri prefix already
-/// stripped, so it starts at `{org_id}` (a leading `/` and an optional `/v2/`
-/// prefix are tolerated). It is taken as a `&str` — rather than pre-split
-/// columns — specifically so the Elasticsearch root-ping route `GET /{org}/`
+/// stripped, so it starts at `{org_id}` (a leading `/` is tolerated). It is taken as a `&str` —
+/// rather than pre-split columns — specifically so the Elasticsearch root-ping route `GET /{org}/`
 /// can be told apart from a top-level single-segment collection route such as
 /// `GET /organizations`: the former has a trailing slash, the latter does not.
 ///
@@ -262,12 +262,8 @@ fn segments_match(patterns: &[Seg], columns: &[&str]) -> bool {
 /// everything else — including data-read routes such as `.../traces/latest`,
 /// which are intentionally not in the table.
 pub fn classify(method: &Method, path: &str) -> Option<IngestionKind> {
+    // No ingestion route lives under `/v2`, where segment 0 is not the org.
     let path = path.strip_prefix('/').unwrap_or(path);
-    // Normalise the optional `/v2/{org}/...` prefix to `/{org}/...`.
-    let path = path
-        .strip_prefix(V2_API_PREFIX)
-        .and_then(|rest| rest.strip_prefix('/'))
-        .unwrap_or(path);
 
     let method = method.as_str();
 
@@ -305,6 +301,16 @@ pub fn is_ingestion_write(method: &Method, path: &str) -> bool {
 /// the read-only ES handshake stubs — nothing else.
 pub fn is_ingestion_allowed(method: &Method, path: &str) -> bool {
     classify(method, path).is_some()
+}
+
+/// Is this exactly `{org}/v1/opamp`, the OpAMP route whose auth differs from other writes?
+pub fn is_opamp(path: &str) -> bool {
+    let path = path.strip_prefix('/').unwrap_or(path);
+    let mut columns: Vec<&str> = path.split('/').collect();
+    if columns.len() > 1 && columns.last() == Some(&"") {
+        columns.pop();
+    }
+    matches!(columns.as_slice(), [org, "v1", "opamp"] if !org.is_empty())
 }
 
 #[cfg(test)]
@@ -382,14 +388,23 @@ mod tests {
     }
 
     #[test]
-    fn v2_prefix_is_normalised() {
+    fn v2_module_routes_are_not_ingestion() {
+        for leaf in ["_json", "_multi", "_sub", "_kinesis_firehose"] {
+            let path = format!("v2/default/folders/{leaf}");
+            assert_eq!(classify_path(&Method::POST, &path), None, "POST /{path}");
+        }
+        assert_eq!(classify_path(&Method::GET, "v2/default/_license"), None);
+    }
+
+    #[test]
+    fn an_org_named_v2_ingests_like_any_other_org() {
         assert_eq!(
-            classify_path(&Method::POST, "v2/default/_bulk"),
+            classify_path(&Method::POST, "v2/mystream/_json"),
             Some(IngestionKind::Write)
         );
         assert_eq!(
-            classify_path(&Method::GET, "v2/default/_license"),
-            Some(IngestionKind::EsHandshakeRead)
+            classify_path(&Method::POST, "default/mystream/_json"),
+            Some(IngestionKind::Write)
         );
     }
 
@@ -496,5 +511,26 @@ mod tests {
         }
         // A non-GET/HEAD to `/{org}/` is not the ping either.
         assert_eq!(classify_path(&Method::POST, "default/"), None);
+    }
+
+    #[test]
+    fn opamp_get_and_post_are_ingestion_writes() {
+        for method in [Method::GET, Method::POST] {
+            assert_eq!(
+                classify_path(&method, "default/v1/opamp"),
+                Some(IngestionKind::Write),
+                "{method} /default/v1/opamp must be a header-only ingestion write"
+            );
+        }
+        assert_eq!(classify_path(&Method::PUT, "default/v1/opamp"), None);
+    }
+
+    #[test]
+    fn is_opamp_matches_only_the_org_opamp_path() {
+        assert!(is_opamp("default/v1/opamp"));
+        assert!(is_opamp("default/v1/opamp/"));
+        for path in ["default/v1/opamp/x", "default/v1/logs", "v1/opamp", ""] {
+            assert!(!is_opamp(path), "{path}");
+        }
     }
 }

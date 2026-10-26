@@ -308,7 +308,7 @@ export default defineComponent({
       {
         id: "method",
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: (row: any) => (row.method ?? "").toUpperCase(),
         sortable: true,
         resizable: true,
         hideable: true,
@@ -472,7 +472,9 @@ export default defineComponent({
     const getTemplates = () => {
       queryClient
         .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
-        .then((list: any) => (templates.value = list));
+        .then((list: any) => (templates.value = list))
+        // Template read can be denied (403) to users who may still manage destinations.
+        .catch(() => (templates.value = []));
     };
     const updateRoute = () => {
       const action = router.currentRoute.value.query.action;

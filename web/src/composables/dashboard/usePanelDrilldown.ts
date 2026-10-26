@@ -34,6 +34,11 @@ import {
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
 import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import {
+  stateTimelineBreakdownColumn,
+  stateTimelineDrilldownSeries,
+  stateTimelineSourceRecord,
+} from "@/utils/dashboard/convertStateTimelineData";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -542,7 +547,13 @@ export function usePanelDrilldown({
         } else if (isQueryMarker) {
           handleAddAnnotation(queryMarkerStart(params?.data?.annotationDetails), null);
         } else {
-          handleAddAnnotation(params?.data?.[0] || params?.data?.time || params?.data?.name, null);
+          // A segment's start is its zoned x value, the same unit the other charts pass.
+          const segmentStart =
+            panelSchema.value.type === "state-timeline" ? params?.value?.[0] : undefined;
+          handleAddAnnotation(
+            segmentStart ?? (params?.data?.[0] || params?.data?.time || params?.data?.name),
+            null,
+          );
         }
         return;
       }
@@ -556,7 +567,9 @@ export function usePanelDrilldown({
 
     // Store click parameters for drilldown (including cross-links)
     const crossLinkItems = getCrossLinkDrilldownItems();
-    const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
+    // A state timeline's drilldown reads a segment, so an annotation click only opens the annotation.
+    const annotationOnly = hasAnnotation && panelSchema.value.type === "state-timeline";
+    const shouldShowDrilldown = !annotationOnly && (hasDrilldown || crossLinkItems.length > 0);
 
     if (shouldShowDrilldown) {
       drilldownParams = [params, args];
@@ -669,7 +682,12 @@ export function usePanelDrilldown({
             ? drilldownParams[0]?.name
             : drilldownParams[0]?.seriesName;
 
-          if (queryResult?.length > 0) {
+          if (chartType === "state-timeline") {
+            Object.assign(
+              record,
+              stateTimelineSourceRecord(panelSchema.value, data.value, drilldownParams[0]),
+            );
+          } else if (queryResult?.length > 0) {
             for (const row of queryResult) {
               let matches = true;
               if (xFields.length > 0 && xAxisValue !== undefined) {
@@ -762,7 +780,11 @@ export function usePanelDrilldown({
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-        const calculatedTimeRange = calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+        const isStateTimeline = queryDetails.type === "state-timeline";
+        const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
+        const calculatedTimeRange = segment
+          ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
+          : calculateTimeRange(hoveredTimestamp, intervalMicro.value);
 
         let modifiedQuery = originalQuery;
 
@@ -783,14 +805,19 @@ export function usePanelDrilldown({
 
           const aliasClause = tableAliases?.length ? ` AS ${tableAliases.join(", ")}` : "";
 
-          const breakdownColumn = breakdown[0]?.column;
+          const breakdownColumn =
+            segment && breakdown[0]
+              ? stateTimelineBreakdownColumn(breakdown[0])
+              : breakdown[0]?.column;
 
           const seriesIndex = drilldownParams[0]?.seriesIndex;
           const breakdownSeriesName =
             seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
-          const uniqueSeriesName = breakdownSeriesName
-            ? breakdownSeriesName.originalSeriesName
-            : drilldownParams[0]?.seriesName;
+          const uniqueSeriesName = segment
+            ? segment.__name
+            : breakdownSeriesName
+              ? breakdownSeriesName.originalSeriesName
+              : drilldownParams[0]?.seriesName;
           const breakdownValue = uniqueSeriesName;
 
           const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
@@ -859,6 +886,8 @@ export function usePanelDrilldown({
                 __value: drilldownParams[0]?.data?.value ?? "",
               };
             }
+          } else if (isStateTimeline) {
+            drilldownVariables.series = segment;
           } else {
             drilldownVariables.series = {
               __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
@@ -988,6 +1017,8 @@ export function usePanelDrilldown({
             __value: drilldownParams[0]?.data?.value ?? "",
           };
         }
+      } else if (panelSchema.value.type == "state-timeline") {
+        drilldownVariables.series = stateTimelineDrilldownSeries(drilldownParams[0]);
       } else {
         // we have an series object
         drilldownVariables.series = {

@@ -336,6 +336,8 @@ export default defineComponent({
       } catch (error: any) {
         // The browser aborts this request when the user leaves the page before it returns.
         if (error?.code === "ECONNABORTED") return;
+        // Offline or blocked before any response; nothing for us to fix.
+        if (error?.code === "ERR_NETWORK") return;
         console.error("Error during redirection:", error);
       }
     };

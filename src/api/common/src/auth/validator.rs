@@ -381,6 +381,58 @@ where
     }
 }
 
+#[cfg(feature = "enterprise")]
+async fn fleet_token_response(
+    user_id: &str,
+    token: &str,
+    path_org: Option<&str>,
+    method: &Method,
+    path: &str,
+) -> TokenValidationResponse {
+    let fleet_enabled = openobserve_core::fleet::enabled();
+    fleet_token_response_with(fleet_enabled, user_id, token, path_org, method, path).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn fleet_token_response(
+    _user_id: &str,
+    _token: &str,
+    _path_org: Option<&str>,
+    _method: &Method,
+    _path: &str,
+) -> TokenValidationResponse {
+    TokenValidationResponse::default()
+}
+
+#[cfg(feature = "enterprise")]
+async fn fleet_token_response_with(
+    fleet_enabled: bool,
+    user_id: &str,
+    token: &str,
+    path_org: Option<&str>,
+    method: &Method,
+    path: &str,
+) -> TokenValidationResponse {
+    use o2_enterprise::enterprise::fleet::enrollment::ENROLLMENT;
+
+    let ingestion_write = ingestion_routes::is_ingestion_write(method, path);
+    match ENROLLMENT
+        .accept(fleet_enabled, ingestion_write, token, path_org)
+        .await
+    {
+        Some(t) => TokenValidationResponse {
+            is_valid: true,
+            user_email: user_id.to_string(),
+            is_internal_user: true,
+            user_role: None,
+            user_name: t.name.clone(),
+            family_name: "".to_string(),
+            given_name: t.name,
+        },
+        None => TokenValidationResponse::default(),
+    }
+}
+
 pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
@@ -438,6 +490,18 @@ pub async fn validate_credentials(
         }
     }
 
+    // Never falls through, so an `o2ft_` value is never tried as a user's password.
+    if user_password.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX) {
+        return Ok(fleet_token_response(
+            user_id,
+            user_password,
+            path_columns.first().copied(),
+            method,
+            path,
+        )
+        .await);
+    }
+
     // Decide whether an org ingestion token (`o2oi_`) may be used on this
     // request. GHSA-wffq-g8qf-ccmv: the previous check accepted the token
     // whenever an ingestion word appeared *anywhere* in the path for *any*
@@ -448,6 +512,10 @@ pub async fn validate_credentials(
     // stubs are accepted — data-read routes are not in the table. `path` (not
     // the trailing-slash-trimmed `path_columns`) is passed so the ES root ping
     // `GET /{org}/` stays distinguishable from `/organizations` etc.
+    // §4.2: OpAMP accepts fleet tokens only, which returned above.
+    if ingestion_routes::is_opamp(path) {
+        return Ok(TokenValidationResponse::default());
+    }
     let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path);
 
     // Check org-level ingestion tokens before user lookup.
@@ -907,6 +975,9 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
             && ingestion_routes::is_ingestion_write(method, path)
             && openobserve_core::organization::check_and_create_org(org_id)
                 .await
+                .inspect_err(|error| {
+                    log::warn!("Failed to auto-create organization '{org_id}': {error}");
+                })
                 .is_ok()
         {
             Ok(())
@@ -1898,7 +1969,95 @@ CN5lTowpVXP2OIiiNTGa75Fj
             );
         }
 
+        // OpAMP is an ingestion-write row, yet only `o2ft_` tokens may manage collectors.
+        for method in [Method::GET, Method::POST] {
+            assert!(
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    "default/v1/opamp",
+                    &method,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
+                "org ingestion token must not be accepted on {method} /default/v1/opamp"
+            );
+        }
+
         ORG_INGESTION_TOKENS.remove(&format!("{org_id}/{token}"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn fleet_token_is_valid_only_on_its_org_writes_while_fleet_is_on() {
+        use o2_enterprise::enterprise::fleet::enrollment::{CachedToken, ENROLLMENT, hash_token};
+
+        let cached = |id: &str, revoked: bool| CachedToken {
+            id: id.to_string(),
+            org_id: "default".to_string(),
+            name: format!("fleet-{id}"),
+            fleet_id: "default".to_string(),
+            created_at: 1,
+            expires_at: None,
+            revoked,
+            loaded_at: std::time::Instant::now(),
+        };
+        let live = "o2ft_validator_live_0123456789abcdef0";
+        let revoked = "o2ft_validator_revoked_0123456789abc";
+        let hash = hash_token;
+        ENROLLMENT.cache_token(hash(live), cached("live", false));
+        ENROLLMENT.cache_token(hash(revoked), cached("revoked", true));
+        let check = |enabled: bool, token: &'static str, method: Method, path: &'static str| async move {
+            let org = path.split('/').next();
+            fleet_token_response_with(enabled, "agent", token, org, &method, path)
+                .await
+                .is_valid
+        };
+
+        for (method, path) in [
+            (Method::GET, "default/v1/opamp"),
+            (Method::POST, "default/v1/opamp"),
+            (Method::POST, "default/v1/logs"),
+            (Method::POST, "default/v1/metrics"),
+        ] {
+            assert!(
+                check(true, live, method.clone(), path).await,
+                "{method} /{path}"
+            );
+        }
+        let valid = fleet_token_response_with(
+            true,
+            "agent",
+            live,
+            Some("default"),
+            &Method::POST,
+            "default/v1/opamp",
+        )
+        .await;
+        assert_eq!(
+            (
+                valid.user_email.as_str(),
+                valid.is_internal_user,
+                valid.user_role
+            ),
+            ("agent", true, None)
+        );
+        assert_eq!(valid.given_name, "fleet-live");
+
+        for (method, path) in [
+            (Method::POST, "other/v1/opamp"),
+            (Method::GET, "default/mystream/traces/latest"),
+            (Method::GET, "default/"),
+        ] {
+            assert!(
+                !check(true, live, method.clone(), path).await,
+                "{method} /{path}"
+            );
+        }
+        assert!(!check(true, revoked, Method::POST, "default/v1/opamp").await);
+        assert!(!check(false, live, Method::POST, "default/v1/opamp").await);
     }
 
     #[tokio::test]
@@ -2110,6 +2269,15 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
+        for method in [Method::GET, Method::POST] {
+            assert!(
+                !validate_credentials(init_user, pwd, "default/v1/opamp", &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "a login must not manage collectors on {method}"
+            );
+        }
         let stored_ext = get_hash(pwd, &config::get_ext_auth_salt());
         for (path, method) in [
             ("default/_bulk", Method::POST),
@@ -2127,6 +2295,37 @@ CN5lTowpVXP2OIiiNTGa75Fj
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
         exercise_path_org_is_the_routed_org().await;
+
+        let static_token = users::get_user(Some(org_id), init_user)
+            .await
+            .unwrap()
+            .token;
+        assert!(
+            validate_credentials(
+                init_user,
+                &static_token,
+                "default/v1/logs",
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid
+        );
+        assert!(
+            !validate_credentials(
+                init_user,
+                &static_token,
+                "default/v1/opamp",
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "a user's ingestion-only static token must not manage collectors"
+        );
+        fleet_prefixed_password_never_reaches_the_user_lookup(org_id, init_user).await;
 
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
@@ -2168,9 +2367,20 @@ CN5lTowpVXP2OIiiNTGa75Fj
     async fn exercise_path_org_is_the_routed_org() {
         let pwd = "Complexpass#123";
         let member = "kv-member@example.com";
-        for org in ["kv", "api", "v2", "aws", "gcp"] {
+        for org in ["kv", "api", "aws", "gcp"] {
             let _ = organization::check_and_create_org_without_ofga(org).await;
         }
+        // `v2` is reserved for new orgs, so it is seeded as an org that predates the reservation.
+        let _ = infra::table::organizations::add(
+            "v2",
+            "v2",
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await;
+        assert!(
+            organization::get_org("v2").await.is_some(),
+            "org v2 is not seeded"
+        );
         seed_user_without_password_ext("kv", member, UserRole::Admin, pwd, "kv-member-tok").await;
         let credentials = base64::encode(&format!("{member}:{pwd}"));
         let basic = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
@@ -2416,6 +2626,59 @@ CN5lTowpVXP2OIiiNTGa75Fj
                     .unwrap()
                     .is_valid,
                 "auth_ext for {email} without a password_ext must be refused"
+            );
+        }
+    }
+
+    /// A real user whose password happens to start `o2ft_` still cannot log in with it.
+    async fn fleet_prefixed_password_never_reaches_the_user_lookup(org_id: &str, root_user: &str) {
+        let user = "fleetpwd@example.com";
+        let pwd = "o2ft_Complexpass#123";
+        // `is_root_user` reads the org-user cache, which nothing populates under test.
+        ORG_USERS.insert(
+            format!("{DEFAULT_ORG}/{root_user}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: None,
+                org_id: DEFAULT_ORG.to_string(),
+                email: root_user.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let _ = users::post_user(
+            org_id,
+            UserRequest {
+                email: user.to_string(),
+                password: pwd.to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "fleet".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            root_user,
+        )
+        .await;
+        assert!(
+            users::get_user(Some(org_id), user).await.is_some(),
+            "fixture must create the user"
+        );
+        for (path, method) in [
+            ("default/v1/opamp", Method::POST),
+            ("default/v1/logs", Method::POST),
+            ("default/user", Method::GET),
+        ] {
+            assert!(
+                !validate_credentials(user, pwd, path, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "an o2ft_ password reached the user lookup on {method} /{path}"
             );
         }
     }

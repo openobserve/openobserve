@@ -134,6 +134,10 @@ const FALLBACKS: Record<string, string> = {
   "--color-status-success-bg": "#f2fcf3",
   "--color-status-success-text": "#20883b",
   "--color-success-200": "#bbf7d0",
+  // Threshold step presets (light values from base.css).
+  "--color-success-500": "#22c55e",
+  "--color-amber-500": "#f59e0b",
+  "--color-error-500": "#ef4444",
   // JSON syntax highlighting in dashboard field renderers (light values from base.css).
   "--color-json-boolean": "#6d28d9",
   "--color-json-key": "#b71c1c",

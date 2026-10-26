@@ -120,7 +120,7 @@ export default defineComponent({
         description: value.description ?? "",
         variables: {
           list: [],
-          showDynamicFilters: true,
+          showDynamicFilters: false,
         },
         defaultDatetimeDuration: {
           startTime: null,

@@ -298,12 +298,10 @@ pub fn is_search_job_result_path(path: &str) -> bool {
             .all(|c| matches!(c, Component::Normal(_)))
 }
 
-/// Delete every S3 result file backing an org's search jobs. Used by org cleanup:
-/// the DB rows are removed by `search_jobs::delete_by_org`, but the result objects
-/// in storage (keyed by created_at/trace_id, not org) would otherwise be orphaned.
-/// Best-effort per job; a storage error on one job does not abort the rest.
+/// Tries every job of the org and returns the first storage error.
 pub async fn delete_org_result_files(org_id: &str) -> Result<(), anyhow::Error> {
     let jobs = list_status_by_org_id(org_id).await?;
+    let mut first_err = None;
     for job in jobs.iter() {
         let mut deleted_files = Vec::new();
         if let Some(partition_num) = job.partition_num {
@@ -338,9 +336,10 @@ pub async fn delete_org_result_files(org_id: &str) -> Result<(), anyhow::Error> 
                 "[SEARCH JOB] delete_org_result_files org={org_id} job={} error: {e}",
                 job.id
             );
+            first_err.get_or_insert(anyhow::anyhow!("job {}: {e}", job.id));
         }
     }
-    Ok(())
+    first_err.map_or(Ok(()), Err)
 }
 
 pub async fn delete_jobs() -> Result<(), anyhow::Error> {

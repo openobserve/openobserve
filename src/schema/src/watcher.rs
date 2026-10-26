@@ -234,6 +234,7 @@ async fn watch(
                 {
                     log::error!("[Schema:watch] del_offset: {e}");
                 }
+                ::db::compact::downsampling::evict_stream(org_id, stream_type, stream_name).await;
 
                 if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
                     let data_dir = format!(

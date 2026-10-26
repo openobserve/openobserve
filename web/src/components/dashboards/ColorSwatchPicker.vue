@@ -94,9 +94,9 @@ export default defineComponent({
   props: {
     modelValue: { type: String as PropType<string | null>, default: null },
     swatches: { type: Array as PropType<string[]>, required: true },
-    // A source/field that must always carry a color hides the "no color" swatch.
-    allowNone: { type: Boolean, default: true },
     dataTest: { type: String, default: "" },
+    // Off where a colour is required, so the row can never be cleared.
+    allowNone: { type: Boolean, default: true },
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {

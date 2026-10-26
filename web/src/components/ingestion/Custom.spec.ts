@@ -300,7 +300,6 @@ describe("Custom Component", () => {
         button: "Copy to Clipboard",
         ingestion: mockRouter.currentRoute.value.name,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
     });
@@ -838,7 +837,6 @@ describe("Custom Component", () => {
         button: "Copy to Clipboard",
         ingestion: "prometheus",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
     });

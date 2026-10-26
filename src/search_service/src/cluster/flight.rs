@@ -147,11 +147,7 @@ pub async fn search(
     } else {
         req.search_event_type
             .as_ref()
-            .map(|v| {
-                SearchEventType::try_from(v.as_str())
-                    .ok()
-                    .map(RoleGroup::from)
-            })
+            .map(|v| v.parse::<SearchEventType>().ok().map(RoleGroup::from))
             .unwrap_or(Some(RoleGroup::Interactive))
     };
     let mut nodes =

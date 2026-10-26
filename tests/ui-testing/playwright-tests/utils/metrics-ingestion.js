@@ -1,5 +1,6 @@
 const testLogger = require('./test-logger');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -20,7 +21,7 @@ class MetricsIngestion {
             // Normalize the endpoint to avoid double slashes
             endpoint = endpoint.replace(/\/+/g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
         } else {
-            endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
+            endpoint = `${ingestBase(baseUrl)}/api/${orgName}/v1/metrics`;
         }
 
         // On cloud, auth is handled by getAuthHeaders() (email:passcode from cloud-config.json)
@@ -33,6 +34,7 @@ class MetricsIngestion {
 
         this.config = {
             endpoint: endpoint,
+            queryBase: process.env.METRICS_ENDPOINT ? endpoint.replace('/v1/metrics', '') : `${baseUrl}/api/${orgName}`,
             username: process.env.ZO_ROOT_USER_EMAIL || '',
             password: process.env.ZO_ROOT_USER_PASSWORD || '',
             orgId: orgName,
@@ -395,7 +397,7 @@ class MetricsIngestion {
      * so callers proceed and let the test's own data assertion fail loudly.
      */
     async waitForMetricQueryable(metricName, maxRetries = 30, interval = 1000) {
-        const base = this.config.endpoint.replace('/v1/metrics', '');
+        const base = this.config.queryBase;
         const url = `${base}/prometheus/api/v1/query?query=${encodeURIComponent(metricName)}`;
         const headers = getAuthHeaders();
         for (let i = 0; i < maxRetries; i++) {

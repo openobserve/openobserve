@@ -756,7 +756,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         };
         let work_group = result.work_group.clone().unwrap_or_default();
         let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
-            search::SearchEventType::try_from(s_event_type.as_str())
+            s_event_type
+                .parse::<search::SearchEventType>()
                 .unwrap_or(search::SearchEventType::UI)
         });
         status.push(search::QueryStatus {

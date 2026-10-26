@@ -13,32 +13,51 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
+import i18n from "@/locales";
 import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 
-const swatches = ["#111111", "#222222", "#333333"];
+const SWATCHES = ["#22c55e", "#f59e0b", "#ef4444"];
+
+const mountPicker = (props: Record<string, unknown> = {}) =>
+  mount(ColorSwatchPicker, {
+    props: { swatches: SWATCHES, dataTest: "picker", ...props },
+    global: { plugins: [i18n] },
+  });
 
 describe("ColorSwatchPicker", () => {
-  it("renders the 'no color' swatch by default", () => {
-    const wrapper = mount(ColorSwatchPicker, {
-      props: { modelValue: null, swatches, dataTest: "picker" },
-    });
-    expect(wrapper.find('[data-test="picker-none"]').exists()).toBe(true);
+  it("shows the None square by default, so its current users are unchanged", () => {
+    const wrapper = mountPicker();
+    const none = wrapper.find('[data-test="picker-none"]');
+    expect(none.exists()).toBe(true);
+    expect(none.attributes("aria-pressed")).toBe("true");
   });
 
-  it("hides the 'no color' swatch when allowNone is false", () => {
-    const wrapper = mount(ColorSwatchPicker, {
-      props: { modelValue: swatches[0], swatches, allowNone: false, dataTest: "picker" },
-    });
+  it("emits null when None is clicked", async () => {
+    const wrapper = mountPicker({ modelValue: "#22c55e" });
+    await wrapper.find('[data-test="picker-none"]').trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toEqual([[null]]);
+  });
+
+  it("hides None when allowNone is false and keeps the swatches and custom input", () => {
+    const wrapper = mountPicker({ allowNone: false, modelValue: "#f59e0b" });
     expect(wrapper.find('[data-test="picker-none"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test^="picker-swatch-"]')).toHaveLength(3);
+    expect(wrapper.find('input[type="color"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="picker-swatch-1"]').attributes("aria-pressed")).toBe("true");
   });
 
-  it("emits the clicked swatch value", async () => {
-    const wrapper = mount(ColorSwatchPicker, {
-      props: { modelValue: null, swatches, allowNone: false, dataTest: "picker" },
-    });
-    await wrapper.find('[data-test="picker-swatch-1"]').trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual(["#222222"]);
+  it("emits the swatch value when a swatch is clicked", async () => {
+    const wrapper = mountPicker({ allowNone: false });
+    await wrapper.find('[data-test="picker-swatch-2"]').trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toEqual([["#ef4444"]]);
+  });
+
+  it("emits the custom colour from the native input", async () => {
+    const wrapper = mountPicker({ allowNone: false });
+    const input = wrapper.find('input[type="color"]');
+    await input.setValue("#123456");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["#123456"]);
   });
 });

@@ -331,6 +331,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^cloud_api_smoke$/,           // Cloud/cloudApiSmoke.spec.js seed stream (re-seeded each run)
         /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
         /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
         /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
@@ -394,7 +395,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
         /^e2e_backfill_dest_\d+$/,                     // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
         /^e2e_time_test_\d+$/,                      // e2e_time_test_<timestamp>
-        /^pw_lib_(ready|absent)_/                   // alert-library.spec.js (Alert Library e2e readiness streams)
+        /^pw_lib_(ready|absent)_/,                  // alert-library.spec.js (Alert Library e2e readiness streams)
+        /^e2e_panel_notices_/                       // panelNotices.spec.js (high-cardinality series-cap streams)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
