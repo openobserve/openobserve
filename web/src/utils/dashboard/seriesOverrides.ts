@@ -22,6 +22,30 @@ import type { ThresholdMode, ThresholdShowAs } from "./thresholds";
 
 export type SeriesOverrideMatchBy = "name" | "regex";
 
+export type SeriesLineStyle = "solid" | "dashed" | "dotted";
+export type SeriesDrawStyle = "line" | "bars" | "points";
+export type SeriesYAxisSide = "left" | "right";
+
+/** Where a series is left out; an unset or false flag keeps it. */
+export interface SeriesHideFrom {
+  chart?: boolean;
+  legend?: boolean;
+  tooltip?: boolean;
+}
+
+/** Visual settings of one series on a line, area or bar chart; unset keeps the panel default. */
+export interface SeriesStyle {
+  lineStyle?: SeriesLineStyle;
+  lineWidth?: number;
+  /** Percent, 0 to 100. */
+  fillOpacity?: number;
+  showPoints?: boolean;
+  drawStyle?: SeriesDrawStyle;
+  stackGroup?: string;
+  yAxis?: SeriesYAxisSide;
+  hideFrom?: SeriesHideFrom;
+}
+
 /** Thresholds as stored inside an override; every field may be missing. */
 export interface SeriesOverrideThresholds {
   mode?: ThresholdMode;
@@ -42,6 +66,7 @@ export interface SeriesOverride {
   thresholds?: SeriesOverrideThresholds;
   /** Value mappings for this series only, in `config.mappings` form; the state timeline reads them per row. */
   valueMappings?: any[];
+  style?: SeriesStyle;
 }
 
 /** The settings of every override matching one series, merged in list order. */
@@ -53,6 +78,7 @@ export interface ResolvedSeriesOverride {
   color?: string;
   thresholds?: SeriesOverrideThresholds;
   valueMappings?: any[];
+  style?: SeriesStyle;
 }
 
 /** Arguments for `getUnitValue`, the override's unit settings merged over the panel's. */
@@ -92,6 +118,11 @@ export const SERIES_OVERRIDE_MATCH_BY = { EXACT: "series", REGEX: "series_regex"
 
 const MAX_COMPILED_PATTERNS = 500;
 
+const LINE_STYLES: ReadonlySet<string> = new Set(["solid", "dashed", "dotted"]);
+const DRAW_STYLES: ReadonlySet<string> = new Set(["line", "bars", "points"]);
+const Y_AXIS_SIDES: ReadonlySet<string> = new Set(["left", "right"]);
+const HIDE_FROM_KEYS = ["chart", "legend", "tooltip"] as const;
+
 const LEGEND_RICH_PREFIXES = ["{a|", "{b|"];
 
 const compiledPatterns = new Map<string, RE2JS | null>();
@@ -127,6 +158,75 @@ const hasThresholdSteps = (thresholds: unknown): thresholds is SeriesOverrideThr
 
 const hasValueMappings = (mappings: unknown): mappings is any[] =>
   Array.isArray(mappings) && mappings.length > 0;
+
+const toNonNegative = (value: unknown, max = Infinity): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, max) : null;
+};
+
+const toHideFrom = (value: unknown): SeriesHideFrom | null => {
+  if (!value || typeof value !== "object") return null;
+  const out: SeriesHideFrom = {};
+  for (const key of HIDE_FROM_KEYS) {
+    if ((value as SeriesHideFrom)[key] === true) out[key] = true;
+  }
+  return Object.keys(out).length ? out : null;
+};
+
+/** The valid settings of a stored or drafted style, dropping unset and malformed ones. */
+export const normalizeSeriesStyle = (style: unknown): SeriesStyle => {
+  const raw = (style ?? {}) as Record<string, unknown>;
+  const out: SeriesStyle = {};
+  if (typeof raw.lineStyle === "string" && LINE_STYLES.has(raw.lineStyle)) {
+    out.lineStyle = raw.lineStyle as SeriesLineStyle;
+  }
+  const lineWidth = toNonNegative(raw.lineWidth);
+  if (lineWidth !== null) out.lineWidth = lineWidth;
+  const fillOpacity = toNonNegative(raw.fillOpacity, 100);
+  if (fillOpacity !== null) out.fillOpacity = fillOpacity;
+  if (typeof raw.showPoints === "boolean") out.showPoints = raw.showPoints;
+  if (typeof raw.drawStyle === "string" && DRAW_STYLES.has(raw.drawStyle)) {
+    out.drawStyle = raw.drawStyle as SeriesDrawStyle;
+  }
+  if (isSetText(raw.stackGroup)) out.stackGroup = raw.stackGroup.trim();
+  if (typeof raw.yAxis === "string" && Y_AXIS_SIDES.has(raw.yAxis)) {
+    out.yAxis = raw.yAxis as SeriesYAxisSide;
+  }
+  const hideFrom = toHideFrom(raw.hideFrom);
+  if (hideFrom) out.hideFrom = hideFrom;
+  return out;
+};
+
+/** The stored `override_config` items for a style, in a fixed order. */
+export const seriesStyleConfigItems = (style: unknown): Array<{ type: string; value: unknown }> => {
+  const s = normalizeSeriesStyle(style);
+  const items: Array<{ type: string; value: unknown }> = [];
+  if (s.lineStyle) items.push({ type: "line_style", value: s.lineStyle });
+  if (s.lineWidth !== undefined) items.push({ type: "line_width", value: s.lineWidth });
+  if (s.fillOpacity !== undefined) items.push({ type: "fill_opacity", value: s.fillOpacity });
+  if (s.showPoints !== undefined) items.push({ type: "show_points", value: s.showPoints });
+  if (s.drawStyle) items.push({ type: "draw_style", value: s.drawStyle });
+  if (s.stackGroup) items.push({ type: "stack_group", value: s.stackGroup });
+  if (s.yAxis) items.push({ type: "y_axis", value: s.yAxis });
+  if (s.hideFrom) items.push({ type: "hide_from", value: s.hideFrom });
+  return items;
+};
+
+const STYLE_ITEM_KEYS: Record<string, keyof SeriesStyle> = {
+  line_style: "lineStyle",
+  line_width: "lineWidth",
+  fill_opacity: "fillOpacity",
+  show_points: "showPoints",
+  draw_style: "drawStyle",
+  stack_group: "stackGroup",
+  y_axis: "yAxis",
+  hide_from: "hideFrom",
+};
+
+/** The style key a stored `override_config` item sets, or undefined for a non-style item. */
+export const seriesStyleKeyOf = (type: unknown): keyof SeriesStyle | undefined =>
+  typeof type === "string" ? STYLE_ITEM_KEYS[type] : undefined;
 
 const hasUnitSetting = (resolved: ResolvedSeriesOverride): boolean =>
   resolved.unit !== undefined ||
@@ -296,6 +396,9 @@ export const parseSeriesOverrideEntry = (entry: any): SeriesOverride | null => {
     else if (item?.type === "series_color") override.color = value;
     else if (item?.type === "thresholds") override.thresholds = value;
     else if (item?.type === "value_mappings") override.valueMappings = value;
+    else if (seriesStyleKeyOf(item?.type)) {
+      override.style = { ...override.style, [seriesStyleKeyOf(item.type)!]: value };
+    }
   }
   return override;
 };
@@ -321,6 +424,7 @@ export const toSeriesOverrideEntry = (override: SeriesOverride): Record<string, 
   if (hasValueMappings(override.valueMappings)) {
     config.push({ type: "value_mappings", value: override.valueMappings });
   }
+  config.push(...seriesStyleConfigItems(override.style));
   if (config.length === 0) return null;
   const matchBy =
     override.matchBy === "regex" ? SERIES_OVERRIDE_MATCH_BY.REGEX : SERIES_OVERRIDE_MATCH_BY.EXACT;
@@ -351,7 +455,13 @@ export const matchesSeriesOverride = (seriesName: string, override: SeriesOverri
   return override.value === name;
 };
 
-/** Merges every override matching the series, later wins per setting; null when none matches or none sets anything. */
+// A name rule outranks a regex rule wherever it sits in the list, so regex rules are merged first.
+const byPrecedence = (overrides: SeriesOverride[]): SeriesOverride[] => [
+  ...overrides.filter((o) => o.matchBy === "regex"),
+  ...overrides.filter((o) => o.matchBy !== "regex"),
+];
+
+/** Merges every override matching the series: name rules beat regex rules, and within a kind the later wins per setting; null when none matches or none sets anything. */
 export const resolveSeriesOverride = (
   config: any,
   seriesName: string,
@@ -359,7 +469,7 @@ export const resolveSeriesOverride = (
   const overrides = getSeriesOverrides(config);
   if (overrides.length === 0) return null;
   const resolved: ResolvedSeriesOverride = {};
-  for (const override of overrides) {
+  for (const override of byPrecedence(overrides)) {
     if (!matchesSeriesOverride(seriesName, override)) continue;
     if (isSetText(override.displayName)) resolved.displayName = override.displayName;
     if (isSetText(override.unit)) resolved.unit = override.unit;
@@ -369,6 +479,15 @@ export const resolveSeriesOverride = (
     if (isSetText(override.color)) resolved.color = override.color.trim();
     if (hasThresholdSteps(override.thresholds)) resolved.thresholds = override.thresholds;
     if (hasValueMappings(override.valueMappings)) resolved.valueMappings = override.valueMappings;
+    const style = normalizeSeriesStyle(override.style);
+    if (Object.keys(style).length) {
+      // Hide flags merge per target, so one override can hide the legend and a later one the tooltip.
+      const hideFrom =
+        resolved.style?.hideFrom || style.hideFrom
+          ? { ...resolved.style?.hideFrom, ...style.hideFrom }
+          : undefined;
+      resolved.style = { ...resolved.style, ...style, ...(hideFrom ? { hideFrom } : {}) };
+    }
   }
   return Object.keys(resolved).length > 0 ? resolved : null;
 };

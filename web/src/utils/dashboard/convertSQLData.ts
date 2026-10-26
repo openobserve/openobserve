@@ -30,6 +30,7 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
 import { applySeriesOverrides } from "./seriesOverrides";
+import { applyChartStyleOptions } from "./seriesStyleOverrides";
 import {
   HEATMAP_MAX_CELLS,
   addHeatmapWarning,
@@ -896,6 +897,7 @@ export const convertMultiSQLData = async (
     }
     // Override colours first: a threshold step outranks them and recolours on top.
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    applyChartStyleOptions(options[0].options, panelSchema);
     applyLineAreaThresholds(options[0].options, panelSchema);
   }
 
