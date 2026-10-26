@@ -257,7 +257,7 @@ pub struct VersionCount {
 pub struct EnrollmentToken {
     pub id: String,
     pub name: String,
-    /// The first 9 characters, the only part of the secret ever shown again.
+    /// The first 9 characters, shown while the value stays masked.
     pub prefix: String,
     /// Epoch milliseconds.
     pub created_at: i64,
@@ -267,7 +267,7 @@ pub struct EnrollmentToken {
     pub max_uses: Option<i64>,
     pub fleet: CollectorFleet,
     pub revoked: bool,
-    /// The stored value; `None` on tokens created before values were kept.
+    /// Readable by anyone who can see the fleet; `None` on tokens created before values were kept.
     pub token: Option<String>,
 }
 

@@ -883,7 +883,7 @@ pub async fn move_collectors(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "ListFleetTokens",
-    summary = "List enrollment tokens; never returns a secret",
+    summary = "List enrollment tokens with their values",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), PageQuery),
     responses(
@@ -927,7 +927,7 @@ pub async fn list_tokens(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "CreateFleetToken",
-    summary = "Create an enrollment token placing collectors in a fleet; the plaintext is returned only here",
+    summary = "Create an enrollment token placing collectors in a fleet",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateTokenRequest, content_type = "application/json"),
