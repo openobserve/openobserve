@@ -75,24 +75,20 @@ pub async fn add(job: BackfillJob) -> Result<()> {
 /// Delete a backfill job
 pub async fn delete(org: &str, job_id: &str) -> Result<()> {
     infra::table::backfill_jobs::delete(org, job_id).await?;
-
-    // Super cluster support
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        let key = format!("{BACKFILL_JOBS_KEY}/{}/{}", org, job_id);
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::backfill_delete(&key).await
-        {
-            log::error!(
-                "[BACKFILL] error sending backfill job {}/{} delete event to super_cluster: {e}",
-                org,
-                job_id
-            );
-        }
-    }
+    publish_delete(org, job_id).await;
+    Ok(())
+}
 
+/// Org teardown: one delete, then each returned job's super-cluster event, as [`delete`] sends.
+pub async fn delete_by_org(org: &str) -> Result<()> {
+    let job_ids = infra::table::backfill_jobs::delete_by_org(org).await?;
+    #[cfg(feature = "enterprise")]
+    for job_id in job_ids {
+        publish_delete(org, &job_id).await;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = job_ids;
     Ok(())
 }
 
@@ -274,4 +270,22 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
     }
 
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn publish_delete(org: &str, job_id: &str) {
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let key = format!("{BACKFILL_JOBS_KEY}/{}/{}", org, job_id);
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::backfill_delete(&key).await
+        {
+            log::error!(
+                "[BACKFILL] error sending backfill job {}/{} delete event to super_cluster: {e}",
+                org,
+                job_id
+            );
+        }
+    }
 }

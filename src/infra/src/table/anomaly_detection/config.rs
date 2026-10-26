@@ -235,6 +235,15 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
     Ok(())
 }
 
+pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
+    anomaly_detection_config::Entity::delete_many()
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -355,7 +364,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ActiveModelTrait as _, IntoActiveModel, Iterable as _};
+    use sea_orm::{IntoActiveModel, Iterable as _};
 
     use super::*;
 

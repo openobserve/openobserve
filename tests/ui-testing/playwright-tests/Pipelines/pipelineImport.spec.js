@@ -33,7 +33,8 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
         // Navigate to base URL after data ingestion (required for storageState)
         await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`);
-        await page.waitForLoadState('networkidle');
+        // Best-effort: a loaded ENT runner never lets this page idle, and every test navigates away from it at once
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     });
 
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {

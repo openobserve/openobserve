@@ -23,6 +23,7 @@ use config::{
     utils::time::now_micros,
 };
 use infra::table::{ai_chat_sessions, ai_chat_turns};
+use openobserve_core::ai_chat;
 
 const SWEEP_INTERVAL_SECS: u64 = 60 * 60;
 /// Chats refreshed per org per pass; the rest wait for the next pass.
@@ -32,8 +33,6 @@ const MARGIN_MICROS: i64 = MICROS_PER_DAY;
 const MICROS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000;
 /// Deleted chats whose replica copies are re-purged per org per pass.
 const REPLICA_PURGE_PER_PASS: u64 = 100;
-/// Deleted chats keep being purged this long, for replicas that were down at delete time.
-const REPLICA_REPURGE_WINDOW_MICROS: i64 = 7 * MICROS_PER_DAY;
 
 pub fn run() {
     if !LOCAL_NODE.is_scheduler() {
@@ -128,7 +127,7 @@ async fn refresh_in_use(org_id: &str, days: i64, now: i64) {
 
 /// A deleted chat is done once one pass reaches every live replica; until then it is retried.
 async fn purge_deleted_replicas(org_id: &str) {
-    let repurge_since = now_micros() - REPLICA_REPURGE_WINDOW_MICROS;
+    let repurge_since = now_micros() - ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
     let due = match ai_chat_sessions::due_for_replica_purge(
         org_id,
         REPLICA_PURGE_PER_PASS,
@@ -146,20 +145,9 @@ async fn purge_deleted_replicas(org_id: &str) {
     let Some(client) = o2_enterprise::enterprise::ai::client::get_agent_client() else {
         return;
     };
-    let auth = match openobserve_core::organization::get_sre_agent_credentials(org_id).await {
-        Ok((email, token)) => openobserve_core::auth::build_basic_auth_header(&email, &token),
-        // o2-ai still accepts the internal secret the client attaches.
-        Err(_) => String::new(),
-    };
+    let auth = ai_chat::sweep_purge_auth(org_id).await;
     for row in due {
-        let result = client
-            .delete_session_everywhere(&row.session_id, org_id, &auth)
-            .await;
-        let label = if result.is_ok() { "ok" } else { "failed" };
-        config::metrics::AI_CHAT_REPLICA_PURGES_TOTAL
-            .with_label_values(&[label])
-            .inc();
-        match result {
+        match ai_chat::purge_replica_copy(&client, org_id, &auth, &row.session_id).await {
             Ok(()) => {
                 if let Err(e) =
                     ai_chat_sessions::mark_replica_purged(org_id, &row.session_id, now_micros())
