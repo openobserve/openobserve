@@ -15,7 +15,13 @@
 
 import { describe, it, expect } from "vitest";
 import { load } from "js-yaml";
-import { graphToYaml, seedGraph, yamlToGraph, type EditorGraph } from "./editorGraph";
+import {
+  graphToYaml,
+  isSettingPath,
+  seedGraph,
+  yamlToGraph,
+  type EditorGraph,
+} from "./editorGraph";
 import { SEEDS } from "./editorGraph.fixtures";
 
 const SEED_IDS = Object.keys(SEEDS);
@@ -142,6 +148,78 @@ service:
     expect(load(graphToYaml(graph!))).toEqual(load(yaml));
   });
 
+  it("quotes a key that holds a dot or other path syntax and writes it back", () => {
+    const yaml = `receivers:
+  hostmetrics:
+    scrapers:
+      cpu: {}
+processors:
+  resourcedetection:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+      resource_attributes:
+        host.id:
+          enabled: true
+        os.description:
+          enabled: false
+exporters:
+  otlphttp:
+    endpoint: \${env:O2_ENDPOINT}
+    headers:
+      X-Scope.OrgID: tenant-a
+      "a: b": "c"
+      'say "hi"': x
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      processors: [resourcedetection]
+      exporters: [otlphttp]
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph?.components["processor:resourcedetection"].settings).toEqual({
+      "detectors[0]": "system",
+      "system.hostname_sources[0]": "os",
+      'system.resource_attributes."host.id".enabled': "true",
+      'system.resource_attributes."os.description".enabled': "false",
+    });
+    expect(graph?.components["exporter:otlphttp"].settings).toMatchObject({
+      'headers."X-Scope.OrgID"': "tenant-a",
+      'headers."a: b"': "c",
+      'headers."say \\"hi\\""': "x",
+    });
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+  });
+
+  it("accepts quoted segments in a settings path and rejects malformed ones", () => {
+    for (const path of [
+      "endpoint",
+      "headers.Authorization",
+      "include[0]",
+      "operators[1].regex",
+      'resource_attributes."host.id".enabled',
+      '"a.b"[2]."c d"',
+      '"say \\"hi\\""',
+    ]) {
+      expect(isSettingPath(path), path).toBe(true);
+    }
+    for (const path of [
+      "",
+      ".a",
+      "a.",
+      "a..b",
+      "a b",
+      'a."b',
+      '"\\q"',
+      "a[x]",
+      "[0]",
+      "host.id.",
+    ]) {
+      expect(isSettingPath(path), path).toBe(false);
+    }
+  });
+
   it("reads an empty document as an empty graph", () => {
     expect(yamlToGraph("")).toEqual({ components: {}, pipelines: [], extensions: [] });
   });
@@ -157,16 +235,25 @@ service:
     ],
     ["a null component", MINIMAL.replace("debug: {}", "debug:")],
     ["a list holding a null", MINIMAL.replace("debug: {}", "debug:\n    include: [a, null]")],
-    ["a key spelled like a list index", MINIMAL.replace("debug: {}", "debug:\n    a[0]: x")],
     ["a null leaf in settings", MINIMAL.replace("debug: {}", "debug:\n    timeout: null")],
     ["connectors", MINIMAL + "connectors:\n  count: {}\n"],
     ["service.telemetry", MINIMAL + "  telemetry:\n    logs:\n      level: debug\n"],
-    ["a dotted key", MINIMAL.replace("debug: {}", "debug:\n    a.b: x")],
     ["a quoted number", MINIMAL.replace("debug: {}", 'debug:\n    sampling: "5"')],
     ["a top-level list", "- a\n- b\n"],
     ["unparseable YAML", "receivers: [otlp\n"],
   ])("cannot represent %s", (_name, src) => {
     expect(yamlToGraph(src)).toBeNull();
+  });
+
+  it.each([
+    ["a dotted key", "a.b", '"a.b"'],
+    ["a key spelled like a list index", "a[0]", '"a[0]"'],
+  ])("represents %s by quoting it", (_name, key, path) => {
+    const graph = yamlToGraph(MINIMAL.replace("debug: {}", `debug:\n    ${key}: x`));
+    expect(graph?.components["exporter:debug"].settings).toEqual({ [path]: "x" });
+    expect(load(graphToYaml(graph!))).toEqual(
+      load(MINIMAL.replace("debug: {}", `debug:\n    ${key}: x`)),
+    );
   });
 });
 

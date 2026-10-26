@@ -176,7 +176,10 @@ describe("FleetCollectors", () => {
 
   it("loads the org-wide list for the selected org", async () => {
     wrapper = await mountList();
-    expect(fleet.listCollectors).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(fleet.listCollectors).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      expect.objectContaining({ offset: 0 }),
+    );
   });
 
   it("renders a row per API collector", async () => {
