@@ -8075,6 +8075,7 @@
     "exampleCharts": "Example Charts",
     "namePlaceholder": "Untitled panel",
     "renameHint": "Click to rename this panel",
+    "titleVariablesHint": "Use {bare} or {braced} to show a variable's value",
     "add": "Add Panel",
     "save": "Save",
     "cancel": "Cancel",

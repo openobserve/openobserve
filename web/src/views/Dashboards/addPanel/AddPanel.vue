@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="title"
               :placeholder="t('panel.namePlaceholder')"
               :aria-label="t('panel.name')"
+              :hint="titleVariablesHint"
               :edit-hint="
                 panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('panel.renameHint')
               "
@@ -449,6 +450,9 @@ export default defineComponent({
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18nTyped();
+    const titleVariablesHint = computed(() =>
+      t("panel.titleVariablesHint", { bare: raw("$variable"), braced: raw("${variable}") }),
+    );
     const { isMobile } = useBreakpoint();
     const router = useRouter();
     const route = useRoute();
@@ -2366,6 +2370,7 @@ export default defineComponent({
 
     return {
       t,
+      titleVariablesHint,
       isMobile,
       updateDateTime,
       goBack,

@@ -17,6 +17,7 @@ import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { DEFAULT_SQL_X_FIELD, DEFAULT_SQL_Y_FIELD_COUNT } from "@/utils/dashboard/defaultFields";
 import config from "@/aws-exports";
 import { createI18n } from "vue-i18n";
+import appI18n from "@/locales";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -342,6 +343,20 @@ describe("AddPanel.vue", () => {
           metaData: null,
         },
       });
+    });
+
+    it("hints at the variable syntax in the panel title field", () => {
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, appI18n],
+          stubs: { PanelSchemaRenderer: true, VariablesValueSelector: true },
+        },
+        props: { metaData: null },
+      });
+
+      expect(wrapper.vm.titleVariablesHint).toBe(
+        "Use $variable or ${variable} to show a variable's value",
+      );
     });
 
     it("should call showTutorial and open window", () => {
