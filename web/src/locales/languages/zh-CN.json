@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU 导出器"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "未保存的面板草稿",
+      "restoreMessage": "您有 {date} 未保存的更改。",
+      "changedOnServer": "您的草稿保存后此面板已被更改。保存草稿将替换这些更改。",
+      "continueDraft": "继续草稿",
+      "startFresh": "重新开始",
+      "panelDeleted": "此面板已不存在，因此其未保存的草稿已被丢弃。",
+      "variablesSkipped": "草稿中的 {count} 个变量因名称已被使用而未添加 | 草稿中的 {count} 个变量因名称已被使用而未添加",
+      "leaveTitle": "有未保存的更改，确定离开？",
+      "leaveMessage": "保存面板，将更改作为草稿保留在此浏览器中，或放弃更改。",
+      "keepDraft": "保留草稿",
+      "addPanelDot": "添加面板 · 未保存的草稿",
+      "panelDot": "此浏览器中有未保存的更改",
+      "panelActionsDot": "面板操作 · 未保存的草稿",
+      "keepFailed": "此浏览器的存储空间已满或不可用，无法保留草稿。请保存面板或放弃更改。",
+      "panelMissingOnSave": "此面板已不在仪表板中。请重新加载仪表板并再次添加。"
+    },
     "sortByClear": "清除排序",
     "sortByAsc": "升序排序",
     "sortByDesc": "降序排序",
@@ -7902,6 +7919,7 @@
     "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
   },
   "panel": {
+    "saveAndStay": "保存并继续编辑",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19830,7 +19848,7 @@
       "logsSearchHistory": "打开搜索记录",
       "alertsImport": "导入告警",
       "panelEditorRun": "运行/应用查询",
-      "panelEditorSave": "保存面板",
+      "panelEditorSave": "保存并继续编辑",
       "panelEditorBack": "丢弃然后回去",
       "traceNextSpan": "下一个 Span",
       "tracePrevSpan": "上一个 Span",
@@ -20694,6 +20712,7 @@
       "updatingSyntheticsSteps": "正在更新合成监控步骤..."
     },
     "dashboard": {
+      "panelSaved": "面板已保存",
       "clickOnTheChartDataOr": "点击图表数据或选择范围以添加注释",
       "runningQueryCanceledSuccessfully": "运行中的查询已成功取消",
       "panelQueryHasNoStreamToAlertOn": "此面板的查询没有可用于告警的流。"

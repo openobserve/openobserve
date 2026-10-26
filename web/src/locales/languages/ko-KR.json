@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU 익스포터"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "저장되지 않은 패널 초안",
+      "restoreMessage": "{date}에 저장되지 않은 변경 사항이 있습니다.",
+      "changedOnServer": "초안이 저장된 후 이 패널이 변경되었습니다. 초안을 저장하면 해당 변경 사항이 대체됩니다.",
+      "continueDraft": "초안 계속",
+      "startFresh": "새로 시작",
+      "panelDeleted": "이 패널이 더 이상 존재하지 않아 저장되지 않은 초안이 삭제되었습니다.",
+      "variablesSkipped": "이름이 이미 사용 중이어서 초안의 변수 {count}개가 추가되지 않았습니다 | 이름이 이미 사용 중이어서 초안의 변수 {count}개가 추가되지 않았습니다",
+      "leaveTitle": "저장되지 않은 변경 사항이 있습니다. 나가시겠습니까?",
+      "leaveMessage": "패널을 저장하거나, 변경 사항을 이 브라우저에 초안으로 보관하거나, 삭제하세요.",
+      "keepDraft": "초안 보관",
+      "addPanelDot": "패널 추가 · 저장되지 않은 초안",
+      "panelDot": "이 브라우저에 저장되지 않은 변경 사항이 있습니다",
+      "panelActionsDot": "패널 작업 · 저장되지 않은 초안",
+      "keepFailed": "이 브라우저의 저장 공간이 가득 찼거나 사용할 수 없어 초안을 보관하지 못했습니다. 패널을 저장하거나 변경 사항을 삭제하세요.",
+      "panelMissingOnSave": "이 패널이 더 이상 대시보드에 없습니다. 대시보드를 다시 불러온 후 다시 추가하세요."
+    },
     "sortByClear": "정렬 해제",
     "sortByAsc": "오름차순 정렬",
     "sortByDesc": "내림차순 정렬",
@@ -7902,6 +7919,7 @@
     "showExemplarsHelp": "대시보드를 여는 모든 사람을 위해 이 차트에 트레이스 샘플을 그립니다. 뷰어는 패널 헤더에서 여전히 숨길 수 있습니다."
   },
   "panel": {
+    "saveAndStay": "저장 후 계속 편집",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19830,7 +19848,7 @@
       "logsSearchHistory": "검색 기록 열기",
       "alertsImport": "알림 가져오기",
       "panelEditorRun": "쿼리 실행/ 적용",
-      "panelEditorSave": "패널 저장",
+      "panelEditorSave": "저장 후 계속 편집",
       "panelEditorBack": "폐기하고 돌아가세요",
       "traceNextSpan": "다음 스팬",
       "tracePrevSpan": "이전 스팬",
@@ -20694,6 +20712,7 @@
       "updatingSyntheticsSteps": "Synthetics 단계를 업데이트하는 중..."
     },
     "dashboard": {
+      "panelSaved": "패널이 저장되었습니다",
       "clickOnTheChartDataOr": "차트 데이터를 클릭하거나 범위를 선택하여 주석을 추가하세요.",
       "runningQueryCanceledSuccessfully": "실행 중인 쿼리가 성공적으로 취소되었습니다.",
       "panelQueryHasNoStreamToAlertOn": "이 패널의 쿼리에는 알림을 보낼 스트림이 없습니다."
