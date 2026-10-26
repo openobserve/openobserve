@@ -16,7 +16,12 @@
 export type ConflictItemKind = "panel" | "tab" | "variable";
 export type ConflictChangeType = "added" | "changed" | "removed";
 export type DashboardSettingKey =
-  "title" | "description" | "defaultDatetimeDuration" | "showDynamicFilters" | "other";
+  | "title"
+  | "description"
+  | "defaultDatetimeDuration"
+  | "defaultRefreshInterval"
+  | "showDynamicFilters"
+  | "other";
 
 export interface ConflictChange {
   kind: ConflictItemKind;
@@ -77,7 +82,12 @@ const NON_SETTING_FIELDS = new Set([
   "updatedAt",
 ]);
 
-const KNOWN_SETTINGS: DashboardSettingKey[] = ["title", "description", "defaultDatetimeDuration"];
+const KNOWN_SETTINGS: DashboardSettingKey[] = [
+  "title",
+  "description",
+  "defaultDatetimeDuration",
+  "defaultRefreshInterval",
+];
 
 const clone = <T>(value: T): T => structuredClone(value ?? null) as T;
 
@@ -129,8 +139,12 @@ const timeRangeShape = (range: any) => {
     : { type, start: range?.startTime ?? null, end: range?.endTime ?? null };
 };
 
-const settingValue = (doc: any, key: string) =>
-  key === "defaultDatetimeDuration" ? timeRangeShape(doc?.[key]) : (doc?.[key] ?? null);
+// A refresh of 0 and a missing one both mean Off.
+const settingValue = (doc: any, key: string) => {
+  if (key === "defaultDatetimeDuration") return timeRangeShape(doc?.[key]);
+  if (key === "defaultRefreshInterval") return doc?.[key] || null;
+  return doc?.[key] ?? null;
+};
 
 const tabsOf = (doc: any): any[] => (Array.isArray(doc?.tabs) ? doc.tabs : []);
 
