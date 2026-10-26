@@ -16,7 +16,13 @@
 import { describe, expect, it } from "vitest";
 import { buildInventory, type Series } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
-import { joinObjects, objectDetailSql, objectListSql, parseObjects } from "./kubernetesObjects";
+import {
+  OVERVIEW_COLUMNS,
+  joinObjects,
+  objectDetailSql,
+  objectListSql,
+  parseObjects,
+} from "./kubernetesObjects";
 
 const ksm = (metric: Record<string, string>, value = 1): Series => ({
   metric: { k8s_cluster: "prod", ...metric },
@@ -45,6 +51,23 @@ describe("object SQL", () => {
     expect(sql).toContain("AND k8s_namespace_name IN ('data', 'o''b')");
     expect(sql).toContain("json_get_json(body_object_status,'conditions') AS conditions");
     expect(sql).toMatch(/WHERE rn = 1 ORDER BY _timestamp DESC LIMIT 5000$/);
+  });
+
+  it("reads only conditions and container statuses for the overview variant", () => {
+    const sql = objectListSql("pod", "prod", [], OVERVIEW_COLUMNS.pod);
+    expect(sql).toContain("json_get_json(body_object_status,'conditions') AS conditions");
+    expect(sql).toContain(
+      "json_get_json(body_object_status,'containerStatuses') AS container_statuses",
+    );
+    expect(sql).not.toContain("qos_class");
+    const [one] = parseObjects([
+      record({
+        conditions: JSON.stringify([{ type: "Ready", status: "False" }]),
+        container_statuses: JSON.stringify([{ name: "app", restartCount: 2 }]),
+      }),
+    ]);
+    expect(one.object.status.conditions).toEqual([{ type: "Ready", status: "False" }]);
+    expect(one.object.status.containerStatuses).toEqual([{ name: "app", restartCount: 2 }]);
   });
 
   it("uses replicasets as the ReplicaSet resource name", () => {

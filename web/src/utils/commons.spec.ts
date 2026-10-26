@@ -101,6 +101,21 @@ vi.mock("moment", () => ({
 
 import dashboardService from "../services/dashboards";
 import commonService from "../services/common";
+import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+
+const draftInput = {
+  tabId: "tab-1",
+  data: {},
+  layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+  sessionVariables: [],
+  variablesWithCurrentPanel: [],
+};
+const draftScope = (dashboardId: string, panelId?: string) => ({
+  userEmail: "me@x.io",
+  org: "test-org",
+  dashboardId,
+  panelId,
+});
 
 describe("Commons Utility Functions", () => {
   let mockStore: any;
@@ -530,6 +545,19 @@ describe("Commons Utility Functions", () => {
         "folder-a": [{ dashboardId: "d2" }],
         "folder-b": [],
       });
+    });
+
+    it("removes the browser drafts of bulk-deleted dashboards", () => {
+      localStorage.clear();
+      mockStore.state.organizationData.allDashboardList = {};
+      writePanelDraft(draftScope("d1", "p1"), draftInput);
+      writePanelDraft(draftScope("d2"), draftInput);
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["d1"]]]));
+
+      expect(readPanelDraft(draftScope("d1", "p1"))).toBeNull();
+      expect(readPanelDraft(draftScope("d2"))).not.toBeNull();
+      localStorage.clear();
     });
 
     it("should leave other folders untouched", () => {
@@ -1200,6 +1228,28 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[0].panels).toHaveLength(1);
       expect(mockDashboard.tabs[0].panels[0].id).toBe("panel-2");
     });
+
+    it("removes the deleted panel's browser draft and keeps the others", async () => {
+      localStorage.clear();
+      const mockDashboard = {
+        tabs: [{ tabId: "tab-1", panels: [{ id: "panel-1" }, { id: "panel-2" }] }],
+      };
+      mockStore.state.organizationData.allDashboardData["dashboard-d"] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+      writePanelDraft(draftScope("dashboard-d", "panel-1"), draftInput);
+      writePanelDraft(draftScope("dashboard-d", "panel-2"), draftInput);
+      writePanelDraft(draftScope("dashboard-d"), draftInput);
+
+      await deletePanel(mockStore, "dashboard-d", "panel-1", "f", "tab-1");
+
+      expect(readPanelDraft(draftScope("dashboard-d", "panel-1"))).toBeNull();
+      expect(readPanelDraft(draftScope("dashboard-d", "panel-2"))).not.toBeNull();
+      expect(readPanelDraft(draftScope("dashboard-d"))).not.toBeNull();
+      localStorage.clear();
+    });
   });
 
   describe("updatePanel", () => {
@@ -1228,9 +1278,59 @@ describe("Commons Utility Functions", () => {
 
       expect(mockDashboard.tabs[0].panels[0]).toBe(panelData);
     });
+
+    it("updates a panel that was moved to another tab instead of writing index -1", async () => {
+      const dashboardId = "dashboard-moved";
+      const panelData = { id: "panel-1", title: "Edited" };
+      const mockDashboard: any = {
+        tabs: [
+          { tabId: "tab-1", panels: [{ id: "panel-2", title: "Other" }] },
+          { tabId: "tab-2", panels: [{ id: "panel-1", title: "Panel 1" }] },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await updatePanel(mockStore, dashboardId, panelData, "f", "tab-1");
+
+      expect(mockDashboard.tabs[1].panels[0]).toBe(panelData);
+      expect(mockDashboard.tabs[0].panels).toEqual([{ id: "panel-2", title: "Other" }]);
+      expect(mockDashboard.tabs[0].panels[-1]).toBeUndefined();
+    });
+
+    it("throws instead of saving when the panel no longer exists", async () => {
+      const dashboardId = "dashboard-gone";
+      mockStore.state.organizationData.allDashboardData[dashboardId] = {
+        tabs: [{ tabId: "tab-1", panels: [] }],
+      };
+      (dashboardService.save as any).mockClear();
+
+      await expect(
+        updatePanel(mockStore, dashboardId, { id: "panel-1" }, "f", "tab-1"),
+      ).rejects.toThrow();
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
   });
 
   describe("getPanel", () => {
+    it("finds a panel that was moved to another tab", async () => {
+      const dashboardId = "dashboard-moved-get";
+      mockStore.state.organizationData.allDashboardData[dashboardId] = {
+        tabs: [
+          { tabId: "tab-1", panels: [] },
+          { tabId: "tab-2", panels: [{ id: "panel-1", title: "Moved" }] },
+        ],
+      };
+
+      const result = await getPanel(mockStore, dashboardId, "panel-1", "f", "tab-1");
+
+      expect(result).toEqual({ id: "panel-1", title: "Moved" });
+    });
+
     it("should return panel by ID from specified tab", async () => {
       const dashboardId = "dashboard-1";
       const panelId = "panel-2";
@@ -1302,6 +1402,42 @@ describe("Commons Utility Functions", () => {
 
       expect(mockDashboard.tabs).toHaveLength(1);
       expect(mockDashboard.tabs[0].tabId).toBe("tab-1");
+    });
+
+    it("removes drafts of panels deleted with the tab, but not of moved panels", async () => {
+      localStorage.clear();
+      const dropped = {
+        tabs: [
+          { tabId: "tab-1", panels: [{ id: "keep-1" }] },
+          { tabId: "tab-2", panels: [{ id: "gone-1" }] },
+        ],
+      };
+      const moved = {
+        tabs: [
+          { tabId: "tab-1", panels: [] },
+          { tabId: "tab-2", panels: [{ id: "moved-1", layout: { x: 0, y: 0, w: 4, h: 4, i: 1 } }] },
+        ],
+      };
+      mockStore.state.organizationData.allDashboardData["dash-drop"] = dropped;
+      mockStore.state.organizationData.allDashboardData["dash-move"] = moved;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockImplementation(
+        async (_org: string, id: string) => ({
+          data: { version: 1, v1: id === "dash-drop" ? dropped : moved, hash: 123 },
+        }),
+      );
+      writePanelDraft(draftScope("dash-drop", "gone-1"), draftInput);
+      writePanelDraft(draftScope("dash-drop", "keep-1"), draftInput);
+      writePanelDraft(draftScope("dash-move", "moved-1"), draftInput);
+
+      await deleteTab(mockStore, "dash-drop", "f", "tab-2");
+      await deleteTab(mockStore, "dash-move", "f", "tab-2", "tab-1");
+
+      expect(readPanelDraft(draftScope("dash-drop", "gone-1"))).toBeNull();
+      expect(readPanelDraft(draftScope("dash-drop", "keep-1"))).not.toBeNull();
+      expect(readPanelDraft(draftScope("dash-move", "moved-1"))).not.toBeNull();
+      (dashboardService.get_Dashboard as any).mockReset();
+      localStorage.clear();
     });
 
     it("should delete tab and move panels to another tab", async () => {
@@ -1505,6 +1641,23 @@ describe("Commons Utility Functions", () => {
         [folderId]: [{ dashboardId: "dashboard-2", title: "Dashboard 2" }],
       });
       expect(mockStore.dispatch).toHaveBeenCalledWith("setDashboardData", {});
+    });
+
+    it("removes every browser draft of the deleted dashboard only", async () => {
+      localStorage.clear();
+      mockStore.state.organizationData.allDashboardList = {};
+      mockStore.state.organizationData.allDashboardData = {};
+      (dashboardService.delete as any).mockResolvedValue({ success: true });
+      writePanelDraft(draftScope("dashboard-gone"), draftInput);
+      writePanelDraft(draftScope("dashboard-gone", "panel-1"), draftInput);
+      writePanelDraft(draftScope("dashboard-kept", "panel-1"), draftInput);
+
+      await deleteDashboardById(mockStore, "dashboard-gone", "f");
+
+      expect(readPanelDraft(draftScope("dashboard-gone"))).toBeNull();
+      expect(readPanelDraft(draftScope("dashboard-gone", "panel-1"))).toBeNull();
+      expect(readPanelDraft(draftScope("dashboard-kept", "panel-1"))).not.toBeNull();
+      localStorage.clear();
     });
   });
 

@@ -20,7 +20,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const split = computed(() => splitControlAttrs($attrs));
+const split = computed(() => splitControlAttrs($attrs, { forwardRole: true }));
 const wrapperAttrs = computed(() => split.value.wrapperAttrs);
 const controlAttrs = computed(() => split.value.controlAttrs);
 onMounted(() =>
