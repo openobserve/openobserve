@@ -4163,6 +4163,14 @@ mod tests {
         infra::table::rca_runs::backfill_v1_pointers_for_tests()
             .await
             .unwrap();
+        // A repeat firing counts toward the total, not toward the distinct alerts.
+        for (alert_id, fired_at) in [("a1", 1), ("a1", 2), ("a2", 3)] {
+            infra::table::alert_incidents::add_alert_to_incident(
+                &analyzed, alert_id, alert_id, "alert", fired_at, "test",
+            )
+            .await
+            .unwrap();
+        }
 
         let (incidents, total) = list_incidents(&org, None, 50, 0).await.unwrap();
 
@@ -4174,6 +4182,12 @@ mod tests {
         assert!(!rca.stale);
         assert!(rca.detail.is_none(), "the list adds no join");
         assert!(by_id(&never).rca.is_none());
+        let analyzed_row = by_id(&analyzed);
+        assert_eq!(
+            (analyzed_row.alert_count, analyzed_row.unique_alert_count),
+            (3, Some(2))
+        );
+        assert_eq!(by_id(&never).unique_alert_count, Some(0), "no linked alert");
         let v1 = |id: &str| {
             let rca = by_id(id).rca.as_ref().expect("a pre-run report shows");
             (

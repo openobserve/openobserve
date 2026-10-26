@@ -1457,6 +1457,25 @@ pub(crate) mod tests {
         assert!(live.is_done());
     }
 
+    /// The cancel banner counts the finished steps a Resume keeps; a live run offers none.
+    #[tokio::test]
+    async fn a_cancelled_runs_thread_counts_the_steps_a_resume_keeps() {
+        let _db = db().await;
+        let (org, inc, run_id) = live_run().await;
+        let events = crate::ai_chat::fork::tests::three_steps();
+        let kept = fork::plan_resume(&events).unwrap().reused_steps;
+        assert_ne!(kept, 0);
+        let reader = Reader::new(events);
+        let now = now_micros();
+        let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
+        let frames = live.tick(now).await;
+        assert!(data(&frames, "thread").get("reusable_steps").is_none());
+
+        cancel_write(&org, &run_id).await;
+        let frames = live.tick(now + SEC).await;
+        assert_eq!(data(&frames, "thread")["reusable_steps"], kept);
+    }
+
     #[tokio::test]
     async fn lu13_a_terminal_run_without_its_record_ends_30_s_after_the_stream_saw_it() {
         let _db = db().await;
