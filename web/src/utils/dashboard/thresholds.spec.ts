@@ -422,6 +422,21 @@ describe("applyLineAreaThresholds", () => {
     expect(typeof options.series[0].areaStyle.opacity).toBe("number");
   });
 
+  it("area: a set fill opacity replaces the theme alpha on the recoloured fill", () => {
+    const gradient = { type: "linear", colorStops: [] };
+    const options: any = lineOptions({ areaStyle: { color: gradient, opacity: 0.3 } });
+    applyLineAreaThresholds(options, panel("area", steps, { fill_opacity: 30 }));
+    expect(options.series[0].areaStyle).toEqual({ opacity: 0.3 });
+  });
+
+  it("line ignores fill_opacity in the recolour path", () => {
+    const plain: any = lineOptions({ areaStyle: { color: "x" } });
+    const withKey: any = lineOptions({ areaStyle: { color: "x" } });
+    applyLineAreaThresholds(plain, panel("line", steps));
+    applyLineAreaThresholds(withKey, panel("line", steps, { fill_opacity: 30 }));
+    expect(withKey.series[0].areaStyle).toEqual(plain.series[0].areaStyle);
+  });
+
   it("area-stacked: never recoloured, limit lines only", () => {
     const gradient = { type: "linear", colorStops: [] };
     const options: any = lineOptions({ areaStyle: { color: gradient } });

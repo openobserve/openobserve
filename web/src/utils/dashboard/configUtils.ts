@@ -281,6 +281,11 @@ export const shouldShowAxisLabelConfig = (dashboardPanelData: any): boolean => {
   );
 };
 
+/** Fill opacity and gradient apply to the unstacked area chart only. */
+export const shouldShowAreaFillConfig = (dashboardPanelData: any): boolean => {
+  return dashboardPanelData.data.type === "area";
+};
+
 /**
  * Check if Drilldown component should be displayed
  * Used by: Drilldown component

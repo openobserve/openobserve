@@ -15,7 +15,7 @@
 
 import type { RE2JS } from "re2js";
 import { escapeHtml } from "@/utils/html";
-import { getAreaStyleOverride } from "./colorPalette";
+import { getAreaStyleOverride, type AreaFillConfig } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { tryCompileLinearRegex } from "./tableConfigUtils";
 import type { ThresholdMode, ThresholdShowAs } from "./thresholds";
@@ -139,7 +139,13 @@ const isNamedSeries = (series: any): boolean =>
 // Time-series points are [time, value]; category points are the value itself.
 const pointValue = (value: unknown): unknown => (Array.isArray(value) ? value[1] : value);
 
-const recolourSeries = (series: any, color: string, panelType: string, theme: string) => {
+const recolourSeries = (
+  series: any,
+  color: string,
+  panelType: string,
+  theme: string,
+  config: AreaFillConfig | null | undefined,
+) => {
   if (series.itemStyle) series.itemStyle = { ...series.itemStyle, color };
   if (!series.itemStyle || "color" in series) series.color = color;
   if (series.lineStyle?.color !== undefined) series.lineStyle = { ...series.lineStyle, color };
@@ -147,7 +153,7 @@ const recolourSeries = (series: any, color: string, panelType: string, theme: st
   if (series.areaStyle) {
     Object.assign(
       series,
-      getAreaStyleOverride(panelType, series.areaStyle, color, series.name, theme),
+      getAreaStyleOverride(panelType, series.areaStyle, color, series.name, theme, config),
     );
   }
 };
@@ -157,10 +163,11 @@ const applyAxisSeriesOverride = (
   lookup: SeriesOverrideLookup,
   panelType: string,
   theme: string,
+  config: AreaFillConfig | null | undefined,
 ) => {
   const resolved = lookup.get(series.name);
   if (!resolved) return;
-  if (resolved.color) recolourSeries(series, resolved.color, panelType, theme);
+  if (resolved.color) recolourSeries(series, resolved.color, panelType, theme, config);
 };
 
 // Value labels take the panel unit and decimals, or the series override's.
@@ -486,7 +493,7 @@ export const applySeriesOverrides = (options: any, panelSchema: any, theme: stri
       continue;
     }
     if (!isNamedSeries(series)) continue;
-    applyAxisSeriesOverride(series, lookup, panelType, theme);
+    applyAxisSeriesOverride(series, lookup, panelType, theme, panelSchema?.config);
     const display = lookup.get(series.name)?.displayName;
     if (display !== undefined) displayNames.set(String(series.name), display);
   }

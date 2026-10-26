@@ -1179,6 +1179,7 @@ export const convertPromQLData = async (
                   resolvedSeriesColor,
                   colorName,
                   store.state.theme,
+                  panelSchema?.config,
                 ),
                 // markLine if exist
                 markLine: buildSeriesMarkLine(panelSchema),
@@ -1248,6 +1249,7 @@ export const convertPromQLData = async (
                   resolvedVectorColor,
                   seriesName,
                   store.state.theme,
+                  panelSchema?.config,
                 ),
                 markLine: buildSeriesMarkLine(panelSchema),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
@@ -1468,6 +1470,7 @@ export const convertPromQLData = async (
           primary.itemStyle.color,
           seriesNames.get(metric) ?? "",
           store.state.theme,
+          panelSchema?.config,
         ),
       );
     });
@@ -1495,6 +1498,7 @@ export const convertPromQLData = async (
         twin.itemStyle.color,
         seriesNames.get(metric) ?? "",
         store.state.theme,
+        panelSchema?.config,
       ),
     );
   }

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { colorToRgba } from "./colorPalette";
+import { colorToRgba, getAreaFillOpacity } from "./colorPalette";
 import { createSeriesOverrideLookup, resolveSeriesOverride } from "./seriesOverrides";
 import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
@@ -519,7 +519,9 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     return percentRange;
   };
   const overrides = createSeriesOverrideLookup(config);
-  const areaFillOpacity = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
+  const areaFillOpacity =
+    getAreaFillOpacity(panelSchema.type, config) ??
+    chartNumber("--chart-area-fill-bottom-opacity", 0.4);
 
   const visualMaps: any[] = [];
   const markerSeries = new Map<string, any>();

@@ -15,6 +15,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
+  shouldShowAreaFillConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   allVisibleQueriesInstant,
@@ -375,6 +376,14 @@ export function useConfigPanel(
       "line-thickness": {
         label: t("dashboard.lineThickness"),
         visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+      },
+      "fill-opacity": {
+        label: t("dashboard.fillOpacity"),
+        visible: shouldShowAreaFillConfig(dashboardPanelData),
+      },
+      "fill-gradient": {
+        label: t("dashboard.fillGradient"),
+        visible: shouldShowAreaFillConfig(dashboardPanelData),
       },
     },
     table: {

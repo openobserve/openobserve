@@ -32,6 +32,7 @@ import {
   shouldShowAxisConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
+  shouldShowAreaFillConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1364,6 +1365,15 @@ describe("configUtils", () => {
       it(`should return false for ${type} chart`, () => {
         expect(shouldShowAxisLabelConfig({ data: { type } })).toBe(false);
       });
+    });
+  });
+
+  describe("shouldShowAreaFillConfig", () => {
+    it("is true only for the area chart", () => {
+      expect(shouldShowAreaFillConfig({ data: { type: "area" } })).toBe(true);
+      ["area-stacked", "line", "bar", "scatter"].forEach((type) =>
+        expect(shouldShowAreaFillConfig({ data: { type } })).toBe(false),
+      );
     });
   });
 
