@@ -39,7 +39,8 @@ use super::{
 };
 use crate::common::utils::http::get_or_create_trace_id;
 
-const MAX_UNIQUE_STACKS: i64 = 99_999;
+// load_stacks fetches one extra row to detect truncation, so the SQL LIMIT is 99_999.
+const MAX_UNIQUE_STACKS: i64 = 99_998;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ProfilesMergeResponse {
