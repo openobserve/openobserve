@@ -511,7 +511,7 @@ describe("fleet queries", () => {
     );
     mockClient.get.mockResolvedValueOnce({ data: { items: [{ id: "default" }] } });
     expect(await (opts.queryFn as any)()).toEqual([{ id: "default" }]);
-    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/fleets");
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/fleets?offset=0&limit=1000");
     mockClient.get.mockResolvedValueOnce({ data: {} });
     await expect((opts.queryFn as any)()).rejects.toThrow();
     const at = (status: string) => [{ state: { rollout: { id: "r1", status } } }];

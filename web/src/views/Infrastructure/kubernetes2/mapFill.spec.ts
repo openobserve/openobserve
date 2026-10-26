@@ -24,7 +24,9 @@ import {
   fillClass,
   fillValue,
   groupRows,
+  isFailing,
   legendClasses,
+  toggleHidden,
   listTarget,
   MAX_LABEL_GROUPS,
   SHORT_KIND,
@@ -83,6 +85,7 @@ const state = (over: Partial<K8sUrlState> = {}): K8sUrlState => ({
   search: "web",
   sort: null,
   desc: false,
+  status: "all",
   entity: "pods",
   fill: "cpuReq",
   group: "node",
@@ -160,13 +163,51 @@ describe("mapFill buckets (AC 43)", () => {
     expect([fillValue(n, "cpu"), fillValue(n, "memory")]).toEqual([7, 8]);
   });
 
-  it("a pod with no request or no usage is No data, never the coldest bucket", () => {
-    expect(fillClass(pod({ cpuPctOfRequest: null }), "cpuReq")).toBe("noData");
+  it("a pod with usage but no request is No request set, with no usage is No data, never the coldest bucket", () => {
+    expect(fillClass(pod({ cpuCores: 0.1, cpuPctOfRequest: null }), "cpuReq")).toBe("noReq");
+    expect(fillClass(pod({ memoryBytes: 5, memoryPctOfLimit: null }), "memLim")).toBe("noReq");
+    expect(fillClass(pod({ cpuCores: null, cpuPctOfRequest: null }), "cpuReq")).toBe("noData");
     expect(fillClass(pod({ restarts: null }), "restarts")).toBe("noData");
   });
 
-  it("the legend lists five buckets plus No data, or the four status categories", () => {
-    expect(legendClasses("memLim")).toEqual(["b1", "b2", "b3", "b4", "b5", "noData"]);
+  it("a pod that is not running is Not running, never No data or No request", () => {
+    for (const phase of ["Pending", "Succeeded", "Failed"] as const) {
+      expect(fillClass(pod({ phase, cpuCores: null, cpuPctOfRequest: null }), "cpuReq")).toBe(
+        "notRunning",
+      );
+    }
+    expect(fillClass(pod({ statusReason: "Evicted" } as any), "memLim")).toBe("notRunning");
+    expect(fillClass(pod({ phase: "Running", cpuCores: null }), "cpuReq")).toBe("noData");
+    expect(fillClass(pod({ phase: "Pending", restarts: 3 }), "restarts")).toBe("b3");
+    expect(fillClass(pod({ phase: "Pending" }), "status")).not.toBe("notRunning");
+  });
+
+  it("toggling a bucket hides it, shows it again, and refuses to hide the last visible one", () => {
+    const present = ["b1", "b2"] as const;
+    expect(toggleHidden([], "b1", present)).toEqual(["b1"]);
+    expect(toggleHidden(["b1"], "b1", present)).toEqual([]);
+    expect(toggleHidden(["b1"], "b2", present)).toEqual(["b1"]);
+    expect(toggleHidden(["b1"], "b3", present)).toEqual(["b1", "b3"]);
+  });
+
+  it("marks only pods with an error warning as failing", () => {
+    const error = { key: "x", severity: "error" } as any;
+    expect(isFailing(pod({ warnings: [error] }))).toBe(true);
+    expect(isFailing(pod())).toBe(false);
+  });
+
+  it("the legend lists five buckets plus No request/Not running/No data, or the four status categories", () => {
+    expect(legendClasses("memLim")).toEqual([
+      "b1",
+      "b2",
+      "b3",
+      "b4",
+      "b5",
+      "noReq",
+      "notRunning",
+      "noData",
+    ]);
+    expect(legendClasses("restarts")).toEqual(["b1", "b2", "b3", "b4", "b5", "noData"]);
     expect(legendClasses("status")).toEqual(["ok", "warning", "error", "noData"]);
   });
 });

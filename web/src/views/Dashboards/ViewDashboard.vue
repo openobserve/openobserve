@@ -76,8 +76,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon-left="add"
+            :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
-            <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
+            <OTooltip
+              :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
+              shortcut-id="dashboardAddPanel"
+            />
+            <!-- A button's children are presentational, so the draft state is also in the button's own name. -->
+            <span
+              v-if="hasNewPanelDraft"
+              role="img"
+              :aria-label="t('dashboard.panelDraft.addPanelDot')"
+              class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-1 -top-1 size-2.5 rounded-full ring-4"
+              data-test="dashboard-panel-add-draft-dot"
+            />
           </OButton>
           <!-- <DateTimePicker 
             class="ms-2"
@@ -618,6 +630,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
+import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashboardAnnotationSources";
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -666,6 +679,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
+import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
@@ -949,6 +963,10 @@ export default defineComponent({
     // A wall screen has no Refresh button to apply a variable change, so kiosk applies it live.
     const applyVariablesLive = computed(() => isAutoRunOn.value || kioskMode.value);
     provide("dashboardAutoRun", applyVariablesLive);
+    provide(ANNOTATION_PREVIEW_CONTEXT_KEY, {
+      timeRange: () => currentTimeObjPerPanel.value?.__global,
+      variables: () => variablesManager.value?.committedVariablesData?.global ?? [],
+    });
 
     const showRangeInPicker = (value: any) =>
       dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
@@ -1760,6 +1778,14 @@ export default defineComponent({
         },
       }),
     });
+
+    const hasNewPanelDraft = computed(() =>
+      hasPanelDraft({
+        userEmail: String(store.state.userInfo?.email ?? ""),
+        org: String(store.state.selectedOrganization?.identifier ?? ""),
+        dashboardId: String(route.query.dashboard ?? ""),
+      }),
+    );
 
     //add panel
     const addPanelData = () => {
@@ -2673,6 +2699,7 @@ export default defineComponent({
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
+      hasNewPanelDraft,
       toggleHomeDashboard,
       isHome,
       t,

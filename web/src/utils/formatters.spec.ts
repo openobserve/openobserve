@@ -17,6 +17,7 @@ import {
   convertToTitleCase,
   truncateText,
   formatLargeNumber,
+  formatEventCount,
   formatSizeFromMB,
   addCommasToNumber,
   formatTimeWithSuffix,
@@ -308,6 +309,41 @@ describe("formatLargeNumber", () => {
 
   it("formats numbers >= 1_000_000_000 with B suffix", () => {
     expect(formatLargeNumber(3_000_000_000)).toBe("3.0B");
+  });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatLargeNumber(999_949)).toBe("999.9K");
+    expect(formatLargeNumber(999_950)).toBe("1.0M");
+    expect(formatLargeNumber(999_999)).toBe("1.0M");
+    expect(formatLargeNumber(999_999_999)).toBe("1.0B");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatEventCount
+// ---------------------------------------------------------------------------
+
+describe("formatEventCount", () => {
+  it("prints counts below 100 000 exactly", () => {
+    expect(formatEventCount(99_999)).toBe("99999");
+  });
+
+  it("formats larger counts with one decimal and drops a trailing .0", () => {
+    expect(formatEventCount(123_456)).toBe("123.5K");
+    expect(formatEventCount(2_000_000)).toBe("2M");
+    expect(formatEventCount(2_900_000_000)).toBe("2.9B");
+  });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatEventCount(999_949)).toBe("999.9K");
+    expect(formatEventCount(999_950)).toBe("1M");
+    expect(formatEventCount(999_999)).toBe("1M");
+    expect(formatEventCount(999_999_999)).toBe("1B");
+    expect(formatEventCount(999_990_000_000)).toBe("1T");
+  });
+
+  it("stays on T past the largest unit", () => {
+    expect(formatEventCount(1e15)).toBe("1000T");
   });
 });
 

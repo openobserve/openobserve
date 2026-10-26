@@ -138,7 +138,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { catalogFor, type EditorComponent, type EditorKind } from "./editorGraph";
+import { catalogFor, isSettingPath, type EditorComponent, type EditorKind } from "./editorGraph";
 
 const props = defineProps<{
   component: EditorComponent;
@@ -165,13 +165,10 @@ const CHIP: Record<EditorKind, string> = {
 const newKey = ref("");
 const newValue = ref("");
 
-// Dotted path with optional `[index]` segments, the shape `editorGraph` nests back into YAML.
-const SETTING_KEY = /^[\w-]+(\[\d+\])*(\.[\w-]+(\[\d+\])*)*$/;
-
 const newKeyError = computed(() => {
   const key = newKey.value.trim();
   if (!key) return null;
-  if (!SETTING_KEY.test(key)) return t("fleet.editor.settingInvalid");
+  if (!isSettingPath(key)) return t("fleet.editor.settingInvalid");
   return key in props.component.settings ? t("fleet.editor.settingExists") : null;
 });
 
