@@ -73,9 +73,7 @@ fn create_reports_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Reports::Org).string_len(256).not_null())
         // Foreign key to the folders table. This is a 27-character human
         // readable KSUID.
-        .col(ColumnDef::new(Reports::FolderId)
-            .char_len(27)
-            .not_null())
+        .col(ColumnDef::new(Reports::FolderId).char_len(27).not_null())
         .col(ColumnDef::new(Reports::Name).string_len(256).not_null())
         .col(ColumnDef::new(Reports::Title).string_len(256).not_null())
         .col(ColumnDef::new(Reports::Description).text().null())
@@ -83,11 +81,7 @@ fn create_reports_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Reports::Frequency).json().not_null())
         .col(ColumnDef::new(Reports::Destinations).json().not_null())
         .col(ColumnDef::new(Reports::Message).text().null())
-        .col(
-            ColumnDef::new(Reports::Timezone)
-                .string_len(256)
-                .not_null(),
-        )
+        .col(ColumnDef::new(Reports::Timezone).string_len(256).not_null())
         .col(ColumnDef::new(Reports::TzOffset).integer().not_null())
         .col(ColumnDef::new(Reports::Owner).string_len(256).null())
         .col(ColumnDef::new(Reports::LastEditedBy).string_len(256).null())
@@ -96,9 +90,9 @@ fn create_reports_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Reports::StartAt).big_integer().not_null())
         .foreign_key(
             sea_query::ForeignKey::create()
-                    .name(REPORTS_FOLDERS_FK)
-                    .from(Reports::Table, Reports::FolderId)
-                    .to(Folders::Table, Folders::Id)
+                .name(REPORTS_FOLDERS_FK)
+                .from(Reports::Table, Reports::FolderId)
+                .to(Folders::Table, Folders::Id),
         )
         .to_owned()
 }
@@ -120,31 +114,47 @@ fn create_report_dashboards_table_statement() -> TableCreateStatement {
         .if_not_exists()
         // Foreign key to the reports table. This is a 27-character human
         // readable KSUID. This is part of the composite primary key.
-        .col(ColumnDef::new(ReportDashboards::ReportId)
-            .char_len(27)
-            .not_null())
+        .col(
+            ColumnDef::new(ReportDashboards::ReportId)
+                .char_len(27)
+                .not_null(),
+        )
         // Foreign key to the dashboards table. This is a 27-character human
         // readable KSUID. This is part of the composite primary key.
-        .col(ColumnDef::new(ReportDashboards::DashboardId)
-            .char_len(27)
-            .not_null())
-        .col(ColumnDef::new(ReportDashboards::TabNames).json().not_null())
-        .col(ColumnDef::new(ReportDashboards::Variables).json().not_null())
-        .col(ColumnDef::new(ReportDashboards::Timerange).json().not_null())
-        .foreign_key(
-            sea_query::ForeignKey::create()
-                    .name(REPORT_DASHBOARDS_REPORTS_FK)
-                    .from(ReportDashboards::Table, ReportDashboards::ReportId)
-                    .to(Reports::Table, Reports::Id)
-                    .on_delete(ForeignKeyAction::Cascade)
+        .col(
+            ColumnDef::new(ReportDashboards::DashboardId)
+                .char_len(27)
+                .not_null(),
         )
-        .primary_key(Index::create().col(ReportDashboards::ReportId).col(ReportDashboards::DashboardId))
+        .col(ColumnDef::new(ReportDashboards::TabNames).json().not_null())
+        .col(
+            ColumnDef::new(ReportDashboards::Variables)
+                .json()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(ReportDashboards::Timerange)
+                .json()
+                .not_null(),
+        )
         .foreign_key(
             sea_query::ForeignKey::create()
-                    .name(REPORT_DASHBOARDS_DASHBOARDS_FK)
-                    .from(ReportDashboards::Table, ReportDashboards::DashboardId)
-                    .to(Dashboards::Table, Dashboards::Id)
-                    .on_delete(ForeignKeyAction::Cascade)
+                .name(REPORT_DASHBOARDS_REPORTS_FK)
+                .from(ReportDashboards::Table, ReportDashboards::ReportId)
+                .to(Reports::Table, Reports::Id)
+                .on_delete(ForeignKeyAction::Cascade),
+        )
+        .primary_key(
+            Index::create()
+                .col(ReportDashboards::ReportId)
+                .col(ReportDashboards::DashboardId),
+        )
+        .foreign_key(
+            sea_query::ForeignKey::create()
+                .name(REPORT_DASHBOARDS_DASHBOARDS_FK)
+                .from(ReportDashboards::Table, ReportDashboards::DashboardId)
+                .to(Dashboards::Table, Dashboards::Id)
+                .on_delete(ForeignKeyAction::Cascade),
         )
         .to_owned()
 }

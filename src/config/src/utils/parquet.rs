@@ -88,14 +88,8 @@ pub fn new_parquet_writer<W: AsyncFileWriter>(
         .set_write_batch_size(cfg.limit.batch_size) // in bytes
         .set_max_row_group_row_count(Some(PARQUET_MAX_ROW_GROUP_SIZE)) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(compression))
-        .set_column_dictionary_enabled(
-            TIMESTAMP_COL_NAME.into(),
-            false,
-        )
-        .set_column_encoding(
-            TIMESTAMP_COL_NAME.into(),
-            Encoding::DELTA_BINARY_PACKED,
-        );
+        .set_column_dictionary_enabled(TIMESTAMP_COL_NAME.into(), false)
+        .set_column_encoding(TIMESTAMP_COL_NAME.into(), Encoding::DELTA_BINARY_PACKED);
     if cfg.common.timestamp_compression_disabled {
         writer_props = writer_props
             .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);

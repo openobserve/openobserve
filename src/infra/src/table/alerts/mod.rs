@@ -1063,8 +1063,6 @@ enum Alerts {
 
 #[cfg(test)]
 pub(super) mod tests {
-    use svix_ksuid::KsuidLike as _;
-
     use super::*;
     use crate::table::entity::alerts::Model;
 
