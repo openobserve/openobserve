@@ -39,6 +39,13 @@ pub fn matcher_residual_field<'a>(schema: &'a Schema, matcher: &Matcher) -> Opti
     schema.field_with_name(&matcher.name).ok()
 }
 
+/// True when `matcher`'s label is absent from `schema` and "" (a missing label's value) fails it.
+pub fn absent_label_rejects_all(schema: &Schema, matcher: &Matcher) -> bool {
+    ![TIMESTAMP_COL_NAME, VALUE_LABEL, NAME_LABEL].contains(&matcher.name.as_str())
+        && schema.field_with_name(&matcher.name).is_err()
+        && !matcher.is_match("")
+}
+
 pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
     let mut predicates = Vec::new();
     for mat in &matchers.matchers {
@@ -174,6 +181,36 @@ mod tests {
                     schema.field(0).data_type()
                 );
             }
+        }
+    }
+
+    #[test]
+    fn absent_label_reads_as_empty_string() {
+        let schema = Schema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, rejects) in [
+            (r#"m{absent="x"}"#, true),
+            (r#"m{absent=~"foo.+"}"#, true),
+            (r#"m{absent!=""}"#, true),
+            (r#"m{absent=""}"#, false),
+            (r#"m{absent!="x"}"#, false),
+            (r#"m{absent=~".*"}"#, false),
+            (r#"m{absent=~"foo|"}"#, false),
+            (r#"m{absent!~"x"}"#, false),
+            (r#"m{job="x"}"#, false),
+            (r#"{__name__="m"}"#, false),
+        ] {
+            let PromExpr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert_eq!(
+                selector
+                    .matchers
+                    .matchers
+                    .iter()
+                    .any(|mat| absent_label_rejects_all(&schema, mat)),
+                rejects,
+                "{query}"
+            );
         }
     }
 }

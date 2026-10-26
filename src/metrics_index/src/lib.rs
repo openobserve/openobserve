@@ -23,7 +23,7 @@ mod pruner;
 mod reader;
 
 pub use layout::{METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_stream};
-pub use matcher::{matcher_predicates, matcher_residual_field};
+pub use matcher::{absent_label_rejects_all, matcher_predicates, matcher_residual_field};
 pub use pruner::{matching_blocks, search};
 pub use reader::fetch_parsed_index;
 
@@ -298,11 +298,23 @@ mod tests {
             Matcher::new(MatchOp::Equal, "path", "a"),
             parsed_matchers(r#"m{instance=~"i.*"}"#).matchers.remove(0),
             Matcher::new(MatchOp::Equal, "__name__", "m"),
-            Matcher::new(MatchOp::Equal, "missing_label", "x"),
+            Matcher::new(MatchOp::NotEqual, "missing_label", "x"),
         ]);
         assert!(residual_matchers_covered(
             &table_schema,
             &covered,
+            &matcher_labels
+        ));
+
+        // a missing label reads as "", which `="x"` rejects; only the residual filter drops every
+        // row
+        let rejecting = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Equal, "missing_label", "x"),
+        ]);
+        assert!(!residual_matchers_covered(
+            &table_schema,
+            &rejecting,
             &matcher_labels
         ));
 
