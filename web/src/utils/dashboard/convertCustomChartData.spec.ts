@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { runJavaScriptCode, panelIdToBeRefreshed } from "./convertCustomChartData";
+import {
+  runJavaScriptCode,
+  panelIdToBeRefreshed,
+  trustCustomChartCode,
+} from "./convertCustomChartData";
 
 // Mock router
 vi.mock("src/router", () => ({
@@ -196,6 +200,7 @@ describe("convertCustomChartData", () => {
           type: "execute",
           code: panelSchema.customChartContent,
           data: JSON.stringify(searchQueryData),
+          fnTag: expect.stringMatching(/^__o2_fn_[0-9a-f]{32}$/),
         },
         "*",
       );
@@ -471,6 +476,94 @@ describe("convertCustomChartData", () => {
 
       // Verify panelIdToBeRefreshed was cleared after success
       expect(panelIdToBeRefreshed.value).toBe(null);
+    });
+  });
+
+  describe("Function callbacks returned by the sandbox", () => {
+    const advisoryPayload = "function(){globalThis.__o2AuditMarker = 'executed'}()";
+
+    const runAndRespond = async (
+      code: string,
+      buildResult: (fnTag: string) => unknown,
+    ): Promise<any> => {
+      const acorn = await import("acorn");
+      const walk = await import("acorn-walk");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
+      vi.mocked(walk.simple).mockImplementation(() => {});
+
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null as null | (() => void),
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
+      };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+
+      const promise = runJavaScriptCode({ id: "p", customChartContent: code }, []);
+      mockIframe.onload?.();
+      const { fnTag } = mockIframe.contentWindow.postMessage.mock.calls[0][0];
+
+      const messageHandler = vi
+        .mocked(window.addEventListener)
+        .mock.calls.find((call) => call[0] === "message")?.[1] as (e: any) => void;
+      messageHandler({
+        source: mockIframe.contentWindow,
+        data: { type: "success", result: JSON.stringify(buildResult(fnTag)) },
+      });
+      return promise;
+    };
+
+    afterEach(() => {
+      delete (globalThis as any).__o2AuditMarker;
+    });
+
+    it("never compiles a function-looking string from stored dashboard code", async () => {
+      const result = await runAndRespond("option = {}", () => ({ audit_probe: advisoryPayload }));
+
+      expect((globalThis as any).__o2AuditMarker).toBeUndefined();
+      expect(result.audit_probe).toBe(advisoryPayload);
+    });
+
+    it("drops real callbacks from stored dashboard code instead of rebuilding them in the app", async () => {
+      const result = await runAndRespond("option = {}", (fnTag) => ({
+        tooltip: { formatter: { [fnTag]: advisoryPayload } },
+        o2_events: { click: { [fnTag]: "function(){}" } },
+      }));
+
+      expect((globalThis as any).__o2AuditMarker).toBeUndefined();
+      expect(result.tooltip.formatter).toBeUndefined();
+      expect(result.o2_events.click).toBeUndefined();
+    });
+
+    it("rebuilds tagged callbacks for trusted first-party code only, never a plain string", async () => {
+      const code = trustCustomChartCode("option = { trusted: true }");
+      const result = await runAndRespond(code, (fnTag) => ({
+        tooltip: { formatter: { [fnTag]: "function (p) { return p.name; }" } },
+        series: [{ name: advisoryPayload }],
+        spoofed: { __o2_fn_00000000000000000000000000000000: advisoryPayload },
+      }));
+
+      expect(result.tooltip.formatter({ name: "a" })).toBe("a");
+      expect(result.series[0].name).toBe(advisoryPayload);
+      expect((globalThis as any).__o2AuditMarker).toBeUndefined();
+    });
+
+    it("only lets the parent page hand code to the sandbox", async () => {
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null,
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
+      };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      const acorn = await import("acorn");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
+
+      void runJavaScriptCode({ id: "p", customChartContent: "option = {}" }, []);
+
+      expect(mockIframe.srcdoc).toContain("if (event.source !== parent || executed) return;");
     });
   });
 
