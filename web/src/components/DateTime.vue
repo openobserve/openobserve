@@ -590,6 +590,8 @@ export default defineComponent({
     const pendingDay = ref<string | null>(null);
     // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
     let isSeedingAbsolute = false;
+    let seededEnd: { date: string; time: string; timezone: string; exclusiveUs: number } | null =
+      null;
     // Date-only pickers cannot show the times a recent range carries.
     const showRail = computed(() => !props.disableRelative);
     const lastValidCustomValue = ref(15);
@@ -969,6 +971,21 @@ export default defineComponent({
     const lastInstant = (token: string | null, endUs: number) =>
       (parseCalendarToken(token)?.offset ?? 0) < 0 ? endUs - 1 : endUs;
 
+    // The shown 23:59:59 of a copied calendar end stands for the next period's start until the user edits it.
+    const rememberSeededEnd = (token: string | null, endUs: number) => {
+      if ((parseCalendarToken(token)?.offset ?? 0) >= 0) {
+        seededEnd = null;
+        return;
+      }
+      const shown = convertUnixTime(endUs - 1);
+      seededEnd = {
+        date: shown.date,
+        time: shown.time,
+        timezone: store.state.timezone,
+        exclusiveUs: endUs,
+      };
+    };
+
     const setRelativeTime = (period: string) => {
       const calendarRange = resolveCalendarPeriod(period, store.state.timezone);
       if (calendarRange && props.calendarPresets) {
@@ -982,6 +999,7 @@ export default defineComponent({
         selectedType.value = "absolute";
         calendarToken.value = null;
         setAbsoluteTime(calendarRange.startTime, lastInstant(period, calendarRange.endTime));
+        rememberSeededEnd(period, calendarRange.endTime);
         return;
       }
 
@@ -1029,6 +1047,7 @@ export default defineComponent({
     const setAbsoluteTime = (startTime: number, endTime: number) => {
       // Parent-invoked setter — the resulting auto-apply emit is programmatic.
       markProgrammaticDateChange();
+      seededEnd = null;
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
         selectedDate.value.from = dateString;
@@ -1301,7 +1320,14 @@ export default defineComponent({
       let startTime = selectedDate.value.from + " " + selectedTime.value.startTime;
       let endTime = selectedDate.value.to + " " + selectedTime.value.endTime;
       const startUTC = convertToUtcTimestamp(startTime, store.state.timezone);
-      const endUTC = convertToUtcTimestamp(endTime, store.state.timezone);
+      const untouchedSeededEnd =
+        seededEnd !== null &&
+        seededEnd.date === selectedDate.value.to &&
+        seededEnd.time === selectedTime.value.endTime &&
+        seededEnd.timezone === store.state.timezone;
+      const endUTC = untouchedSeededEnd
+        ? seededEnd!.exclusiveUs
+        : convertToUtcTimestamp(endTime, store.state.timezone);
       return { startUTC, endUTC };
     };
 
@@ -1417,8 +1443,9 @@ export default defineComponent({
           // So have added check for from and to
           if (selectedDate.value?.from && selectedDate.value?.to && !props.disableRelative) {
             // A pending single clicked day is what Apply will use, so the label shows it already.
-            const from = pendingDay.value ?? selectedDate.value.from;
-            const to = pendingDay.value ?? selectedDate.value.to;
+            const pending = menuOpen.value ? pendingDay.value : null;
+            const from = pending ?? selectedDate.value.from;
+            const to = pending ?? selectedDate.value.to;
             return `${from} ${selectedTime.value.startTime} - ${to} ${selectedTime.value.endTime}`;
           } else if (selectedDate.value?.from && selectedDate.value?.to && props.disableRelative) {
             return `${selectedDate.value.from} - ${selectedDate.value.to}`;
@@ -1559,6 +1586,7 @@ export default defineComponent({
       if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return;
       const start = convertUnixTime(startTime);
       const end = convertUnixTime(lastInstant(calendarToken.value, endTime));
+      rememberSeededEnd(calendarToken.value, endTime);
       isSeedingAbsolute = true;
       selectedDate.value.from = start.date;
       selectedDate.value.to = end.date;
@@ -1894,6 +1922,7 @@ export default defineComponent({
         onShow();
       } else {
         if (props.autoApply && commitPendingDay()) saveDate("absolute");
+        pendingDay.value = null;
         if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
           restoreAppliedSelection();
         } else if (absoluteRangeKey() !== rangeKeyAtOpen) {

@@ -298,7 +298,7 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.selectedType).toBe("absolute");
       expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
         startTime: micros("2026-10-06T18:30:00Z"),
-        endTime: micros("2026-10-07T18:29:59Z"),
+        endTime: micros("2026-10-07T18:30:00Z"),
       });
     });
 
@@ -482,6 +482,24 @@ describe("DateTime rail", () => {
       });
     });
 
+    it("drops an unapplied pending day from the label when the panel closes without Apply", async () => {
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      const applied = wrapper!.vm.triggerLabel;
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+      calendar().vm.$emit("update:pendingDate", "2026/10/03");
+      await flushPromises();
+
+      wrapper!.vm.onMenuOpenChange(false);
+      wrapper!.vm.menuOpen = false;
+      await flushPromises();
+
+      expect(wrapper!.vm.pendingDay).toBeNull();
+      expect(wrapper!.vm.triggerLabel).toBe(applied);
+    });
+
     it("holds auto-apply while the day is pending and applies that day on close", async () => {
       createWrapper({ autoApply: true });
       await flushPromises();
@@ -598,8 +616,12 @@ describe("DateTime rail", () => {
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-09-01T00:30:00Z"),
-        endTime: micros("2026-09-30T18:29:59Z"),
+        endTime: micros("2026-09-30T18:30:00Z"),
       });
+
+      wrapper!.vm.selectedTime.endTime = "23:00:00";
+      await flushPromises();
+      expect(lastEmit()).toMatchObject({ endTime: micros("2026-09-30T17:30:00Z") });
     });
   });
 
@@ -776,6 +798,32 @@ describe("DateTime rail", () => {
       expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail-recent-0");
     });
 
+    it("lets a row over the query-range limit be removed by keyboard, then moves focus on", async () => {
+      vi.useRealTimers();
+      seedHistory([
+        { startUs: micros("2026-10-01T00:00:00Z"), endUs: micros("2026-10-03T00:00:00Z") },
+      ]);
+      createWrapper({ queryRangeRestrictionInHour: 24 });
+      await openMenu();
+
+      const row = el("date-time-rail-recent-0")!;
+      expect(row.hasAttribute("disabled")).toBe(false);
+      expect(row.getAttribute("aria-disabled")).toBe("true");
+      expect(row.getAttribute("tabindex")).toBe("0");
+      const hintId = row.getAttribute("aria-describedby")!;
+      expect(document.getElementById(hintId)?.textContent).toContain("Delete");
+      expect(row.hasAttribute("aria-keyshortcuts")).toBe(false);
+
+      row.focus();
+      row.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+      await flushPromises();
+
+      expect(storedHistory()).toEqual([]);
+      expect(document.activeElement?.getAttribute("data-test")).toBe(
+        "date-time-rail-calendar-today",
+      );
+    });
+
     it("opens on the first rail item and keeps the rail a single Tab stop", async () => {
       vi.useRealTimers();
       seedHistory([1, 2, 3, 4].map(hourRange));
@@ -907,7 +955,7 @@ describe("DateTime rail", () => {
       createWrapper({ queryRangeRestrictionInHour: 24 });
       await openMenu();
 
-      expect(el("date-time-rail-recent-0")?.disabled).toBe(true);
+      expect(el("date-time-rail-recent-0")?.getAttribute("aria-disabled")).toBe("true");
     });
   });
 });

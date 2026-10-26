@@ -39,6 +39,7 @@ import {
   useLocalTimezone,
   useLocalWrapContent,
   applyTimezone,
+  applySessionTimezone,
 } from "./storage";
 
 beforeEach(() => {
@@ -414,5 +415,15 @@ describe("applyTimezone", () => {
 
     expect(localStorageMock.setItem).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("applySessionTimezone", () => {
+  it("sets the store only, so a shared saved view does not change the user's stored zone", () => {
+    const dispatch = vi.fn();
+    applySessionTimezone({ dispatch }, "Asia/Tokyo");
+
+    expect(dispatch).toHaveBeenCalledWith("setTimezone", "Asia/Tokyo");
+    expect(localStorageMock.setItem).not.toHaveBeenCalled();
   });
 });

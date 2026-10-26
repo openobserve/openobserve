@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div :id="recentHeadingId" class="text-text-secondary px-2 pt-1 pb-1 text-xs font-semibold">
         {{ t("common.timeRangeRecent") }}
       </div>
+      <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
       <div
         v-if="recent.length === 0"
         class="text-text-muted px-2 pb-1 text-xs"
@@ -53,11 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-date-time-rail-recent
             :tabindex="tabindexFor(`recent-${item.id}`)"
             :data-test="`date-time-rail-recent-${item.id}`"
-            class="w-full justify-start! pe-7! font-normal tabular-nums disabled:opacity-35"
+            class="w-full justify-start! pe-7! font-normal tabular-nums aria-disabled:opacity-35"
             :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
             :disabled="item.disabled"
+            focusable-unavailable
             :aria-pressed="item.selected"
-            :aria-keyshortcuts="raw('Delete ArrowRight')"
+            :aria-describedby="recentKeysHintId"
+            :description-id="recentKeysHintId"
             @mouseenter="emit('hover')"
             @focus="onItemFocus(`recent-${item.id}`)"
             @click="emit('select-recent', item.id)"
@@ -158,7 +161,7 @@ import { computed, nextTick, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { TimeRangeRailItem } from "@/utils/timeRangeRail";
 
 const COLLAPSED_COUNT = 3;
@@ -181,6 +184,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const recentHeadingId = useId();
+const recentKeysHintId = useId();
 const calendarHeadingId = useId();
 
 // Starts collapsed on every open because the popover unmounts this rail when it closes.
@@ -193,8 +197,9 @@ const visibleRecent = computed(() =>
 // The rail is one Tab stop: only its active item is tabbable and arrow keys move within it.
 const activeKey = ref<string | null>(null);
 
+// A recent row over the query-range limit stays focusable, so it can still be removed by keyboard.
 const focusOrder = computed(() => [
-  ...visibleRecent.value.filter((item) => !item.disabled).map((item) => `recent-${item.id}`),
+  ...visibleRecent.value.map((item) => `recent-${item.id}`),
   ...(props.recent.length > COLLAPSED_COUNT ? ["toggle"] : []),
   ...(props.calendar ?? []).filter((item) => !item.disabled).map((item) => `calendar-${item.id}`),
 ]);
@@ -226,5 +231,6 @@ const removeFocusedRecent = async (id: string, event: Event) => {
   await nextTick();
   const rows = list?.querySelectorAll<HTMLElement>("[data-date-time-rail-recent]");
   if (rows && rows.length > 0) rows[Math.min(index, rows.length - 1)].focus();
+  else list?.querySelector<HTMLElement>("[data-date-time-rail-item]")?.focus();
 };
 </script>

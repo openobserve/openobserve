@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:modelValue="timeGate.onPick"
             @show="timeGate.onShow"
             @hide="onTimePickerHide"
-            @timezone-change="onHeaderTimezoneChange"
+            @timezone-change="timeGate.flush"
             data-test="dashboard-global-date-time-picker"
           />
           <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
@@ -637,7 +637,8 @@ import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel } from "../../utils/date";
+import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { useRoute } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
@@ -1081,13 +1082,15 @@ export default defineComponent({
       return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
 
+    // Panel calendar ranges moved by a zone change while Auto Run was off; Refresh applies them with the global range.
+    const zoneRefreshPending = ref(false);
     const isRefreshPending = computed(
-      () => isVariablesChanged.value || timeGate.needsRefresh.value,
+      () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
     );
 
     const refreshTooltip = computed(() => {
       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
-      if (timeGate.needsRefresh.value) {
+      if (timeGate.needsRefresh.value || zoneRefreshPending.value) {
         return isVariablesChanged.value
           ? t("dashboard.refreshToApplyTimeRangeAndVariables")
           : t("dashboard.refreshToApplyTimeRange");
@@ -1461,29 +1464,6 @@ export default defineComponent({
     };
 
     // Compute time for a single specific panel (for panel-level refresh)
-    // The global range re-applies through the gate when its window moves; a panel's own calendar range has no such path.
-    const onHeaderTimezoneChange = () => {
-      timeGate.flush();
-      const globalTime = getAppliedGlobalTime();
-      if (!globalTime) return;
-      for (const tab of currentDashboardData.data?.tabs ?? []) {
-        for (const panel of tab.panels ?? []) {
-          if (
-            !hasPanelTime(panel) ||
-            !isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value)
-          ) {
-            continue;
-          }
-          const next = computePanelTime(panel, globalTime);
-          const current = currentTimeObjPerPanel.value[panel.id];
-          // Only a moved start re-queries; a "so far" end always differs by the moment it was read.
-          if (next && current?.start_time?.getTime() !== next.start_time?.getTime()) {
-            currentTimeObjPerPanel.value[panel.id] = next;
-          }
-        }
-      }
-    };
-
     const computeSinglePanelTime = (panelId: string) => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
         return;
@@ -1613,6 +1593,41 @@ export default defineComponent({
         }
       });
     };
+
+    // A zone change from any picker (header, panel, ViewPanel) moves every calendar window, which no single picker re-emits.
+    const reResolveCalendarRanges = () => {
+      const applied = selectedDate.value;
+      if (applied?.valueType === "relative" && parseCalendarToken(applied.relativeTimePeriod)) {
+        const window = getConsumableRelativeTime(applied.relativeTimePeriod);
+        if (window)
+          timeGate.onPick({ ...applied, startTime: window.startTime, endTime: window.endTime });
+      }
+      const globalTime = getAppliedGlobalTime();
+      if (!globalTime) return;
+      const moved: [string, { start_time: Date; end_time: Date }][] = [];
+      for (const tab of currentDashboardData.data?.tabs ?? []) {
+        for (const panel of tab.panels ?? []) {
+          if (!hasPanelTime(panel)) continue;
+          if (!isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value)) continue;
+          const next = computePanelTime(panel, globalTime);
+          const current = currentTimeObjPerPanel.value[panel.id];
+          // Only a moved start counts; a "so far" end always differs by the moment it was read.
+          if (next && current?.start_time?.getTime() !== next.start_time?.getTime()) {
+            moved.push([panel.id, next]);
+          }
+        }
+      }
+      if (!moved.length) return;
+      if (!isAutoRunOn.value) {
+        zoneRefreshPending.value = true;
+        return;
+      }
+      for (const [id, next] of moved) currentTimeObjPerPanel.value[id] = next;
+    };
+    watch(
+      () => store.state.timezone,
+      () => reResolveCalendarRanges(),
+    );
 
     // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
@@ -1872,6 +1887,7 @@ export default defineComponent({
 
       // Applied before the recompute below, which reads the applied range and not the picker.
       timeGate.refresh();
+      zoneRefreshPending.value = false;
 
       // Recompute all panel times after syncing
       // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
@@ -2741,7 +2757,8 @@ export default defineComponent({
       currentTimeObj,
       currentTimeObjPerPanel,
       computeAllPanelTimes,
-      onHeaderTimezoneChange,
+      reResolveCalendarRanges,
+      zoneRefreshPending,
       shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------

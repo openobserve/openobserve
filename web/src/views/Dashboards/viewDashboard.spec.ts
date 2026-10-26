@@ -1893,45 +1893,97 @@ describe("ViewDashboard", () => {
       expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00.000Z") * 1000);
     });
 
-    it("re-resolves a panel's own calendar range when the header timezone changes", async () => {
-      await mountWithPicker();
-      setPickerTimezoneSource(() => store.state.timezone);
-      try {
-        wrapper.vm.currentDashboardData.data = {
-          ...baseDashboard,
-          tabs: [
-            {
-              tabId: "tab-1",
-              name: "Tab 1",
-              panels: [
-                {
-                  id: "p1",
-                  type: "line",
-                  config: {
-                    panel_time_enabled: true,
-                    panel_time_range: { type: "relative", relativeTimePeriod: "calendar:day:-1" },
-                  },
+    describe("timezone change from any picker", () => {
+      const panelWithOwnYesterday = {
+        ...baseDashboard,
+        tabs: [
+          {
+            tabId: "tab-1",
+            name: "Tab 1",
+            panels: [
+              {
+                id: "p1",
+                type: "line",
+                config: {
+                  panel_time_enabled: true,
+                  panel_time_range: { type: "relative", relativeTimePeriod: "calendar:day:-1" },
                 },
-              ],
-            },
-          ],
+              },
+            ],
+          },
+        ],
+      };
+      const UTC_START = Date.parse("2026-10-07T00:00:00Z") * 1000;
+      const IST_START = Date.parse("2026-10-06T18:30:00Z") * 1000;
+
+      const mountOnRollingGlobal = async (autoRun: boolean) => {
+        global.mockStoreState.zoConfig = {
+          ...global.mockStoreState.zoConfig,
+          auto_query_enabled: autoRun,
         };
+        await mountWithPicker();
+        setPickerTimezoneSource(() => store.state.timezone);
+        wrapper.vm.currentDashboardData.data = panelWithOwnYesterday;
         wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
         wrapper.vm.computeAllPanelTimes(true);
-        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(
-          Date.parse("2026-10-07T00:00:00Z") * 1000,
-        );
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+      };
+
+      afterEach(() => {
+        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
+        global.mockStoreState.zoConfig = { min_auto_refresh_interval: 5 };
+      });
+
+      it("moves a panel's own calendar range at once with Auto Run on, and only once", async () => {
+        await mountOnRollingGlobal(true);
 
         store.state.timezone = "Asia/Kolkata";
-        wrapper.vm.onHeaderTimezoneChange();
+        wrapper.vm.reResolveCalendarRanges();
         const moved = wrapper.vm.currentTimeObjPerPanel.p1;
-        expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-06T18:30:00Z") * 1000);
+        expect(moved.start_time.getTime()).toBe(IST_START);
 
-        wrapper.vm.onHeaderTimezoneChange();
+        wrapper.vm.reResolveCalendarRanges();
         expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(moved);
-      } finally {
-        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
-      }
+      });
+
+      it("re-applies a global calendar range through the time gate", async () => {
+        global.mockStoreState.zoConfig = {
+          ...global.mockStoreState.zoConfig,
+          auto_query_enabled: true,
+        };
+        await mountWithPicker();
+        setPickerTimezoneSource(() => store.state.timezone);
+        const yesterdayUtc = {
+          valueType: "relative",
+          relativeTimePeriod: "calendar:day:-1",
+          startTime: UTC_START,
+          endTime: UTC_START + 86_400_000_000,
+        };
+        wrapper.vm.timeGate.onPick(yesterdayUtc);
+        wrapper.vm.selectedDate = yesterdayUtc;
+        await flushPromises();
+
+        store.state.timezone = "Asia/Kolkata";
+        wrapper.vm.reResolveCalendarRanges();
+        await flushPromises();
+
+        expect(wrapper.vm.selectedDate.startTime).toBe(IST_START);
+        expect(wrapper.vm.currentTimeObjPerPanel.__global.start_time.getTime()).toBe(IST_START);
+      });
+
+      it("waits for Refresh with Auto Run off, then applies the new zone with everything else", async () => {
+        await mountOnRollingGlobal(false);
+
+        store.state.timezone = "Asia/Kolkata";
+        wrapper.vm.reResolveCalendarRanges();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(true);
+        expect(wrapper.vm.isRefreshPending).toBe(true);
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
     });
 
     it("still refreshes __global on a forced recompute", async () => {
