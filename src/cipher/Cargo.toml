@@ -7,14 +7,14 @@ publish = false
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise"]
+enterprise = ["dep:o2_enterprise", "dep:parking_lot", "dep:serde", "dep:utoipa"]
 
 [dependencies]
 hashbrown.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
-parking_lot.workspace = true
-serde.workspace = true
-utoipa.workspace = true
+parking_lot = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+utoipa = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
