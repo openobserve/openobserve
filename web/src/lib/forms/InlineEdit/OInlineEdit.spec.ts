@@ -147,6 +147,29 @@ describe("OInlineEdit", () => {
     expect(message.attributes("role")).toBe("alert");
   });
 
+  it("shows the hint beside the input only while editing, linked as its description", async () => {
+    const wrapper = mountInlineEdit({ hint: "Use $variable to show a value" });
+    expect(wrapper.find('[data-test="name-hint"]').exists()).toBe(false);
+
+    await trigger(wrapper).trigger("click");
+
+    const hint = wrapper.find('[data-test="name-hint"]');
+    expect(hint.text()).toBe("Use $variable to show a value");
+    expect(input(wrapper).attributes("aria-describedby")).toBe(hint.attributes("id"));
+  });
+
+  it("lets an error message take the hint's place", async () => {
+    const wrapper = mountInlineEdit({
+      hint: "Hint",
+      error: true,
+      errorMessage: "Name is required",
+    });
+    await trigger(wrapper).trigger("click");
+
+    expect(wrapper.find('[data-test="name-hint"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="name-error"]').exists()).toBe(true);
+  });
+
   it("offers no edit affordance when readonly", () => {
     const wrapper = mountInlineEdit({ readonly: true });
 

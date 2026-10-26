@@ -20,7 +20,7 @@
 // grid cell) rather than a measured pixel width, so it grows with the text
 // without an inline style or a hardcoded px.
 
-import { computed, nextTick, ref, useAttrs, watch } from "vue";
+import { computed, nextTick, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -43,6 +43,7 @@ defineSlots<InlineEditSlots>();
 
 const $attrs = useAttrs();
 const dataTest = computed(() => $attrs["data-test"] as string | undefined);
+const hintId = useId();
 
 const isEditing = ref(false);
 const draft = ref("");
@@ -247,6 +248,7 @@ defineExpose({ focus: startEdit });
         :placeholder="placeholder"
         :aria-label="ariaLabel"
         :aria-invalid="error || undefined"
+        :aria-describedby="hint ? hintId : undefined"
         :maxlength="maxlength"
         :data-test="dataTest ? `${dataTest}-input` : undefined"
         :class="[
@@ -350,6 +352,13 @@ defineExpose({ focus: startEdit });
       class="text-input-error-text text-2xs shrink-0 leading-tight whitespace-nowrap"
       :data-test="dataTest ? `${dataTest}-error` : undefined"
       >{{ errorMessage }}</span
+    >
+    <span
+      v-else-if="isEditing && hint"
+      :id="hintId"
+      class="text-text-secondary text-2xs shrink-0 leading-tight whitespace-nowrap max-md:hidden"
+      :data-test="dataTest ? `${dataTest}-hint` : undefined"
+      >{{ hint }}</span
     >
   </div>
 </template>

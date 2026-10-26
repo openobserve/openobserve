@@ -32,6 +32,8 @@ export interface InlineEditProps {
   ariaLabel?: I18nText;
   /** Tooltip/title on the display trigger — e.g. "Click to rename". */
   editHint?: I18nText;
+  /** Helper text beside the input while editing, e.g. the syntax the value accepts. */
+  hint?: I18nText;
   size?: InlineEditSize;
   /** Heading line (default) or the meta/description line. */
   tone?: InlineEditTone;
