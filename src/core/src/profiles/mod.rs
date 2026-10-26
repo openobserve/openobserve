@@ -913,7 +913,7 @@ fn format_location_frames(location_index: i32, dictionary: &ProfilesDictionary) 
     }
 }
 
-/// Format an unsymbolized location as `{file}@{build_id}+0x{rel}` (+ optional `/{frame_type}`).
+/// Format an unsymbolized location as `[{file}@]{id}+0x{rel}` (+ optional `/{frame_type}`).
 ///
 /// eBPF native frames omit Line/Function and expect backends to retain mapping metadata
 /// for later symbolization. Bare `0x{va}` collapses frames across different binaries.
@@ -921,18 +921,21 @@ fn format_unsymbolized_frame(
     location: &opentelemetry_proto::tonic::profiles::v1development::Location,
     dictionary: &ProfilesDictionary,
 ) -> Option<String> {
-    let mapping_id = resolve_mapping_identity(location.mapping_index, dictionary);
-    let rel = relative_file_offset(location, dictionary);
-    let frame = match (mapping_id.as_deref(), rel, location.address) {
-        (Some(id), Some(off), _) => format!("{id}+0x{off:x}"),
-        (Some(id), None, addr) if addr != 0 => format!("{id}+0x{addr:x}"),
-        (None, _, addr) if addr != 0 => format!("0x{addr:x}"),
+    let mapping = mapping_at(location.mapping_index, dictionary);
+    let file = mapping.and_then(|m| mapping_file_name(m, dictionary));
+    let build_id = mapping.and_then(|m| mapping_build_id(m, dictionary));
+    let offset = match relative_file_offset(location, dictionary) {
+        Some(rel) if file.is_some() || build_id.is_some() => rel,
+        _ if location.address != 0 => location.address,
         _ => return None,
     };
-    match location_frame_type(location, dictionary) {
-        Some(ft) if !ft.is_empty() => Some(format!("{frame}/{ft}")),
-        _ => Some(frame),
-    }
+    let frame_type = location_frame_type(location, dictionary).unwrap_or_default();
+    let sep = if frame_type.is_empty() { "" } else { "/" };
+    Some(match (file, build_id.as_deref()) {
+        (Some(file), Some(id)) => format!("{file}@{id}+0x{offset:x}{sep}{frame_type}"),
+        (Some(id), None) | (None, Some(id)) => format!("{id}+0x{offset:x}{sep}{frame_type}"),
+        (None, None) => format!("0x{offset:x}{sep}{frame_type}"),
+    })
 }
 
 fn relative_file_offset(
@@ -949,19 +952,17 @@ fn relative_file_offset(
     Some(location.address - mapping.memory_start + mapping.file_offset)
 }
 
-fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary) -> Option<String> {
-    let mapping = mapping_at(mapping_index, dictionary)?;
-    let file = lookup_string(&dictionary.string_table, mapping.filename_strindex).map(|path| {
-        std::path::Path::new(&path)
+fn mapping_file_name<'a>(
+    mapping: &opentelemetry_proto::tonic::profiles::v1development::Mapping,
+    dictionary: &'a ProfilesDictionary,
+) -> Option<&'a str> {
+    let path = string_at(&dictionary.string_table, mapping.filename_strindex)?;
+    Some(
+        std::path::Path::new(path)
             .file_name()
             .and_then(|name| name.to_str())
-            .map(|name| name.to_string())
-            .unwrap_or(path)
-    });
-    match (file, mapping_build_id(mapping, dictionary)) {
-        (Some(file), Some(build_id)) => Some(format!("{file}@{build_id}")),
-        (file, build_id) => build_id.or(file),
-    }
+            .unwrap_or(path),
+    )
 }
 
 fn mapping_build_id(
@@ -975,10 +976,10 @@ fn mapping_build_id(
         let Some(attr) = dictionary.attribute_table.get(attr_index as usize) else {
             continue;
         };
-        let Some(key) = lookup_string(&dictionary.string_table, attr.key_strindex) else {
+        let Some(key) = string_at(&dictionary.string_table, attr.key_strindex) else {
             continue;
         };
-        if !MAPPING_ID_ATTR_KEYS.contains(&key.as_str()) {
+        if !MAPPING_ID_ATTR_KEYS.contains(&key) {
             continue;
         }
         if let Some(value) = resolve_any_value_string(attr.value.as_ref(), Some(dictionary))
@@ -1001,7 +1002,7 @@ fn location_frame_type(
         let Some(attr) = dictionary.attribute_table.get(attr_index as usize) else {
             continue;
         };
-        let Some(key) = lookup_string(&dictionary.string_table, attr.key_strindex) else {
+        let Some(key) = string_at(&dictionary.string_table, attr.key_strindex) else {
             continue;
         };
         if key != PROFILE_FRAME_TYPE_ATTR {
@@ -1153,12 +1154,16 @@ fn get_profile_type_unit(
 }
 
 fn lookup_string(values: &[String], index: i32) -> Option<String> {
+    string_at(values, index).map(str::to_string)
+}
+
+fn string_at(values: &[String], index: i32) -> Option<&str> {
     if index <= 0 {
         return None;
     }
     values
         .get(index as usize)
-        .cloned()
+        .map(String::as_str)
         .filter(|v| !v.is_empty())
 }
 
