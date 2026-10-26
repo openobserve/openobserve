@@ -41,14 +41,6 @@ export const publicLinksListQuery = (org: string) =>
   });
 
 // Build state moves with viewers, not with writes, so it takes the live tier.
-export const publicLinkStatusQuery = (org: string, dashboardId: string, linkId: string) =>
-  queryOptions({
-    queryKey: publicLinkKeys.status(org, linkId),
-    queryFn: async (): Promise<PublicLinkStatusReport> =>
-      (await admin.status(org, dashboardId, linkId)).data,
-    staleTime: LIVE_STALE_TIME,
-  });
-
 export const publicLinksStatusBatchQuery = (org: string, ids: string[]) =>
   queryOptions({
     queryKey: publicLinkKeys.statusBatch(org, ids),

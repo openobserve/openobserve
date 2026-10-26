@@ -948,12 +948,6 @@
     "boolTrue": "Doğru",
     "boolFalse": "Yanlış",
     "browserTimeWithZone": "Tarayıcı Zamanı ({zone})",
-    "durationSeconds": "{n} saniye | {n} saniye",
-    "durationMinutes": "{n} dakika | {n} dakika",
-    "durationHours": "{n} saat | {n} saat",
-    "durationDays": "{n} gün | {n} gün",
-    "durationWeeks": "{n} hafta | {n} hafta",
-    "durationYears": "{n} yıl | {n} yıl",
     "poweredBy": "Destekleyen"
   },
   "flow": {
@@ -8028,6 +8022,7 @@
       "publisherLeft": "Yayınlayan kuruluştan ayrıldı",
       "urlHidden": "Erişim yok",
       "urlHiddenHint": "Bu bağlantının gösterge panosunu görüntüleyemediğiniz için genel URL'si gizlendi.",
+      "orgDisabledHint": "Bu kuruluş için herkese açık bağlantılar kapatıldı",
       "takeOver": "Devral",
       "takeOverTitle": "Bu bağlantı devralınsın mı?",
       "takeOverBody": "Yayınlayan siz olursunuz. Genel sayfa, görmenize izin verilen içeriği gösterir; bu, öncekinden daha fazla ya da daha az olabilir. URL'ye sahip herkes erişimini korur ve bağlantı hemen etkinleşir.",
@@ -20491,7 +20486,8 @@
         "notViewed": "Hiç görüntülenmedi",
         "needsAttention": "Dikkat gerekiyor",
         "expired": "Süresi doldu",
-        "dashboardDeleted": "Gösterge panosu silindi"
+        "dashboardDeleted": "Gösterge panosu silindi",
+        "disabled": "Devre dışı"
       },
       "downtimeStatus": {
         "scheduled": "Planlandı",

@@ -181,6 +181,8 @@ export const BADGE_GROUPS = {
         variant: "error-soft",
         labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
       },
+      // The organization has public links turned off.
+      disabled: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.disabled" },
     },
   },
 

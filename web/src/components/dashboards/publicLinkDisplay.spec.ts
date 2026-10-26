@@ -25,6 +25,7 @@ import {
   publicLinkSearchTerm,
   publicLinkUrl,
   shortRange,
+  statusReason,
   takeOverError,
 } from "@/components/dashboards/publicLinkDisplay";
 import type {
@@ -132,6 +133,16 @@ describe("public link status", () => {
     expect(
       attentionReason(report(withheld, range({ state: "needs_attention", last_error: "x" })), gt),
     ).toBe("The last build failed. Viewers see older data where there is some.");
+  });
+
+  it("keeps a disabled link disabled, and explains it before any build trouble", () => {
+    const failing = report(range({ state: "needs_attention", last_error: "timeout" }));
+    expect(displayStatus(row({ status: "disabled" }), failing)).toBe("disabled");
+    expect(statusReason(row({ status: "disabled" }), failing, gt)).toBe(
+      "Public links are turned off for this organization",
+    );
+    expect(statusReason(row({}), failing, gt)).toBe(attentionReason(failing, gt));
+    expect(statusReason(row({}), undefined, gt)).toBeNull();
   });
 
   it("shows Last viewed from the access time, not an update time", () => {

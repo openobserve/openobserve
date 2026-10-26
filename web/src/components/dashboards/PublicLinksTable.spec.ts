@@ -30,7 +30,6 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     resume: vi.fn(),
     takeOver: vi.fn(),
     refresh: vi.fn(),
-    status: vi.fn(),
     statusBatch: vi.fn(),
     revoke: vi.fn(),
   },
@@ -255,6 +254,30 @@ describe("PublicLinksTable", () => {
 
     await selectTile(w, "all");
     expect(rows(w)).toHaveLength(5);
+  });
+
+  it("tags a link of an org with public links off as disabled, says why, and leaves it out of Live", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: { list: [link(), link({ id: "off", name: "Lobby", status: "disabled" })] },
+    } as never);
+    vi.mocked(admin.statusBatch).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-off-status").text()).toBe("Disabled");
+    expect(
+      w.findAllComponents({ name: "OTooltip" }).map((tip) => String(tip.props("content"))),
+    ).toContain("Public links are turned off for this organization");
+    const tile = (key: string) =>
+      w
+        .findAllComponents({ name: "OStatCard" })
+        .find((card) => card.attributes("data-test") === `dashboards-public-links-summary-${key}`)
+        ?.props("value");
+    expect(tile("live")).toBe(1);
+    expect(tile("all")).toBe(2);
+
+    await selectTile(w, "live");
+    expect(rows(w)).toHaveLength(1);
+    expect(find(w, "dashboards-public-links-off-status").exists()).toBe(false);
   });
 
   it("searches by name, dashboard, folder and publisher", async () => {

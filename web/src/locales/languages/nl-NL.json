@@ -948,12 +948,6 @@
     "boolTrue": "Waar",
     "boolFalse": "Onwaar",
     "browserTimeWithZone": "Browsertijd ({zone})",
-    "durationSeconds": "{n} seconde | {n} seconden",
-    "durationMinutes": "{n} minuut | {n} minuten",
-    "durationHours": "{n} uur | {n} uur",
-    "durationDays": "{n} dag | {n} dagen",
-    "durationWeeks": "{n} week | {n} weken",
-    "durationYears": "{n} jaar | {n} jaar",
     "poweredBy": "Mogelijk gemaakt door"
   },
   "flow": {
@@ -8028,6 +8022,7 @@
       "publisherLeft": "Uitgever heeft de organisatie verlaten",
       "urlHidden": "Geen toegang",
       "urlHiddenHint": "Je kunt het dashboard van deze link niet bekijken, dus de openbare URL is verborgen.",
+      "orgDisabledHint": "Openbare links zijn uitgeschakeld voor deze organisatie",
       "takeOver": "Overnemen",
       "takeOverTitle": "Deze link overnemen?",
       "takeOverBody": "Je wordt de uitgever. De openbare pagina toont wat jij mag zien, en dat kan meer of minder zijn dan voorheen. Iedereen met de URL houdt toegang, en de link is vanaf nu actief.",
@@ -20491,7 +20486,8 @@
         "notViewed": "Nooit bekeken",
         "needsAttention": "Vereist aandacht",
         "expired": "Verlopen",
-        "dashboardDeleted": "Dashboard verwijderd"
+        "dashboardDeleted": "Dashboard verwijderd",
+        "disabled": "Uitgeschakeld"
       },
       "downtimeStatus": {
         "scheduled": "Gepland",

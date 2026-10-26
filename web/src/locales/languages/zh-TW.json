@@ -948,12 +948,6 @@
     "boolTrue": "是",
     "boolFalse": "否",
     "browserTimeWithZone": "瀏覽器時間（{zone}）",
-    "durationSeconds": "{n} 秒 | {n} 秒",
-    "durationMinutes": "{n} 分鐘 | {n} 分鐘",
-    "durationHours": "{n} 小時 | {n} 小時",
-    "durationDays": "{n} 天 | {n} 天",
-    "durationWeeks": "{n} 週 | {n} 週",
-    "durationYears": "{n} 年 | {n} 年",
     "poweredBy": "技術提供"
   },
   "flow": {
@@ -8023,6 +8017,7 @@
       "publisherLeft": "發佈者已離開組織",
       "urlHidden": "無存取權限",
       "urlHiddenHint": "您無法檢視此連結的儀表板，因此其公開 URL 已隱藏。",
+      "orgDisabledHint": "此組織已關閉公開連結",
       "takeOver": "接管",
       "takeOverTitle": "要接管此連結嗎？",
       "takeOverBody": "您將成為發佈者。公開頁面會顯示您有權檢視的內容，可能比之前多或少。擁有該 URL 的任何人仍可存取，且連結會立即生效。",
@@ -20486,7 +20481,8 @@
         "notViewed": "從未檢視",
         "needsAttention": "需要關注",
         "expired": "已到期",
-        "dashboardDeleted": "儀表板已刪除"
+        "dashboardDeleted": "儀表板已刪除",
+        "disabled": "已停用"
       },
       "downtimeStatus": {
         "scheduled": "已排程",

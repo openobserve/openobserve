@@ -948,12 +948,6 @@
     "boolTrue": "Prawda",
     "boolFalse": "Fałsz",
     "browserTimeWithZone": "Czas przeglądarki ({zone})",
-    "durationSeconds": "{n} sekunda | {n} sekund",
-    "durationMinutes": "{n} minuta | {n} minut",
-    "durationHours": "{n} godzina | {n} godzin",
-    "durationDays": "{n} dzień | {n} dni",
-    "durationWeeks": "{n} tydzień | {n} tygodni",
-    "durationYears": "{n} rok | {n} lat",
     "poweredBy": "Obsługiwane przez"
   },
   "flow": {
@@ -8028,6 +8022,7 @@
       "publisherLeft": "Osoba publikująca opuściła organizację",
       "urlHidden": "Brak dostępu",
       "urlHiddenHint": "Nie możesz wyświetlić pulpitu tego linku, więc jego publiczny URL jest ukryty.",
+      "orgDisabledHint": "Linki publiczne są wyłączone w tej organizacji",
       "takeOver": "Przejmij",
       "takeOverTitle": "Przejąć ten link?",
       "takeOverBody": "Staniesz się osobą publikującą. Strona publiczna pokaże to, co masz prawo widzieć, a to może być więcej lub mniej niż wcześniej. Każdy, kto ma URL, zachowuje dostęp, a link jest od teraz aktywny.",
@@ -20491,7 +20486,8 @@
         "notViewed": "Nigdy nie wyświetlano",
         "needsAttention": "Wymaga uwagi",
         "expired": "Wygasł",
-        "dashboardDeleted": "Pulpit usunięty"
+        "dashboardDeleted": "Pulpit usunięty",
+        "disabled": "Wyłączony"
       },
       "downtimeStatus": {
         "scheduled": "Zaplanowana",

@@ -181,6 +181,16 @@ export function attentionReason(
   );
 }
 
+/** The tooltip on a link's status tag: the org-wide switch is off, else why it needs attention. */
+export function statusReason(
+  link: PublicLink,
+  report: PublicLinkStatusReport | undefined,
+  t: TranslateFn,
+): I18nText | null {
+  if (link.status === "disabled") return t("dashboard.publicLinks.orgDisabledHint");
+  return attentionReason(report, t);
+}
+
 // Expired and orphaned links can't be resumed, so their pause toggle is disabled.
 export function canPause(link: PublicLink): boolean {
   return link.status !== "expired" && link.status !== "dashboard_deleted";

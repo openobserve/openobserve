@@ -948,12 +948,6 @@
     "boolTrue": "참",
     "boolFalse": "거짓",
     "browserTimeWithZone": "브라우저 시간 ({zone})",
-    "durationSeconds": "{n}초 | {n}초",
-    "durationMinutes": "{n}분 | {n}분",
-    "durationHours": "{n}시간 | {n}시간",
-    "durationDays": "{n}일 | {n}일",
-    "durationWeeks": "{n}주 | {n}주",
-    "durationYears": "{n}년 | {n}년",
     "poweredBy": "제공"
   },
   "flow": {
@@ -8028,6 +8022,7 @@
       "publisherLeft": "게시자가 조직을 떠났습니다",
       "urlHidden": "액세스 권한 없음",
       "urlHiddenHint": "이 링크의 대시보드를 볼 수 없으므로 공개 URL이 숨겨집니다.",
+      "orgDisabledHint": "이 조직에서는 공개 링크가 꺼져 있습니다",
       "takeOver": "인계받기",
       "takeOverTitle": "이 링크를 인계받을까요?",
       "takeOverBody": "본인이 게시자가 됩니다. 공개 페이지에는 본인이 볼 수 있는 내용이 표시되며, 이전보다 많거나 적을 수 있습니다. URL이 있는 사람은 계속 액세스할 수 있으며, 링크는 지금 바로 활성화됩니다.",
@@ -20491,7 +20486,8 @@
         "notViewed": "조회된 적 없음",
         "needsAttention": "주의 필요",
         "expired": "만료됨",
-        "dashboardDeleted": "대시보드 삭제됨"
+        "dashboardDeleted": "대시보드 삭제됨",
+        "disabled": "비활성화됨"
       },
       "downtimeStatus": {
         "scheduled": "예약됨",

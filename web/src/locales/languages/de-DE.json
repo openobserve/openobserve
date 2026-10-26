@@ -948,12 +948,6 @@
     "boolTrue": "Wahr",
     "boolFalse": "Falsch",
     "browserTimeWithZone": "Browser-Zeit ({zone})",
-    "durationSeconds": "{n} Sekunde | {n} Sekunden",
-    "durationMinutes": "{n} Minute | {n} Minuten",
-    "durationHours": "{n} Stunde | {n} Stunden",
-    "durationDays": "{n} Tag | {n} Tage",
-    "durationWeeks": "{n} Woche | {n} Wochen",
-    "durationYears": "{n} Jahr | {n} Jahre",
     "poweredBy": "Bereitgestellt von"
   },
   "flow": {
@@ -8028,6 +8022,7 @@
       "publisherLeft": "Herausgeber hat die Organisation verlassen",
       "urlHidden": "Kein Zugriff",
       "urlHiddenHint": "Sie können das Dashboard dieses Links nicht ansehen, daher ist seine öffentliche URL ausgeblendet.",
+      "orgDisabledHint": "Öffentliche Links sind für diese Organisation deaktiviert",
       "takeOver": "Übernehmen",
       "takeOverTitle": "Diesen Link übernehmen?",
       "takeOverBody": "Sie werden zum Herausgeber. Die öffentliche Seite zeigt, was Sie sehen dürfen. Das kann mehr oder weniger sein als bisher. Wer die URL hat, behält den Zugriff, und der Link ist ab sofort aktiv.",
@@ -20491,7 +20486,8 @@
         "notViewed": "Nie angesehen",
         "needsAttention": "Benötigt Aufmerksamkeit",
         "expired": "Abgelaufen",
-        "dashboardDeleted": "Dashboard gelöscht"
+        "dashboardDeleted": "Dashboard gelöscht",
+        "disabled": "Deaktiviert"
       },
       "downtimeStatus": {
         "scheduled": "Geplant",

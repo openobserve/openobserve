@@ -948,12 +948,6 @@
     "boolTrue": "真",
     "boolFalse": "假",
     "browserTimeWithZone": "浏览器时间（{zone}）",
-    "durationSeconds": "{n} 秒 | {n} 秒",
-    "durationMinutes": "{n} 分钟 | {n} 分钟",
-    "durationHours": "{n} 小时 | {n} 小时",
-    "durationDays": "{n} 天 | {n} 天",
-    "durationWeeks": "{n} 周 | {n} 周",
-    "durationYears": "{n} 年 | {n} 年",
     "poweredBy": "技术支持"
   },
   "flow": {
@@ -8028,6 +8022,7 @@
       "publisherLeft": "发布者已离开组织",
       "urlHidden": "无访问权限",
       "urlHiddenHint": "您无法查看此链接的仪表盘，因此其公开 URL 已隐藏。",
+      "orgDisabledHint": "此组织已关闭公开链接",
       "takeOver": "接管",
       "takeOverTitle": "接管此链接？",
       "takeOverBody": "您将成为发布者。公开页面将显示您有权查看的内容，可能比之前多或少。拥有该 URL 的任何人仍可访问，链接将立即生效。",
@@ -20491,7 +20486,8 @@
         "notViewed": "从未查看",
         "needsAttention": "需要关注",
         "expired": "已过期",
-        "dashboardDeleted": "仪表盘已删除"
+        "dashboardDeleted": "仪表盘已删除",
+        "disabled": "已禁用"
       },
       "downtimeStatus": {
         "scheduled": "已计划",

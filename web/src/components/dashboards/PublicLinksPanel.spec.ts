@@ -29,7 +29,6 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     resume: vi.fn(),
     takeOver: vi.fn(),
     refresh: vi.fn(),
-    status: vi.fn(),
     statusBatch: vi.fn(),
     revoke: vi.fn(),
   },
@@ -605,7 +604,7 @@ describe("PublicLinksPanel", () => {
     vi.mocked(admin.update).mockResolvedValue({ data: expired } as never);
     const w = build({ editLinkId: "l1", variablesConfig: undefined });
     await flushPromises();
-    expect(w.findComponent({ name: "OFormDate" }).props("min")).toBe("2020-01-01");
+    expect(w.findComponent({ name: "OFormDate" }).props("min")).toBeUndefined();
 
     await submit(w);
     expect(admin.update).toHaveBeenCalledTimes(1);
@@ -623,6 +622,21 @@ describe("PublicLinksPanel", () => {
     ).form.setFieldValue("expires", "2020-01-05");
     await submit(w);
     expect(admin.update).not.toHaveBeenCalled();
+    expect(w.text()).toContain("Pick today or a later date");
+  });
+
+  it("leaves a past expiry to the form's own check, which names the problem and sends nothing", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build({ variablesConfig: undefined });
+    await flushPromises();
+    // No browser minimum: it would block the date silently, so the message below never showed.
+    expect(w.findComponent({ name: "OFormDate" }).props("min")).toBeUndefined();
+    const form = (w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } })
+      .form;
+    form.setFieldValue("name", "NOC wall");
+    form.setFieldValue("expires", "2020-01-05");
+    await submit(w);
+    expect(admin.create).not.toHaveBeenCalled();
     expect(w.text()).toContain("Pick today or a later date");
   });
 
@@ -1125,10 +1139,9 @@ describe("PublicLinksPanel", () => {
       last_error: null,
       ...over,
     });
-    const createLink = async (status: () => Promise<unknown>, created = link()) => {
+    const createLink = async (created = link()) => {
       vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
       vi.mocked(admin.create).mockResolvedValue({ data: created } as never);
-      vi.mocked(admin.status).mockImplementation(status as never);
       const w = build({ variablesConfig: undefined, dashboardData: tenPanels });
       await flushPromises();
       (
@@ -1138,13 +1151,10 @@ describe("PublicLinksPanel", () => {
       return w;
     };
 
-    it("shows no per-range state table and asks no status after creating a link", async () => {
-      const w = await createLink(async () => ({
-        data: { link_id: "l1", access_count: 0, ranges: [] },
-      }));
+    it("shows no per-range state table after creating a link", async () => {
+      const w = await createLink();
       expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
       expect(has(w, "dashboards-public-links-panel-created-states")).toBe(false);
-      expect(admin.status).not.toHaveBeenCalled();
     });
 
     it("shows no save note on create or edit", async () => {
@@ -1183,6 +1193,23 @@ describe("PublicLinksPanel", () => {
       );
       expect(w.find('[data-test="dashboards-public-links-panel-l2-status"]').text()).toBe("Live");
       expect(w.text()).toContain("Never");
+    });
+
+    it("tags a link of an org with public links off as disabled, and says why", async () => {
+      vi.mocked(admin.list).mockResolvedValue({
+        data: { list: [link(), link({ id: "l2", name: "Lobby", status: "disabled" })] },
+      } as never);
+      vi.mocked(admin.statusBatch).mockResolvedValue({ data: { list: [] } } as never);
+      const w = build();
+      await flushPromises();
+      const statusCell = (id: string) =>
+        w.find(`[data-test="dashboards-public-links-panel-${id}-status"]`);
+      expect(statusCell("l2").text()).toBe("Disabled");
+      expect(String(statusCell("l2").findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "Public links are turned off for this organization",
+      );
+      expect(statusCell("l1").text()).toBe("Live");
+      expect(statusCell("l1").findComponent({ name: "OTooltip" }).exists()).toBe(false);
     });
 
     it("tags the drawer title as beta", async () => {

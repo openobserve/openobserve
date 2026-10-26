@@ -243,7 +243,6 @@
         <OFormDate
           name="expires"
           clearable
-          :min="expiresMin"
           :label="t('dashboard.publicDashboard.expiresOptional')"
           :help-text="t('dashboard.publicLinks.expiresHelp')"
           data-test="dashboards-public-links-panel-expires-input"
@@ -385,7 +384,7 @@
           <span class="inline-flex min-w-0 items-center gap-1.5">
             <span class="inline-flex" :data-test="`dashboards-public-links-panel-${row.id}-status`">
               <OTag type="publicLinkStatus" :value="displayStatus(row, linkReports[row.id])" />
-              <OTooltip v-if="attention[row.id]" side="bottom" :content="attention[row.id]" />
+              <OTooltip v-if="statusHints[row.id]" side="bottom" :content="statusHints[row.id]" />
             </span>
             <OBadge
               v-if="row.publisher_left"
@@ -660,7 +659,6 @@ import {
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
 import {
-  attentionReason,
   canPause,
   canRefresh,
   canTakeOver,
@@ -670,6 +668,7 @@ import {
   longRange,
   publicLinkColumns,
   publicLinkSearchTerm,
+  statusReason,
   forbiddenMessage,
   pauseBlockedReason,
   publicLinkUrl as publicUrl,
@@ -729,6 +728,7 @@ const { t } = useI18nTyped();
 const { showErrorNotification, showPositiveNotification } = useNotifications();
 const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
+// Ticks the Last viewed times.
 const now = useNow();
 const userId = computed<string>(() => store.state.userInfo?.email ?? "");
 
@@ -749,8 +749,6 @@ function guardClose(): boolean {
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );
-// Follows the clock, so the date picker's earliest day moves on at midnight.
-const today = computed(() => todayIn(timezone.value, new Date(now.value)));
 
 const linksQuery = useQuery(() =>
   Object.assign(publicLinksForDashboardQuery(orgId.value, props.dashboardId), {
@@ -772,10 +770,10 @@ const statusQuery = useQuery(() =>
 );
 // Best effort: without a report a row shows the state its link row gives.
 const linkReports = computed(() => statusQuery.data.value ?? {});
-const attention = computed<Record<string, I18nText>>(() =>
+const statusHints = computed<Record<string, I18nText>>(() =>
   Object.fromEntries(
     links.value.flatMap((link) => {
-      const reason = attentionReason(linkReports.value[link.id], t);
+      const reason = statusReason(link, linkReports.value[link.id], t);
       return reason ? [[link.id, reason]] : [];
     }),
   ),
@@ -804,12 +802,6 @@ const editing = ref<PublicLink | null>(null);
 // The backend checks an expiry only when it changes, so an expired link stays editable until its date is touched.
 const storedExpires = computed(() =>
   editing.value?.expires_at ? expiryDate(editing.value.expires_at, timezone.value) : "",
-);
-// The browser's own date check would otherwise block saving an expired link's unchanged date.
-const expiresMin = computed(() =>
-  storedExpires.value !== "" && storedExpires.value < today.value
-    ? storedExpires.value
-    : today.value,
 );
 const createdLink = ref<PublicLink | null>(null);
 // Remounts the variable pickers so each form opens on its own seed.

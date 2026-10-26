@@ -104,12 +104,8 @@ describe("public_dashboards_admin service", () => {
     );
   });
 
-  it("reads one link's status and a batch of them for the org list", async () => {
-    await service.status("org1", "dash1", "l1");
+  it("reads a batch of link statuses for the org list", async () => {
     await service.statusBatch("org1", ["l1", "l2"]);
-    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/status", {
-      silentForbidden: true,
-    });
     expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/public_dashboards/status", {
       silentForbidden: true,
       params: { ids: "l1,l2" },

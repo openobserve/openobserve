@@ -15,8 +15,15 @@
 
 import http from "./http";
 
+/** `disabled`: the organization has public links turned off, so the link serves nothing. */
 export type PublicLinkStatus =
-  "live" | "paused" | "not_viewed" | "needs_attention" | "expired" | "dashboard_deleted";
+  | "live"
+  | "paused"
+  | "not_viewed"
+  | "needs_attention"
+  | "expired"
+  | "dashboard_deleted"
+  | "disabled";
 
 /** A rolling window rebuilt every refresh, or a fixed one (UTC micros) built once. */
 export type PublicLinkRange =
@@ -114,8 +121,6 @@ const public_dashboards_admin = {
     ),
   refresh: (org: string, dashboardId: string, linkId: string) =>
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/refresh`, undefined, silent),
-  status: (org: string, dashboardId: string, linkId: string) =>
-    http().get<PublicLinkStatusReport>(`${linksPath(org, dashboardId)}/${linkId}/status`, silent),
   statusBatch: (org: string, ids: string[]) =>
     http().get<{ list: PublicLinkStatusReport[] }>(`/api/${org}/public_dashboards/status`, {
       ...silent,

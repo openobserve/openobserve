@@ -129,7 +129,7 @@
               :value="statusOf(row)"
               :data-test="`dashboards-public-links-${row.id}-status`"
             />
-            <OTooltip v-if="attention[row.id]" side="bottom" :content="attention[row.id]" />
+            <OTooltip v-if="statusHints[row.id]" side="bottom" :content="statusHints[row.id]" />
           </span>
           <OBadge
             v-if="row.publisher_left"
@@ -427,7 +427,6 @@ import {
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
 import {
-  attentionReason,
   canPause,
   canRefresh,
   canTakeOver,
@@ -435,6 +434,7 @@ import {
   noDashboardAccess,
   publicLinkColumns,
   publicLinkSearchTerm,
+  statusReason,
   forbiddenMessage,
   pauseBlockedReason,
   publicLinkUrl,
@@ -510,10 +510,10 @@ const statusQuery = useQuery(() =>
 const attentionKnown = computed(() => statusQuery.isSuccess.value);
 const statusOf = (link: PublicLink): PublicLinkStatus =>
   displayStatus(link, statusQuery.data.value?.[link.id]);
-const attention = computed<Record<string, I18nText>>(() =>
+const statusHints = computed<Record<string, I18nText>>(() =>
   Object.fromEntries(
     links.value.flatMap((link) => {
-      const reason = attentionReason(statusQuery.data.value?.[link.id], t);
+      const reason = statusReason(link, statusQuery.data.value?.[link.id], t);
       return reason ? [[link.id, reason]] : [];
     }),
   ),
