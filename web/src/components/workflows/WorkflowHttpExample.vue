@@ -138,29 +138,17 @@ const toggleReveal = () => {
 };
 
 const onCopy = async () => {
-  const signed = isSigned.value;
-  const copiesSecret = canReveal.value && !!active.value;
   try {
     const copied = await copyExample();
     if (!copied) {
       toast({ variant: "error", message: t("common.copyError") });
       return;
     }
-    if (!copiesSecret) {
-      toast({ variant: "success", message: t("common.copySuccess") });
-      return;
-    }
-    toast({
-      variant: "success",
-      message: signed ? t("workflow.http.secretCopied") : t("workflow.http.tokenCopied"),
-    });
+    toast({ variant: "success", message: t("workflow.http.commandCopied") });
   } catch (err) {
-    const reason = httpErrorText(err, t);
     toast({
       variant: "error",
-      message: signed
-        ? t("workflow.http.revealFailedSigned", { reason })
-        : t("workflow.http.revealFailed", { reason }),
+      message: t("workflow.http.copyCommandFailed", { reason: httpErrorText(err, t) }),
     });
   }
 };

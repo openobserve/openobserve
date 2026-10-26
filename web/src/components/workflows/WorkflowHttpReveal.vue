@@ -67,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sample-body="DEFAULT_SAMPLE_BODY"
     />
 
-    <div v-if="!rotated" class="flex flex-wrap items-center gap-3">
+    <!-- A draft's URL can only answer 403, so the dry run has nothing to show -->
+    <div v-if="!rotated && refusal !== 'draft'" class="flex flex-wrap items-center gap-3">
       <OButton
         variant="outline"
         size="sm-action"
@@ -79,7 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.sendTest") }}
       </OButton>
       <OText variant="meta" class="min-w-0 flex-1" data-test="workflow-http-send-test-hint">
-        {{ refused ? t("workflow.http.sendTestHintDraft") : t("workflow.http.sendTestHint") }}
+        {{
+          refusal === "paused"
+            ? t("workflow.http.sendTestHintPaused")
+            : t("workflow.http.sendTestHint")
+        }}
       </OText>
     </div>
 
@@ -164,7 +169,7 @@ const SIGNATURE_HEADERS = "webhook-id, webhook-timestamp, webhook-signature";
 const props = defineProps<{
   context: EndpointContext;
   /** Draft or paused: the server refuses the call before any input is built. */
-  refused: boolean;
+  refusal: "draft" | "paused" | null;
 }>();
 
 const emit = defineEmits<{ (e: "run-test"): void }>();
@@ -227,6 +232,7 @@ const resultTitle = computed<I18nText>(() => {
   const r = result.value;
   if (!r) return raw("");
   if (accepted.value) return t("workflow.http.dryRunAccepted");
+  if (r.reason === "workflow_disabled") return t("workflow.http.dryRunRefusedPaused");
   if (refusedByState.value) return t("workflow.http.dryRunRefused");
   if (r.reason === "rate_limited") return t("workflow.http.dryRunRateLimited");
   if (r.reason && r.reason !== "unauthorized") return t(HOOK_REASON_KEYS[r.reason].title);

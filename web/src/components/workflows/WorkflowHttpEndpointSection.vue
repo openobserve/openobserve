@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </i18n-t>
           <span v-else data-test="workflow-http-last-call">{{
-            t("workflow.http.lastCallNone")
+            t(isDraftOnly ? "workflow.http.lastCallNoneDraft" : "workflow.http.lastCallNone")
           }}</span>
         </OText>
         <OText v-else variant="meta" as="p" :data-test="metaTestId">{{ metaText }}</OText>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.saveAndCreate") }}
       </OButton>
       <OBanner
-        v-if="status === 'draft'"
+        v-if="showDraftNotice"
         variant="warning"
         dense
         data-test="workflow-http-draft-banner"
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <WorkflowHttpReveal
         v-if="phase === 'revealing'"
         :context="context"
-        :refused="refused"
+        :refusal="refusal"
         @run-test="onRunTest"
       >
         <WorkflowHttpSteady
@@ -251,12 +251,18 @@ const disableOpen = ref(false);
 const creating = ref(false);
 
 const switchOn = computed(() => phase.value === "revealing" || !!config.value?.enabled);
-const refused = computed(() => status.value === "draft" || status.value === "paused");
+const refusal = computed<"draft" | "paused" | null>(() => {
+  if (props.isDraftOnly) return "draft";
+  return status.value === "paused" ? "paused" : null;
+});
+// A draft refuses calls whether or not the endpoint is on, so the notice does not wait for it.
+const showDraftNotice = computed(() => props.isDraftOnly && phase.value !== "loading");
 const hasBody = computed(
   () =>
     phase.value === "unsaved" ||
     phase.value === "revealing" ||
     phase.value === "steady" ||
+    showDraftNotice.value ||
     !!actionError.value ||
     endpointExists.value,
 );

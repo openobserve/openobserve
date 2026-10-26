@@ -53,6 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
       <template #actions-overflow>
+        <WorkflowHttpEndpointButton
+          v-if="hooksOn"
+          :chip="httpChip"
+          :tooltip-key="httpTooltipKey"
+          data-test="workflow-runs-http-endpoint"
+          @click="httpPanelOpen = true"
+        />
         <!-- Test is a read-only dry-run (it never edits the workflow), so it's
              offered here too — no need to switch to the editor just to test. -->
         <OButton variant="outline" data-test="workflow-runs-test" @click="onTest">
@@ -142,7 +149,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Test input popup — a fresh dry-run of the current graph, launched from the
          header. Results paint on the read-only canvas (switching it out of the
          selected historical run) and the node NDV shows each step's I/O. -->
-    <WorkflowTestDialog v-if="workflowObj.testRun.show" />
+    <WorkflowTestDialog
+      v-if="workflowObj.testRun.show"
+      :seed="testSeed"
+      :payload-from="testPayloadFrom"
+      :seed-run-at="testSeedRunAt"
+    />
+
+    <WorkflowHttpEndpointPanel
+      v-if="hooksOn"
+      :open="httpPanelOpen"
+      :workflow-id="workflowId || null"
+      :workflow-name="workflowName"
+      :kind="httpKind"
+      :is-draft-only="isDraft"
+      :workflow-enabled="workflowEnabled"
+      context="editor"
+      :trigger-node-id="httpTriggerNodeId"
+      @update:open="httpPanelOpen = $event"
+      @run-test="onHttpRunTest"
+    />
   </div>
 </template>
 
@@ -164,13 +190,19 @@ import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
+import WorkflowHttpEndpointButton from "./WorkflowHttpEndpointButton.vue";
+import WorkflowHttpEndpointPanel from "./WorkflowHttpEndpointPanel.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
   loadWorkflowRun,
   isRetryableRun,
   retryWorkflowRun,
+  currentTriggerKind,
+  currentTriggerNodeId,
 } from "@/plugins/workflows/useWorkflowCanvas";
+import { useWorkflowHttpButton } from "@/plugins/workflows/useWorkflowHttpButton";
+import type { PayloadFrom } from "@/plugins/workflows/httpEndpointUi";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
 
@@ -193,7 +225,30 @@ const activeFolderId = computed(
 );
 const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
 const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
+const isDraft = computed(() => !!workflowObj.currentSelectedWorkflow?.isDraft);
+const workflowEnabled = computed(() => workflowObj.currentSelectedWorkflow?.enabled !== false);
 const selectedRunId = ref<string>("");
+
+const {
+  visible: hooksOn,
+  chip: httpChip,
+  tooltipKey: httpTooltipKey,
+} = useWorkflowHttpButton({ workflowId, isDraft, workflowEnabled });
+const httpKind = computed(() => currentTriggerKind());
+const httpTriggerNodeId = computed(() => currentTriggerNodeId());
+const httpPanelOpen = ref(false);
+const testSeed = ref<unknown[] | undefined>(undefined);
+const testPayloadFrom = ref<PayloadFrom | undefined>(undefined);
+const testSeedRunAt = ref<number | undefined>(undefined);
+watch(
+  () => workflowObj.testRun.show,
+  (show) => {
+    if (show) return;
+    testSeed.value = undefined;
+    testPayloadFrom.value = undefined;
+    testSeedRunAt.value = undefined;
+  },
+);
 
 // Steps this run executed that no longer exist in the workflow (deleted/edited
 // since). Their badges can't render, so the canvas alone would under-report the
@@ -240,6 +295,14 @@ const goBack = () => {
 const onTest = () => {
   selectedRunId.value = "";
   workflowObj.testRun.show = true;
+};
+
+const onHttpRunTest = (seed: unknown[], runAt?: number) => {
+  httpPanelOpen.value = false;
+  testSeed.value = seed;
+  testPayloadFrom.value = "http";
+  testSeedRunAt.value = runAt;
+  onTest();
 };
 
 // A live test result (from the header Test button, or a step drawer's "Use as Test
@@ -360,6 +423,16 @@ const onSelectRun = async (runId: string) => {
     query: { ...router.currentRoute.value.query, run_id: runId },
   });
 };
+
+// The panel's "View run" link lands on this same route, which does not remount.
+watch(
+  () => router.currentRoute.value.query.run_id,
+  (runId) => {
+    if (typeof runId !== "string" || !runId || runId === selectedRunId.value) return;
+    httpPanelOpen.value = false;
+    void onSelectRun(runId);
+  },
+);
 
 onMounted(async () => {
   // Read-only inspection surface — no editing on the canvas.

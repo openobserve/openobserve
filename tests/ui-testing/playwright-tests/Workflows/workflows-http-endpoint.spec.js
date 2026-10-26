@@ -124,13 +124,8 @@ test.describe(
       await expect(page.locator(http.toggle)).toHaveCount(0);
       await page.locator(http.saveAndCreate).click();
       await page.locator(http.reveal).waitFor({ state: 'visible', timeout: 25000 });
-      await expect(page.locator(http.draftBanner)).toBeVisible();
-      await expect(page.locator(http.sendTestHint)).toContainText('Drafts refuse the call');
-
-      const result = await http.sendDryRun();
-      expect(result).toContain('403');
-      expect(result).toContain('Credentials valid');
-      await expect(page.locator(http.runTestInstead)).toBeVisible();
+      await expect(page.locator(http.draftBanner)).toContainText('This workflow is a draft');
+      await expect(page.locator(http.sendTest)).toHaveCount(0);
 
       await http.finishReveal();
       await http.closePanel();

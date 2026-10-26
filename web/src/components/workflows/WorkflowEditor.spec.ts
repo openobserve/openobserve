@@ -2133,7 +2133,7 @@ describe("WorkflowEditor HTTP endpoint", () => {
     expect(at("workflow-editor-http-endpoint")).toBeLessThan(at("workflow-editor-test"));
   });
 
-  it("chip success when live, warning when draft or disabled", async () => {
+  it("chip success when live, warning when draft or disabled, neutral Off when switched off", async () => {
     await openSaved();
     expect(chipVariant(wrapper)).toBe("success-soft");
     expect(httpEditorState.endpointOn).toBe(true);
@@ -2150,8 +2150,23 @@ describe("WorkflowEditor HTTP endpoint", () => {
     queryClient.clear();
     getHttpTrigger.mockResolvedValue(endpoint(false));
     await openSaved();
-    expect(chip(wrapper).exists()).toBe(false);
+    expect(chipVariant(wrapper)).toBe("default-soft");
+    expect(chip(wrapper).text()).toBe(t("workflow.http.editorButtonOff"));
     expect(httpEditorState.endpointOn).toBe(false);
+  });
+
+  it("the refused tooltip names the draft or the paused state", async () => {
+    const tooltipOf = (w: any) =>
+      w
+        .findAllComponents({ name: "OTooltip" })
+        .find((c: any) => c.find('[data-test="workflow-editor-http-endpoint"]').exists())
+        ?.props("content");
+    await openSaved({ is_draft: true });
+    expect(tooltipOf(wrapper)).toBe(t("workflow.http.editorButtonRefusedDraft"));
+    wrapper.unmount();
+    queryClient.clear();
+    await openSaved({ enabled: false });
+    expect(tooltipOf(wrapper)).toBe(t("workflow.http.editorButtonRefusedPaused"));
   });
 
   it("hides the header button and its overflow item when workflow_hooks_enabled is false", async () => {

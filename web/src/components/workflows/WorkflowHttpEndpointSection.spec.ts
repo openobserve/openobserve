@@ -375,7 +375,7 @@ describe("WorkflowHttpEndpointSection", () => {
         input: null,
         bodyBytes: 68,
       });
-      const w = await reveal({ isDraftOnly: true });
+      const w = await reveal();
       await byTest(w, "workflow-http-send-test").trigger("click");
       await flushPromises();
       expect(byTest(w, "workflow-http-test-result").text()).toContain(
@@ -422,7 +422,7 @@ describe("WorkflowHttpEndpointSection", () => {
         secret: HTTP_SECRET,
       });
       expect(byTest(w, "workflow-http-test-result").text()).toContain(
-        t("workflow.http.dryRunRefused"),
+        t("workflow.http.dryRunRefusedPaused"),
       );
     });
 
@@ -431,14 +431,20 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(byTest(live, "workflow-http-send-test-hint").text()).toBe(
         t("workflow.http.sendTestHint"),
       );
-      const draft = await reveal({ isDraftOnly: true });
-      expect(byTest(draft, "workflow-http-send-test-hint").text()).toBe(
-        t("workflow.http.sendTestHintDraft"),
-      );
       const paused = await reveal({ workflowEnabled: false });
       expect(byTest(paused, "workflow-http-send-test-hint").text()).toBe(
-        t("workflow.http.sendTestHintDraft"),
+        t("workflow.http.sendTestHintPaused"),
       );
+      expect(t("workflow.http.sendTestHintPaused")).not.toContain("Draft");
+    });
+
+    it("a draft gets no Send test request, and its notice differs from the paused hint", async () => {
+      const draft = await reveal({ isDraftOnly: true });
+      expect(byTest(draft, "workflow-http-send-test").exists()).toBe(false);
+      expect(byTest(draft, "workflow-http-send-test-hint").exists()).toBe(false);
+      const notice = byTest(draft, "workflow-http-draft-banner").text();
+      expect(notice).toBe(t("workflow.http.draftBanner"));
+      expect(notice).not.toBe(t("workflow.http.sendTestHintPaused"));
     });
   });
 
@@ -526,6 +532,13 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(byTest(w, "workflow-http-last-call").text()).toBe(t("workflow.http.lastCallNone"));
     });
 
+    it("a draft with no calls drops the send-a-test-request hint", async () => {
+      const w = await mountSection({ isDraftOnly: true });
+      expect(byTest(w, "workflow-http-last-call").text()).toBe(
+        t("workflow.http.lastCallNoneDraft"),
+      );
+    });
+
     it("both modes show workflow-http-secret-storage-warning when secrets_encrypted_at_rest is false", async () => {
       api.getHttpTrigger.mockResolvedValue(httpConfig({ secrets_encrypted_at_rest: false }));
       const token = await mountSection();
@@ -543,6 +556,24 @@ describe("WorkflowHttpEndpointSection", () => {
     it("no warning when encrypted", async () => {
       const w = await mountSection();
       expect(byTest(w, "workflow-http-secret-storage-warning").exists()).toBe(false);
+    });
+
+    it("the draft notice shows with the endpoint on, off or not set up", async () => {
+      const on = await mountSection({ isDraftOnly: true });
+      expect(byTest(on, "workflow-http-draft-banner").text()).toBe(t("workflow.http.draftBanner"));
+      expect(byTest(on, "workflow-http-run-test").exists()).toBe(true);
+      queryClient.clear();
+      api.getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
+      const off = await mountSection({ isDraftOnly: true, workflowId: "wf2" });
+      expect(byTest(off, "workflow-http-draft-banner").text()).toBe(t("workflow.http.draftBanner"));
+      queryClient.clear();
+      api.getHttpTrigger.mockResolvedValue(httpAbsent());
+      const none = await mountSection({ isDraftOnly: true, workflowId: "wf3" });
+      expect(byTest(none, "workflow-http-draft-banner").exists()).toBe(true);
+      queryClient.clear();
+      api.getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
+      const published = await mountSection({ workflowId: "wf4" });
+      expect(byTest(published, "workflow-http-draft-banner").exists()).toBe(false);
     });
 
     it("draft shows the 403 banner and a paused workflow the disabled banner", async () => {
