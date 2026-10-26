@@ -633,7 +633,7 @@ pub async fn metadata(
                     OFGA_MODELS
                         .get(stream_type_str)
                         .map_or(stream_type_str, |model| model.key),
-                    metric_name
+                    promql::utils::resolve_metric_name(&org_id, metric_name.clone()).await
                 ),
                 None => format!(
                     "{}:{}",
@@ -1315,6 +1315,7 @@ async fn check_metric_permissions(
     names: impl IntoIterator<Item = String>,
 ) -> Option<Response> {
     for name in names {
+        let name = promql::utils::resolve_metric_name(org_id, name).await;
         if let Some(res) = openobserve_core::authz::check_stream_permissions(
             &name,
             org_id,

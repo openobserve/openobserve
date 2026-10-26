@@ -15,12 +15,9 @@
 
 use std::sync::OnceLock;
 
-use config::{
-    meta::promql::NAME_LABEL,
-    utils::{flatten::format_label_name_owned, schema::format_stream_name},
-};
+use config::utils::flatten::format_label_name_owned;
 use promql_parser::{
-    label::{Labels, MatchOp, Matcher},
+    label::Labels,
     parser::{
         self, Expr, Function, LabelModifier, VectorMatchCardinality, VectorSelector,
         function::register_extra_functions, value::ValueType,
@@ -46,8 +43,7 @@ impl ExprVisitor for SupportedModifiers {
     }
 }
 
-/// Preserves the legacy smoothing function, rejects modifiers the evaluator cannot execute, and
-/// rewrites metric and label names to the form ingest stores them in.
+/// Parses PromQL the way the evaluator runs it, with label names rewritten to their ingested form.
 pub fn parse(query: &str) -> Result<Expr, String> {
     LEGACY_FUNCTIONS
         .get_or_init(|| {
@@ -114,21 +110,11 @@ fn normalize_names(expr: &mut Expr) {
     }
 }
 
+// a metric name may name a stream stored as written, so the engine resolves it, not the parser
 fn normalize_selector(vs: &mut VectorSelector) {
-    if let Some(name) = vs.name.take() {
-        vs.name = Some(format_stream_name(name));
-    }
     let or_matchers = vs.matchers.or_matchers.iter_mut().flatten();
     for matcher in vs.matchers.matchers.iter_mut().chain(or_matchers) {
-        normalize_matcher(matcher);
-    }
-}
-
-fn normalize_matcher(matcher: &mut Matcher) {
-    normalize_label(&mut matcher.name);
-    // a regex cannot be rewritten safely, so only a literal metric name is normalized
-    if matcher.name == NAME_LABEL && matches!(matcher.op, MatchOp::Equal | MatchOp::NotEqual) {
-        matcher.value = format_stream_name(std::mem::take(&mut matcher.value));
+        normalize_label(&mut matcher.name);
     }
 }
 
@@ -209,11 +195,11 @@ mod tests {
     }
 
     #[test]
-    fn names_are_normalized_like_ingest() {
+    fn label_names_are_normalized_like_ingest() {
         for (query, expected) in [
             (
                 r#"DCGM_FI_DEV_GPU_TEMP{UUID="GPU-1", modelName=~"A.*"}"#,
-                r#"dcgm_fi_dev_gpu_temp{uuid="GPU-1", modelname=~"A.*"}"#,
+                r#"DCGM_FI_DEV_GPU_TEMP{uuid="GPU-1", modelname=~"A.*"}"#,
             ),
             (
                 r#"m{Job="a" or Instance!="B"}"#,
@@ -221,12 +207,12 @@ mod tests {
             ),
             (
                 r#"{__name__="PortXmitData", Port="1"}"#,
-                r#"{__name__="portxmitdata", port="1"}"#,
+                r#"{__name__="PortXmitData", port="1"}"#,
             ),
             (r#"{__name__=~"DCGM_.*"}"#, r#"{__name__=~"DCGM_.*"}"#),
             (
                 "rate(PortXmitDataExtended[1m])",
-                "rate(portxmitdataextended[1m])",
+                "rate(PortXmitDataExtended[1m])",
             ),
             ("count by (UUID) (m)", "count by (uuid) (m)"),
             (
@@ -245,7 +231,7 @@ mod tests {
                 r#"count_values("Version", m)"#,
                 r#"count_values("version", m)"#,
             ),
-            ("topk(5, M)", "topk(5, m)"),
+            ("topk(5, M)", "topk(5, M)"),
             (
                 r#"label_replace(m, "DST", "$1-X", "SRC_Label", "(A.*)")"#,
                 r#"label_replace(m, "dst", "$1-X", "src_label", "(A.*)")"#,
@@ -257,7 +243,7 @@ mod tests {
             (r#"sort_by_label(m, "UUID")"#, r#"sort_by_label(m, "uuid")"#),
             (
                 r#"sum by (Quantile) (histogram_quantiles(M_bucket, "Quantile", 0.5, 0.9))"#,
-                r#"sum by (quantile) (histogram_quantiles(m_bucket, "quantile", 0.5, 0.9))"#,
+                r#"sum by (quantile) (histogram_quantiles(M_bucket, "quantile", 0.5, 0.9))"#,
             ),
             (
                 r#"sum by (DST) (label_replace(vector(1), ("DST"), "A", "", ""))"#,
@@ -267,7 +253,7 @@ mod tests {
                 r#"count_values(("Version"), m)"#,
                 r#"count_values(("version"), m)"#,
             ),
-            ("max_over_time(M[5m:1m])", "max_over_time(m[5m:1m])"),
+            ("max_over_time(M[5m:1m])", "max_over_time(M[5m:1m])"),
         ] {
             assert_eq!(
                 parse(query).unwrap(),

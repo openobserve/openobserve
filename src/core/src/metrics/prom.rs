@@ -47,7 +47,7 @@ use infra::{
     schema::SchemaCache,
 };
 use ingestion_common::IngestUser;
-use promql::utils::absent_label_rejects_all;
+use promql::utils::{absent_label_rejects_all, resolve_metric_name};
 use promql_parser::{label::MatchOp, parser};
 use proto::prometheus_rpc;
 use schema::stream_schema_exists;
@@ -659,7 +659,8 @@ pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<Response
     let stream_type = StreamType::Metrics;
 
     if let Some(metric_name) = req.metric {
-        let schema = infra::schema::get(org_id, &metric_name, stream_type)
+        let stream_name = resolve_metric_name(org_id, metric_name.clone()).await;
+        let schema = infra::schema::get(org_id, &stream_name, stream_type)
             .await
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
@@ -762,7 +763,7 @@ pub async fn get_series(
 ) -> Result<Vec<serde_json::Value>> {
     let (start, end) = normalize_series_time_range(start, end);
     let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
-        Some(name) => name,
+        Some(name) => resolve_metric_name(org_id, name).await,
         None => {
             // HACK: in the ideal world we would have queried all the metric streams
             return Ok(vec![]);
@@ -826,7 +827,10 @@ pub async fn get_labels(
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
+    let opt_metric_name = match selector.as_ref().and_then(try_into_metric_name) {
+        Some(name) => Some(resolve_metric_name(org_id, name).await),
+        None => None,
+    };
     let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
@@ -914,9 +918,10 @@ pub async fn get_label_values(
         }
 
         // Bare selectors store the metric in selector.name rather than in matchers.
-        let metric_name = sel
-            .and_then(|sel| sel.name.as_deref())
-            .filter(|name| !name.is_empty());
+        let metric_name = match sel.and_then(|sel| sel.name.clone()) {
+            Some(name) if !name.is_empty() => Some(resolve_metric_name(org_id, name).await),
+            _ => None,
+        };
         let name_matchers = sel
             .map(|sel| sel.matchers.matchers.as_slice())
             .unwrap_or_default();
@@ -926,7 +931,9 @@ pub async fn get_label_values(
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
         for schema in stream_schemas {
-            if metric_name.is_some_and(|name| name != schema.stream_name)
+            if metric_name
+                .as_deref()
+                .is_some_and(|name| name != schema.stream_name)
                 || !name_matchers
                     .iter()
                     .all(|matcher| matcher.is_match(&schema.stream_name))
@@ -947,7 +954,8 @@ pub async fn get_label_values(
         return Ok(label_values);
     }
 
-    let metric_name = label_values_metric_name(selector.as_ref())?;
+    let metric_name =
+        resolve_metric_name(org_id, label_values_metric_name(selector.as_ref())?).await;
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
