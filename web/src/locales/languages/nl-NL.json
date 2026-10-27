@@ -27056,7 +27056,7 @@
       "joinsFleet": "Collectors die met dit token zijn geïnstalleerd, voegen zich bij fleet {fleet} en draaien {config} v{version}.",
       "joinsFleetNoConfig": "Collectors die met dit token zijn geïnstalleerd, voegen zich bij fleet {fleet}, die nog geen configuratie heeft.",
       "envRefNote": "Gebruik {ref}-verwijzingen voor inloggegevens in configuraties, zodat secrets op de host blijven.",
-      "httpTransport": "De proxy of load balancer kan geen WebSocket verwerken (gebruik HTTP-polling)",
+      "websocketTransport": "WebSocket gebruiken (stuurt configuratie direct door; de proxy moet het ondersteunen)",
       "kubernetesNote": "Implementeert een DaemonSet die de supervisor en de collector in één container draait. Upgrade door de imagetag te wijzigen.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",

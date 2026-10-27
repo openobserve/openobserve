@@ -27056,7 +27056,7 @@
       "joinsFleet": "Mit diesem Token installierte Collector treten dem Fleet {fleet} bei und führen {config} v{version} aus.",
       "joinsFleetNoConfig": "Mit diesem Token installierte Collector treten dem Fleet {fleet} bei, das noch keine Konfiguration hat.",
       "envRefNote": "Verwenden Sie {ref}-Verweise für Zugangsdaten in Konfigurationen, damit Secrets auf dem Host bleiben.",
-      "httpTransport": "Der Proxy oder Load Balancer kann kein WebSocket übertragen (HTTP-Polling verwenden)",
+      "websocketTransport": "WebSocket verwenden (überträgt Konfiguration sofort; der Proxy muss es unterstützen)",
       "kubernetesNote": "Stellt ein DaemonSet bereit, das den Supervisor und den Collector in einem Container ausführt. Zum Upgrade das Image-Tag ändern.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",
