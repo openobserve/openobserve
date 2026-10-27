@@ -161,7 +161,7 @@ export function quotaPercent(d: LicenseDecision): number | null {
 
 export function licenseExpiryState(
   zo: Record<string, unknown>,
-  env: string | undefined,
+  refreshMode: string | undefined,
   nowUs: number,
 ): { kind: "none" } | { kind: "expiring"; untilUs: number; online: boolean } {
   const untilUs = zo.license_expiry;
@@ -172,7 +172,7 @@ export function licenseExpiryState(
     untilUs - nowUs > 30 * DAY_US
   )
     return { kind: "none" };
-  return { kind: "expiring", untilUs, online: env === "online" };
+  return { kind: "expiring", untilUs, online: refreshMode === "online" };
 }
 
 export function licenseBannerState(zo: Record<string, unknown>, nowUs: number): LicenseBannerState {

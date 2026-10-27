@@ -210,6 +210,16 @@ describe("licenseExpiryState", () => {
       online: false,
     });
   });
+  it.each(["disabled", "not_v2", "no_license", undefined])(
+    "a refresh mode of %s cannot fetch a renewal",
+    (mode) => {
+      expect(licenseExpiryState({ license_expiry: now + DAY_US }, mode, now)).toEqual({
+        kind: "expiring",
+        untilUs: now + DAY_US,
+        online: false,
+      });
+    },
+  );
   it.each([undefined, 0, now, now - 1, now + 31 * DAY_US])(
     "hides missing, expired or distant expiries (%s)",
     (expiry) => {

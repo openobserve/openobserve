@@ -68,13 +68,12 @@ const withinWindow = computed(
 const license = useQuery(() => ({ ...licenseQuery(), enabled: withinWindow.value }));
 const data = computed(
   () =>
-    license.data.value as
-      { license?: { environment_type?: string }; can_update_license?: boolean } | undefined,
+    license.data.value as { refresh?: { mode?: string }; can_update_license?: boolean } | undefined,
 );
 const expiry = computed(() =>
   licenseExpiryState(
     isMetaOrg.value ? (store.state.zoConfig ?? {}) : {},
-    data.value?.license?.environment_type,
+    data.value?.refresh?.mode,
     nowUs.value,
   ),
 );
