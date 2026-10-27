@@ -122,6 +122,8 @@ export class NavRailPage {
 
   // Move onto a tile and let the pointer rest until the flyout is open.
   async restOn(locator) {
+    // On short viewports the tile can sit below the rail's visible area, so its centre would be off-screen.
+    await locator.scrollIntoViewIfNeeded();
     const c = await this.centre(locator);
     await this.page.mouse.move(c.x, c.y);
     await this.page.waitForTimeout(450);
