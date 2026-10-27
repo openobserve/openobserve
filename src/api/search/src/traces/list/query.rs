@@ -205,6 +205,7 @@ pub fn build_llm_trace_query(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
+        GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate, \
             sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
@@ -224,6 +225,7 @@ pub fn build_llm_trace_query(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
+        GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate, \
             sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
             sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
@@ -241,6 +243,7 @@ pub fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
         "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
         min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
         (max(end_time) - min(start_time)) as zo_sql_duration, \
+        GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate, \
         {extra_selects} \
         FROM {}",
         quote_identifier(stream_name)
@@ -400,6 +403,18 @@ mod tests {
             build_partition_query("default"),
             "SELECT * FROM \"default\""
         );
+    }
+
+    #[test]
+    fn trace_queries_select_the_partition_local_duration_candidate() {
+        let candidate =
+            "GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate";
+        assert!(build_trace_query("default", "count(*) AS span_count").contains(candidate));
+        for has_gen_ai in [true, false] {
+            let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
+            let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
+            assert!(sql.contains(candidate), "{sql}");
+        }
     }
 
     #[test]

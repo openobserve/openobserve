@@ -95,7 +95,7 @@ impl TraceListPlan {
     fn sql(&self, stream_name: &str) -> String {
         let sql = self.select_sql(stream_name);
         let filter = self.filter();
-        let order = self.sort.sql();
+        let order = self.sort.sql(self.mode);
         if filter.is_empty() {
             format!("{sql} GROUP BY trace_id ORDER BY {order}")
         } else {
@@ -249,14 +249,21 @@ impl TraceSort {
         })
     }
 
-    pub fn sql(self) -> String {
-        let field = if self.by_duration {
+    pub fn sql(self, mode: TraceListMode) -> String {
+        let field = if self.ranks_by_candidate(mode) {
+            "zo_sql_candidate"
+        } else if self.by_duration {
             "zo_sql_duration"
         } else {
             "zo_sql_timestamp"
         };
         let order = if self.ascending { "ASC" } else { "DESC" };
         format!("{field} {order}")
+    }
+
+    // A crossing trace reaches the candidate (longest span or local range) in one partition.
+    pub fn ranks_by_candidate(self, mode: TraceListMode) -> bool {
+        mode == TraceListMode::Streaming && self.by_duration && !self.ascending
     }
 
     pub fn sort(self, hits: &mut [TraceResponseItem]) {
@@ -453,6 +460,41 @@ mod tests {
             assert_eq!(request.timeout, 17);
             assert_eq!(request.search_type, base.search_type);
         }
+    }
+
+    #[test]
+    fn only_the_streamed_descending_duration_sort_ranks_by_the_candidate() {
+        for (sort_order, expected) in [
+            ("desc", ["zo_sql_duration DESC", "zo_sql_candidate DESC"]),
+            ("asc", ["zo_sql_duration ASC", "zo_sql_duration ASC"]),
+        ] {
+            let mut query = query();
+            query.insert("sort_by".to_string(), "duration".to_string());
+            query.insert("sort_order".to_string(), sort_order.to_string());
+            for (mode, expected) in [TraceListMode::Complete, TraceListMode::Streaming]
+                .into_iter()
+                .zip(expected)
+            {
+                let plan = TraceListPlan {
+                    options: TraceListOptions::parse(&query, mode).unwrap(),
+                    sort: TraceSort::parse(&query).unwrap(),
+                    columns: TraceColumns::default(),
+                    llm_schema: None,
+                    mode,
+                };
+                let sql = plan.sql("traces");
+                assert!(
+                    sql.ends_with(&format!("GROUP BY trace_id ORDER BY {expected}")),
+                    "{sql}"
+                );
+                assert!(sql.contains("as zo_sql_candidate"), "{sql}");
+            }
+        }
+        let mut query = query();
+        query.insert("sort_by".to_string(), "start_time".to_string());
+        let sort = TraceSort::parse(&query).unwrap();
+        assert!(!sort.ranks_by_candidate(TraceListMode::Streaming));
+        assert_eq!(sort.sql(TraceListMode::Streaming), "zo_sql_timestamp DESC");
     }
 
     #[test]
