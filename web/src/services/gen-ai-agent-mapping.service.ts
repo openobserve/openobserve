@@ -202,19 +202,15 @@ const genAiAgentMappingService = {
     analytics.track("gen_ai_agent_mapping_saved");
     return normalizeConfig(response.data);
   },
-  // Wide-window (retention-scoped) version enumeration for the version-compare
-  // slot pickers. Deliberately ignores the page date-picker window: a baseline
-  // version's last_seen may predate the page window, and it must still appear
-  // as a selectable compare slot. UNIT CONTRACT: `nowMicros` is epoch
-  // MICROSECONDS (= Date.now() * 1000). RETENTION_MS is milliseconds, so it is
-  // multiplied by 1000 here to convert to microseconds before subtracting.
+  // Reaches back to the page start so every version the Version dropdown lists is offered as a compare slot.
   listVersionsForCompare: async (
     orgIdentifier: string,
     agentName: string,
     env: string | null,
     nowMicros: number,
+    pageStartMicros?: number,
   ): Promise<GenAiAgentListItem[]> => {
-    const start = nowMicros - RETENTION_MS * 1000;
+    const start = Math.min(nowMicros - RETENTION_MS * 1000, pageStartMicros ?? Infinity);
     const response = await genAiAgentMappingService.listAgents(orgIdentifier, start, nowMicros);
     return response.agents.filter(
       (agent) =>

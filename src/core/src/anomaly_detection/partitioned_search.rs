@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     ops::ControlFlow,
     sync::{LazyLock, Mutex},
     time::{Duration, Instant},
@@ -130,19 +130,6 @@ impl ResultColumns {
             value: VALUE_COLUMN.to_string(),
         }
     }
-
-    /// Positions of the bucket and value cells in a table response's declared columns.
-    fn positions(&self, declared: &[String]) -> Result<(usize, usize)> {
-        let position = |name: &str| declared.iter().position(|c| c == name);
-        match (position(&self.bucket), position(&self.value)) {
-            (Some(bucket), Some(value)) => Ok((bucket, value)),
-            _ => anyhow::bail!(
-                "response declares columns {declared:?}, not both '{}' and '{}'",
-                self.bucket,
-                self.value
-            ),
-        }
-    }
 }
 
 /// A query proven safe to search one bucket-aligned partition at a time, and how to read it.
@@ -204,7 +191,6 @@ impl<'a> SupportedRun<'a> {
             i64::from(self.size),
         );
         req.query.histogram_interval = self.grid.interval_secs;
-        req.query.query_type = "table".to_string();
         req
     }
 
@@ -287,7 +273,7 @@ impl<'a> SupportedRun<'a> {
         }
         let (raw_hits, omitted_nulls) = (series.raw_hits, series.omitted_nulls);
         let points = series
-            .finish(self.budget)
+            .finish(self.budget, &self.columns.value)
             .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] {e}", self.anomaly_id))?;
         log::info!(
             "[anomaly_detection {}] supported search done: trace_id {}, executed {} searches, raw \
@@ -324,6 +310,7 @@ struct SeriesAccumulator {
     raw_buckets: HashSet<i64>,
     raw_hits: usize,
     omitted_nulls: usize,
+    keys_seen: BTreeSet<String>,
 }
 
 impl SeriesAccumulator {
@@ -357,34 +344,26 @@ impl SeriesAccumulator {
         if raw == 0 {
             return Ok(());
         }
-        // Table rows carry an explicit null per declared column, so a NULL is never an absent key.
-        let positions = columns.positions(&response.columns)?;
-        let width = response.columns.len();
         response.hits.iter().try_for_each(|hit| {
-            let Some(cells) = hit.as_array().filter(|cells| cells.len() == width) else {
-                anyhow::bail!("row is not a {width}-cell table row: {hit}");
+            let Some(row) = hit.as_object() else {
+                anyhow::bail!("row is not an object: {hit}");
             };
-            self.add_row(
-                hit,
-                &cells[positions.0],
-                &cells[positions.1],
-                columns,
-                slice,
-                interval_us,
-            )
+            self.note_keys(row);
+            self.add_row(hit, row, columns, slice, interval_us)
         })
     }
 
     fn add_row(
         &mut self,
         hit: &serde_json::Value,
-        bucket_cell: &serde_json::Value,
-        value_cell: &serde_json::Value,
+        row: &serde_json::Map<String, serde_json::Value>,
         columns: &ResultColumns,
         slice: [i64; 2],
         interval_us: i64,
     ) -> Result<()> {
-        let bucket = super::timestamp_from_value(bucket_cell)
+        let bucket = row
+            .get(&columns.bucket)
+            .and_then(super::timestamp_from_value)
             .with_context(|| format!("row has no usable '{}': {hit}", columns.bucket))?;
         if bucket.rem_euclid(interval_us) != 0 {
             anyhow::bail!("bucket {bucket} is off the {interval_us}us grid");
@@ -395,10 +374,11 @@ impl SeriesAccumulator {
         if !self.raw_buckets.insert(bucket) {
             anyhow::bail!("bucket {bucket} was returned more than once");
         }
-        if value_cell.is_null() {
+        // Object rows omit SQL NULL fields; a column absent from every row fails in finish.
+        let Some(value_cell) = row.get(&columns.value).filter(|v| !v.is_null()) else {
             self.omitted_nulls += 1;
             return Ok(());
-        }
+        };
         let value = super::json_value_as_f64(value_cell)
             .filter(|v| v.is_finite())
             .with_context(|| format!("'{}' is not a finite number: {hit}", columns.value))?;
@@ -409,7 +389,20 @@ impl SeriesAccumulator {
         Ok(())
     }
 
-    fn finish(mut self, budget: usize) -> Result<Vec<QueryDataPoint>> {
+    /// Object rows drop NULL keys, so the diagnostic needs keys from every row, not one.
+    fn note_keys(&mut self, row: &serde_json::Map<String, serde_json::Value>) {
+        // Only an all-NULL run reports the keys, so collecting stops at the first usable point.
+        if !self.points.is_empty() {
+            return;
+        }
+        for key in row.keys() {
+            if !self.keys_seen.contains(key) {
+                self.keys_seen.insert(key.clone());
+            }
+        }
+    }
+
+    fn finish(mut self, budget: usize, value_column: &str) -> Result<Vec<QueryDataPoint>> {
         if self.raw_hits >= budget {
             anyhow::bail!(
                 "{} rows across the run reached the {budget}-row budget, so the result may be \
@@ -419,8 +412,10 @@ impl SeriesAccumulator {
         }
         if self.raw_hits > 0 && self.points.is_empty() {
             anyhow::bail!(
-                "query returned {} rows but none were usable: every value was SQL NULL",
-                self.raw_hits
+                "query returned {} rows but none were usable: every '{value_column}' was SQL \
+                 NULL, or the column is missing from the result (columns present: {:?})",
+                self.raw_hits,
+                self.keys_seen.iter().collect::<Vec<_>>()
             );
         }
         self.points.sort_by_key(|p| p.timestamp_us);
@@ -1273,7 +1268,7 @@ mod tests {
         }
 
         async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
-            assert_eq!(req.query.query_type, "table");
+            assert!(req.query.query_type.is_empty(), "{}", req.query.query_type);
             let call = (
                 trace_id.to_string(),
                 req.query.start_time,
@@ -1294,7 +1289,7 @@ mod tests {
         }
     }
 
-    /// Uses the leader JSON and table conversion so null handling matches production.
+    /// Uses the leader JSON row conversion so null handling matches production.
     struct ArrowSearch {
         plan: Option<SearchPartitionResponse>,
         batches: Mutex<VecDeque<RecordBatch>>,
@@ -1314,7 +1309,7 @@ mod tests {
         }
 
         async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
-            assert_eq!(req.query.query_type, "table");
+            assert!(req.query.query_type.is_empty(), "{}", req.query.query_type);
             self.searched.fetch_add(1, Ordering::SeqCst);
             let batch = self
                 .batches
@@ -1322,7 +1317,7 @@ mod tests {
                 .unwrap()
                 .pop_front()
                 .expect("unscripted search");
-            Ok(table_response(&batch))
+            Ok(object_response(&batch))
         }
     }
 
@@ -2143,39 +2138,51 @@ mod tests {
 
     fn response(hits: Vec<serde_json::Value>) -> Response {
         Response {
-            columns: vec![BUCKET_COLUMN.to_string(), VALUE_COLUMN.to_string()],
             hits,
             ..Default::default()
         }
     }
 
     fn row(bucket: i64, value: serde_json::Value) -> serde_json::Value {
-        json!([bucket, value])
+        json!({BUCKET_COLUMN: bucket, VALUE_COLUMN: value})
+    }
+
+    /// An object row whose SQL NULL value was omitted, as the leader JSON writer does.
+    fn null_row(bucket: i64) -> serde_json::Value {
+        json!({ BUCKET_COLUMN: bucket })
     }
 
     fn parse_one(resp: &Response, slice: [i64; 2]) -> Result<Vec<QueryDataPoint>> {
         let mut series = SeriesAccumulator::default();
         series.add_slice(resp, slice, FIVE_MIN_US, 100, &ResultColumns::generated())?;
-        series.finish(100)
+        series.finish(100, VALUE_COLUMN)
     }
 
     #[test]
     fn malformed_rows_fail_even_beside_valid_rows() {
         let slice = [T0, T0 + 4 * FIVE_MIN_US];
+        let next = T0 + FIVE_MIN_US;
         let good = row(T0, json!(1.0));
         let bad = [
-            json!(["yesterday", 1.0]),
-            json!({"time_bucket": T0 + FIVE_MIN_US, "value": 1.0}),
-            json!([T0 + FIVE_MIN_US]),
-            json!([T0 + FIVE_MIN_US, 1.0, 2.0]),
-            row(T0 + FIVE_MIN_US, json!("1.0")),
-            row(T0 + FIVE_MIN_US, json!(true)),
+            json!([next, 1.0]),
+            json!(T0),
+            json!(null),
+            json!({ VALUE_COLUMN: 1.0 }),
+            json!({BUCKET_COLUMN: null, VALUE_COLUMN: 1.0}),
+            json!({BUCKET_COLUMN: "yesterday", VALUE_COLUMN: 1.0}),
+            json!({BUCKET_COLUMN: true, VALUE_COLUMN: 1.0}),
+            row(next, json!("1.0")),
+            row(next, json!("NaN")),
+            row(next, json!("inf")),
+            row(next, json!(true)),
+            row(next, json!({"v": 1})),
+            row(next, json!([1.0])),
             row(T0 + 1, json!(1.0)),
             row(T0 - FIVE_MIN_US, json!(1.0)),
             row(T0 + 4 * FIVE_MIN_US, json!(1.0)),
             row(T0, json!(2.0)),
             row(T0, serde_json::Value::Null),
-            json!(T0),
+            null_row(T0),
         ];
         for b in bad {
             let resp = response(vec![good.clone(), b.clone()]);
@@ -2186,79 +2193,121 @@ mod tests {
     #[test]
     fn string_buckets_parse_and_an_unaligned_start_keeps_its_first_bucket() {
         let slice = [T0 + MINUTE_US, T0 + 2 * FIVE_MIN_US];
-        let resp = response(vec![json!(["2026-01-01T00:05:00", 2]), row(T0, json!(1.5))]);
+        let resp = response(vec![
+            json!({BUCKET_COLUMN: "2026-01-01T00:05:00", VALUE_COLUMN: 2}),
+            row(T0, json!(1.5)),
+        ]);
         let points = parse_one(&resp, slice).unwrap();
         let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
         assert_eq!(got, vec![(T0, 1.5), (T0 + FIVE_MIN_US, 2.0)]);
     }
 
     #[test]
-    fn null_values_are_omitted_counted_and_never_zero() {
+    fn omitted_and_explicit_null_values_are_counted_and_never_zero() {
         let slice = [T0, T0 + 4 * FIVE_MIN_US];
         let resp = response(vec![
             row(T0, json!(1.0)),
-            row(T0 + FIVE_MIN_US, serde_json::Value::Null),
+            null_row(T0 + FIVE_MIN_US),
+            row(T0 + 2 * FIVE_MIN_US, serde_json::Value::Null),
             row(T0 + 3 * FIVE_MIN_US, json!(3.0)),
         ]);
         let mut series = SeriesAccumulator::default();
         series
             .add_slice(&resp, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
             .unwrap();
-        assert_eq!((series.raw_hits, series.omitted_nulls), (3, 1));
-        let points = series.finish(100).unwrap();
-        let got: Vec<_> = points.iter().map(|p| p.timestamp_us).collect();
-        assert_eq!(got, vec![T0, T0 + 3 * FIVE_MIN_US]);
+        assert_eq!((series.raw_hits, series.omitted_nulls), (4, 2));
+        let points = series.finish(100, VALUE_COLUMN).unwrap();
+        let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+        assert_eq!(got, vec![(T0, 1.0), (T0 + 3 * FIVE_MIN_US, 3.0)]);
     }
 
     #[test]
-    fn a_missing_value_column_is_an_error_not_a_null() {
-        let slice = [T0, T0 + 2 * FIVE_MIN_US];
-        let mut undeclared = response(vec![json!([T0])]);
-        undeclared.columns = vec![BUCKET_COLUMN.to_string()];
-        let err = parse_one(&undeclared, slice).unwrap_err().to_string();
-        assert!(err.contains("declares columns"), "{err}");
-        let mut no_columns = response(vec![row(T0, json!(1))]);
-        no_columns.columns.clear();
-        assert!(parse_one(&no_columns, slice).is_err());
-        let mut extra = response(vec![json!([T0, 1.0, 2.0])]);
-        extra.columns.push("other".to_string());
-        assert_eq!(parse_one(&extra, slice).unwrap()[0].value, 1.0);
-        let narrow = response(vec![json!([T0, 1.0, 2.0])]);
-        assert!(parse_one(&narrow, slice).is_err());
-        let object_without_value = response(vec![json!({"time_bucket": T0})]);
-        assert!(parse_one(&object_without_value, slice).is_err());
-
-        let mut swapped = response(vec![json!([2.5, T0 + FIVE_MIN_US])]);
-        swapped.columns.reverse();
-        let points = parse_one(&swapped, slice).unwrap();
-        assert_eq!(
-            (points[0].timestamp_us, points[0].value),
-            (T0 + FIVE_MIN_US, 2.5)
+    fn a_column_missing_from_every_row_fails_the_run_naming_the_keys_seen() {
+        let first = [T0, T0 + FIVE_MIN_US];
+        let second = [T0 + FIVE_MIN_US, T0 + 2 * FIVE_MIN_US];
+        let mut series = SeriesAccumulator::default();
+        for (slice, bucket) in [(first, T0), (second, T0 + FIVE_MIN_US)] {
+            let rows = response(vec![json!({BUCKET_COLUMN: bucket, "count": 3})]);
+            series
+                .add_slice(&rows, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+        }
+        assert_eq!(series.omitted_nulls, 2);
+        let err = series.finish(100, VALUE_COLUMN).unwrap_err().to_string();
+        assert!(err.contains("2 rows"), "{err}");
+        assert!(err.contains("every 'value' was SQL NULL"), "{err}");
+        assert!(err.contains("missing from the result"), "{err}");
+        assert!(
+            err.contains(r#"columns present: ["count", "time_bucket"]"#),
+            "{err}"
         );
 
-        let mut empty = response(vec![]);
-        empty.columns.clear();
-        assert!(parse_one(&empty, slice).unwrap().is_empty());
+        let custom = columns("zo_sql_timestamp", "Cnt");
+        let mut series = SeriesAccumulator::default();
+        for (slice, hit) in [
+            (first, json!({ "zo_sql_timestamp": T0 })),
+            (
+                second,
+                json!({"zo_sql_timestamp": T0 + FIVE_MIN_US, "cnt": 4}),
+            ),
+        ] {
+            series
+                .add_slice(&response(vec![hit]), slice, FIVE_MIN_US, 100, &custom)
+                .unwrap();
+        }
+        let err = series.finish(100, "Cnt").unwrap_err().to_string();
+        assert!(
+            err.contains(r#"columns present: ["cnt", "zo_sql_timestamp"]"#),
+            "{err}"
+        );
+
+        let wide: serde_json::Map<_, _> = (0..128)
+            .map(|i| (format!("k{i:03}"), json!(1)))
+            .chain([(BUCKET_COLUMN.to_string(), json!(T0))])
+            .collect();
+        let mut series = SeriesAccumulator::default();
+        series
+            .add_slice(
+                &response(vec![serde_json::Value::Object(wide)]),
+                first,
+                FIVE_MIN_US,
+                100,
+                &ResultColumns::generated(),
+            )
+            .unwrap();
+        assert_eq!(series.keys_seen.len(), 129);
+        assert!(series.keys_seen.contains(BUCKET_COLUMN));
+
+        let slice = [T0, T0 + 2 * FIVE_MIN_US];
+        let no_bucket = response(vec![json!({ VALUE_COLUMN: 1 })]);
+        let err = parse_one(&no_bucket, slice).unwrap_err().to_string();
+        assert!(err.contains("no usable 'time_bucket'"), "{err}");
+
+        let extra = response(vec![
+            json!({BUCKET_COLUMN: T0, VALUE_COLUMN: 1.0, "other": 2.0}),
+        ]);
+        assert_eq!(parse_one(&extra, slice).unwrap()[0].value, 1.0);
+
+        assert!(parse_one(&response(vec![]), slice).unwrap().is_empty());
     }
 
     #[test]
-    fn custom_columns_are_read_by_name_wherever_they_sit() {
-        let slice = [T0, T0 + 2 * FIVE_MIN_US];
+    fn custom_columns_are_read_by_name_from_object_rows() {
+        let slice = [T0, T0 + 3 * FIVE_MIN_US];
         let custom = columns("zo_sql_timestamp", "zo_sql_num");
-        let resp = Response {
-            columns: ["zo_sql_num", "n", "zo_sql_timestamp"]
-                .map(str::to_string)
-                .to_vec(),
-            hits: vec![json!([7, 99, T0]), json!([null, 99, T0 + FIVE_MIN_US])],
-            ..Default::default()
-        };
+        let resp = response(vec![
+            json!({"zo_sql_num": 7, "n": 99, "zo_sql_timestamp": T0}),
+            json!({"n": 99, "zo_sql_timestamp": T0 + FIVE_MIN_US}),
+            json!({"zo_sql_timestamp": T0 + 2 * FIVE_MIN_US, VALUE_COLUMN: 5}),
+        ]);
         let mut series = SeriesAccumulator::default();
         series
             .add_slice(&resp, slice, FIVE_MIN_US, 100, &custom)
             .unwrap();
-        assert_eq!(series.omitted_nulls, 1);
-        let points = series.finish(100).unwrap();
-        assert_eq!((points[0].timestamp_us, points[0].value), (T0, 7.0));
+        assert_eq!(series.omitted_nulls, 2);
+        let points = series.finish(100, VALUE_COLUMN).unwrap();
+        let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+        assert_eq!(got, vec![(T0, 7.0)]);
 
         let mut series = SeriesAccumulator::default();
         let err = series
@@ -2278,47 +2327,74 @@ mod tests {
     fn a_null_only_slice_is_fine_but_an_all_null_run_is_an_error() {
         let first = [T0, T0 + FIVE_MIN_US];
         let second = [T0 + FIVE_MIN_US, T0 + 2 * FIVE_MIN_US];
-        let mut series = SeriesAccumulator::default();
-        let nulls = response(vec![row(T0, serde_json::Value::Null)]);
-        series
-            .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
-            .unwrap();
-        let numbers = response(vec![row(T0 + FIVE_MIN_US, json!(4))]);
-        series
-            .add_slice(
-                &numbers,
-                second,
-                FIVE_MIN_US,
-                100,
-                &ResultColumns::generated(),
-            )
-            .unwrap();
-        assert_eq!(series.finish(100).unwrap().len(), 1);
+        for nulls in [
+            response(vec![null_row(T0)]),
+            response(vec![row(T0, serde_json::Value::Null)]),
+        ] {
+            let mut series = SeriesAccumulator::default();
+            series
+                .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+            let numbers = response(vec![row(T0 + FIVE_MIN_US, json!(4))]);
+            series
+                .add_slice(
+                    &numbers,
+                    second,
+                    FIVE_MIN_US,
+                    100,
+                    &ResultColumns::generated(),
+                )
+                .unwrap();
+            let points = series.finish(100, VALUE_COLUMN).unwrap();
+            assert_eq!(
+                points
+                    .iter()
+                    .map(|p| (p.timestamp_us, p.value))
+                    .collect::<Vec<_>>(),
+                vec![(T0 + FIVE_MIN_US, 4.0)]
+            );
 
-        let mut all_null = SeriesAccumulator::default();
-        all_null
-            .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
-            .unwrap();
-        let err = all_null.finish(100).unwrap_err().to_string();
-        assert!(err.contains("NULL"), "{err}");
+            let mut all_null = SeriesAccumulator::default();
+            all_null
+                .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+            let err = all_null.finish(100, VALUE_COLUMN).unwrap_err().to_string();
+            assert!(err.contains("NULL"), "{err}");
+        }
 
-        assert!(parse_one(&response(vec![]), first).unwrap().is_empty());
+        let mut empty_run = SeriesAccumulator::default();
+        for slice in [first, second] {
+            empty_run
+                .add_slice(
+                    &response(vec![]),
+                    slice,
+                    FIVE_MIN_US,
+                    100,
+                    &ResultColumns::generated(),
+                )
+                .unwrap();
+        }
+        assert!(empty_run.finish(100, VALUE_COLUMN).unwrap().is_empty());
     }
 
     #[test]
     fn a_null_row_still_counts_toward_duplicates_across_slices() {
-        let mut series = SeriesAccumulator::default();
         let slice = [T0, T0 + FIVE_MIN_US];
-        let nulls = response(vec![row(T0, serde_json::Value::Null)]);
-        series
-            .add_slice(&nulls, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
-            .unwrap();
-        let again = response(vec![row(T0, json!(1))]);
-        assert!(
+        for nulls in [
+            response(vec![null_row(T0)]),
+            response(vec![row(T0, serde_json::Value::Null)]),
+        ] {
+            let mut series = SeriesAccumulator::default();
             series
-                .add_slice(&again, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
-                .is_err()
-        );
+                .add_slice(&nulls, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+            let again = response(vec![row(T0, json!(1))]);
+            assert!(
+                series
+                    .add_slice(&again, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                    .is_err()
+            );
+        }
     }
 
     #[test]
@@ -2332,25 +2408,25 @@ mod tests {
         let err = parse_one(&partial, slice).unwrap_err().to_string();
         assert!(err.contains("querier timeout"), "{err}");
 
-        let full = response(vec![row(T0, json!(1)), row(T0 + FIVE_MIN_US, json!(1))]);
-        let mut series = SeriesAccumulator::default();
         let wide = [T0, T0 + 2 * FIVE_MIN_US];
-        assert!(
-            series
-                .add_slice(&full, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
-                .is_err()
-        );
+        let full = response(vec![null_row(T0), null_row(T0 + FIVE_MIN_US)]);
+        let mut series = SeriesAccumulator::default();
+        let err = series
+            .add_slice(&full, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("budget"), "{err}");
 
         let mut series = SeriesAccumulator::default();
         let one = response(vec![row(T0, json!(1))]);
         series
             .add_slice(&one, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
             .unwrap();
-        let two = response(vec![row(T0 + FIVE_MIN_US, json!(1))]);
+        let two = response(vec![null_row(T0 + FIVE_MIN_US)]);
         series
             .add_slice(&two, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
             .unwrap();
-        assert!(series.finish(2).is_err());
+        assert!(series.finish(2, VALUE_COLUMN).is_err());
     }
 
     fn three_slices() -> SearchPartitionResponse {
@@ -2538,17 +2614,15 @@ mod tests {
         );
     }
 
-    fn table_response(batch: &RecordBatch) -> Response {
+    /// Mirrors the leader: real JSON rows with empty objects dropped.
+    fn object_response(batch: &RecordBatch) -> Response {
         let rows = config::utils::arrow::record_batches_to_json_rows(&[batch]).unwrap();
-        let (columns, hits) = search_service::cluster::handle_table_response(
-            batch.schema(),
-            rows.into_iter().map(serde_json::Value::Object).collect(),
-        );
-        Response {
-            columns,
-            hits,
-            ..Default::default()
-        }
+        response(
+            rows.into_iter()
+                .filter(|v| !v.is_empty())
+                .map(serde_json::Value::Object)
+                .collect(),
+        )
     }
 
     fn arrow_rows(rows: &[(i64, Option<f64>)]) -> RecordBatch {
@@ -2579,11 +2653,14 @@ mod tests {
             (T0 + FIVE_MIN_US, None),
             (T0 + 2 * FIVE_MIN_US, Some(f64::INFINITY)),
         ]);
-        let resp = table_response(&batch);
+        let resp = object_response(&batch);
+        let hits = &resp.hits;
         assert!(
-            resp.hits[1][1].is_null() && resp.hits[2][1].is_null(),
-            "{:?}",
-            resp.hits
+            hits[1].get(VALUE_COLUMN).is_none()
+                && hits[2]
+                    .get(VALUE_COLUMN)
+                    .is_none_or(serde_json::Value::is_null),
+            "{hits:?}"
         );
         let mut series = SeriesAccumulator::default();
         series
@@ -2596,6 +2673,35 @@ mod tests {
             )
             .unwrap();
         assert_eq!(series.omitted_nulls, 2);
+    }
+
+    #[tokio::test]
+    async fn an_entirely_null_value_partition_is_skipped_never_zeroed() {
+        let all_null = arrow_rows(&[(T0 + FIVE_MIN_US, None)]);
+        let resp = object_response(&all_null);
+        assert!(
+            !resp.hits.is_empty() && resp.hits.iter().all(|hit| hit.get(VALUE_COLUMN).is_none()),
+            "{:?}",
+            resp.hits
+        );
+
+        let engine = arrow_engine(
+            Some(three_slices()),
+            vec![
+                arrow_rows(&[(T0, Some(2.0))]),
+                all_null,
+                arrow_rows(&[(T0 + 2 * FIVE_MIN_US, Some(0.5))]),
+            ],
+        );
+        let points = run_arrow(&engine).await.unwrap();
+        let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+        assert_eq!(got, vec![(T0, 2.0), (T0 + 2 * FIVE_MIN_US, 0.5)]);
+
+        let only_nulls = arrow_rows(&[(T0, None), (T0 + FIVE_MIN_US, None)]);
+        let engine = arrow_engine(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![only_nulls]);
+        let err = run_arrow(&engine).await.unwrap_err().to_string();
+        assert!(err.contains("SQL NULL"), "{err}");
+        assert!(err.contains(r#"columns present: ["time_bucket"]"#), "{err}");
     }
 
     #[tokio::test]
