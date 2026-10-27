@@ -32,25 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useFeatureLockActions } from "@/composables/useFeatureLock";
-
-// Label and icon mirror each feature's own nav entry.
-const FEATURES: Record<string, { labelKey: I18nKey; icon: IconName }> = {
-  workflows: { labelKey: "menu.workflows", icon: "schema" },
-  oncall: { labelKey: "menu.onCall", icon: "notifications-active" },
-  incidents: { labelKey: "menu.incidents", icon: "notifications-active" },
-  ai_assistant: { labelKey: "menu.aiAssistant", icon: "auto-awesome" },
-  ai_observability: { labelKey: "menu.aiObservability", icon: "auto-awesome" },
-};
+import { LOCKED_FEATURES } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const route = useRoute();
 const { hasLicensePage, openLicense, openContactSales } = useFeatureLockActions();
 
-const meta = computed(() => FEATURES[String(route.params.feature ?? "")]);
+const meta = computed(() => LOCKED_FEATURES[String(route.params.feature ?? "")]);
 const label = computed(() => (meta.value ? t(meta.value.labelKey) : t("featureLock.thisFeature")));
 </script>

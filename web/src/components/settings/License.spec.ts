@@ -1275,7 +1275,7 @@ describe("License.vue", () => {
     });
   });
 
-  describe("License feature rows", () => {
+  describe("License features row", () => {
     const configFeatures = {
       alerts: "enabled",
       dashboards: "enabled",
@@ -1315,78 +1315,305 @@ describe("License.vue", () => {
       await flushPromises();
     };
 
-    const row = (name: string) => wrapper.find(`[data-test=settings-license-${name}-features]`);
-
-    it("splits the license into additional, free and locked rows", async () => {
-      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
-
-      expect(row("additional").text()).toContain("Additional features");
-      expect(row("additional").text()).toContain("sso");
-      expect(row("free").text()).toContain("3 features");
-      expect(row("locked").text()).toContain("2 features");
-      const lists = Object.fromEntries(
-        wrapper.vm.featureRows.map((r: any) => [r.testId, r.features]),
-      );
-      expect(lists["settings-license-free-features"]).toEqual(["alerts", "dashboards", "metering"]);
-      expect(lists["settings-license-locked-features"]).toEqual(["ai", "rbac"]);
-    });
-
-    it("keeps free and locked rows collapsed until clicked", async () => {
-      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
-
-      expect(row("free").text()).not.toContain("metering");
-      await row("free").find("button").trigger("click");
+    const find = (name: string) => wrapper.find(`[data-test=settings-license-features${name}]`);
+    const chips = (name: string) =>
+      find(`-${name}`)
+        .findAllComponents({ name: "OBadge" })
+        .map((b: any) => b.text());
+    const items = (name: string) =>
+      find(`-${name}`)
+        .findAll("li")
+        .map((li: any) => li.text());
+    const expand = async () => {
+      await find("-expand").trigger("click");
       await flushPromises();
-      expect(row("free").text()).toContain("metering");
-    });
+    };
+    const licenseUrl =
+      "https://license.example.com/user/request-license?base_url=http%3A%2F%2Flocalhost%3A3000&license_id=test-installation-123";
 
-    it("shows only all features for a license without a features list", async () => {
-      await mountWith({ feature_definition: featureDefinition });
+    it("summarises unlocked of paid features and the free count", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
 
-      expect(row("additional").text()).toContain("All features");
-      expect(row("free").exists()).toBe(false);
-      expect(row("locked").exists()).toBe(false);
-    });
-
-    it("falls back to the org config for free features without a feature definition", async () => {
-      await mountWith({ features: ["sso"] });
-
-      const free = wrapper.vm.featureRows.find(
-        (r: any) => r.testId === "settings-license-free-features",
+      expect(find("").text()).toContain("Features");
+      expect(find("-summary").text()).toBe(
+        "Your license unlocks 1 of 3 paid features. 3 free features are always included.",
       );
-      expect(free.features).toEqual(["alerts", "dashboards"]);
     });
 
-    it("shows none when no feature is locked", async () => {
-      await mountWith({ features: ["sso"] }, { alerts: "enabled", sso: "enabled" });
+    it("splits a feature definition into unlocked, missing and free", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
 
-      expect(row("locked").text()).toContain("None");
+      expect(chips("unlocked")).toEqual(["sso"]);
+      expect(chips("missing")).toEqual(["ai", "rbac"]);
+      expect(find("-expand").text()).toContain("Show 3 free features");
+      await expand();
+      expect(items("free")).toEqual(["alerts", "dashboards", "metering"]);
     });
 
-    it("lists a licensed feature in row 1 even when the config hides it", async () => {
-      await mountWith({ features: ["sso", "pipelines"], feature_definition: featureDefinition });
-
-      expect(row("additional").text()).toContain("pipelines");
-      expect(row("free").text()).toContain("3 features");
-    });
-
-    it("shows an ungated licensed feature only in row 1", async () => {
-      await mountWith({ features: ["sso", "dashboards"], feature_definition: featureDefinition });
-
-      const lists = Object.fromEntries(
-        wrapper.vm.featureRows.map((r: any) => [r.testId, r.features]),
-      );
-      expect(lists["settings-license-additional-features"]).toEqual(["dashboards", "sso"]);
-      expect(lists["settings-license-free-features"]).toEqual(["alerts", "metering"]);
-    });
-
-    it("excludes licensed features from the config fallback", async () => {
+    it("falls back to the license list and the org config without a feature definition", async () => {
       await mountWith({ features: ["sso", "alerts"] });
 
-      const free = wrapper.vm.featureRows.find(
-        (r: any) => r.testId === "settings-license-free-features",
-      );
-      expect(free.features).toEqual(["dashboards"]);
+      expect(chips("unlocked")).toEqual(["alerts", "sso"]);
+      expect(chips("missing")).toEqual(["ai", "rbac"]);
+      await expand();
+      expect(items("free")).toEqual(["dashboards"]);
+    });
+
+    it("keeps a listed key unlocked even when the config hides it", async () => {
+      await mountWith({ features: ["sso", "pipelines"], feature_definition: featureDefinition });
+
+      expect(chips("unlocked")).toEqual(["pipelines", "sso"]);
+      expect(find("-summary").text()).toContain("2 of 4 paid features");
+    });
+
+    it("hides the missing block when nothing is missing", async () => {
+      await mountWith({ features: ["sso"] }, { alerts: "enabled", sso: "enabled" });
+
+      expect(find("-missing").exists()).toBe(false);
+      expect(find("-request-access").exists()).toBe(false);
+    });
+
+    it("reads 0 of N for an empty features list", async () => {
+      await mountWith({ features: [], feature_definition: featureDefinition });
+
+      expect(find("-summary").text()).toContain("0 of 3 paid features");
+      expect(find("-unlocked").exists()).toBe(false);
+    });
+
+    it("shows only the all-features summary for a license without a features list", async () => {
+      await mountWith({ feature_definition: featureDefinition });
+
+      expect(find("-summary").text()).toBe("Your license unlocks all features.");
+      expect(find("-unlocked").exists()).toBe(false);
+      expect(find("-missing").exists()).toBe(false);
+      expect(find("-expand").exists()).toBe(false);
+    });
+
+    it("toggles between the compact and expanded states", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(find("-search").exists()).toBe(false);
+      await expand();
+      expect(find("-search").exists()).toBe(true);
+      expect(find("-filter").exists()).toBe(true);
+      expect(find("-expand").exists()).toBe(false);
+      expect(items("unlocked")).toEqual(["sso"]);
+      expect(items("missing")).toEqual(["ai", "rbac"]);
+      await find("-collapse").trigger("click");
+      await flushPromises();
+      expect(find("-search").exists()).toBe(false);
+      expect(chips("unlocked")).toEqual(["sso"]);
+    });
+
+    it("shows only the selected group for a filter tab", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      await expand();
+
+      expect(find("-filter").text()).toContain("All 6");
+      expect(find("-filter").text()).toContain("Not in license 2");
+      wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "missing");
+      await flushPromises();
+      expect(items("missing")).toEqual(["ai", "rbac"]);
+      expect(find("-unlocked").exists()).toBe(false);
+      expect(find("-free").exists()).toBe(false);
+    });
+
+    it("searches across groups and shows the empty state when nothing matches", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      await expand();
+      const search = wrapper.findComponent({ name: "OSearchInput" });
+
+      search.vm.$emit("update:modelValue", "AL");
+      await flushPromises();
+      expect(items("free")).toEqual(["alerts"]);
+      expect(find("-unlocked").exists()).toBe(false);
+      expect(find("-missing").exists()).toBe(false);
+
+      search.vm.$emit("update:modelValue", "zzz");
+      await flushPromises();
+      const empty = wrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.exists()).toBe(true);
+      expect(empty.props("filtered")).toBe(true);
+      empty.vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OEmptyState" }).exists()).toBe(false);
+      expect(items("free")).toEqual(["alerts", "dashboards", "metering"]);
+    });
+
+    it("request access opens the same license-server page as Request new License", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await find("-request-access").trigger("click");
+      await wrapper.find("[data-test=request-new-license-btn]").trigger("click");
+      await expand();
+      await find("-request-access").trigger("click");
+
+      expect(open).toHaveBeenCalledTimes(3);
+      for (const call of open.mock.calls) expect(call).toEqual([licenseUrl, "_blank"]);
+      open.mockRestore();
+    });
+
+    it("lets the masked license key wrap while the reveal button keeps its size", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      const button = wrapper.find("[data-test=show-license-key-btn]");
+
+      expect(button.classes()).toContain("shrink-0");
+      expect(button.element.parentElement?.classList).toContain("flex-wrap");
+      expect(button.element.previousElementSibling?.classList).toContain("break-all");
+    });
+
+    it("strips trailing slashes from the license server url", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+      store.state.zoConfig.license_server_url = "https://license.example.com//";
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+
+      await find("-request-access").trigger("click");
+
+      expect(open).toHaveBeenCalledWith(licenseUrl, "_blank");
+      open.mockRestore();
+    });
+
+    describe("new after your license", () => {
+      const withNew = {
+        ...configFeatures,
+        workflows: "locked",
+        traces_v2: "enabled",
+        legacy_beta: "hidden",
+      };
+      const licensed = { features: ["sso"], feature_definition: featureDefinition };
+
+      it("lists config keys missing from the license definition, ignoring hidden ones", async () => {
+        await mountWith(licensed, withNew);
+
+        expect(chips("new")).toEqual(["traces_v2", "workflows"]);
+        expect(find("-new").text()).not.toContain("legacy_beta");
+        expect(wrapper.text()).toContain("New after your license");
+        expect(wrapper.text()).toContain("Added after your license was issued.");
+        expect(find("-summary").text()).toBe(
+          "Your license unlocks 1 of 3 paid features. 3 free features are always included.",
+        );
+      });
+
+      it("hides the block when New is empty", async () => {
+        await mountWith(licensed, { ...configFeatures, legacy_beta: "hidden" });
+
+        expect(find("-new").exists()).toBe(false);
+      });
+
+      it("hides the block without a feature definition", async () => {
+        await mountWith({ features: ["sso"] }, withNew);
+
+        expect(find("-new").exists()).toBe(false);
+      });
+
+      it("hides the block without a features list", async () => {
+        await mountWith({ feature_definition: featureDefinition }, withNew);
+
+        expect(find("-new").exists()).toBe(false);
+      });
+
+      it("shows enabled keys in the free style and locked keys with a lock", async () => {
+        await mountWith(licensed, withNew);
+        const badges = find("-new").findAllComponents({ name: "OBadge" });
+
+        expect(badges.map((b: any) => [b.text(), b.props("icon"), b.props("dot")])).toEqual([
+          ["traces_v2", undefined, true],
+          ["workflows", "lock", false],
+        ]);
+        await expand();
+        const icons = find("-new")
+          .findAll("li")
+          .map((li: any) => li.findComponent({ name: "OIcon" }).exists());
+        expect(icons).toEqual([false, true]);
+      });
+
+      it("shows request access only when a New key is locked and opens the license page", async () => {
+        await mountWith(licensed, { ...configFeatures, traces_v2: "enabled" });
+        expect(
+          find("-new").find("[data-test=settings-license-features-request-access]").exists(),
+        ).toBe(false);
+
+        wrapper.unmount();
+        await mountWith(licensed, withNew);
+        const open = vi.spyOn(window, "open").mockReturnValue(null);
+        await find("-new")
+          .find("[data-test=settings-license-features-request-access]")
+          .trigger("click");
+        await expand();
+        await find("-new")
+          .find("[data-test=settings-license-features-request-access]")
+          .trigger("click");
+
+        expect(open).toHaveBeenCalledTimes(2);
+        for (const call of open.mock.calls) expect(call).toEqual([licenseUrl, "_blank"]);
+        open.mockRestore();
+      });
+
+      it("filters to the New group with its tab and covers it in search", async () => {
+        await mountWith(licensed, withNew);
+        await expand();
+
+        expect(find("-filter").text()).toContain("All 8");
+        expect(find("-filter").text()).toContain("New 2");
+        expect(find("-filter-new").exists()).toBe(true);
+        wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "new");
+        await flushPromises();
+        expect(items("new")).toEqual(["traces_v2", "workflows"]);
+        expect(find("-unlocked").exists()).toBe(false);
+        expect(find("-missing").exists()).toBe(false);
+        expect(find("-free").exists()).toBe(false);
+
+        wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "all");
+        wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "WORK");
+        await flushPromises();
+        expect(items("new")).toEqual(["workflows"]);
+        expect(find("-free").exists()).toBe(false);
+      });
+
+      it("orders groups and filter tabs unlocked, missing, new, free", async () => {
+        await mountWith(licensed, withNew);
+        await expand();
+        const order = (prefix: string, ids: string[]) =>
+          wrapper
+            .findAll(`[data-test^=${prefix}]`)
+            .map((el: any) => el.attributes("data-test").slice(prefix.length))
+            .filter((id: string) => ids.includes(id));
+
+        expect(order("settings-license-features-", ["unlocked", "missing", "new", "free"])).toEqual(
+          ["unlocked", "missing", "new", "free"],
+        );
+        expect(
+          order("settings-license-features-filter-", ["all", "unlocked", "missing", "new", "free"]),
+        ).toEqual(["all", "unlocked", "missing", "new", "free"]);
+      });
+
+      it("truncates list keys with the full key as a tooltip instead of breaking them", async () => {
+        await mountWith(licensed, withNew);
+        await expand();
+        const label = find("-new").find("li span[title]");
+
+        expect(label.attributes("title")).toBe("traces_v2");
+        expect(label.classes()).toContain("truncate");
+        expect(label.classes()).not.toContain("break-all");
+      });
+
+      it("has no New tab when New is empty", async () => {
+        await mountWith(licensed);
+        await expand();
+
+        expect(find("-filter-new").exists()).toBe(false);
+      });
+
+      it("never puts a key in two groups", async () => {
+        await mountWith({ ...licensed, features: ["sso", "workflows"] }, withNew);
+        await expand();
+        const all = ["unlocked", "missing", "free", "new"].flatMap((group) => items(group));
+
+        expect(new Set(all).size).toBe(all.length);
+        expect(items("unlocked")).toEqual(["sso", "workflows"]);
+        expect(items("new")).toEqual(["traces_v2"]);
+      });
     });
   });
 

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h, nextTick, ref, type Ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { createStore } from "vuex";
@@ -125,7 +125,7 @@ describe("useFeatureLock", () => {
 });
 
 describe("FeatureLockBanner", () => {
-  const mountBanner = async (withLicensePage: boolean) => {
+  const mountBanner = async (withLicensePage: boolean, feature = "workflows") => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -138,29 +138,34 @@ describe("FeatureLockBanner", () => {
     await router.push("/");
     const store = createStore({ state: () => ({ selectedOrganization: { identifier: "acme" } }) });
     wrapper = mount(FeatureLockBanner, {
-      props: { feature: "workflows" },
+      props: { feature },
       global: { plugins: [i18n, router, store] },
     });
     return router;
   };
 
-  it("names the exact feature key the license is missing", async () => {
+  it("names the missing feature by its label, not its key", async () => {
     await mountBanner(true);
-    expect(wrapper!.text()).toContain("This feature is locked. It needs the workflows feature");
+    expect(wrapper!.text()).toContain("This feature is locked. It needs the Workflows feature");
     expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').element.tagName).toBe(
       "STRONG",
     );
+    wrapper!.unmount();
+    await mountBanner(true, "ai_assistant");
+    expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').text()).toBe("AI Assistant");
   });
 
-  it("keeps its actions live and opens the license page", async () => {
-    const router = await mountBanner(true);
-    await wrapper!.get('[data-test="feature-lock-banner-view-license"]').trigger("click");
-    await flushPromises();
-    expect(router.currentRoute.value.fullPath).toBe("/license?org_identifier=acme");
+  it("says a generic sentence for a key it has no label for, naming nothing", async () => {
+    await mountBanner(true, "some_new_feature");
+    expect(wrapper!.get('[data-test="feature-lock-banner-generic"]').text()).toBe(
+      "This page needs a feature that is not in your license.",
+    );
+    expect(wrapper!.find('[data-test="feature-lock-banner-feature"]').exists()).toBe(false);
+    expect(wrapper!.text()).not.toContain("This feature feature");
   });
 
-  it("offers only Contact sales where no license page exists", async () => {
-    await mountBanner(false);
+  it("offers only Contact sales, even where a license page exists", async () => {
+    await mountBanner(true);
     expect(wrapper!.find('[data-test="feature-lock-banner-view-license"]').exists()).toBe(false);
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     await wrapper!.get('[data-test="feature-lock-banner-contact-sales"]').trigger("click");
