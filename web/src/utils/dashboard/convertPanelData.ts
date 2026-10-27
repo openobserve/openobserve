@@ -32,6 +32,7 @@ import { applyPanelTypeOptions } from "./panelTypeOptions";
 import { applyMetricOptions } from "./metricOptions";
 import { applyGeoMapClusters, mapClusterRadius } from "./geoMapCluster";
 import { applyTableOptions } from "./tableOptions";
+import { barGaugeSchemaAsGauge, convertBarGaugeData } from "./convertBarGaugeData";
 import { convertHostmapData } from "./convertHostmapData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -121,6 +122,50 @@ export const convertPanelData = async (
         applyPanelTypeOptions(result?.options, panelSchema, chartPanelRef);
         applyMetricOptions(result?.options, panelSchema);
         return { chartType: panelSchema.type, ...result };
+      } catch (error) {
+        if (panelSchema?.queryType == "promql") throw error;
+        console.error(error);
+        return {};
+      }
+    }
+    case "bar-gauge": {
+      const query = panelSchema?.queries?.[0];
+      if (panelSchema?.queryType !== "promql" && !query?.customQuery && !query?.fields?.y?.length) {
+        throw new Error(gt("dashboard.utils.selectRequiredFields"));
+      }
+      // The gauge converters already reduce each series and resolve its colour and unit text.
+      const gaugeSchema = barGaugeSchemaAsGauge(panelSchema);
+      try {
+        const gauges: any =
+          panelSchema?.queryType == "promql"
+            ? await convertPromQLData(
+                gaugeSchema,
+                data,
+                store,
+                chartPanelRef,
+                hoveredSeriesState,
+                annotations,
+                metadata,
+                resultMetaData?.value,
+                loading,
+              )
+            : await convertMultiSQLData(
+                gaugeSchema,
+                data,
+                store,
+                chartPanelRef,
+                hoveredSeriesState,
+                resultMetaData,
+                metadata,
+                chartPanelStyle,
+                annotations,
+                loading,
+              );
+        return {
+          chartType: panelSchema.type,
+          ...gauges,
+          options: convertBarGaugeData(gauges?.options, panelSchema),
+        };
       } catch (error) {
         if (panelSchema?.queryType == "promql") throw error;
         console.error(error);

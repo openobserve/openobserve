@@ -177,6 +177,8 @@ export const buildDefaultBuilderFields = (
   if (chartType === "metric") return { x: [], y };
   // A count is not a state; the user picks the state column.
   if (chartType === "state-timeline") return { x, y: [] };
+  // One bar per label, so a time bucket is not a useful default label.
+  if (chartType === "bar-gauge") return { x: [], y };
   // A time bucket is not an entity; the user picks the entity field.
   if (chartType === "hostmap") return { x: [], y };
   return { x, y };

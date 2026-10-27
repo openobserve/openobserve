@@ -538,7 +538,10 @@ mod tests {
             "heatmap_hide_below": 1.0,
             "state_value_align": "right",
             "map_cluster": true,
-            "map_cluster_radius": 60.0
+            "map_cluster_radius": 60.0,
+            "bar_gauge_mode": "gradient",
+            "bar_gauge_orientation": "horizontal",
+            "bar_gauge_show_unfilled": true
         });
         let rest3 = serde_json::json!({
             "override_config": [{

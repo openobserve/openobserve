@@ -323,6 +323,11 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("hostmap");
       });
 
+      it("includes the bar gauge, which needs aggregation", () => {
+        expect(ALL_CHART_TYPES).toContain("bar-gauge");
+        expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("bar-gauge");
+      });
+
       it("lists each chart type once", () => {
         expect(new Set(ALL_CHART_TYPES).size).toBe(ALL_CHART_TYPES.length);
       });

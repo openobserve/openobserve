@@ -19,6 +19,7 @@ import {
   filterOption,
   filterSection,
   shouldShowThresholds,
+  shouldShowSeriesOverrides,
 } from "./useConfigPanel";
 import type { ConfigOption } from "./useConfigPanel";
 import {
@@ -1546,6 +1547,29 @@ describe("useConfigPanel – metric, gauge, pie, table, heatmap, state timeline 
     expect(shouldShowThresholds(table([]))).toBe(false);
     expect(shouldShowThresholds(table([barGauge]))).toBe(true);
     expect(shouldShowThresholds(table([barGauge], "promql"))).toBe(false);
+  });
+});
+
+describe("useConfigPanel – bar gauge options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the bar gauge options on the bar gauge only", () => {
+    expect(visible("bar-gauge", "gauge", "bar-gauge-range-mode")).toBe(true);
+    expect(visible("gauge", "gauge", "bar-gauge-range-mode")).toBe(false);
+    expect(visible("bar-gauge", "gauge", "gauge-min")).toBe(false);
+    const fixed = makePanelData("bar-gauge", {}, { config: { range_mode: "fixed" } });
+    expect(makeComposable(fixed, ref(false)).isConfigOptionVisible("gauge", "gauge-min")).toBe(
+      true,
+    );
+    expect(visible("bar-gauge", "gauge", "bar-gauge-mode")).toBe(true);
+    expect(visible("bar-gauge", "gauge", "gauge-style")).toBe(false);
+    expect(visible("gauge", "gauge", "bar-gauge-orientation")).toBe(false);
+  });
+
+  it("shows thresholds and series overrides on the bar gauge", () => {
+    expect(shouldShowThresholds({ data: { type: "bar-gauge", config: {} } })).toBe(true);
+    expect(shouldShowSeriesOverrides({ data: { type: "bar-gauge" } })).toBe(true);
   });
 });
 

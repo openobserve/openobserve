@@ -1559,6 +1559,32 @@ describe("configUtils", () => {
       expect(shouldShowCartesianAxisConfig(panel)).toBe(false);
     });
   });
+
+  describe("bar gauge", () => {
+    const panel = {
+      data: {
+        type: "bar-gauge",
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("has no axes, gridlines or legend", () => {
+      expect(shouldShowGridlines(panel)).toBe(false);
+      expect(shouldShowLegendsToggle(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+    });
+
+    it("keeps the PromQL query type and shows the no-value text", () => {
+      expect(shouldShowPromQLQueryType(panel)).toBe(true);
+      expect(shouldShowNoValueReplacement(panel, true)).toBe(true);
+    });
+  });
 });
 
 describe("pruneDependentOptions", () => {
