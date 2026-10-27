@@ -105,6 +105,7 @@ export const usePanelFields = ({
       case "node-graph":
       case "alert-list":
       case "flame-graph":
+      case "logs":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -152,6 +153,7 @@ export const usePanelFields = ({
       case "alert-list":
       case "flame-graph":
       case "boxplot":
+      case "logs":
         return true;
       case "hostmap":
         return (
@@ -186,6 +188,7 @@ export const usePanelFields = ({
       case "node-graph":
       case "alert-list":
       case "flame-graph":
+      case "logs":
         return true;
       case "metric":
         return (

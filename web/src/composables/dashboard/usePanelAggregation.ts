@@ -20,6 +20,7 @@ import {
   keepRawValueFields,
 } from "@/utils/dashboard/defaultFields";
 import { isCustomSqlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import type { LogsOrder } from "@/utils/dashboard/convertLogsPanelData";
 import {
   HOSTMAP_DEFAULT_COLOR,
   HOSTMAP_MAX_GROUP_LEVELS,
@@ -37,9 +38,20 @@ const seededStarters = new WeakMap<object, string>();
 export const defaultFlameGraphPanelQuery = (stream: string): string =>
   stream ? `SELECT stack, sum(samples) AS value FROM "${stream}" GROUP BY stack` : "";
 
+/** The SQL a new logs panel starts from: the stream's latest rows, or its earliest when ordered oldest first. */
+export const defaultLogsPanelQuery = (
+  stream: string,
+  timestampColumn: string,
+  order: LogsOrder = "newest",
+): string =>
+  stream
+    ? `SELECT * FROM "${stream}" ORDER BY ${timestampColumn} ${order === "oldest" ? "ASC" : "DESC"} LIMIT 100`
+    : "";
+
 // The SQL each custom-SQL panel type starts from, keyed by panel type.
 const STARTER_QUERIES: Record<string, (stream: string, timestampColumn: string) => string> = {
   "flame-graph": (stream) => defaultFlameGraphPanelQuery(stream),
+  logs: defaultLogsPanelQuery,
 };
 
 /** Records the query's current SQL as the starter it was just seeded with. */
@@ -50,6 +62,15 @@ export const markPanelStarterQuery = (query: any) => {
 /** Whether the query still holds exactly the starter SQL it was seeded with. */
 export const isPanelStarterQuery = (query: any): boolean =>
   !!query && typeof query.query === "string" && seededStarters.get(toRaw(query)) === query.query;
+
+/** Rewrites an untouched logs starter to fetch rows in `order`; reversing the newest 100 would never show the oldest. */
+export const orderLogsStarter = (query: any, order: LogsOrder) => {
+  if (!isPanelStarterQuery(query)) return;
+  query.query = query.query
+    .trim()
+    .replace(/ (?:ASC|DESC) LIMIT 100$/, ` ${order === "oldest" ? "ASC" : "DESC"} LIMIT 100`);
+  markPanelStarterQuery(query);
+};
 
 const BY_SERIES_COLOR_MODES = ["palette-classic-by-series", "palette-classic"];
 
