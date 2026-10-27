@@ -1325,7 +1325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
-                  mode-storage-key="o2.logs.filterBuilderMode"
                   data-test="logs-search-bar-filter-builder"
                   @update:query="onFilterBuilderQuery"
                   @submit="handleRunQueryFn()"

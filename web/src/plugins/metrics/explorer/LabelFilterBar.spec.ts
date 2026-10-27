@@ -46,20 +46,22 @@ const filter = (label: string, value: string, operator?: string): LabelFilter =>
   ...(operator ? { operator } : {}),
 });
 
-const input = () => wrapper!.find<HTMLInputElement>('[data-test="metrics-explorer-label-input"]');
+const input = () =>
+  document.body.querySelector<HTMLInputElement>('[data-test="metrics-explorer-label-input"]')!;
 
 async function focus() {
-  await input().trigger("focus");
+  await wrapper!.find('[data-test="metrics-explorer-label-add"]').trigger("click");
   await flushPromises();
 }
 
 async function type(text: string) {
-  await input().setValue(text);
+  input().value = text;
+  input().dispatchEvent(new Event("input"));
   await flushPromises();
 }
 
 async function press(key: string) {
-  await input().trigger("keydown", { key });
+  input().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
   await flushPromises();
   await nextTick();
 }
@@ -95,7 +97,7 @@ describe("LabelFilterBar", () => {
   it("emits focus-picker on every open so label names load lazily", async () => {
     createWrapper();
     await focus();
-    await input().trigger("blur");
+    await press("Escape");
     await focus();
     expect(wrapper!.emitted("focus-picker")).toHaveLength(2);
   });
@@ -171,14 +173,14 @@ describe("LabelFilterBar", () => {
     const target = filter("job", "web", "!=");
     createWrapper({ filters: [filter("job", "api"), target] });
     const chips = wrapper!.findAll('[data-test="metrics-explorer-label-chip-job"]');
-    await chips[1].find('[data-test="o2-badge-remove"]').trigger("click");
+    await chips[1].find('[data-test="metrics-explorer-label-chip-job-remove"]').trigger("click");
     expect(wrapper!.emitted("remove")).toEqual([[target]]);
   });
 
   it("emits replace when a chip is edited, so it keeps its place", async () => {
     const original = filter("job", "api");
     createWrapper({ filters: [original, filter("code", "200")] });
-    await wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').trigger("click");
+    await wrapper!.find('[data-test="metrics-explorer-label-chip-job-value"]').trigger("click");
     await flushPromises();
     await type("web");
     await press("Enter");

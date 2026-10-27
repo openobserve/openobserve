@@ -146,7 +146,6 @@ function onFocus() {
       :model-value="tree"
       :fields="fields"
       dialect="promql"
-      :show-mode-toggle="false"
       allow-custom-fields
       :load-values="loadValues"
       :fields-loading="labelNamesLoading || schemaLoading"

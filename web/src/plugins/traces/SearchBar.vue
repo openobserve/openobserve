@@ -527,7 +527,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
             :fields-loading="searchObj.loading"
-            mode-storage-key="o2.traces.filterBuilderMode"
             data-test="traces-search-bar-filter-builder"
             @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
             @submit="searchData"
