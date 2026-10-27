@@ -36,8 +36,17 @@
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
-      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
+      <OButton
+        variant="primary"
+        size="sm-action"
+        data-test="slos-slolist-new"
+        :aria-label="
+          sloDrafts.hasNew ? t('common.editorDraft.newDot', { label: t('slos.new') }) : undefined
+        "
+        @click="goToNew"
+      >
         {{ t("slos.new") }}
+        <EditorDraftDot v-if="sloDrafts.hasNew" corner data-test="slos-slolist-new-draft-dot" />
       </OButton>
     </template>
 
@@ -144,6 +153,12 @@
       <template #cell-name="{ row }">
         <div class="flex min-w-0 items-center gap-2">
           <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="sloDrafts.ids.has(row.id)"
+            :saved-at="sloDrafts.savedAt(row.id)"
+            class="shrink-0"
+            :data-test="`slos-slolist-draft-dot-${row.name}`"
+          />
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
@@ -552,6 +567,9 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -669,6 +687,7 @@ const org = computed(() => store.state.selectedOrganization?.identifier);
 const moveSlos = useMutation(() => moveSlosMutation(org.value));
 const setSloEnabled = useMutation(() => setSloEnabledMutation(org.value));
 const deleteSlo = useMutation(() => deleteSloMutation(org.value));
+const sloDrafts = useEditorDraftIds("slo");
 
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
 
@@ -1124,6 +1143,7 @@ async function doDelete() {
   if (!row) return;
   try {
     await deleteSlo.mutateAsync(row.id);
+    deleteEditorDraftsFor({ kind: "slo", org: String(org.value ?? ""), entityId: row.id });
     queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
       (old ?? []).filter((r) => r.id !== row.id),
     );
