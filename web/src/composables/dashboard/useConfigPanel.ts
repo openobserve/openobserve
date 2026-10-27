@@ -7,16 +7,22 @@ import {
   shouldShowLegendWidth,
   shouldShowLegendHeight,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
+  shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
+  shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import {
   SectionId,
@@ -24,6 +30,10 @@ import {
   DEFAULT_EXPANDED_SECTIONS,
 } from "@/utils/dashboard/searchLabelsConfig";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
+import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
+import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
+import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +56,8 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "area-stacked",
   "bar",
   "h-bar",
+  "stacked",
+  "h-stacked",
   "scatter",
   "gauge",
   "metric",
@@ -74,6 +86,22 @@ export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
 
 export const shouldShowSeriesOverrides = (dashboardPanelData: any): boolean =>
   SERIES_OVERRIDE_CHART_TYPES.includes(dashboardPanelData?.data?.type);
+
+// Histogram mode always orders rows by le, so the sort control would do nothing there.
+export const shouldShowHeatmapYSort = (dashboardPanelData: any, promqlMode: boolean): boolean =>
+  dashboardPanelData?.data?.type === "heatmap" &&
+  !(promqlMode && dashboardPanelData?.data?.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE);
+
+// Bucketing is generated in the builder's SQL, so custom SQL and PromQL keep the y values they return.
+export const shouldShowHeatmapYBucket = (dashboardPanelData: any, promqlMode: boolean): boolean => {
+  const query = dashboardPanelData?.data?.queries?.[dashboardPanelData?.layout?.currentQueryIndex];
+  return (
+    !promqlMode &&
+    dashboardPanelData?.data?.type === "heatmap" &&
+    !query?.customQuery &&
+    isNumericYField(query?.fields?.y?.[0], dashboardPanelData)
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Pure filter helpers (exported so they can be unit-tested independently)
@@ -139,6 +167,11 @@ export function useConfigPanel(
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
+      },
+      "promql-series-limit": {
+        label: t("dashboard.promqlSeriesLimit"),
+        visible:
+          !!promqlMode.value && PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
       },
       "show-exemplars": {
         label: t("dashboard.showExemplarsLabel"),
@@ -237,6 +270,10 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
+      "legend-values": {
+        label: t("dashboard.legendValues"),
+        visible: shouldShowLegendValues(dashboardPanelData),
+      },
       "promql-legend": {
         label: t("dashboard.query"),
         visible:
@@ -259,6 +296,41 @@ export function useConfigPanel(
         visible: !isStateTimeline.value && dashboardPanelData.data.config.unit === "custom",
       },
       decimals: { label: t("dashboard.decimals"), visible: !isStateTimeline.value },
+      "heatmap-color-range": {
+        label: [t("dashboard.heatmapColorMin"), t("dashboard.heatmapColorMax")],
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-palette": {
+        label: t("dashboard.heatmapPalette"),
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-palette-reverse": {
+        label: t("dashboard.heatmapPaletteReverse"),
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-color-scale": {
+        label: t("dashboard.heatmapColorScale"),
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-histogram-mode": {
+        label: t("dashboard.heatmapHistogramMode"),
+        visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",
+      },
+      "bucket-unit": {
+        label: t("dashboard.bucketUnit"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "heatmap" &&
+          dashboardPanelData.data.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE,
+      },
+      "bucket-unit-custom": {
+        label: t("dashboard.bucketUnitCustom"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "heatmap" &&
+          dashboardPanelData.data.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE &&
+          dashboardPanelData.data.config?.bucket_unit === "custom",
+      },
       limit: {
         label: t("dashboard.queryLimit"),
         visible:
@@ -318,9 +390,27 @@ export function useConfigPanel(
         label: t("common.axisWidth"),
         visible: shouldShowAxisConfig(dashboardPanelData),
       },
+      "heatmap-y-sort": {
+        label: t("dashboard.heatmapYSort"),
+        visible: shouldShowHeatmapYSort(dashboardPanelData, !!promqlMode.value),
+      },
+      "heatmap-y-bucket": {
+        label: [
+          t("dashboard.heatmapYBucket"),
+          t("dashboard.heatmapYBucketSize"),
+          t("dashboard.heatmapYBucketBase"),
+        ],
+        visible: shouldShowHeatmapYBucket(dashboardPanelData, !!promqlMode.value),
+      },
+      "heatmap-y-range": {
+        label: [t("dashboard.heatmapYMin"), t("dashboard.heatmapYMax")],
+        visible:
+          shouldShowHeatmapYBucket(dashboardPanelData, !!promqlMode.value) &&
+          !!dashboardPanelData.data.config?.heatmap_y_bucket?.mode,
+      },
       "axis-border": {
         label: t("dashboard.showBorder"),
-        visible: shouldShowAxisConfig(dashboardPanelData),
+        visible: shouldShowAxisBorderConfig(dashboardPanelData),
       },
       "y-axis": {
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
@@ -333,6 +423,14 @@ export function useConfigPanel(
       gridlines: {
         label: t("dashboard.showGridlines"),
         visible: shouldShowGridlines(dashboardPanelData),
+      },
+      "bar-width": {
+        label: t("dashboard.barWidth"),
+        visible: shouldShowBarWidthConfig(dashboardPanelData, promqlMode.value),
+      },
+      "bar-track": {
+        label: t("dashboard.showBarTrack"),
+        visible: shouldShowBarStyleConfig(dashboardPanelData),
       },
     },
     labels: {
@@ -360,7 +458,23 @@ export function useConfigPanel(
       },
       "line-thickness": {
         label: t("dashboard.lineThickness"),
-        visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
+        visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+      },
+      "fill-opacity": {
+        label: t("dashboard.fillOpacity"),
+        visible: shouldShowAreaFillConfig(dashboardPanelData),
+      },
+      "fill-gradient": {
+        label: t("dashboard.fillGradient"),
+        visible: shouldShowAreaFillConfig(dashboardPanelData),
+      },
+      "point-size": {
+        label: t("dashboard.pointSize"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
+      },
+      "point-opacity": {
+        label: t("dashboard.pointOpacity"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
       },
     },
     table: {
@@ -379,6 +493,10 @@ export function useConfigPanel(
       filtering: {
         label: t("dashboard.tableFiltering"),
         visible: dashboardPanelData.data.type === "table",
+      },
+      "expandable-rows": {
+        label: t("dashboard.tableExpandableRows"),
+        visible: dashboardPanelData.data.type === "table" && !isPivotMode.value,
       },
       pagination: {
         label: t("dashboard.pagination"),
@@ -451,14 +569,34 @@ export function useConfigPanel(
         visible:
           dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps",
       },
+      "map-roam": {
+        label: t("dashboard.mapsEnableRoam"),
+        visible: dashboardPanelData.data.type === "maps",
+      },
     },
     gauge: {
+      "gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible: dashboardPanelData.data.type === "gauge",
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
+      },
+      "gauge-end-labels": {
+        label: t("dashboard.showGaugeEndLabels"),
         visible: dashboardPanelData.data.type === "gauge",
       },
     },
@@ -524,7 +662,13 @@ export function useConfigPanel(
     sparkline: {
       sparkline: {
         label: t("dashboard.configSectionSparkline"),
-        visible: dashboardPanelData.data.type === "metric",
+        // Matches ConfigPanel, which drops the section for an all-instant PromQL metric.
+        visible:
+          dashboardPanelData.data.type === "metric" &&
+          !(
+            dashboardPanelData.data.queryType === "promql" &&
+            allVisibleQueriesInstant(dashboardPanelData)
+          ),
       },
     },
   }));

@@ -426,6 +426,81 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
+    it("lists map names that joined no region, with the overflow count and missing labels", async () => {
+      const wrapper = mountAttached({
+        regionJoin: {
+          unmatched: ["us-east-1", "eu-west-1"],
+          unmatchedTotal: 25,
+          missingLabel: { label: "country", count: 2 },
+        },
+      });
+      const chip = wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]');
+      expect(chip.text()).toBe("25 not on the map");
+      await openTooltip(chip.element);
+      const details = [
+        ...(bubble()?.querySelectorAll('[data-test="panel-notice-detail-unmatched-regions"]') ??
+          []),
+      ].map((el) => el.textContent?.trim());
+      expect(details).toEqual([
+        "us-east-1, eu-west-1 and 23 more",
+        "2 series have no country label",
+      ]);
+      wrapper.unmount();
+    });
+
+    it("names unlabeled series in the chip when every name joined", () => {
+      const wrapper = mountAttached({
+        regionJoin: { unmatched: [], unmatchedTotal: 0, missingLabel: { label: "name", count: 3 } },
+      });
+      expect(wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]').text()).toBe(
+        "3 unlabeled series",
+      );
+      wrapper.unmount();
+    });
+
+    it("counts a single unmatched value", () => {
+      const wrapper = mountAttached({ regionJoin: { unmatched: ["Atlantis"], unmatchedTotal: 1 } });
+      expect(wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]').text()).toBe(
+        "1 not on the map",
+      );
+      wrapper.unmount();
+    });
+
+    it("counts sankey return links in a chip whose tooltip explains them without an action", async () => {
+      const wrapper = mountAttached({
+        sankeyNotice: { returnLinks: 3, skippedRows: 0 },
+        canEdit: true,
+        canRefresh: true,
+      });
+      const chip = wrapper.find('[data-test="panel-notice-chip-return-links"]');
+      expect(chip.text()).toBe("3 return links");
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain("Loops shown as return nodes");
+      expect(bubble()?.textContent).toContain("3 links loop back to earlier nodes");
+      expect(bubble()?.querySelector('[data-test^="panel-notice-action-"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("uses the singular for one return link and no chip for none", async () => {
+      const wrapper = mountAttached({ sankeyNotice: { returnLinks: 1, skippedRows: 0 } });
+      expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').text()).toBe(
+        "1 return link",
+      );
+      await wrapper.setProps({ sankeyNotice: { returnLinks: 0, skippedRows: 0 } });
+      expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("counts sankey rows skipped for a missing endpoint or a non-positive value", async () => {
+      const wrapper = mountAttached({ sankeyNotice: { returnLinks: 0, skippedRows: 1200 } });
+      const chip = wrapper.find('[data-test="panel-notice-chip-skipped-rows"]');
+      expect(chip.text()).toBe("1,200 rows skipped");
+      expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').exists()).toBe(false);
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain("1,200 rows have no source or target");
+      wrapper.unmount();
+    });
+
     it("shows server partial and client interruption as separate chips", () => {
       const wrapper = mountAttached({
         serverPartial: true,

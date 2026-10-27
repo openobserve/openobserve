@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
+import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { inject, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
@@ -120,6 +121,8 @@ const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = []
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Mutable so a test can open the dashboard from a folder other than the default.
+const mockRouteFolder = { value: "default" };
 // Extra query params a test wants on the route it mounts with (cleared before every test).
 const mockExtraRouteQuery: Record<string, string> = {};
 
@@ -154,7 +157,7 @@ vi.mock("vue-router", () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
     query: {
       dashboard: "test-dashboard-1",
-      folder: "default",
+      folder: mockRouteFolder.value,
       tab: "tab-1",
       ...mockExtraRouteQuery,
     },
@@ -1856,6 +1859,58 @@ describe("ViewDashboard", () => {
     });
   });
 
+  it("names beta in the publish button's label instead of a chip while public links are on", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    const publish = wrapper.find('[data-test="dashboard-publish-public"]');
+    const button = publish.find('[data-test="dashboard-publish-public-btn"]');
+    expect(button.exists()).toBe(true);
+    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    // This spec's t() returns the key, so the rendered label is checked against the real message.
+    expect(button.attributes("aria-label")).toBe("dashboard.publicDashboard.shareTooltip");
+    expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");
+  });
+
+  it("tells the public links drawer the dashboard's folder, so publishing can save it there", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    mockRouteFolder.value = "f9";
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+      mockRouteFolder.value = "default";
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "PublicLinksPanel" }).props("folderId")).toBe("f9");
+  });
+
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
+  });
+
   describe("layout edit mode", () => {
     const mockSaveExecute = vi.fn();
     const mockSyncGrid = vi.fn();
@@ -1932,6 +1987,38 @@ describe("ViewDashboard", () => {
       expect(has("dashboard-panel-add")).toBe(true);
       expect(has("dashboard-edit-save-btn")).toBe(false);
       expect(has("dashboard-edit-badge")).toBe(false);
+    });
+
+    it("marks Add panel with a dot while this dashboard has a new-panel draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "panel.add",
+      );
+
+      writePanelDraft(
+        { userEmail: "", org: "test-org", dashboardId: "test-dashboard-1" },
+        {
+          tabId: "tab-1",
+          data: {},
+          layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+          sessionVariables: [],
+          variablesWithCurrentPanel: [],
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "dashboard.panelDraft.addPanelDot",
+      );
+
+      // The dot lives inside the Add panel button, which layout editing removes.
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+      expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
     });
 
     it("swaps the header actions when entering edit mode", async () => {

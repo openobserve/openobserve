@@ -12,11 +12,27 @@ const HTML_ENTITIES: Record<string, string> = {
 
 export type VariableFormat = (typeof VARIABLE_FORMATS)[number];
 
-export interface VariablePlaceholder {
+// Text panels only: queries and drilldown would parse these and fall back to SQL quoting.
+const CONTENT_VARIABLE_FORMATS = [...VARIABLE_FORMATS, "percentencode", "queryparam"] as const;
+
+type ContentVariableFormat = (typeof CONTENT_VARIABLE_FORMATS)[number];
+
+const QUERY_VALUE_PREFIX = /(?:[?&]|&amp;)[\w.-]+=$/;
+
+type TimeBound = Date | number | string | null;
+
+interface ContentVariable {
+  name?: string;
+  [key: string]: unknown;
+}
+
+export interface VariablePlaceholder<F extends string = VariableFormat> {
   name: string;
-  format?: VariableFormat;
+  format?: F;
   /** True when the placeholder sits directly inside single quotes, e.g. `'$name'`. */
   quoted: boolean;
+  /** Index of the placeholder in the text. */
+  offset: number;
 }
 
 export const formatInterval = (interval: any) => {
@@ -244,25 +260,10 @@ const resolveVariablesWithPrecedence = (
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const formatVariableValue = (value: any, format?: VariableFormat): string => {
-  if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
-    return SELECT_ALL_VALUE;
-  }
-  if (!Array.isArray(value)) return String(value);
-
-  switch (format) {
-    case "pipe":
-      return value.join("|");
-    case "doublequote":
-      return value.map((v) => `"${v}"`).join(",");
-    case "singlequote":
-      return value.map((v) => `'${v}'`).join(",");
-    default:
-      return value.join(",");
-  }
-};
-
-const buildPlaceholderRegex = (names: Iterable<string>): RegExp | null => {
+const buildPlaceholderRegex = (
+  names: Iterable<string>,
+  formats: readonly string[] = VARIABLE_FORMATS,
+): RegExp | null => {
   const unique = [...new Set(names)].filter((name) => typeof name === "string" && name !== "");
   if (!unique.length) return null;
   // Longest first: alternation takes the first branch that matches, so $traceid_sql never resolves as $traceid + "_sql".
@@ -270,7 +271,7 @@ const buildPlaceholderRegex = (names: Iterable<string>): RegExp | null => {
     .sort((a, b) => b.length - a.length)
     .map(escapeRegExp)
     .join("|");
-  const format = `(?::\\s*(${VARIABLE_FORMATS.join("|")})\\s*)?`;
+  const format = `(?::\\s*(${formats.join("|")})\\s*)?`;
   return new RegExp(
     `\\{\\{\\s*(${alternation})\\s*${format}\\}\\}` +
       `|\\$\\{\\s*(${alternation})\\s*${format}\\}` +
@@ -298,12 +299,13 @@ export const normalizeVariableSyntax = (str: string): string => {
 /**
  * Replaces `{{name}}`, `${name}` and `$name` placeholders of the given variable names in one pass; a `resolve` result of undefined leaves the placeholder untouched.
  */
-export const replaceVariablePlaceholders = (
+export const replaceVariablePlaceholders = <F extends string = VariableFormat>(
   text: string,
   names: Iterable<string>,
-  resolve: (placeholder: VariablePlaceholder) => string | undefined,
+  resolve: (placeholder: VariablePlaceholder<F>) => string | undefined,
+  formats: readonly F[] = VARIABLE_FORMATS as readonly string[] as readonly F[],
 ): string => {
-  const regex = typeof text === "string" ? buildPlaceholderRegex(names) : null;
+  const regex = typeof text === "string" ? buildPlaceholderRegex(names, formats) : null;
   if (!regex) return text;
 
   return text.replace(
@@ -313,6 +315,7 @@ export const replaceVariablePlaceholders = (
         name: mustacheName ?? bracedName ?? bareName,
         format: mustacheFormat ?? bracedFormat,
         quoted: text[offset - 1] === "'" && text[offset + match.length] === "'",
+        offset,
       });
       return replacement ?? match;
     },
@@ -357,11 +360,53 @@ export const getVariablesReferencedInQueries = (
 export const escapeHtmlValue = (value: string): string =>
   value.replace(/[&<>"'`=\s]/g, (ch) => HTML_ENTITIES[ch] ?? `&#${ch.charCodeAt(0)};`);
 
+/** Appends `start_time` / `end_time` (the drilldown names and unit) for text panels, unless a dashboard variable already uses the name. */
+export const withTimeRangeVariables = <T extends { values?: ContentVariable[] }>(
+  variablesData: T,
+  timeObj: { start_time?: TimeBound; end_time?: TimeBound } | null | undefined,
+): T => {
+  const start = timeObj?.start_time ? new Date(timeObj.start_time).getTime() : NaN;
+  const end = timeObj?.end_time ? new Date(timeObj.end_time).getTime() : NaN;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return variablesData;
+  const values = variablesData?.values ?? [];
+  const taken = new Set(values.map((v) => v?.name));
+  const builtins = [
+    { name: "start_time", value: start },
+    { name: "end_time", value: end },
+  ].filter((v) => !taken.has(v.name));
+  return { ...variablesData, values: [...values, ...builtins] };
+};
+
+const formatContentValue = (name: string, value: any, format?: ContentVariableFormat): string => {
+  if (format === "percentencode") {
+    return encodeURIComponent(Array.isArray(value) ? value.join(",") : String(value));
+  }
+  if (format === "queryparam") {
+    const key = `var-${encodeURIComponent(name)}`;
+    return (Array.isArray(value) ? value : [value])
+      .map((v) => `${key}=${encodeURIComponent(String(v))}`)
+      .join("&");
+  }
+  if (!Array.isArray(value)) return String(value);
+
+  switch (format) {
+    case "pipe":
+      return value.join("|");
+    case "doublequote":
+      return value.map((v) => `"${v}"`).join(",");
+    case "singlequote":
+      return value.map((v) => `'${v}'`).join(",");
+    default:
+      return value.join(",");
+  }
+};
+
+/** Substitutes variables into html/markdown panel content; with `allLabel`, the All sentinel prints that label and a cleared value prints "", except in URL formats and URL query values, which keep the sentinel so links round-trip; `escapeValue` applies to every substituted string. */
 export const processVariableContent = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
-  escapeValue: (value: string) => string = (value) => value,
+  options?: { allLabel?: string; escapeValue?: (value: string) => string },
 ) => {
   const processedContent: string = normalizeVariableSyntax(content);
 
@@ -383,7 +428,30 @@ export const processVariableContent = (
     );
   });
 
-  return replaceVariablePlaceholders(processedContent, valuesByName.keys(), (placeholder) =>
-    escapeValue(formatVariableValue(valuesByName.get(placeholder.name), placeholder.format)),
+  const escapeValue = options?.escapeValue ?? ((value: string) => value);
+  return replaceVariablePlaceholders<ContentVariableFormat>(
+    processedContent,
+    valuesByName.keys(),
+    ({ name, format, offset }) => {
+      let value = valuesByName.get(name);
+      const isUrlFormat = format === "percentencode" || format === "queryparam";
+      const inQueryValue = QUERY_VALUE_PREFIX.test(
+        processedContent.slice(Math.max(0, offset - 256), offset),
+      );
+      const allLabel = isUrlFormat || inQueryValue ? undefined : options?.allLabel;
+      const isEmpty =
+        value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+      if (allLabel !== undefined && isEmpty) return escapeValue("");
+      if (isEmpty) value = SELECT_ALL_VALUE;
+      // Legacy formats never applied to the sentinel, so saved panels keep rendering it unformatted.
+      if (value === SELECT_ALL_VALUE && !isUrlFormat) {
+        return escapeValue(allLabel ?? SELECT_ALL_VALUE);
+      }
+      if (allLabel !== undefined && Array.isArray(value)) {
+        value = value.map((v) => (v === SELECT_ALL_VALUE ? allLabel : v));
+      }
+      return escapeValue(formatContentValue(name, value, format));
+    },
+    CONTENT_VARIABLE_FORMATS,
   );
 };

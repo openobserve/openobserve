@@ -84,6 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
+        <!-- A note the injected result carries about itself, such as the public view's retained or truncated data. -->
+        <OTag
+          v-if="injectedNotice"
+          variant="default-soft"
+          size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
+          data-test="dashboard-panel-injected-notice"
+        >
+          {{ injectedNotice }}
+        </OTag>
         <OTag
           v-if="
             !kiosk &&
@@ -155,11 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
@@ -242,6 +250,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
+          name="error-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-error"
+          :label="failedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="failedAnnotationSourcesLabel"
+          />
+        </OIcon>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-truncated"
+          :label="truncatedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="truncatedAnnotationSourcesLabel"
+          />
+        </OIcon>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
         <!-- On a wall screen only a failure may draw the eye; the failed panel says so in its body. -->
@@ -251,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          v-bind="noticeProps"
+          v-bind="panelNoticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -295,12 +333,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
             <OButton
-              :aria-label="t('dashboard.moreActions')"
+              :aria-label="
+                showDraftDot
+                  ? t('dashboard.panelDraft.panelActionsDot')
+                  : t('dashboard.moreActions')
+              "
               variant="ghost"
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
               <OIcon name="more-vert" size="sm" />
+              <span
+                v-if="showDraftDot"
+                class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-0.5 top-0 size-2.5 rounded-full ring-3 in-[.fullscreen]:hidden"
+                aria-hidden="true"
+                data-test="dashboard-panel-draft-dot"
+              />
             </OButton>
           </template>
           <ODropdownItem
@@ -311,6 +359,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon-left><OIcon name="edit" size="sm" /></template>
             {{ t("panel.editPanel") }}
+            <template v-if="showDraftDot" #icon-right>
+              <OTooltip :content="t('dashboard.panelDraft.panelDot')" side="right">
+                <span
+                  role="img"
+                  :aria-label="t('dashboard.panelDraft.panelDot')"
+                  class="bg-button-pending-bg ring-button-pending-bg/30 size-2 shrink-0 rounded-full ring-2"
+                  data-test="dashboard-panel-edit-draft-dot"
+                />
+              </OTooltip>
+            </template>
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
@@ -414,7 +472,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="drag-cancel relative min-h-0 flex-1"
-      :class="curatedBadge || kioskStale ? 'opacity-60' : undefined"
+      :class="
+        curatedBadge || kioskStale || props.injectedPanelData?.dimmed ? 'opacity-60' : undefined
+      "
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
     >
@@ -438,6 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="viewOnly"
         :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
         :exemplars-override="exemplarOverride"
+        :injectedPromqlData="props.injectedPanelData"
         @loading-state-change="handleLoadingStateChange"
         @metadata-update="metaDataValue"
         @limit-number-of-series-warning-message-update="
@@ -445,6 +506,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
+        @sankey-notice-update="handleSankeyNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -459,7 +522,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @is-partial-data-update="handleIsPartialDataUpdate"
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
-        :allowAnnotationsAdd="true"
+        :allowAnnotationsAdd="!props.injectedPanelData"
+        :allowDrilldown="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
@@ -617,6 +681,8 @@ import {
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
+import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -664,6 +730,7 @@ export default defineComponent({
     "shouldRefreshWithoutCache",
     "showLegendsButton",
     "isTimeRangeWaiting",
+    "injectedPanelData",
     "layoutMode",
     "kiosk",
   ],
@@ -726,6 +793,7 @@ export default defineComponent({
       curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
     );
     // Both halves are already translated; joining them widens to string without untranslating either.
+    const injectedNotice = computed(() => props.injectedPanelData?.notice);
     const curatedBadgeTooltip = computed(() =>
       raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
     );
@@ -759,6 +827,22 @@ export default defineComponent({
         ? PanleSchemaRendererRef.value?.exemplarsError || ""
         : "",
     );
+    const failedAnnotationSourcesLabel = computed(() => {
+      const failed = PanleSchemaRendererRef.value?.failedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.failedOnPanel",
+        { names: failed.join(", ") },
+        failed.length,
+      );
+    });
+    const truncatedAnnotationSourcesLabel = computed(() => {
+      const truncated = PanleSchemaRendererRef.value?.truncatedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.truncatedOnPanel",
+        { names: truncated.join(", "), limit: ANNOTATION_SOURCE_ROW_LIMIT },
+        truncated.length,
+      );
+    });
 
     // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
     // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
@@ -814,11 +898,14 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      sankeyNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -876,7 +963,16 @@ export default defineComponent({
     const canEditFromNotice = computed(
       () => !props.viewOnly && !props.simplifiedPanelView && !isLayoutEditing.value,
     );
-    const canRefreshFromNotice = computed(() => !props.simplifiedPanelView);
+    // An injected result (the public viewer) has no query to re-run, so its notices offer no Refresh.
+    const canRefreshFromNotice = computed(
+      () => !props.simplifiedPanelView && !props.injectedPanelData,
+    );
+    // The public viewer's server marks a panel partial itself; it reads as the server's Partial notice.
+    const injectedPartial = computed(() => !!props.injectedPanelData?.serverPartial);
+    const panelNoticeProps = computed(() => ({
+      ...noticeProps.value,
+      serverPartial: noticeProps.value.serverPartial || injectedPartial.value,
+    }));
     const canInspectFromNotice = computed(
       () => !props.simplifiedPanelView && (metaData.value?.queries?.length ?? 0) > 0,
     );
@@ -893,7 +989,11 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
+        !!sankeyNotice.value?.returnLinks ||
+        !!sankeyNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
+        injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
     );
@@ -919,6 +1019,22 @@ export default defineComponent({
         },
       });
     };
+
+    // Only where the panel can be edited; print mode, layout editing and full screen are for viewing.
+    const showDraftDot = computed(
+      () =>
+        !props.viewOnly &&
+        !props.simplifiedPanelView &&
+        !isLayoutEditing.value &&
+        store.state.printMode !== true &&
+        !!props.data?.id &&
+        hasPanelDraft({
+          userEmail: String(store.state.userInfo?.email ?? ""),
+          org: String(store.state.selectedOrganization?.identifier ?? ""),
+          dashboardId: String(route.query.dashboard ?? props.dashboardId ?? ""),
+          panelId: String(props.data.id),
+        }),
+    );
 
     // A notice's fix action deep-links into the editor on the setting that resolves it.
     const NOTICE_EDITOR_FOCUS: Partial<Record<PanelNoticeActionId, PanelEditorFocusTarget>> = {
@@ -1335,10 +1451,13 @@ export default defineComponent({
       setExemplarOverride,
       exemplarToggleAtRest,
       exemplarErrorMessage,
+      failedAnnotationSourcesLabel,
+      truncatedAnnotationSourcesLabel,
       curatedBadge,
       curatedBadgeParams,
       curatedBadgeText,
       curatedBadgeTooltip,
+      injectedNotice,
       curatedNoData,
       curatedAllClear,
       curatedTile,
@@ -1347,6 +1466,7 @@ export default defineComponent({
       alertDisabledReason,
       onEditPanel,
       onNoticeEditPanel,
+      showDraftDot,
       onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,
@@ -1400,8 +1520,11 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
+      panelNoticeProps,
       canInspectFromNotice,
     };
   },

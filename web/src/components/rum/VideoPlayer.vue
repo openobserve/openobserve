@@ -16,25 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="player-container flex h-full flex-col p-2">
-    <div
-      v-if="isLoading"
-      class="flex min-h-0 w-full flex-1 items-center justify-center pb-4 text-center"
-    >
-      <div>
-        <OSpinner size="md" class="mx-auto block" data-test="video-player-loading-indicator" />
-        <div class="w-full text-center">
-          {{ t("rum.loadingSessions") }}
-        </div>
-        <div
-          v-if="retryAttempt > 1"
-          class="text-text-secondary w-full text-center text-xs"
-          data-test="video-player-retrying"
-        >
-          {{ t("rum.sessionReplayRetrying", { attempt: retryAttempt, total: MAX_ATTEMPTS }) }}
+    <div ref="playerContainerRef" class="relative flex min-h-0 flex-1 items-center justify-center">
+      <div
+        v-if="showLoader"
+        class="bg-surface-base absolute inset-0 z-20 flex items-center justify-center text-center"
+      >
+        <div>
+          <OSpinner size="md" class="mx-auto block" data-test="video-player-loading-indicator" />
+          <div class="w-full text-center">
+            {{ t("rum.loadingSessions") }}
+          </div>
+          <div
+            v-if="retryAttempt > 1"
+            class="text-text-secondary w-full text-center text-xs"
+            data-test="video-player-retrying"
+          >
+            {{ t("rum.sessionReplayRetrying", { attempt: retryAttempt, total: MAX_ATTEMPTS }) }}
+          </div>
         </div>
       </div>
-    </div>
-    <div ref="playerContainerRef" class="relative flex min-h-0 flex-1 items-center justify-center">
       <div
         ref="playerRef"
         id="player"
@@ -358,6 +358,11 @@ const speedOptions = [
 
 const speedValue = computed(() => props.speed ?? localSpeed.value);
 const skipInactivityValue = computed(() => props.skipInactivity ?? localSkipInactivity.value);
+
+// Covers the replay surface until the player is built or loading settles, so its first frame never shows under the loader.
+const showLoader = computed(
+  () => !playerBuilt.value && (props.isLoading || expectsMoreData(props.loadState)),
+);
 
 const playbackState = computed<PlaybackState>(() => {
   if (props.loadState === "error") return "error";

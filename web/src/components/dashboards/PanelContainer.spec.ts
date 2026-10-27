@@ -24,6 +24,12 @@ import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import {
+  deletePanelDraft,
+  panelDraftKey,
+  panelDraftRevision,
+  writePanelDraft,
+} from "@/composables/dashboard/usePanelDraft";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
 
 // Mock shortURL service
@@ -1970,6 +1976,24 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.hoverRevealClass).toBe("");
     });
 
+    it("shows a public panel's server-side partial build as Partial, with no Refresh to offer", async () => {
+      wrapper = mountWithChips({
+        viewOnly: true,
+        injectedPanelData: { data: [], serverPartial: true },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-partial"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-notice-chip-interrupted"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(false);
+      expect(wrapper.findComponent(PanelErrorButtons).props("canRefresh")).toBe(false);
+
+      wrapper.unmount();
+      wrapper = mountWithChips({ viewOnly: true, injectedPanelData: { data: [] } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-partial"]').exists()).toBe(false);
+    });
+
     it("keeps Refresh but not editor actions while the layout is being edited", async () => {
       wrapper = mountWithChips({ layoutMode: "edit" });
       expect(wrapper.vm.canEditFromNotice).toBe(false);
@@ -2489,6 +2513,23 @@ describe("PanelContainer", () => {
       expect(body.attributes("data-curated-stale")).toBe("true");
     });
 
+    it("shows an injected result's own note and dims it only when it asks to be", () => {
+      wrapper = createWrapper({
+        viewOnly: true,
+        injectedPanelData: { data: [], dimmed: true, notice: "from 12:04" },
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').text()).toBe(
+        "from 12:04",
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).toContain("opacity-60");
+
+      wrapper = createWrapper({ viewOnly: true, injectedPanelData: { data: [] } });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).not.toContain(
+        "opacity-60",
+      );
+    });
+
     it("renders NO badge and NO dimming when config.curated_badge is absent", () => {
       // Stored dashboards never carry the key, so the change must be invisible
       // outside curated pages — asserted both ways so a blanket dim can't ship.
@@ -2644,14 +2685,8 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
-    // THE ANTI-DRIFT PIN. Everything above fires at a stub, so it is only
-    // trustworthy while the stub matches reality. This calls the REAL converter
-    // and pins the fact that made the original implementation inert: for a
-    // `metric` panel — the type the curated tiles use — an EMPTY promql result
-    // still produces exactly ONE synthetic rendering series. So counting
-    // `options.series` can never detect an empty metric tile, and any future
-    // "simplification" back to a length check fails here.
-    it("an empty metric result still emits one synthetic series — length cannot detect it", async () => {
+    // Pins the real converter the stubs above stand in for; the tile reads the renderer's noData, not series.
+    it("an empty metric result builds no cells, a populated one builds one", async () => {
       const { convertPanelData } = await import("@/utils/dashboard/convertPanelData");
       const panelSchema = {
         type: "metric",
@@ -2686,10 +2721,8 @@ describe("PanelContainer", () => {
       expect(Array.isArray(emptyResult)).toBe(false);
       expect(emptyResult).toHaveProperty("chartType");
 
-      // ...and the empty case is INDISTINGUISHABLE from the populated one by length.
-      expect(emptyResult.options.series.length).toBe(1);
+      expect(emptyResult.options.series.length).toBe(0);
       expect(populated.options.series.length).toBe(1);
-      expect(emptyResult.options.series.length).toBe(populated.options.series.length);
     });
 
     // The inline subtitle was withdrawn: sharing the one-line PanelBar with the
@@ -2838,6 +2871,266 @@ describe("PanelContainer", () => {
       );
       await flushPromises();
       expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
+    });
+  });
+
+  describe("annotation source failures", () => {
+    const rendererWithFailures = (failed: string[]) => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ noData: "", failedAnnotationSources: failed }),
+      },
+    });
+
+    it("shows a quiet indicator naming the failed source while the panel still renders", async () => {
+      wrapper = createWrapper({}, rendererWithFailures(["Incidents"]));
+      await flushPromises();
+      const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-error"]');
+      expect(indicator.exists()).toBe(true);
+      expect(indicator.attributes("aria-label")).toBe(
+        "Annotation source Incidents failed to load. Panel data is unaffected.",
+      );
+      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.attributes("aria-hidden")).toBeUndefined();
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows nothing when every source loaded", () => {
+      wrapper = createWrapper({}, rendererWithFailures([]));
+      expect(wrapper.find('[data-test="dashboard-panel-annotation-source-error"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("annotation source truncation", () => {
+    const rendererWithTruncation = (truncated: string[]) => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ noData: "", truncatedAnnotationSources: truncated }),
+      },
+    });
+
+    it("shows a quiet indicator naming a source showing only its latest 500 markers", async () => {
+      wrapper = createWrapper({}, rendererWithTruncation(["Incidents"]));
+      await flushPromises();
+      const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]');
+      expect(indicator.exists()).toBe(true);
+      expect(indicator.attributes("aria-label")).toBe(
+        "Annotation source Incidents is showing only the latest 500 markers in this range.",
+      );
+      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.attributes("aria-hidden")).toBeUndefined();
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows nothing when no source was truncated", () => {
+      wrapper = createWrapper({}, rendererWithTruncation([]));
+      expect(
+        wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  describe("Unsaved draft dot", () => {
+    const draftScope = {
+      userEmail: "me@x.io",
+      org: "test-org",
+      dashboardId: "test-dashboard-id",
+      panelId: "panel-1",
+    };
+    const seed = () =>
+      writePanelDraft(draftScope, {
+        tabId: "default-tab",
+        data: { ...mockPanelData, title: "Draft" },
+        layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+        sessionVariables: [],
+        variablesWithCurrentPanel: [],
+      });
+    // The menu renders open so the Edit Panel item and its dot are in the DOM.
+    const menuStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        template:
+          '<div role="menuitem" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+        emits: ["select"],
+      },
+      OTooltip: { template: "<slot />" },
+    };
+    const mountPanel = (props = {}) => createWrapper({ layoutMode: "view", ...props }, menuStubs);
+    const trigger = () => wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]');
+    const triggerDot = () => wrapper.find('[data-test="dashboard-panel-draft-dot"]');
+    const itemDot = () => wrapper.find('[data-test="dashboard-panel-edit-draft-dot"]');
+    const editItem = () => wrapper.find('[data-test="dashboard-edit-panel"]');
+
+    beforeEach(() => {
+      localStorage.clear();
+      (store.state as any).userInfo = { email: "me@x.io" };
+      store.state.printMode = false;
+    });
+
+    afterEach(() => {
+      store.state.printMode = false;
+    });
+
+    it("badges the panel menu trigger and names the draft in its accessible name", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(true);
+      expect(trigger().element.contains(triggerDot().element)).toBe(true);
+      expect(triggerDot().attributes("aria-hidden")).toBe("true");
+      expect(trigger().element.tagName).toBe("BUTTON");
+      expect(trigger().attributes("aria-label")).toBe("Panel actions · unsaved draft");
+    });
+
+    it("keeps the plain trigger name and no dots without a draft", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
+    });
+
+    it("marks Edit Panel with a labelled dot after its label", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(itemDot().exists()).toBe(true);
+      expect(itemDot().attributes("role")).toBe("img");
+      expect(itemDot().attributes("aria-label")).toBe("Unsaved changes in this browser");
+      const item = editItem().element;
+      expect(item.contains(itemDot().element)).toBe(true);
+      expect(item.textContent?.trim().startsWith("Edit Panel")).toBe(true);
+      expect(item.lastElementChild).toBe(itemDot().element);
+    });
+
+    it("Edit Panel keeps its normal behaviour and does not skip the restore dialog", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      await editItem().trigger("click");
+      await flushPromises();
+
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "panel-1" }),
+        }),
+      );
+      expect(routerPushSpy.mock.lastCall?.[0]).not.toHaveProperty("query.draft");
+      routerPushSpy.mockRestore();
+    });
+
+    it("follows drafts as they are written and deleted, including from another tab", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
+
+      seed();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(true);
+      expect(itemDot().exists()).toBe(true);
+
+      deletePanelDraft(draftScope);
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+
+      // Another tab writes straight to storage; only its storage event reaches this one.
+      localStorage.setItem(
+        panelDraftKey(draftScope),
+        JSON.stringify({ v: 1, savedAt: Date.now(), data: {} }),
+      );
+      const before = panelDraftRevision.value;
+      window.dispatchEvent(new StorageEvent("storage", { key: panelDraftKey(draftScope) }));
+      expect(panelDraftRevision.value).toBe(before + 1);
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(true);
+    });
+
+    it.each([
+      ["view only", { viewOnly: true }],
+      ["simplified panel view", { simplifiedPanelView: true }],
+      ["layout editing", { layoutMode: "edit" }],
+    ])("is hidden in %s", async (_label, props) => {
+      seed();
+      wrapper = mountPanel(props);
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+    });
+
+    it("is hidden in print mode", async () => {
+      seed();
+      store.state.printMode = true;
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
+    });
+
+    it("hides the trigger badge in full screen", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().classes()).toContain("in-[.fullscreen]:hidden");
+    });
+
+    it("paints both dots with the Refresh pending token and a soft halo of the same colour", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().classes()).toEqual(
+        expect.arrayContaining(["bg-button-pending-bg", "ring-3", "ring-button-pending-bg/30"]),
+      );
+      expect(itemDot().classes()).toEqual(
+        expect.arrayContaining(["bg-button-pending-bg", "ring-2", "ring-button-pending-bg/30"]),
+      );
+      for (const dot of [triggerDot(), itemDot()]) {
+        expect(dot.classes()).not.toContain("ring-badge-amber-ol-text");
+      }
+    });
+  });
+
+  describe("add annotation button", () => {
+    const timeSeriesRenderer = {
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ checkIfPanelIsTimeSeries: true, isAddAnnotationMode: false }),
+        methods: { toggleAddAnnotationMode: vi.fn() },
+      },
+    };
+    const button = '[data-test="panel-schema-renderer-annotation-button"]';
+
+    it.each([
+      ["line", true],
+      ["stacked", true],
+      ["h-bar", false],
+      ["h-stacked", false],
+    ])("%s time-series panel shows it: %s", async (type, shown) => {
+      wrapper = createWrapper({ data: { ...mockPanelData, type } }, timeSeriesRenderer);
+      await flushPromises();
+      expect(wrapper.find(button).exists()).toBe(shown);
     });
   });
 });

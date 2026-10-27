@@ -114,6 +114,11 @@ export interface SelectProps {
    * selected, a check when all are, and toggles the entire selection on click.
    */
   selectAll?: boolean;
+  /**
+   * Multi-select only: when every selectable option is in the model value, shows
+   * this text in the trigger instead of listing every selected label as chips.
+   */
+  allSelectedLabel?: I18nText;
   /** Allows creating new values by typing — emits @create event */
   creatable?: boolean;
   /** Optional dropdown content style passthrough */

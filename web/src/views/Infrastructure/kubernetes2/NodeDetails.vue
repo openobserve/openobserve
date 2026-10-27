@@ -21,6 +21,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import RelatedPodsTable from "./RelatedPodsTable.vue";
@@ -28,8 +29,11 @@ import type { DetailsRef } from "./kubernetesUrlState";
 import {
   formatBytes,
   formatCores,
+  formatPct,
   membersOf,
   nodeConditionWords,
+  usageBarVariant,
+  type ContainerRow,
   type Inventory,
   type NodeRow,
 } from "./kubernetesModel";
@@ -104,6 +108,78 @@ const capacity = computed(() => {
 });
 
 const pods = computed(() => membersOf(props.inventory.pods, props.row));
+
+const sumOf = (pick: (c: ContainerRow) => number | null) => {
+  const values = pods.value.flatMap((p) => p.containers.filter((c) => !c.init).map((c) => pick(c)));
+  const known = values.filter((v): v is number => v != null);
+  return known.length ? known.reduce((a, b) => a + b, 0) : null;
+};
+
+const CAPACITY_ROWS = [
+  {
+    id: "cpu-requests",
+    label: "infra.k8s2.drawerCapCpuRequests",
+    of: "cpu",
+    format: formatCores,
+    used: () => sumOf((c) => c.cpuRequest),
+  },
+  {
+    id: "cpu-limits",
+    label: "infra.k8s2.drawerCapCpuLimits",
+    of: "cpu",
+    format: formatCores,
+    used: () => sumOf((c) => c.cpuLimit),
+  },
+  {
+    id: "cpu-usage",
+    label: "infra.k8s2.drawerCapCpuUsage",
+    of: "cpu",
+    format: formatCores,
+    used: () => props.row.cpuCores,
+  },
+  {
+    id: "memory-requests",
+    label: "infra.k8s2.drawerCapMemoryRequests",
+    of: "memory",
+    format: formatBytes,
+    used: () => sumOf((c) => c.memoryRequest),
+  },
+  {
+    id: "memory-limits",
+    label: "infra.k8s2.drawerCapMemoryLimits",
+    of: "memory",
+    format: formatBytes,
+    used: () => sumOf((c) => c.memoryLimit),
+  },
+  {
+    id: "memory-usage",
+    label: "infra.k8s2.drawerCapMemoryUsage",
+    of: "memory",
+    format: formatBytes,
+    used: () => props.row.memoryBytes,
+  },
+] as const;
+
+const capacityBars = computed(() =>
+  CAPACITY_ROWS.flatMap((r) => {
+    const total = props.row.allocatable[r.of];
+    const used = r.used();
+    if (!total || used == null) return [];
+    const pct = (used / total) * 100;
+    return [
+      {
+        id: r.id,
+        label: t(r.label),
+        text: t("infra.k8s2.drawerCapacityOf", {
+          used: r.format(used),
+          total: r.format(total),
+          pct: formatPct(pct),
+        }),
+        pct,
+      },
+    ];
+  }),
+);
 </script>
 
 <template>
@@ -134,9 +210,14 @@ const pods = computed(() => membersOf(props.inventory.pods, props.row));
       </ODescriptionItem>
       <ODescriptionItem :label="t('infra.k8s2.drawerConditions')" data-test="k8s2-node-conditions">
         <div v-if="conditions.length" class="flex flex-wrap gap-1">
-          <OTag v-for="c in conditions" :key="c.text" size="sm" :variant="c.variant">{{
-            raw(c.text)
-          }}</OTag>
+          <OTag
+            v-for="c in conditions"
+            :key="c.text"
+            size="sm"
+            :variant="c.variant"
+            :icon="c.variant === 'error' || c.variant === 'warning' ? 'warning' : 'check'"
+            >{{ raw(c.text) }}</OTag
+          >
           <OTooltip>
             <template #content>
               <div class="grid grid-cols-2 gap-x-3">
@@ -159,6 +240,24 @@ const pods = computed(() => membersOf(props.inventory.pods, props.row));
         <template v-if="allocatable">{{ raw(allocatable) }}</template>
       </ODescriptionItem>
     </ODescriptionList>
+    <section
+      v-if="capacityBars.length"
+      class="flex flex-col gap-2"
+      data-test="k8s2-node-capacity-bars"
+    >
+      <OText variant="card-title" as="h4">{{ t("infra.k8s2.drawerCapacityBars") }}</OText>
+      <div v-for="b in capacityBars" :key="b.id" class="flex flex-col gap-1">
+        <div class="flex items-baseline justify-between gap-2 text-xs">
+          <span class="text-text-secondary">{{ b.label }}</span>
+          <span class="tabular-nums" :data-test="`k8s2-node-capacity-${b.id}`">{{ b.text }}</span>
+        </div>
+        <OProgressBar
+          size="xs"
+          :value="Math.min(b.pct, 100) / 100"
+          :variant="usageBarVariant(b.pct)"
+        />
+      </div>
+    </section>
     <section class="flex flex-col gap-2">
       <OText variant="card-title" as="h4">{{ t("infra.k8s2.columnPods") }}</OText>
       <RelatedPodsTable

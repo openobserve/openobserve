@@ -110,6 +110,13 @@ const dbMonitoringEnabled = (): boolean => {
   return Boolean(zoConfig.database_monitoring_enabled);
 };
 
+// Like dbMonitoringEnabled: a /config that hasn't loaded yet lets a deep link through.
+const publicDashboardsEnabled = (): boolean => {
+  const zoConfig = store?.state?.zoConfig;
+  const configLoaded = !!zoConfig && Object.keys(zoConfig).length > 0;
+  return !configLoaded || zoConfig.public_dashboards_enabled === true;
+};
+
 /**
  * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
  * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
@@ -175,6 +182,7 @@ const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
+const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
@@ -310,6 +318,15 @@ const useRoutes = () => {
       component: () => import("@/views/SlackConnectCallback.vue"),
       meta: {
         titleKey: "routeTitles.slackConnectCallback",
+      },
+    },
+    {
+      path: "/public/dashboards/:slug",
+      name: "publicDashboard",
+      component: () => import("@/views/Dashboards/PublicDashboard.vue"),
+      meta: {
+        public: true,
+        titleKey: "dashboard.header",
       },
     },
   ];
@@ -620,15 +637,16 @@ const useRoutes = () => {
     {
       path: "infra/kubernetes",
       name: "infraKubernetes",
-      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
-      props: { workload: "kubernetes" },
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
       meta: { titleKey: "menu.kubernetes" },
       beforeEnter: routeGuard,
     },
     {
+      // Not in the nav; the previous curated Kubernetes page stays reachable by URL only.
       path: "infra/kubernetes-2",
       name: "infraKubernetes2",
-      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
       meta: { titleKey: "menu.kubernetes2" },
       beforeEnter: routeGuard,
     },
@@ -743,6 +761,21 @@ const useRoutes = () => {
         titleKey: "dashboard.importDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/dashboards/public-links",
+      name: "publicDashboardLinks",
+      component: PublicDashboardLinks,
+      meta: {
+        titleKey: "dashboard.publicLinks.pageTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (!publicDashboardsEnabled()) {
+          next({ name: "dashboards", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },

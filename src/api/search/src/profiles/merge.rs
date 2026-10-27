@@ -28,6 +28,7 @@ use openobserve_core::{
         MergeResult, build_merge_result, is_snapshot_profile_type, resolve_max_nodes,
     },
 };
+use search::datafusion::udf::fold_native_frames_udf::FOLD_NATIVE_FRAMES_UDF_NAME;
 use serde::Serialize;
 use tracing::Span;
 use utoipa::ToSchema;
@@ -285,16 +286,18 @@ pub(crate) async fn load_stacks(
     let result_size = default_result_size();
     let stack_q = quote_identifier("stack");
     let value_q = quote_identifier("value");
+    // Grouping on folded stacks keeps one binary's raw addresses from splitting into many stacks.
+    let folded = format!("{FOLD_NATIVE_FRAMES_UDF_NAME}({stack_q})");
     let sql = if where_clause.is_empty() {
         format!(
-            "SELECT {stack_q} AS stack, sum({value_q}) AS value FROM {stream} \
-             WHERE {stack_q} IS NOT NULL GROUP BY stack ORDER BY value DESC"
+            "SELECT {folded} AS stack, sum({value_q}) AS value FROM {stream} \
+             WHERE {stack_q} IS NOT NULL GROUP BY {folded} ORDER BY value DESC"
         )
     } else {
         format!(
-            "SELECT {stack_q} AS stack, sum({value_q}) AS value FROM {stream} \
+            "SELECT {folded} AS stack, sum({value_q}) AS value FROM {stream} \
              WHERE {stack_q} IS NOT NULL AND ({where_clause}) \
-             GROUP BY stack ORDER BY value DESC"
+             GROUP BY {folded} ORDER BY value DESC"
         )
     };
     // Concurrent searches need their own ids: the query manager keys running searches by trace_id.
