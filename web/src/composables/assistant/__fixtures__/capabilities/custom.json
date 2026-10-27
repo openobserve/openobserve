@@ -17,5 +17,8 @@
   "agents": ["o2-ai", "sre"],
   "toolsets": [],
   "toolset_secret_merge": true,
-  "policy_enforced": false
+  "policy_enforced": false,
+  "attachments": true,
+  "context_used": true,
+  "answer_locale": true
 }

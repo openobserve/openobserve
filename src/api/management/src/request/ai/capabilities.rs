@@ -104,6 +104,12 @@ pub struct Capabilities {
     pub turn_versions: bool,
     /// `POST /ai/feedback` stores the vote with its turn; detail turns carry `feedback`.
     pub feedback_stored: bool,
+    /// o2-ai reads typed `attachments[]`; the client's `attachmentsEnabled` reads this.
+    pub attachments: bool,
+    /// `complete` carries `context_used[]`.
+    pub context_used: bool,
+    /// Answers follow `context.locale`, so doors need no English-only note.
+    pub answer_locale: bool,
     /// Set only when the org turned the assistant off; `can_chat` is then false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gate: Option<Gate>,
@@ -139,6 +145,9 @@ impl Capabilities {
             history_import: settings.persistence,
             turn_versions: settings.persistence && facts.turn_versions,
             feedback_stored: settings.persistence,
+            attachments: facts.attachments,
+            context_used: facts.context_used,
+            answer_locale: facts.answer_locale,
             gate: None,
         }
     }
@@ -213,6 +222,9 @@ struct AgentFacts {
     policy_enforced: bool,
     /// o2-ai's health lists `turn_versions` in `capabilities`: it answers from the given history.
     turn_versions: bool,
+    attachments: bool,
+    context_used: bool,
+    answer_locale: bool,
 }
 
 impl AgentFacts {
@@ -231,6 +243,9 @@ impl AgentFacts {
             agents: discover.agents.iter().map(|a| a.id.clone()).collect(),
             policy_enforced: discover.policy_enforced,
             turn_versions: agent_capability(health, TURN_VERSIONS_CAPABILITY),
+            attachments: discover.attachments,
+            context_used: discover.context_used,
+            answer_locale: discover.answer_locale,
         }
     }
 }
@@ -926,6 +941,9 @@ mod tests {
             agents: vec!["o2-ai".to_string(), "sre".to_string()],
             policy_enforced: false,
             turn_versions: true,
+            attachments: true,
+            context_used: true,
+            answer_locale: true,
         };
         (health, facts)
     }
@@ -1140,6 +1158,24 @@ mod tests {
         let odd: HealthResponse =
             serde_json::from_value(json!({"capabilities": "turn_versions"})).unwrap();
         assert!(!AgentFacts::new(&odd, &discover).turn_versions);
+    }
+
+    #[test]
+    fn context_flags_follow_discover_and_default_off_for_older_agents() {
+        let health: HealthResponse = serde_json::from_value(json!({"status": "healthy"})).unwrap();
+        let agents = json!([{"id": "o2-ai", "name": "O2", "description": "d"}]);
+        let current: DiscoverResponse = serde_json::from_value(json!({
+            "agents": agents,
+            "attachments": true,
+            "context_used": true,
+            "answer_locale": true
+        }))
+        .unwrap();
+        let facts = AgentFacts::new(&health, &current);
+        assert!(facts.attachments && facts.context_used && facts.answer_locale);
+        let older: DiscoverResponse = serde_json::from_value(json!({"agents": agents})).unwrap();
+        let facts = AgentFacts::new(&health, &older);
+        assert!(!facts.attachments && !facts.context_used && !facts.answer_locale);
     }
 
     #[test]

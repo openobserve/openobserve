@@ -64,7 +64,7 @@ use {
 use super::error::{self, AiErrorAction, AiErrorCode, AiErrorEnvelope};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::ai::{PromptRequest, PromptResponse},
+    models::ai::{Attachment, ChatMode, PromptRequest, PromptResponse},
 };
 
 /// Context flag telling o2-ai that `history` is a fork's or an import's transcript, not new turns.
@@ -777,6 +777,21 @@ impl TurnMeter {
     }
 }
 
+/// A query-helper turn always runs the chat agent, never RCA; other turns pick as chat does.
+#[cfg(feature = "enterprise")]
+async fn turn_agent_and_context(
+    org_id: &str,
+    user_id: &str,
+    session_id: Option<&str>,
+    context: serde_json::Value,
+    mode: Option<ChatMode>,
+) -> (&'static str, serde_json::Value) {
+    if mode == Some(ChatMode::GenerateQuery) {
+        return select_chat_agent(context, None);
+    }
+    session_agent_and_context(org_id, user_id, session_id, context).await
+}
+
 /// Picks the agent and its context; RCA only when the caller clears the RCA endpoint's own bar.
 #[cfg(feature = "enterprise")]
 async fn chat_agent_and_context(
@@ -923,6 +938,93 @@ fn confirm_timeout(requested: Option<u32>) -> Option<u32> {
     requested
         .filter(|secs| *secs > 0)
         .map(|secs| secs.min(MAX_CONFIRM_TIMEOUT_SECS))
+}
+
+/// The typed chips o2-ai reads, already capped by `PromptRequest`.
+#[cfg(feature = "enterprise")]
+fn forwarded_attachments(
+    attachments: Option<Vec<Attachment>>,
+) -> Option<Vec<o2_enterprise::enterprise::ai::client::Attachment>> {
+    attachments
+        .filter(|list| !list.is_empty())
+        .map(|list| list.into_iter().map(Into::into).collect())
+}
+
+/// Whether a turn is admitted and stored; an ephemeral one never is, so it leaves no row.
+#[cfg(feature = "enterprise")]
+fn persists_turn(persistence_enabled: bool, query: &QueryRequest) -> bool {
+    persistence_enabled && !query.ephemeral
+}
+
+/// Why a turn's `mode`/`ephemeral` cannot run, or `None`; only the query helper skips storage.
+#[cfg(feature = "enterprise")]
+fn turn_mode_problem(mode: Option<ChatMode>, ephemeral: bool) -> Option<&'static str> {
+    if mode == Some(ChatMode::Unsupported) {
+        return Some("Unsupported mode");
+    }
+    (ephemeral && mode != Some(ChatMode::GenerateQuery))
+        .then_some("An ephemeral turn must use mode generate_query")
+}
+
+/// The org's tools a turn may carry: the query helper gets no CLI or third-party MCP tools.
+#[cfg(feature = "enterprise")]
+fn turn_tools<M, C>(mode: Option<ChatMode>, mcps: Vec<M>, clis: Vec<C>) -> (Vec<M>, Vec<C>) {
+    if mode == Some(ChatMode::GenerateQuery) {
+        return (Vec::new(), Vec::new());
+    }
+    (mcps, clis)
+}
+
+/// Refuses a turn whose mode is unknown, or an ephemeral one that is not a query or names a chat.
+#[cfg(feature = "enterprise")]
+async fn refuse_turn_mode(
+    org_id: &str,
+    prompt: &PromptRequest,
+    session_id: Option<&str>,
+) -> Result<(), Response> {
+    if let Some(problem) = turn_mode_problem(prompt.mode, prompt.ephemeral) {
+        return Err(error::invalid_request(problem));
+    }
+    if prompt.ephemeral {
+        return refuse_saved_chat(org_id, session_id).await;
+    }
+    Ok(())
+}
+
+/// An ephemeral turn may not continue a saved chat: persistence is decided here, not by the client.
+#[cfg(feature = "enterprise")]
+async fn refuse_saved_chat(org_id: &str, session_id: Option<&str>) -> Result<(), Response> {
+    let Some(session_id) = session_id else {
+        return Ok(());
+    };
+    if !o2_enterprise::enterprise::ai::chat::is_enabled() {
+        return Ok(());
+    }
+    let found = infra::table::ai_chat_sessions::get(org_id, session_id)
+        .await
+        .map(|row| row.is_some());
+    saved_chat_refusal(org_id, session_id, found)
+}
+
+/// Refuses an ephemeral turn whose session id names a saved chat; an unreadable store fails closed.
+#[cfg(feature = "enterprise")]
+fn saved_chat_refusal(
+    org_id: &str,
+    session_id: &str,
+    found: Result<bool, impl std::fmt::Display>,
+) -> Result<(), Response> {
+    match found {
+        Ok(false) => Ok(()),
+        Ok(true) => Err(error::invalid_request(
+            "An ephemeral turn cannot continue a saved chat",
+        )),
+        Err(e) => {
+            log::error!("[AI-CHAT] cannot read chat {org_id}/{session_id}: {e}");
+            Err(error::history_unavailable(
+                "Chat history is unavailable; please retry",
+            ))
+        }
+    }
 }
 
 /// The server's policy replaces whatever `context.policy` the browser sent.
@@ -1756,6 +1858,39 @@ async fn check_chat_owner(
     }
 }
 
+/// Whether a Stop takes the persisted path; a turn without a row (ephemeral) is stopped as direct.
+#[cfg(feature = "enterprise")]
+async fn stop_route(
+    headers: &axum::http::HeaderMap,
+    org_id: &str,
+    session_id: &str,
+) -> Result<bool, Response> {
+    if !o2_enterprise::enterprise::ai::chat::is_enabled() {
+        return Ok(false);
+    }
+    let row = match infra::table::ai_chat_sessions::get(org_id, session_id).await {
+        Ok(row) => row,
+        Err(e) => {
+            log::error!("[AI-CHAT] cannot read session {org_id}/{session_id}: {e}");
+            return Err(error::internal("Could not read the conversation"));
+        }
+    };
+    let running_here =
+        !o2_enterprise::enterprise::ai::chat::registry::turns(org_id, session_id).is_empty();
+    if direct_stop(row.is_some(), running_here) {
+        return Ok(false);
+    }
+    check_chat_owner(headers, org_id, session_id)
+        .await
+        .map(|()| true)
+}
+
+/// A Stop of a session with no row goes to this node's turns; the caller still stops only its own.
+#[cfg(feature = "enterprise")]
+fn direct_stop(row_exists: bool, running_here: bool) -> bool {
+    !row_exists && running_here
+}
+
 /// Asks o2-ai to abort first so the partial reply is still stored, else stops the turn on its node.
 #[cfg(feature = "enterprise")]
 async fn cancel_turn(
@@ -1764,10 +1899,10 @@ async fn cancel_turn(
     turn_id: Option<String>,
     auth: String,
     caller: String,
+    persisted: bool,
 ) -> Response {
     use o2_enterprise::enterprise::ai::chat::{CancelReason, lease};
 
-    let persisted = o2_enterprise::enterprise::ai::chat::is_enabled();
     // o2-ai's Stop is chat-wide, so which turn it may stop is settled here first.
     let mut chat_turns: Option<Vec<String>> = None;
     let target = if persisted {
@@ -2656,9 +2791,10 @@ pub async fn cancel(
             Ok(turn_id) => turn_id,
             Err(resp) => return resp,
         };
-        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
-            return resp;
-        }
+        let persisted = match stop_route(&parts.headers, &org_id, &session_id).await {
+            Ok(persisted) => persisted,
+            Err(resp) => return resp,
+        };
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         let caller = parts
             .headers
@@ -2666,7 +2802,7 @@ pub async fn cancel(
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default()
             .to_string();
-        cancel_turn(org_id, session_id, turn_id, auth_str, caller).await
+        cancel_turn(org_id, session_id, turn_id, auth_str, caller, persisted).await
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -2703,6 +2839,10 @@ async fn chat_turn(
 
         if !o2_cfg.ai.has_agent_target() {
             return error::not_enabled("AI agent URL is not set");
+        }
+        // Nothing is stored on this path, so an ephemeral query turn needs only the mode check.
+        if let Some(problem) = turn_mode_problem(prompt_body.mode, prompt_body.ephemeral) {
+            return error::invalid_request(problem);
         }
 
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
@@ -2779,8 +2919,14 @@ async fn chat_turn(
             .headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
             .and_then(|v| v.to_str().ok());
-        let (agent_type, context) =
-            session_agent_and_context(org_id_str, user_id, session_header, context).await;
+        let (agent_type, context) = turn_agent_and_context(
+            org_id_str,
+            user_id,
+            session_header,
+            context,
+            prompt_body.mode,
+        )
+        .await;
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -2795,6 +2941,7 @@ async fn chat_turn(
 
         let (tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
+        let (tool_mcps, tool_clis) = turn_tools(prompt_body.mode, tool_mcps, tool_clis);
         let session = parts
             .headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
@@ -2831,6 +2978,9 @@ async fn chat_turn(
                 known_seq: None,
                 known_opencode_session_id: None,
                 session_epoch: None,
+                mode: prompt_body.mode.map(|mode| mode.as_str().to_string()),
+                ephemeral: prompt_body.ephemeral,
+                attachments: forwarded_attachments(prompt_body.attachments),
                 confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
                 ..QueryRequest::new(last_user_message, context)
             },
@@ -3098,6 +3248,15 @@ async fn stream_turn(
                 .await;
             return refusal;
         }
+        let session = forward_headers.get(X_O2_ASSISTANT_SESSION_ID.as_str());
+        if let Err(refusal) =
+            refuse_turn_mode(&org_id_str, &prompt_body, session.map(String::as_str)).await
+        {
+            audit
+                .report(refusal.status(), Some("Mode or ephemeral turn refused"))
+                .await;
+            return refusal;
+        }
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
         if !get_o2_config()
             .ai
@@ -3163,13 +3322,14 @@ async fn stream_turn(
         let context = agent_context(&prompt_body.context, &org_id_str, delegated);
 
         // An existing chat keeps its stored agent; resolve before context moves into QueryRequest.
-        let (agent_type, context) = session_agent_and_context(
+        let (agent_type, context) = turn_agent_and_context(
             &org_id_str,
             &user_id,
             forward_headers
                 .get(X_O2_ASSISTANT_SESSION_ID.as_str())
                 .map(String::as_str),
             context,
+            prompt_body.mode,
         )
         .await;
 
@@ -3186,6 +3346,7 @@ async fn stream_turn(
 
         let (tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
+        let (tool_mcps, tool_clis) = turn_tools(prompt_body.mode, tool_mcps, tool_clis);
         let session = forward_headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
             .map(String::as_str);
@@ -3219,6 +3380,9 @@ async fn stream_turn(
                 known_seq: None,
                 known_opencode_session_id: None,
                 session_epoch: None,
+                mode: prompt_body.mode.map(|mode| mode.as_str().to_string()),
+                ephemeral: prompt_body.ephemeral,
+                attachments: forwarded_attachments(prompt_body.attachments),
                 confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
                 ..QueryRequest::new(last_user_message, context)
             },
@@ -3245,7 +3409,10 @@ async fn stream_turn(
             audit,
         };
         // With persistence on, a background task owns the turn; a closed tab drops only its feed.
-        if o2_enterprise::enterprise::ai::chat::is_enabled() {
+        if persists_turn(
+            o2_enterprise::enterprise::ai::chat::is_enabled(),
+            &turn.query,
+        ) {
             persisted_turn(turn).await
         } else {
             direct_turn(turn).await
@@ -3385,6 +3552,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
             stop_turn,
             stop_auth,
             stop_user,
+            o2_enterprise::enterprise::ai::chat::is_enabled(),
         ));
     };
     let toolset_use = super::toolsets::ToolsetUse::load(&org_id).await;
@@ -3493,6 +3661,7 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         agent_type,
         query,
         auth,
+        auth_session_id,
         forward_headers,
         client,
         span,
@@ -3504,6 +3673,35 @@ async fn direct_turn(turn: StreamTurn) -> Response {
             use opentelemetry::trace::TraceContextExt;
             span_cx.span().end();
         }
+    };
+    let ephemeral = query.ephemeral;
+    // Without the browser's turn id the trace id keys the refund; both are unique per request.
+    let charge_key = turn_id
+        .as_deref()
+        .and_then(openobserve_core::ai_chat::admission::normalize_uuid)
+        .unwrap_or_else(|| trace_id.clone());
+    let ephemeral_registration = if ephemeral {
+        let session_id = forward_headers
+            .as_ref()
+            .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()));
+        match register_ephemeral_turn(
+            &org_id,
+            session_id.map(String::as_str),
+            &charge_key,
+            &user_id,
+            auth_session_id.as_deref(),
+        ) {
+            Ok(registration) => Some(registration),
+            Err(refusal) => {
+                end_span(&span);
+                audit
+                    .report(refusal.status(), Some("Active-turn limit reached"))
+                    .await;
+                return refusal;
+            }
+        }
+    } else {
+        None
     };
     // The upstream accepts before headers or usage go out, so startup errors keep statuses.
     let response = match client
@@ -3528,11 +3726,6 @@ async fn direct_turn(turn: StreamTurn) -> Response {
     let session_id = forward_headers
         .as_ref()
         .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()));
-    // Without the browser's turn id the trace id keys the refund; both are unique per request.
-    let charge_key = turn_id
-        .as_deref()
-        .and_then(openobserve_core::ai_chat::admission::normalize_uuid)
-        .unwrap_or_else(|| trace_id.clone());
     let mut charge = TurnCharge::new(
         &org_id,
         &user_id,
@@ -3552,24 +3745,27 @@ async fn direct_turn(turn: StreamTurn) -> Response {
     }
     audit.report(StatusCode::OK, None).await;
     // A Stop of this turn is only forwarded for its own user (`direct_stop_target`).
-    let registration = session_id
-        .filter(|sid| is_valid_session_id(sid))
-        .map(|sid| {
-            o2_enterprise::enterprise::ai::chat::registry::register(
-                &org_id,
-                &sid.to_ascii_lowercase(),
-                &charge_key,
-                &user_id,
-                None,
-            )
-        });
+    let registration = ephemeral_registration.or_else(|| {
+        session_id
+            .filter(|sid| is_valid_session_id(sid))
+            .map(|sid| {
+                o2_enterprise::enterprise::ai::chat::registry::register(
+                    &org_id,
+                    &sid.to_ascii_lowercase(),
+                    &charge_key,
+                    &user_id,
+                    None,
+                )
+            })
+    });
 
     let mut meter = TurnMeter::new(TurnPhase::charged(), charge, None);
     let toolset_use = super::toolsets::ToolsetUse::load(&org_id).await;
     let session = session_id
         .filter(|sid| is_valid_session_id(sid))
         .map(|sid| sid.to_ascii_lowercase());
-    let (turn_mark, confirmations) = match &session {
+    // An ephemeral turn leaves no row behind, not even a turn mark; it never asks to confirm.
+    let (turn_mark, confirmations) = match session.as_ref().filter(|_| !ephemeral) {
         Some(sid) => (
             Some(super::turn_marks::mark_turn(&org_id, sid, &user_id).await),
             Some(super::turn_marks::ConfirmationWatch::new(
@@ -3622,6 +3818,32 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         end_span(&span);
     };
     sse_response(Body::from_stream(s))
+}
+
+/// An ephemeral turn writes no row, so `admit_turn`'s active-turn caps are taken here, per node.
+#[cfg(feature = "enterprise")]
+fn register_ephemeral_turn(
+    org_id: &str,
+    session_id: Option<&str>,
+    turn_key: &str,
+    user_id: &str,
+    auth_session_id: Option<&str>,
+) -> Result<o2_enterprise::enterprise::ai::chat::registry::Registration, Response> {
+    use o2_enterprise::enterprise::ai::chat::registry;
+
+    // Without a session the turn key stands in, so the turn still counts against the caps.
+    let key = session_id
+        .filter(|sid| is_valid_session_id(sid))
+        .map_or_else(|| turn_key.to_string(), str::to_ascii_lowercase);
+    registry::register_capped(
+        org_id,
+        &key,
+        turn_key,
+        user_id,
+        auth_session_id,
+        registry::TurnCaps::from_config(),
+    )
+    .map_err(super::chats::turn_limit_response)
 }
 
 /// Meters a persisted turn and reads on after the browser leaves, so a background turn still pays.
@@ -5624,5 +5846,132 @@ mod tests {
         assert!(!context.contains_key(FORK_SEED_CONTEXT_KEY));
         set_version_history(&mut history, &mut context, Some((vec![msg("seed")], true)));
         assert_eq!(context[FORK_SEED_CONTEXT_KEY], true);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_ephemeral_turn_is_never_persisted() {
+        let mut query = QueryRequest::new("q".to_string(), serde_json::json!({}));
+        assert!(persists_turn(true, &query));
+        assert!(!persists_turn(false, &query));
+        query.ephemeral = true;
+        assert!(!persists_turn(true, &query));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_query_helper_turn_runs_the_chat_agent_without_rca_inputs() {
+        let context =
+            serde_json::json!({"incident_id": "inc-1", "severity": "P1", "locale": "de-DE"});
+        let (agent, context) =
+            turn_agent_and_context("org", "user", None, context, Some(ChatMode::GenerateQuery))
+                .await;
+        assert_eq!(agent, DEFAULT_AGENT_TYPE);
+        assert!(context.get("incident_id").is_none() && context.get("severity").is_none());
+        assert_eq!(context["locale"], "de-DE");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_ephemeral_turn_without_a_session_is_admitted_and_chips_are_forwarded() {
+        assert!(refuse_saved_chat("org", None).await.is_ok());
+        assert!(forwarded_attachments(Some(Vec::new())).is_none());
+        let chip: Attachment =
+            serde_json::from_value(serde_json::json!({"kind": "field", "data": "status"})).unwrap();
+        let sent = forwarded_attachments(Some(vec![chip])).unwrap();
+        assert_eq!(
+            (sent[0].kind.as_str(), &sent[0].data),
+            ("field", &serde_json::json!("status"))
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_unknown_mode_or_a_chat_turn_marked_ephemeral_is_a_typed_400() {
+        assert_eq!(
+            turn_mode_problem(Some(ChatMode::Unsupported), false),
+            Some("Unsupported mode")
+        );
+        assert!(turn_mode_problem(None, true).is_some());
+        assert!(turn_mode_problem(Some(ChatMode::Chat), true).is_some());
+        assert!(turn_mode_problem(Some(ChatMode::GenerateQuery), true).is_none());
+        assert!(turn_mode_problem(None, false).is_none());
+        let prompt: PromptRequest =
+            serde_json::from_value(serde_json::json!({"messages": [], "ephemeral": true})).unwrap();
+        let refusal = refuse_turn_mode("org", &prompt, None).await.unwrap_err();
+        assert_eq!(refusal.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(refusal.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["code"], "invalid_request");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_ephemeral_turn_naming_a_saved_chat_is_refused_and_an_unreadable_one_fails_closed() {
+        assert!(saved_chat_refusal("org", "s", Ok::<bool, String>(false)).is_ok());
+        let saved = saved_chat_refusal("org", "s", Ok::<bool, String>(true)).unwrap_err();
+        assert_eq!(saved.status(), StatusCode::BAD_REQUEST);
+        let unreadable = saved_chat_refusal("org", "s", Err("db down")).unwrap_err();
+        assert_eq!(
+            unreadable.status(),
+            error::history_unavailable("x").status()
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_query_turn_carries_no_cli_or_third_party_mcp_tools() {
+        let (mcps, clis) = turn_tools(
+            Some(ChatMode::GenerateQuery),
+            vec!["github"],
+            vec!["kubectl"],
+        );
+        assert!(mcps.is_empty() && clis.is_empty());
+        let (mcps, clis) = turn_tools(None, vec!["github"], vec!["kubectl"]);
+        assert_eq!((mcps, clis), (vec!["github"], vec!["kubectl"]));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn ephemeral_turns_count_against_the_active_turn_limit() {
+        let caps = o2_enterprise::enterprise::ai::chat::TurnCaps::from_config();
+        if caps.per_user == 0 {
+            return;
+        }
+        let user = format!("eph-{}", config::ider::uuid());
+        let held: Vec<_> = (0..caps.per_user)
+            .map(|n| {
+                register_ephemeral_turn("eph-org", None, &format!("t{n}"), &user, None).unwrap()
+            })
+            .collect();
+        let Err(refusal) = register_ephemeral_turn("eph-org", None, "t-over", &user, None) else {
+            panic!("a turn over the per-user cap was admitted");
+        };
+        assert_eq!(refusal.status(), StatusCode::TOO_MANY_REQUESTS);
+        drop(held);
+        assert!(register_ephemeral_turn("eph-org", None, "t-again", &user, None).is_ok());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_stop_without_a_saved_chat_reaches_the_turn_streaming_here() {
+        assert!(direct_stop(false, true));
+        assert!(!direct_stop(true, true));
+        assert!(!direct_stop(false, false));
+        let session = uuid::Uuid::now_v7().to_string();
+        let _turn =
+            register_ephemeral_turn("eph-org", Some(&session), "t1", "alice", None).unwrap();
+        let running = o2_enterprise::enterprise::ai::chat::registry::turns("eph-org", &session);
+        let running: Vec<(&str, &str)> = running
+            .iter()
+            .map(|t| (t.turn_id.as_str(), t.user_id.as_str()))
+            .collect();
+        assert!(matches!(
+            direct_stop_target(None, &running, "alice"),
+            Ok(StopTarget::Turn(turn)) if turn == "t1"
+        ));
+        assert!(direct_stop_target(None, &running, "mallory").is_err());
     }
 }
