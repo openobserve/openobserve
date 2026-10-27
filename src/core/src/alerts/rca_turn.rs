@@ -3942,6 +3942,8 @@ mod tests {
             started_at,
             ended_at,
             first_event_at: None,
+            version_of: None,
+            decisions: None,
         }
     }
 

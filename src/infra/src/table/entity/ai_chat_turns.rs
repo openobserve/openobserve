@@ -21,6 +21,11 @@ pub struct Model {
     pub ended_at: Option<i64>,
     /// When the turn's first o2-ai event was forwarded (micros); NULL until then.
     pub first_event_at: Option<i64>,
+    /// The turn this one regenerates or edits; NULL on an original turn.
+    pub version_of: Option<String>,
+    /// JSON array of the approval decisions answered during the turn.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub decisions: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

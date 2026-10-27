@@ -1136,6 +1136,7 @@ fn ai_chat_routes(router: Router) -> Router {
             "/{org_id}/ai/chats",
             get(ai::chats::list).delete(ai::chats::delete_all),
         )
+        .route("/{org_id}/ai/chats/import", post(ai::chats::import))
         .route(
             "/{org_id}/ai/chats/{session_id}",
             get(ai::chats::get)

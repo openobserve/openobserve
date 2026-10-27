@@ -1251,6 +1251,8 @@ mod tests {
             started_at: 0,
             ended_at: None,
             first_event_at: None,
+            version_of: None,
+            decisions: None,
         }
     }
 

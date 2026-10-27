@@ -1100,6 +1100,12 @@ async fn delete_org_ai_assistant_resources(org_id: &str) -> Result<(), anyhow::E
     infra::table::ai_turn_marks::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_turn_marks: {e}"))?;
+    infra::table::ai_chat_feedback::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_feedback: {e}"))?;
+    infra::table::ai_chat_imports::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_imports: {e}"))?;
     Ok(())
 }
 

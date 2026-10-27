@@ -17,7 +17,7 @@
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait, Set, SqlErr, sea_query::Expr,
+    QueryTrait, Set, SqlErr, TransactionTrait, sea_query::Expr,
 };
 
 pub use super::entity::ai_chat_turns::Model;
@@ -32,6 +32,12 @@ pub const TURN_COMPLETED: &str = "completed";
 pub const TURN_CANCELLED: &str = "cancelled";
 pub const TURN_FAILED: &str = "failed";
 pub const TURN_INTERRUPTED: &str = "interrupted";
+
+/// Decisions kept per turn; a turn asks a handful, so the cap only bounds a misbehaving client.
+pub const MAX_DECISIONS: usize = 64;
+
+// SQLite has no row locks, so this node's appends also queue here.
+static DECISION_WRITES: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Outcome of [`admit`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,6 +92,8 @@ pub async fn admit_with<C: ConnectionTrait>(
         started_at: Set(now),
         ended_at: Set(None),
         first_event_at: Set(None),
+        version_of: Set(None),
+        decisions: Set(None),
     };
     let admission = match Entity::insert(record).exec(conn).await {
         Ok(_) => Admission::Admitted,
@@ -104,6 +112,86 @@ pub async fn admit_with<C: ConnectionTrait>(
         interrupt_others_with(conn, org_id, session_id, turn_id, now).await?;
     }
     Ok(admission)
+}
+
+/// Marks `turn_id` as a new version of `version_of`; `false` when the turn is unknown.
+pub async fn set_version_of(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    version_of: &str,
+) -> Result<bool, errors::Error> {
+    set_version_of_with(
+        get_orm_client_rw().await,
+        (org_id, session_id, turn_id),
+        version_of,
+    )
+    .await
+}
+
+pub async fn set_version_of_with<C: ConnectionTrait>(
+    conn: &C,
+    (org_id, session_id, turn_id): (&str, &str, &str),
+    version_of: &str,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::VersionOf, Expr::value(version_of.to_string()))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(turn_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
+/// Appends an answered approval to the session's newest turn; `false` when it has no turn.
+pub async fn add_decision(
+    org_id: &str,
+    session_id: &str,
+    decision: serde_json::Value,
+) -> Result<bool, errors::Error> {
+    let _queued = DECISION_WRITES.lock().await;
+    add_decision_with(get_orm_client_rw().await, org_id, session_id, decision).await
+}
+
+/// Appends under a row lock, so two confirms of one turn both keep their decision.
+pub async fn add_decision_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    decision: serde_json::Value,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await.map_err(db_err)?;
+    let newest = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .order_by_desc(Column::StartedAt)
+        .lock_exclusive()
+        .one(&txn)
+        .await
+        .map_err(db_err)?;
+    let Some(newest) = newest else {
+        return Ok(false);
+    };
+    let mut decisions = decisions_of(&newest);
+    if decisions.len() >= MAX_DECISIONS {
+        return Ok(true);
+    }
+    decisions.push(decision);
+    Entity::update_many()
+        .col_expr(
+            Column::Decisions,
+            Expr::value(serde_json::Value::Array(decisions).to_string()),
+        )
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(newest.turn_id.as_str()))
+        .exec(&txn)
+        .await
+        .map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(true)
 }
 
 /// Records how a running turn ended (`false` if not running); `None` start keeps admission's.
@@ -338,6 +426,14 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(
         .await
         .map_err(db_err)?;
     Ok(result.rows_affected)
+}
+
+/// The decisions recorded on a turn, oldest first.
+pub fn decisions_of(record: &Model) -> Vec<serde_json::Value> {
+    match record.decisions.as_deref().map(serde_json::from_str) {
+        Some(Ok(serde_json::Value::Array(decisions))) => decisions,
+        _ => Vec::new(),
+    }
 }
 
 /// Marked running and started after `stale_before` (older ones died without finishing).
@@ -766,5 +862,51 @@ mod tests {
             .collect();
         found.sort();
         assert_eq!(found, vec!["done", "stale"], "only the exact pairs");
+    }
+
+    #[tokio::test]
+    async fn versions_and_decisions_land_on_their_turns() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "t1", 0, 10).await.unwrap();
+        admit_with(&db, ORG, SID, "t2", 5, 20).await.unwrap();
+        assert!(
+            set_version_of_with(&db, (ORG, SID, "t2"), "t1")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !set_version_of_with(&db, (ORG, SID, "nope"), "t1")
+                .await
+                .unwrap()
+        );
+        assert_eq!(record(&db, "t2").await.version_of.as_deref(), Some("t1"));
+        assert_eq!(record(&db, "t1").await.version_of, None);
+
+        let decision = serde_json::json!({"id": "apr_1", "approved": true, "by": "a@x", "at": 1});
+        assert!(
+            add_decision_with(&db, ORG, SID, decision.clone())
+                .await
+                .unwrap()
+        );
+        assert!(
+            !add_decision_with(&db, ORG, "other", decision.clone())
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            decisions_of(&record(&db, "t2").await),
+            vec![decision.clone()]
+        );
+        assert!(decisions_of(&record(&db, "t1").await).is_empty());
+        let second = serde_json::json!({"id": "apr_2", "approved": false});
+        let third = serde_json::json!({"id": "apr_3", "approved": true});
+        let (a, b) = tokio::join!(
+            add_decision_with(&db, ORG, SID, second.clone()),
+            add_decision_with(&db, ORG, SID, third.clone()),
+        );
+        assert!(a.unwrap() && b.unwrap());
+        let kept = decisions_of(&record(&db, "t2").await);
+        assert_eq!(kept.len(), 3, "{kept:?}");
+        assert!(kept.contains(&second) && kept.contains(&third));
     }
 }

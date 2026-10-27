@@ -1690,6 +1690,8 @@ pub(crate) mod tests {
             started_at: started_ms * 1000,
             ended_at: None,
             first_event_at: None,
+            version_of: None,
+            decisions: None,
         }
     }
 

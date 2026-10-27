@@ -1520,6 +1520,7 @@ mod tests {
             visibility: ai_chat_shares::VISIBILITY_ORG,
             expires_at: None,
             redact_tools: false,
+            hide_attachments: false,
         };
         let share = ai_chat_shares::insert(&share, now).await.unwrap();
         ai_chat_shares::revoke(org, &share.id, now).await.unwrap();

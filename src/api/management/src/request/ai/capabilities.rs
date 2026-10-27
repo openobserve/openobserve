@@ -61,6 +61,7 @@ const CHAT_UNREACHABLE: &str = "O2 Assistant did not answer a chat request";
 const ROUND_TRIP_FAILED: &str = "O2 Assistant answered its health check but not a request";
 const ROUND_TRIP_REFUSED: &str = "O2 Assistant refused the credentials of this request";
 const ROUND_TRIP_REJECTED: &str = "O2 Assistant rejected this request";
+const TURN_VERSIONS_CAPABILITY: &str = "turn_versions";
 const SERVER_REFUSED: &str = "O2 Assistant refused this server's internal secret";
 const NOT_CONFIGURED: &str = "O2 Assistant is not configured on this server";
 
@@ -93,6 +94,16 @@ pub struct Capabilities {
     pub toolsets: Vec<ToolsetSummary>,
     pub toolset_secret_merge: bool,
     pub policy_enforced: bool,
+    /// `GET /ai/chats` honours `q`.
+    pub history_search: bool,
+    /// `pinned` is stored and `PATCH /ai/chats/{id}` takes `{pinned}`.
+    pub history_pins: bool,
+    /// `POST /ai/chats/import` moves browser chats to the server.
+    pub history_import: bool,
+    /// `chat_stream` takes `replaces_turn_id` and o2-ai says it answers versions.
+    pub turn_versions: bool,
+    /// `POST /ai/feedback` stores the vote with its turn; detail turns carry `feedback`.
+    pub feedback_stored: bool,
     /// Set only when the org turned the assistant off; `can_chat` is then false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gate: Option<Gate>,
@@ -123,6 +134,11 @@ impl Capabilities {
             toolsets,
             toolset_secret_merge: true,
             policy_enforced: facts.policy_enforced,
+            history_search: settings.persistence,
+            history_pins: settings.persistence,
+            history_import: settings.persistence,
+            turn_versions: settings.persistence && facts.turn_versions,
+            feedback_stored: settings.persistence,
             gate: None,
         }
     }
@@ -195,6 +211,8 @@ struct AgentFacts {
     model_provider: Option<String>,
     agents: Vec<String>,
     policy_enforced: bool,
+    /// o2-ai's health lists `turn_versions` in `capabilities`: it answers from the given history.
+    turn_versions: bool,
 }
 
 impl AgentFacts {
@@ -212,6 +230,7 @@ impl AgentFacts {
                 .or_else(|| from_health(health.model_provider())),
             agents: discover.agents.iter().map(|a| a.id.clone()).collect(),
             policy_enforced: discover.policy_enforced,
+            turn_versions: agent_capability(health, TURN_VERSIONS_CAPABILITY),
         }
     }
 }
@@ -822,6 +841,15 @@ fn is_agent_unreachable_frame(chunk: &[u8]) -> bool {
         .any(|frame| frame["type"] == "error" && frame["error_code"] == CODE)
 }
 
+/// Whether o2-ai's health answer lists `name` under `capabilities`.
+fn agent_capability(health: &HealthResponse, name: &str) -> bool {
+    health
+        .extra
+        .get("capabilities")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|c| c.iter().any(|v| v.as_str() == Some(name)))
+}
+
 fn rfc3339(at: DateTime<Utc>) -> String {
     at.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
@@ -833,6 +861,13 @@ mod tests {
     use super::*;
 
     const ORG: &str = "acme";
+    const HISTORY_FLAGS: [&str; 5] = [
+        "history_search",
+        "history_pins",
+        "history_import",
+        "turn_versions",
+        "feedback_stored",
+    ];
 
     /// Default-role grants of the OpenFGA model, as `(object type, permission)`.
     #[derive(Debug, Clone, Copy)]
@@ -890,6 +925,7 @@ mod tests {
             model_provider: Some("openai".to_string()),
             agents: vec!["o2-ai".to_string(), "sre".to_string()],
             policy_enforced: false,
+            turn_versions: true,
         };
         (health, facts)
     }
@@ -1035,11 +1071,14 @@ mod tests {
             let path = format!("{dir}/{name}.json");
             let raw = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
             let fixture: Value = serde_json::from_str(&raw).unwrap();
-            assert_eq!(
-                probe(role).await,
-                fixture,
-                "{name}.json drifted from the probe"
-            );
+            let mut probed = probe(role).await;
+            for key in HISTORY_FLAGS {
+                if fixture.get(key).is_none() {
+                    assert_eq!(probed[key], probed["persistence"], "{name}.json: {key}");
+                    probed.as_object_mut().unwrap().remove(key);
+                }
+            }
+            assert_eq!(probed, fixture, "{name}.json drifted from the probe");
         }
     }
 
@@ -1093,7 +1132,14 @@ mod tests {
         assert_eq!(facts.agents, ["o2-ai"]);
         assert_eq!(facts.agent_version.as_deref(), Some("1.0.0"));
         assert!(facts.policy_enforced);
+        assert!(!facts.turn_versions);
         assert!(!format!("{facts:?}").contains("http"));
+        let versioned: HealthResponse =
+            serde_json::from_value(json!({"capabilities": ["turn_versions"]})).unwrap();
+        assert!(AgentFacts::new(&versioned, &discover).turn_versions);
+        let odd: HealthResponse =
+            serde_json::from_value(json!({"capabilities": "turn_versions"})).unwrap();
+        assert!(!AgentFacts::new(&odd, &discover).turn_versions);
     }
 
     #[test]

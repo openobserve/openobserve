@@ -16,7 +16,7 @@
 // The `/{org_id}/ai/chats` API (owner: `users.id`) and the responses of turn admission.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{LazyLock, Mutex},
     time::Duration,
 };
@@ -29,7 +29,8 @@ use axum::{
 };
 use bytes::Bytes;
 use infra::table::{
-    ai_chat_sessions::{self, ListCursor, Model, NO_SEQ, STATUS_ACTIVE},
+    ai_chat_feedback, ai_chat_imports,
+    ai_chat_sessions::{self, ListCursor, ListFilter, Model, NO_SEQ, NewImport, STATUS_ACTIVE},
     ai_chat_turns::{
         self, Model as TurnRecord, TURN_CANCELLED, TURN_COMPLETED, TURN_FAILED, TURN_INTERRUPTED,
         TURN_RUNNING,
@@ -46,7 +47,7 @@ use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config,
 };
 use openobserve_core::ai_chat::admission::{
-    AdmitError, TURN_LIMIT, is_uuid, normalize_uuid, resolve_owner,
+    AdmitError, TURN_LIMIT, is_uuid, normalize_uuid, prompt_title, resolve_owner,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -58,6 +59,8 @@ use crate::common::meta::{http::HttpResponse as MetaHttpResponse, user::AuthToke
 /// Open tails on this node per `user:` and `turn:` key (see [`TailSlot`]).
 static OPEN_TAILS: LazyLock<Mutex<HashMap<String, usize>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+/// `org/owner` keys with an import running on this node (see [`ImportSlot`]).
+static IMPORTING: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// The trace id the server gave a turn at admission, so a refused turn's Details can show it.
 pub const X_O2_TRACE_ID: &str = "x-o2-trace-id";
@@ -85,6 +88,40 @@ const MAX_TAILS_PER_TURN: usize = 4;
 const MICROS_PER_DAY: i64 = 86_400 * MICROS_PER_SEC;
 /// Older confirmation requests go unreported, so a dormant chat never widens the search.
 const PENDING_APPROVAL_MAX_AGE: i64 = MICROS_PER_DAY;
+const MAX_QUERY_CHARS: usize = 200;
+const MAX_AGENT_TYPE_FILTERS: usize = 16;
+const IMPORT_MAX_CHATS: usize = 100;
+// Mirrors the share size cap: an imported chat is never larger than a shared one may be.
+const IMPORT_CHAT_MAX_BYTES: usize = 16 * 1024 * 1024;
+const IMPORT_BODY_MAX_BYTES: usize = 32 * 1024 * 1024;
+const IMPORT_ORG_MAX_CHATS: u64 = 10_000;
+const IMPORT_MAX_TURNS: usize = MAX_TURNS_PAGE;
+const IMPORT_MAX_FRAMES: usize = 5_000;
+// Turn ids and error codes are stored next to UUIDs and enum codes, never longer.
+const IMPORT_MAX_ID_CHARS: usize = 64;
+const IMPORT_MAX_ERROR_CHARS: usize = 2_000;
+const IMPORTED_STATUSES: [&str; 4] = [
+    TURN_COMPLETED,
+    TURN_FAILED,
+    TURN_CANCELLED,
+    TURN_INTERRUPTED,
+];
+const MAX_CLIENT_ID_CHARS: usize = 128;
+const IMPORTED_TURN_KEYS: [&str; 7] = [
+    "turn_id",
+    "created",
+    "user",
+    "frames",
+    "error",
+    "status",
+    "error_code",
+];
+const IMPORT_TOO_LARGE: &str = "payload_too_large";
+const IMPORT_INVALID: &str = "invalid_chat";
+const IMPORT_UNAVAILABLE: &str = "unavailable";
+const IMPORT_QUOTA: &str = "quota_exceeded";
+const IMPORT_BUSY: &str = "import_busy";
+const ORIGIN_INCIDENT: &str = "incident";
 
 /// One chat in the user's list.
 #[derive(Debug, Serialize, ToSchema)]
@@ -109,6 +146,11 @@ pub struct ChatSummary {
     /// The call id of that request, when it could be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pending_approval_id: Option<String>,
+    /// Pinned by the owner, on every device.
+    pub pinned: bool,
+    /// When it was pinned (micros); absent while unpinned.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pinned_at: Option<i64>,
 }
 
 impl ChatSummary {
@@ -136,6 +178,8 @@ impl From<Model> for ChatSummary {
             active_turn_id: None,
             pending_approval: false,
             pending_approval_id: None,
+            pinned: row.pinned,
+            pinned_at: row.pinned_at,
         }
     }
 }
@@ -152,6 +196,10 @@ pub struct ChatListResponse {
 pub struct ListParams {
     pub limit: Option<u64>,
     pub cursor: Option<String>,
+    /// Case-insensitive text in the title or the typed prompts.
+    pub q: Option<String>,
+    /// `true`: only pinned chats.
+    pub pinned: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,11 +229,104 @@ pub struct ChatDetailResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Vec<Object>>)]
     pub turns: Option<Vec<serde_json::Value>>,
+    /// A fork's seed `{owner_name, as_of, turns}`, copied from the share when it was forked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub seed: Option<Value>,
+}
+
+/// `PATCH` body: a new title, a pin, or both.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RenameRequest {
+    pub title: Option<String>,
+    pub pinned: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct RenameRequest {
+pub struct ImportRequest<'a> {
+    /// Each chat is read on its own, so one malformed chat fails alone.
+    #[serde(borrow)]
+    #[schema(value_type = Vec<ImportChat>)]
+    pub chats: Vec<&'a serde_json::value::RawValue>,
+}
+
+/// One browser-recorded chat; `turns` are stored as frames and never re-run.
+#[derive(Debug, ToSchema)]
+pub struct ImportChat {
+    pub client_id: String,
+    /// A missing, `null` or non-string title is taken from the first prompt.
     pub title: String,
+    /// When the browser started it (ms or micros, integer or float); informational.
+    pub created: Option<i64>,
+    /// `editor` | `alert` | `incident` | `none`; picks the imported chat's `agent_type`.
+    pub origin: String,
+    pub pinned: bool,
+    #[schema(value_type = Vec<Object>)]
+    pub turns: Vec<Value>,
+}
+
+impl ImportChat {
+    /// Reads one chat of an import body; a missing, `null` or mistyped optional field is unset.
+    fn from_raw(raw: &serde_json::value::RawValue) -> Result<Self, ImportFailure> {
+        let text = raw.get();
+        let fail = |client_id: String, code: &str| ImportFailure {
+            client_id,
+            code: code.to_string(),
+        };
+        if text.len() > IMPORT_CHAT_MAX_BYTES {
+            return Err(fail(raw_client_id(text), IMPORT_TOO_LARGE));
+        }
+        let Ok(Value::Object(mut chat)) = serde_json::from_str::<Value>(text) else {
+            return Err(fail(raw_client_id(text), IMPORT_INVALID));
+        };
+        let text_of = |value: Option<&Value>| {
+            value
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string()
+        };
+        let client_id = text_of(chat.get("client_id"));
+        if client_id.is_empty() || client_id.chars().count() > MAX_CLIENT_ID_CHARS {
+            let shown = client_id.chars().take(MAX_CLIENT_ID_CHARS).collect();
+            return Err(fail(shown, IMPORT_INVALID));
+        }
+        let Some(Value::Array(turns)) = chat.remove("turns") else {
+            return Err(fail(client_id, IMPORT_INVALID));
+        };
+        let created = chat
+            .get("created")
+            .and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64)));
+        Ok(Self {
+            title: text_of(chat.get("title")),
+            created,
+            origin: text_of(chat.get("origin")),
+            pinned: chat.get("pinned").and_then(Value::as_bool).unwrap_or(false),
+            client_id,
+            turns,
+        })
+    }
+}
+
+#[derive(Debug, Default, Serialize, ToSchema)]
+pub struct ImportResponse {
+    pub imported: Vec<ImportedChat>,
+    /// Chats imported before; their ids are in no other list.
+    pub skipped: Vec<String>,
+    pub failed: Vec<ImportFailure>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ImportedChat {
+    pub client_id: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ImportFailure {
+    pub client_id: String,
+    /// `payload_too_large` | `invalid_chat` | `unavailable`.
+    pub code: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -338,6 +479,29 @@ impl Drop for TailSlot {
     }
 }
 
+/// The one import a member runs at a time on this node; dropping it frees it.
+struct ImportSlot {
+    key: String,
+}
+
+impl ImportSlot {
+    fn take(org_id: &str, owner: &str) -> Option<Self> {
+        let key = format!("{org_id}/{owner}");
+        let mut running = IMPORTING.lock().unwrap_or_else(|e| e.into_inner());
+        if !running.insert(key.clone()) {
+            return None;
+        }
+        Some(Self { key })
+    }
+}
+
+impl Drop for ImportSlot {
+    fn drop(&mut self) {
+        let mut running = IMPORTING.lock().unwrap_or_else(|e| e.into_inner());
+        running.remove(&self.key);
+    }
+}
+
 /// The turns a detail read returns (see [`build_history`]).
 #[derive(Debug, Default, PartialEq)]
 struct History {
@@ -382,6 +546,12 @@ impl StateVersion {
             active,
             pending: false,
         }
+    }
+
+    /// A vote changes no event or turn record, so the version moves with the newest one too.
+    fn with_vote(mut self, newest_vote: i64) -> Self {
+        self.changed_at = self.changed_at.max(newest_vote);
+        self
     }
 
     /// Whether a copy at `self` is current with `now`.
@@ -617,12 +787,19 @@ pub(super) fn lease_busy(active_turn_id: Option<String>) -> AiErrorEnvelope {
                    `pending_approval` (and `pending_approval_id`) when its newest turn, started \
                    in the last 24 hours, stored a request for confirmation that the caller has \
                    not yet answered through `/confirm`; the latter is a hint, so re-read the \
-                   conversation before acting on it.",
+                   conversation before acting on it. `q` matches the title and the prompts typed \
+                   in the chat, case-insensitively (a chat stored before history search \
+                   matches by title only); `agent_type` (repeatable) keeps only \
+                   those agent types and `agent_type=!type` leaves one out; `pinned=true` keeps \
+                   the pinned chats.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("limit" = Option<u64>, Query, description = "Page size (default 50, max 200)"),
         ("cursor" = Option<String>, Query, description = "`next_cursor` of the previous page"),
+        ("q" = Option<String>, Query, description = "Text in the title or the typed prompts (max 200 characters)"),
+        ("agent_type" = Option<Vec<String>>, Query, description = "Agent types to keep; `!type` leaves one out (repeatable)"),
+        ("pinned" = Option<bool>, Query, description = "Only pinned chats"),
     ),
     responses(
         (status = 200, description = "A page of conversations", body = inline(ChatListResponse)),
@@ -651,13 +828,17 @@ pub async fn list(
         None => None,
     };
     let limit = params.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
+    let filter = match list_filter(&params, in_req.uri().query()) {
+        Ok(filter) => filter,
+        Err(resp) => return resp,
+    };
     let running_since = running_since(config::utils::time::now_micros());
     // One extra row tells whether there is a next page.
     let mut rows = match ai_chat_sessions::list_for_user(
         &org_id,
         &owner,
-        cursor.as_ref(),
-        limit + 1,
+        (cursor.as_ref(), limit + 1),
+        &filter,
         running_since,
     )
     .await
@@ -740,7 +921,9 @@ pub async fn get(
         .iter()
         .rfind(|r| ai_chat_turns::is_running(r, running_since(now)))
         .cloned();
-    let mut version = StateVersion::of(&row, &records, active.is_some());
+    let feedback = caller_feedback(&row, &user_email).await;
+    let newest_vote = newest_vote(&feedback);
+    let mut version = StateVersion::of(&row, &records, active.is_some()).with_vote(newest_vote);
     let known = params
         .known_version
         .as_deref()
@@ -762,6 +945,7 @@ pub async fn get(
             partial_from_seq: None,
             has_more: false,
             turns: None,
+            seed: None,
         })
         .into_response();
     }
@@ -779,7 +963,7 @@ pub async fn get(
     let known_seq = params
         .known_seq
         .filter(|n| (NO_SEQ..row.last_committed_seq).contains(n))
-        .filter(|_| known.is_some());
+        .filter(|_| known.is_some_and(|k| newest_vote <= k.changed_at));
     let cut = Cut {
         cutoff: row.last_committed_seq,
         known_seq,
@@ -788,13 +972,24 @@ pub async fn get(
         limit: params.limit.map(|l| l.clamp(1, MAX_TURNS_PAGE)),
     };
     let history = build_history(turns, &records, running_since(now), cut);
+    let mut turns = history.turns;
+    // Imported turns precede every stored one, so only a read that reaches the start shows them.
+    if history.partial_from_seq.is_none() && !history.has_more {
+        prepend_imported(&row, &mut turns).await;
+    }
+    annotate_turns(&mut turns, &records, &feedback);
+    let seed = row
+        .seed
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok());
     Json(ChatDetailResponse {
         chat: ChatSummary::from(row).with_markers(active.as_ref(), pending.as_ref()),
         state_version: version.to_string(),
         not_modified: false,
         partial_from_seq: history.partial_from_seq,
         has_more: history.has_more,
-        turns: Some(history.turns),
+        turns: Some(turns),
+        seed,
     })
     .into_response()
 }
@@ -806,9 +1001,10 @@ pub async fn get(
     context_path = "/api",
     tag = "AI",
     operation_id = "RenameAiChat",
-    summary = "Rename an AI conversation",
-    description = "Sets the title of the caller's conversation. A title set here is never \
-                   replaced by the automatically generated one.",
+    summary = "Rename or pin an AI conversation",
+    description = "Sets the title of the caller's conversation, pins or unpins it, or both. A \
+                   title set here is never replaced by the automatically generated one; a pin \
+                   shows on every device.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -836,11 +1032,14 @@ pub async fn rename(
         Ok(b) => b,
         Err(_) => return error::invalid_request("Request body too large"),
     };
-    let Ok(RenameRequest { title }) = serde_json::from_slice::<RenameRequest>(&body) else {
-        return error::invalid_request("Expected {\"title\": string}");
+    let Ok(patch) = serde_json::from_slice::<RenameRequest>(&body) else {
+        return error::invalid_request("Expected {\"title\"?: string, \"pinned\"?: boolean}");
     };
-    let title = title.trim();
-    if title.is_empty() || title.chars().count() > MAX_TITLE_CHARS {
+    let title = patch.title.as_deref().map(str::trim);
+    if patch.title.is_none() && patch.pinned.is_none() {
+        return error::invalid_request("Expected {\"title\"?: string, \"pinned\"?: boolean}");
+    }
+    if title.is_some_and(|t| t.is_empty() || t.chars().count() > MAX_TITLE_CHARS) {
         return error::invalid_request(format!(
             "The title must be 1 to {MAX_TITLE_CHARS} characters"
         ));
@@ -852,11 +1051,14 @@ pub async fn rename(
         Ok(owner) => owner,
         Err(e) => return admit_error_response(e),
     };
-    match ai_chat_sessions::rename(&org_id, &session_id, &owner, title).await {
-        Ok(true) => MetaHttpResponse::json(serde_json::json!({"title": title})),
+    let key = (org_id.as_str(), session_id.as_str(), owner.as_str());
+    match apply_patch(key, title, patch.pinned).await {
+        Ok(true) => {
+            MetaHttpResponse::json(serde_json::json!({"title": title, "pinned": patch.pinned}))
+        }
         Ok(false) => error::not_found("Unknown conversation"),
         Err(e) => {
-            log::error!("[AI-CHAT] cannot rename {org_id}/{session_id}: {e}");
+            log::error!("[AI-CHAT] cannot update {org_id}/{session_id}: {e}");
             error::history_unavailable("Chat history is unavailable; please retry")
         }
     }
@@ -916,6 +1118,7 @@ pub async fn delete(
         }
     }
     super::shares::revoke_for_deleted(&org_id, std::slice::from_ref(&session_id), now).await;
+    forget_content(&org_id, std::slice::from_ref(&session_id)).await;
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
     tokio::spawn(purge_replicas(org_id, vec![session_id], auth));
@@ -956,12 +1159,108 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
         }
     };
     let deleted = session_ids.len();
+    forget_content(&org_id, &session_ids).await;
     if !session_ids.is_empty() {
         let (parts, _) = in_req.into_parts();
         let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         tokio::spawn(purge_replicas(org_id, session_ids, auth));
     }
     MetaHttpResponse::json(serde_json::json!({ "deleted": deleted }))
+}
+
+/// ImportAiChats
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/chats/import",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ImportAiChats",
+    summary = "Move browser-recorded AI conversations to the server",
+    description = "Creates one conversation of the caller per chat, holding its recorded turns \
+                   as frames: nothing is re-run. Idempotent on `client_id` per caller: a chat \
+                   imported before and not deleted since is listed in `skipped`. A chat over the \
+                   16 MiB cap fails with `payload_too_large`, a malformed one with \
+                   `invalid_chat`, one past the organization's import quota with \
+                   `quota_exceeded`. The new chat's `agent_type` follows `origin`. One import \
+                   per member runs at a time.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(ImportRequest), content_type = "application/json"),
+    responses(
+        (status = 200, description = "Each chat imported, skipped or failed", body = inline(ImportResponse)),
+        (status = 400, description = "Malformed body or too many chats", body = Object),
+        (status = 409, description = "Another import of the caller is running (`reason: import_busy`)", body = Object),
+        (status = 413, description = "The body is over 32 MiB, or the organization's import quota is full (`reason: quota_exceeded`)", body = Object),
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn import(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    let Some(user_email) = user_email(&in_req) else {
+        return error::session_expired("Unauthorized");
+    };
+    if !o2_enterprise::enterprise::ai::chat::is_enabled() {
+        return history_not_enabled();
+    }
+    let Ok(body) = axum::body::to_bytes(in_req.into_body(), IMPORT_BODY_MAX_BYTES).await else {
+        return AiErrorEnvelope::new(AiErrorCode::InvalidRequest, "The import is too large")
+            .status(StatusCode::PAYLOAD_TOO_LARGE)
+            .into_response();
+    };
+    let Ok(request) = serde_json::from_slice::<ImportRequest<'_>>(&body) else {
+        return error::invalid_request(
+            "Expected {\"chats\": [{client_id, title, created, origin, turns}]}",
+        );
+    };
+    if request.chats.len() > IMPORT_MAX_CHATS {
+        return error::invalid_request(format!("At most {IMPORT_MAX_CHATS} chats per request"));
+    }
+    let owner = match resolve_owner(&user_email).await {
+        Ok(owner) => owner,
+        Err(e) => return admit_error_response(e),
+    };
+    let Some(_slot) = ImportSlot::take(&org_id, &owner) else {
+        return AiErrorEnvelope::new(AiErrorCode::TurnBusy, "Another import of yours is running")
+            .status(StatusCode::CONFLICT)
+            .with("reason", IMPORT_BUSY)
+            .into_response();
+    };
+    let mut room = match ai_chat_imports::count_for_org(&org_id).await {
+        Ok(held) => IMPORT_ORG_MAX_CHATS.saturating_sub(held),
+        Err(e) => {
+            log::error!("[AI-CHAT] cannot count the imports of {org_id}: {e}");
+            return error::history_unavailable("Chat persistence is unavailable; please retry");
+        }
+    };
+    if room == 0 {
+        return AiErrorEnvelope::new(
+            AiErrorCode::InvalidRequest,
+            "This organization holds as many imported chats as it may",
+        )
+        .status(StatusCode::PAYLOAD_TOO_LARGE)
+        .with("reason", IMPORT_QUOTA)
+        .into_response();
+    }
+    let mut response = ImportResponse::default();
+    for raw in request.chats {
+        let chat = match ImportChat::from_raw(raw) {
+            Ok(chat) if room > 0 => chat,
+            Ok(chat) => {
+                response.failed.push(ImportFailure {
+                    client_id: chat.client_id,
+                    code: IMPORT_QUOTA.to_string(),
+                });
+                continue;
+            }
+            Err(failure) => {
+                response.failed.push(failure);
+                continue;
+            }
+        };
+        if import_one(&org_id, (&owner, &user_email), chat, &mut response).await {
+            room -= 1;
+        }
+    }
+    Json(response).into_response()
 }
 
 /// StreamAiChatTurn
@@ -1060,6 +1359,345 @@ pub async fn stream_turn(
             .map(|chunk| (Ok::<_, std::convert::Infallible>(chunk), rx))
     });
     super::chat::sse_response(axum::body::Body::from_stream(body))
+}
+
+/// The list filter of `params` and the raw query's repeatable `agent_type`.
+fn list_filter(params: &ListParams, raw_query: Option<&str>) -> Result<ListFilter, Response> {
+    let q = params.q.as_deref().map(str::trim).filter(|q| !q.is_empty());
+    if q.is_some_and(|q| q.chars().count() > MAX_QUERY_CHARS) {
+        return Err(error::invalid_request(format!(
+            "q is at most {MAX_QUERY_CHARS} characters"
+        )));
+    }
+    let mut filter = ListFilter {
+        q: q.map(str::to_string),
+        pinned_only: params.pinned == Some(true),
+        ..Default::default()
+    };
+    let types = url::form_urlencoded::parse(raw_query.unwrap_or_default().as_bytes())
+        .filter(|(key, _)| key == "agent_type")
+        .map(|(_, value)| value.trim().to_string())
+        .filter(|value| !value.is_empty() && value != "!");
+    for value in types {
+        match value.strip_prefix('!') {
+            Some(excluded) => filter.exclude_agent_types.push(excluded.to_string()),
+            None => filter.agent_types.push(value),
+        }
+    }
+    if filter.agent_types.len() + filter.exclude_agent_types.len() > MAX_AGENT_TYPE_FILTERS {
+        return Err(error::invalid_request(format!(
+            "At most {MAX_AGENT_TYPE_FILTERS} agent_type filters"
+        )));
+    }
+    Ok(filter)
+}
+
+/// Applies a validated `PATCH`; `false` when the caller has no such chat.
+async fn apply_patch(
+    (org_id, session_id, owner): (&str, &str, &str),
+    title: Option<&str>,
+    pinned: Option<bool>,
+) -> Result<bool, infra::errors::Error> {
+    if let Some(title) = title
+        && !ai_chat_sessions::rename(org_id, session_id, owner, title).await?
+    {
+        return Ok(false);
+    }
+    match pinned {
+        Some(pinned) => {
+            let now = config::utils::time::now_micros();
+            ai_chat_sessions::set_pinned(org_id, session_id, owner, pinned, now).await
+        }
+        None => Ok(true),
+    }
+}
+
+/// The caller's vote per turn of this chat, as detail turns carry it.
+async fn caller_feedback(row: &Model, user_email: &str) -> HashMap<String, Value> {
+    let votes = ai_chat_feedback::list_for_session(&row.org_id, &row.session_id, &row.user_id)
+        .await
+        .unwrap_or_else(|e| {
+            // Votes annotate the history; an unreadable vote leaves it out.
+            log::warn!(
+                "[AI-CHAT] cannot read the feedback of {}: {e}",
+                row.session_id
+            );
+            Vec::new()
+        });
+    votes
+        .into_iter()
+        .map(|vote| {
+            let mut body = serde_json::json!({
+                "rating": vote.rating,
+                "by": user_email,
+                "at": vote.updated_at,
+            });
+            if let Some(comment) = vote.comment {
+                body["comment"] = comment.into();
+            }
+            (vote.turn_id, body)
+        })
+        .collect()
+}
+
+/// When the caller last voted on this chat, `0` before any vote.
+fn newest_vote(feedback: &HashMap<String, Value>) -> i64 {
+    feedback
+        .values()
+        .filter_map(|vote| vote["at"].as_i64())
+        .max()
+        .unwrap_or(0)
+}
+
+/// Each turn's caller vote and the turn versions that regenerate or edit it.
+fn annotate_turns(turns: &mut [Value], records: &[TurnRecord], feedback: &HashMap<String, Value>) {
+    for turn in turns {
+        let Some(id) = turn
+            .get("turn_id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let Some(obj) = turn.as_object_mut() else {
+            continue;
+        };
+        if let Some(vote) = feedback.get(&id) {
+            obj.insert("feedback".into(), vote.clone());
+        }
+        let versions: Vec<Value> = records
+            .iter()
+            .filter(|r| r.version_of.as_deref() == Some(id.as_str()))
+            .map(|r| serde_json::json!({"turn_id": r.turn_id, "created_at": r.started_at}))
+            .collect();
+        if !versions.is_empty() {
+            obj.insert("versions".into(), versions.into());
+        }
+        if let Some(of) = records
+            .iter()
+            .find(|r| r.turn_id == id)
+            .and_then(|r| r.version_of.clone())
+        {
+            obj.insert("version_of".into(), of.into());
+        }
+    }
+}
+
+/// Puts an imported chat's recorded turns before the turns it has stored since.
+async fn prepend_imported(row: &Model, turns: &mut Vec<Value>) {
+    match ai_chat_imports::turns_for_session(&row.org_id, &row.session_id).await {
+        Ok(Some(Value::Array(imported))) => {
+            turns.splice(0..0, imported);
+        }
+        Ok(_) => {}
+        Err(e) => log::warn!(
+            "[AI-CHAT] cannot read the imported turns of {}: {e}",
+            row.session_id
+        ),
+    }
+}
+
+/// Votes and imported turns are content of the chat: they go when it is deleted.
+async fn forget_content(org_id: &str, session_ids: &[String]) {
+    // Retention removes what is left once the chat rows go.
+    if let Err(e) = ai_chat_feedback::delete_for_sessions(org_id, session_ids).await {
+        log::warn!("[AI-CHAT] cannot delete the feedback of deleted chats in {org_id}: {e}");
+    }
+    if let Err(e) = ai_chat_imports::delete_for_sessions(org_id, session_ids).await {
+        log::warn!("[AI-CHAT] cannot delete the imports of deleted chats in {org_id}: {e}");
+    }
+}
+
+/// Imports one chat into `response`: a new chat (`true`), a skipped repeat, or a failure code.
+async fn import_one(
+    org_id: &str,
+    (owner, user_email): (&str, &str),
+    mut chat: ImportChat,
+    response: &mut ImportResponse,
+) -> bool {
+    let prepared = match prepare_import(&mut chat) {
+        Ok(prepared) => prepared,
+        Err(code) => {
+            response.failed.push(ImportFailure {
+                client_id: chat.client_id,
+                code: code.to_string(),
+            });
+            return false;
+        }
+    };
+    let session_id = uuid::Uuid::now_v7().to_string();
+    let title = imported_title(&chat.title, &prepared);
+    let search_text = imported_search_text(&prepared);
+    let new = NewImport {
+        org_id,
+        session_id: &session_id,
+        user_id: owner,
+        user_email,
+        agent_type: imported_agent_type(&chat.origin),
+        title: &title,
+        pinned: chat.pinned,
+        search_text: &search_text,
+    };
+    let origin: String = chat.origin.chars().take(32).collect();
+    let now = config::utils::time::now_micros();
+    let client_id = chat.client_id;
+    match ai_chat_imports::import_chat(&new, (&client_id, &origin), prepared, now).await {
+        Ok(ai_chat_imports::Imported::Created(session_id)) => {
+            response.imported.push(ImportedChat {
+                client_id,
+                session_id,
+            });
+            true
+        }
+        Ok(ai_chat_imports::Imported::Existing(_)) => {
+            response.skipped.push(client_id);
+            false
+        }
+        Err(e) => {
+            log::error!("[AI-CHAT] cannot import a chat into {org_id}/{owner}: {e}");
+            response.failed.push(ImportFailure {
+                client_id,
+                code: IMPORT_UNAVAILABLE.to_string(),
+            });
+            false
+        }
+    }
+}
+
+/// The turns to store for an imported chat, taken out of it, or the failure code for it.
+fn prepare_import(chat: &mut ImportChat) -> Result<Value, &'static str> {
+    if chat.turns.is_empty() || chat.turns.len() > IMPORT_MAX_TURNS {
+        return Err(IMPORT_INVALID);
+    }
+    let turns = std::mem::take(&mut chat.turns)
+        .into_iter()
+        .map(imported_turn)
+        .collect::<Option<Vec<Value>>>()
+        .ok_or(IMPORT_INVALID)?;
+    Ok(Value::Array(turns))
+}
+
+/// A recorded turn reduced to the stored-turn keys and bounded; `None` when it is malformed.
+fn imported_turn(turn: Value) -> Option<Value> {
+    let Value::Object(source) = turn else {
+        return None;
+    };
+    let mut kept: serde_json::Map<String, Value> = source
+        .into_iter()
+        .filter(|(key, _)| IMPORTED_TURN_KEYS.contains(&key.as_str()))
+        .collect();
+    let frames = kept.get("frames").and_then(Value::as_array)?;
+    let typed = |f: &Value| f.get("type").is_some_and(Value::is_string);
+    if frames.len() > IMPORT_MAX_FRAMES || !frames.iter().all(typed) {
+        return None;
+    }
+    let status = match kept.get("status") {
+        None | Some(Value::Null) => TURN_COMPLETED,
+        Some(Value::String(s)) if s.as_str() == TURN_RUNNING => TURN_INTERRUPTED,
+        Some(Value::String(s)) => IMPORTED_STATUSES.into_iter().find(|k| *k == s.as_str())?,
+        Some(_) => return None,
+    };
+    kept.insert("status".into(), status.into());
+    for key in ["turn_id", "error_code"] {
+        let short = kept
+            .get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|v| v.chars().count() <= IMPORT_MAX_ID_CHARS);
+        if !short {
+            kept.remove(key);
+        }
+    }
+    match kept.get("error") {
+        Some(Value::String(e)) => {
+            let bounded: String = e.chars().take(IMPORT_MAX_ERROR_CHARS).collect();
+            kept.insert("error".into(), bounded.into());
+        }
+        Some(Value::Null) | None => {}
+        Some(_) => {
+            kept.remove("error");
+        }
+    }
+    if !kept.get("created").is_none_or(Value::is_number) {
+        kept.remove("created");
+    }
+    imported_user(&mut kept)?;
+    Some(Value::Object(kept))
+}
+
+/// Keeps the user's text and only inline images; `None` when `user` is not an object.
+fn imported_user(turn: &mut serde_json::Map<String, Value>) -> Option<()> {
+    let Some(user) = turn.get_mut("user") else {
+        return Some(());
+    };
+    let user = user.as_object_mut()?;
+    if !user.get("text").is_none_or(Value::is_string) {
+        user.remove("text");
+    }
+    if let Some(images) = user.get_mut("images") {
+        let inline = |image: &Value| {
+            image["url"]
+                .as_str()
+                .is_some_and(|url| url.starts_with("data:image/"))
+        };
+        match images {
+            Value::Array(list) => list.retain(inline),
+            _ => *images = Value::Array(Vec::new()),
+        }
+    }
+    Some(())
+}
+
+/// The `client_id` of a chat too large or malformed to read whole, when it has one.
+fn raw_client_id(text: &str) -> String {
+    #[derive(Deserialize)]
+    struct Named {
+        #[serde(default)]
+        client_id: Option<Value>,
+    }
+    serde_json::from_str::<Named>(text)
+        .ok()
+        .and_then(|n| n.client_id)
+        .and_then(|v| {
+            v.as_str()
+                .map(|s| s.trim().chars().take(MAX_CLIENT_ID_CHARS).collect())
+        })
+        .unwrap_or_default()
+}
+
+/// The chat's own title, else its first prompt's first line.
+fn imported_title(title: &str, turns: &Value) -> String {
+    let title = title.trim();
+    if !title.is_empty() {
+        return title.chars().take(MAX_TITLE_CHARS).collect();
+    }
+    turns
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|t| t["user"]["text"].as_str())
+        .find_map(prompt_title)
+        .unwrap_or_else(|| "Imported chat".to_string())
+}
+
+/// What `q` searches in an imported chat: its typed prompts, attachment blocks left out.
+fn imported_search_text(turns: &Value) -> String {
+    turns
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|t| t["user"]["text"].as_str())
+        .map(|text| openobserve_core::ai_chat::projection::split_attachment_blocks(text).0)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// An incident chat ran the RCA agent; every other origin is the default assistant.
+fn imported_agent_type(origin: &str) -> &'static str {
+    if origin == ORIGIN_INCIDENT {
+        o2_enterprise::enterprise::ai::client::RCA_AGENT_TYPE
+    } else {
+        o2_enterprise::enterprise::ai::client::DEFAULT_AGENT_TYPE
+    }
 }
 
 fn encode_cursor(row: &Model) -> String {
@@ -1313,7 +1951,7 @@ fn build_history(
             while let Some(failed) = synthetic.next_if(|s| s.started_at < record.started_at) {
                 turns.push(failed_turn(failed));
             }
-            attach_record(&mut turn, record, running_since);
+            attach_record(&mut turn, record, running_since, cut.admitted_by);
         }
         let newer = cut
             .known_seq
@@ -1356,7 +1994,18 @@ fn covering_record(records: &[TurnRecord], first_seq: i64) -> Option<&TurnRecord
 }
 
 /// Labels a projected turn with its record; its frames end as the live stream of that outcome did.
-fn attach_record(turn: &mut Value, record: &TurnRecord, running_since: i64) {
+fn attach_record(
+    turn: &mut Value,
+    record: &TurnRecord,
+    running_since: i64,
+    decided_by: Option<i64>,
+) {
+    // A snapshot shows the answers given by its time (micros), not ones given since (ms).
+    let decisions: Vec<Value> = ai_chat_turns::decisions_of(record)
+        .into_iter()
+        .filter(|d| decided_by.is_none_or(|by| d["at"].as_i64().is_some_and(|ms| ms * 1000 <= by)))
+        .collect();
+    openobserve_core::ai_chat::projection::attach_decisions(turn, &decisions);
     let Some(obj) = turn.as_object_mut() else {
         return;
     };
@@ -2058,6 +2707,8 @@ mod tests {
             started_at,
             ended_at: None,
             first_event_at: None,
+            version_of: None,
+            decisions: None,
         }
     }
 
@@ -2082,6 +2733,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         }
     }
 
@@ -2493,6 +3148,7 @@ mod tests {
             partial_from_seq: None,
             has_more: false,
             turns: None,
+            seed: None,
         };
         let text = serde_json::to_string(&detail).unwrap();
         assert_eq!(text.matches("\"active_turn\"").count(), 1, "{text}");
@@ -3031,5 +3687,233 @@ mod tests {
         // A day on, with nothing new committed, the copy's flag no longer holds.
         assert!(!still_pending(true, Some(&fresh), now + MICROS_PER_DAY));
         assert!(!still_pending(true, None, now));
+    }
+
+    fn list_params(q: Option<&str>, pinned: Option<bool>) -> ListParams {
+        ListParams {
+            limit: None,
+            cursor: None,
+            q: q.map(str::to_string),
+            pinned,
+        }
+    }
+
+    #[test]
+    fn list_filters_read_repeated_and_negated_agent_types() {
+        let filter = list_filter(
+            &list_params(Some("  p99 latency "), Some(true)),
+            Some("agent_type=o2-ai&agent_type=%21sre-rca&agent_type=!&agent_type=&q=x"),
+        )
+        .unwrap();
+        assert_eq!(filter.q.as_deref(), Some("p99 latency"));
+        assert!(filter.pinned_only);
+        assert_eq!(filter.agent_types, vec!["o2-ai".to_string()]);
+        assert_eq!(filter.exclude_agent_types, vec!["sre-rca".to_string()]);
+        let none = list_filter(&list_params(Some("   "), Some(false)), None).unwrap();
+        assert!(none.q.is_none() && !none.pinned_only && none.agent_types.is_empty());
+        let long = "x".repeat(MAX_QUERY_CHARS + 1);
+        assert!(list_filter(&list_params(Some(&long), None), None).is_err());
+        let many = vec!["agent_type=a"; MAX_AGENT_TYPE_FILTERS + 1].join("&");
+        assert!(list_filter(&list_params(None, None), Some(&many)).is_err());
+    }
+
+    #[test]
+    fn detail_turns_carry_votes_and_versions() {
+        let mut turns = vec![
+            serde_json::json!({"turn_id": "t1", "frames": []}),
+            serde_json::json!({"turn_id": "t2", "frames": []}),
+            serde_json::json!({"frames": []}),
+        ];
+        let records = vec![
+            record("t1", TURN_COMPLETED, (Some(1), Some(4)), 10),
+            TurnRecord {
+                version_of: Some("t1".into()),
+                ..record("t2", TURN_COMPLETED, (Some(5), Some(9)), 20)
+            },
+        ];
+        let feedback = HashMap::from([("t1".to_string(), serde_json::json!({"rating": "up"}))]);
+        annotate_turns(&mut turns, &records, &feedback);
+        assert_eq!(turns[0]["feedback"]["rating"], "up");
+        assert_eq!(
+            turns[0]["versions"],
+            serde_json::json!([{"turn_id": "t2", "created_at": 20}])
+        );
+        assert!(turns[0].get("version_of").is_none());
+        assert_eq!(turns[1]["version_of"], "t1");
+        assert!(turns[1].get("feedback").is_none() && turns[1].get("versions").is_none());
+        assert_eq!(turns[2], serde_json::json!({"frames": []}));
+    }
+
+    #[test]
+    fn a_vote_moves_the_state_version() {
+        let records = vec![record("t1", TURN_COMPLETED, (Some(1), Some(4)), 100)];
+        let copy = StateVersion::of(&chat_row(), &records, false);
+        let mut feedback = HashMap::new();
+        assert_eq!(copy.with_vote(newest_vote(&feedback)), copy);
+        feedback.insert(
+            "t1".to_string(),
+            serde_json::json!({"rating": "up", "at": 500}),
+        );
+        let now = copy.with_vote(newest_vote(&feedback));
+        assert!(!copy.current_with(&now));
+        assert_eq!(now.changed_at, 500);
+    }
+
+    #[test]
+    fn a_snapshot_shows_only_the_decisions_given_by_its_time() {
+        let turn = || {
+            serde_json::json!({"first_seq": 1, "last_seq": 4, "frames": [
+                {"type": "confirmation_required", "id": "a1"},
+                {"type": "confirmation_required", "id": "a2"},
+            ]})
+        };
+        let records = vec![TurnRecord {
+            decisions: Some(
+                serde_json::json!([
+                    {"id": "a1", "approved": true, "at": 5},
+                    {"id": "a2", "approved": false, "at": 50},
+                ])
+                .to_string(),
+            ),
+            ..record("t1", TURN_COMPLETED, (Some(1), Some(4)), 1)
+        }];
+        let answered = |cut: Cut| -> Vec<String> {
+            build_history(vec![turn()], &records, 0, cut).turns[0]["frames"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|f| f["type"] == "confirmation_resolved")
+                .map(|f| f["id"].as_str().unwrap().to_string())
+                .collect()
+        };
+        let live = Cut {
+            cutoff: 4,
+            ..Default::default()
+        };
+        assert_eq!(answered(live), ["a1", "a2"]);
+        let snapshot = Cut {
+            admitted_by: Some(10_000),
+            ..live
+        };
+        assert_eq!(answered(snapshot), ["a1"]);
+    }
+
+    fn import_chat(turns: Vec<Value>) -> ImportChat {
+        ImportChat {
+            client_id: "local-1".into(),
+            title: String::new(),
+            created: None,
+            origin: "incident".into(),
+            pinned: false,
+            turns,
+        }
+    }
+
+    fn read_chat(chat: &Value) -> Result<ImportChat, ImportFailure> {
+        let text = chat.to_string();
+        let raw = serde_json::value::RawValue::from_string(text).unwrap();
+        ImportChat::from_raw(&raw)
+    }
+
+    #[test]
+    fn imports_keep_stored_turn_keys_and_settle_running_turns() {
+        let mut chat = import_chat(vec![
+            serde_json::json!({
+                "user_message_id": "m1",
+                "user": {"text": "why is p99 up?\n--- a.json [abcd2345] ---\n{}\n--- end [abcd2345] ---",
+                    "images": [{"url": "https://x/y.png"}, {"url": "data:image/png;base64,AA"}]},
+                "frames": [{"type": "text", "content": "pool"}],
+                "status": "running",
+                "error_code": "x".repeat(65),
+                "secret": "dropped"
+            }),
+            serde_json::json!({"turn_id": "t2", "user": {"text": "and now?"}, "frames": [], "error": 7}),
+        ]);
+        let turns = prepare_import(&mut chat).unwrap();
+        assert!(chat.turns.is_empty(), "moved, not copied");
+        assert_eq!(turns[0]["status"], TURN_INTERRUPTED);
+        assert!(turns[0].get("secret").is_none() && turns[0].get("error_code").is_none());
+        assert_eq!(
+            turns[0]["user"]["images"],
+            serde_json::json!([{"url": "data:image/png;base64,AA"}])
+        );
+        assert_eq!(turns[1]["status"], TURN_COMPLETED);
+        assert_eq!(turns[1]["turn_id"], "t2");
+        assert!(turns[1].get("error").is_none());
+        assert_eq!(imported_title("", &turns), "why is p99 up?");
+        assert_eq!(imported_title("  Mine ", &turns), "Mine");
+        let text = imported_search_text(&turns);
+        assert!(text.contains("why is p99 up?") && text.contains("and now?"));
+        assert!(!text.contains("a.json"), "{text}");
+        assert_eq!(
+            imported_agent_type(&chat.origin),
+            o2_enterprise::enterprise::ai::client::RCA_AGENT_TYPE
+        );
+        assert_eq!(
+            imported_agent_type("editor"),
+            o2_enterprise::enterprise::ai::client::DEFAULT_AGENT_TYPE
+        );
+    }
+
+    #[test]
+    fn imports_reject_malformed_and_oversized_chats() {
+        assert_eq!(
+            prepare_import(&mut import_chat(vec![])),
+            Err(IMPORT_INVALID)
+        );
+        let mut no_frames = import_chat(vec![serde_json::json!({"user": {"text": "x"}})]);
+        assert_eq!(prepare_import(&mut no_frames), Err(IMPORT_INVALID));
+        let mut odd_status =
+            import_chat(vec![serde_json::json!({"frames": [], "status": "weird"})]);
+        assert_eq!(prepare_import(&mut odd_status), Err(IMPORT_INVALID));
+        let mut untyped = import_chat(vec![serde_json::json!({"frames": [{"content": "x"}]})]);
+        assert_eq!(prepare_import(&mut untyped), Err(IMPORT_INVALID));
+        let blank = read_chat(&serde_json::json!({"client_id": "  ", "turns": []}));
+        assert_eq!(blank.unwrap_err().code, IMPORT_INVALID);
+        let no_turns = read_chat(&serde_json::json!({"client_id": "c1", "turns": null}));
+        let failure = no_turns.unwrap_err();
+        assert_eq!(
+            (failure.client_id.as_str(), failure.code.as_str()),
+            ("c1", IMPORT_INVALID)
+        );
+        let huge = "x".repeat(IMPORT_CHAT_MAX_BYTES);
+        let big = read_chat(
+            &serde_json::json!({"client_id": "c2", "turns": [{"user": {"text": huge}, "frames": []}]}),
+        );
+        let failure = big.unwrap_err();
+        assert_eq!(
+            (failure.client_id.as_str(), failure.code.as_str()),
+            ("c2", IMPORT_TOO_LARGE)
+        );
+    }
+
+    #[test]
+    fn imported_chats_take_defaults_for_null_or_mistyped_fields() {
+        let chat = read_chat(&serde_json::json!({
+            "client_id": " c1 ", "title": null, "created": 1772417580000.5,
+            "origin": 3, "pinned": null, "turns": [],
+        }))
+        .unwrap();
+        assert_eq!(chat.client_id, "c1");
+        assert_eq!((chat.title.as_str(), chat.origin.as_str()), ("", ""));
+        assert_eq!(chat.created, Some(1_772_417_580_000));
+        assert!(!chat.pinned);
+        let body = r#"{"chats": [{"client_id": "a", "turns": []}, 5, {"client_id": "b"}]}"#;
+        let request: ImportRequest<'_> = serde_json::from_str(body).unwrap();
+        let read: Vec<bool> = request
+            .chats
+            .iter()
+            .map(|c| ImportChat::from_raw(c).is_ok())
+            .collect();
+        assert_eq!(read, [true, false, false]);
+    }
+
+    #[test]
+    fn one_import_runs_per_member() {
+        let first = ImportSlot::take("o", "u1").unwrap();
+        assert!(ImportSlot::take("o", "u1").is_none());
+        assert!(ImportSlot::take("o", "u2").is_some());
+        drop(first);
+        assert!(ImportSlot::take("o", "u1").is_some());
     }
 }
