@@ -1767,7 +1767,8 @@ export default defineComponent({
     };
 
     const loadSchemasBeforeSqlToggle = async () => {
-      if (!(searchObj.data.query ?? "").trim()) return;
+      const query = searchObj.data.query ?? "";
+      if (!query.trim() || isAuthoredStatement(query)) return;
       await loadPendingFreeTextSchemas(searchObj, (name) =>
         getStream(name, searchObj.data.stream.streamType || "logs", true),
       );

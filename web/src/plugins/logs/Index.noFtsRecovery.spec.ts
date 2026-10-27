@@ -133,6 +133,7 @@ describe("Index SQL toggle before the stream fields load (#15549)", { timeout: 3
     await vi.waitFor(() => expect(state.data.freeTextBlocked?.streams).toEqual(["plain"]));
     expect(state.meta.sqlMode).toBe(false);
     expect(state.data.query).toBe("timeout");
+    expect(results()).toHaveLength(0);
   });
 });
 
