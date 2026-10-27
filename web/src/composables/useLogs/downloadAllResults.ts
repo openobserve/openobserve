@@ -48,8 +48,9 @@ export const useDownloadAllResults = () => {
     }
 
     isDownloadingAll.value = true;
+    const runSignature = searchObj.meta.executed?.signature;
     try {
-      const allRows: any[] = [];
+      let allRows: any[] = [];
       let from = 0;
       let size = Math.max(DOWNLOAD_PAGE_SIZE, total);
       // total is a paging lower bound ("51+") when the histogram is off, so only a short page ends the loop.
@@ -66,13 +67,23 @@ export const useDownloadAllResults = () => {
           "ui",
         );
         const page = res?.data?.hits ?? [];
-        allRows.push(...page);
+        allRows = allRows.concat(page);
         if (page.length < size) break;
         from += size;
         size = DOWNLOAD_PAGE_SIZE;
       }
-      if (allRows.length > 0) {
-        await downloadLogs(allRows, format);
+      // A different run took over mid-fetch; downloadLogs's disabled guard would silently drop the file.
+      if (searchObj.meta.executed?.signature !== runSignature) {
+        toast({
+          message: t("search.somethingWentWrong"),
+          variant: "error",
+        });
+        return;
+      }
+      // Retention can expire rows between the run and the refetch — the loaded hits are the run's own rows.
+      const exportRows = allRows.length >= hits.length ? allRows : hits;
+      if (exportRows.length > 0) {
+        await downloadLogs(exportRows, format);
       } else {
         toast({
           message: t("logs.searchBar.noDataToDownload"),

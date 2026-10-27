@@ -39,7 +39,7 @@ const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ _timestamp: i
 
 const buildSearchObj = (hitsCount: number, total: number, withSnapshot = true) => ({
   organizationIdentifier: "default",
-  meta: { executed: { complete: true } },
+  meta: { executed: { complete: true, signature: "sig-1" } },
   data: {
     stream: { streamType: "logs" },
     queryResults: { hits: rows(hitsCount), total },
@@ -175,9 +175,44 @@ describe("useDownloadAllResults", () => {
     expect(downloadLogsSpy).toHaveBeenCalledWith(searchObj.value.data.queryResults.hits, "csv");
   });
 
-  it("warns instead of downloading when the refetch comes back empty", async () => {
+  it("exports a first page larger than the spread-argument limit", async () => {
+    searchMock
+      .mockResolvedValueOnce({ data: { hits: rows(200000) } })
+      .mockResolvedValueOnce({ data: { hits: [] } });
+    searchObj.value = buildSearchObj(100, 200000);
+
+    const vm = await mountComposable();
+    await vm.downloadAllResults("csv", downloadLogsSpy);
+
+    expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
+    expect(downloadLogsSpy.mock.calls[0][0]).toHaveLength(200000);
+  });
+
+  it("falls back to the loaded hits when the refetch comes back empty", async () => {
     searchMock.mockResolvedValue({ data: { hits: [] } });
     searchObj.value = buildSearchObj(100, 350);
+
+    const vm = await mountComposable();
+    await vm.downloadAllResults("csv", downloadLogsSpy);
+
+    expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
+    expect(downloadLogsSpy).toHaveBeenCalledWith(searchObj.value.data.queryResults.hits, "csv");
+  });
+
+  it("falls back to the loaded hits when the refetch returns fewer rows than the loaded page", async () => {
+    searchMock.mockResolvedValue({ data: { hits: rows(2) } });
+    searchObj.value = buildSearchObj(100, 350);
+
+    const vm = await mountComposable();
+    await vm.downloadAllResults("csv", downloadLogsSpy);
+
+    expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
+    expect(downloadLogsSpy).toHaveBeenCalledWith(searchObj.value.data.queryResults.hits, "csv");
+  });
+
+  it("warns instead of downloading when neither the refetch nor the loaded hits have rows", async () => {
+    searchMock.mockResolvedValue({ data: { hits: [] } });
+    searchObj.value = buildSearchObj(0, 350);
 
     const vm = await mountComposable();
     await vm.downloadAllResults("csv", downloadLogsSpy);
@@ -231,6 +266,45 @@ describe("useDownloadAllResults", () => {
     await first;
 
     expect(searchMock).toHaveBeenCalledTimes(1);
+    expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the download with an error toast when a new run replaces this one mid-fetch", async () => {
+    let resolveSearch: (value: any) => void = () => {};
+    searchMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSearch = resolve;
+      }),
+    );
+    searchObj.value = buildSearchObj(100, 350);
+
+    const vm = await mountComposable();
+    const pending = vm.downloadAllResults("csv", downloadLogsSpy);
+    // a new search invalidates the executed record while the fetch is in flight
+    searchObj.value.meta.executed = null;
+    resolveSearch({ data: { hits: rows(350) } });
+    await pending;
+
+    expect(downloadLogsSpy).not.toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+  });
+
+  it("still exports when the run is re-executed with the same signature mid-fetch", async () => {
+    let resolveSearch: (value: any) => void = () => {};
+    searchMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSearch = resolve;
+      }),
+    );
+    searchObj.value = buildSearchObj(100, 350);
+
+    const vm = await mountComposable();
+    const pending = vm.downloadAllResults("csv", downloadLogsSpy);
+    // same query re-executed (auto-refresh): different record, identical signature
+    searchObj.value.meta.executed = { complete: true, signature: "sig-1" };
+    resolveSearch({ data: { hits: rows(350) } });
+    await pending;
+
     expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
   });
 });
