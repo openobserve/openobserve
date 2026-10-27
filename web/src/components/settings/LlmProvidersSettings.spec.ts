@@ -74,3 +74,28 @@ describe("LlmProvidersSettings list view state", () => {
     });
   });
 });
+
+describe("LlmProvidersSettings delete dialog", () => {
+  it("names the provider in bold and makes the confirm button destructive", async () => {
+    const w: any = mount(LlmProvidersSettings, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: { ProviderFormPage: true, OTable: true },
+      },
+    });
+    await flushPromises();
+    w.vm.confirmDelete({ id: "p1", name: "openai-prod" });
+    await flushPromises();
+
+    const name = document.querySelector('[data-test="confirm-dialog-name"]');
+    expect(name?.textContent).toBe("openai-prod");
+    expect(name?.closest(".para")?.textContent).toBe(
+      "Are you sure you want to delete openai-prod? This action cannot be undone.",
+    );
+    const dialog = w.findComponent({ name: "ODialog" });
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    w.unmount();
+  });
+});

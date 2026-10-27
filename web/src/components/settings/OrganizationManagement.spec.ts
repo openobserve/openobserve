@@ -1820,8 +1820,9 @@ describe("OrganizationManagement.vue", () => {
 
       expect(mockConfirmFn).toHaveBeenCalledWith({
         title: "Revoke External Contract",
-        message:
-          'Are you sure you want to revoke the external contract for "TestOrg"? The organization will revert to the Free tier.',
+        messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
+        messageName: "TestOrg",
+        confirmVariant: "destructive",
       });
     });
 

@@ -319,14 +319,15 @@ document.body.appendChild(appNode);
 const sharedStubs = {
   DateTime: {
     template: '<div data-test="logs-search-bar-date-time-dropdown" />',
-    props: [
-      "autoApply",
-      "defaultType",
-      "defaultAbsoluteTime",
-      "defaultRelativeTime",
-      "queryRangeRestrictionInHour",
-      "queryRangeRestrictionMsg",
-    ],
+    props: {
+      autoApply: null,
+      defaultType: null,
+      defaultAbsoluteTime: null,
+      defaultRelativeTime: null,
+      queryRangeRestrictionInHour: null,
+      queryRangeRestrictionMsg: null,
+      calendarPresets: Boolean,
+    },
     emits: ["on:date-change", "on:timezone-change"],
     setup() {
       return {
@@ -631,6 +632,18 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(false);
     });
+
+    it.each(["service-graph", "services-catalog"])(
+      "keeps a shared calendar range on the %s picker by offering calendar presets",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        const picker = wrapper.findComponent(`[data-test="${mode}-date-time-picker"]`);
+        expect(picker.props("calendarPresets")).toBe(true);
+      },
+    );
 
     it("should emit service-graph-refresh when the graph refresh button is clicked", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
@@ -2275,7 +2288,9 @@ describe("SearchBar", () => {
         expect(dialog().props("open")).toBe(false);
         expect(mockConfirm).toHaveBeenCalledWith({
           title: "search.deleteSavedView",
-          message: "search.deleteSavedViewConfirm",
+          messageKeypath: "search.deleteSavedViewConfirm",
+          messageName: tracesView.view_name,
+          confirmVariant: "destructive",
         });
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
         expect(dialog().props("favoriteIds")).toEqual([]);

@@ -212,6 +212,7 @@ export default class LogsVisualise {
       timeout: 15000,
     });
     await this.page.locator(selector).click();
+    await new LogsPage(this.page).closeDateTimePickerIfOpen();
   }
 
   //search and add fields

@@ -18,6 +18,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { DateTime as _DateTime } from "luxon";
 
 import { gt } from "@/types/i18n";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 // ---------------------------------------------------------------------------
 // Duration helpers
@@ -196,7 +197,10 @@ export const getDurationObjectFromParams = (params: any) => {
 
 export const RELATIVE_PERIOD_PATTERN = /(\d+)([smhdwM])/;
 
-export const getConsumableRelativeTime = (period: string) => {
+export const getConsumableRelativeTime = (period: string, timezone?: string | null) => {
+  const calendarRange = resolveCalendarPeriod(period, timezone);
+  if (calendarRange) return calendarRange;
+
   const periodString = period?.match(RELATIVE_PERIOD_PATTERN);
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);

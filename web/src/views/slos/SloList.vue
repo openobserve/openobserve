@@ -416,7 +416,15 @@
       :title="t('slos.deleteConfirmTitle')"
       data-test="slos-slolist-delete-dialog"
     >
-      <p>{{ t("slos.deleteConfirmBody", { name: pendingDelete?.name }) }}</p>
+      <i18n-t keypath="slos.deleteConfirmBody" tag="p" data-test="slos-slolist-delete-message">
+        <template #name>
+          <span
+            data-test="slos-slolist-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ pendingDelete?.name }}</span
+          >
+        </template>
+      </i18n-t>
       <!-- The cascade, which is the irreversible part. Deleting an SLO deletes
            every alert attached to it, and until this said so the dialog warned
            only about disk. Three states, all distinct: still checking, a known

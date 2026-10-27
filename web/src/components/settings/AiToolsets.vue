@@ -158,7 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Delete confirmation -->
   <ConfirmDialog
     :title="t('aiToolset.deleteTitle')"
-    :message="t('aiToolset.deleteMessage', { name: confirmDelete.data?.name ?? '' })"
+    message-keypath="aiToolset.deleteMessage"
+    :message-name="confirmDelete.data?.name"
+    ok-variant="destructive"
     @update:ok="deleteToolset"
     @update:cancel="cancelDelete"
     v-model="confirmDelete.visible"
