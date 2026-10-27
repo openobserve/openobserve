@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
 use super::{
-    plan::TraceListPlan,
+    plan::{TraceListPlan, TraceSort},
     query::{TraceSearchContext, build_partition_query},
     response::TraceBatch,
 };
@@ -99,6 +99,19 @@ async fn run(
 
     let base_req = plan.request(&stream_name);
 
+    match ctx.ranked_page(&plan, &base_req).await {
+        Ok(Some(hits)) => {
+            send_ranked_page(&ctx, &plan, hits, &base_req, &sender).await;
+            return;
+        }
+        Ok(None) => {}
+        Err(error) => {
+            log::error!("[TRACES_STREAM trace_id {trace_id}] index page summary error: {error}");
+            let _ = sender.send(Err(error)).await;
+            return;
+        }
+    }
+
     let partition_req = SearchPartitionRequest {
         sql: build_partition_query(&stream_name),
         start_time,
@@ -137,26 +150,19 @@ async fn run(
         return;
     }
 
-    let total_partitions = partitions.len();
     let is_non_ts_order_by = plan.sort.by_duration;
-    let partitions_desc: Vec<[i64; 2]> = if !is_non_ts_order_by && plan.sort.ascending {
-        log::info!(
-            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
-            partitions.len()
-        );
-        partitions.into_iter().rev().collect()
-    } else {
-        log::info!(
-            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order={}",
-            partitions.len(),
-            if is_non_ts_order_by {
-                format!("non-ts ({}), TopKHeap", plan.sort.sql())
-            } else {
-                "DESC".to_string()
-            }
-        );
-        partitions
-    };
+    let partitions_desc = order_partitions(partitions, plan.sort, (start_time, end_time));
+    let total_partitions = partitions_desc.len();
+    log::info!(
+        "[TRACES_STREAM trace_id {trace_id}] using {total_partitions} time partitions, order={}",
+        if is_non_ts_order_by {
+            format!("non-ts ({}), one partition", plan.sort.sql())
+        } else if plan.sort.ascending {
+            "ASC".to_string()
+        } else {
+            "DESC".to_string()
+        }
+    );
 
     let heap_k = if from + size > 0 {
         (from + size) as usize
@@ -366,38 +372,76 @@ async fn run(
         else {
             return;
         };
-
-        let deliverable: Vec<serde_json::Value> = batch
-            .into_sorted_items(plan.sort)
-            .iter()
-            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
-            .collect();
-
-        let mut results = config::meta::search::Response::default();
-        for h in deliverable {
-            results.add_hit(h);
-        }
-        results.set_total(total_across_partitions);
-        if !range_error.is_empty() {
-            results.function_error.push(range_error.clone());
-        }
-
-        let _ = sender
-            .send(Ok(StreamResponses::SearchResponse {
-                results,
-                streaming_aggs: false,
-                streaming_id: None,
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            }))
-            .await;
-        let _ = sender.send(Ok(StreamResponses::Done)).await;
+        send_final_page(
+            &plan,
+            batch,
+            (start_time, end_time),
+            total_across_partitions,
+            &range_error,
+            &sender,
+        )
+        .await;
         return;
     }
 
     let _ = sender.send(Ok(StreamResponses::Done)).await;
+}
+
+async fn send_ranked_page(
+    ctx: &TraceSearchContext,
+    plan: &TraceListPlan,
+    hits: Vec<json::Value>,
+    base_request: &Request,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) {
+    if hits.is_empty() {
+        let _ = sender.send(Ok(StreamResponses::Done)).await;
+        return;
+    }
+    let total = hits.len();
+    let range = plan.options.range;
+    let Some(batch) = batch_with_services(ctx, plan, hits, range, base_request, sender).await
+    else {
+        return;
+    };
+    if sender
+        .send(Ok(StreamResponses::Progress { percent: 100 }))
+        .await
+        .is_err()
+    {
+        return;
+    }
+    send_final_page(plan, batch, range, total, &plan.options.range_error, sender).await;
+}
+
+async fn send_final_page(
+    plan: &TraceListPlan,
+    batch: TraceBatch,
+    range: (i64, i64),
+    total: usize,
+    range_error: &str,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) {
+    let mut results = config::meta::search::Response::default();
+    for item in batch.into_sorted_items(plan.sort) {
+        results.add_hit(serde_json::to_value(&item).unwrap_or(serde_json::Value::Null));
+    }
+    results.set_total(total);
+    if !range_error.is_empty() {
+        results.function_error.push(range_error.to_string());
+    }
+    let response = StreamResponses::SearchResponse {
+        results,
+        streaming_aggs: false,
+        streaming_id: None,
+        time_offset: TimeOffset {
+            start_time: range.0,
+            end_time: range.1,
+        },
+    };
+    if sender.send(Ok(response)).await.is_ok() {
+        let _ = sender.send(Ok(StreamResponses::Done)).await;
+    }
 }
 
 async fn load_batch(
@@ -419,6 +463,17 @@ async fn load_batch(
             return None;
         }
     };
+    batch_with_services(ctx, plan, hits, range, base_request, sender).await
+}
+
+async fn batch_with_services(
+    ctx: &TraceSearchContext,
+    plan: &TraceListPlan,
+    hits: Vec<json::Value>,
+    range: (i64, i64),
+    base_request: &Request,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) -> Option<TraceBatch> {
     let mut batch = TraceBatch::from_hits(&hits, range);
     if !batch.multi_service_ids.is_empty() && sender.is_closed() {
         return None;
@@ -436,6 +491,21 @@ async fn load_batch(
         return None;
     }
     Some(batch)
+}
+
+// A per-partition GROUP BY ranks a crossing trace by a partial duration, so that sort runs once.
+fn order_partitions(
+    partitions: Vec<[i64; 2]>,
+    sort: TraceSort,
+    range: (i64, i64),
+) -> Vec<[i64; 2]> {
+    if sort.by_duration {
+        vec![[range.0, range.1]]
+    } else if sort.ascending {
+        partitions.into_iter().rev().collect()
+    } else {
+        partitions
+    }
 }
 
 fn select_timestamp_page(
@@ -464,6 +534,29 @@ fn select_timestamp_page(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn duration_sort_runs_one_partition_and_timestamp_sorts_keep_their_order() {
+        let partitions = vec![[30, 40], [20, 30], [10, 20]];
+        let sort = |by_duration, ascending| TraceSort {
+            by_duration,
+            ascending,
+        };
+        for ascending in [true, false] {
+            assert_eq!(
+                order_partitions(partitions.clone(), sort(true, ascending), (5, 45)),
+                [[5, 45]]
+            );
+        }
+        assert_eq!(
+            order_partitions(partitions.clone(), sort(false, false), (5, 45)),
+            [[30, 40], [20, 30], [10, 20]]
+        );
+        assert_eq!(
+            order_partitions(partitions, sort(false, true), (5, 45)),
+            [[10, 20], [20, 30], [30, 40]]
+        );
+    }
 
     #[test]
     fn timestamp_pagination_remembers_skipped_and_undelivered_ids() {

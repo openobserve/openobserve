@@ -72,6 +72,83 @@ impl TraceSearchContext {
         .await
     }
 
+    /// The page ranked on the trace time index, summarized; None when the spans must rank it.
+    pub async fn ranked_page(
+        &self,
+        plan: &TraceListPlan,
+        base_request: &Request,
+    ) -> Result<Option<Vec<json::Value>>, Error> {
+        if !self.ranks_from_index(plan).await {
+            return Ok(None);
+        }
+        let (start_time, end_time) = plan.options.range;
+        let around = TraceTimeRange {
+            start_time,
+            end_time,
+        };
+        let page = rank_page(plan.options.from, plan.options.size);
+        let deadline = Instant::now() + rank_timeout(base_request.timeout);
+        let rank_started = std::time::Instant::now();
+        let ranked = match time_index::rank_traces_by_duration(
+            &self.org_id,
+            &self.stream_name,
+            around,
+            !plan.sort.ascending,
+            page,
+            deadline,
+        )
+        .await
+        {
+            Ok(Some(ranked)) => ranked,
+            Ok(None) => {
+                log::warn!(
+                    "[TRACES_LIST trace_id {}] index ranking of {}/{} timed out; ranking on spans",
+                    self.trace_id,
+                    self.org_id,
+                    self.stream_name
+                );
+                return Ok(None);
+            }
+            Err(error) => {
+                log::warn!(
+                    "[TRACES_LIST trace_id {}] index ranking of {}/{} failed: {error}; ranking on spans",
+                    self.trace_id,
+                    self.org_id,
+                    self.stream_name
+                );
+                return Ok(None);
+            }
+        };
+        let rank_took = rank_started.elapsed();
+        if ranked.is_empty() {
+            return Ok(Some(Vec::new()));
+        }
+        let ids = sanitize_trace_ids(ranked.iter().map(|(id, _)| id.as_str()));
+        // max_ts is the last span's end in micros; the search end bound is exclusive.
+        let window = ranked
+            .iter()
+            .fold(plan.options.range, |window, (_, range)| {
+                (
+                    window.0.min(range.start_time),
+                    window.1.max(range.end_time.saturating_add(1)),
+                )
+            });
+        let request = plan.summary_request(&self.stream_name, base_request, &ids, window);
+        let summary_started = std::time::Instant::now();
+        let response = self.search(&request).await?;
+        let hits = order_by_rank(&ids, response.hits);
+        log::info!(
+            "[TRACES_LIST trace_id {}] index page cost: rank={}ms summary={}ms ranked={} summarized={} window={:?} summary_window={window:?}",
+            self.trace_id,
+            rank_took.as_millis(),
+            summary_started.elapsed().as_millis(),
+            ranked.len(),
+            hits.len(),
+            plan.options.range,
+        );
+        Ok(Some(hits))
+    }
+
     /// Swaps each hit's partial aggregates for its trace's aggregates over every indexed span.
     pub async fn summarize_traces(
         &self,
@@ -134,6 +211,28 @@ impl TraceSearchContext {
         let response = self.search(&request).await?;
         batch.fill_services(response.hits);
         Ok(())
+    }
+
+    // Ranking needs every index row of the range, so the gate also checks index coverage.
+    async fn ranks_from_index(&self, plan: &TraceListPlan) -> bool {
+        let cfg = get_config();
+        if !plan.index_ranking_candidate()
+            || !cfg.common.trace_time_index_enabled
+            || !cfg.common.trace_list_rank_from_index_enabled
+        {
+            return false;
+        }
+        let covered = match infra::db::trace_time_index::get_or_create_coverage_start().await {
+            Ok(coverage_start) => plan.options.range.0 >= coverage_start,
+            Err(error) => {
+                log::warn!(
+                    "[TRACES_LIST trace_id {}] trace time index coverage unknown: {error}",
+                    self.trace_id
+                );
+                false
+            }
+        };
+        covered && time_index::index_stream_exists(&self.org_id, &self.stream_name).await
     }
 
     // An unanswered lookup degrades to the aggregates already in hand, never to an error.
@@ -284,6 +383,37 @@ fn sanitize_trace_ids<'a>(ids: impl Iterator<Item = &'a str>) -> Vec<String> {
     })
     .filter(|id| !id.is_empty())
     .collect()
+}
+
+// The index page has no heap, so the heap's default limit applies here too.
+fn rank_page(from: i64, size: i64) -> (i64, i64) {
+    let size = if size > 0 {
+        size
+    } else {
+        get_config().limit.query_default_limit
+    };
+    (from.max(0), size)
+}
+
+fn rank_timeout(timeout: i64) -> Duration {
+    let secs = if timeout > 0 {
+        timeout as u64
+    } else {
+        get_config().limit.query_timeout
+    };
+    Duration::from_secs(secs.max(1))
+}
+
+// The summary returns rows in engine order; the page keeps the index ranking.
+fn order_by_rank(ids: &[String], hits: Vec<json::Value>) -> Vec<json::Value> {
+    let mut by_id = hits
+        .into_iter()
+        .filter_map(|hit| {
+            let id = hit.get("trace_id")?.as_str()?.to_string();
+            Some((id, hit))
+        })
+        .collect::<HashMap<_, _>>();
+    ids.iter().filter_map(|id| by_id.remove(id)).collect()
 }
 
 /// Traces to re-aggregate and the range covering their spans; only crossers unless `all`.
@@ -500,6 +630,23 @@ mod tests {
             start_time,
             end_time,
         }
+    }
+
+    #[test]
+    fn index_page_keeps_rank_order_and_drops_traces_the_summary_lost() {
+        let ids = ["slow", "gone", "fast"].map(String::from).to_vec();
+        let hits = vec![
+            json::json!({"trace_id": "fast", "span_count": 1}),
+            json::json!({"trace_id": "other", "span_count": 2}),
+            json::json!({"trace_id": "slow", "span_count": 3}),
+        ];
+        let ordered = order_by_rank(&ids, hits);
+        assert_eq!(ordered.len(), 2);
+        assert_eq!(ordered[0]["trace_id"], "slow");
+        assert_eq!(ordered[1]["trace_id"], "fast");
+        assert_eq!(rank_page(-3, 25), (0, 25));
+        assert_eq!(rank_page(10, 25), (10, 25));
+        assert_eq!(rank_timeout(17), Duration::from_secs(17));
     }
 
     #[test]

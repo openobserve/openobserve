@@ -81,18 +81,28 @@ pub async fn prepare(
 pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<TraceListResult, Error> {
     let options = &plan.options;
     let request = plan.request(&ctx.stream_name);
-    let response = ctx.search(&request).await.inspect_err(|error| {
-        log::error!("get traces latest data error: {error:?}");
+    let ranked = ctx.ranked_page(plan, &request).await.inspect_err(|error| {
+        log::error!("get traces latest index-page error: {error:?}");
     })?;
-    if response.hits.is_empty() {
-        return Ok(TraceListResult::Empty(Box::new(response)));
+    let hits = match ranked {
+        Some(hits) => hits,
+        None => {
+            let response = ctx.search(&request).await.inspect_err(|error| {
+                log::error!("get traces latest data error: {error:?}");
+            })?;
+            if response.hits.is_empty() {
+                return Ok(TraceListResult::Empty(Box::new(response)));
+            }
+            ctx.summarize_traces(plan, &request, response.hits, options.range)
+                .await
+                .inspect_err(|error| {
+                    log::error!("get traces latest full-summary error: {error:?}");
+                })?
+        }
+    };
+    if hits.is_empty() {
+        return Ok(TraceListResult::Empty(Box::default()));
     }
-    let hits = ctx
-        .summarize_traces(plan, &request, response.hits, options.range)
-        .await
-        .inspect_err(|error| {
-            log::error!("get traces latest full-summary error: {error:?}");
-        })?;
     let mut batch = TraceBatch::from_hits(&hits, options.range);
     drop(hits);
     let service_range = batch.range;

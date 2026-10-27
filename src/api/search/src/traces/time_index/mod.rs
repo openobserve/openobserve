@@ -379,6 +379,18 @@ async fn search_index_window(
     end_time: i64,
     deadline: Instant,
 ) -> Result<Option<Vec<json::Value>>> {
+    search_index_rows(org_id, sql, start_time, end_time, (0, 50_000), deadline).await
+}
+
+/// One page of index rows; None means the deadline expired first.
+async fn search_index_rows(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    page: (i64, i64),
+    deadline: Instant,
+) -> Result<Option<Vec<json::Value>>> {
     let remaining = deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
         return Ok(None);
@@ -386,8 +398,8 @@ async fn search_index_window(
     let request = Request {
         query: Query {
             sql,
-            from: 0,
-            size: 50_000,
+            from: page.0,
+            size: page.1,
             start_time,
             // Timer windows use closed endpoints; search ranges are half-open.
             end_time: end_time.saturating_add(1),
@@ -538,6 +550,20 @@ fn ranges_sql<'a>(
         quote_identifier(index_stream),
         key_in_predicate(column, keys),
         quote_identifier(column),
+    )
+}
+
+/// Traces overlapping `around` ordered by indexed duration; the margin scan supplies rows the
+/// HAVING trims.
+fn rank_sql(index_stream: &str, around: TraceTimeRange, descending: bool) -> String {
+    format!(
+        "SELECT trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, \
+         MAX(max_ts) - MIN(min_ts) AS zo_sql_duration FROM {} GROUP BY trace_id \
+         HAVING MAX(max_ts) >= {} AND MIN(min_ts) < {} ORDER BY zo_sql_duration {}, trace_id ASC",
+        quote_identifier(index_stream),
+        around.start_time,
+        around.end_time,
+        if descending { "DESC" } else { "ASC" },
     )
 }
 
@@ -703,6 +729,38 @@ pub async fn query_session(
         deadline: default_deadline(),
     })
     .await
+}
+
+/// One page of traces overlapping `around`, ranked by indexed duration; None if the deadline
+/// expired.
+pub(crate) async fn rank_traces_by_duration(
+    org_id: &str,
+    stream_name: &str,
+    around: TraceTimeRange,
+    descending: bool,
+    page: (i64, i64),
+    deadline: Instant,
+) -> Result<Option<Vec<(String, TraceTimeRange)>>> {
+    let sql = rank_sql(
+        &get_trace_time_index_stream_name(stream_name),
+        around,
+        descending,
+    );
+    // Rows sit at a span's start and end hour, so one margin reaches every overlapping trace.
+    let hits = search_index_rows(
+        org_id,
+        sql,
+        around.start_time.saturating_sub(LIST_MARGIN),
+        around.end_time.saturating_add(LIST_MARGIN),
+        page,
+        deadline,
+    )
+    .await?;
+    Ok(hits.map(|hits| {
+        hits.iter()
+            .filter_map(|hit| parse_hit_range(hit, "trace_id"))
+            .collect()
+    }))
 }
 
 /// Ranges of traces with rows within LIST_MARGIN of an edge of `around`; None if the index is mute.
@@ -1452,7 +1510,7 @@ async fn effective_searched_range(
     })
 }
 
-async fn index_stream_exists(org_id: &str, stream_name: &str) -> bool {
+pub(crate) async fn index_stream_exists(org_id: &str, stream_name: &str) -> bool {
     infra::schema::exists(
         org_id,
         StreamType::Metadata,
@@ -1656,6 +1714,24 @@ mod tests {
             ranges_sql("trace_time_index_default", "trace_id", ["a", "b"]),
             "SELECT \"trace_id\", MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts \
              FROM \"trace_time_index_default\" WHERE \"trace_id\" IN ('a', 'b') GROUP BY \"trace_id\""
+        );
+    }
+
+    #[test]
+    fn rank_sql_keeps_overlapping_traces_and_orders_by_indexed_duration() {
+        let around = TraceTimeRange {
+            start_time: 1_000,
+            end_time: 2_000,
+        };
+        assert_eq!(
+            rank_sql("trace_time_index_default", around, true),
+            "SELECT trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, \
+             MAX(max_ts) - MIN(min_ts) AS zo_sql_duration FROM \"trace_time_index_default\" \
+             GROUP BY trace_id HAVING MAX(max_ts) >= 1000 AND MIN(min_ts) < 2000 \
+             ORDER BY zo_sql_duration DESC, trace_id ASC"
+        );
+        assert!(
+            rank_sql("idx", around, false).ends_with("ORDER BY zo_sql_duration ASC, trace_id ASC")
         );
     }
 

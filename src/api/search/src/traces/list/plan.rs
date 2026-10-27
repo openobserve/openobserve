@@ -87,9 +87,15 @@ impl TraceListPlan {
         !self.filter().is_empty()
     }
 
-    // Heap rows of the streamed duration sort are per-partition aggregates.
+    /// The index holds no span attributes, so only an unfiltered duration sort can rank on it.
+    pub fn index_ranking_candidate(&self) -> bool {
+        self.sort.by_duration && !self.is_filtered()
+    }
+
+    // An unfiltered page aggregates its whole range in one query, so only crossers need a
+    // recompute.
     pub fn recompute_all(&self) -> bool {
-        self.is_filtered() || (self.mode == TraceListMode::Streaming && self.sort.by_duration)
+        self.is_filtered()
     }
 
     fn sql(&self, stream_name: &str) -> String {
@@ -456,11 +462,12 @@ mod tests {
     }
 
     #[test]
-    fn only_filtered_pages_and_the_streamed_duration_sort_recompute_every_trace() {
+    fn only_filtered_pages_recompute_every_trace() {
         for (sort_by, filter, expected) in [
             ("start_time", "", [false, false]),
-            ("duration", "", [false, true]),
+            ("duration", "", [false, false]),
             ("start_time", "service_name = 'api'", [true, true]),
+            ("duration", "service_name = 'api'", [true, true]),
         ] {
             let mut query = query();
             query.insert("sort_by".to_string(), sort_by.to_string());
@@ -480,6 +487,35 @@ mod tests {
                 };
                 assert_eq!(
                     plan.recompute_all(),
+                    expected,
+                    "{sort_by} {filter:?} {mode:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn only_unfiltered_duration_sorts_can_rank_on_the_index() {
+        for (sort_by, filter, expected) in [
+            ("duration", "", true),
+            ("start_time", "", false),
+            ("duration", "service_name = 'api'", false),
+        ] {
+            let mut query = query();
+            query.insert("sort_by".to_string(), sort_by.to_string());
+            if !filter.is_empty() {
+                query.insert("filter".to_string(), filter.to_string());
+            }
+            for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+                let plan = TraceListPlan {
+                    options: TraceListOptions::parse(&query, mode).unwrap(),
+                    sort: TraceSort::parse(&query).unwrap(),
+                    columns: TraceColumns::default(),
+                    llm_schema: None,
+                    mode,
+                };
+                assert_eq!(
+                    plan.index_ranking_candidate(),
                     expected,
                     "{sort_by} {filter:?} {mode:?}"
                 );
