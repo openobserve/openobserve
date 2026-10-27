@@ -668,7 +668,7 @@ import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel } from "../../utils/date";
+import { generateDurationLabel } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
@@ -756,6 +756,7 @@ import {
   resolveKioskRefresh,
   stripKioskParams,
 } from "@/utils/dashboard/kiosk";
+import { minAutoRefreshSeconds, resolveOpenRefreshInterval } from "@/utils/dashboard/autoRefresh";
 import {
   PLAYLIST_VIEW_PATH,
   isPlaylistEmbed,
@@ -953,6 +954,10 @@ export default defineComponent({
 
     // refresh interval v-model
     const refreshInterval = ref(0);
+    // The URL's refresh as a dashboard opens; null once applied, so reloading the same dashboard keeps the viewer's choice.
+    let openingUrlRefresh: { value: typeof route.query.refresh } | null = {
+      value: route.query.refresh,
+    };
 
     // initial timezone, which will come from the route query
     const initialTimezone = ref(route.query.timezone ?? null);
@@ -1251,6 +1256,7 @@ export default defineComponent({
 
       // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
+      applyOpeningRefresh(dashboard);
 
       // set selected tab from query params
       const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
@@ -1295,6 +1301,23 @@ export default defineComponent({
       if (previousAppliedDate && !arePickerValuesEqual(previousAppliedDate, selectedDate.value)) {
         showAppliedDateInPicker();
       }
+    };
+
+    const applyOpeningRefresh = (dashboard: any) => {
+      if (!openingUrlRefresh) return;
+      const urlRefresh = openingUrlRefresh.value;
+      openingUrlRefresh = null;
+      const configuredMin = store.state?.zoConfig?.min_auto_refresh_interval;
+      // A TV must keep refreshing: a too-low value is raised to the server minimum, not turned off.
+      if (urlRefresh !== undefined && kioskMode.value) {
+        refreshInterval.value = resolveKioskRefresh(urlRefresh, configuredMin);
+        return;
+      }
+      refreshInterval.value = resolveOpenRefreshInterval({
+        urlRefresh,
+        savedDefault: dashboard?.defaultRefreshInterval,
+        minSeconds: minAutoRefreshSeconds(configuredMin),
+      });
     };
 
     // The mounted picker reads its v-model only once, so a range applied by another dashboard's URL is pushed in.
@@ -1679,6 +1702,7 @@ export default defineComponent({
         // loadDashboard() is already called during onMounted setup.
         if (!oldDashboardId) return;
         if (newDashboardId && newDashboardId !== oldDashboardId) {
+          openingUrlRefresh = { value: route.query.refresh };
           isDashboardLoading.value = true;
           try {
             await loadDashboard();
@@ -1995,15 +2019,12 @@ export default defineComponent({
           params.refresh,
           store.state?.zoConfig?.min_auto_refresh_interval,
         );
-      } else if (params.refresh) {
-        const refreshInSecs = parseDuration(params.refresh);
-        if (store.state?.zoConfig?.min_auto_refresh_interval) {
-          if (refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval) {
-            refreshInterval.value = 0;
-          } else {
-            refreshInterval.value = refreshInSecs;
-          }
-        }
+      } else if (params.refresh !== undefined) {
+        refreshInterval.value = resolveOpenRefreshInterval({
+          urlRefresh: params.refresh,
+          savedDefault: undefined,
+          minSeconds: minAutoRefreshSeconds(store.state?.zoConfig?.min_auto_refresh_interval),
+        });
       }
 
       // check if timezone query params exist

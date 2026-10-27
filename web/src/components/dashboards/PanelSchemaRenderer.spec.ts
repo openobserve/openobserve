@@ -686,6 +686,57 @@ describe("PanelSchemaRenderer", () => {
       );
     });
 
+    it("shows the panel's empty-state text with dashboard variables substituted", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { no_data_text: "Set site_meter: candidates for $site_meter" },
+        },
+        variablesData: { values: [{ name: "site_meter", value: "pm-07", type: "custom" }] },
+      });
+      await flushPromises();
+
+      const empty = wrapper.find('[data-test="no-data"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("Set site_meter: candidates for pm-07");
+      expect(empty.text()).not.toContain("No Data");
+    });
+
+    it("shows No Data when the panel sets no empty-state text", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="no-data"]').text()).toContain("No Data");
+    });
+
     it("clears a stale custom_chart error when switching to another chart type", async () => {
       vi.mocked(usePanelDataLoader).mockReturnValueOnce({
         data: ref([]),

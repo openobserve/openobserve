@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :empty-text="customNoDataText ? noDataTitle : null"
           @row-click="onPanelClick"
         />
         <TableRenderer
@@ -64,7 +65,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowDrilldown &&
             drilldownAllColumns
           "
-        />
+        >
+          <template v-if="customNoDataText" #empty>
+            <OEmptyState
+              size="inline"
+              icon="bar-chart"
+              :title="noDataTitle"
+              :backdrop="false"
+              data-test="no-data"
+            />
+          </template>
+        </TableRenderer>
         <div
           v-else-if="panelSchema.type == 'html'"
           class="column flex h-full w-full flex-1 flex-col"
@@ -187,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         size="inline"
         icon="bar-chart"
-        :title="t('panel.noData')"
+        :title="noDataTitle"
         :backdrop="false"
         data-test="no-data"
         class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
@@ -442,6 +453,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import { resolveNoDataText } from "@/utils/dashboard/noDataText";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
@@ -2121,6 +2133,17 @@ export default defineComponent({
       return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
     });
 
+    const customNoDataText = computed(() =>
+      resolveNoDataText(
+        panelSchema.value?.config,
+        props.currentVariablesData || variablesData.value,
+        { tabId: tabId.value, panelId: panelSchema.value?.id },
+      ),
+    );
+    const noDataTitle = computed(() =>
+      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
+    );
+
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
     // also get the transparent background instead of showing a skeleton.
@@ -2557,6 +2580,8 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      noDataTitle,
+      customNoDataText,
       geoMapRendererData,
       isAwaitingFirstLoad,
       chartRendererData,

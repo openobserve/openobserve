@@ -45,6 +45,8 @@ interface StackedSeries {
   stack?: unknown;
   data?: unknown;
   _panelQueryIndex?: number;
+  xAxisIndex?: number;
+  yAxisIndex?: number;
 }
 
 interface StackedOptions {
@@ -171,15 +173,11 @@ export const stackTotalRows = (
   return rows;
 };
 
-/** Widens a user-set value-axis min/max so it never cuts into a stack; positives and negatives stack apart. */
-export const fitAxisBoundsToStacks = (
-  options: StackedOptions | null | undefined,
-  valueAxis: ValueAxisKey = "yAxis",
-  fromZero = true,
+const fitBoundsToStacks = (
+  bounds: ValueAxisBounds,
+  seriesList: (StackedSeries | null)[],
+  fromZero: boolean,
 ): void => {
-  const axis = options?.[valueAxis];
-  if (!axis || typeof axis !== "object" || !Array.isArray(options?.series)) return;
-  const bounds = axis as ValueAxisBounds;
   const hasMax = typeof bounds.max === "number";
   const hasMin = typeof bounds.min === "number";
   if (!hasMax && !hasMin) return;
@@ -192,7 +190,7 @@ export const fitAxisBoundsToStacks = (
   let hi = fromZero ? 0 : -Infinity;
   let lo = fromZero ? 0 : Infinity;
   let seen = false;
-  options.series.forEach((series: StackedSeries, seriesIndex: number) => {
+  seriesList.forEach((series: StackedSeries | null, seriesIndex: number) => {
     // Unnamed series carry annotations and limit lines, not stacked data.
     if (!series?.name || !Array.isArray(series.data)) return;
     const stack =
@@ -216,6 +214,29 @@ export const fitAxisBoundsToStacks = (
   if (!seen) return;
   if (hasMax && Number.isFinite(hi)) bounds.max = Math.max(bounds.max as number, hi);
   if (hasMin && Number.isFinite(lo)) bounds.min = Math.min(bounds.min as number, lo);
+};
+
+/** Widens a user-set value-axis min/max so it never cuts into a stack; positives and negatives stack apart. */
+export const fitAxisBoundsToStacks = (
+  options: StackedOptions | null | undefined,
+  valueAxis: ValueAxisKey = "yAxis",
+  fromZero = true,
+): void => {
+  const axis = options?.[valueAxis];
+  if (!axis || typeof axis !== "object" || !Array.isArray(options?.series)) return;
+  if (!Array.isArray(axis)) {
+    fitBoundsToStacks(axis as ValueAxisBounds, options.series, fromZero);
+    return;
+  }
+  // A right y-axis or a trellis grid owns only the series bound to its index.
+  const indexKey = valueAxis === "yAxis" ? "yAxisIndex" : "xAxisIndex";
+  axis.forEach((bounds: ValueAxisBounds, axisIndex: number) => {
+    if (!bounds || typeof bounds !== "object") return;
+    const owned = (options.series as StackedSeries[]).map((series) =>
+      (series?.[indexKey] ?? 0) === axisIndex ? series : null,
+    );
+    fitBoundsToStacks(bounds, owned, fromZero);
+  });
 };
 
 /** Fits the value-axis bounds of stacked chart types; other types are left untouched. */

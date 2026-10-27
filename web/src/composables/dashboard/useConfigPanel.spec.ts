@@ -40,6 +40,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
+  shouldShowNoDataText: vi.fn(() => false),
   shouldShowAxisConfig: vi.fn(() => false),
   shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),

@@ -297,6 +297,23 @@ describe("FieldList", () => {
       expect(fields.stream).toBe("");
       expect(fields.stream_type).toBe("metrics");
     });
+
+    const streamTypeValues = (w: VueWrapper) =>
+      (
+        w.findComponent('[data-test="index-dropdown-stream_type"]').props("options") as {
+          value: string;
+        }[]
+      ).map((o) => o.value);
+
+    it("offers enrichment tables on the dashboard page", () => {
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      expect(streamTypeValues(wrapper)).toEqual(["logs", "metrics", "traces", "enrichment_tables"]);
+    });
+
+    it.each(["logs", "build"])("does not offer enrichment tables on the %s page", (pageKey) => {
+      wrapper = mountComponent({ pageKey });
+      expect(streamTypeValues(wrapper)).toEqual(["logs", "metrics", "traces"]);
+    });
   });
 
   // ── Stream List Loading ─────────────────────────────────────────────
@@ -323,6 +340,18 @@ describe("FieldList", () => {
 
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
       expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("metrics");
+    });
+
+    it("loads enrichment tables when that stream type is picked", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      mockGetStreams.mockClear();
+
+      currentFields().stream_type = "enrichment_tables";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("enrichment_tables");
     });
 
     it("does not refetch the stream list when only the selected stream changes", async () => {

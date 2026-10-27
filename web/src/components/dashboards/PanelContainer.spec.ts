@@ -1171,6 +1171,13 @@ describe("PanelContainer", () => {
         expect(wrapper.vm.alertDisabledReason).toBeNull();
       });
 
+      it("disables the action on an enrichment-table panel", () => {
+        const panel = formulaPanel(true);
+        panel.queries[0].fields.stream_type = "enrichment_tables";
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBe("Alerts can't run on enrichment tables");
+      });
+
       it("disables the action when every query is hidden", () => {
         const panel = formulaPanel(true);
         panel.queries[2].config.hide = true;
