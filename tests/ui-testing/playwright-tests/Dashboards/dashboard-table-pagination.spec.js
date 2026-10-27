@@ -1155,14 +1155,19 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const paginationInfo = pm.dashboardPanelConfigs.tableRowCount;
     await expect(paginationInfo).toHaveText(/^\s*\d+-\d+\s+of\s+\d+\s*$/, { timeout: 15000 });
 
-    // Only the footer's presence and range shape are checked; the page-size count is wrong today (#15544) and its fix adds the exact assertion.
-    const paginationText = await paginationInfo.textContent();
-    expect(paginationText.trim()).toMatch(/^\d+-\d+\s+of\s+\d+$/);
+    // The page size must bound the range: "1-10 of N" with N > 10, never "1-N of N" (#15544).
+    const paginationText = (await paginationInfo.textContent()).trim();
+    const match = paginationText.match(/^1-(\d+)\s+of\s+(\d+)$/);
+    expect(match, `unexpected footer text "${paginationText}"`).not.toBeNull();
+    expect(Number(match[1])).toBe(10);
+    expect(Number(match[2])).toBeGreaterThanOrEqual(12);
 
-    // Verify we're on the first page (starts with "1-")
-    expect(paginationText.trim().startsWith('1-')).toBe(true);
+    const nextPage = page.locator('[data-test="dashboard-table-pagination-next-page"]');
+    await expect(nextPage).toBeVisible();
+    await nextPage.click();
+    await expect(paginationInfo).toHaveText(new RegExp(`^\\s*11-\\d+\\s+of\\s+${match[2]}\\s*$`));
 
-    testLogger.info(`Verified PromQL table pagination: ${paginationText.trim()}`);
+    testLogger.info(`Verified PromQL table pagination: ${paginationText}`);
 
     // Clean up - save panel first before navigating back
     await pm.dashboardPanelActions.savePanel();
