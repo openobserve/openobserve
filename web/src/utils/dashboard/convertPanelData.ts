@@ -36,6 +36,7 @@ import { barGaugeSchemaAsGauge, convertBarGaugeData } from "./convertBarGaugeDat
 import { convertDistributionData } from "./convertDistributionData";
 import { convertTreemapData } from "./convertTreemapData";
 import { convertSunburstData } from "./convertSunburstData";
+import { convertFunnelData } from "./convertFunnelData";
 import { convertHostmapData } from "./convertHostmapData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -191,6 +192,12 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertSunburstData(panelSchema, data, store, chartPanelRef),
+      };
+    }
+    case "funnel": {
+      return {
+        chartType: panelSchema.type,
+        ...convertFunnelData(panelSchema, data, store, chartPanelRef),
       };
     }
     case "table": {

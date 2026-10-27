@@ -100,6 +100,7 @@ import {
   PictorialBarChart,
   TreemapChart,
   SunburstChart,
+  FunnelChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -170,6 +171,7 @@ echarts.use([
   PictorialBarChart,
   TreemapChart,
   SunburstChart,
+  FunnelChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
@@ -319,7 +321,9 @@ export default defineComponent({
       }
 
       // These series are not lines to single out, and unnamed heatmaps share ECharts' default name.
-      if (["sankey", "heatmap", "treemap", "sunburst"].includes(params?.componentSubType)) {
+      if (
+        ["sankey", "heatmap", "treemap", "sunburst", "funnel"].includes(params?.componentSubType)
+      ) {
         params.seriesName = "";
         params.seriesIndex = -1;
       }

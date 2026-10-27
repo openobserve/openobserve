@@ -177,6 +177,12 @@ describe("defaultFields", () => {
       expect(y).toHaveLength(0);
     });
 
+    it("funnel: seeds a count with no time label", () => {
+      const { x, y } = buildDefaultBuilderFields("funnel", "logs", logsSchema, "logs");
+      expect(x).toEqual([]);
+      expect(y[0].functionName).toBe("count");
+    });
+
     it("metrics stream with value column: seeds avg(value) y", () => {
       const grouped = [{ name: "m1", schema: [{ name: "value" }] }];
       const { y } = buildDefaultBuilderFields("bar", "metrics", grouped, "m1");

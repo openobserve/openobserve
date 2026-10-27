@@ -284,7 +284,7 @@ describe("usePanelDrilldown", () => {
     const api = usePanelDrilldown(deps);
     await api.onChartClick({
       componentType: "series",
-      seriesType: "pie",
+      seriesType: "funnel",
       event: { offsetX: 40, offsetY: 50 },
       dataIndex: 0,
       name: "visit",

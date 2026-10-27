@@ -787,6 +787,12 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     sunburst_show_labels: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    funnel_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    funnel_orient: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    funnel_show_percent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -2986,7 +2992,10 @@ mod tests {
             "distribution_bucket_offset": -1.0,
             "state_timeline_display": "cells",
             "treemap_show_breadcrumb": false,
-            "sunburst_show_labels": true
+            "sunburst_show_labels": true,
+            "funnel_sort": "ascending",
+            "funnel_orient": "horizontal",
+            "funnel_show_percent": true
         });
         for part in [rest, rest2, rest3] {
             fields
