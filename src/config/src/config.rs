@@ -2635,8 +2635,8 @@ pub struct Common {
     pub auto_query_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PROFILING_ENABLED",
-        default = false,
-        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+        default = true,
+        help = "Show the Profiles module in the UI. Ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
     #[env_config(
