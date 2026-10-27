@@ -182,10 +182,13 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     const severityFilterExists = await severityFilterTrigger.isVisible({ timeout: 3000 }).catch(() => false);
     if (severityFilterExists) {
       await severityFilterTrigger.click();
-      await page.waitForTimeout(300);
-      const criticalOption = pm.alertsPage.getElementByText(/critical/i).first();
-      await criticalOption.click().catch(() => {});
-      await page.keyboard.press('Escape').catch(() => {});
+      // Options carry data-test-value; a /critical/i text match picks up any element on the
+      // page, so the filter silently stayed unset and the assertions below then failed for
+      // a reason unrelated to severity gating.
+      await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().first().click();
+      await page.keyboard.press('Escape');
+      // The filter has to be applied before its effect can be asserted.
+      await expect(severityFilterTrigger).toContainText(/critical/i);
     } else {
       testLogger.warn('Per-field severity filter control not found via expected selectors — skipping show_when UI interaction, will rely on preview-panel severity toggle only');
     }
