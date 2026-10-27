@@ -59,6 +59,10 @@ const test = baseTest.extend({
             }
           }
           if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
+          // Logs and traces open the filter builder by default; existing specs drive the code editor.
+          for (const key of ['o2.logs.queryInput', 'o2.traces.queryInput']) {
+            if (!localStorage.getItem(key)) localStorage.setItem(key, 'query');
+          }
         } catch (_) {}
       }, cloudUserEmail);
 
