@@ -370,7 +370,9 @@ mod tests {
     }
 
     #[test]
-    fn operational_allowlist_names_match_their_writers() {
-        assert!(search_service::is_operational_stream(DIGEST_STREAM));
+    fn digests_stay_gated_while_search_is_blocked() {
+        // OTLP log ingest accepts customer writes into this name, so it must never join the
+        // allowlist
+        assert!(!search_service::is_operational_stream(DIGEST_STREAM));
     }
 }
