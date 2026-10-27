@@ -35,8 +35,7 @@ export const CALENDAR_RAIL_ITEMS: readonly CalendarRailPreset[] = [
     soFar: false,
   },
   { id: "this-quarter", token: "calendar:quarter:0", labelKey: "common.thisQuarter", soFar: true },
-  { id: "last-year", token: "calendar:year:-1", labelKey: "common.lastYear", soFar: false },
-  { id: "this-year", token: "calendar:year:0", labelKey: "common.thisYear", soFar: true },
+  // No year chip — nobody keeps a year of retention; the resolver still accepts calendar:year:* tokens.
 ];
 
 export interface CalendarRailPreset {
@@ -46,6 +45,14 @@ export interface CalendarRailPreset {
   soFar: boolean;
 }
 
+/** A recent row's label split into date/time segments, so the rail can colour them differently. */
+export interface TimeRangeRailRangeParts {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+}
+
 /** One row of the time picker's rail, already formatted for display. */
 export interface TimeRangeRailItem {
   id: string;
@@ -53,6 +60,8 @@ export interface TimeRangeRailItem {
   tooltip: I18nText | undefined;
   selected: boolean;
   disabled: boolean;
+  /** Recent rows only — lets the rail render the date in the normal colour and the time muted. */
+  parts?: TimeRangeRailRangeParts;
 }
 
 /** The trigger's absolute-range date/time split: "yyyy/MM/dd" + "HH:mm:ss", in the given zone. */
@@ -67,21 +76,40 @@ export const formatAbsoluteInstant = (
   return { date: date.toLocaleDateString("en-ZA"), time: `${hours}:${minutes}:${seconds}` };
 };
 
+// An end exactly at midnight is exclusive, so the row shows the previous day's last second, as the trigger does.
+const splitRecentRange = (
+  startUs: number,
+  endUs: number,
+  zone: string,
+): { start: { date: string; time: string }; end: { date: string; time: string } } => {
+  const endsAtMidnight =
+    endUs > startUs &&
+    endUs % MICROS_PER_SECOND === 0 &&
+    formatAbsoluteInstant(endUs, zone).time === "00:00:00";
+  return {
+    start: formatAbsoluteInstant(startUs, zone),
+    end: formatAbsoluteInstant(endsAtMidnight ? endUs - 1 : endUs, zone),
+  };
+};
+
 /** "2026/10/01 00:00:00 - 2026/10/27 09:43:21", matching the trigger's absolute-range label exactly. */
 export const formatRecentRange = (
   startUs: number,
   endUs: number,
   timezone: string | null | undefined,
 ): I18nText => {
-  const zone = safeTimezone(timezone);
-  // An end exactly at midnight is exclusive, so the row shows the previous day's last second, as the trigger does.
-  const endsAtMidnight =
-    endUs > startUs &&
-    endUs % MICROS_PER_SECOND === 0 &&
-    formatAbsoluteInstant(endUs, zone).time === "00:00:00";
-  const start = formatAbsoluteInstant(startUs, zone);
-  const end = formatAbsoluteInstant(endsAtMidnight ? endUs - 1 : endUs, zone);
+  const { start, end } = splitRecentRange(startUs, endUs, safeTimezone(timezone));
   return raw(`${start.date} ${start.time} - ${end.date} ${end.time}`);
+};
+
+/** Same range as {@link formatRecentRange}, split so the rail can colour the date and time differently. */
+export const formatRecentRangeParts = (
+  startUs: number,
+  endUs: number,
+  timezone: string | null | undefined,
+): TimeRangeRailRangeParts => {
+  const { start, end } = splitRecentRange(startUs, endUs, safeTimezone(timezone));
+  return { startDate: start.date, startTime: start.time, endDate: end.date, endTime: end.time };
 };
 
 /** Whether a range is longer than the page's query-range limit; 0 means no limit. */

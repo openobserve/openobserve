@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-if="recent.length > 0" role="list" data-test="date-time-rail-recent-list">
         <div
-          v-for="item in visibleRecent"
+          v-for="(item, index) in visibleRecent"
           :key="item.id"
           role="listitem"
           class="group relative px-1"
+          :class="index < visibleRecent.length - 1 ? 'border-border-default border-b' : ''"
         >
           <OTooltip
             side="right"
@@ -68,7 +69,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
             @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
           >
-            <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
+            <OTruncatedText v-if="item.parts" :tooltip="false" class="min-w-0"
+              ><span>{{ item.parts.startDate }}</span
+              ><span :class="item.selected ? '' : 'text-text-secondary'">{{
+                ` ${item.parts.startTime} - `
+              }}</span
+              ><span>{{ item.parts.endDate }}</span
+              ><span :class="item.selected ? '' : 'text-text-secondary'">{{
+                ` ${item.parts.endTime}`
+              }}</span></OTruncatedText
+            >
+            <OTruncatedText v-else :tooltip="false" class="min-w-0">{{
+              item.label
+            }}</OTruncatedText>
           </OButton>
           <OButton
             variant="ghost"
@@ -159,7 +172,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { TimeRangeRailItem } from "@/utils/timeRangeRail";
 
-const COLLAPSED_COUNT = 3;
+const COLLAPSED_COUNT = 6;
 
 const props = defineProps<{
   recent: TimeRangeRailItem[];

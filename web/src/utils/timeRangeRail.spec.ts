@@ -19,6 +19,7 @@ import {
   exceedsRangeRestriction,
   formatAbsoluteInstant,
   formatRecentRange,
+  formatRecentRangeParts,
 } from "./timeRangeRail";
 import { parseCalendarToken } from "./dashboard/calendarPeriods";
 
@@ -78,6 +79,30 @@ describe("timeRangeRail", () => {
     });
   });
 
+  describe("formatRecentRangeParts", () => {
+    it("splits the same range formatRecentRange renders into date/time segments", () => {
+      expect(
+        formatRecentRangeParts(us("2026-10-26T15:45:00Z"), us("2026-10-26T16:20:00Z"), "UTC"),
+      ).toEqual({
+        startDate: "2026/10/26",
+        startTime: "15:45:00",
+        endDate: "2026/10/26",
+        endTime: "16:20:00",
+      });
+    });
+
+    it("reads an end at exactly midnight as the previous day's last second, same as formatRecentRange", () => {
+      expect(
+        formatRecentRangeParts(us("2026-10-26T00:00:00Z"), us("2026-10-27T00:00:00Z"), "UTC"),
+      ).toEqual({
+        startDate: "2026/10/26",
+        startTime: "00:00:00",
+        endDate: "2026/10/26",
+        endTime: "23:59:59",
+      });
+    });
+  });
+
   describe("exceedsRangeRestriction", () => {
     it("compares the span in hours, with 0 meaning no limit", () => {
       const day = 24 * 3_600_000_000;
@@ -87,12 +112,17 @@ describe("timeRangeRail", () => {
     });
   });
 
-  it("lists the ten calendar ranges as valid tokens, with so far on the current ones", () => {
-    expect(CALENDAR_RAIL_ITEMS).toHaveLength(10);
+  it("lists the eight calendar ranges as valid tokens, with so far on the current ones", () => {
+    expect(CALENDAR_RAIL_ITEMS).toHaveLength(8);
     for (const item of CALENDAR_RAIL_ITEMS) {
       const period = parseCalendarToken(item.token);
       expect(period).not.toBeNull();
       expect(item.soFar).toBe(period?.offset === 0);
     }
+  });
+
+  it("has no year chip, even though the resolver still accepts a calendar:year token", () => {
+    expect(CALENDAR_RAIL_ITEMS.some((item) => item.token.startsWith("calendar:year:"))).toBe(false);
+    expect(parseCalendarToken("calendar:year:-1")).not.toBeNull();
   });
 });

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
       :collision-padding="POPOVER_COLLISION_PADDING"
-      content-class="p-1"
+      content-class="p-1 shadow-lg!"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
     >
@@ -176,14 +176,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="row-start-2 flex min-h-0 min-w-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
             :class="showRail ? 'col-start-2 max-sm:order-4' : 'col-start-1'"
           >
-            <OTabPanels
-              v-model="selectedType"
-              animated
-              scroll="y"
-              grow
-              class="min-h-0 max-sm:flex-none max-sm:overflow-visible"
+            <div
+              class="relative grid min-h-0 flex-1 overflow-y-auto max-sm:flex-none max-sm:overflow-visible"
             >
-              <OTabPanel v-if="!disableRelative" name="relative">
+              <div
+                v-if="!disableRelative"
+                role="tabpanel"
+                class="col-start-1 row-start-1"
+                :class="selectedType === 'relative' ? '' : 'pointer-events-none invisible'"
+                :aria-hidden="selectedType !== 'relative'"
+                :inert="selectedType !== 'relative'"
+              >
                 <div class="date-time-table relative flex flex-col">
                   <div
                     class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
@@ -274,8 +277,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </OTabPanel>
-              <OTabPanel name="absolute">
+              </div>
+              <div
+                role="tabpanel"
+                class="col-start-1 row-start-1"
+                :class="selectedType === 'absolute' ? '' : 'pointer-events-none invisible'"
+                :aria-hidden="selectedType !== 'absolute'"
+                :inert="selectedType !== 'absolute'"
+              >
                 <div class="date-time-table flex flex-col">
                   <OTooltip
                     side="right"
@@ -338,38 +347,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </tbody>
                   </table>
                 </div>
-              </OTabPanel>
-            </OTabPanels>
+              </div>
+            </div>
+            <!-- Timezone (and Apply, when not auto-applying) sits right under this pane's own content; no top border, so it never doubles with the preset grid's own bottom line. -->
+            <div
+              v-if="!hideRelativeTimezone || !autoApply"
+              class="flex shrink-0 items-center gap-3 px-3 py-2"
+            >
+              <OSelect
+                v-if="!hideRelativeTimezone"
+                data-test="datetime-timezone-select"
+                v-model="timezone"
+                :options="timezoneSelectOptions"
+                searchable
+                :label="t('logStream.timezone')"
+                @update:model-value="onTimezoneChange"
+                @open="isTimezoneSelectOpen = true"
+                @close="isTimezoneSelectOpen = false"
+                class="min-w-0 flex-1"
+              />
+              <div v-else class="flex-1" />
+              <OButton
+                v-if="!autoApply"
+                data-test="date-time-apply-btn"
+                variant="primary"
+                size="xs"
+                class="element-box-shadow"
+                @click="applyAndClose"
+              >
+                {{ t("common.apply") }}
+              </OButton>
+            </div>
           </div>
-        </div>
-        <!-- Shared footer: Timezone (and Apply, when not auto-applying) spans both panes, one top border. -->
-        <div
-          v-if="!hideRelativeTimezone || !autoApply"
-          class="border-border-default flex shrink-0 items-center gap-3 border-t px-3 py-2"
-        >
-          <OSelect
-            v-if="!hideRelativeTimezone"
-            data-test="datetime-timezone-select"
-            v-model="timezone"
-            :options="timezoneSelectOptions"
-            searchable
-            :label="t('logStream.timezone')"
-            @update:model-value="onTimezoneChange"
-            @open="isTimezoneSelectOpen = true"
-            @close="isTimezoneSelectOpen = false"
-            class="min-w-0 flex-1"
-          />
-          <div v-else class="flex-1" />
-          <OButton
-            v-if="!autoApply"
-            data-test="date-time-apply-btn"
-            variant="primary"
-            size="xs"
-            class="element-box-shadow"
-            @click="applyAndClose"
-          >
-            {{ t("common.apply") }}
-          </OButton>
         </div>
       </div>
     </OPopover>
@@ -389,8 +398,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
-import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -436,6 +443,7 @@ import {
   exceedsRangeRestriction,
   formatAbsoluteInstant,
   formatRecentRange,
+  formatRecentRangeParts,
   type TimeRangeRailItem,
 } from "@/utils/timeRangeRail";
 import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
@@ -483,8 +491,6 @@ interface ConsumableDateTime {
 export default defineComponent({
   components: {
     OSeparator,
-    OTabPanels,
-    OTabPanel,
     OButton,
     OIcon,
     OTooltip,
@@ -802,6 +808,7 @@ export default defineComponent({
       return timeRangeHistory.entries.value.map((entry, index) => ({
         id: String(index),
         label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
+        parts: formatRecentRangeParts(entry.startUs, entry.endUs, store.state.timezone),
         tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
         selected:
           current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,

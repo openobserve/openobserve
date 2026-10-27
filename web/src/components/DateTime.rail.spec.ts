@@ -35,8 +35,6 @@ const CALENDAR_IDS = [
   "this-month",
   "last-quarter",
   "this-quarter",
-  "last-year",
-  "this-year",
 ];
 
 const SELECTED_CLASS = "bg-button-primary!";
@@ -99,7 +97,7 @@ describe("DateTime rail", () => {
   });
 
   describe("layout", () => {
-    it("shows Recent and the ten calendar ranges beside the unchanged picker", async () => {
+    it("shows Recent and the eight calendar ranges beside the unchanged picker", async () => {
       createWrapper();
       await openMenu();
 
@@ -181,7 +179,7 @@ describe("DateTime rail", () => {
       expect(calendarItem("today")?.disabled).toBe(false);
       expect(calendarItem("yesterday")?.disabled).toBe(false);
       expect(calendarItem("this-week")?.disabled).toBe(true);
-      expect(calendarItem("last-year")?.disabled).toBe(true);
+      expect(calendarItem("last-quarter")?.disabled).toBe(true);
     });
 
     it("moves between rail items with the arrow keys, pairing calendar rows two at a time", async () => {
@@ -209,8 +207,8 @@ describe("DateTime rail", () => {
         "date-time-rail-calendar-last-week",
       );
       expect(press("date-time-rail-calendar-yesterday", "ArrowUp")).toBe("date-time-rail-recent-0");
-      expect(press("date-time-rail-calendar-last-year", "ArrowDown")).toBe(
-        "date-time-rail-calendar-last-year",
+      expect(press("date-time-rail-calendar-last-quarter", "ArrowDown")).toBe(
+        "date-time-rail-calendar-last-quarter",
       );
       expect(press("date-time-rail-calendar-today", "ArrowRight")).toBe(
         "date-time-rail-calendar-today",
@@ -550,7 +548,7 @@ describe("DateTime rail", () => {
       );
       expect(names).toEqual(["Recent", "Calendar"]);
       expect(groups[0].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(2);
-      expect(groups[1].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(10);
+      expect(groups[1].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(8);
     });
   });
 
@@ -658,9 +656,9 @@ describe("DateTime rail", () => {
 
       const menu = document.querySelector("#date-time-menu")!;
       expect(menu.className).toContain("max-h-[calc(var(--reka-popper-available-height");
-      expect(document.querySelector("#date-time-menu .o-tab-panels")?.className).toContain(
-        "overflow-y-auto",
-      );
+      expect(
+        document.querySelector('#date-time-menu [role="tabpanel"]')?.parentElement?.className,
+      ).toContain("overflow-y-auto");
     });
   });
 
@@ -762,7 +760,12 @@ describe("DateTime rail", () => {
 
       await openMenu();
       expect(el("date-time-rail-recent-0")?.className).toContain(SELECTED_CLASS);
-      expect(el("date-time-relative-15-m-btn")).toBeNull();
+      // Both tab panels stay mounted for equal height; the inactive one is just aria-hidden.
+      expect(
+        el("date-time-relative-15-m-btn")
+          ?.closest('[role="tabpanel"]')
+          ?.getAttribute("aria-hidden"),
+      ).toBe("true");
     });
 
     it("keeps the × out of the Tab order and removes the focused row with Delete", async () => {
@@ -854,7 +857,7 @@ describe("DateTime rail", () => {
 
     it("opens on the first rail item and keeps the rail a single Tab stop", async () => {
       vi.useRealTimers();
-      seedHistory([1, 2, 3, 4].map(hourRange));
+      seedHistory([1, 2, 3, 4, 5, 6, 7].map(hourRange));
       createWrapper();
       await openMenu();
 
@@ -868,9 +871,7 @@ describe("DateTime rail", () => {
 
       const press = (key: string) =>
         document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-      press("ArrowDown");
-      press("ArrowDown");
-      press("ArrowDown");
+      for (let i = 0; i < 6; i++) press("ArrowDown");
       await flushPromises();
       expect(document.activeElement?.getAttribute("data-test")).toBe(
         "date-time-rail-recent-toggle",
@@ -925,22 +926,22 @@ describe("DateTime rail", () => {
       expect(el("date-time-rail-recent-1")).toBeNull();
     });
 
-    it("shows three ranges with Show more, and all of them after a click or Enter", async () => {
+    it("shows six ranges with Show more, and all of them after a click or Enter", async () => {
       // Vue drops a handler's events stamped before it attached, which a faked Date clock gets wrong.
       vi.useRealTimers();
-      seedHistory([1, 2, 3, 4, 5].map(hourRange));
+      seedHistory([1, 2, 3, 4, 5, 6, 7, 8].map(hourRange));
       createWrapper();
       await openMenu();
 
       const toggle = el("date-time-rail-recent-toggle")!;
       expect(toggle.tagName).toBe("BUTTON");
       expect(toggle.textContent?.trim()).toBe("Show more");
-      expect(el("date-time-rail-recent-2")).not.toBeNull();
-      expect(el("date-time-rail-recent-3")).toBeNull();
+      expect(el("date-time-rail-recent-5")).not.toBeNull();
+      expect(el("date-time-rail-recent-6")).toBeNull();
 
       toggle.click();
       await flushPromises();
-      expect(el("date-time-rail-recent-4")).not.toBeNull();
+      expect(el("date-time-rail-recent-7")).not.toBeNull();
       expect(el("date-time-rail-recent-toggle")?.textContent?.trim()).toBe("Show less");
       expect(el("date-time-rail-recent-list")?.className).not.toContain("overflow");
       expect(el("date-time-rail")?.className).toContain("overflow-y-auto");
@@ -950,7 +951,7 @@ describe("DateTime rail", () => {
         new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
       await flushPromises();
-      expect(el("date-time-rail-recent-3")).toBeNull();
+      expect(el("date-time-rail-recent-6")).toBeNull();
       expect(el("date-time-rail-recent-toggle")?.textContent?.trim()).toBe("Show more");
     });
 
@@ -972,27 +973,27 @@ describe("DateTime rail", () => {
       expect(document.querySelectorAll("[data-date-time-rail-recent]")).toHaveLength(15);
     });
 
-    it("has no Show more link for three ranges or fewer", async () => {
-      seedHistory([1, 2, 3].map(hourRange));
+    it("has no Show more link for six ranges or fewer", async () => {
+      seedHistory([1, 2, 3, 4, 5, 6].map(hourRange));
       createWrapper();
       await openMenu();
 
-      expect(el("date-time-rail-recent-2")).not.toBeNull();
+      expect(el("date-time-rail-recent-5")).not.toBeNull();
       expect(el("date-time-rail-recent-toggle")).toBeNull();
     });
 
     it("starts collapsed every time the panel opens", async () => {
-      seedHistory([1, 2, 3, 4].map(hourRange));
+      seedHistory([1, 2, 3, 4, 5, 6, 7, 8].map(hourRange));
       createWrapper();
       await openMenu();
       el("date-time-rail-recent-toggle")!.click();
       await flushPromises();
-      expect(el("date-time-rail-recent-3")).not.toBeNull();
+      expect(el("date-time-rail-recent-6")).not.toBeNull();
 
       wrapper!.vm.menuOpen = false;
       await flushPromises();
       await openMenu();
-      expect(el("date-time-rail-recent-3")).toBeNull();
+      expect(el("date-time-rail-recent-6")).toBeNull();
     });
 
     it("disables a recent range longer than the query-range limit", async () => {
