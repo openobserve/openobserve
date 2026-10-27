@@ -865,16 +865,24 @@ jobs:
           [ "$(jq '.failed_count' <<< "$COMPUTED" 2>/dev/null)" -ge 0 ] 2>/dev/null || exit 0
           # The file says "no advice" until every check below passes, so any early exit keeps the bot's old behaviour.
           jq -c '.failed_count = -1 | .failed_files = []' <<< "$COMPUTED" > "$ADVICE"
-          JOBS='[]'
-          PAGE=1
-          while :; do
-            if ! RESP=$(curl -sf -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
-                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100&page=$PAGE") \
-              || ! JOBS=$(jq -c --argjson acc "$JOBS" '$acc + [.jobs[] | {name, conclusion}]' <<< "$RESP"); then
-              echo "::warning::Could not list this attempt's jobs; no rerun advice"; exit 0
+          for TRY in 1 2 3 4 5 6; do
+            JOBS='[]'
+            PAGE=1
+            while :; do
+              if ! RESP=$(curl -sf -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                  "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100&page=$PAGE") \
+                || ! JOBS=$(jq -c --argjson acc "$JOBS" '$acc + [.jobs[] | {name, status, conclusion}]' <<< "$RESP"); then
+                echo "::warning::Could not list this attempt's jobs; no rerun advice"; exit 0
+              fi
+              [ "$(jq '.jobs | length' <<< "$RESP")" -eq 100 ] || break
+              PAGE=$((PAGE + 1))
+            done
+            [ "$(jq '[.[] | select((.name | startswith("e2e / ")) and .status != "completed")] | length' <<< "$JOBS")" -eq 0 ] && break
+            if [ "$TRY" -eq 6 ]; then
+              echo "::warning::Shard jobs are still not reported finished; no rerun advice"; exit 0
             fi
-            [ "$(jq '.jobs | length' <<< "$RESP")" -eq 100 ] || break
-            PAGE=$((PAGE + 1))
+            # GitHub can still report a shard that just finished as running when this job starts.
+            sleep 10
           done
           [ "$(jq '[.[] | select(.name | startswith("e2e / "))] | length' <<< "$JOBS")" -gt 0 ] \
             || { echo "::warning::No shard jobs listed for this attempt; no rerun advice"; exit 0; }
