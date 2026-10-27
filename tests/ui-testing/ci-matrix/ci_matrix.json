@@ -272,6 +272,10 @@
     ],
     "disabled": [
       {
+        "file": "organizationStatusSteps.spec.js",
+        "reason": "cloud-only: test.skip(!isCloudEnvironment()) at line 13, so an OSS shard would report 5 permanent skips. Its home is the enterprise repo's ci_matrix_cloud.json"
+      },
+      {
         "file": "navRailLocale.spec.js",
         "reason": "10 of 12 cases pass on a live env; :89 (Logs keeps a typed unrun query across the language reload) and :139 (a dirty pipeline editor prompts) still fail and are not yet diagnosed"
       }
