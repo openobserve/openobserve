@@ -24,7 +24,7 @@
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
-import type { RichCardContent, RichCardStepVariant } from "../types";
+import type { RichCardContent, RichCardDetect, RichCardStepVariant } from "../types";
 
 /**
  * Pinned browser SDK release the CDN URLs point at — bump in one place.
@@ -181,6 +181,13 @@ ${indent(LOGS_INIT_FIELDS, 4)},
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
+// Every session emits `view` events on init: the earliest sign that the SDK is wired up.
+export const rumDetect: RichCardDetect = {
+  streamType: "logs",
+  streamName: "_rumdata",
+  filter: "type = 'view'",
+};
+
 export default function rumCard(subs: RumCardSubs, t: TranslateFn): RichCardContent {
   const nodeIcon = getImageURL("images/ingestion/nodejs.svg");
 
@@ -279,13 +286,7 @@ export default function rumCard(subs: RumCardSubs, t: TranslateFn): RichCardCont
         ],
       },
     ],
-    // Every session emits `view` events on init, so their presence in _rumdata
-    // is the earliest reliable signal that the SDK is wired up.
-    detect: {
-      streamType: "logs",
-      streamName: "_rumdata",
-      filter: "type = 'view'",
-    },
+    detect: rumDetect,
     extras: {
       fixTitle: t("ingestion.setupCard.rumFixTitle"),
       fixBody: t("ingestion.setupCard.rumFixBody"),

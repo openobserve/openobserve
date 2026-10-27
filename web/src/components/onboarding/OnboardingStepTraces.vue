@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      checks the pick instead of being disabled. Hover or focus shows the answer in the side panel. -->
 <template>
   <div
-    class="grid min-h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:grid-cols-1"
+    class="grid h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:h-auto max-md:min-h-full max-md:grid-cols-1 md:grid-rows-1"
     data-test="onboarding-step-traces"
   >
-    <section class="flex px-13 pt-8 pb-5 max-md:px-4 max-md:pt-6 md:max-lg:px-8">
+    <section class="flex px-13 pt-8 max-md:px-4 max-md:pt-6 md:overflow-y-auto md:max-lg:px-8">
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 items-center gap-3">
           <OButton
@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </li>
         </ul>
+        <OnboardingStepFooter />
       </div>
     </section>
 
@@ -104,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="sticky top-0 h-[calc(100dvh-var(--navbar-height)-0.5rem-2px)]">
         <OnboardingPreview
           :preview="panelText(previewed)"
+          :example="previewed.example"
           :reserve="traces.options.map(panelText)"
         />
       </div>
@@ -125,6 +127,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OnboardingChoiceButton from "./OnboardingChoiceButton.vue";
 import OnboardingPreview from "./OnboardingPreview.vue";
 import { makeTracesFormSchema, type TracesForm } from "./OnboardingStepTraces.schema";
+import OnboardingStepFooter from "./OnboardingStepFooter.vue";
 import type {
   OnboardingChoice,
   OnboardingRow,

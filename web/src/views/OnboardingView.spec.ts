@@ -82,7 +82,7 @@ async function mountAt(path: string, { inRouterView = false } = {}) {
       { path: "/ingest/k8s", name: "ingestFromKubernetes", component: empty },
       { path: "/ingest/kafka", name: "kafka", component: empty },
       { path: "/ingest/curl", name: "curl", component: empty },
-      { path: "/synthetics/add", name: "synthetics-add", component: empty },
+      { path: "/synthetics", name: "synthetics", component: empty },
       { path: "/iam/users", name: "users", component: empty },
     ],
   });
@@ -179,6 +179,32 @@ describe("OnboardingView", () => {
   it("redirects a bad path to the nearest valid step", async () => {
     const { router } = await mountAt("/onboarding/nope");
     expect(router.currentRoute.value.path).toBe("/onboarding");
+  });
+
+  describe("Continuous profiling, which needs the Profiles page", () => {
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, profiling_enabled: undefined };
+    });
+
+    it("lists the row and opens its guide only when profiling_enabled is true", async () => {
+      for (const [flag, shown] of [
+        [true, true],
+        [false, false],
+        [undefined, false],
+      ] as const) {
+        store.state.zoConfig = { ...store.state.zoConfig, profiling_enabled: flag };
+        const rows = await mountAt("/onboarding/backend");
+        expect(
+          rows.wrapper.find('[data-test="onboarding-step-rows-row-continuous-profiling"]').exists(),
+        ).toBe(shown);
+        // Its guide is the only page that waits for profiles, so "Explore Your Profiles" goes with it.
+        const { router, wrapper } = await mountAt("/onboarding/backend/continuous-profiling");
+        expect(router.currentRoute.value.path).toBe(
+          shown ? "/onboarding/backend/continuous-profiling" : "/onboarding/backend",
+        );
+        expect(wrapper.find('[data-test="guide-stub"]').exists()).toBe(shown);
+      }
+    });
   });
 
   it("keeps a guide with no setup card inside onboarding and records the start once", async () => {
@@ -398,7 +424,7 @@ describe("OnboardingView", () => {
       await flushPromises();
       expect(billings.submit_new_user_info).toHaveBeenCalledTimes(1);
       expect(vi.mocked(billings.submit_new_user_info).mock.calls[0][1]).toEqual(noFirstSource);
-      expect(router.currentRoute.value.name).toBe("synthetics-add");
+      expect(router.currentRoute.value.name).toBe("synthetics");
     } finally {
       store.state.zoConfig = zoConfig;
     }

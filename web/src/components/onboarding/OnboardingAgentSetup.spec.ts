@@ -15,20 +15,26 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { http, HttpResponse } from "msw";
 import { defineComponent, h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 
+import kubernetesCard from "@/components/ingestion/setupCard/content/kubernetes";
+import linuxCard from "@/components/ingestion/setupCard/content/linux";
+import macosCard from "@/components/ingestion/setupCard/content/macos";
+import otlpTracesCard from "@/components/ingestion/setupCard/content/otlpTraces";
+import rumCard from "@/components/ingestion/setupCard/content/rum";
+import windowsCard from "@/components/ingestion/setupCard/content/windows";
+import type { RichCardDetect } from "@/components/ingestion/setupCard/types";
 import { queryClient } from "@/composables/query/queryClient";
 import { maskSecret } from "@/composables/useCredentialSnippet";
-import { streamKeys } from "@/services/stream.querykeys";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import analytics from "@/services/product_analytics";
 import store from "@/test/unit/helpers/store";
+import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { b64EncodeStandard } from "@/utils/formatters";
 
-import { buildAgentSetupFile } from "./agentSetupFile";
+import { buildAgentSetupFile, type AgentFocus } from "./agentSetupFile";
 import OnboardingAgentSetup from "./OnboardingAgentSetup.vue";
 
 vi.mock("@/composables/useOrgCredential", () => ({
@@ -41,10 +47,11 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 const start = vi.fn();
 const StatusStub = defineComponent({
   name: "FirstEventStatus",
-  props: ["org", "signal", "targetStream", "kind"],
+  props: ["org", "signal", "targetStream", "match", "filter", "kind"],
   emits: ["state", "detected", "copy-command"],
-  setup: (_, { expose }) => {
-    expose({ start });
+  // The signal names the instance that restarted, after a focus change mounts a new one.
+  setup: (props, { expose }) => {
+    expose({ start: (why: string) => start(why, props.signal) });
     return () => h("div", { "data-test": "first-event-status" });
   },
 });
@@ -55,14 +62,38 @@ const token = b64EncodeStandard(`${email}:${PASSCODE}`)!;
 const org = store.state.selectedOrganization.identifier;
 const empty = { render: () => null };
 
-// The org's logs streams; the other types have none.
-const serveLogStreams = (logs: string[]) =>
-  global.server.use(
-    http.get(`${store.state.API_ENDPOINT}/api/:org/streams`, ({ request }) => {
-      const type = new URL(request.url).searchParams.get("type");
-      return HttpResponse.json({ list: type === "logs" ? logs.map((name) => ({ name })) : [] });
-    }),
-  );
+// What each setup's guide waits for, read from the guide's own setup card.
+const subs = { url: "https://api.example.test", org: "acme", token: "x" };
+const rumSubs = {
+  site: "",
+  endpoint: "",
+  org: "acme",
+  rumToken: "",
+  rumTokenMasked: "",
+  insecureHTTP: false,
+};
+const GUIDE_DETECT: Record<AgentFocus, (RichCardDetect | undefined)[]> = {
+  kubernetes: [kubernetesCard(subs, gt).detect],
+  host: [linuxCard(subs, gt).detect, macosCard(subs, gt).detect, windowsCard(subs, gt).detect],
+  backend: [otlpTracesCard(subs, gt).detect],
+  // The LLM guides' cards come with the fetched AI catalog; the agent page waits for any trace.
+  llm: [otlpTracesCard(subs, gt).detect],
+  frontend: [rumCard(rumSubs, gt).detect],
+  // The HTTP logs guide has no card: it watches logs stream default, where its record goes.
+  logs: [{ streamType: "logs", streamName: "default", filter: "" }],
+};
+const FOCUSES = Object.keys(GUIDE_DETECT) as AgentFocus[];
+const chooseFocus = async (w: Page, focus: AgentFocus) => {
+  w.findComponent(OSelect).vm.$emit("update:modelValue", focus);
+  await flushPromises();
+};
+const RECEIVED = {
+  streamName: "default",
+  streamType: "traces",
+  count: 3,
+  rangeStart: 1,
+  rangeEnd: 2,
+};
 
 let router: ReturnType<typeof createRouter>;
 async function mountPage() {
@@ -94,7 +125,6 @@ describe("OnboardingAgentSetup", () => {
   beforeEach(() => {
     store.state.organizationData.organizationPasscode = PASSCODE;
     Element.prototype.scrollIntoView = vi.fn();
-    serveLogStreams([]);
   });
 
   afterEach(() => {
@@ -112,10 +142,10 @@ describe("OnboardingAgentSetup", () => {
     expect(w.html()).not.toContain(token);
   });
 
-  it("shows the brand panel, like the other steps, with no example screen", async () => {
+  it("shows the brand panel with the setup file example, like the other steps", async () => {
     const w = await mountPage();
     expect(byTest(w, "onboarding-preview").classes()).toContain("from-onboarding-panel-start");
-    expect(w.find('[data-test="onboarding-example"]').exists()).toBe(false);
+    expect(byTest(w, "onboarding-example").attributes("data-kind")).toBe("agent");
   });
 
   it("copies the real token, and a copy restarts the watch", async () => {
@@ -127,29 +157,29 @@ describe("OnboardingAgentSetup", () => {
       `export O2_ACCESS_KEY="${token}"`,
       `$env:O2_ACCESS_KEY="${token}"`,
     ]);
-    expect(start).toHaveBeenCalledWith("copy");
+    expect(start).toHaveBeenCalledWith("copy", "logs");
   });
 
   it("copies a prompt for the chosen focus, never with the token", async () => {
     const w = await mountPage();
     await byTest(w, "onboarding-agent-setup-copy").trigger("click");
-    w.findComponent(OSelect).vm.$emit("update:modelValue", "kubernetes");
+    w.findComponent(OSelect).vm.$emit("update:modelValue", "frontend");
     await flushPromises();
     await byTest(w, "onboarding-agent-setup-copy").trigger("click");
     await flushPromises();
-    const [auto, k8s] = copiedTexts();
-    expect(auto).toMatch(/^Set up OpenObserve/);
-    expect(auto).toContain("## What to set up");
+    const [k8s, web] = copiedTexts();
+    expect(k8s).toMatch(/^Set up OpenObserve/);
     expect(k8s).toContain("## Kubernetes cluster");
     expect(k8s).not.toContain("## Web frontend");
-    for (const text of [auto, k8s]) {
+    expect(web).toContain("## Web frontend");
+    for (const text of [k8s, web]) {
       expect(text).toContain(`- Organization: ${org}`);
       expect(text).not.toContain(token);
     }
     expect(analytics.track).toHaveBeenLastCalledWith("onboarding_agent_prompt_copied", {
-      focus: "kubernetes",
+      focus: "frontend",
     });
-    expect(start).toHaveBeenCalledWith("copy");
+    expect(start).toHaveBeenCalledWith("copy", "logs");
   });
 
   it("downloads the file as openobserve-setup.md", async () => {
@@ -173,7 +203,7 @@ describe("OnboardingAgentSetup", () => {
         endpoint: "http://localhost:5080",
         org,
         stream: "default",
-        focus: "auto",
+        focus: "kubernetes",
       }),
     );
     expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe("openobserve-setup.md");
@@ -197,60 +227,49 @@ describe("OnboardingAgentSetup", () => {
     expect(link.attributes("target")).toBe("_blank");
   });
 
-  it("watches any new stream, with the bar mirroring its state", async () => {
+  it.each(FOCUSES)("waits for the same data as the %s setup guide", async (focus) => {
     const w = await mountPage();
+    await chooseFocus(w, focus);
     const status = w.findComponent(StatusStub);
-    expect(status.props("targetStream")).toBeUndefined();
-    expect(status.props("signal")).toBeUndefined();
-    expect(byTest(w, "onboarding-listen-bar-title").text()).toBe(
-      "Waiting for your coding agent's first event",
-    );
-    status.vm.$emit("state", "rejected");
-    await flushPromises();
-    expect(byTest(w, "onboarding-listen-bar-title").text()).toBe(
-      "Data from your coding agent is being rejected",
-    );
-    await byTest(w, "onboarding-listen-bar-troubleshoot").trigger("click");
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
-    status.vm.$emit("detected", {
-      streamName: "default",
-      streamType: "logs",
-      count: 1,
-      rangeStart: 1,
-      rangeEnd: 2,
-    });
-    await flushPromises();
-    const panel = byTest(w, "onboarding-first-data");
-    expect(panel.text()).toContain("Your token and endpoint work");
-    expect(panel.text()).toContain("1 record arrived in default");
+    for (const d of GUIDE_DETECT[focus]) {
+      expect(d).toBeDefined();
+      expect(status.props("signal")).toBe(d!.streamType);
+      expect(status.props("targetStream")).toBe(d!.streamName);
+      expect(status.props("match")).toBe(d!.match);
+      expect(status.props("filter")).toBe(d!.filter);
+    }
   });
 
-  it("watches the logs stream default for new records when the org already has it", async () => {
-    serveLogStreams(["default", "app"]);
+  it("restarts the watch for a new setup, and a copy restarts the new one", async () => {
     const w = await mountPage();
-    const status = w.findComponent(StatusStub);
-    expect(status.props("signal")).toBe("logs");
-    expect(status.props("targetStream")).toBe("default");
-    // Existing traffic holds the watch until a copy.
-    status.vm.$emit("state", "idle");
+    const first = w.findComponent(StatusStub).vm;
+    first.$emit("detected", RECEIVED);
     await flushPromises();
-    expect(byTest(w, "onboarding-listen-bar-title").text()).toBe(
-      "Copy the prompt to start checking",
-    );
+    expect(byTest(w, "onboarding-first-data").exists()).toBe(true);
+    await chooseFocus(w, "host");
+    expect(w.findComponent(StatusStub).vm).not.toBe(first);
+    // The earlier success was for other data.
+    expect(byTest(w, "onboarding-first-data").exists()).toBe(false);
     await byTest(w, "onboarding-agent-setup-copy").trigger("click");
     await flushPromises();
-    expect(start).toHaveBeenCalledWith("copy");
+    expect(start).toHaveBeenLastCalledWith("copy", "metrics");
   });
 
-  it("keeps the watch it chose at page open when the cached list later gains default", async () => {
+  it("shows the bar only once the setup's own data arrives, as a setup guide does", async () => {
     const w = await mountPage();
     const status = w.findComponent(StatusStub);
-    // The watch refreshes this same cached list when data lands.
-    queryClient.setQueryData(streamKeys.nameList(org, "logs"), [{ name: "default" }]);
+    // The inline status shows the wait; a second waiting bar would repeat it.
+    expect(w.find('[data-test="onboarding-listen-bar"]').exists()).toBe(false);
+    status.vm.$emit("state", "rejected");
     await flushPromises();
-    expect(w.findComponent(StatusStub).vm).toBe(status.vm);
-    expect(status.props("signal")).toBeUndefined();
-    expect(status.props("targetStream")).toBeUndefined();
+    expect(w.find('[data-test="onboarding-listen-bar"]').exists()).toBe(false);
+    status.vm.$emit("detected", RECEIVED);
+    await flushPromises();
+    const panel = byTest(w, "onboarding-first-data");
+    expect(panel.text()).toContain("Your data is arriving");
+    expect(panel.text()).toContain("3 records arrived in default");
+    expect(byTest(w, "onboarding-first-data-open").text()).toBe("Explore Your Traces");
+    expect(byTest(w, "onboarding-first-data-note").exists()).toBe(false);
   });
 
   it("names each step once, as a heading, with no disabled button", async () => {
@@ -266,42 +285,6 @@ describe("OnboardingAgentSetup", () => {
     await flushPromises();
     expect(w.find('[aria-current="step"] h2').text()).toBe("Copy the prompt");
     expect(w.findAll("ol > li h2")[0].text()).toBe("Save your token (done)");
-  });
-
-  it("after the test event, says to run the app and offers Traces", async () => {
-    const w = await mountPage();
-    w.findComponent(StatusStub).vm.$emit("detected", {
-      streamName: "default",
-      streamType: "logs",
-      count: 1,
-      rangeStart: 1,
-      rangeEnd: 2,
-    });
-    await flushPromises();
-    expect(byTest(w, "onboarding-first-data").text()).toContain("Your token and endpoint work");
-    expect(byTest(w, "onboarding-first-data-note").text()).toBe(
-      "Next, run your app. Its logs, metrics and traces show up here as they arrive.",
-    );
-    expect(byTest(w, "onboarding-first-data-open").text()).toBe("Explore Your Logs");
-    await byTest(w, "onboarding-agent-setup-open-traces").trigger("click");
-    await flushPromises();
-    expect(router.currentRoute.value.name).toBe("traces");
-    expect(router.currentRoute.value.query.org_identifier).toBe(org);
-  });
-
-  it("adds no next step when the app's own data arrives first", async () => {
-    const w = await mountPage();
-    w.findComponent(StatusStub).vm.$emit("detected", {
-      streamName: "default",
-      streamType: "traces",
-      count: 3,
-      rangeStart: 1,
-      rangeEnd: 2,
-    });
-    await flushPromises();
-    expect(byTest(w, "onboarding-first-data-open").text()).toBe("Explore Your Traces");
-    expect(byTest(w, "onboarding-first-data-note").exists()).toBe(false);
-    expect(byTest(w, "onboarding-agent-setup-open-traces").exists()).toBe(false);
   });
 
   it("re-copies the export line when the status asks to copy the command", async () => {

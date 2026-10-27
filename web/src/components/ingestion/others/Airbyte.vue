@@ -17,17 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "airbyte";
-const { othersContent, othersDocURLs } = useIngestion();
+const { othersContent } = useIngestion();
 const content = othersContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-const docURL = othersDocURLs[name];
 </script>
 
 <template>
   <IngestionContent>
     <CredentialCodeBlock slug="airbyte" :content="content" />
-    <IngestionDocLink :href="docURL" />
   </IngestionContent>
 </template>

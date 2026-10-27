@@ -35,6 +35,7 @@ import { getImageURL } from "@/utils/zincutils";
 import type {
   CardSubstitutions,
   RichCardContent,
+  RichCardDetect,
   RichCardStep,
   RichCardStepVariant,
   RichCardStepVariantGroup,
@@ -112,7 +113,7 @@ const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
  * instrumentation into every pod in it — no application code or image change.
  * One line per language, each in its own namespace.
  */
-const annotate = (langs: { id: string; namespace: string }[]) =>
+export const annotate = (langs: { id: string; namespace: string }[]) =>
   `# Every pod in the namespace is instrumented — no code or image change.
 ${langs
   .map(
@@ -136,7 +137,7 @@ const EBPF_DOC_URL =
   "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing";
 
 // --reuse-values would keep the old chart's defaults and lose the ebpf ones 0.6.0 adds.
-const EBPF_UPGRADE = `helm repo update openobserve
+export const EBPF_UPGRADE = `helm repo update openobserve
 helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
   --version '>=0.6.0' --reset-then-reuse-values \\
   --set ebpf.enabled=true{flags}`;
@@ -250,6 +251,13 @@ const instrumentStep = (t: TranslateFn, presets?: SetupCardPresets): RichCardSte
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
+// `k8s_namespace_name` (the collector's k8s.namespace.name) sets cluster logs apart on `default`.
+export const kubernetesDetect: RichCardDetect = {
+  streamType: "logs",
+  streamName: "default",
+  filter: "k8s_namespace_name IS NOT NULL",
+};
+
 export default function kubernetesCard(
   subs: CardSubstitutions,
   t: TranslateFn,
@@ -301,7 +309,12 @@ export default function kubernetesCard(
       tone: "#326ce5",
       runtime: t("ingestion.setupCard.runtimeCluster"),
       setupTime: t("ingestion.setupCard.setupTime3Min"),
-      metaBadges: [t("common.logs"), t("common.metrics"), t("common.events"), ...traces],
+      metaBadges: [
+        t("common.logs"),
+        t("common.metrics"),
+        t("ingestion.setupCard.pillKubernetesEvents"),
+        ...traces,
+      ],
     },
     steps: [
       {
@@ -349,14 +362,7 @@ export default function kubernetesCard(
         ],
       },
     ],
-    // Collector logs carry the k8sattributes processor's resource attributes;
-    // `k8s_namespace_name` is the flattened `k8s.namespace.name`, which is what
-    // distinguishes cluster logs from anything else already on `default`.
-    detect: {
-      streamType: "logs",
-      streamName: "default",
-      filter: "k8s_namespace_name IS NOT NULL",
-    },
+    detect: kubernetesDetect,
     extras: {
       // The manual Helm path, kept secondary. Previously six separate copy
       // boxes with a "wait 2 minutes" instruction between them; the explicit

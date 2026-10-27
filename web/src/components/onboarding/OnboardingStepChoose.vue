@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="grid min-h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:grid-cols-1"
+    class="grid h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:h-auto max-md:min-h-full max-md:grid-cols-1 md:grid-rows-1"
     data-test="onboarding-step-choose"
   >
-    <section class="flex px-13 pt-8 pb-5 max-md:px-4 max-md:pt-6 md:max-lg:px-8">
+    <section class="flex px-13 pt-8 max-md:px-4 max-md:pt-6 md:overflow-y-auto md:max-lg:px-8">
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <!-- Same height as the Back row on the other steps (a small button is 2.125rem), so the title never moves. -->
         <div class="mb-2 min-h-8.5" aria-hidden="true"></div>
@@ -70,35 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </section>
 
-        <!-- A passive notice at the foot of the column, not a consent box. -->
-        <i18n-t
-          keypath="onboarding.terms"
-          tag="p"
-          class="text-text-label mt-auto pt-6 text-xs"
-          data-test="onboarding-step-choose-terms"
-        >
-          <template #product>{{ raw("OpenObserve") }}</template>
-          <template #terms
-            ><a
-              :href="TERMS_URL"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hover:text-text-heading underline underline-offset-2"
-              data-test="onboarding-step-choose-terms-link"
-              >{{ t("onboarding.termsOfService") }}</a
-            ></template
-          >
-          <template #privacy
-            ><a
-              :href="PRIVACY_URL"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hover:text-text-heading underline underline-offset-2"
-              data-test="onboarding-step-choose-privacy-link"
-              >{{ t("onboarding.privacyPolicy") }}</a
-            ></template
-          >
-        </i18n-t>
+        <OnboardingStepFooter />
       </div>
     </section>
 
@@ -107,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            bottom gap (0.5rem) and its top and bottom border hairlines. -->
       <!-- eslint-disable-next-line local/no-hardcoded-px -- the card's two hairline borders -->
       <div class="sticky top-0 h-[calc(100dvh-var(--navbar-height)-0.5rem-2px)]">
-        <OnboardingPreview :preview="preview" :reserve="reserve" />
+        <OnboardingPreview :preview="preview" :example="preview.example" :reserve="reserve" />
       </div>
     </aside>
   </div>
@@ -123,10 +95,12 @@ import {
   type FirstSourceId,
 } from "@/components/login/firstSourceOptions";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OnboardingChoiceButton from "./OnboardingChoiceButton.vue";
 import OnboardingPreview from "./OnboardingPreview.vue";
+import type { OnboardingExampleKind } from "./examples/onboardingExamples";
+import OnboardingStepFooter from "./OnboardingStepFooter.vue";
 import {
   CODING_AGENTS,
   type OnboardingChoice,
@@ -149,10 +123,6 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
-
-// The same pages the sign-up consent linked to.
-const TERMS_URL = "https://openobserve.ai/legal/terms-of-service/";
-const PRIVACY_URL = "https://openobserve.ai/legal/privacy-policy/";
 
 // The signup link or docs page the user came from picks the choice the panel opens on.
 const PREFILL_CHOICE: Partial<Record<FirstSourceId, OnboardingChoiceId>> = {
@@ -178,16 +148,18 @@ interface OtherWay {
   route?: string;
   gets?: I18nText;
   signals?: OnboardingSignal[];
+  example?: OnboardingExampleKind;
 }
 
 const others = computed<OtherWay[]>(() => [
   {
     id: "agent",
-    icon: "smart-toy",
+    icon: "terminal",
     name: t("onboarding.others.agent.name"),
     description: t("onboarding.others.agent.description", CODING_AGENTS),
     gets: t("onboarding.others.agent.gets"),
     signals: ["logs", "metrics", "traces"],
+    example: "agent",
   },
   ...(store.state.zoConfig?.synthetics_enabled === true
     ? [
@@ -196,9 +168,10 @@ const others = computed<OtherWay[]>(() => [
           icon: "public" as const,
           name: t("onboarding.others.synthetics.name"),
           description: t("onboarding.others.synthetics.description"),
-          route: "synthetics-add",
+          route: "synthetics",
           gets: t("onboarding.others.synthetics.gets"),
           signals: ["uptime", "latency", "certificates"] satisfies OnboardingSignal[],
+          example: "synthetics" as const,
         },
       ]
     : []),
@@ -243,6 +216,7 @@ const preview = computed(() => {
     title: other?.name ?? choice.name,
     text: other?.gets ?? choice.gets,
     signals: other?.signals ?? choice.signals,
+    example: other?.example ?? choice.id,
   };
 });
 </script>

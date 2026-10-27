@@ -20,8 +20,10 @@ import { mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 import { queryClient } from "@/composables/query/queryClient";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import store from "@/test/unit/helpers/store";
 
+import type { AgentFocus } from "./agentSetupFile";
 import OnboardingAgentSetup from "./OnboardingAgentSetup.vue";
 
 interface FakeRow {
@@ -29,6 +31,8 @@ interface FakeRow {
   stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
 }
 const rows: Record<string, FakeRow[]> = { logs: [], metrics: [], traces: [] };
+// The test event's fields; a cluster's logs add the collector's k8s_namespace_name.
+let logFields = ["_timestamp", "level", "message"];
 vi.mock("@/services/stream", () => ({
   default: {
     nameList: async (_o: string, type: string, _s: boolean, offset = -1, limit = -1, kw = "") => {
@@ -36,7 +40,7 @@ vi.mock("@/services/stream", () => ({
       const list = offset === -1 ? all : all.slice(offset, offset + limit);
       return { data: { list: list.map((r) => ({ stream_type: type, ...r })), total: all.length } };
     },
-    schema: async () => ({ data: { schema: [{ name: "_timestamp" }] } }),
+    schema: async () => ({ data: { schema: logFields.map((name) => ({ name })) } }),
   },
 }));
 
@@ -79,7 +83,7 @@ async function mountPage() {
     global: { plugins: [store, router] },
     attachTo: document.body,
   });
-  // The mode read, then the watch's first poll.
+  // The watch's first poll.
   await vi.advanceTimersByTimeAsync(1);
   return wrapper;
 }
@@ -89,6 +93,10 @@ const click = (w: Page, id: string) => w.find(`[data-test="${id}"]`).trigger("cl
 const copyTokenAndPrompt = async (w: Page) => {
   await click(w, "ingestion-onboarding-agent-token-code-block-copy-btn");
   await click(w, "onboarding-agent-setup-copy");
+  await vi.advanceTimersByTimeAsync(1);
+};
+const chooseFocus = async (w: Page, focus: AgentFocus) => {
+  w.findComponent(OSelect).vm.$emit("update:modelValue", focus);
   await vi.advanceTimersByTimeAsync(1);
 };
 const arrived = (w: Page) => w.find('[data-test="onboarding-first-data"]').exists();
@@ -105,6 +113,7 @@ describe("OnboardingAgentSetup, with the real watch", () => {
     rows.logs = [];
     rows.metrics = [];
     rows.traces = [];
+    logFields = ["_timestamp", "level", "message"];
     store.state.organizationData.organizationPasscode = "passcode";
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -118,26 +127,40 @@ describe("OnboardingAgentSetup, with the real watch", () => {
     vi.useRealTimers();
   });
 
-  it("turns green for data that lands after the copies, on an org with no streams", async () => {
+  it("turns green for the cluster's own logs, not for the test event (Kubernetes)", async () => {
     const w = await mountPage();
     await copyTokenAndPrompt(w);
-    await vi.advanceTimersByTimeAsync(60_000);
-    rows.traces.push({ name: "default", stats: fresh() });
+    await vi.advanceTimersByTimeAsync(10_000);
+    countHits.mockReturnValue([{ zo_count: 1, zo_min: Date.now() * 1000 }]);
     rows.logs.push({ name: "default", stats: fresh() });
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(arrived(w)).toBe(false);
+    logFields = [...logFields, "k8s_namespace_name"];
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(arrived(w)).toBe(true);
-    expect(w.find('[data-test="onboarding-first-data"]').text()).toContain(
-      "Your token and endpoint work",
-    );
+    expect(w.find('[data-test="onboarding-first-data"]').text()).toContain("Your data is arriving");
+  });
+
+  it("turns green for the test event in logs stream default, not for traces (Logs only)", async () => {
+    const w = await mountPage();
+    await chooseFocus(w, "logs");
+    await copyTokenAndPrompt(w);
+    await vi.advanceTimersByTimeAsync(10_000);
+    rows.traces.push({ name: "default", stats: fresh() });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(arrived(w)).toBe(false);
+    rows.logs.push({ name: "default", stats: fresh() });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(arrived(w)).toBe(true);
   });
 
   it("keeps the baseline on Troubleshoot, so data that already landed still counts", async () => {
     const w = await mountPage();
+    await chooseFocus(w, "logs");
     await copyTokenAndPrompt(w);
     await vi.advanceTimersByTimeAsync(10_000);
     rows.logs.push({ name: "default", stats: fresh() });
     await click(w, "first-event-status-troubleshoot-btn");
-    await click(w, "onboarding-listen-bar-troubleshoot");
     await vi.advanceTimersByTimeAsync(5_000);
     expect(arrived(w)).toBe(true);
   });
@@ -145,7 +168,8 @@ describe("OnboardingAgentSetup, with the real watch", () => {
   it("counts the test event in an existing default stream once a copy starts the watch", async () => {
     rows.logs = [{ name: "default", stats: { doc_num: 50, doc_time_min: 1, doc_time_max: 2 } }];
     const w = await mountPage();
-    expect(w.find('[data-test="onboarding-listen-bar"]').attributes("data-state")).toBe("idle");
+    await chooseFocus(w, "logs");
+    expect(w.find('[data-test="first-event-status"]').attributes("data-state")).toBe("idle");
     await copyTokenAndPrompt(w);
     await vi.advanceTimersByTimeAsync(10_000);
     countHits.mockReturnValue([{ zo_count: 1, zo_min: Date.now() * 1000 }]);

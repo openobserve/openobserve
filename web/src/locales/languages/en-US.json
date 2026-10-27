@@ -8179,7 +8179,7 @@
       "logs": "Send logs",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} & more",
       "traces": "Send traces",
-      "tracesDesc": "{product1} / {product2} / {product3} distributed tracing",
+      "tracesOtlpDesc": "{otlp} from any {otel} SDK or collector",
       "metrics": "Send metrics",
       "metricsDesc": "{product1}, {product2}, {product3} & more",
       "or": "Or:",
@@ -26534,27 +26534,27 @@
       "windows": "Event logs and metrics from Windows servers.",
       "macos": "Logs and metrics from Mac machines.",
       "aws": "Logs and metrics from your AWS services.",
-      "googleCloud": "Logs and metrics from your Google Cloud projects.",
-      "azure": "Logs and metrics from your Azure resources.",
+      "googleCloud": "Logs from your {gcp} projects, through a {pubSub} push subscription.",
+      "azure": "Activity logs from your {azure} subscription, through {eventHub}.",
       "postgresql": "Query, connection and replication metrics.",
       "mysql": "Query, connection and InnoDB metrics.",
-      "mongodb": "Operation, connection and replication metrics.",
+      "mongodb": "Operation, connection and cache metrics.",
       "redis": "Memory, command and keyspace metrics.",
       "sqlServer": "Query, wait and buffer metrics.",
-      "oracle": "Session, tablespace and wait metrics.",
+      "oracle": "Session, tablespace and resource-limit metrics.",
       "mariadb": "Query, connection and InnoDB metrics.",
       "elasticsearch": "Cluster, index and node health.",
       "cassandra": "Read, write and compaction metrics.",
-      "dynamodb": "Capacity, latency and throttling per table.",
+      "dynamodb": "Item changes (inserts, updates, deletes) as logs, through {kinesisFirehose}.",
       "snowflake": "Warehouse, query and credit usage.",
-      "databricks": "Cluster, job and workspace metrics.",
+      "databricks": "Notebook logs, sent over the logs API.",
       "couchdb": "Request, database and replication metrics.",
-      "aerospike": "Namespace, latency and node metrics.",
+      "aerospike": "Namespace, node, memory and connection metrics.",
       "sapHana": "Memory, CPU and service metrics.",
       "zookeeper": "Latency, connection and node metrics.",
-      "nginx": "Access and error logs, plus request metrics.",
-      "apache": "Access and error logs, plus server status.",
-      "iis": "Request logs and site metrics.",
+      "nginx": "Access and error logs, tailed by {fluentBit}.",
+      "apache": "Access and error logs, tailed by {fluentBit}.",
+      "iis": "Request logs, tailed by {fluentBit}.",
       "kafka": "Broker, topic and consumer lag metrics.",
       "rabbitmq": "Queue depth, message rate and node metrics.",
       "nats": "Connection, message and stream metrics.",
@@ -26562,7 +26562,7 @@
       "telegraf": "Send metrics from an agent you already run.",
       "opentelemetryCollector": "Point a collector you already run here.",
       "cloudwatch": "Stream metrics out of your AWS account.",
-      "gpu": "Use, memory and temperature per GPU.",
+      "gpu": "Use, memory and temperature per {nvidia} GPU.",
       "networkFlows": "Traffic flows between your hosts and networks.",
       "fluentBit": "Lightweight log forwarder for hosts and Kubernetes.",
       "fluentd": "Log collector with a large plugin set.",
@@ -26590,15 +26590,11 @@
       "heroku": "App and router logs from a log drain.",
       "airflow": "DAG run logs and task metrics.",
       "airbyte": "Sync job logs and status.",
-      "languageTile": "Traces with the {otel} SDK and auto-instrumentation.",
-      "aiIntegration": "Traces, tokens and cost from your LLM calls."
+      "languageTile": "Traces with the {otel} SDK, with automatic instrumentation where your language has it.",
+      "aiIntegration": "Traces of your AI app's calls, with tokens and cost for model calls."
     },
-    "skip": "Skip",
     "skipToApp": "Skip to app",
     "chooseTitle": "What do you want to monitor first?",
-    "terms": "By using {product}, you agree to the {terms} and {privacy}.",
-    "termsOfService": "Terms of Service",
-    "privacyPolicy": "Privacy Policy",
     "back": "Back",
     "searchGuides": "Search {count} guide | Search {count} guides",
     "showMore": "Show {count} more | Show {count} more",
@@ -26614,19 +26610,28 @@
       "metrics": "Metrics",
       "logs": "Logs",
       "traces": "Traces",
-      "events": "Events",
       "profiles": "Profiles",
       "sessions": "Sessions",
       "errors": "Errors",
-      "webVitals": "Web vitals",
+      "webVitals": "Web vitals (web)",
       "replays": "Session replays",
       "tokens": "Tokens",
       "cost": "Cost",
       "latency": "Latency",
-      "auditLogs": "Audit logs",
-      "securityEvents": "Security events",
       "uptime": "Uptime",
       "certificates": "Certificates"
+    },
+    "example": {
+      "caption": {
+        "row": "Example screen: what {product} shows for {name}.",
+        "infrastructure": "Example screen: a {k8s} cluster overview with CPU, memory and pod health.",
+        "backend": "Example screen: the waterfall of a failed checkout trace, with 21 spans across 9 services.",
+        "frontend": "Example screen: {rum} web vitals from real user sessions.",
+        "logs": "Example screen: a log search with a histogram and the matching log lines.",
+        "llm": "Example screen: {insights} with cost, tokens and latency by model, plus traces and errors over time.",
+        "agent": "Example screen: the {mcp} server page that your coding agent connects to.",
+        "synthetics": "Example screen: results for one {http} check across 3 locations."
+      }
     },
     "guide": {
       "agentTitle": "Prefer a coding agent?",
@@ -26638,7 +26643,7 @@
       "inviteAction": "Invite a teammate",
       "loadFailed": "This guide did not load.",
       "openInApp": "Open it in Data sources",
-      "languageText": "For {language}, add the {otelSdk} with automatic instrumentation, then point it at {product} with the settings below.",
+      "languageText": "For {language}, add the {otelSdk}, with automatic instrumentation where {language} has it, then point it at {product} with the settings below.",
       "languageLink": "{otel} {language} guide"
     },
     "rail": {
@@ -26681,7 +26686,7 @@
     "agent": {
       "crumb": "Coding agent",
       "title": "Set up with your coding agent",
-      "lead": "{claudeCode}, {cursor}, {codex} or any coding agent reads your project, adds the setup and checks that data arrived. You approve each change.",
+      "lead": "{claudeCode}, {cursor}, {codex} or any coding agent reads your project, adds the setup and checks that data arrived. It asks you before it installs anything or changes deployment files.",
       "tokenTitle": "Save your token",
       "tokenText": "Run this in the terminal where you will start your coding agent, before you start it.",
       "powerShell": "In {powerShell}:",
@@ -26689,7 +26694,6 @@
       "promptTitle": "Copy the prompt",
       "focusLabel": "Set up",
       "focus": {
-        "auto": "Whatever it finds in the project",
         "kubernetes": "{k8s} cluster",
         "host": "{linux}, {macos} or {windows} host",
         "backend": "Backend service ({otel})",
@@ -26731,10 +26735,7 @@
         "rejectedHint": "The status above shows the cause and the fix.",
         "noRequests": "No data has reached your organization yet",
         "noRequestsHint": "The status above lists the values your coding agent must use."
-      },
-      "firstDataTitle": "Your token and endpoint work",
-      "firstDataNext": "Next, run your app. Its logs, metrics and traces show up here as they arrive.",
-      "openTraces": "Open Traces"
+      }
     },
     "collect": {
       "continueToSetup": "Continue to Setup",
@@ -26743,9 +26744,9 @@
       "kubernetesCluster": {
         "question": "Choose what to collect from your cluster",
         "off": {
-          "name": "Logs, Metrics and Events",
+          "name": "Logs and Metrics",
           "description": "Cluster health and container logs. One command.",
-          "about": "Container logs, CPU and memory of every node and pod, and {k8s} events, from one install command."
+          "about": "Container logs, CPU and memory of every node and pod, and {k8s} events as logs, from one install command."
         },
         "ebpf": {
           "name": "Add Traces With eBPF",
@@ -26762,7 +26763,7 @@
     "groups": {
       "webServers": "Web servers",
       "messageQueues": "Message queues",
-      "metricsFromAgent": "Metrics from an agent you already run",
+      "metricsYouCollect": "Metrics you already collect",
       "gpuAndNetwork": "GPU and network flows",
       "movingFromAnotherTool": "Moving from another tool",
       "cloudLogs": "Cloud logs",
@@ -26777,45 +26778,45 @@
       "rows": {
         "kubernetesCluster": {
           "name": "{k8s} cluster",
-          "description": "Logs, metrics, events and traces from one install",
+          "description": "Logs, metrics and {k8s} events from one install. Traces with one more command.",
           "about": "Installs the {productCollector} in your cluster with one command. You get container logs, {k8s} events and cluster metrics."
         },
         "linuxWindowsOrMacosHost": {
           "name": "{linux}, {windows} or {macos} host",
           "description": "Install the {productAgent} as a service",
-          "about": "One agent collects logs and metrics from the host, and traces programs with no code changes.",
+          "about": "One agent collects logs and metrics from the host. On {linux} it can also trace programs with no code changes.",
           "question": "Which operating system is your host?"
         },
         "cloudAccount": {
           "name": "Cloud account",
           "description": "{aws}, {gcp} or {azure}",
-          "about": "Streams metrics and logs from your cloud account. Nothing runs on your servers.",
+          "about": "Streams logs from your cloud account, and metrics from {aws}. Nothing runs on your servers.",
           "question": "Which cloud is your account on?"
         },
         "databases": {
           "name": "Databases",
           "description": "{examples} and {count} more",
-          "about": "Collects database metrics and logs through the {otelCollector}.",
+          "about": "Collects database metrics, mostly through the {otelCollector}.",
           "question": "Which database do you want to monitor?"
         },
         "somethingElse": {
           "name": "Something else",
           "description": "Web servers, message queues, {prometheus}, GPU and network flows",
-          "about": "Web servers, message queues, metrics from an agent you already run, GPU use and network flows.",
+          "about": "Web servers, message queues, metrics you already collect, GPU use and network flows.",
           "question": "What else do you want to monitor?"
         }
       }
     },
     "backend": {
       "name": "Backend applications",
-      "description": "Traces and logs from your services",
+      "description": "Traces from your services, and logs where your SDK sends them",
       "gets": "See how each request moves through your services.",
       "question": "How do you want to trace your services?",
       "rows": {
         "addALibraryToYourCode": {
           "name": "Add a library to your code",
           "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} or {fastapi}",
-          "about": "Adds the {otelLibrary} for your language. Traces and logs go to {product}.",
+          "about": "Adds the {otelLibrary} for your language. Traces go to {product}.",
           "question": "Which language is your service written in?"
         },
         "kubernetesWorkloadsNoCodeChanges": {
@@ -26831,7 +26832,7 @@
         "continuousProfiling": {
           "name": "Continuous profiling",
           "description": "CPU and memory profiles",
-          "about": "Collects CPU and memory profiles through the {otelCollector}."
+          "about": "Forwards profiles from your profilers ({go}, {java}, {rust} or the eBPF profiler) through the {otelCollector}."
         }
       }
     },
@@ -26852,11 +26853,11 @@
         },
         "android": {
           "description": "Native {android} apps",
-          "about": "Adds the {sdk} to your {platform} app. You get crashes and slow screens."
+          "about": "Adds the {sdk} to your {platform} app. You get sessions, screen views, errors and crashes."
         },
         "ios": {
           "description": "Native {ios} apps",
-          "about": "Adds the {sdk} to your {platform} app. You get crashes and slow screens."
+          "about": "Adds the {sdk} to your {platform} app. You get sessions, screen views, errors and crashes."
         }
       }
     },

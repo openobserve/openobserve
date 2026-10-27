@@ -43,9 +43,6 @@ vi.mock("@/composables/useIngestion", () => ({
     headers:
       Authorization: Basic [BASIC_PASSCODE]
       stream-name: [STREAM_NAME]`,
-    databaseDocURLs: {
-      couchDB: "https://short.openobserve.ai/database/couchdb",
-    },
   })),
 }));
 
@@ -110,34 +107,15 @@ describe("CouchDB.vue Comprehensive Coverage", () => {
   };
 
   describe("Component Rendering Tests", () => {
+    it("links no docs page, since the docs have none for it", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find("a").exists()).toBe(false);
+    });
+
     it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
-    });
-
-    it("should render documentation link", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.exists()).toBe(true);
-      expect(docLink.attributes("target")).toBe("_blank");
-    });
-
-    it("should apply correct styling to documentation link", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.classes()).toContain("text-text-link");
-      expect(docLink.classes()).toContain("hover:text-text-link-hover");
-      expect(docLink.classes()).toContain("underline");
-      expect(docLink.classes()).toContain("font-medium");
-    });
-
-    it("should render documentation text correctly", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find("a").exists()).toBe(true);
-      expect(wrapper.text()).toContain("Click");
-      expect(wrapper.text()).toContain("here");
-      expect(wrapper.text()).toContain("to check further documentation.");
     });
   });
 
@@ -204,23 +182,11 @@ describe("CouchDB.vue Comprehensive Coverage", () => {
       expect(vm.content).toContain("couchdb");
     });
 
-    it("should return correct docURL", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.docURL).toBe("https://short.openobserve.ai/database/couchdb");
-    });
-
     it("should expose content string", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.content).toBeDefined();
       expect(typeof vm.content).toBe("string");
-    });
-
-    it("should expose docURL", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.docURL).toBeDefined();
     });
   });
 
@@ -229,19 +195,12 @@ describe("CouchDB.vue Comprehensive Coverage", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.content).toBeDefined();
-      expect(vm.docURL).toBeDefined();
     });
 
     it("should use databaseContent from useIngestion", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.content).toContain("couchdb");
-    });
-
-    it("should use databaseDocURLs from useIngestion", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.docURL).toBe("https://short.openobserve.ai/database/couchdb");
     });
   });
 
@@ -289,12 +248,6 @@ describe("CouchDB.vue Comprehensive Coverage", () => {
       expect(content).toContain("couchdb");
       expect(content).not.toContain("[STREAM_NAME]");
     });
-
-    it("should pass href to documentation link", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.attributes("href")).toBe("https://short.openobserve.ai/database/couchdb");
-    });
   });
 
   describe("Component Lifecycle Tests", () => {
@@ -328,7 +281,6 @@ describe("CouchDB.vue Comprehensive Coverage", () => {
         default: vi.fn().mockReturnValue({
           endpoint: null,
           databaseContent: "",
-          databaseDocURLs: {},
         }),
       }));
       expect(() => createWrapper()).not.toThrow();
@@ -341,28 +293,10 @@ describe("CouchDB.vue Comprehensive Coverage", () => {
       expect(vm.content.length).toBeGreaterThanOrEqual(0);
     });
 
-    it("should handle missing couchdb docURL", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.docURL).toBeDefined();
-      expect(typeof vm.docURL).toBe("string");
-      expect(vm.docURL).toBe("https://short.openobserve.ai/database/couchdb");
-    });
-
     it("should handle special characters in content", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(typeof vm.content).toBe("string");
-    });
-  });
-
-  describe("Template Integration Tests", () => {
-    it("should render documentation link with correct attributes", () => {
-      wrapper = createWrapper();
-      const link = wrapper.find("a");
-      expect(link.attributes("target")).toBe("_blank");
-      expect(link.classes()).toContain("text-text-link");
-      expect(link.classes()).toContain("hover:text-text-link-hover");
     });
   });
 

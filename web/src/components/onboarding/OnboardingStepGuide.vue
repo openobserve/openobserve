@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-subtle h-full w-1/4 max-w-96 min-w-64 shrink-0 border-e max-md:contents"
     >
       <div class="h-full max-md:contents">
-        <div class="flex h-full flex-col gap-6 overflow-y-auto px-6 pt-8 pb-6 max-md:contents">
+        <div class="flex h-full flex-col gap-6 overflow-y-auto px-6 pt-8 max-md:contents">
           <!-- The nav's heading names the source, so Back needs no breadcrumb beside it. -->
           <div class="flex min-w-0 max-md:order-first max-md:px-4 max-md:pt-4">
             <OButton
@@ -52,14 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <section
+            v-if="agentFocus || canInvite"
             class="border-border-subtle mt-auto flex flex-col gap-4 border-t pt-5 max-md:order-last max-md:mx-4 max-md:mb-6"
             data-test="onboarding-step-guide-help"
           >
-            <div class="flex items-start gap-3">
+            <div v-if="agentFocus" class="flex items-start gap-3">
               <span
                 class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex size-7 shrink-0 items-center justify-center"
               >
-                <OIcon name="smart-toy" size="sm" />
+                <OIcon name="terminal" size="sm" />
               </span>
               <div class="min-w-0 flex-1">
                 <h2 class="text-text-heading text-compact font-semibold">
@@ -129,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </section>
+          <OnboardingStepFooter class="max-md:order-last max-md:px-4 max-md:pb-4" />
         </div>
       </div>
     </aside>
@@ -265,6 +267,7 @@ import { buildAgentPrompt, buildAgentSetupFile, type AgentFocus } from "./agentS
 import OnboardingEmbeddedGuide from "./OnboardingEmbeddedGuide.vue";
 import OnboardingFirstData from "./OnboardingFirstData.vue";
 import OnboardingGuideRail, { type GuideNavStep } from "./OnboardingGuideRail.vue";
+import OnboardingStepFooter from "./OnboardingStepFooter.vue";
 import {
   CODING_AGENTS,
   guideHasTitle,
@@ -398,34 +401,41 @@ provideSnippetCopied(orgStatus);
 const EXPORT_LINE = 'export O2_ACCESS_KEY="[BASIC_PASSCODE]"';
 const { endpoint } = useIngestion();
 const tracePresets = inject(SETUP_CARD_ONBOARDING, null);
-const agentFocus = computed((): AgentFocus => {
+// A guide with no matching prompt section (databases, cloud accounts) offers no prompt.
+const agentFocus = computed((): AgentFocus | undefined => {
   if (props.guide.cardSlug === "kubernetes") return "kubernetes";
   if (props.row.id === "linux-windows-or-macos-host") return "host";
+  // The frontend prompt installs the browser SDK and the backend one sets up traces only.
+  if (["react-native", "android", "ios", "continuous-profiling"].includes(props.row.id))
+    return undefined;
   const byChoice: Partial<Record<string, AgentFocus>> = {
     backend: "backend",
     llm: "llm",
     frontend: "frontend",
     logs: "logs",
   };
-  return byChoice[props.choice.id] ?? "auto";
+  return byChoice[props.choice.id];
 });
-const agentCtx = computed(() => ({
+const agentCtx = (focus: AgentFocus) => ({
   endpoint: endpoint.value?.url ?? "",
   org: org.value,
   stream: "default",
-  focus: agentFocus.value,
+  focus,
   traces: tracePresets?.value,
-}));
+});
 const copyPrompt = async () => {
+  if (!agentFocus.value) return;
   if (
-    await copyToClipboard(buildAgentPrompt(agentCtx.value), t, {
+    await copyToClipboard(buildAgentPrompt(agentCtx(agentFocus.value)), t, {
       successMessage: t("onboarding.agent.promptCopied"),
     })
   )
     analytics.track("onboarding_agent_prompt_copied", { focus: agentFocus.value, from: "guide" });
 };
 const downloadSetup = () => {
-  if (downloadFile("openobserve-setup.md", buildAgentSetupFile(agentCtx.value), "text/markdown"))
+  if (!agentFocus.value) return;
+  const file = buildAgentSetupFile(agentCtx(agentFocus.value));
+  if (downloadFile("openobserve-setup.md", file, "text/markdown"))
     analytics.track("onboarding_agent_prompt_downloaded", {
       focus: agentFocus.value,
       from: "guide",

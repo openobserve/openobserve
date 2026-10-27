@@ -17,20 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- Cloud onboarding: a focus-mode page (route meta `focusMode`), so the app header shows with no side menu. -->
 <template>
   <div class="bg-surface-base flex h-full min-h-0 flex-col" data-test="onboarding-view">
-    <Teleport defer to="#o2-header-actions">
-      <OButton
-        variant="ghost-muted"
-        size="sm"
-        icon-right="arrow-forward"
-        data-test="onboarding-view-skip"
-        @click="skip"
-      >
-        <!-- Phones get the short label, so the header still fits the user menu. -->
-        <span class="max-md:hidden">{{ t("onboarding.skipToApp") }}</span>
-        <span class="md:hidden">{{ t("onboarding.skip") }}</span>
-      </OButton>
-    </Teleport>
-
     <!-- The page never scrolls sideways; a step that needs to scrolls inside itself. -->
     <div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
       <OnboardingStepChoose
@@ -114,13 +100,13 @@ import {
   type OnboardingRow,
 } from "@/components/onboarding/onboardingChoices";
 import {
+  ONBOARDING_SKIP,
   recordStartBounded,
   startPending,
   suppressConnectPrompt,
 } from "@/components/onboarding/onboardingFlow";
 import type { FirstSourceId } from "@/components/login/firstSourceOptions";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
-import OButton from "@/lib/core/Button/OButton.vue";
 import analytics from "@/services/product_analytics";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -140,7 +126,9 @@ const orgQuery = computed(() => ({ org_identifier: store.state.selectedOrganizat
 const fromFirstLogin = startPending(store.state.userInfo?.email);
 
 // Built in a computed so the copy follows a locale change.
-const choices = computed(() => buildChoices(t));
+const choices = computed(() =>
+  buildChoices(t, { profiling: store.state.zoConfig?.profiling_enabled === true }),
+);
 
 const segments = computed(() => {
   const path = route.params.path;
@@ -312,4 +300,5 @@ const skip = async () => {
     router.push({ name: "home", query: orgQuery.value });
   }
 };
+provide(ONBOARDING_SKIP, skip);
 </script>

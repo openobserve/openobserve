@@ -47,6 +47,9 @@ const panelText = (w: ReturnType<typeof mountChoose>) =>
 const panelChips = (w: ReturnType<typeof mountChoose>) =>
   w.findAll('[data-test^="onboarding-preview-signal-"]').map((c) => c.text());
 
+const panelExample = (w: ReturnType<typeof mountChoose>) =>
+  w.find('[data-test="onboarding-example"]').attributes("data-kind");
+
 // The brand fill the previewed row takes from the tablet width up.
 const filled = (el: { classes: () => string[] }) =>
   el.classes().includes("md:bg-onboarding-choice-active-bg");
@@ -85,23 +88,26 @@ describe("OnboardingStepChoose", () => {
     expect(panelTitle(w)).toBe("Frontend and mobile apps");
   });
 
-  it("fills the row the panel describes", async () => {
+  it("fills the row the panel describes, and the panel shows that choice's example screen", async () => {
     const w = mountChoose();
     expect(choiceButtons(w).map(filled)).toEqual([true, false, false, false, false]);
+    expect(panelExample(w)).toBe("infrastructure");
     await choiceButtons(w)[4].trigger("mouseenter");
     expect(choiceButtons(w).map(filled)).toEqual([false, false, false, false, true]);
+    expect(panelExample(w)).toBe("llm");
     await w.find('[data-test="onboarding-step-choose-other-agent"]').trigger("mouseenter");
     expect(filled(w.find('[data-test="onboarding-step-choose-other-agent"]'))).toBe(true);
     expect(choiceButtons(w).some(filled)).toBe(false);
+    expect(panelExample(w)).toBe("agent");
   });
 
   it("shows the hovered choice's sentence and signal chips, not a tick-mark list", async () => {
     const w = mountChoose();
     expect(panelText(w)).toBe("See every host, pod and cloud service in one place.");
-    expect(panelChips(w)).toEqual(["Metrics", "Logs", "Events", "Traces"]);
+    expect(panelChips(w)).toEqual(["Metrics", "Logs", "Traces"]);
     await choiceButtons(w)[2].trigger("mouseenter");
     expect(panelText(w)).toBe("See what real users experience in your web and mobile apps.");
-    expect(panelChips(w)).toEqual(["Sessions", "Errors", "Web vitals", "Session replays"]);
+    expect(panelChips(w)).toEqual(["Sessions", "Errors", "Web vitals (web)", "Session replays"]);
     await w.find('[data-test="onboarding-step-choose-other-synthetics"]').trigger("mouseenter");
     expect(panelText(w)).toBe("Run checks on a schedule from outside your network.");
     expect(panelChips(w)).toEqual(["Uptime", "Latency", "Certificates"]);
@@ -113,11 +119,25 @@ describe("OnboardingStepChoose", () => {
     ).toBe(false);
   });
 
+  it("shows Backend's Profiles chip only when profiling is on", async () => {
+    const backendChips = async (profiling: boolean) => {
+      const w = mount(OnboardingStepChoose, {
+        props: { choices: buildChoices(i18n.global.t as unknown as TranslateFn, { profiling }) },
+        global: { plugins: [store] },
+      });
+      await choiceButtons(w)[1].trigger("mouseenter");
+      expect(panelTitle(w)).toBe("Backend applications");
+      return panelChips(w);
+    };
+    expect(await backendChips(true)).toEqual(["Traces", "Logs", "Profiles"]);
+    expect(await backendChips(false)).toEqual(["Traces", "Logs"]);
+  });
+
   it("reserves room for every choice's sentence and chips", () => {
     const cells = mountChoose().findAll('[data-test="onboarding-preview"] .row-start-1');
     // Five choices, then the coding agent and synthetic checks; the invite has no preview.
     expect(cells).toHaveLength(1 + 7);
-    expect(cells.slice(1).every((c) => c.findAll("li").length >= 3)).toBe(true);
+    expect(cells.slice(1).every((c) => c.findAll("li").length > 0)).toBe(true);
   });
 
   it("moves between choices with the arrow keys, wrapping at the ends", async () => {
@@ -156,7 +176,7 @@ describe("OnboardingStepChoose", () => {
   it("emits leave for synthetic checks", async () => {
     const w = mountChoose();
     await w.find('[data-test="onboarding-step-choose-other-synthetics"]').trigger("click");
-    expect(w.emitted("leave")).toEqual([[{ id: "synthetics", route: "synthetics-add" }]]);
+    expect(w.emitted("leave")).toEqual([[{ id: "synthetics", route: "synthetics" }]]);
   });
 
   it("asks the view to open the invite dialog instead of leaving", async () => {
@@ -195,17 +215,9 @@ describe("OnboardingStepChoose", () => {
     ).toBe("onboarding-step-choose-other-agent");
   });
 
-  it("shows the terms notice with both links, and no consent box", () => {
+  it("shows no terms notice and no consent box", () => {
     const w = mountChoose();
-    const notice = w.find('[data-test="onboarding-step-choose-terms"]');
-    expect(notice.text()).toBe(
-      "By using OpenObserve, you agree to the Terms of Service and Privacy Policy.",
-    );
-    const terms = w.find('[data-test="onboarding-step-choose-terms-link"]');
-    const privacy = w.find('[data-test="onboarding-step-choose-privacy-link"]');
-    expect(terms.attributes("href")).toBe("https://openobserve.ai/legal/terms-of-service/");
-    expect(privacy.attributes("href")).toBe("https://openobserve.ai/legal/privacy-policy/");
-    expect(terms.attributes("target")).toBe("_blank");
+    expect(w.find('[data-test="onboarding-step-choose-terms"]').exists()).toBe(false);
     expect(w.find('input[type="checkbox"], [role="checkbox"]').exists()).toBe(false);
   });
 });

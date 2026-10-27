@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- The "which one?" page: guide tiles in groups, with a search box when there are many. -->
 <template>
   <div
-    class="grid min-h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:grid-cols-1"
+    class="grid h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:h-auto max-md:min-h-full max-md:grid-cols-1 md:grid-rows-1"
     data-test="onboarding-step-which"
   >
-    <section class="flex px-13 pt-8 pb-5 max-md:px-4 max-md:pt-6 md:max-lg:px-8">
+    <section class="flex px-13 pt-8 max-md:px-4 max-md:pt-6 md:overflow-y-auto md:max-lg:px-8">
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 items-center gap-3">
           <OButton
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="row.agent"
             variant="ghost-primary"
             size="xs"
-            icon-left="smart-toy"
+            icon-left="terminal"
             class="-ms-2.5 self-start"
             data-test="onboarding-step-which-agent"
             @click="emit('agent')"
@@ -142,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("onboarding.clearSearch") }}
           </OButton>
         </div>
+        <OnboardingStepFooter />
       </div>
     </section>
 
@@ -150,7 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            bottom gap (0.5rem) and its top and bottom border hairlines. -->
       <!-- eslint-disable-next-line local/no-hardcoded-px -- the card's two hairline borders -->
       <div class="sticky top-0 h-[calc(100dvh-var(--navbar-height)-0.5rem-2px)]">
-        <OnboardingPreview :preview="{ eyebrow: choice.name, title: row.name, text: row.about }" />
+        <OnboardingPreview
+          :preview="{ eyebrow: choice.name, title: row.name, text: row.about }"
+          :example="choice.id"
+          :example-row="row.id"
+        />
       </div>
     </aside>
   </div>
@@ -165,6 +170,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import OnboardingChoiceButton from "./OnboardingChoiceButton.vue";
 import OnboardingPreview from "./OnboardingPreview.vue";
+import OnboardingStepFooter from "./OnboardingStepFooter.vue";
 import {
   findGuides,
   guideLogo,

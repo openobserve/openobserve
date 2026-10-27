@@ -166,6 +166,7 @@ import Notifications from "~icons/material-symbols/notifications-outline";
 import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
+import Terminal from "~icons/material-symbols/terminal";
 import Speed from "~icons/material-symbols/speed-outline";
 import Target from "~icons/material-symbols/target";
 import TrackChanges from "~icons/material-symbols/track-changes";
@@ -554,6 +555,7 @@ export const iconRegistry = {
   "open-in-full": OpenInFull,
   "play-circle": PlayCircle,
   "smart-toy": SmartToy,
+  terminal: Terminal,
   speed: Speed,
   target: Target,
   "track-changes": TrackChanges,

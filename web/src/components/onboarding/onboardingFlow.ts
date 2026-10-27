@@ -21,6 +21,10 @@ import {
 import { markHeardFromPending } from "@/components/login/heardFrom";
 import billings from "@/services/billings";
 import { connectDataPromptSessionKey } from "@/utils/slackCommunityInvite";
+import type { InjectionKey } from "vue";
+
+/** The page's Skip to app, provided to the footer every step renders. */
+export const ONBOARDING_SKIP: InjectionKey<() => void> = Symbol("onboarding-skip");
 
 const pendingStartKey = (email: string | undefined) =>
   `o2.onboarding.pendingStart.${email || "anonymous"}`;

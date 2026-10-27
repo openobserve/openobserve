@@ -14,18 +14,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The bar pinned to the bottom of an onboarding page while it waits for data. It mirrors an
+<!-- The status block at the end of an onboarding page while it waits for data. It mirrors an
      inline first-event status on the page, and turns into the success panel when data lands.
      The `rail` variant is its status line alone, for a side rail that lays out the rest. -->
 <template>
-  <!-- Pinned to the bottom of the onboarding scroll area; on phones it spans the screen. -->
-  <div :class="rail ? undefined : 'sticky bottom-0 z-10 mt-8 pb-4 max-md:-mx-4 max-md:pb-0'">
+  <div :class="rail ? undefined : 'mt-8'">
     <div
       :class="
         rail
           ? undefined
           : [
-              'bg-surface-overlay rounded-surface border shadow-lg transition-colors duration-200 motion-reduce:transition-none max-md:rounded-none max-md:border-x-0 max-md:border-b-0',
+              'rounded-surface border transition-colors duration-200 motion-reduce:transition-none',
               tone.border,
             ]
       "

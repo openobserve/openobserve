@@ -81,7 +81,6 @@ const SCREENS = [
             await ob.openAsFirstLogin(`${base()}/web/?org_identifier=${orgId}`, { orgId, prefill: { utm_content: 'kubernetes' } });
             await ob.expectStepOne();
             expect(await ob.choiceIds()).toEqual(OnboardingPage.CHOICE_IDS);
-            await expect(ob.terms).toBeVisible();
         },
         cleanup: async ({ page }) => page.evaluate(() => localStorage.removeItem('isFirstTimeLogin')),
     },

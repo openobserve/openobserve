@@ -36,7 +36,7 @@ test.describe('Onboarding on first login', () => {
         if (orgId) await authedRequest(page, 'delete', `${baseUrl()}/api/organizations/${orgId}`).catch(() => {});
     });
 
-    test('opens step 1 once, with five choices, the coding agent first and the terms notice', {
+    test('opens step 1 once, with five choices and the coding agent first', {
         tag: ['@onboarding', '@get-started', '@cloud', '@P1'],
     }, async ({ page }) => {
         await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
@@ -44,11 +44,6 @@ test.describe('Onboarding on first login', () => {
 
         expect(await ob.choiceIds()).toEqual(OnboardingPage.CHOICE_IDS);
         expect((await ob.otherIds())[0]).toBe('agent');
-        await expect(ob.terms).toHaveText(
-            'By using OpenObserve Cloud, you agree to the Terms of Service and Privacy Policy.',
-        );
-        await expect(ob.termsLink).toHaveAttribute('href', 'https://openobserve.ai/legal/terms-of-service/');
-        await expect(ob.privacyLink).toHaveAttribute('href', 'https://openobserve.ai/legal/privacy-policy/');
         expect(await ob.firstLoginFlag()).toBeNull();
         expect(ob.attributionBodies).toEqual([]);
 

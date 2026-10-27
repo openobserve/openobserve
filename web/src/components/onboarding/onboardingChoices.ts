@@ -25,6 +25,8 @@ import type { FirstSourceId } from "@/components/login/firstSourceOptions";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
+import type { OnboardingExampleKind } from "./examples/onboardingExamples";
+
 export type OnboardingChoiceId = "infrastructure" | "backend" | "frontend" | "logs" | "llm";
 
 /** What a choice collects, as chips on the brand panel. The label is `onboarding.signals.<id>`. */
@@ -32,7 +34,6 @@ export const SIGNAL_ICONS = {
   metrics: "bar-chart",
   logs: "article",
   traces: "account-tree",
-  events: "bolt",
   profiles: "memory",
   sessions: "person",
   errors: "error-outline",
@@ -41,8 +42,6 @@ export const SIGNAL_ICONS = {
   tokens: "data-usage",
   cost: "paid",
   latency: "timer",
-  auditLogs: "fact-check",
-  securityEvents: "shield",
   uptime: "monitor-heart",
   certificates: "lock",
 } as const satisfies Record<string, IconName>;
@@ -77,6 +76,7 @@ export interface OnboardingTraceOption {
   icon: IconName;
   /** The panel text while the answer is under the pointer or focus. */
   about: I18nText;
+  example: OnboardingExampleKind;
   signals: OnboardingSignal[];
 }
 
@@ -291,9 +291,18 @@ const NAMES = {
   anthropic: raw("Anthropic"),
   claude: raw("Claude"),
   langchain: raw("LangChain"),
+  fluentBit: raw("Fluent Bit"),
+  pubSub: raw("Pub/Sub"),
+  eventHub: raw("Event Hub"),
+  kinesisFirehose: raw("Kinesis Firehose"),
+  nvidia: raw("NVIDIA"),
 };
 
-export function buildChoices(translate: TranslateFn): OnboardingChoice[] {
+/** `profiling`: the server's `profiling_enabled`; without it the Profiles page does not open. */
+export function buildChoices(
+  translate: TranslateFn,
+  { profiling = false }: { profiling?: boolean } = {},
+): OnboardingChoice[] {
   const t = (key: string, named: Record<string, unknown> = {}) =>
     translate(key, { ...NAMES, ...named });
   // Row ids are fixed slugs; the i18n key is the camelCase of the id.
@@ -363,28 +372,41 @@ export function buildChoices(translate: TranslateFn): OnboardingChoice[] {
     languages: { id: string; label: string }[],
   ): OnboardingTraces => {
     const k = `onboarding.collect.${key}`;
-    const option = (id: OnboardingTraceOption["id"], icon: IconName): OnboardingTraceOption => ({
+    const option = (
+      id: OnboardingTraceOption["id"],
+      icon: IconName,
+      example: OnboardingExampleKind,
+    ): OnboardingTraceOption => ({
       id,
       name: t(`${k}.${id}.name`),
       description: t(`${k}.${id}.description`),
       icon,
       about: t(`${k}.${id}.about`),
+      example,
       signals: id === "off" ? signals : [...signals, "traces"],
     });
     return {
       question: t(`${k}.question`),
-      options: [option("off", "dns"), option("ebpf", "memory"), option("library", "code")],
+      options: [
+        option("off", "dns", "infrastructure"),
+        option("ebpf", "memory", "backend"),
+        option("library", "code", "backend"),
+      ],
       languages: languages.map((l) => ({ id: l.id, name: raw(l.label) })),
     };
   };
 
+  const backendSignals: OnboardingSignal[] = profiling
+    ? ["traces", "logs", "profiles"]
+    : ["traces", "logs"];
+
   const choices: OnboardingChoice[] = [
-    choice("infrastructure", "dns", ["metrics", "logs", "events", "traces"], (row) => [
+    choice("infrastructure", "dns", ["metrics", "logs", "traces"], (row) => [
       row("kubernetes-cluster", "view-in-ar", {
         route: "ingestFromKubernetes",
         firstSource: "kubernetes",
         cardSlug: "kubernetes",
-        traces: traces("kubernetesCluster", ["logs", "metrics", "events"], K8S_TRACE_LANGUAGES),
+        traces: traces("kubernetesCluster", ["logs", "metrics"], K8S_TRACE_LANGUAGES),
       }),
       row("linux-windows-or-macos-host", "computer", {
         groups: one(
@@ -437,7 +459,7 @@ export function buildChoices(translate: TranslateFn): OnboardingChoice[] {
             guides: [guide("Kafka", "kafka"), guide("RabbitMQ", "rabbitmq"), guide("NATS", "nats")],
           },
           {
-            heading: heading("metricsFromAgent"),
+            heading: heading("metricsYouCollect"),
             guides: [
               guide("Prometheus", "prometheus"),
               guide("Telegraf", "telegraf"),
@@ -453,7 +475,7 @@ export function buildChoices(translate: TranslateFn): OnboardingChoice[] {
       }),
     ]),
 
-    choice("backend", "code", ["traces", "logs", "profiles"], (row) => [
+    choice("backend", "code", backendSignals, (row) => [
       row("add-a-library-to-your-code", "code", {
         agent: true,
         groups: one(
@@ -476,7 +498,9 @@ export function buildChoices(translate: TranslateFn): OnboardingChoice[] {
         cardSlug: "otlpTraces",
         agent: true,
       }),
-      row("continuous-profiling", "speed", { route: "profilesOtelCollector" }),
+      ...(profiling
+        ? [row("continuous-profiling", "speed", { route: "profilesOtelCollector" })]
+        : []),
     ]),
 
     // All four open the same guide for now; phase 2 can preselect the platform tab.
@@ -495,7 +519,7 @@ export function buildChoices(translate: TranslateFn): OnboardingChoice[] {
       row("ios", "phone-iphone", { ...rum, name: raw("iOS"), params: { platform: NAMES.ios } }),
     ]),
 
-    choice("logs", "article", ["logs", "auditLogs", "securityEvents"], (row) => [
+    choice("logs", "article", ["logs"], (row) => [
       row("from-a-log-shipper-you-run", "extension", {
         examples: 4,
         groups: one(

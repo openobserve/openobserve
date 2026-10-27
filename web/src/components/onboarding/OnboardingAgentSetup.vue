@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- The coding agent page: the token goes into the terminal, the prompt into the agent, and the
-     pinned bar watches every stream, since the agent may send to any of them. -->
+     status waits for the chosen setup's own data, as its setup guide does. -->
 <template>
   <div
-    class="grid min-h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:grid-cols-1"
+    class="grid h-full grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] max-md:h-auto max-md:min-h-full max-md:grid-cols-1 md:grid-rows-1"
     data-test="onboarding-agent-setup"
   >
-    <section class="flex px-13 pt-8 max-md:px-4 max-md:pt-6 md:max-lg:px-8">
+    <section class="flex px-13 pt-8 max-md:px-4 max-md:pt-6 md:overflow-y-auto md:max-lg:px-8">
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 min-w-0 items-center gap-3">
           <OButton
@@ -190,13 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("onboarding.agent.mcp", { mcp: raw("MCP") }) }}
             </OButton>
             <div ref="statusEl" class="mt-4">
-              <!-- Mounts once the mode is known, and the mode never changes. -->
               <FirstEventStatus
-                v-if="testStreamExisted !== undefined"
+                :key="focus"
                 ref="status"
                 :org="org"
-                :signal="testStreamExisted ? 'logs' : undefined"
-                :target-stream="testStreamExisted ? STREAM : undefined"
+                :signal="detect.streamType"
+                :target-stream="detect.streamName"
+                :match="detect.match"
+                :filter="detect.filter"
                 @state="state = $event"
                 @detected="result = $event"
                 @copy-command="copySnippet(exportLine.code.value)"
@@ -205,27 +206,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OnboardingSetupStep>
         </ol>
 
+        <!-- The inline status above already shows the wait, so the bar only shows the success. -->
         <OnboardingListenBar
+          v-if="result"
           :state="state"
           :copy="barCopy"
           :result="result"
-          :success-title="t('onboarding.agent.firstDataTitle')"
-          :success-note="testEventFirst ? t('onboarding.agent.firstDataNext') : undefined"
+          :success-title="t('onboarding.firstData.title')"
           route="onboarding-agent"
           :status-root="statusEl"
-        >
-          <template v-if="testEventFirst" #success-actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              class="max-md:flex-1"
-              data-test="onboarding-agent-setup-open-traces"
-              @click="openTraces"
-            >
-              {{ t("onboarding.agent.openTraces") }}
-            </OButton>
-          </template>
-        </OnboardingListenBar>
+        />
+        <OnboardingStepFooter />
       </div>
     </section>
 
@@ -254,13 +245,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref } from "vue";
+import { computed, provide, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
-import { queryClient } from "@/composables/query/queryClient";
+import { kubernetesDetect } from "@/components/ingestion/setupCard/content/kubernetes";
+import { hostMetricsDetect } from "@/components/ingestion/setupCard/content/osAgent";
+import { otlpTracesDetect } from "@/components/ingestion/setupCard/content/otlpTraces";
+import { rumDetect } from "@/components/ingestion/setupCard/content/rum";
+import type { RichCardDetect } from "@/components/ingestion/setupCard/types";
 import { FIRST_EVENT_SNIPPET_COPIED } from "@/composables/firstEvent/firstEventCopied";
 import type {
   FirstEventResult,
@@ -277,7 +272,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import analytics from "@/services/product_analytics";
-import { streamNameListQuery } from "@/services/stream.queries";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { downloadFile } from "@/utils/dom";
@@ -287,6 +281,7 @@ import { CODING_AGENTS } from "./onboardingChoices";
 import OnboardingListenBar, { type ListenBarCopy } from "./OnboardingListenBar.vue";
 import OnboardingPreview from "./OnboardingPreview.vue";
 import OnboardingSetupStep from "./OnboardingSetupStep.vue";
+import OnboardingStepFooter from "./OnboardingStepFooter.vue";
 
 const emit = defineEmits<{ back: [] }>();
 
@@ -295,7 +290,7 @@ const store = useStore();
 const router = useRouter();
 const { endpoint } = useIngestion();
 
-// The file tells the agent to send its test event here.
+// The prompt's stream: its test event and its OpenTelemetry and HTTP setups send here.
 const STREAM = "default";
 const FILE_NAME = raw("openobserve-setup.md");
 const EXPORT_LINE = 'export O2_ACCESS_KEY="[BASIC_PASSCODE]"';
@@ -306,28 +301,8 @@ const org = computed<string>(() => store.state.selectedOrganization?.identifier 
 const exportLine = useCredentialSnippet(ref(EXPORT_LINE));
 const powerShell = useCredentialSnippet(ref('$env:O2_ACCESS_KEY="[BASIC_PASSCODE]"'));
 
-// A new org gets the test event in a new stream, so the watch looks for any new stream. An org
-// that already has the stream watches it for records sent after a copy. The mode is read once, from
-// a fresh list at page open: the watch itself refreshes the same cached list as data arrives, and a
-// mode that followed it would restart the watch after the data and miss it.
-const testStreamExisted = ref<boolean>();
-const readMode = async () => {
-  if (!org.value) return false;
-  try {
-    const list = await queryClient.fetchQuery({
-      ...streamNameListQuery(org.value, "logs"),
-      staleTime: 0,
-    });
-    return list.some((s: { name?: string }) => s?.name === STREAM);
-  } catch {
-    return false;
-  }
-};
-void readMode().then((existed) => (testStreamExisted.value = existed));
-
-const focus = ref<AgentFocus>("auto");
+const focus = ref<AgentFocus>("kubernetes");
 const focusOptions = computed(() => [
-  { value: "auto", label: t("onboarding.agent.focus.auto") },
   {
     value: "kubernetes",
     label: t("onboarding.agent.focus.kubernetes", { k8s: raw("Kubernetes") }),
@@ -348,6 +323,19 @@ const focusOptions = computed(() => [
   { value: "frontend", label: t("onboarding.agent.focus.frontend") },
   { value: "logs", label: t("onboarding.agent.focus.logs") },
 ]);
+
+// Each setup waits for the same data as its setup guide.
+const DETECT: Record<AgentFocus, RichCardDetect> = {
+  kubernetes: kubernetesDetect,
+  host: hostMetricsDetect,
+  backend: otlpTracesDetect,
+  // The LLM guides' checks come with the fetched AI catalog, one per provider; any trace counts here.
+  llm: otlpTracesDetect,
+  frontend: rumDetect,
+  // The HTTP logs guide (Curl.vue) watches logs stream default, where the prompt's test event goes.
+  logs: { streamType: "logs", streamName: STREAM, filter: "" },
+};
+const detect = computed(() => DETECT[focus.value]);
 
 const ctx = computed(() => ({
   endpoint: endpoint.value?.url ?? "",
@@ -387,6 +375,8 @@ const statusEl = ref<HTMLElement | null>(null);
 // The watch starts on mount, so the bar starts waiting.
 const state = ref<FirstEventState>("waiting");
 const result = ref<FirstEventResult>();
+// Another setup waits for other data, so an earlier success no longer applies.
+watch(focus, () => (result.value = undefined));
 
 // A copy restarts the watch's fast checks, as a copy on a setup card does.
 const tokenCopied = ref(false);
@@ -425,18 +415,11 @@ const download = () => {
   }
 };
 
-// The prompt's test event lands first in logs stream default; the app's own data comes after it.
-const testEventFirst = computed(
-  () => result.value?.streamType === "logs" && result.value.streamName === STREAM,
-);
-const openTraces = () =>
-  router.push({ name: "traces", query: { org_identifier: org.value } }).catch(() => {});
-
 const barCopy = computed((): ListenBarCopy => ({
-  // Only when the test stream already has data: the watch holds until a copy.
+  // Only when the watched stream already has data: the watch holds until a copy.
   idle: {
     title: t("onboarding.agent.bar.idle"),
-    hint: t("onboarding.agent.bar.idleHint", { stream: raw(STREAM) }),
+    hint: t("onboarding.agent.bar.idleHint", { stream: raw(detect.value.streamName ?? STREAM) }),
   },
   waiting: {
     title: t("onboarding.agent.bar.waiting"),

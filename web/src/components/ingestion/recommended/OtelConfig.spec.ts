@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import { routeLocationKey } from "vue-router";
 
 import store from "@/test/unit/helpers/store";
 import OtelConfig from "./OtelConfig.vue";
@@ -434,7 +435,7 @@ service:
   });
 
   describe("first event status", () => {
-    it("mounts one traces status bar for the org whose Copy config re-copies the HTTP block", () => {
+    it("mounts one logs status bar for the org whose Copy config re-copies the HTTP block", () => {
       wrapper = mount(OtelConfig, {
         props: defaultProps,
         global: {
@@ -453,7 +454,7 @@ service:
       const bars = wrapper.findAllComponents({ name: "FirstEventStatus" });
       expect(bars).toHaveLength(1);
       expect(bars[0].props("org")).toBe(store.state.selectedOrganization.identifier);
-      expect(bars[0].props("signal")).toBe("traces");
+      expect(bars[0].props("signal")).toBe("logs");
       expect(bars[0].props("snippetKind")).toBe("config");
 
       const copy = document.createElement("button");
@@ -463,6 +464,30 @@ service:
       wrapper.element.appendChild(copy);
       bars[0].vm.$emit("copy-command");
       expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for logs on the Logs tab and onboarding, and for traces on the Traces tab", () => {
+      const signalAt = (name: string) => {
+        const w = mount(OtelConfig, {
+          props: defaultProps,
+          global: {
+            plugins: [[{}], [store]],
+            provide: { store, [routeLocationKey as symbol]: { name } },
+            stubs: {
+              FirstEventStatus: {
+                name: "FirstEventStatus",
+                props: ["signal"],
+                template: "<div />",
+              },
+            },
+          },
+        });
+        const signal = w.findComponent({ name: "FirstEventStatus" }).props("signal");
+        w.unmount();
+        return signal;
+      };
+      expect(signalAt("ingestLogsFromOtel")).toBe("logs");
+      expect(signalAt("ingestTracesFromOtel")).toBe("traces");
     });
   });
 });

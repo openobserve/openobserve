@@ -229,22 +229,22 @@ describe("OnboardingStepGuide", () => {
   });
 
   it.each([
-    ["java", "For Java,", "https://opentelemetry.io/docs/languages/java/getting-started/", "Java"],
+    ["java", "Java", "https://opentelemetry.io/docs/languages/java/getting-started/", "Java"],
     [
       "node-js",
-      "For Node.js,",
+      "Node.js",
       "https://opentelemetry.io/docs/languages/js/getting-started/",
       "Node.js",
     ],
     [
       "fastapi",
-      "For FastAPI,",
+      "FastAPI",
       "https://opentelemetry.io/docs/languages/python/getting-started/",
       "Python",
     ],
   ])(
     "tells a %s tile what to add and links its OpenTelemetry guide",
-    async (id, line, url, docs) => {
+    async (id, name, url, docs) => {
       const w = await mountGuide(false, undefined, {
         choice: backend,
         row: libraryRow,
@@ -252,7 +252,7 @@ describe("OnboardingStepGuide", () => {
       });
       expect(card(w).props("slug")).toBe("otlpTraces");
       expect(w.find('[data-test="onboarding-step-guide-language"]').text()).toBe(
-        `${line} add the OpenTelemetry SDK with automatic instrumentation, then point it at OpenObserve with the settings below.`,
+        `For ${name}, add the OpenTelemetry SDK, with automatic instrumentation where ${name} has it, then point it at OpenObserve with the settings below.`,
       );
       const link = w.find('[data-test="onboarding-step-guide-language-docs"]');
       expect(link.attributes("href")).toBe(url);
@@ -357,6 +357,31 @@ describe("OnboardingStepGuide", () => {
         "text/markdown",
       );
       expect(w.emitted("agent")).toBeUndefined();
+    });
+
+    it.each([
+      ["frontend", "react-native"],
+      ["frontend", "android"],
+      ["frontend", "ios"],
+      ["backend", "continuous-profiling"],
+    ])("offers no coding agent prompt on the %s %s guide", async (choiceId, rowId) => {
+      // The frontend prompt installs the browser SDK and the backend one sets up traces only.
+      const choice = buildChoices(i18n.global.t as unknown as TranslateFn, {
+        profiling: true,
+      }).find((c) => c.id === choiceId)!;
+      const row = choice.rows.find((r) => r.id === rowId)!;
+      const guide = { id: row.id, name: row.name, route: row.route! };
+      const w = await mountGuide(true, undefined, { choice, row, guide });
+      expect(w.find('[data-test="onboarding-step-guide-agent-copy"]').exists()).toBe(false);
+      expect(w.find('[data-test="onboarding-step-guide-invite"]').exists()).toBe(true);
+    });
+
+    it("offers no coding agent prompt on a guide no prompt section covers", async () => {
+      const row = infra.rows.find((r) => r.id === "cloud-account")!;
+      const guide = row.groups!.flatMap((g) => g.guides).find((g) => g.id === "aws")!;
+      const w = await mountGuide(true, undefined, { choice: infra, row, guide });
+      expect(w.find('[data-test="onboarding-step-guide-agent-copy"]').exists()).toBe(false);
+      expect(w.find('[data-test="onboarding-step-guide-invite"]').exists()).toBe(true);
     });
   });
 

@@ -24,7 +24,12 @@ import { raw, type TranslateFn } from "@/types/i18n";
 
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardDetect,
+  RichCardStepVariant,
+} from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 // Collector exporter config. {stream} is filled live by the renderer.
@@ -79,6 +84,13 @@ export const SDK_ENV = `export OTEL_EXPORTER_OTLP_ENDPOINT="{url}/api/{org}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic {token},stream-name={stream}"
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_SERVICE_NAME="my-service"`;
+
+// Every span carries a trace id, so any row on the stream proves the exporter is wired up.
+export const otlpTracesDetect: RichCardDetect = {
+  streamType: "traces",
+  streamName: "default",
+  filter: "trace_id IS NOT NULL",
+};
 
 export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const isCloud = config.isCloud === "true";
@@ -171,13 +183,7 @@ export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn):
       placeholder: raw("default"),
       helpKey: "ingestion.setupCard.otlpTracesStreamHelp",
     },
-    // Every span carries a trace id, so any row on the target stream proves the
-    // exporter is wired up correctly.
-    detect: {
-      streamType: "traces",
-      streamName: "default",
-      filter: "trace_id IS NOT NULL",
-    },
+    detect: otlpTracesDetect,
     extras: {
       fixTitle: t("ingestion.setupCard.otlpFixTitle"),
       fixBody: t("ingestion.setupCard.otlpFixBody"),

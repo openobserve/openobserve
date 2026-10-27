@@ -65,6 +65,26 @@ describe("OnboardingStepRows", () => {
     expect(hidden.map((c) => c.find("h2").text())).toEqual(infrastructure.rows.map((r) => r.name));
   });
 
+  it("shows the choice's example screen in the panel, for every row", async () => {
+    const w = mountRows();
+    const kind = () => w.find('[data-test="onboarding-example"]').attributes("data-kind");
+    expect(kind()).toBe("infrastructure");
+    await rows(w)[1].trigger("mouseenter");
+    expect(kind()).toBe("infrastructure");
+  });
+
+  it("shows no example screen for Continuous profiling, rather than a trace waterfall", async () => {
+    const profiling = buildChoices(i18n.global.t as unknown as TranslateFn, {
+      profiling: true,
+    }).find((c) => c.id === "backend")!;
+    const w = mountRows(profiling);
+    const at = profiling.rows.findIndex((r) => r.id === "continuous-profiling");
+    expect(w.find('[data-test="onboarding-example"]').exists()).toBe(true);
+    await rows(w)[at].trigger("mouseenter");
+    expect(panelTitle(w)).toBe("Continuous profiling");
+    expect(w.find('[data-test="onboarding-example"]').exists()).toBe(false);
+  });
+
   it("moves between rows with the arrow keys, skipping the coding agent link", async () => {
     // The first backend row has a coding agent link under it; the arrow goes past it.
     const w = mountRows(backend, document.body);

@@ -53,12 +53,14 @@ describe("OnboardingStepWhich", () => {
     );
   });
 
-  it("shows the title and the tiles, with the panel beside them", () => {
+  it("shows the title and the tiles, with the choice's example screen beside them", () => {
     const w = mountWhich("infrastructure", "databases");
     expect(w.find("h1").text()).toBe("Which database do you want to monitor?");
     expect(w.text()).not.toContain("Each opens its setup guide");
     expect(w.find('[data-test="onboarding-preview-title"]').text()).toBe("Databases");
-    expect(w.find('[data-test="onboarding-example"]').exists()).toBe(false);
+    expect(w.find('[data-test="onboarding-example"]').attributes("data-kind")).toBe(
+      "infrastructure",
+    );
   });
 
   it("filters tiles as the user types", async () => {

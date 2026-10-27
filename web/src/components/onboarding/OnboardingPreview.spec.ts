@@ -28,7 +28,7 @@ const preview = {
   eyebrow: raw("What you get"),
   title: raw("Infrastructure"),
   text: raw("See every host, pod and cloud service in one place."),
-  signals: ["metrics", "logs", "events"] as OnboardingSignal[],
+  signals: ["metrics", "logs", "traces"] as OnboardingSignal[],
 };
 
 const chips = (w: VueWrapper) =>
@@ -58,18 +58,19 @@ describe("OnboardingPreview", () => {
     );
     expect(w.find('[data-test="onboarding-preview-title"]').text()).toBe("Infrastructure");
     expect(w.text()).toContain("See every host, pod and cloud service in one place.");
-    expect(chips(w)).toEqual(["Metrics", "Logs", "Events"]);
+    expect(chips(w)).toEqual(["Metrics", "Logs", "Traces"]);
     // White on the brand fill: the chip sets the panel text colour itself, like every text on the panel.
     for (const chip of w.findAll('[data-test^="onboarding-preview-signal-"]')) {
       expect(chip.classes()).toEqual(
         expect.arrayContaining(["text-onboarding-panel-text", "bg-onboarding-panel-text/10"]),
       );
     }
-    expect(icons(w)).toEqual(["bar-chart", "article", "bolt"]);
+    expect(icons(w)).toEqual(["bar-chart", "article", "account-tree"]);
     // A sentence and chips, not the tick-mark list.
     expect(icons(w)).not.toContain("check");
-    // Text only: no example screen under it.
-    expect(w.find('[data-test="onboarding-example"]').exists()).toBe(false);
+    expect(w.find('[data-test="onboarding-example"]').attributes("data-kind")).toBe(
+      "infrastructure",
+    );
     // No "Example" tag: the "What you get" eyebrow already frames the screen. The eyebrow is full white, for AA contrast.
     expect(w.findAll("span").some((s) => s.text() === "Example")).toBe(false);
     expect(w.find("p").text()).toBe("What you get");
@@ -111,7 +112,7 @@ describe("OnboardingPreview", () => {
       eyebrow: raw("What you get"),
       title: raw("Logs"),
       text: raw("Search and filter every log line, whatever sends it."),
-      signals: ["logs", "auditLogs", "securityEvents", "traces", "metrics"] as OnboardingSignal[],
+      signals: ["logs", "sessions", "errors", "traces", "metrics"] as OnboardingSignal[],
     };
     const w = mount(OnboardingPreview, {
       props: { preview, example: "logs", reserve: [preview, longer] },
@@ -128,12 +129,12 @@ describe("OnboardingPreview", () => {
     expect(cells[2].text()).toContain("Search and filter every log line, whatever sends it.");
     expect(cells[2].findAll("li").map((li) => li.text())).toEqual([
       "Logs",
-      "Audit logs",
-      "Security events",
+      "Sessions",
+      "Errors",
       "Traces",
       "Metrics",
     ]);
     // Only the visible cell's chips carry a data-test.
-    expect(chips(w)).toEqual(["Metrics", "Logs", "Events"]);
+    expect(chips(w)).toEqual(["Metrics", "Logs", "Traces"]);
   });
 });

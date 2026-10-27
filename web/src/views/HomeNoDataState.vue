@@ -66,10 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="account-tree"
         :label="t('home.noDataState.traces')"
         :sublabel="
-          t('home.noDataState.tracesDesc', {
-            product1: raw('OTLP'),
-            product2: raw('Jaeger'),
-            product3: raw('Zipkin'),
+          t('home.noDataState.tracesOtlpDesc', {
+            otlp: raw('OTLP'),
+            otel: raw('OpenTelemetry'),
           })
         "
         icon-variant="purple"

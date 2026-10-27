@@ -171,10 +171,7 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
       expect(docURLs).toHaveProperty("postgres");
       expect(docURLs).toHaveProperty("mongoDB");
       expect(docURLs).toHaveProperty("redis");
-      expect(docURLs).toHaveProperty("couchDB");
-      expect(docURLs).toHaveProperty("elasticsearch");
       expect(docURLs).toHaveProperty("mySQL");
-      expect(docURLs).toHaveProperty("sapHana");
       expect(docURLs).toHaveProperty("snowflake");
       expect(docURLs).toHaveProperty("zookeeper");
       expect(docURLs).toHaveProperty("cassandra");
@@ -205,7 +202,7 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
     it("should have correct number of database documentation URLs", () => {
       const result = useIngestion();
       const docURLs = result.databaseDocURLs;
-      expect(Object.keys(docURLs)).toHaveLength(15);
+      expect(Object.keys(docURLs)).toHaveLength(12);
     });
   });
 
@@ -456,7 +453,6 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
       const docURLs = result.othersDocURLs;
 
       expect(docURLs).toHaveProperty("airflow");
-      expect(docURLs).toHaveProperty("airbyte");
       expect(docURLs).toHaveProperty("cribl");
       expect(docURLs).toHaveProperty("vercel");
       expect(docURLs).toHaveProperty("heroku");
@@ -465,7 +461,7 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
     it("should have correct number of others documentation URLs", () => {
       const result = useIngestion();
       const docURLs = result.othersDocURLs;
-      expect(Object.keys(docURLs)).toHaveLength(5);
+      expect(Object.keys(docURLs)).toHaveLength(4);
     });
   });
 

@@ -41,6 +41,7 @@ const panel = (w: W) => w.find('[data-test="onboarding-step-traces-library-panel
 const language = (w: W, id: string) =>
   w.find(`[data-test="onboarding-step-traces-language-${id}"] button`);
 const submit = (w: W) => w.find('[data-test="onboarding-step-traces-form"]').trigger("submit");
+const kind = (w: W) => w.find('[data-test="onboarding-example"]').attributes("data-kind");
 const panelTitle = (w: W) => w.find('[data-test="onboarding-preview-title"]').text();
 
 describe("OnboardingStepTraces", () => {
@@ -54,7 +55,7 @@ describe("OnboardingStepTraces", () => {
         option(w, id).find(".text-compact").text(),
       ]),
     ).toEqual([
-      ["Logs, Metrics and Events", "Cluster health and container logs. One command."],
+      ["Logs and Metrics", "Cluster health and container logs. One command."],
       [
         "Add Traces With eBPF",
         "No code changes, any language. Needs Linux kernel 5.8+ on your nodes.",
@@ -128,18 +129,27 @@ describe("OnboardingStepTraces", () => {
     expect(panelTitle(w)).toBe("Add Traces With Language Libraries");
   });
 
-  it("shows each answer's text and signals in the panel", async () => {
+  it("keeps Kubernetes events out of the option name and chips: they arrive as logs", () => {
+    const w = mountTraces();
+    const labels = w.findAll('[data-test^="onboarding-preview-signal-"]').map((c) => c.text());
+    expect(labels).toEqual(["Logs", "Metrics"]);
+    expect(option(w, "off").find(".text-sm").text()).toBe("Logs and Metrics");
+    expect(w.text()).toContain("Kubernetes events as logs");
+    expect(w.findAll(".row-start-1 li").map((li) => li.text())).not.toContain("Events");
+  });
+
+  it("shows the cluster screen for No and the trace waterfall for both Yes rows", async () => {
     const w = mountTraces();
     const chips = () =>
       w
         .findAll('[data-test^="onboarding-preview-signal-"]')
         .map((c) => c.attributes("data-test")!.replace("onboarding-preview-signal-", ""));
-    expect(panelTitle(w)).toBe("Logs, Metrics and Events");
-    expect(chips()).toEqual(["logs", "metrics", "events"]);
+    expect([kind(w), panelTitle(w)]).toEqual(["infrastructure", "Logs and Metrics"]);
+    expect(chips()).toEqual(["logs", "metrics"]);
     await option(w, "ebpf").trigger("mouseenter");
-    expect(panelTitle(w)).toBe("Add Traces With eBPF");
-    expect(chips()).toEqual(["logs", "metrics", "events", "traces"]);
+    expect([kind(w), panelTitle(w)]).toEqual(["backend", "Add Traces With eBPF"]);
+    expect(chips()).toEqual(["logs", "metrics", "traces"]);
     await option(w, "library").trigger("focus");
-    expect(panelTitle(w)).toBe("Add Traces With Language Libraries");
+    expect([kind(w), panelTitle(w)]).toEqual(["backend", "Add Traces With Language Libraries"]);
   });
 });

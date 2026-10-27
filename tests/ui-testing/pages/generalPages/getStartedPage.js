@@ -14,9 +14,6 @@ class OnboardingPage {
         this.choose = page.locator('[data-test="onboarding-step-choose"]');
         this.choices = page.locator('[data-test^="onboarding-step-choose-choice-"]');
         this.others = page.locator('[data-test^="onboarding-step-choose-other-"]');
-        this.terms = page.locator('[data-test="onboarding-step-choose-terms"]');
-        this.termsLink = page.locator('[data-test="onboarding-step-choose-terms-link"]');
-        this.privacyLink = page.locator('[data-test="onboarding-step-choose-privacy-link"]');
         this.previewTitle = page.locator('[data-test="onboarding-preview-title"]');
         this.rows = page.locator('[data-test="onboarding-step-rows"]');
         this.which = page.locator('[data-test="onboarding-step-which"]');

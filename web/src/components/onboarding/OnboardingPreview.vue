@@ -14,19 +14,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The brand panel beside each step: what the option under the pointer or focus gives the user.
-     It fills its parent's height. -->
+<!-- The brand panel beside each step: what the option under the pointer or focus gives the user,
+     over an example screen of the page it fills. It fills its parent's height; the example screen
+     takes the rest of it and runs off the right and bottom edges, like a screenshot. -->
 <template>
   <div
     :class="[
       'from-onboarding-panel-start to-onboarding-panel-end text-onboarding-panel-text flex h-full min-h-0 flex-col overflow-hidden bg-linear-to-b ps-14 pt-14 max-lg:ps-8 max-lg:pt-10',
-      'rounded-surface pb-14 max-lg:pb-10',
+      !example && 'rounded-surface pb-14 max-lg:pb-10',
     ]"
     data-test="onboarding-preview"
   >
     <!-- Every text this panel can show sits in one grid cell, and only the current one is visible.
-         The cell takes the height of the tallest, at any width and in any language, so nothing
-         below it moves while the text changes on hover. -->
+         The cell takes the height of the tallest, at any width and in any language, so the example
+         screen stays put while the text changes on hover. -->
     <div class="me-14 grid max-w-136 shrink-0 max-lg:me-8">
       <div
         v-for="(p, i) in texts"
@@ -64,6 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
       </div>
     </div>
+
+    <OnboardingExampleScreen
+      v-if="example"
+      :kind="example"
+      :row="exampleRow"
+      :row-name="preview.title"
+      class="mt-7 min-h-56 flex-1"
+    />
   </div>
 </template>
 
@@ -73,6 +82,8 @@ import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
+import OnboardingExampleScreen from "./examples/OnboardingExampleScreen.vue";
+import type { OnboardingExampleKind } from "./examples/onboardingExamples";
 import { SIGNAL_ICONS, type OnboardingSignal } from "./onboardingChoices";
 
 interface PreviewText {
@@ -86,6 +97,10 @@ interface PreviewText {
 
 const props = defineProps<{
   preview: PreviewText;
+  /** The example screen under the text; without one the panel is text only. */
+  example?: OnboardingExampleKind;
+  /** The step 2 row the panel describes, so the screen can show that row's page. */
+  exampleRow?: string;
   /** The other texts hover can bring in. The text area keeps the tallest one's height. */
   reserve?: PreviewText[];
 }>();
