@@ -2791,6 +2791,8 @@
     "online_error_validator_rejected": "The fetched key was rejected by the license validator. The current key remains in use.",
     "online_error_instance_key_unreadable": "The installation key cannot be read. Check O2_MASTER_ENCRYPTION_KEY and contact OpenObserve support.",
     "online_error_lock_unavailable": "The refresh lock is unavailable. Try again in a moment.",
+    "online_error_pending_reload": "A newer license key was just saved and is still loading on this server. Try Refresh again in a moment.",
+    "online_error_rotation_unsettled": "The installation key rotation has not finished. Try Refresh again to complete it.",
     "online_error_internal": "Online refresh could not be completed. Try again or contact OpenObserve support.",
     "refresh_now": "Refresh now",
     "online_registered": "Registered",

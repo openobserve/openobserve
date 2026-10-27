@@ -26,13 +26,17 @@ const errors = {
   instance_key_unreadable: "cannot be read",
   lock_unavailable: "lock",
   internal: "could not be completed",
-  rotation_unsettled: "could not be completed",
+  rotation_unsettled: "key rotation has not finished",
+  pending_reload: "still loading on this server",
 };
 describe("license refresh messages", () => {
   it.each(Object.entries(errors))("maps %s to translated copy", (error, text) => {
     expect(refreshMessage({ error, retry_after_s: 30, limits_refreshed: true }, gt).text).toContain(
       text,
     );
+  });
+  it.each(["pending_reload", "rotation_unsettled"])("shows %s as a retryable warning", (error) => {
+    expect(refreshMessage({ error }, gt).variant).toBe("warning");
   });
   it("includes waiver counts", () => {
     expect(
