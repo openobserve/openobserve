@@ -1341,11 +1341,17 @@ pub async fn redirect(
                 );
             }
 
+            let login_id = crate::request::ai::chats::bound_login_id(
+                &ider::uuid(),
+                &session_id,
+                &login_data.refresh_token,
+            );
             let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
                 refresh_token: login_data.refresh_token,
+                login_id: Some(login_id),
             })
             .unwrap();
             let cfg = get_config();
@@ -1461,20 +1467,24 @@ pub async fn refresh_token_with_dex(
         delegated: None,
     };
 
-    let token = if let Some(cookie) = cookies.get("auth_tokens") {
+    let (token, login) = if let Some(cookie) = cookies.get("auth_tokens") {
         let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
+        // Carried into the new cookie, so racing refreshes of one login still name the same login.
+        let live = match auth_tokens.session_id() {
+            Some(session_id) => openobserve_core::session::get_session(session_id)
+                .await
+                .is_some(),
+            None => false,
+        };
+        let login = crate::request::ai::chats::cookie_login(&auth_tokens, live);
 
         // remove old session id from cluster co-ordinator
-        let access_token = auth_tokens.access_token;
-        if access_token.starts_with("session") {
-            openobserve_core::session::remove_session(
-                access_token.strip_prefix("session ").unwrap(),
-            )
-            .await;
+        if let Some(session_id) = auth_tokens.session_id() {
+            openobserve_core::session::remove_session(session_id).await;
         }
 
-        auth_tokens.refresh_token
+        (auth_tokens.refresh_token, login)
     } else {
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
@@ -1563,12 +1573,15 @@ pub async fn refresh_token_with_dex(
                     session_id
                 );
             }
-
+            let login = login.unwrap_or_else(ider::uuid);
+            let login_id =
+                crate::request::ai::chats::bound_login_id(&login, &session_id, &refresh_token_str);
             let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
                 refresh_token: refresh_token_str,
+                login_id: Some(login_id),
             })
             .unwrap();
             let conf = get_config();
@@ -1718,13 +1731,18 @@ pub async fn logout(
         let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens =
             json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
-        let access_token = auth_tokens.access_token;
-
-        if access_token.starts_with("session") {
-            openobserve_core::session::remove_session(
-                access_token.strip_prefix("session ").unwrap(),
-            )
-            .await;
+        // Only a live session signs its login out, so a stale or edited cookie stops nothing.
+        #[cfg(feature = "enterprise")]
+        if let Some(session_id) = auth_tokens.session_id()
+            && openobserve_core::session::get_session(session_id)
+                .await
+                .is_some()
+            && let Some(login) = crate::request::ai::chats::cookie_login(&auth_tokens, true)
+        {
+            o2_enterprise::enterprise::ai::chat::lease::cancel_auth_session(&login).await;
+        }
+        if let Some(session_id) = auth_tokens.session_id() {
+            openobserve_core::session::remove_session(session_id).await;
         }
     };
     let max_age_secs = db::password_policy::cookie_max_age_secs().await;

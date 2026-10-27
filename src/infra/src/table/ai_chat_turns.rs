@@ -215,6 +215,91 @@ pub async fn list_for_session_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
+/// The turns of `session_ids` marked running and started at or after `stale_before`, one query.
+pub async fn running_for_sessions(
+    org_id: &str,
+    session_ids: &[String],
+    stale_before: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    running_for_sessions_with(get_orm_client_ro().await, org_id, session_ids, stale_before).await
+}
+
+pub async fn running_for_sessions_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_ids: &[String],
+    stale_before: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    if session_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.is_in(session_ids.iter().cloned()))
+        .filter(Column::Status.eq(TURN_RUNNING))
+        .filter(Column::StartedAt.gte(stale_before))
+        .order_by_asc(Column::StartedAt)
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// The records of these `(session_id, turn_id)` pairs of one org, one query.
+pub async fn get_many(
+    org_id: &str,
+    keys: &[(String, String)],
+) -> Result<Vec<Model>, errors::Error> {
+    get_many_with(get_orm_client_ro().await, org_id, keys).await
+}
+
+pub async fn get_many_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    keys: &[(String, String)],
+) -> Result<Vec<Model>, errors::Error> {
+    if keys.is_empty() {
+        return Ok(Vec::new());
+    }
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.is_in(keys.iter().map(|(sid, _)| sid.clone())))
+        .filter(Column::TurnId.is_in(keys.iter().map(|(_, tid)| tid.clone())))
+        .all(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(records
+        .into_iter()
+        .filter(|r| {
+            keys.iter()
+                .any(|(sid, tid)| *sid == r.session_id && *tid == r.turn_id)
+        })
+        .collect())
+}
+
+pub async fn get(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+) -> Result<Option<Model>, errors::Error> {
+    get_with(get_orm_client_ro().await, org_id, session_id, turn_id).await
+}
+
+pub async fn get_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+) -> Result<Option<Model>, errors::Error> {
+    Entity::find_by_id((
+        org_id.to_string(),
+        session_id.to_string(),
+        turn_id.to_string(),
+    ))
+    .one(conn)
+    .await
+    .map_err(db_err)
+}
+
 /// Remove the turn records of chats whose index row is gone (retention).
 pub async fn purge_orphans(org_id: &str) -> Result<u64, errors::Error> {
     purge_orphans_with(get_orm_client_rw().await, org_id).await
@@ -622,5 +707,64 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn running_turns_of_many_chats_are_read_at_once() {
+        let db = db().await;
+        let other = "11111111-89ab-7def-8123-456789abcdef";
+        admit_with(&db, ORG, SID, "done", 0, 10).await.unwrap();
+        finish_with(
+            &db,
+            ORG,
+            SID,
+            "done",
+            TURN_COMPLETED,
+            None,
+            None,
+            Some(3),
+            11,
+        )
+        .await
+        .unwrap();
+        admit_with(&db, ORG, SID, "live", 4, 20).await.unwrap();
+        admit_with(&db, ORG, other, "stale", 0, 5).await.unwrap();
+        admit_with(&db, ORG, "not-listed", "elsewhere", 0, 20)
+            .await
+            .unwrap();
+        let sessions = vec![SID.to_string(), other.to_string()];
+        let running = running_for_sessions_with(&db, ORG, &sessions, 10)
+            .await
+            .unwrap();
+        let ids: Vec<&str> = running.iter().map(|r| r.turn_id.as_str()).collect();
+        assert_eq!(ids, vec!["live"], "stale and unlisted turns are left out");
+        assert!(
+            running_for_sessions_with(&db, ORG, &[], 0)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            get_with(&db, ORG, SID, "done")
+                .await
+                .unwrap()
+                .unwrap()
+                .end_seq,
+            Some(3)
+        );
+        assert!(get_with(&db, ORG, SID, "nope").await.unwrap().is_none());
+        let keys = vec![
+            (SID.to_string(), "done".to_string()),
+            (other.to_string(), "live".to_string()),
+            (other.to_string(), "stale".to_string()),
+        ];
+        let mut found: Vec<String> = get_many_with(&db, ORG, &keys)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.turn_id)
+            .collect();
+        found.sort();
+        assert_eq!(found, vec!["done", "stale"], "only the exact pairs");
     }
 }

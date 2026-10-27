@@ -636,6 +636,33 @@ pub fn keep_inline_images(turn: &mut Value) {
     }
 }
 
+/// The call id (maybe empty) of a delete the agent asked the user to confirm in this event.
+pub fn delete_confirmation_call(event_type: &str, data: &Value) -> Option<String> {
+    if live_type(event_type) != "message.part.updated" {
+        return None;
+    }
+    let part = obj(data.get("part"))?;
+    let state = obj(part.get("state"))?;
+    if state.get("status").and_then(Value::as_str) != Some("completed") {
+        return None;
+    }
+    let tool = part.get("tool").and_then(Value::as_str).unwrap_or_default();
+    let metadata = state
+        .get("metadata")
+        .filter(|v| truthy(v))
+        .cloned()
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    let result = coerce_tool_output(state.get("output"), metadata);
+    is_delete_confirmation(&result, tool).then(|| {
+        [part.get("callID"), part.get("id")]
+            .into_iter()
+            .flatten()
+            .find(|v| truthy(v))
+            .map(py_str)
+            .unwrap_or_default()
+    })
+}
+
 fn redact_frame(frame: &mut Value) {
     let Some(map) = frame.as_object_mut() else {
         return;
@@ -1565,6 +1592,32 @@ mod tests {
         assert_eq!(
             strip_mcp_prefix("o2_correlate_streams"),
             "correlate_streams"
+        );
+    }
+
+    #[test]
+    fn a_delete_confirmation_sentinel_names_its_call() {
+        let sentinel = json!({"type": "delete_confirmation", "resource_type": "alert", "id": "a1"});
+        let part = |tool: &str, status: &str| {
+            json!({"part": {"id": "prt_1", "callID": "call_9", "tool": tool,
+                "state": {"status": status, "output": sentinel.to_string()}}})
+        };
+        let updated = "message.part.updated.1";
+        assert_eq!(
+            delete_confirmation_call(updated, &part("o2_delete", "completed")).as_deref(),
+            Some("call_9")
+        );
+        assert_eq!(
+            delete_confirmation_call(updated, &part("o2_delete", "running")),
+            None
+        );
+        assert_eq!(
+            delete_confirmation_call(updated, &part("SearchSQL", "completed")),
+            None
+        );
+        assert_eq!(
+            delete_confirmation_call("message.updated.1", &part("o2_delete", "completed")),
+            None
         );
     }
 }

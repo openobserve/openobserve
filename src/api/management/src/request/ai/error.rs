@@ -49,10 +49,13 @@ pub enum AiErrorCode {
     InvalidRequest,
     Internal,
     Unknown,
+    SignedOut,
+    StreamDropped,
+    TurnExpired,
 }
 
 impl AiErrorCode {
-    pub const ALL: [AiErrorCode; 23] = [
+    pub const ALL: [AiErrorCode; 26] = [
         AiErrorCode::SessionExpired,
         AiErrorCode::PermissionDenied,
         AiErrorCode::NotEnabled,
@@ -76,6 +79,9 @@ impl AiErrorCode {
         AiErrorCode::InvalidRequest,
         AiErrorCode::Internal,
         AiErrorCode::Unknown,
+        AiErrorCode::SignedOut,
+        AiErrorCode::StreamDropped,
+        AiErrorCode::TurnExpired,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -103,6 +109,9 @@ impl AiErrorCode {
             AiErrorCode::InvalidRequest => "invalid_request",
             AiErrorCode::Internal => "internal",
             AiErrorCode::Unknown => "unknown",
+            AiErrorCode::SignedOut => "signed_out",
+            AiErrorCode::StreamDropped => "stream_dropped",
+            AiErrorCode::TurnExpired => "turn_expired",
         }
     }
 
@@ -157,7 +166,7 @@ impl AiErrorCode {
 
     pub fn default_status(self) -> StatusCode {
         match self {
-            AiErrorCode::SessionExpired => StatusCode::UNAUTHORIZED,
+            AiErrorCode::SessionExpired | AiErrorCode::SignedOut => StatusCode::UNAUTHORIZED,
             AiErrorCode::PermissionDenied => StatusCode::FORBIDDEN,
             AiErrorCode::NotEnabled | AiErrorCode::InvalidRequest => StatusCode::BAD_REQUEST,
             AiErrorCode::CreditsExhausted | AiErrorCode::SubscriptionRequired => {
@@ -174,10 +183,12 @@ impl AiErrorCode {
             | AiErrorCode::RestoreRequired
             | AiErrorCode::StaleEpoch => StatusCode::CONFLICT,
             AiErrorCode::NotFound => StatusCode::NOT_FOUND,
+            AiErrorCode::TurnExpired => StatusCode::GONE,
             AiErrorCode::PersistenceFailed
             | AiErrorCode::ProviderError
             | AiErrorCode::ApprovalDeliveryFailed
             | AiErrorCode::Internal
+            | AiErrorCode::StreamDropped
             | AiErrorCode::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -194,6 +205,7 @@ impl AiErrorCode {
                 | AiErrorCode::RestoreRequired
                 | AiErrorCode::ApprovalDeliveryFailed
                 | AiErrorCode::HistoryUnavailable
+                | AiErrorCode::StreamDropped
         )
     }
 
@@ -212,7 +224,10 @@ impl AiErrorCode {
             AiErrorCode::CreditsExhausted | AiErrorCode::SubscriptionRequired => {
                 Some(AiErrorAction::ManageBilling)
             }
-            AiErrorCode::TurnLimit | AiErrorCode::RateLimited => Some(AiErrorAction::Retry),
+            AiErrorCode::TurnLimit | AiErrorCode::RateLimited | AiErrorCode::StreamDropped => {
+                Some(AiErrorAction::Retry)
+            }
+            AiErrorCode::SignedOut => Some(AiErrorAction::SignIn),
             AiErrorCode::AgentUnavailable | AiErrorCode::SessionOwnerUnavailable => {
                 Some(AiErrorAction::Retry)
             }
@@ -223,7 +238,8 @@ impl AiErrorCode {
             | AiErrorCode::Internal => Some(AiErrorAction::None),
             AiErrorCode::AlreadySubmitted
             | AiErrorCode::RestoreRequired
-            | AiErrorCode::StaleEpoch => Some(AiErrorAction::Reload),
+            | AiErrorCode::StaleEpoch
+            | AiErrorCode::TurnExpired => Some(AiErrorAction::Reload),
             _ => None,
         }
     }
@@ -500,6 +516,9 @@ mod tests {
                 "invalid_request",
                 "internal",
                 "unknown",
+                "signed_out",
+                "stream_dropped",
+                "turn_expired",
             ]
         );
         for code in AiErrorCode::ALL {
