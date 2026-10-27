@@ -60,3 +60,10 @@ test('Logo Upload on Management', { tag: '@enterprise' }, async ({ page }) => {
 
     testLogger.info('Logo upload test completed successfully');
 });
+
+// Crosscheck scenario only: a first-try failure makes the reporting step send a flaky row.
+test('ci scenario: crosscheck fails on the first try only', async ({ page }, testInfo) => {
+    await page.setContent('<p>ci scenario</p>');
+    await expect(page.locator('p')).toBeVisible();
+    expect(testInfo.retry, 'fails on the first try only').toBeGreaterThan(0);
+});

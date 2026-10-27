@@ -1,5 +1,5 @@
 {
-  "_comment": "PR smoke selection config for build-ci-matrix.js --select-for-changes. global_paths force the FULL matrix on the PR (shared frontend code, deps, and the smoke machinery itself); ignore_paths are files that cannot affect the app; a changed file matching neither list nor any shard's globs (its folder_paths entry, keyed by actual_folder, plus optional per-shard paths extras; a shard also implicitly owns its own playwright-tests folder) pulls in core_shards \u2014 one representative shard per major surface \u2014 because merge_group always runs the full matrix before anything lands. always_run shards are appended to every smoke selection as a cheap canary. Selection never emits zero shards.",
+  "_comment": "PR smoke selection config for build-ci-matrix.js --select-for-changes. global_paths force the FULL matrix on the PR (shared frontend code, deps, and the smoke machinery itself); ignore_paths are files that cannot affect the app; a changed file matching neither list nor any shard's globs (its folder_paths entry, keyed by actual_folder, plus optional per-shard paths extras; a shard also implicitly owns its own playwright-tests folder) pulls in core_shards — one representative shard per major surface — because merge_group always runs the full matrix before anything lands. always_run shards are appended to every smoke selection as a cheap canary. Selection never emits zero shards.",
   "always_ignore_paths": [
     "web/src/**/*.spec.ts",
     "web/src/**/*.spec.js",
@@ -68,20 +68,9 @@
     "scripts/translations/**"
   ],
   "core_shards": [
-    "Alerts",
-    "Dashboards-Core",
-    "Logs-Core",
-    "Metrics",
-    "Traces",
-    "Pipelines",
-    "GeneralTests",
-    "Management",
-    "Org",
-    "Streams"
+    "CIScenario-Rerun"
   ],
-  "always_run": [
-    "Logs-SelectStar"
-  ],
+  "always_run": [],
   "folder_paths": {
     "Alerts": [
       "web/src/components/alerts/**",
@@ -221,6 +210,9 @@
       "web/src/services/status_pages.ts",
       "tests/ui-testing/pages/generalPages/statusPagesPage.js",
       "tests/ui-testing/pages/syntheticsPages/**"
+    ],
+    "CIScenario": [
+      "tests/ui-testing/playwright-tests/CIScenario/**"
     ]
   }
 }
