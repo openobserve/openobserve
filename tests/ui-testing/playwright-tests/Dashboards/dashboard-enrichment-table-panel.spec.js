@@ -143,7 +143,7 @@ test.describe("Dashboard panel on an enrichment table", () => {
 
       await addEnrichmentPanel(page, pm, dashboardName, tableName, "table");
       await pm.chartTypeSelector.setCustomSQL(
-        `SELECT city AS x_axis_1, sum(population) AS y_axis_1 FROM "${tableName}" GROUP BY x_axis_1`,
+        `SELECT city AS x_axis_1, count(_timestamp) AS y_axis_1 FROM "${tableName}" GROUP BY x_axis_1`,
       );
       await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
       await pm.dashboardPanelActions.addPanelName("Cities");
@@ -167,6 +167,7 @@ test.describe("Dashboard panel on an enrichment table", () => {
       await pm.dashboardPanelActions.addPanelName("Uploads");
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await expect(pm.dashboardPanelActions.getNoDataLocator()).toBeHidden({ timeout: 30000 });
       await pm.dashboardPanelActions.verifyChartHasData(expect);
 
       await pm.dashboardPanelActions.savePanel();
@@ -193,7 +194,7 @@ test.describe("Dashboard panel on an enrichment table", () => {
 
       await uploadEnrichmentTable(page, tableName, REPLACED_CSV);
       await waitForRowCount(page, tableName, 2);
-      await page.reload();
+      await pm.dashboardAutoRun.clickRefresh();
       await pm.dashboardPanelActions.waitForTablePanelWithData(30000);
       await expectFirstColumn(page, ["Brazil", "Japan"]);
 
