@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} von {total} fehlgeschlagen · in der Serverumgebung beheben, neu starten, dann Erneut prüfen",
       "allPassed": "Alle Voraussetzungen erfüllt",
       "recheck": "Erneut prüfen",
-      "helmHint": "Ohne Helm installiert? {variable} setzen, neu starten, dann Erneut prüfen.",
+      "helmHint": "Ohne Helm installiert? In der Serverumgebung setzen, neu starten, dann Erneut prüfen.",
       "loadFailed": "Die Voraussetzungsprüfungen konnten nicht ausgeführt werden.",
       "names": {
         "master_key": "Verschlüsselungsschlüssel",

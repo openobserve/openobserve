@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} van {total} mislukt · los dit op in de serveromgeving, herstart en klik dan op Opnieuw controleren",
       "allPassed": "Alle vereisten zijn voldaan",
       "recheck": "Opnieuw controleren",
-      "helmHint": "Zonder Helm geïnstalleerd? Stel {variable} in, herstart en klik dan op Opnieuw controleren.",
+      "helmHint": "Zonder Helm geïnstalleerd? Stel deze in de serveromgeving in, herstart en klik dan op Opnieuw controleren.",
       "loadFailed": "De controle van de vereisten kon niet worden uitgevoerd.",
       "names": {
         "master_key": "Versleutelingssleutel",

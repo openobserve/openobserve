@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed}/{total} 项失败 · 请在服务器环境中修复，重启后重新检查",
       "allPassed": "所有前提条件均已通过",
       "recheck": "重新检查",
-      "helmHint": "未使用 Helm 安装？请设置 {variable}，重启，然后重新检查。",
+      "helmHint": "未使用 Helm 安装？请在服务器环境中设置它，重启，然后重新检查。",
       "loadFailed": "无法运行前提条件检查。",
       "names": {
         "master_key": "加密密钥",

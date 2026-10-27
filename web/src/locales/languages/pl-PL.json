@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} z {total} nie powiodło się · napraw w środowisku serwera, uruchom ponownie, a następnie sprawdź ponownie",
       "allPassed": "Wszystkie wymagania są spełnione",
       "recheck": "Sprawdź ponownie",
-      "helmHint": "Zainstalowano bez Helma? Ustaw {variable}, uruchom ponownie, a następnie sprawdź ponownie.",
+      "helmHint": "Zainstalowano bez Helma? Ustaw go w środowisku serwera, uruchom ponownie, a następnie sprawdź ponownie.",
       "loadFailed": "Nie udało się uruchomić sprawdzania wymagań.",
       "names": {
         "master_key": "Klucz szyfrowania",

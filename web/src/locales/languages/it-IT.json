@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} di {total} non superati · correggi nell'ambiente del server, riavvia, poi Ricontrolla",
       "allPassed": "Tutti i prerequisiti sono superati",
       "recheck": "Ricontrolla",
-      "helmHint": "Installato senza Helm? Imposta {variable}, riavvia, poi Ricontrolla.",
+      "helmHint": "Installato senza Helm? Impostala nell'ambiente del server, riavvia, poi Ricontrolla.",
       "loadFailed": "Impossibile eseguire le verifiche dei prerequisiti.",
       "names": {
         "master_key": "Chiave di crittografia",

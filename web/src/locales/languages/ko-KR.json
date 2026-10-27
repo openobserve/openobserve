@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed}/{total} 실패 · 서버 환경에서 수정한 후 재시작하고 다시 확인하세요",
       "allPassed": "모든 사전 요구 사항 통과",
       "recheck": "다시 확인",
-      "helmHint": "Helm 없이 설치했나요? {variable}을(를) 설정하고 재시작한 뒤 다시 확인하세요.",
+      "helmHint": "Helm 없이 설치했나요? 서버 환경에서 설정하고 재시작한 뒤 다시 확인하세요.",
       "loadFailed": "사전 요구 사항 검사를 실행할 수 없습니다.",
       "names": {
         "master_key": "암호화 키",

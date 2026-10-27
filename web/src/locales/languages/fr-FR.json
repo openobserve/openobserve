@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} sur {total} en échec · corrigez dans l'environnement serveur, redémarrez, puis cliquez sur Revérifier",
       "allPassed": "Tous les prérequis sont satisfaits",
       "recheck": "Revérifier",
-      "helmHint": "Installé sans Helm ? Définissez {variable}, redémarrez, puis cliquez sur Revérifier.",
+      "helmHint": "Installé sans Helm ? Définissez-la dans l'environnement du serveur, redémarrez, puis cliquez sur Revérifier.",
       "loadFailed": "Les vérifications des prérequis n'ont pas pu s'exécuter.",
       "names": {
         "master_key": "Clé de chiffrement",

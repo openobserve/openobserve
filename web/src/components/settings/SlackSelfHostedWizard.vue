@@ -91,7 +91,7 @@ const props = defineProps<{ installation: InstallationView | null }>();
 
 const emit = defineEmits<{ done: []; cancel: [] }>();
 
-/** A 409 from row 2 or row 6 for the Slack team of an instance workspace (R-81) or of org workspaces (R-82). */
+/** Why create or install failed: the server's message (a 409 names the instance team, R-81, or org workspaces, R-82), or no response. */
 interface WizardRefusal {
   message: string;
   unreachable: boolean;

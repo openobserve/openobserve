@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} de {total} falharam · corrija no ambiente do servidor, reinicie e depois clique em Verificar novamente",
       "allPassed": "Todos os pré-requisitos são cumpridos",
       "recheck": "Verificar novamente",
-      "helmHint": "Instalou sem Helm? Defina {variable}, reinicie e depois clique em Verificar novamente.",
+      "helmHint": "Instalou sem Helm? Defina-a no ambiente do servidor, reinicie e depois clique em Verificar novamente.",
       "loadFailed": "Não foi possível executar as verificações de pré-requisitos.",
       "names": {
         "master_key": "Chave de encriptação",

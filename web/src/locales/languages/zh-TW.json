@@ -26213,7 +26213,7 @@
       "failedSummary": "{failed}／{total} 項失敗 · 請在伺服器環境中修正、重新啟動，然後重新檢查",
       "allPassed": "所有先決條件皆通過",
       "recheck": "重新檢查",
-      "helmHint": "未使用 Helm 安裝？請設定 {variable}、重新啟動，然後重新檢查。",
+      "helmHint": "未使用 Helm 安裝？請在伺服器環境中設定它、重新啟動，然後重新檢查。",
       "loadFailed": "無法執行先決條件檢查。",
       "names": {
         "master_key": "加密金鑰",

@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} de {total} fallaron · corrígelo en el entorno del servidor, reinicia y vuelve a comprobar",
       "allPassed": "Todos los requisitos previos se cumplen",
       "recheck": "Volver a comprobar",
-      "helmHint": "¿Instalado sin Helm? Define {variable}, reinicia y vuelve a comprobar.",
+      "helmHint": "¿Instalado sin Helm? Defínelo en el entorno del servidor, reinicia y vuelve a comprobar.",
       "loadFailed": "No se pudieron ejecutar las comprobaciones de requisitos previos.",
       "names": {
         "master_key": "Clave de cifrado",

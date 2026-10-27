@@ -26218,7 +26218,7 @@
       "failedSummary": "{total} kontrolden {failed} tanesi başarısız · sunucu ortamında düzeltin, yeniden başlatın ve ardından Yeniden kontrol edin",
       "allPassed": "Tüm ön koşullar başarılı",
       "recheck": "Yeniden kontrol et",
-      "helmHint": "Helm olmadan mı kurdunuz? {variable} değişkenini ayarlayın, yeniden başlatın ve ardından Yeniden kontrol edin.",
+      "helmHint": "Helm olmadan mı kurdunuz? Sunucu ortamında ayarlayın, yeniden başlatın ve ardından Yeniden kontrol edin.",
       "loadFailed": "Ön koşul kontrolleri çalıştırılamadı.",
       "names": {
         "master_key": "Şifreleme anahtarı",

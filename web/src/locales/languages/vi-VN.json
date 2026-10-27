@@ -26218,7 +26218,7 @@
       "failedSummary": "{failed} trên {total} bị lỗi · khắc phục trong môi trường máy chủ, khởi động lại, rồi Kiểm tra lại",
       "allPassed": "Mọi điều kiện tiên quyết đều đạt",
       "recheck": "Kiểm tra lại",
-      "helmHint": "Cài đặt không dùng Helm? Đặt {variable}, khởi động lại, rồi Kiểm tra lại.",
+      "helmHint": "Cài đặt không dùng Helm? Đặt nó trong môi trường máy chủ, khởi động lại, rồi Kiểm tra lại.",
       "loadFailed": "Không thể chạy các kiểm tra điều kiện tiên quyết.",
       "names": {
         "master_key": "Khóa mã hóa",
