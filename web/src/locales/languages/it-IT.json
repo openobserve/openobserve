@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Medio",
       "severityLow": "P4 · Basso",
       "moreDimensions": "+{count} altri",
+      "moreAlertGroups": "+{count} altri",
+      "alertGroupTooltip": "{name}: attivato {count} volta | {name}: attivato {count} volte",
       "filterAll": "Tutti",
       "filterActive": "Attivi",
       "alertCount": "Avvisi",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Rianalisi da zero…",
         "reanalyzingBuildOnPrevious": "Analisi basata sul report precedente…",
+        "resumingFrom": "Ripresa da “{step}”…",
         "showDetails": "Mostra dettagli",
         "hideDetails": "Nascondi dettagli",
         "stale": "Questa analisi è in corso da un tempo insolitamente lungo e potrebbe essersi fermata. Nessun nuovo messaggio dalle {time} UTC. Annullala e riprova.",

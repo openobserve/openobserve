@@ -118,7 +118,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 118: add the lease columns to org_cleanup_tasks.
 // 119: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
 // 120: add search_type to search_queue.
-pub const DB_SCHEMA_VERSION: u64 = 120;
+// 121: point pre-run incidents' run summary at their newest v1 report.
+pub const DB_SCHEMA_VERSION: u64 = 121;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2635,8 +2636,8 @@ pub struct Common {
     pub auto_query_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PROFILING_ENABLED",
-        default = false,
-        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+        default = true,
+        help = "Show the Profiles module in the UI. Ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
     #[env_config(

@@ -757,6 +757,7 @@ import {
   noFtsRecoveryStreams,
   noFtsRecoveryTerm as recoveryTerm,
   planStreamsFilter,
+  loadPendingFreeTextSchemas,
   recoveryCardsFor,
   searchTextReplacement,
 } from "@/composables/useLogs/freeTextSearch";
@@ -1763,6 +1764,14 @@ export default defineComponent({
           searchResultRef.value.reDrawChart();
         }
       });
+    };
+
+    const loadSchemasBeforeSqlToggle = async () => {
+      const query = searchObj.data.query ?? "";
+      if (!query.trim() || isAuthoredStatement(query)) return;
+      await loadPendingFreeTextSchemas(searchObj, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true),
+      );
     };
 
     const setQuery = (sqlMode: boolean) => {
@@ -4054,6 +4063,7 @@ export default defineComponent({
       onFirstDataDetected,
       refreshData,
       setQuery,
+      loadSchemasBeforeSqlToggle,
       verifyOrganizationStatus,
       collapseFieldList,
       areStreamsPresent,
@@ -4304,7 +4314,8 @@ export default defineComponent({
         if (this.searchObj.meta.sqlModeManualTrigger) {
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
-          this.setQuery(newVal);
+          await this.loadSchemasBeforeSqlToggle();
+          if (this.searchObj.meta.sqlMode) this.setQuery(newVal);
         }
       } else {
         this.searchObj.meta.sqlMode = false;
