@@ -383,6 +383,22 @@ describe("LibraryCard", () => {
       expect(wrapper.find(CUSTOMIZE).exists()).toBe(false);
     });
 
+    it("ties both buttons to their own card's title, since every card repeats the labels", () => {
+      const wrapper = mountCard();
+      const title = wrapper.find(`[data-test="alert-library-card-title-${entry.id}"]`);
+      const titleId = title.attributes("id");
+      expect(titleId).toBeTruthy();
+      expect(title.text()).toBe("Pod OOM Killed");
+      expect(wrapper.find(ADD).attributes("aria-describedby")).toBe(titleId);
+      expect(wrapper.find(CUSTOMIZE).attributes("aria-describedby")).toBe(titleId);
+
+      const other = mountCard({ entry: { ...entry, id: "k8s/node-disk-pressure" } });
+      const otherTitle = other.find(
+        '[data-test="alert-library-card-title-k8s/node-disk-pressure"]',
+      );
+      expect(otherTitle.attributes("id")).not.toBe(titleId);
+    });
+
     it("offers neither on a locked card, whose click is the upsell", () => {
       const wrapper = mountCard({ entry: anomaly, locked: true });
       expect(wrapper.find(ADD).exists()).toBe(false);

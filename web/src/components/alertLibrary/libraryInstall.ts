@@ -23,10 +23,7 @@
 //   1. The same normalization ImportAlert does (`createAlert`, ImportAlert.vue)
 //      — that is the only place in the app that has ever turned a stored alert
 //      document back into a create, and divergence here is a bug by definition.
-//   2. Three things only the library needs: the author's destinations are
-//      dropped (none of them exist here), provenance is stamped so Phase 5 can
-//      recognise the alert later, and the library's severity becomes the
-//      product's priority.
+//   2. Library-only: drop the author's destinations, stamp provenance, map severity to priority.
 //
 // Pure and file-in/payload-out, so the wizard stays markup and this stays
 // tested — same split as libraryTunables.ts.

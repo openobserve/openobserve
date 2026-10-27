@@ -1,13 +1,4 @@
-/**
- * AlertLibraryPage - Page object for the Alert Library (browse / filter / preview / install).
- *
- * Covers the gallery page, the left rail (severity + category facets), the
- * readiness stat strip, cross-surface selection, the card actions, the detail
- * drawer and the Folder -> Tune -> Add install wizard. Selectors are the
- * feature's own data-test attributes.
- *
- * Reuses: the O2 OInput `-field` inner-input gotcha for text/number inputs.
- */
+// Selectors and expects for the Alert Library page; specs never inline them.
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -289,7 +280,17 @@ export class AlertLibraryPage {
   async expectTuneStep() { await expect(this.page.locator(this.l.tuneStep)).toBeVisible(); }
   async expectReviewStep() { await expect(this.page.locator(this.l.reviewStep)).toBeVisible(); }
   async expectNoDestinationAsked() {
-    await expect(this.page.locator(this.l.dialog)).not.toContainText('Destination');
+    const dialog = this.page.locator(this.l.dialog);
+    for (const removed of [
+      'alert-library-install-destination-step',
+      'alert-library-install-destination',
+      'alert-library-install-alerts-step',
+      'alert-library-install-count',
+      'alert-library-install-select-all',
+    ]) {
+      await expect(dialog.locator(`[data-test="${removed}"]`)).toHaveCount(0);
+    }
+    await expect(dialog.locator('[data-test^="alert-library-install-alert-"]')).toHaveCount(0);
   }
   async expectRunDisabled() { await expect(this.page.locator(this.l.run)).toBeDisabled(); }
   async expectRunEnabled() { await expect(this.page.locator(this.l.run)).toBeEnabled(); }
