@@ -19,6 +19,7 @@ import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
 import { applyGaugeOptions, applyHeatmapOptions, applyPieOptions } from "./panelTypeOptions";
 import { chartColor } from "@/utils/chartTheme";
+import { labelColorOn } from "./chartLabelContrast";
 import * as echarts from "echarts";
 
 // jsdom has no canvas to measure text, so labels get the same average-glyph estimate the app's helpers use.
@@ -27,6 +28,13 @@ echarts.setPlatformAPI({
     width: text.length * (parseFloat(String(font).match(/(\d+)px/)?.[1] ?? "12") * 0.6),
   }),
 });
+
+// The app's measurement must agree with ECharts', as the browser canvas does for both.
+vi.mock("./chartDimensionUtils", async (original) => ({
+  ...(await original<any>()),
+  calculateWidthText: (text: string, fontSize = "12px") =>
+    String(text ?? "").length * parseFloat(fontSize) * 0.6,
+}));
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -360,54 +368,74 @@ describe("pie and donut", () => {
     expect(deep.label.color).toBe(chartColor("--color-white"));
   });
 
-  it("puts name labels outside in the theme text colour, truncated inside a narrow panel", async () => {
-    const regions = ["eu-west", "us-west", "sa-east", "ap-south", "us-east"].map((name, i) => ({
-      x_axis_1: name,
-      y_axis_1: 3500 + i * 40,
-    }));
-    const narrow = { value: { offsetWidth: 146, offsetHeight: 190 } };
+  const regionRows = ["eu-west", "us-west", "sa-east", "ap-south", "us-east"].map((name, i) => ({
+    x_axis_1: name,
+    y_axis_1: 3500 + i * 40,
+  }));
+
+  const renderDonut = async (width: number, height: number, config: Record<string, any> = {}) => {
     const panel = sqlPanel("donut", {
       pie_label_content: ["name", "percent"],
       donut_inner_radius: 55,
       show_legends: false,
+      ...config,
     });
     const options = (
       (await convertPanelData(
         panel,
-        [regions],
+        [regionRows],
         store,
-        narrow,
+        { value: { offsetWidth: width, offsetHeight: height } },
         { value: null },
         { value: [] },
         metadata,
-        { height: "190px" },
+        { height: `${height}px` },
         { value: [] },
         false,
       )) as any
     ).options;
-    const series = pieSeries(options);
+    const chart = echarts.init(null as any, null, { renderer: "svg", ssr: true, width, height });
+    chart.setOption({ ...options, animation: false });
+    const labels = (chart.getZr() as any).storage
+      .getDisplayList(true)
+      .filter((el: any) => typeof el.style?.text === "string" && el.style.text !== "")
+      .map((label: any) => {
+        const box = label.getBoundingRect().clone();
+        box.applyTransform(label.getComputedTransform());
+        return { text: label.style.text as string, box };
+      });
+    const data = (chart.getModel() as any).getSeriesByIndex(0).getData();
+    const fills = regionRows.map((_, i) => data.getItemVisual(i, "style").fill);
+    chart.dispose();
+    return { series: pieSeries(options), labels, fills };
+  };
+
+  it("keeps whole name labels outside, in the theme text colour, where the panel has room", async () => {
+    const { series, labels } = await renderDonut(800, 400);
     expect(series.label.position).toBe("outside");
     expect(series.label.color).toBe(chartColor("--color-text-body"));
     expect(series.avoidLabelOverlap).toBe(true);
-    const chart = echarts.init(null as any, null, {
-      renderer: "svg",
-      ssr: true,
-      width: 146,
-      height: 190,
-    });
-    chart.setOption({ ...options, animation: false });
-    const labels = chart
-      .getZr()
-      .storage.getDisplayList(true)
-      .filter((el: any) => typeof el.style?.text === "string" && el.style.text !== "");
-    expect(labels.length).toBeGreaterThan(0);
-    for (const label of labels as any[]) {
-      const box = label.getBoundingRect().clone();
-      box.applyTransform(label.getComputedTransform());
+    expect(labels.length).toBe(regionRows.length);
+    labels.forEach(({ text, box }) => {
+      expect(text).toMatch(/^[a-z]+-[a-z]+ · \d+%$/);
       expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(146);
+      expect(box.x + box.width).toBeLessThanOrEqual(800);
+    });
+  });
+
+  it("falls back to whole percents inside the slices when names would be cut", async () => {
+    for (const [width, height] of [
+      [146, 190],
+      [246, 220],
+    ]) {
+      const { series, labels, fills } = await renderDonut(width, height);
+      expect(series.label.position).toBe("inside");
+      expect(labels.length).toBeGreaterThan(0);
+      labels.forEach(({ text }) => expect(text, `${width}px`).toMatch(/^\d+%$/));
+      series.data.forEach((slice: any, index: number) =>
+        expect(slice.label.color).toBe(labelColorOn(fills[index])),
+      );
     }
-    chart.dispose();
   });
 
   it("buckets small slices into Other and keeps it last", async () => {

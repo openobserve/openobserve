@@ -17,6 +17,7 @@ import { color as echartsColor } from "echarts/core";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { getDataValue } from "./aliasUtils";
+import { calculateWidthText } from "./chartDimensionUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { paintByPalette } from "./convertTreemapData";
 
@@ -26,9 +27,14 @@ const NODE_SIZE_MAX = 40;
 const EDGE_WIDTH_MIN = 1;
 const EDGE_WIDTH_MAX = 6;
 const NODE_LABEL_WIDTH = 96;
-const EDGE_LABEL_CHAR_WIDTH = 6.5;
+// eslint-disable-next-line local/no-hardcoded-px -- ECharts label fontSize is a plain canvas px value
+const LABEL_FONT_SIZE = "12px";
 const LABEL_PADDING: [number, number] = [2, 4];
-const EDGE_LABEL_HEIGHT = 14 + 2 * LABEL_PADDING[0];
+// One 12px line plus a little slack over ECharts' glyph-based line height, and the chip's vertical padding.
+const LABEL_HEIGHT = 14 + 2 * LABEL_PADDING[0];
+// ECharts' default gap between a label and its symbol or edge.
+const LABEL_DISTANCE = 5;
+const LABEL_GAP = 2;
 const LABEL_CHIP_OPACITY = 0.85;
 const CURVENESS_FORCE = 0.12;
 // Curves bulge by a share of their length, so long ring edges stay near the ring.
@@ -48,6 +54,7 @@ export interface GraphNode {
   value: number;
   symbolSize?: number;
   itemStyle?: { color: string };
+  label?: { width: number; overflow: "truncate" };
   x?: number;
   y?: number;
 }
@@ -232,6 +239,12 @@ interface Box {
   angle: number;
 }
 
+interface Circle {
+  x: number;
+  y: number;
+  radius: number;
+}
+
 const corners = (box: Box): Point[] => {
   const [cos, sin] = [Math.cos(box.angle), Math.sin(box.angle)];
   return [
@@ -245,18 +258,80 @@ const corners = (box: Box): Point[] => {
   ]);
 };
 
-/** Separating-axis test for two rotated rectangles. */
-const overlap = (a: Box, b: Box) => {
+/** Separating-axis test for two rotated rectangles, kept `gap` apart. */
+const overlap = (a: Box, b: Box, gap = LABEL_GAP) => {
   const [cornersA, cornersB] = [corners(a), corners(b)];
   return [a.angle, a.angle + Math.PI / 2, b.angle, b.angle + Math.PI / 2].every((angle) => {
     const axis = [Math.cos(angle), Math.sin(angle)];
     const project = (points: Point[]) => points.map(([x, y]) => x * axis[0] + y * axis[1]);
     const [pa, pb] = [project(cornersA), project(cornersB)];
-    return Math.max(...pa) > Math.min(...pb) && Math.max(...pb) > Math.min(...pa);
+    return Math.max(...pa) + gap > Math.min(...pb) && Math.max(...pb) + gap > Math.min(...pa);
   });
 };
 
-/** Keeps a static label only on edges whose label stays inside the panel and clear of nodes, node names and labels already kept; the rest show on hover. */
+const hitsCircle = (box: Box, circle: Circle, gap = LABEL_GAP) => {
+  const [cos, sin] = [Math.cos(box.angle), Math.sin(box.angle)];
+  const [dx, dy] = [circle.x - box.x, circle.y - box.y];
+  const localX = dx * cos + dy * sin;
+  const localY = -dx * sin + dy * cos;
+  const nearX = Math.max(-box.halfWidth, Math.min(box.halfWidth, localX));
+  const nearY = Math.max(-box.halfHeight, Math.min(box.halfHeight, localY));
+  return Math.hypot(localX - nearX, localY - nearY) < circle.radius + gap;
+};
+
+const textWidth = (text: string) => calculateWidthText(text, LABEL_FONT_SIZE);
+
+/** The chip ECharts draws under a node name: centred below the symbol, as wide as the text up to the label width. */
+const nodeLabelBox = (node: GraphNode): Box => {
+  const radius = (node.symbolSize ?? NODE_SIZE_MIN) / 2;
+  return {
+    x: node.x!,
+    y: node.y! + radius + LABEL_DISTANCE + LABEL_HEIGHT / 2,
+    halfWidth: Math.min(textWidth(node.name), NODE_LABEL_WIDTH) / 2 + LABEL_PADDING[1],
+    halfHeight: LABEL_HEIGHT / 2,
+    angle: 0,
+  };
+};
+
+const quadraticAt = (p0: Point, p1: Point, p2: Point, t: number): Point => [
+  (1 - t) * (1 - t) * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0],
+  (1 - t) * (1 - t) * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1],
+];
+
+/** The chip ECharts draws for an edge value: the edge is first cut where it enters the target symbol (for the arrow), then the label sits `distance` above the cut curve's midpoint, turned along it. */
+const edgeLabelBox = (from: GraphNode, to: GraphNode, curveness: number, text: string): Box => {
+  const p0: Point = [from.x!, from.y!];
+  const p2: Point = [to.x!, to.y!];
+  const p1: Point = [
+    (p0[0] + p2[0]) / 2 - (p0[1] - p2[1]) * curveness,
+    (p0[1] + p2[1]) / 2 - (p2[0] - p0[0]) * curveness,
+  ];
+  const radius = (to.symbolSize ?? NODE_SIZE_MIN) / 2;
+  let [low, high] = [0, 1];
+  for (let i = 0; i < 32; i++) {
+    const mid = (low + high) / 2;
+    const point = quadraticAt(p0, p1, p2, mid);
+    if (Math.hypot(point[0] - p2[0], point[1] - p2[1]) > radius) low = mid;
+    else high = mid;
+  }
+  const t = (low + high) / 2;
+  const cutControl: Point = [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t];
+  const cutEnd = quadraticAt(p0, p1, p2, t);
+  const middle = quadraticAt(p0, cutControl, cutEnd, 0.5);
+  let angle = Math.atan2(cutEnd[1] - p0[1], cutEnd[0] - p0[0]);
+  // ECharts flips right-to-left edges so text reads upright, which also moves the label to the other side.
+  if (cutEnd[0] < p0[0]) angle += Math.PI;
+  const lift = LABEL_DISTANCE + LABEL_HEIGHT / 2;
+  return {
+    x: middle[0] + Math.sin(angle) * lift,
+    y: middle[1] - Math.cos(angle) * lift,
+    halfWidth: textWidth(text) / 2 + LABEL_PADDING[1],
+    halfHeight: LABEL_HEIGHT / 2,
+    angle,
+  };
+};
+
+/** Keeps a static label only on edges whose chip stays inside the panel and clear of every node, node name and label already kept, largest values first; the rest show on hover. */
 export const fittingEdgeLabels = (
   edges: GraphEdge[],
   nodes: GraphNode[],
@@ -265,47 +340,29 @@ export const fittingEdgeLabels = (
   panel: { width: number; height: number },
 ): boolean[] => {
   const byName = new Map(nodes.map((node) => [node.name, node]));
-  const taken: Box[] = nodes.flatMap((node) => {
-    const radius = (node.symbolSize ?? NODE_SIZE_MIN) / 2;
-    const nameWidth =
-      Math.min(node.name.length * EDGE_LABEL_CHAR_WIDTH, NODE_LABEL_WIDTH) + 2 * LABEL_PADDING[1];
-    return [
-      { x: node.x!, y: node.y!, halfWidth: radius, halfHeight: radius, angle: 0 },
-      {
-        x: node.x!,
-        y: node.y! + radius + 5 + EDGE_LABEL_HEIGHT / 2,
-        halfWidth: nameWidth / 2,
-        halfHeight: EDGE_LABEL_HEIGHT / 2,
-        angle: 0,
-      },
-    ];
-  });
-  return edges.map((edge) => {
+  const symbols: Circle[] = nodes.map((node) => ({
+    x: node.x!,
+    y: node.y!,
+    radius: (node.symbolSize ?? NODE_SIZE_MIN) / 2,
+  }));
+  const taken: Box[] = nodes.map(nodeLabelBox);
+  const fits = edges.map(() => false);
+  const order = edges.map((_, index) => index).sort((a, b) => edges[b].value - edges[a].value);
+  order.forEach((index) => {
+    const edge = edges[index];
     const from = byName.get(edge.source);
     const to = byName.get(edge.target);
-    if (!from || !to || edge.source === edge.target) return false;
-    // ECharts' quadratic control point, and the curve's midpoint where the label sits.
-    const control = [
-      (from.x! + to.x!) / 2 - (from.y! - to.y!) * curveness,
-      (from.y! + to.y!) / 2 - (to.x! - from.x!) * curveness,
-    ];
-    let angle = Math.atan2(to.y! - from.y!, to.x! - from.x!);
-    // Text is never drawn upside down, which leaves the box unchanged but keeps the angle tidy.
-    if (Math.abs(angle) > Math.PI / 2) angle += Math.PI;
-    const box: Box = {
-      x: 0.25 * from.x! + 0.5 * control[0] + 0.25 * to.x!,
-      y: 0.25 * from.y! + 0.5 * control[1] + 0.25 * to.y!,
-      halfWidth: (format(edge.value).length * EDGE_LABEL_CHAR_WIDTH) / 2 + LABEL_PADDING[1],
-      halfHeight: EDGE_LABEL_HEIGHT / 2,
-      angle,
-    };
+    if (!from || !to || edge.source === edge.target) return;
+    const box = edgeLabelBox(from, to, curveness, format(edge.value));
     const inside = corners(box).every(
       ([x, y]) => x >= 0 && y >= 0 && x <= panel.width && y <= panel.height,
     );
-    if (!inside || taken.some((other) => overlap(box, other))) return false;
+    if (!inside || symbols.some((circle) => hitsCircle(box, circle))) return;
+    if (taken.some((other) => overlap(box, other))) return;
     taken.push(box);
-    return true;
+    fits[index] = true;
   });
+  return fits;
 };
 
 /** Converts SQL source/target/value rows into a node graph with directed, weighted edges. */
@@ -344,6 +401,10 @@ export const convertNodeGraphData = (
   const points = toPlot(circular ? ringByName(nodes) : forcePositions(nodes, edges), panel);
   nodes.forEach((node, index) => {
     [node.x, node.y] = points[index];
+    // Only long names get a fixed width, so every other chip hugs its text.
+    if (textWidth(node.name) > NODE_LABEL_WIDTH) {
+      node.label = { width: NODE_LABEL_WIDTH, overflow: "truncate" };
+    }
   });
   const showEdgeLabels = config.node_graph_show_edge_labels === true;
   // Labels sit on a chip of the panel surface so the edges crossing them do not cut through the text.
@@ -396,14 +457,18 @@ export const convertNodeGraphData = (
           show: true,
           position: "bottom",
           color: chartColor("--color-text-body"),
-          width: NODE_LABEL_WIDTH,
-          overflow: "truncate",
+          fontSize: 12,
+          distance: LABEL_DISTANCE,
           ...chip,
         },
         lineStyle: { opacity: 0.55, curveness },
         edgeLabel: {
           show: showEdgeLabels,
           color: chartColor("--color-text-body"),
+          fontSize: 12,
+          distance: LABEL_DISTANCE,
+          // Edge labels otherwise inherit the faded line opacity, which leaves the chip see-through.
+          opacity: 1,
           ...chip,
           formatter: (params: any) => format(params?.value),
         },

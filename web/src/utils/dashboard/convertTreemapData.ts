@@ -32,7 +32,7 @@ export interface TreemapNode {
   path: string[];
   children?: TreemapNode[];
   itemStyle?: { color: string };
-  label?: { color: string };
+  label?: { color?: string; show?: boolean };
   upperLabel?: { color: string };
 }
 

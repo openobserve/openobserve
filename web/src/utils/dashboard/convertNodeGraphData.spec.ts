@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 import { sankeyChartQuery } from "./dashboardAutoQueryBuilder";
 import { buildGraph, circularPositions, forcePositions } from "./convertNodeGraphData";
@@ -22,6 +23,18 @@ vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
+// The converter and ECharts must measure text alike, as the browser canvas does for both.
+const GLYPH = 7;
+vi.mock("./chartDimensionUtils", async (original) => ({
+  ...(await original<any>()),
+  calculateWidthText: (text: string) => String(text ?? "").length * GLYPH,
+}));
+(echarts as any).setPlatformAPI({
+  // zrender takes the line height from the width of this glyph.
+  measureText: (text: string) => ({
+    width: text === "国" ? 12 : String(text ?? "").length * GLYPH,
+  }),
+});
 
 const store = {
   state: {
@@ -90,6 +103,80 @@ const rows = [
   { source: "api", target: "", value: 5 },
   { source: "cache", target: "db", value: "bad" },
 ];
+
+type Point = [number, number];
+
+/** Renders the options with real ECharts and returns every visible label's drawn chip and every node symbol. */
+const renderedLayout = (options: any, width: number, height: number) => {
+  const chart = echarts.init(null as any, null, { renderer: "svg", ssr: true, width, height });
+  chart.setOption({ ...options, animation: false });
+  chart.renderToSVGString();
+  const chips: { text: string; corners: Point[]; opacity: number }[] = [];
+  // A label with a background draws as a rect (the chip) plus a tspan, both children of its text element.
+  (chart.getZr() as any).storage.getDisplayList(true).forEach((el: any) => {
+    if (el.type !== "rect" || el.parent?.type !== "text" || !el.parent.style?.text) return;
+    const rect = el.getBoundingRect();
+    const m = el.transform ?? [1, 0, 0, 1, 0, 0];
+    const corners = (
+      [
+        [rect.x, rect.y],
+        [rect.x + rect.width, rect.y],
+        [rect.x + rect.width, rect.y + rect.height],
+        [rect.x, rect.y + rect.height],
+      ] as Point[]
+    ).map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]] as Point);
+    const opacity = Math.min(el.style.opacity ?? 1, el.parent.style.opacity ?? 1);
+    chips.push({ text: el.parent.style.text, corners, opacity });
+  });
+  const data = (chart.getModel() as any).getSeriesByIndex(0).getData();
+  const symbols = options.series[0].data.map((_node: any, i: number) => {
+    const symbol = data.getItemGraphicEl(i).childAt(0);
+    const m = symbol.getComputedTransform();
+    // The symbol path is a unit circle scaled to the node radius.
+    return { x: m[4], y: m[5], radius: Math.hypot(m[0], m[1]) };
+  });
+  chart.dispose();
+  return { chips, symbols };
+};
+
+const project = (points: Point[], axis: Point) => points.map(([x, y]) => x * axis[0] + y * axis[1]);
+
+const edgesOf = (points: Point[]): Point[] =>
+  points.map((p, i) => {
+    const q = points[(i + 1) % points.length];
+    return [-(q[1] - p[1]), q[0] - p[0]];
+  });
+
+const polygonsOverlap = (a: Point[], b: Point[]) =>
+  [...edgesOf(a), ...edgesOf(b)].every((axis) => {
+    const [pa, pb] = [project(a, axis), project(b, axis)];
+    return Math.max(...pa) > Math.min(...pb) + 1e-6 && Math.max(...pb) > Math.min(...pa) + 1e-6;
+  });
+
+const distanceToSegment = ([px, py]: Point, [ax, ay]: Point, [bx, by]: Point) => {
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2),
+    ),
+  );
+  return Math.hypot(px - ax - t * (bx - ax), py - ay - t * (by - ay));
+};
+
+const polygonHitsCircle = (polygon: Point[], circle: { x: number; y: number; radius: number }) => {
+  const centre: Point = [circle.x, circle.y];
+  const inside = edgesOf(polygon).every((normal, i) => {
+    const [px, py] = polygon[i];
+    return (centre[0] - px) * normal[0] + (centre[1] - py) * normal[1] >= 0;
+  });
+  return (
+    inside ||
+    polygon.some(
+      (p, i) => distanceToSegment(centre, p, polygon[(i + 1) % polygon.length]) < circle.radius,
+    )
+  );
+};
 
 describe("node graph", () => {
   it("builds the sankey source, target and value SQL", () => {
@@ -209,6 +296,41 @@ describe("node graph", () => {
     expect(shown(large)).toBeGreaterThanOrEqual(shown(small));
     small.links.forEach((link: any) => expect(link.emphasis.label.show).toBe(true));
     expect(small.emphasis.edgeLabel.show).toBe(true);
+  });
+
+  it("draws edge values on opaque chips that overlap no other label and no node, at small and large sizes", async () => {
+    const names = ["payments", "auth", "search", "cart", "checkout", "inventory"];
+    const mesh = names.flatMap((source, i) =>
+      names
+        .filter((target) => target !== source)
+        .map((target, j) => ({ source, target, value: 600 + ((i * 7 + j * 13) % 70) })),
+    );
+    for (const layout of ["force", "circular"]) {
+      for (const [width, height] of [
+        [400, 250],
+        [1200, 500],
+      ]) {
+        const schema = panel({ node_graph_layout: layout, node_graph_show_edge_labels: true });
+        const { options } = await convert(schema, [mesh], { width, height });
+        const { chips, symbols } = renderedLayout(options, width, height);
+        const values = chips.filter((chip) => /^\d+$/.test(chip.text));
+        expect(values.length).toBeGreaterThan(0);
+        values.forEach((chip) => expect(chip.opacity).toBe(1));
+        chips.forEach((chip, i) => {
+          chips.slice(i + 1).forEach((other) => {
+            expect(
+              polygonsOverlap(chip.corners, other.corners),
+              `${chip.text} / ${other.text}`,
+            ).toBe(false);
+          });
+        });
+        values.forEach((chip) =>
+          symbols.forEach((symbol: any) =>
+            expect(polygonHitsCircle(chip.corners, symbol), `${chip.text} on a node`).toBe(false),
+          ),
+        );
+      }
+    }
   });
 
   it("lays a complete graph out differently in force and circular modes", async () => {

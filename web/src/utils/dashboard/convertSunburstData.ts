@@ -17,8 +17,9 @@ import { color as echartsColor } from "echarts/core";
 import { chartColor } from "@/utils/chartTheme";
 import { labelColorOn } from "./chartLabelContrast";
 import { escapeHtml } from "@/utils/html";
+import { calculateWidthText } from "./chartDimensionUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { buildTreemapNodes, paintByPalette } from "./convertTreemapData";
+import { buildTreemapNodes, paintByPalette, type TreemapNode } from "./convertTreemapData";
 
 // Rings thinner than this many degrees drop their label instead of overprinting the neighbour.
 const MIN_LABEL_ANGLE = 8;
@@ -27,17 +28,23 @@ const LABEL_LINE_HEIGHT = 14;
 // Below this the ring is too shallow for even a few characters, so its labels are hidden.
 const MIN_LABEL_WIDTH = 24;
 const LABEL_PADDING = 4;
+// eslint-disable-next-line local/no-hardcoded-px -- ECharts label fontSize is a plain canvas px value
+const LABEL_FONT_SIZE = "12px";
 const OUTER_RING_OPACITY = 0.72;
 const OUTER_RADIUS = 0.92;
 const FALLBACK_PANEL = { width: 800, height: 400 };
 
-/** Label width and minimum slice angle for a ring between radii r0 and r, in pixels. */
+/** Minimum slice angle for a ring between radii r0 and r, in pixels, or no labels when the ring is too shallow. */
 const ringLabel = (r0: number, r: number) => {
-  const width = r - r0 - 2 * LABEL_PADDING;
-  if (width < MIN_LABEL_WIDTH) return { show: false };
+  if (r - r0 - 2 * LABEL_PADDING < MIN_LABEL_WIDTH) return { show: false };
   const minAngle = (LABEL_LINE_HEIGHT / ((r0 + r) / 2)) * (180 / Math.PI);
-  return { width, minAngle: Math.max(MIN_LABEL_ANGLE, minAngle) };
+  return { minAngle: Math.max(MIN_LABEL_ANGLE, minAngle) };
 };
+
+/** True when the name fits whole along the ring's depth and the slice is a text line wide at its middle. */
+const labelFits = (name: string, share: number, r0: number, r: number) =>
+  calculateWidthText(name, LABEL_FONT_SIZE) <= r - r0 - 2 * LABEL_PADDING &&
+  share * 2 * Math.PI * ((r0 + r) / 2) >= LABEL_LINE_HEIGHT;
 
 /** Converts SQL rows into a sunburst: the x field is the inner ring, the breakdown the outer ring. */
 export const convertSunburstData = (
@@ -74,6 +81,17 @@ export const convertSunburstData = (
     ) / 2;
   const innerRadius = nested ? 0.12 : 0.3;
   const split = nested ? (innerRadius + OUTER_RADIUS) / 2 : OUTER_RADIUS;
+  const total = nodes.reduce((sum, node) => sum + node.value, 0) || 1;
+  // A label that does not fit whole is hidden rather than cut; the tooltip still names the slice.
+  const hideUnfitting = (node: TreemapNode, r0: number, r: number) => {
+    if (!labelFits(node.name, node.value / total, r0 * base, r * base)) {
+      node.label = { ...node.label, show: false };
+    }
+  };
+  nodes.forEach((node) => {
+    hideUnfitting(node, innerRadius, split);
+    node.children?.forEach((child) => hideUnfitting(child, split, OUTER_RADIUS));
+  });
 
   const options = {
     backgroundColor: "transparent",
@@ -104,7 +122,7 @@ export const convertSunburstData = (
           show: config.sunburst_show_labels !== false,
           rotate: "radial",
           minAngle: MIN_LABEL_ANGLE,
-          overflow: "truncate",
+          fontSize: 12,
           color: chartColor("--color-text-inverse"),
         },
         levels: [

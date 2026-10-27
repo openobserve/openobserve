@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 import { buildSQLChartQuery } from "./dashboardAutoQueryBuilder";
 import { labelColorOn } from "./chartLabelContrast";
@@ -22,6 +23,17 @@ vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
+// The converter and ECharts must measure text alike, as the browser canvas does for both.
+const GLYPH = 7;
+vi.mock("./chartDimensionUtils", async (original) => ({
+  ...(await original<any>()),
+  calculateWidthText: (text: string) => String(text ?? "").length * GLYPH,
+}));
+(echarts as any).setPlatformAPI({
+  measureText: (text: string) => ({
+    width: text === "国" ? 12 : String(text ?? "").length * GLYPH,
+  }),
+});
 
 const store = {
   state: {
@@ -149,19 +161,48 @@ describe("sunburst", () => {
     expect(labelColorOn("rgba(206,221,251,1)")).toBe("#000000");
   });
 
-  it("fits labels to the ring depth and hides them on slices or rings too thin for text", async () => {
+  it("sets a per-ring minimum angle and hides rings too shallow for text", async () => {
     const small = (await convert(panel({}), [rows], { width: 400, height: 250 })).options.series[0];
     const large = (await convert(panel({}), [rows], { width: 1200, height: 500 })).options
       .series[0];
     const [, innerSmall, outerSmall] = small.levels.map((level: any) => level.label);
-    expect(innerSmall.width).toBeGreaterThanOrEqual(24);
-    expect(innerSmall.width).toBeLessThan(large.levels[1].label.width);
     // A slice needs a text line of arc at its middle, so the inner ring needs a wider angle.
     expect(innerSmall.minAngle).toBeGreaterThan(outerSmall.minAngle);
     expect(outerSmall.minAngle).toBeGreaterThan(large.levels[2].label.minAngle);
+    expect(small.label.overflow).toBeUndefined();
+    small.levels.forEach((level: any) => expect(level.label?.width).toBeUndefined());
     const tiny = (await convert(panel({}), [rows], { width: 120, height: 90 })).options.series[0];
     expect(tiny.levels[1].label.show).toBe(false);
     expect(tiny.levels[2].label.show).toBe(false);
+  });
+
+  it("draws a label only when its whole name fits the slice, and never cuts one short", async () => {
+    const services = ["checkout", "inventory", "payments", "search", "cart", "auth"];
+    const mixed = ["us-east", "eu-west", "ap-south"].flatMap((region, i) =>
+      services.map((service, j) => ({
+        x_axis_1: region,
+        breakdown_1: service,
+        y_axis_1: 400 + ((i * 5 + j * 11) % 9) * 120,
+      })),
+    );
+    const names = new Set([...services, "us-east", "eu-west", "ap-south"]);
+    for (const [width, height] of [
+      [246, 220],
+      [400, 250],
+      [1200, 500],
+    ]) {
+      const { options } = await convert(panel({}), [mixed], { width, height });
+      const chart = echarts.init(null as any, null, { renderer: "svg", ssr: true, width, height });
+      chart.setOption({ ...options, animation: false });
+      chart.renderToSVGString();
+      const drawn: string[] = (chart.getZr() as any).storage
+        .getDisplayList(true)
+        .filter((el: any) => el.type === "tspan" || el.type === "text")
+        .map((el: any) => String(el.style.text));
+      chart.dispose();
+      expect(drawn.length).toBeGreaterThan(0);
+      drawn.forEach((text) => expect(names.has(text), `"${text}" at ${width}`).toBe(true));
+    }
   });
 
   it("formats the tooltip path with the panel unit", async () => {

@@ -1925,6 +1925,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="dashboardPanelDataModel.data.config.line_thickness"
           type="number"
           :min="0"
+          step="any"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.config.line_thickness =

@@ -18,6 +18,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
 import { echartsPaletteColor } from "./thresholds";
 import { labelColorOn } from "./chartLabelContrast";
+import { calculateWidthText } from "./chartDimensionUtils";
 
 export const GAUGE_STYLES = ["semi", "arc", "circle"] as const;
 export const PIE_LABEL_CONTENTS = ["name", "value", "percent"] as const;
@@ -31,6 +32,11 @@ const GAUGE_ANGLES: Record<string, { startAngle: number; endAngle: number }> = {
 const SEGMENT_GAP_WIDTH = 3;
 const OUTSIDE_LABEL_RADIUS_SHARE = 0.72;
 const MAX_GAUGE_SEGMENTS = 100;
+// ECharts' outside-label line segments (length + length2) and the bleed margin it keeps from the panel edge.
+const PIE_LABEL_LINE = 12;
+const PIE_LABEL_BLEED = 10;
+const PIE_LABEL_FONT_SIZE = 12;
+const PIE_LABEL_INSET = 4;
 
 const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -209,14 +215,113 @@ const shrinkRadius = (radius: unknown, share: number): unknown => {
   return Array.isArray(radius) ? radius.map(scale) : scale(radius);
 };
 
+interface PanelSize {
+  width: number;
+  height: number;
+}
+
+const toPixels = (value: unknown, base: number, fallback: number) => {
+  const text = String(value ?? "").trim();
+  const number = parseFloat(text);
+  if (!Number.isFinite(number)) return fallback;
+  return text.endsWith("%") ? (number / 100) * base : number;
+};
+
+/** The pie's centre and radii in pixels, resolved the way ECharts does against the whole panel. */
+const pieGeometry = (series: any, panel: PanelSize) => {
+  const [radiusInner, radiusOuter] = Array.isArray(series.radius)
+    ? series.radius
+    : [0, series.radius ?? "75%"];
+  const half = Math.min(panel.width, panel.height) / 2;
+  const center = Array.isArray(series.center) ? series.center : ["50%", "50%"];
+  return {
+    cx: toPixels(center[0], panel.width, panel.width / 2),
+    inner: toPixels(radiusInner, half, 0),
+    outer: toPixels(radiusOuter, half, half),
+  };
+};
+
+const sliceShares = (data: any[]) => {
+  const values = data.map((item) => Math.max(0, Number(item?.value) || 0));
+  const total = values.reduce((sum, value) => sum + value, 0) || 1;
+  return values.map((value) => value / total);
+};
+
+const labelWidth = (text: string, fontSize: number) => calculateWidthText(text, `${fontSize}px`);
+
+/** True when every outside label fits whole between its label line and the panel edge on its side, so ECharts never cuts one. */
+const outsideLabelsFit = (
+  series: any,
+  contents: readonly string[],
+  panel: PanelSize,
+  panelSchema: any,
+) => {
+  const { cx, outer } = pieGeometry(
+    { ...series, radius: shrinkRadius(series.radius, OUTSIDE_LABEL_RADIUS_SHARE) },
+    panel,
+  );
+  const fontSize = Number(series.label?.fontSize) || PIE_LABEL_FONT_SIZE;
+  const format = pieLabelFormatter([...contents], panelSchema);
+  const precision = Number(series.percentPrecision ?? 2);
+  const roomRight = panel.width - (cx + outer + PIE_LABEL_LINE) - PIE_LABEL_BLEED;
+  const roomLeft = cx - outer - PIE_LABEL_LINE - PIE_LABEL_BLEED;
+  let start = 0;
+  return sliceShares(series.data).every((share, index) => {
+    const middle = Math.PI / 2 - 2 * Math.PI * (start + share / 2);
+    start += share;
+    const item = series.data[index];
+    const text = format({
+      name: item?.name,
+      value: item?.value,
+      percent: (share * 100).toFixed(precision),
+    });
+    return labelWidth(String(text), fontSize) <= (Math.cos(middle) >= 0 ? roomRight : roomLeft);
+  });
+};
+
+const percentLabel = (series: any, item: any, index: number) => ({
+  ...item?.label,
+  color: labelColorOn(sliceColor(series, item, index)),
+});
+
+/** Percent labels inside each slice, hidden on slices too thin to hold the text. */
+const placePercentInside = (series: any, panel: PanelSize | null) => {
+  series.label = { ...series.label, position: "inside", formatter: "{d}%" };
+  const shares = sliceShares(series.data);
+  const geometry = panel ? pieGeometry(series, panel) : null;
+  const fontSize = Number(series.label?.fontSize) || PIE_LABEL_FONT_SIZE;
+  const precision = Number(series.percentPrecision ?? 2);
+  series.data = series.data.map((item: any, index: number) => {
+    const label = percentLabel(series, item, index);
+    if (!geometry) return { ...item, label };
+    const middle = (geometry.inner + geometry.outer) / 2;
+    const arc = shares[index] * 2 * Math.PI * middle;
+    const text = `${(shares[index] * 100).toFixed(precision)}%`;
+    const ring = geometry.outer - geometry.inner;
+    const fits =
+      arc >= labelWidth(text, fontSize) + PIE_LABEL_INSET && ring >= fontSize + PIE_LABEL_INSET;
+    return { ...item, label: fits ? label : { ...label, show: false } };
+  });
+};
+
 // A name or value outgrows the ring, so those labels go outside, where only the panel background is behind them.
-const placePieLabels = (series: any, contents: readonly string[]) => {
+const placePieLabels = (
+  series: any,
+  contents: readonly string[],
+  panel: PanelSize | null,
+  panelSchema: any,
+) => {
   const inside = series.label?.position === "inside";
   if (inside && contents.every((content) => content === "percent")) {
     series.data = series.data.map((item: any, index: number) => ({
       ...item,
-      label: { ...item?.label, color: labelColorOn(sliceColor(series, item, index)) },
+      label: percentLabel(series, item, index),
     }));
+    return;
+  }
+  // Labels too long for the room beside the pie fall back to percents inside, leaving names to the legend and tooltip.
+  if (panel && !outsideLabelsFit(series, contents, panel, panelSchema)) {
+    placePercentInside(series, panel);
     return;
   }
   series.label = {
@@ -234,7 +339,11 @@ const placePieLabels = (series: any, contents: readonly string[]) => {
 };
 
 /** Applies the pie and donut slice settings to converted options; a no-op while every key is absent. */
-export const applyPieOptions = (options: any, panelSchema: any): void => {
+export const applyPieOptions = (
+  options: any,
+  panelSchema: any,
+  panel: PanelSize | null = null,
+): void => {
   if (panelSchema?.type !== "pie" && panelSchema?.type !== "donut") return;
   const config = panelSchema?.config ?? {};
   const contents = Array.isArray(config.pie_label_content)
@@ -257,7 +366,7 @@ export const applyPieOptions = (options: any, panelSchema: any): void => {
     if (panelSchema.type === "donut" && innerRadius !== null) {
       applyDonutInnerRadius(series, innerRadius);
     }
-    if (contents?.length) placePieLabels(series, contents);
+    if (contents?.length) placePieLabels(series, contents, panel, panelSchema);
   });
 };
 
@@ -291,9 +400,15 @@ export const applyHeatmapOptions = (options: any, panelSchema: any): void => {
 };
 
 /** Applies the metric-family panel settings that live on the final options of one chart type. */
-export const applyPanelTypeOptions = (options: any, panelSchema: any): void => {
+export const applyPanelTypeOptions = (
+  options: any,
+  panelSchema: any,
+  chartPanelRef?: any,
+): void => {
   if (!options) return;
+  const width = chartPanelRef?.value?.offsetWidth;
+  const height = chartPanelRef?.value?.offsetHeight;
   applyGaugeOptions(options, panelSchema);
-  applyPieOptions(options, panelSchema);
+  applyPieOptions(options, panelSchema, width && height ? { width, height } : null);
   applyHeatmapOptions(options, panelSchema);
 };

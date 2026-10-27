@@ -123,7 +123,7 @@ export const convertPanelData = async (
         if (!split) {
           const result: any = await convert(data, metadata, sparklineData, resultMetaData);
           applyCartesianOptions(result?.options, panelSchema);
-          applyPanelTypeOptions(result?.options, panelSchema);
+          applyPanelTypeOptions(result?.options, panelSchema, chartPanelRef);
           applyMetricOptions(result?.options, panelSchema);
           return { chartType: panelSchema.type, ...result };
         }
