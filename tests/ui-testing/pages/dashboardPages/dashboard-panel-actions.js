@@ -660,7 +660,6 @@ export default class DashboardactionPage {
     return [...new Set(names)];
   }
 
-  // Each series' name and plotted values (the last coordinate of a point), read from the live ECharts instance.
   async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
     return this.page.evaluate((scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));

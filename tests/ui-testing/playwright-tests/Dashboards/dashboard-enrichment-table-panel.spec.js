@@ -77,7 +77,7 @@ async function expectFirstColumn(page, values) {
   await expect.poll(() => firstColumn(page), { timeout: 30000 }).toEqual([...values].sort());
 }
 
-// Resolves with the panel request's own range, so a test can prove the dashboard really ran on last week.
+// The panel request's own range proves the dashboard ran on last week, not on a restored default.
 async function openOnLastWeek(page, tableName) {
   const from = Date.now() - 2 * WEEK_MS;
   const to = Date.now() - WEEK_MS;

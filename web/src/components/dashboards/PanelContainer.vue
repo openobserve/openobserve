@@ -638,6 +638,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import useStreams from "@/composables/useStreams";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -744,6 +745,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    const { getStream } = useStreams();
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1025,18 +1027,32 @@ export default defineComponent({
 
       return { originalQuery, streamName };
     };
+    // Panels search an enrichment table over its whole lifetime, so the logs page opens on its rows' span.
+    const getLogsTimeRange = async (fields?: {
+      stream?: string;
+      stream_type?: string;
+    }): Promise<{ from: number; to: number }> => {
+      const query = metaData.value.queries[0];
+      if (fields?.stream && fields.stream_type === "enrichment_tables") {
+        const stream = await getStream(fields.stream, fields.stream_type, false).catch(() => null);
+        const { doc_time_min: min, doc_time_max: max } = stream?.stats ?? {};
+        if (min && max) return { from: min - 1_000_000, to: max + 60_000_000 };
+      }
+      return { from: query?.startTime, to: query?.endTime };
+    };
     const constructLogsUrl = (
       streamName: string,
       encodedQuery: string,
       queryDetails: any,
       currentUrl: string,
       vrlFunctionQueryEncoded: string,
+      timeRange: { from: number; to: number },
     ) => {
       const logsUrl = new URL(currentUrl + "/logs");
       logsUrl.searchParams.set("stream_type", queryDetails.queries[0]?.fields?.stream_type);
       logsUrl.searchParams.set("stream", streamName);
-      logsUrl.searchParams.set("from", metaData.value.queries[0]?.startTime.toString());
-      logsUrl.searchParams.set("to", metaData.value.queries[0]?.endTime.toString());
+      logsUrl.searchParams.set("from", String(timeRange.from));
+      logsUrl.searchParams.set("to", String(timeRange.to));
       logsUrl.searchParams.set("functionContent", vrlFunctionQueryEncoded);
       //this url paramater have been added to show the function editor in the logs page when the query has vrl function
       //otherwise it will be false and the function editor will not be shown
@@ -1091,6 +1107,7 @@ export default defineComponent({
         queryDetails,
         currentUrl,
         vrlFunctionQueryEncoded,
+        await getLogsTimeRange(queryDetails.queries[0]?.fields),
       );
 
       // Use short_url service to shorten the URL and redirect

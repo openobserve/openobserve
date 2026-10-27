@@ -401,6 +401,19 @@ describe("xAxis min/max with comparison timeGap", () => {
       expect(options.xAxis[0].max).toBeUndefined();
     });
 
+    it("does not pin xAxis to the dashboard window for an enrichment-table panel", () => {
+      const options = makeOptions(["2025-06-01 00:00:00"]);
+      const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
+      panelSchema.queries[0].fields.stream_type = "enrichment_tables";
+
+      applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeComparisonMetadata(0), {
+        value: null,
+      });
+
+      expect(options.xAxis[0].min).toBeUndefined();
+      expect(options.xAxis[0].max).toBeUndefined();
+    });
+
     it("does not set xAxis.min/max when timeRangeGap.seconds is 0 (current period query)", () => {
       const options = makeOptions(["2025-06-01 00:00:00"]);
       const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
@@ -444,6 +457,19 @@ describe("xAxis min/max with comparison timeGap", () => {
       };
 
       applyCustomSQLTimeSeries(options, panelSchema, makeStore(), metadata, { value: null });
+
+      expect(options.xAxis[0].min).toBeUndefined();
+      expect(options.xAxis[0].max).toBeUndefined();
+    });
+
+    it("does not pin xAxis to the dashboard window for an enrichment-table panel", () => {
+      const options = makeOptions(["2025-06-01 00:00:00"]);
+      const panelSchema = makePanelSchema("line", true);
+      panelSchema.queries[0].fields.stream_type = "enrichment_tables";
+
+      applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeComparisonMetadata(0), {
+        value: null,
+      });
 
       expect(options.xAxis[0].min).toBeUndefined();
       expect(options.xAxis[0].max).toBeUndefined();

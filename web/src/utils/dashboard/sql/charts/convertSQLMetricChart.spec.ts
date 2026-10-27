@@ -343,6 +343,20 @@ describe("applyMetricChart", () => {
       // ordered oldest→newest by zo_sql_key → [5, 9, 7] (not the y1 [100,200,300])
       expect(ctx.options.series[1].data).toEqual([5, 9, 7]);
     });
+
+    it("does not pad an enrichment-table sparkline to the dashboard window", () => {
+      const ctx = makeMockContext();
+      ctx.panelSchema.config.sparkline = { enabled: true, type: "line" };
+      ctx.panelSchema.queries = [{ fields: { stream_type: "enrichment_tables" } }];
+      ctx.metadata = { queries: [{ startTime: 0, endTime: 5 }] };
+      ctx.sparklineData = [
+        { zo_sql_key: 1, zo_sql_num: 5 },
+        { zo_sql_key: 2, zo_sql_num: 9 },
+        { zo_sql_key: 3, zo_sql_num: 7 },
+      ];
+      applyMetricChart(ctx);
+      expect(ctx.options.series[1].data).toEqual([5, 9, 7]);
+    });
   });
 });
 

@@ -255,15 +255,15 @@ pub async fn search_http2_stream(
     }
 
     // Enrichment rows carry their upload time, so a dashboard time range would hide them.
-    let enrichment_range = enrichment_table_time_range(
+    if let Some((start_time, end_time)) = enrichment_table_time_range(
         &org_id,
         stream_type,
         req.search_type
             .or_else(|| get_search_type_from_request(&query).ok().flatten()),
         &req.query.sql,
     )
-    .await;
-    if let Some((start_time, end_time)) = enrichment_range {
+    .await
+    {
         req.query.start_time = start_time;
         req.query.end_time = end_time;
     }
@@ -442,9 +442,8 @@ pub async fn search_http2_stream(
         }
     }
 
-    // A re-uploaded enrichment table replaces its rows, so cached results would be stale.
-    req.use_cache =
-        get_use_cache_from_request(&query) && !req.clear_cache && enrichment_range.is_none();
+    // Set use_cache from query params
+    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // Set search type if not set
     if req.search_type.is_none() {

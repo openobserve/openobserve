@@ -174,11 +174,11 @@ pub async fn enrichment_table_time_range(
     let mut bounds = Vec::with_capacity(tables.len());
     for table in &tables {
         let name = table.stream_name();
-        let start = db::enrichment_table::get_start_time(org_id, &name).await;
-        let end = db::enrichment_table::get_meta_table_stats(org_id, &name)
-            .await
-            .map_or(0, |stats| stats.end_time);
-        bounds.push((start, end));
+        let bound = match db::enrichment_table::get_meta_table_stats(org_id, &name).await {
+            Some(stats) => (stats.start_time, stats.end_time),
+            None => (db::enrichment_table::get_start_time(org_id, &name).await, 0),
+        };
+        bounds.push(bound);
     }
     Some(full_table_range(&bounds, now_micros()))
 }
@@ -318,6 +318,12 @@ mod tests {
             );
         }
         let join = r#"SELECT * FROM "t" JOIN "logs"."app" ON t.ip = app.ip"#;
+        let types: Vec<_> = resolve_stream_names_with_type(join)
+            .unwrap()
+            .iter()
+            .map(|t| t.get_stream_type(StreamType::EnrichmentTables))
+            .collect();
+        assert_eq!(types, [StreamType::EnrichmentTables, StreamType::Logs]);
         assert_eq!(
             enrichment_table_time_range("org", StreamType::EnrichmentTables, dashboards, join)
                 .await,

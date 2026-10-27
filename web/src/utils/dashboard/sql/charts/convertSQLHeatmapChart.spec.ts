@@ -416,6 +416,22 @@ describe("applyHeatmapChart histogram time axis", () => {
     expect(ctx.options.series[0].data.map((cell: any) => cell[2])).toEqual([1, "-", "-", 3, "-"]);
   });
 
+  it("does not fill an enrichment-table heatmap to the dashboard window", () => {
+    const ctx = histogramContext(
+      [
+        { x: "2024-01-15T10:03:00", y: "r", z: 3 },
+        { x: "2024-01-15T10:00:00", y: "r", z: 1 },
+      ],
+      "2024-01-08T10:00:00Z",
+      "2024-01-08T10:04:00Z",
+    );
+    ctx.panelSchema.queries[0].fields.stream_type = "enrichment_tables";
+    applyHeatmapChart(ctx);
+
+    expect(ctx.options.series[0].data.map((cell: any) => cell[2])).toEqual([3, 1]);
+    expect(ctx.extras.heatmapTimeAxis).toBeUndefined();
+  });
+
   it("keeps the returned order without a server interval", () => {
     const ctx = histogramContext(
       [
