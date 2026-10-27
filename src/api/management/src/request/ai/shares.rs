@@ -57,13 +57,16 @@ use serde_json::Value;
 use tokio::sync::{Semaphore, SemaphorePermit};
 use utoipa::ToSchema;
 
-use super::chats::{
-    MAX_TITLE_CHARS, admit_error_response, attach_turn_status_at, load_turns, owned_chat,
-    running_since, user_email,
+use super::{
+    chats::{
+        MAX_TITLE_CHARS, admit_error_response, attach_turn_status_at, history_not_enabled,
+        load_turns, owned_chat, running_since, user_email,
+    },
+    error::{self, AiErrorCode, AiErrorEnvelope},
 };
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    request::public_rate_limit::{Counters, client_ip, too_many_requests},
+    request::public_rate_limit::{Counters, client_ip},
     service::auth::check_permissions,
 };
 
@@ -525,7 +528,7 @@ pub async fn create(
     };
     let expires_in = match validate_create(&req, public_links_enabled(), public_max_expiry_secs()) {
         Ok(expires_in) => expires_in,
-        Err(msg) => return MetaHttpResponse::bad_request(msg),
+        Err(msg) => return error::invalid_request(msg),
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
@@ -541,9 +544,7 @@ pub async fn create(
         Err(resp) => return resp,
     };
     if chat.last_committed_seq == NO_SEQ {
-        return MetaHttpResponse::bad_request(
-            "A conversation with no stored messages cannot be shared",
-        );
+        return error::invalid_request("A conversation with no stored messages cannot be shared");
     }
     let now = now_micros();
     let new = NewShare {
@@ -658,7 +659,7 @@ pub async fn list_mine(
     let now = now_micros();
     let (shares, scope, caller) = if params.all {
         if !is_org_admin(&org_id, &user_email).await {
-            return MetaHttpResponse::forbidden("Only organization admins can list every share");
+            return error::permission_denied("Only organization admins can list every share");
         }
         let shares = ai_chat_shares::list_live_for_org(&org_id, now).await;
         (
@@ -749,7 +750,7 @@ pub async fn update(
         public_max_expiry_secs(),
     ) {
         Ok(settings) => settings,
-        Err(msg) => return MetaHttpResponse::bad_request(msg),
+        Err(msg) => return error::invalid_request(msg),
     };
     match ai_chat_shares::update(&org_id, &share_id, &settings, now).await {
         Ok(true) => {}
@@ -916,7 +917,7 @@ pub async fn fork(
     )
     .await
     {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
+        return error::permission_denied("Unauthorized Access");
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
@@ -966,14 +967,14 @@ pub async fn get_public(
 ) -> Response {
     let ip = ip.map(|e| e.0);
     if public_rate_limited(ip) {
-        return with_public_headers(too_many_requests(PUBLIC_READ_WINDOW));
+        return with_public_headers(rate_limited(PUBLIC_READ_WINDOW));
     }
     // Only clients outside the per-IP limit share the node-wide gate (design: public links).
     let _slot = match ip {
         Some(_) => None,
         None => match enter(&PUBLIC_READ_GATE) {
             Some(slot) => Some(slot),
-            None => return with_public_headers(too_many_requests(Duration::from_secs(1))),
+            None => return with_public_headers(rate_limited(Duration::from_secs(1))),
         },
     };
     log::info!(
@@ -1080,10 +1081,10 @@ async fn seed_source(org_id: &str, share_id: &str) -> Result<Option<ChatModel>, 
 /// The caller's email, once chat history is known to be on.
 fn guard(in_req: &axum::extract::Request) -> Result<String, Response> {
     let Some(email) = user_email(in_req) else {
-        return Err(MetaHttpResponse::unauthorized("Unauthorized"));
+        return Err(error::session_expired("Unauthorized"));
     };
     if !o2_enterprise::enterprise::ai::chat::is_enabled() {
-        return Err(MetaHttpResponse::not_found("Chat history is not enabled"));
+        return Err(history_not_enabled());
     }
     Ok(email)
 }
@@ -1093,9 +1094,9 @@ async fn read_body<T: serde::de::DeserializeOwned>(
 ) -> Result<T, Response> {
     let body = axum::body::to_bytes(in_req.into_body(), MAX_BODY_BYTES)
         .await
-        .map_err(|_| MetaHttpResponse::bad_request("Request body too large"))?;
+        .map_err(|_| error::invalid_request("Request body too large"))?;
     serde_json::from_slice(&body)
-        .map_err(|e| MetaHttpResponse::bad_request(format!("Invalid request body: {e}")))
+        .map_err(|e| error::invalid_request(format!("Invalid request body: {e}")))
 }
 
 /// The share with this token if it may be served on this route, with its chat.
@@ -1169,7 +1170,11 @@ async fn settled_chat(chat: &ChatModel, owner: &str) -> Result<ChatModel, Respon
     let (org_id, session_id) = (&chat.org_id, &chat.session_id);
     let lease = match lease::acquire(org_id, session_id, 0).await {
         Ok(lease) => lease,
-        Err(LeaseError::Busy) => return Err(MetaHttpResponse::conflict(TURN_IN_PROGRESS)),
+        Err(LeaseError::Busy) => {
+            return Err(
+                AiErrorEnvelope::new(AiErrorCode::TurnBusy, TURN_IN_PROGRESS).into_response(),
+            );
+        }
         Err(LeaseError::Backend(e)) => {
             log::error!("[AI-CHAT-SHARE] turn lease unavailable for {org_id}/{session_id}: {e}");
             return Err(unavailable());
@@ -1240,7 +1245,7 @@ async fn shared_turns(
     }
     let Ok(Ok(_slot)) = tokio::time::timeout(PROJECTION_WAIT, PROJECTION_GATE.acquire()).await
     else {
-        return Err(too_many_requests(Duration::from_secs(1)));
+        return Err(rate_limited(Duration::from_secs(1)));
     };
     let mut cut = chat.clone();
     cut.last_committed_seq = seq;
@@ -1440,14 +1445,12 @@ fn require_json(in_req: &axum::extract::Request) -> Result<(), Response> {
     if is_json(in_req.headers()) {
         return Ok(());
     }
-    Err((
-        StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        Json(MetaHttpResponse::error(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "Content-Type must be application/json",
-        )),
+    Err(AiErrorEnvelope::new(
+        AiErrorCode::InvalidRequest,
+        "Content-Type must be application/json",
     )
-        .into_response())
+    .status(StatusCode::UNSUPPORTED_MEDIA_TYPE)
+    .into_response())
 }
 
 fn is_json(headers: &HeaderMap) -> bool {
@@ -1459,11 +1462,20 @@ fn is_json(headers: &HeaderMap) -> bool {
 }
 
 fn not_found() -> Response {
-    MetaHttpResponse::not_found(NOT_FOUND)
+    error::not_found(NOT_FOUND)
 }
 
 fn unavailable() -> Response {
-    MetaHttpResponse::service_unavailable("Shared chats are unavailable; please retry")
+    error::history_unavailable("Shared chats are unavailable; please retry")
+}
+
+fn rate_limited(retry_after: Duration) -> Response {
+    AiErrorEnvelope::new(
+        AiErrorCode::RateLimited,
+        "Too many requests; please retry later",
+    )
+    .retry_after(Some(retry_after.as_secs().max(1)))
+    .into_response()
 }
 
 /// The token is a bearer secret, so no response is indexed or leaks it through `Referer`.
@@ -2000,6 +2012,7 @@ mod tests {
             end_seq: None,
             started_at,
             ended_at: None,
+            first_event_at: None,
         }
     }
 
@@ -2146,6 +2159,20 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert_eq!(resp.headers()[header::REFERRER_POLICY], "no-referrer");
         assert_eq!(resp.headers()["x-robots-tag"], "noindex, nofollow");
+        let body: Value = serde_json::from_slice(&a).unwrap();
+        assert_eq!(body["code"], "not_found");
+        assert_eq!(body["message"], NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn a_busy_reader_is_told_when_to_retry() {
+        let resp = rate_limited(PUBLIC_READ_WINDOW);
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(resp.headers()[header::RETRY_AFTER], "60");
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "rate_limited");
+        assert_eq!(body["retry_after"], 60);
     }
 
     #[test]

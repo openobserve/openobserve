@@ -225,6 +225,7 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_add_first_event_at_to_ai_chat_turns;
 mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
 mod m20261017_000001_add_rca_run_progress_columns;
@@ -664,6 +665,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000001_create_public_dashboards::Migration),
             Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
             Box::new(m20261026_000001_backfill_v1_rca_pointer::Migration),
+            Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
         ]
     }
 }
@@ -744,6 +746,7 @@ mod tests {
         (119, "m20261021_000001_create_public_dashboards"),
         (120, "m20261021_000002_add_search_type_to_search_queue"),
         (121, "m20261026_000001_backfill_v1_rca_pointer"),
+        (122, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -889,6 +892,10 @@ mod tests {
             (
                 "m20261016_000001_create_rca_runs",
                 "m20261018_000001_create_rca_steering",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261016_000001_add_first_event_at_to_ai_chat_turns",
             ),
         ] {
             assert!(

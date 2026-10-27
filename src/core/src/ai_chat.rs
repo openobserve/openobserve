@@ -1174,6 +1174,7 @@ mod tests {
             end_seq: end,
             started_at: 0,
             ended_at: None,
+            first_event_at: None,
         }
     }
 

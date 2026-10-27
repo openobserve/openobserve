@@ -39,7 +39,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
+use super::error::{self, AiErrorAction, AiErrorCode, AiErrorEnvelope};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+/// The trace id the server gave a turn at admission, so a refused turn's Details can show it.
+pub const X_O2_TRACE_ID: &str = "x-o2-trace-id";
 
 pub(super) const MAX_TITLE_CHARS: usize = 200;
 const DEFAULT_PAGE: u64 = 50;
@@ -210,17 +214,30 @@ pub(super) fn running_since(now: i64) -> i64 {
 
 pub(super) fn admit_error_response(error: AdmitError) -> Response {
     match error {
-        AdmitError::InvalidSession(message) => MetaHttpResponse::bad_request(message),
+        AdmitError::InvalidSession(message) => error::invalid_request(message),
         AdmitError::NotRegistered => {
-            MetaHttpResponse::forbidden("Chat history is only available to registered users")
+            error::permission_denied("Chat history is only available to registered users")
         }
-        AdmitError::NotFound(message) => MetaHttpResponse::not_found(message),
-        AdmitError::Busy => lease_conflict_response(),
+        AdmitError::NotFound(message) => error::not_found(message),
+        AdmitError::Busy => lease_busy(None).into_response(),
         AdmitError::TurnLimit(scope) => turn_limit_response(scope),
-        AdmitError::AlreadySubmitted => MetaHttpResponse::conflict(
-            "This turn was already submitted; reload the conversation to see its result",
-        ),
-        AdmitError::Unavailable(message) => MetaHttpResponse::service_unavailable(message),
+        AdmitError::AlreadySubmitted => already_submitted().into_response(),
+        AdmitError::Unavailable(message) => error::history_unavailable(message),
+    }
+}
+
+/// A refused turn admission; a busy chat names its running turn when this node runs it.
+pub(super) fn turn_admit_error_response(
+    error: AdmitError,
+    org_id: &str,
+    session_id: Option<&str>,
+) -> Response {
+    match (error, session_id.and_then(normalize_uuid)) {
+        (AdmitError::Busy, Some(session_id)) => {
+            let active = registry::get(org_id, &session_id).map(|turn| turn.turn_id);
+            lease_busy(active).into_response()
+        }
+        (error, _) => admit_error_response(error),
     }
 }
 
@@ -231,14 +248,14 @@ pub(super) async fn owned_chat(
     owner: &str,
 ) -> Result<Model, Response> {
     let Some(session_id) = normalize_uuid(session_id) else {
-        return Err(MetaHttpResponse::bad_request("Invalid session id"));
+        return Err(error::invalid_request("Invalid session id"));
     };
     match ai_chat_sessions::get(org_id, &session_id).await {
         Ok(Some(row)) if row.user_id == owner && row.status == STATUS_ACTIVE => Ok(row),
-        Ok(_) => Err(MetaHttpResponse::not_found("Unknown conversation")),
+        Ok(_) => Err(error::not_found("Unknown conversation")),
         Err(e) => {
             log::error!("[AI-CHAT] cannot read chat {org_id}/{session_id}: {e}");
-            Err(MetaHttpResponse::service_unavailable(
+            Err(error::history_unavailable(
                 "Chat history is unavailable; please retry",
             ))
         }
@@ -253,17 +270,7 @@ pub(super) async fn load_turns(
     let events = match openobserve_core::ai_chat::read_committed_events(row, -1).await {
         Ok(events) => events,
         // Logged and counted by the reader; a partial chat is never presented as whole.
-        Err(_) => {
-            return Err((
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({
-                    "code": StatusCode::SERVICE_UNAVAILABLE.as_u16(),
-                    "message": "This conversation's history could not be read in full; please retry",
-                    "error_code": "history_unavailable",
-                })),
-            )
-                .into_response());
-        }
+        Err(_) => return Err(history_unreadable().into_response()),
     };
 
     let mut projected = openobserve_core::ai_chat::projection::project(&events);
@@ -297,6 +304,54 @@ pub(super) fn user_email(req: &axum::extract::Request) -> Option<String> {
         .map(str::to_string)
 }
 
+/// 429 `turn_limit`, its reason also in the legacy `error_code` (E2E #5).
+pub(super) fn turn_limit_response(scope: &str) -> Response {
+    AiErrorEnvelope::new(
+        AiErrorCode::TurnLimit,
+        "Too many AI responses are running at once; please wait for one to finish",
+    )
+    .legacy_code(TURN_LIMIT)
+    .with("scope", scope)
+    .into_response()
+}
+
+/// History routes answer a deployment without chat persistence with a 404.
+pub(super) fn history_not_enabled() -> Response {
+    AiErrorEnvelope::new(AiErrorCode::NotEnabled, "Chat history is not enabled")
+        .status(StatusCode::NOT_FOUND)
+        .into_response()
+}
+
+/// A chat whose stored events could not all be read; never shown as a partial chat.
+pub(super) fn history_unreadable() -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::HistoryUnavailable,
+        "This conversation's history could not be read in full; please retry",
+    )
+    .legacy_code("history_unavailable")
+}
+
+pub(super) fn already_submitted() -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::AlreadySubmitted,
+        "This turn was already submitted; reload the conversation to see its result",
+    )
+}
+
+/// `active_turn_id` lets the client offer to stop the running turn; known only on its node.
+pub(super) fn lease_busy(active_turn_id: Option<String>) -> AiErrorEnvelope {
+    // The Slack bridge matches the legacy `error_code`, not the text.
+    let busy = AiErrorEnvelope::new(
+        AiErrorCode::TurnBusy,
+        "Another turn is already running in this conversation",
+    )
+    .legacy_code(TURN_ALREADY_RUNNING);
+    match active_turn_id {
+        Some(turn_id) => busy.with("active_turn_id", turn_id),
+        None => busy,
+    }
+}
+
 /// ListAiChats
 #[utoipa::path(
     get,
@@ -325,17 +380,17 @@ pub async fn list(
     in_req: axum::extract::Request,
 ) -> Response {
     let Some(user_email) = user_email(&in_req) else {
-        return MetaHttpResponse::unauthorized("Unauthorized");
+        return error::session_expired("Unauthorized");
     };
     if !o2_enterprise::enterprise::ai::chat::is_enabled() {
-        return MetaHttpResponse::not_found("Chat history is not enabled");
+        return history_not_enabled();
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
         Err(e) => return admit_error_response(e),
     };
     let cursor = match params.cursor.as_deref().map(decode_cursor) {
-        Some(None) => return MetaHttpResponse::bad_request("Invalid cursor"),
+        Some(None) => return error::invalid_request("Invalid cursor"),
         Some(Some(c)) => Some(c),
         None => None,
     };
@@ -354,9 +409,7 @@ pub async fn list(
         Ok(rows) => rows,
         Err(e) => {
             log::error!("[AI-CHAT] cannot list chats of {org_id}/{owner}: {e}");
-            return MetaHttpResponse::service_unavailable(
-                "Chat history is unavailable; please retry",
-            );
+            return error::history_unavailable("Chat history is unavailable; please retry");
         }
     };
     let next_cursor = if rows.len() as u64 > limit {
@@ -406,10 +459,10 @@ pub async fn get(
     in_req: axum::extract::Request,
 ) -> Response {
     let Some(user_email) = user_email(&in_req) else {
-        return MetaHttpResponse::unauthorized("Unauthorized");
+        return error::session_expired("Unauthorized");
     };
     if !o2_enterprise::enterprise::ai::chat::is_enabled() {
-        return MetaHttpResponse::not_found("Chat history is not enabled");
+        return history_not_enabled();
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
@@ -501,26 +554,26 @@ pub async fn rename(
     in_req: axum::extract::Request,
 ) -> Response {
     let Some(user_email) = user_email(&in_req) else {
-        return MetaHttpResponse::unauthorized("Unauthorized");
+        return error::session_expired("Unauthorized");
     };
     if !o2_enterprise::enterprise::ai::chat::is_enabled() {
-        return MetaHttpResponse::not_found("Chat history is not enabled");
+        return history_not_enabled();
     }
     let body = match axum::body::to_bytes(in_req.into_body(), 16 * 1024).await {
         Ok(b) => b,
-        Err(_) => return MetaHttpResponse::bad_request("Request body too large"),
+        Err(_) => return error::invalid_request("Request body too large"),
     };
     let Ok(RenameRequest { title }) = serde_json::from_slice::<RenameRequest>(&body) else {
-        return MetaHttpResponse::bad_request("Expected {\"title\": string}");
+        return error::invalid_request("Expected {\"title\": string}");
     };
     let title = title.trim();
     if title.is_empty() || title.chars().count() > MAX_TITLE_CHARS {
-        return MetaHttpResponse::bad_request(format!(
+        return error::invalid_request(format!(
             "The title must be 1 to {MAX_TITLE_CHARS} characters"
         ));
     }
     let Some(session_id) = normalize_uuid(&session_id) else {
-        return MetaHttpResponse::bad_request("Invalid session id");
+        return error::invalid_request("Invalid session id");
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
@@ -528,10 +581,10 @@ pub async fn rename(
     };
     match ai_chat_sessions::rename(&org_id, &session_id, &owner, title).await {
         Ok(true) => MetaHttpResponse::json(serde_json::json!({"title": title})),
-        Ok(false) => MetaHttpResponse::not_found("Unknown conversation"),
+        Ok(false) => error::not_found("Unknown conversation"),
         Err(e) => {
             log::error!("[AI-CHAT] cannot rename {org_id}/{session_id}: {e}");
-            MetaHttpResponse::service_unavailable("Chat history is unavailable; please retry")
+            error::history_unavailable("Chat history is unavailable; please retry")
         }
     }
 }
@@ -563,13 +616,13 @@ pub async fn delete(
     in_req: axum::extract::Request,
 ) -> Response {
     let Some(user_email) = user_email(&in_req) else {
-        return MetaHttpResponse::unauthorized("Unauthorized");
+        return error::session_expired("Unauthorized");
     };
     if !o2_enterprise::enterprise::ai::chat::is_enabled() {
-        return MetaHttpResponse::not_found("Chat history is not enabled");
+        return history_not_enabled();
     }
     let Some(session_id) = normalize_uuid(&session_id) else {
-        return MetaHttpResponse::bad_request("Invalid session id");
+        return error::invalid_request("Invalid session id");
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
@@ -583,12 +636,10 @@ pub async fn delete(
     let now = config::utils::time::now_micros();
     match ai_chat_sessions::mark_deleted(&org_id, &session_id, &owner, now).await {
         Ok(true) => {}
-        Ok(false) => return MetaHttpResponse::not_found("Unknown conversation"),
+        Ok(false) => return error::not_found("Unknown conversation"),
         Err(e) => {
             log::error!("[AI-CHAT] cannot delete {org_id}/{session_id}: {e}");
-            return MetaHttpResponse::service_unavailable(
-                "Chat history is unavailable; please retry",
-            );
+            return error::history_unavailable("Chat history is unavailable; please retry");
         }
     }
     super::shares::revoke_for_deleted(&org_id, std::slice::from_ref(&session_id), now).await;
@@ -615,10 +666,10 @@ pub async fn delete(
 )]
 pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
     let Some(user_email) = user_email(&in_req) else {
-        return MetaHttpResponse::unauthorized("Unauthorized");
+        return error::session_expired("Unauthorized");
     };
     if !o2_enterprise::enterprise::ai::chat::is_enabled() {
-        return MetaHttpResponse::not_found("Chat history is not enabled");
+        return history_not_enabled();
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
@@ -628,9 +679,7 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
         Ok(ids) => ids,
         Err(e) => {
             log::error!("[AI-CHAT] cannot clear chats of {org_id}/{owner}: {e}");
-            return MetaHttpResponse::service_unavailable(
-                "Chat history is unavailable; please retry",
-            );
+            return error::history_unavailable("Chat history is unavailable; please retry");
         }
     };
     let deleted = session_ids.len();
@@ -833,14 +882,21 @@ fn failed_turn(record: &TurnRecord) -> Value {
     })
 }
 
-/// The terminal frame a failed turn's live stream would have ended with.
+/// The terminal frame a failed turn's live stream would have ended with; `code` is the stored one.
 fn error_frame(error: &str, code: Option<&str>) -> Value {
-    serde_json::json!({
-        "type": "error",
-        "error": error,
-        "error_code": code,
-        "recoverable": false,
-    })
+    let (ledger, action) = code.map_or(
+        (AiErrorCode::Unknown, AiErrorAction::None),
+        AiErrorCode::live_failure,
+    );
+    let mut frame = AiErrorEnvelope::new(ledger, error)
+        .retryable(action == AiErrorAction::Retry)
+        .action(Some(action))
+        .body();
+    if let Some(obj) = frame.as_object_mut() {
+        obj.insert("type".into(), "error".into());
+        obj.insert("error_code".into(), code.into());
+    }
+    frame
 }
 
 /// The browser-facing text of a failed turn; provider details never leave the server.
@@ -849,32 +905,6 @@ fn failed_turn_message(code: Option<&str>) -> String {
         Some(code) => format!("The response failed ({code}). Please try again."),
         None => "The response failed. Please try again.".to_string(),
     }
-}
-
-/// 409 with the reason in `error_code`, so the Slack bridge matches on it instead of the text.
-fn lease_conflict_response() -> Response {
-    (
-        StatusCode::CONFLICT,
-        Json(serde_json::json!({
-            "code": StatusCode::CONFLICT.as_u16(),
-            "error_code": TURN_ALREADY_RUNNING,
-            "message": "Another turn is already running in this conversation",
-        })),
-    )
-        .into_response()
-}
-/// 429 with the numeric HTTP code in `code` and the reason in `error_code` (E2E #5).
-fn turn_limit_response(scope: &str) -> Response {
-    (
-        StatusCode::TOO_MANY_REQUESTS,
-        Json(serde_json::json!({
-            "code": StatusCode::TOO_MANY_REQUESTS.as_u16(),
-            "error_code": TURN_LIMIT,
-            "scope": scope,
-            "message": "Too many AI responses are running at once; please wait for one to finish",
-        })),
-    )
-        .into_response()
 }
 
 #[cfg(test)]
@@ -926,7 +956,7 @@ mod tests {
             let resp = admit_error_response(error);
             assert_eq!(resp.status(), status, "{error:?}");
             let body = body_of(resp).await;
-            assert_eq!(body["code"], status.as_u16(), "{error:?}");
+            assert!(body["code"].is_string(), "{error:?}");
             assert_eq!(body["message"], message, "{error:?}");
         }
     }
@@ -964,33 +994,85 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_turn_limit_is_a_429_with_a_numeric_code() {
+    async fn a_turn_limit_is_a_429_coded_turn_limit_in_both_keys() {
         let resp = turn_limit_response("user");
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body: Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(body["code"], 429);
+        let body = body_of(resp).await;
+        assert_eq!(body["code"], "turn_limit");
         assert_eq!(body["error_code"], "turn_limit");
         assert_eq!(body["scope"], "user");
+        assert_eq!(body["retryable"], true);
+    }
+
+    #[tokio::test]
+    async fn the_duplicate_turn_409_is_already_submitted_and_the_lease_409_is_turn_busy() {
+        let duplicate = already_submitted().into_response();
+        assert_eq!(duplicate.status(), StatusCode::CONFLICT);
+        let duplicate = body_of(duplicate).await;
+        assert_eq!(duplicate["code"], "already_submitted");
+        assert_eq!(duplicate["action"], "reload");
+        let busy = body_of(lease_busy(Some("t-1".into())).into_response()).await;
+        assert_eq!(busy["code"], "turn_busy");
+        assert_eq!(busy["retryable"], false);
+        assert_eq!(busy["action"], "none");
+        assert_eq!(busy["active_turn_id"], "t-1");
+        assert!(
+            body_of(lease_busy(None).into_response())
+                .await
+                .get("active_turn_id")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn history_unavailable_not_enabled_and_forbidden_are_told_apart() {
+        let unreadable = history_unreadable().into_response();
+        assert_eq!(unreadable.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let unreadable = body_of(unreadable).await;
+        assert_eq!(unreadable["code"], "history_unavailable");
+        assert_eq!(unreadable["error_code"], "history_unavailable");
+        assert_eq!(unreadable["retryable"], true);
+
+        let off = history_not_enabled();
+        assert_eq!(off.status(), StatusCode::NOT_FOUND);
+        assert_eq!(body_of(off).await["code"], "not_enabled");
+
+        let forbidden = error::permission_denied("no");
+        assert_eq!(forbidden.status(), StatusCode::FORBIDDEN);
+        assert_eq!(body_of(forbidden).await["code"], "permission_denied");
+    }
+
+    #[test]
+    fn a_failed_turn_frame_carries_the_ledger_code_and_keeps_the_stored_one() {
+        let frame = error_frame("The response failed.", Some("agent_unreachable"));
+        assert_eq!(frame["type"], "error");
+        assert_eq!(frame["code"], "agent_unavailable");
+        assert_eq!(frame["error_code"], "agent_unreachable");
+        assert_eq!(frame["retryable"], true, "as the live frame said");
+        assert_eq!(frame["recoverable"], true);
+        assert_eq!(frame["action"], "retry");
+        let fenced = error_frame("The response failed.", Some("fenced"));
+        assert_eq!(fenced["code"], "persistence_failed");
+        assert_eq!(fenced["action"], "none");
+        assert_eq!(fenced["retryable"], false);
+        let crashed = error_frame("The response failed.", Some("agent_query_failed"));
+        assert_eq!(crashed["code"], "internal");
+        let uncoded = error_frame("The response failed.", None);
+        assert_eq!(uncoded["code"], "unknown");
+        assert_eq!(uncoded["action"], "none");
+        assert_eq!(uncoded["error_code"], Value::Null);
     }
 
     #[tokio::test]
     async fn a_lease_conflict_is_a_409_with_turn_already_running() {
-        let resp = lease_conflict_response();
+        let resp = admit_error_response(AdmitError::Busy);
         assert_eq!(resp.status(), StatusCode::CONFLICT);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body: Value = serde_json::from_slice(&body).unwrap();
+        let body = body_of(resp).await;
+        assert_eq!(body["code"], "turn_busy");
+        assert_eq!(body["error_code"], "turn_already_running");
         assert_eq!(
-            body,
-            serde_json::json!({
-                "code": 409,
-                "error_code": "turn_already_running",
-                "message": "Another turn is already running in this conversation",
-            })
+            body["message"],
+            "Another turn is already running in this conversation"
         );
     }
 
@@ -1045,6 +1127,7 @@ mod tests {
             end_seq: seqs.1,
             started_at,
             ended_at: None,
+            first_event_at: None,
         }
     }
 
@@ -1134,6 +1217,10 @@ mod tests {
             synthetic["frames"],
             serde_json::json!([{
                 "type": "error",
+                "code": "unknown",
+                "message": synthetic["error"],
+                "retryable": false,
+                "action": "none",
                 "error": synthetic["error"],
                 "error_code": "upstream_error",
                 "recoverable": false,

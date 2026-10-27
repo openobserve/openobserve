@@ -15,5 +15,6 @@
 
 pub mod chat;
 pub mod chats;
+pub mod error;
 pub mod shares;
 pub mod toolsets;

@@ -19,6 +19,8 @@ pub struct Model {
     pub end_seq: Option<i64>,
     pub started_at: i64,
     pub ended_at: Option<i64>,
+    /// When the turn's first o2-ai event was forwarded (micros); NULL until then.
+    pub first_event_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

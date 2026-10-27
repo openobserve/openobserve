@@ -97,6 +97,13 @@ static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
 static FLUSH_RX: OnceLock<&'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>> =
     OnceLock::new();
 
+/// Chat turn charges not yet settled or refunded, keyed by `(org_id, turn_id, charge_id)`.
+static PENDING_TURN_CHARGES: Lazy<RwLock<HashMap<TurnChargeKey, PendingTurnCharge>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Two requests may carry one turn id, so each charge is told apart by its own id.
+static NEXT_TURN_CHARGE: AtomicU64 = AtomicU64::new(1);
+
 /// Dedicated NATS queue for HA sync of quota deductions across nodes.
 pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";
 
@@ -112,7 +119,7 @@ static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
 
 /// A usage record buffered for periodic DB flush. `cost` is signed to match the
-/// counters it feeds; every producer today passes a non-negative value.
+/// counters it feeds; only a refund the DB refused passes a negative value.
 struct FlushRecord {
     org_id: String,
     feature_key: String,
@@ -1313,11 +1320,17 @@ pub async fn get_paid_overage_status(
 #[derive(Debug)]
 pub struct AiUsagePermit {
     feature: TrialQuotaFeature,
+    charge_id: Option<u64>,
 }
 
 impl AiUsagePermit {
     pub fn feature(&self) -> TrialQuotaFeature {
         self.feature
+    }
+
+    /// The held charge of [`authorize_ai_turn`], which settles or refunds only that charge.
+    pub fn charge_id(&self) -> Option<u64> {
+        self.charge_id
     }
 }
 
@@ -1344,6 +1357,16 @@ pub enum AiUsageAuthorizationError {
     },
     #[error("AI usage authorization is temporarily unavailable: {0}")]
     Unavailable(String),
+}
+
+type TurnChargeKey = (String, String, u64);
+
+/// One chat turn's charge, held until the turn shows content or fails before any.
+struct PendingTurnCharge {
+    user_email: String,
+    feature: TrialQuotaFeature,
+    billable: bool,
+    usage_context: AiUsageContext,
 }
 
 /// Reject a chat request that cannot be billed without consuming a free credit.
@@ -1417,7 +1440,10 @@ pub async fn authorize_ai_usage(
     match deducted {
         Ok(_) => {
             record_free_ai_usage(org_id, usage_context, feature);
-            Ok(AiUsagePermit { feature })
+            Ok(AiUsagePermit {
+                feature,
+                charge_id: None,
+            })
         }
         Err(exhausted) => {
             authorize_paid_overage(
@@ -1428,9 +1454,119 @@ pub async fn authorize_ai_usage(
             )
             .await?;
             record_billable_ai_usage(org_id, usage_context, feature);
-            Ok(AiUsagePermit { feature })
+            Ok(AiUsagePermit {
+                feature,
+                charge_id: None,
+            })
         }
     }
+}
+
+/// [`authorize_ai_usage`] for a chat turn, held until [`settle_ai_turn`] or [`refund_ai_usage`].
+pub async fn authorize_ai_turn(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    usage_context: &AiUsageContext,
+    turn_id: &str,
+) -> Result<AiUsagePermit, AiUsageAuthorizationError> {
+    let deducted = try_deduct(org_id, feature)
+        .await
+        .map_err(|error| AiUsageAuthorizationError::Unavailable(error.to_string()))?;
+    let billable = match deducted {
+        Ok(_) => false,
+        Err(exhausted) => {
+            authorize_paid_overage(
+                org_id,
+                feature.pool(),
+                &usage_context.user_email,
+                &exhausted.to_string(),
+            )
+            .await?;
+            true
+        }
+    };
+    let charge_id = hold_turn_charge(
+        org_id,
+        turn_id,
+        PendingTurnCharge {
+            user_email: usage_context.user_email.clone(),
+            feature,
+            billable,
+            usage_context: usage_context.clone(),
+        },
+    );
+    Ok(AiUsagePermit {
+        feature,
+        charge_id: Some(charge_id),
+    })
+}
+
+/// Records a charged turn's usage once it showed content; `false` when nothing was held.
+pub fn settle_ai_turn(org_id: &str, turn_id: &str, charge_id: u64) -> bool {
+    let key = (org_id.to_string(), turn_id.to_string(), charge_id);
+    let Some(charge) = PENDING_TURN_CHARGES.write().remove(&key) else {
+        return false;
+    };
+    record_usage_internal(
+        org_id,
+        &charge.usage_context,
+        charge.feature,
+        charge.billable,
+    );
+    true
+}
+
+/// Returns the credit of a turn that failed before any content, once per charge of `turn_id`.
+pub async fn refund_ai_usage(
+    org_id: &str,
+    user_email: &str,
+    turn_id: &str,
+    charge_id: u64,
+) -> bool {
+    let Some(charge) = take_turn_charge(org_id, user_email, turn_id, charge_id) else {
+        return false;
+    };
+    // A paid charge only ever became a usage record at settle time, so dropping it is the refund.
+    if !charge.billable {
+        let cost = i64::try_from(charge.feature.cost()).unwrap_or(i64::MAX);
+        apply_to_pool_counter(org_id, charge.feature.pool(), -cost);
+        let record = (
+            org_id.to_string(),
+            charge.feature.feature_key().to_string(),
+            -cost,
+        );
+        if let Err(e) = infra::table::trial_quota_usage::batch_increment(vec![record]).await {
+            log::warn!("[TRIAL_QUOTA] refund of turn {turn_id} deferred to the flush: {e}");
+            buffer_flush(org_id, charge.feature, -cost);
+        }
+    }
+    log::info!(
+        "[TRIAL_QUOTA] refunded turn {turn_id}: org={org_id} feature={} billable={}",
+        charge.feature,
+        charge.billable
+    );
+    true
+}
+
+fn hold_turn_charge(org_id: &str, turn_id: &str, charge: PendingTurnCharge) -> u64 {
+    let charge_id = NEXT_TURN_CHARGE.fetch_add(1, Ordering::Relaxed);
+    let key = (org_id.to_string(), turn_id.to_string(), charge_id);
+    PENDING_TURN_CHARGES.write().insert(key, charge);
+    charge_id
+}
+
+fn take_turn_charge(
+    org_id: &str,
+    user_email: &str,
+    turn_id: &str,
+    charge_id: u64,
+) -> Option<PendingTurnCharge> {
+    let key = (org_id.to_string(), turn_id.to_string(), charge_id);
+    let mut pending = PENDING_TURN_CHARGES.write();
+    if pending.get(&key)?.user_email != user_email {
+        return None;
+    }
+    pending.remove(&key)
 }
 
 /// AI usage response for the API
@@ -3133,5 +3269,82 @@ mod tests {
         let json = serde_json::to_string(&body).unwrap();
         assert!(json.contains("session_id"));
         assert!(json.contains("incident_id"));
+    }
+
+    fn held(user: &str, billable: bool) -> PendingTurnCharge {
+        PendingTurnCharge {
+            user_email: user.to_string(),
+            feature: TrialQuotaFeature::AiChat,
+            billable,
+            usage_context: AiUsageContext {
+                user_email: user.to_string(),
+                ..Default::default()
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn a_refund_returns_one_charge_of_a_turn_once() {
+        let charge = hold_turn_charge("refund-org", "t1", held("u@x", true));
+        assert!(refund_ai_usage("refund-org", "u@x", "t1", charge).await);
+        assert!(
+            !refund_ai_usage("refund-org", "u@x", "t1", charge).await,
+            "no double refund"
+        );
+        assert!(
+            !settle_ai_turn("refund-org", "t1", charge),
+            "a refunded turn records no usage"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_turn_that_showed_content_is_never_refunded() {
+        let charge = hold_turn_charge("settle-org", "t1", held("u@x", true));
+        assert!(settle_ai_turn("settle-org", "t1", charge));
+        assert!(!settle_ai_turn("settle-org", "t1", charge));
+        assert!(!refund_ai_usage("settle-org", "u@x", "t1", charge).await);
+    }
+
+    #[tokio::test]
+    async fn only_the_charged_user_is_refunded() {
+        let charge = hold_turn_charge("owner-org", "t1", held("a@x", true));
+        assert!(!refund_ai_usage("owner-org", "b@x", "t1", charge).await);
+        assert!(!refund_ai_usage("other-org", "a@x", "t1", charge).await);
+        assert!(refund_ai_usage("owner-org", "a@x", "t1", charge).await);
+    }
+
+    #[tokio::test]
+    async fn two_charges_of_one_turn_id_settle_and_refund_apart() {
+        let first = hold_turn_charge("shared-org", "t1", held("a@x", true));
+        let second = hold_turn_charge("shared-org", "t1", held("a@x", true));
+        assert_ne!(first, second);
+        assert!(refund_ai_usage("shared-org", "a@x", "t1", first).await);
+        assert!(
+            settle_ai_turn("shared-org", "t1", second),
+            "the other request's charge is untouched"
+        );
+        assert!(!settle_ai_turn("shared-org", "t1", first));
+    }
+
+    #[test]
+    fn chat_turns_are_charged_only_by_the_turn_meter() {
+        let chat = workspace_code_mentioning(&["authorize_ai_turn".to_string()])
+            .into_iter()
+            .filter(|(path, _)| path.ends_with("request/ai/chat.rs"))
+            .map(|(_, code)| code)
+            .next()
+            .expect("chat.rs charges chat turns");
+        let without_tests = chat.split("mod tests {").next().unwrap();
+        assert_eq!(without_tests.matches("authorize_ai_turn(").count(), 1);
+        // The non-streaming route charges once, after o2-ai answered with a 2xx.
+        assert_eq!(without_tests.matches("authorize_ai_usage(").count(), 1);
+        let charge = without_tests
+            .find("async fn charge(&mut self)")
+            .expect("TurnCharge::charge");
+        let call = without_tests.find("authorize_ai_turn(").unwrap();
+        assert!(
+            call > charge,
+            "authorize_ai_turn is called inside TurnCharge::charge"
+        );
     }
 }

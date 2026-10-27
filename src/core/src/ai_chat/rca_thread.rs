@@ -1689,6 +1689,7 @@ pub(crate) mod tests {
             end_seq: None,
             started_at: started_ms * 1000,
             ended_at: None,
+            first_event_at: None,
         }
     }
 

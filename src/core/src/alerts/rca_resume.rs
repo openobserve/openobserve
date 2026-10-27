@@ -439,6 +439,7 @@ pub(crate) mod tests {
             end_seq: None,
             started_at: 1,
             ended_at: Some(2),
+            first_event_at: None,
         };
         turn_rows::Entity::insert(turn_rows::ActiveModel::from(row).reset_all())
             .exec(infra::db::get_orm_client_rw().await)
