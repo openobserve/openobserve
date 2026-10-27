@@ -133,6 +133,27 @@ describe("LicenseOnlineRefreshCard", () => {
     expect(w.text()).not.toContain("Jt4W");
     expect(w.text()).not.toContain("secret");
   });
+  it("before the first refresh nobody is told the missing key is root-only", () => {
+    const fresh = {
+      key_id: null,
+      key_created: false,
+      key_at_rest: "none",
+      registration: "not_registered",
+      last_attempt_at: null,
+      last_success_at: null,
+      last_attempt_by: null,
+      last_status: null,
+    };
+    for (const props of [{ isRoot: false }, { isRoot: false, canUpdate: false }]) {
+      const w = card(fresh, props);
+      expect(w.text()).not.toContain("Visible to the root user only");
+      expect(w.text()).toContain("Not created yet");
+      w.unmount();
+    }
+    expect(card({ key_id: null }, { isRoot: false }).text()).toContain(
+      "Visible to the root user only",
+    );
+  });
   it("plaintext shows the master-key hint", () => {
     expect(card({ key_at_rest: "plaintext" }).text()).toContain(
       "Set O2_MASTER_ENCRYPTION_KEY to encrypt it, then rotate the key.",
