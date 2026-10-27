@@ -674,6 +674,28 @@ describe("ConfigPanel", () => {
       expect(panel.data.config.no_data_text).toBeNull();
     });
 
+    it("suggests the dashboard's variables when typing $ in the empty-state text", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf("line"),
+        variablesData: {
+          values: [
+            { name: "meter", type: "query_values", multiSelect: true },
+            { name: "site", type: "constant" },
+          ],
+        },
+      });
+      const field = wrapper.findComponent({ name: "OTemplateInput" });
+      expect(field.props("delimiter")).toBe("dollar");
+      expect(field.props("suggestions").map((s: { name: string }) => s.name)).toEqual([
+        "meter",
+        "meter:csv",
+        "meter:pipe",
+        "meter:doublequote",
+        "meter:singlequote",
+        "site",
+      ]);
+    });
+
     it.each(["html", "markdown"])("offers no empty-state text for %s", (type) => {
       wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
       expect(wrapper.find('[data-test="dashboard-config-no-data-text"]').exists()).toBe(false);
