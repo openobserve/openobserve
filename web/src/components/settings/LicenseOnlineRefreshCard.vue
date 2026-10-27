@@ -291,7 +291,7 @@ const outcomeIcon = computed(() =>
 );
 let newestAttempt = 0;
 let clearAfter: number | undefined;
-// a lost response may have recorded an attempt so it uses the pre-click value; a 2xx lacking both fields may be an older server, so only the next click replaces it
+// a lost response may still have recorded an attempt, so it keys off the pre-click value
 const clickBoundary = (clicked: RefreshResult, before: number) => {
   const body = clicked.body;
   if (typeof body === "object" && body !== null) {

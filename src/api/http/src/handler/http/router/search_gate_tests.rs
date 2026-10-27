@@ -780,7 +780,7 @@ async fn closed_gate_leaves_the_ungated_search_job_reads_open() {
     use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
     let _gate = close_search_gate_for_tests().await;
-    // the table without its auth layers, which would answer 401 before any route
+    // auth layers would answer 401 before any route, so test the bare route table
     let app = service_route_table();
     for (method, uri, gated) in [
         (Method::GET, "/acme/search_jobs", false),

@@ -421,7 +421,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
 
 /// Why a job waits for search to be allowed again, `None` when it may run.
 fn job_pause_reason() -> Option<String> {
-    // installation-wide like the claim check, so `_meta` and operational-stream jobs wait too (A7)
+    // installation-wide like the claim check, so `_meta` and operational-stream jobs wait too
     (!o2_enterprise::enterprise::license::search_allowed()).then(|| {
         crate::search_blocked_message(
             o2_enterprise::enterprise::license::current_license_id().as_deref(),
