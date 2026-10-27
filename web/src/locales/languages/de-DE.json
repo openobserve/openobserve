@@ -12476,6 +12476,9 @@
     "alertTypeAnomaly": "Anomalie",
     "enterprise": "Enterprise",
     "enterpriseHint": "Alarme zur Anomalieerkennung erfordern OpenObserve Enterprise.",
+    "card": {
+      "customize": "Anpassen"
+    },
     "drawer": {
       "dataAvailable": "Daten verfügbar",
       "streamNotFound": "Stream nicht gefunden",

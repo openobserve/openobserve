@@ -12476,6 +12476,9 @@
     "alertTypeAnomaly": "Bất thường",
     "enterprise": "Enterprise",
     "enterpriseHint": "Cảnh báo phát hiện bất thường cần OpenObserve Enterprise.",
+    "card": {
+      "customize": "Tùy chỉnh"
+    },
     "drawer": {
       "dataAvailable": "Có dữ liệu",
       "streamNotFound": "Không tìm thấy stream",

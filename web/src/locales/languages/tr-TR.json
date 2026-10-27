@@ -12476,6 +12476,9 @@
     "alertTypeAnomaly": "Anomali",
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomali algılama uyarıları OpenObserve Enterprise gerektirir.",
+    "card": {
+      "customize": "Özelleştir"
+    },
     "drawer": {
       "dataAvailable": "Veri mevcut",
       "streamNotFound": "Akış bulunamadı",

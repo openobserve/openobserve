@@ -12476,6 +12476,9 @@
     "alertTypeAnomaly": "Аномалия",
     "enterprise": "Enterprise",
     "enterpriseHint": "Оповещения об аномалиях требуют OpenObserve Enterprise.",
+    "card": {
+      "customize": "Настроить"
+    },
     "drawer": {
       "dataAvailable": "Данные доступны",
       "streamNotFound": "Поток не найден",

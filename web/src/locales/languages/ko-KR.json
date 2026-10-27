@@ -12476,6 +12476,9 @@
     "alertTypeAnomaly": "이상",
     "enterprise": "Enterprise",
     "enterpriseHint": "이상 탐지 알림에는 OpenObserve Enterprise가 필요합니다.",
+    "card": {
+      "customize": "사용자 지정"
+    },
     "drawer": {
       "dataAvailable": "데이터 사용 가능",
       "streamNotFound": "스트림을 찾을 수 없습니다.",
