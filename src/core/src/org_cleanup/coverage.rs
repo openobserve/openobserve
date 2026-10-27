@@ -73,6 +73,7 @@ pub const COVERAGE: &[Coverage] = &[
     table("ai_actions", DB),
     table("ai_chat_feedback", DB),
     table("ai_chat_imports", DB),
+    table("ai_approvals", DB),
     table("ai_chat_sessions", DB),
     table("ai_chat_shares", DB),
     table("ai_chat_turns", DB),

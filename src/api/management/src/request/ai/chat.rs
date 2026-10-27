@@ -35,6 +35,7 @@ use serde_json::Value;
 #[cfg(feature = "enterprise")]
 use {
     futures::StreamExt,
+    infra::table::ai_approvals,
     o2_enterprise::enterprise::{
         ai::{
             agent::meta::Role,
@@ -92,6 +93,29 @@ const UPSTREAM_CANCEL_WAIT: std::time::Duration = std::time::Duration::from_secs
 /// How long a turn may keep settling after o2-ai accepted its abort.
 #[cfg(feature = "enterprise")]
 const CANCEL_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
+
+// Above o2-ai's longest approved apply (`O2_CONFIRM_APPLY_TIMEOUT`, at most 50 s) plus a margin.
+#[cfg(feature = "enterprise")]
+const CONFIRM_RELAY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+#[cfg(any(feature = "enterprise", test))]
+const APPROVAL_RESOLVED: &str = "approval_resolved";
+#[cfg(any(feature = "enterprise", test))]
+const CONFIRM_REFUSAL_KEYS: [&str; 7] = [
+    "id",
+    "resolved_by",
+    "at",
+    "approved",
+    "withdrawn",
+    "pending_id",
+    "extends",
+];
+
+#[cfg(any(feature = "enterprise", test))]
+const CONFIRM_SCOPES: [&str; 3] = ["once", "chat", "always"];
+// Older clients name the card `approval_id` or `call_id`; the relay forwards it as `id`.
+#[cfg(any(feature = "enterprise", test))]
+const CONFIRM_ID_KEYS: [&str; 3] = ["id", "approval_id", "call_id"];
 // With o2-ai's health unknown, a turn waits this long at most for a replacement owner.
 #[cfg(feature = "enterprise")]
 const UNKNOWN_HEALTH_OWNER_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -326,6 +350,17 @@ enum CancelReply {
     /// o2-ai's refusal, kept typed.
     Relay,
     Failed,
+}
+
+/// A `/confirm` o2-ai accepted, as the relay records it.
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy)]
+struct Answered<'a> {
+    org_id: &'a str,
+    session_id: &'a str,
+    caller: &'a str,
+    request: &'a [u8],
+    stored: Option<&'a ai_approvals::Model>,
 }
 
 /// One turn's credit: who pays, under which id it is refunded, and what it cost.
@@ -911,13 +946,137 @@ fn declines(body: &[u8]) -> bool {
 
 /// The body o2-ai gets: `org_id` is the authorized path org, `approved` true only for JSON `true`.
 #[cfg(any(feature = "enterprise", test))]
-fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Vec<u8>> {
+fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Value> {
     let mut value: serde_json::Value = serde_json::from_slice(body).ok()?;
     let object = value.as_object_mut()?;
     let approved = object.get("approved") == Some(&Value::Bool(true));
     object.insert("approved".to_string(), Value::Bool(approved));
     object.insert("org_id".to_string(), serde_json::Value::from(org_id));
-    serde_json::to_vec(&value).ok()
+    // The card the browser answers is relayed as `approval_record`, never taken from the body.
+    object.remove("approval_record");
+    object.remove("policy");
+    if let Some(id) = confirm_id(&Value::Object(object.clone())) {
+        object.insert("id".to_string(), Value::from(id));
+    }
+    Some(value)
+}
+
+/// The stored expiry (microseconds) and card frame after o2-ai's `{expires_at}` (ms) extension.
+#[cfg(any(feature = "enterprise", test))]
+fn extended_card(card: &str, answer: &Value) -> Option<(i64, String)> {
+    let expires_at_ms = answer.get("expires_at")?.as_i64()?;
+    let mut card: Value = serde_json::from_str(card).ok()?;
+    card.as_object_mut()?
+        .insert("expires_at".to_string(), Value::from(expires_at_ms));
+    Some((expires_at_ms.saturating_mul(1000), card.to_string()))
+}
+
+/// The card a `/confirm` body names, under any of [`CONFIRM_ID_KEYS`].
+#[cfg(any(feature = "enterprise", test))]
+fn confirm_id(body: &Value) -> Option<String> {
+    CONFIRM_ID_KEYS
+        .iter()
+        .find_map(|key| body.get(*key).and_then(Value::as_str))
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
+}
+
+/// Why a `/confirm` body is malformed: `id`, `scope`, `items`, `reply` and `extend` are typed.
+#[cfg(any(feature = "enterprise", test))]
+fn confirm_body_problem(body: &[u8]) -> Option<&'static str> {
+    let Ok(Value::Object(body)) = serde_json::from_slice::<Value>(body) else {
+        return Some("Confirmation body must be a JSON object");
+    };
+    let is = |key: &str, ok: fn(&Value) -> bool| body.get(key).is_none_or(ok);
+    let ids_ok = CONFIRM_ID_KEYS.iter().all(|key| is(key, Value::is_string));
+    if !ids_ok || !is("reply", Value::is_string) {
+        return Some("id and reply must be strings");
+    }
+    if !is("extend", Value::is_boolean) {
+        return Some("extend must be a boolean");
+    }
+    if !is("scope", |v| {
+        v.as_str().is_some_and(|s| CONFIRM_SCOPES.contains(&s))
+    }) {
+        return Some("scope must be once, chat or always");
+    }
+    let items_ok = |v: &Value| v.as_array().is_some_and(|a| a.iter().all(Value::is_string));
+    if !is("items", items_ok) {
+        return Some("items must be a list of target ids");
+    }
+    None
+}
+
+/// `{id, extend: true}` only asks o2-ai for more time; nothing is decided.
+#[cfg(any(feature = "enterprise", test))]
+fn extends_only(body: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(body)
+        .is_ok_and(|body| body.get("extend") == Some(&Value::Bool(true)))
+}
+
+/// o2-ai's refusal of a decision keeps its status (404 unknown or expired, 409 decided, 410).
+#[cfg(any(feature = "enterprise", test))]
+fn confirm_refusal(status: u16, body: &str) -> Response {
+    let upstream: Value = serde_json::from_str(body).unwrap_or_default();
+    let upstream = match upstream.get("detail") {
+        Some(detail) if detail.is_object() => detail.clone(),
+        _ => upstream,
+    };
+    let reason = upstream
+        .get("code")
+        .and_then(Value::as_str)
+        .filter(|c| c.len() <= 40 && c.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'));
+    if status == 409 && reason == Some(SESSION_OWNER_UNAVAILABLE) {
+        return AiErrorEnvelope::new(
+            AiErrorCode::SessionOwnerUnavailable,
+            "The assistant replica holding this chat is unavailable; please send it again",
+        )
+        .with("reason", SESSION_OWNER_UNAVAILABLE)
+        .into_response();
+    }
+    let (code, message) = match status {
+        404 => (
+            AiErrorCode::NotFound,
+            "The confirmation is no longer pending; nothing was changed",
+        ),
+        409 => (
+            AiErrorCode::AlreadySubmitted,
+            "The confirmation was already answered, or is not the one waiting",
+        ),
+        410 => (
+            AiErrorCode::TurnExpired,
+            "The confirmation has expired; nothing was changed",
+        ),
+        400 | 422 => (
+            AiErrorCode::InvalidRequest,
+            "The assistant refused the confirmation body",
+        ),
+        403 => (
+            AiErrorCode::PermissionDenied,
+            "This confirmation belongs to another user or organization",
+        ),
+        _ => {
+            return AiErrorEnvelope::new(
+                AiErrorCode::ApprovalDeliveryFailed,
+                "The confirmation did not reach the assistant; please send it again",
+            )
+            .into_response();
+        }
+    };
+    let mut envelope = AiErrorEnvelope::new(code, message)
+        .status(StatusCode::from_u16(status).unwrap_or(StatusCode::CONFLICT));
+    if let Some(reason) = reason {
+        envelope = envelope.with("reason", reason);
+    }
+    for key in CONFIRM_REFUSAL_KEYS {
+        if let Some(value) = upstream
+            .get(key)
+            .filter(|v| !v.is_object() && !v.is_array())
+        {
+            envelope = envelope.with(key, value.clone());
+        }
+    }
+    envelope.into_response()
 }
 
 /// Cross-site forms cannot send JSON without a CORS preflight, so every state change requires it.
@@ -1262,7 +1421,7 @@ fn feedback_rating(body: &serde_json::Value) -> Option<&'static str> {
 
 /// Keeps a successful `/confirm` with the turn that asked, so the decision shows after a reload.
 #[cfg(feature = "enterprise")]
-async fn record_decision(org_id: &str, session_id: &str, caller: &str, request: &[u8]) {
+async fn record_turn_decision(org_id: &str, session_id: &str, caller: &str, request: &[u8]) {
     let Some(decision) = decision_of(request, caller, config::utils::time::now_micros() / 1000)
     else {
         return;
@@ -1334,6 +1493,104 @@ async fn replaced_turn(
     }
 }
 
+/// A decision o2-ai accepted: record it, then relay the answer unchanged; `extend` decides nothing.
+#[cfg(feature = "enterprise")]
+async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> Response {
+    let Answered {
+        org_id,
+        session_id,
+        caller,
+        request,
+        stored,
+    } = *answered;
+    let answer = serde_json::from_str::<Value>(response_body)
+        .unwrap_or_else(|_| serde_json::json!({"ok": true}));
+    if !extends_only(request) {
+        let resolved = &answer["resolved"];
+        let tool = resolved["tool"]
+            .as_str()
+            .or_else(|| stored.and_then(|row| row.tool.as_deref()));
+        record_decision(org_id, resolved).await;
+        super::grants::record_from_confirm(org_id, session_id, caller, resolved, tool).await;
+        super::activity::record_confirm(org_id, session_id, caller, request, &answer).await;
+        // The chat index stops reporting the confirmation as pending.
+        super::turn_marks::mark_answered(org_id, session_id, caller).await;
+        record_turn_decision(org_id, session_id, caller, request).await;
+    } else if let Some(row) = stored {
+        record_extension(org_id, row, &answer).await;
+    }
+    (StatusCode::OK, axum::Json(answer)).into_response()
+}
+
+/// Keeps OpenObserve's copy of an extended card pending as long as o2-ai holds it.
+#[cfg(feature = "enterprise")]
+async fn record_extension(org_id: &str, row: &ai_approvals::Model, answer: &Value) {
+    let Some((expires_at, card)) = extended_card(&row.card, answer) else {
+        return;
+    };
+    if let Err(e) = ai_approvals::extend(org_id, &row.id, expires_at, &card).await {
+        log::warn!(
+            "[org_id:{org_id}] extension of approval {} not stored: {e}",
+            row.id
+        );
+    }
+}
+
+/// Checks and binds a `/confirm` body, handing o2-ai the stored card and the org's current policy.
+#[cfg(feature = "enterprise")]
+async fn prepare_confirm(
+    org_id: &str,
+    session_id: &str,
+    caller: &str,
+    body: &[u8],
+) -> Result<(Vec<u8>, Option<ai_approvals::Model>), Response> {
+    if let Some(problem) = confirm_body_problem(body) {
+        return Err(error::invalid_request(problem));
+    }
+    // o2-ai refuses a card recorded for another org, so it gets the authorized path org.
+    let Some(mut forward) = bind_confirm_body_to_org(body, org_id) else {
+        return Err(error::invalid_request(
+            "Confirmation body must be a JSON object",
+        ));
+    };
+    let stored = stored_approval(org_id, session_id, caller, &forward).await;
+    if let Some(row) = &stored {
+        if row.status != ai_approvals::STATUS_PENDING {
+            return Err(already_decided(row));
+        }
+        if let Ok(card) = serde_json::from_str::<Value>(&row.card) {
+            forward["approval_record"] = card;
+        }
+    }
+    let policy = super::settings::turn_policy(org_id, caller, Some(session_id)).await;
+    if let Ok(policy) = serde_json::to_value(policy) {
+        forward["policy"] = policy;
+    }
+    let bytes = serde_json::to_vec(&forward)
+        .map_err(|_| error::invalid_request("Confirmation body must be a JSON object"))?;
+    Ok((bytes, stored))
+}
+
+/// The caller's stored card the body names; `None` leaves the decision to o2-ai's store.
+#[cfg(feature = "enterprise")]
+async fn stored_approval(
+    org_id: &str,
+    session_id: &str,
+    caller: &str,
+    forward: &Value,
+) -> Option<ai_approvals::Model> {
+    let id = confirm_id(forward)?;
+    match ai_approvals::get(org_id, &id).await {
+        Ok(row) => row.filter(|row| {
+            row.session_id == session_id && row.user_email.eq_ignore_ascii_case(caller)
+        }),
+        Err(e) => {
+            log::warn!("[org_id:{org_id}] stored approval {id} unreadable: {e}");
+            None
+        }
+    }
+}
+
 /// Marks the admitted turn a version and seeds o2-ai with the history before the replaced one.
 #[cfg(feature = "enterprise")]
 async fn version_turn(
@@ -1385,6 +1642,84 @@ fn set_version_history(
         _ if context.contains_key(FORK_SEED_CONTEXT_KEY) => {}
         _ => *history = None,
     }
+}
+
+/// The 409 o2-ai would give for a card decided on any replica, from OpenObserve's record.
+#[cfg(feature = "enterprise")]
+fn already_decided(row: &ai_approvals::Model) -> Response {
+    let resolved: Value = row
+        .resolved
+        .as_deref()
+        .and_then(|r| serde_json::from_str(r).ok())
+        .unwrap_or_default();
+    let mut upstream = serde_json::json!({
+        "code": APPROVAL_RESOLVED,
+        "id": row.id,
+        "approved": row.status == ai_approvals::STATUS_APPROVED,
+        "at": resolved.get("at").cloned().unwrap_or(Value::from(row.decided_at.unwrap_or(0))),
+    });
+    if let Some(by) = resolved.get("by") {
+        upstream["resolved_by"] = by.clone();
+    }
+    confirm_refusal(409, &upstream.to_string())
+}
+
+/// Stores the decision a `confirmation_resolved` frame reports; a decided card stays as it was.
+#[cfg(feature = "enterprise")]
+async fn record_decision(org_id: &str, resolved: &Value) {
+    let Some(id) = resolved["id"].as_str().filter(|id| id.starts_with("apr_")) else {
+        return;
+    };
+    let text = resolved.to_string();
+    let decision = super::turn_marks::decision_of(resolved, &text);
+    let now = config::utils::time::now_micros();
+    if let Err(e) = ai_approvals::decide(org_id, id, &decision, now).await {
+        log::warn!("[org_id:{org_id}] decision on approval {id} not stored: {e}");
+    }
+}
+
+/// o2-ai said the card was decided already (possibly on another replica): keep that decision.
+#[cfg(feature = "enterprise")]
+async fn record_known_decision(org_id: &str, body: &str) {
+    let upstream: Value = serde_json::from_str(body).unwrap_or_default();
+    let upstream = upstream.get("detail").cloned().unwrap_or(upstream);
+    if upstream["code"] != APPROVAL_RESOLVED {
+        return;
+    }
+    let mut resolved = serde_json::json!({
+        "type": "confirmation_resolved",
+        "id": upstream["id"],
+        "approved": upstream["approved"] == true,
+        "by": upstream["resolved_by"],
+        "at": upstream["at"],
+    });
+    for flag in ["withdrawn", "expired"] {
+        if upstream[flag] == true {
+            resolved[flag] = Value::Bool(true);
+        }
+    }
+    record_decision(org_id, &resolved).await;
+}
+
+/// The relay gave up waiting; the decision may still have been applied, so it says 504.
+#[cfg(feature = "enterprise")]
+fn confirm_timed_out() -> Response {
+    log::warn!("Confirmation relay timed out");
+    AiErrorEnvelope::new(
+        AiErrorCode::ApprovalDeliveryFailed,
+        "The assistant did not answer the confirmation in time; it may still apply",
+    )
+    .status(StatusCode::GATEWAY_TIMEOUT)
+    .into_response()
+}
+
+#[cfg(feature = "enterprise")]
+fn is_timeout(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<reqwest::Error>()
+            .is_some_and(reqwest::Error::is_timeout)
+    })
 }
 
 /// Refuses a stop or confirmation on someone else's or an unknown persisted chat.
@@ -2133,13 +2468,21 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     ),
     request_body(
         content = serde_json::Value,
-        description = "Confirmation payload",
-        example = json!({"approved": true}),
+        description = "Decision on a card: `{id, approved, scope?, items?, reply?}`, where `id` \
+                       is the card's id (or its `call_id`), `scope` is `once`, `chat` or \
+                       `always` (only for a grantable card), `items` approves a subset of a \
+                       batch and `reply` declines with text. `{id, extend: true}` asks for more \
+                       time instead (at most three times) and answers the new `expires_at`.",
+        example = json!({"id": "apr_3f9c2e81a0b4d5c6e7f8", "approved": true, "scope": "once"}),
     ),
     responses(
-        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::OK, description = "Decision applied: `{id, status, items[], resolved}` \
+            with per-item results and the `confirmation_resolved` frame (plus the legacy fields)", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "No such card, or it expired (`reason`: `approval_not_found` / `approval_expired`)", body = Object),
+        (status = StatusCode::CONFLICT, description = "Already decided (`reason` `approval_resolved` with `resolved_by`, `at`) or not the pending card (`approval_mismatch`)", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "The decision did not reach the assistant", body = Object),
+        (status = StatusCode::GATEWAY_TIMEOUT, description = "The assistant did not answer in time; the decision may still apply", body = Object),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -2194,56 +2537,49 @@ pub async fn confirm_action(
         // Extract user auth from headers to pass to the agent
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
 
-        // The session id alone names no org, so pass the authorized one along:
-        // o2-ai refuses to answer a confirmation recorded for a different org.
-        let Some(forward_bytes) = bind_confirm_body_to_org(&body_bytes, &org_id) else {
-            return error::invalid_request("Confirmation body must be a JSON object");
-        };
+        let caller = parts
+            .headers
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        let (forward_bytes, stored) =
+            match prepare_confirm(&org_id, &session_id, caller, &body_bytes).await {
+                Ok(prepared) => prepared,
+                Err(resp) => return resp,
+            };
 
         // The client routes the confirm to the replica holding the paused turn.
-        match client
-            .confirm_action(&session_id, forward_bytes, &auth_str)
-            .await
-        {
-            Ok(resp) => {
+        let sent = tokio::time::timeout(
+            CONFIRM_RELAY_TIMEOUT,
+            client.confirm_action(&session_id, forward_bytes, &auth_str),
+        )
+        .await;
+        match sent {
+            Ok(Ok(resp)) => {
                 let status = resp.status();
                 let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
-
-                if status.is_success() {
-                    let answer = serde_json::from_str::<serde_json::Value>(&response_body)
-                        .unwrap_or_else(|_| serde_json::json!({"ok": true}));
-                    let caller = parts
-                        .headers
-                        .get("user_id")
-                        .and_then(|v| v.to_str().ok())
-                        .unwrap_or_default();
-                    super::grants::record_from_confirm(&org_id, &session_id, caller, &body_bytes)
-                        .await;
-                    super::activity::record_confirm(
-                        &org_id,
-                        &session_id,
-                        caller,
-                        &body_bytes,
-                        &answer,
-                    )
-                    .await;
-                    // The chat index stops reporting the confirmation as pending.
-                    super::turn_marks::mark_answered(&org_id, &session_id, caller).await;
-                    record_decision(&org_id, &session_id, caller, &body_bytes).await;
-                    (StatusCode::OK, axum::Json(answer)).into_response()
-                } else {
-                    log::error!(
-                        "Agent confirm endpoint returned {}: {}",
-                        status,
-                        response_body
-                    );
-                    approval_delivery_failed_error()
+                if !status.is_success() {
+                    log::warn!("Agent confirm endpoint returned {status}");
+                    if status == StatusCode::CONFLICT {
+                        record_known_decision(&org_id, &response_body).await;
+                    }
+                    return confirm_refusal(status.as_u16(), &response_body);
                 }
+                let answered = Answered {
+                    org_id: &org_id,
+                    session_id: &session_id,
+                    caller,
+                    request: &body_bytes,
+                    stored: stored.as_ref(),
+                };
+                relay_confirm_answer(&answered, &response_body).await
             }
-            Err(e) => {
+            Ok(Err(e)) if is_timeout(&e) => confirm_timed_out(),
+            Ok(Err(e)) => {
                 log::error!("Failed to forward confirmation to agent: {e}");
                 approval_delivery_failed_error()
             }
+            Err(_) => confirm_timed_out(),
         }
     }
 
@@ -4137,8 +4473,7 @@ mod tests {
 
     #[test]
     fn test_confirm_body_carries_the_path_org() {
-        let bound = bind_confirm_body_to_org(br#"{"approved":true}"#, "acme").unwrap();
-        let value: serde_json::Value = serde_json::from_slice(&bound).unwrap();
+        let value = bind_confirm_body_to_org(br#"{"approved":true}"#, "acme").unwrap();
         assert_eq!(
             value,
             serde_json::json!({"approved": true, "org_id": "acme"})
@@ -4147,10 +4482,33 @@ mod tests {
 
     #[test]
     fn test_confirm_body_org_cannot_be_chosen_by_the_client() {
-        let bound =
+        let value =
             bind_confirm_body_to_org(br#"{"approved":true,"org_id":"victim"}"#, "acme").unwrap();
-        let value: serde_json::Value = serde_json::from_slice(&bound).unwrap();
         assert_eq!(value["org_id"], "acme");
+    }
+
+    #[test]
+    fn the_relay_names_the_card_id_and_drops_client_records() {
+        let body =
+            br#"{"approval_id":"apr_9","approved":true,"approval_record":{"id":"x"},"policy":{}}"#;
+        assert_eq!(confirm_body_problem(body), None);
+        let value = bind_confirm_body_to_org(body, "acme").unwrap();
+        assert_eq!(value["id"], "apr_9");
+        assert!(value.get("approval_record").is_none() && value.get("policy").is_none());
+        assert!(confirm_body_problem(br#"{"call_id":3}"#).is_some());
+        assert!(confirm_body_problem(br#"{"id":"apr_1","scope":"tool"}"#).is_some());
+    }
+
+    #[test]
+    fn an_extension_moves_the_stored_expiry_and_card() {
+        let card = r#"{"type":"confirmation_required","id":"apr_1","expires_at":1000}"#;
+        let answer = serde_json::json!({"id": "apr_1", "expires_at": 5000, "extends": 1});
+        let (expires_at, extended) = extended_card(card, &answer).unwrap();
+        assert_eq!(expires_at, 5_000_000);
+        let extended: Value = serde_json::from_str(&extended).unwrap();
+        assert_eq!(extended["expires_at"], 5000);
+        assert_eq!(extended["id"], "apr_1");
+        assert!(extended_card(card, &serde_json::json!({"extends": 1})).is_none());
     }
 
     #[test]
@@ -4158,6 +4516,74 @@ mod tests {
         assert!(bind_confirm_body_to_org(b"", "acme").is_none());
         assert!(bind_confirm_body_to_org(b"not json", "acme").is_none());
         assert!(bind_confirm_body_to_org(b"[true]", "acme").is_none());
+    }
+
+    #[test]
+    fn the_confirm_relay_passes_scope_items_reply_and_id_through() {
+        let body = br#"{"id":"apr_1","approved":true,"scope":"chat","items":["a1"],"reply":"no"}"#;
+        assert_eq!(confirm_body_problem(body), None);
+        let bound = bind_confirm_body_to_org(body, "acme").unwrap();
+        assert_eq!(bound["scope"], "chat");
+        assert_eq!(bound["items"], serde_json::json!(["a1"]));
+        assert_eq!(bound["reply"], "no");
+        assert_eq!(bound["id"], "apr_1");
+        assert!(extends_only(br#"{"id":"apr_1","extend":true}"#));
+        assert!(!extends_only(br#"{"id":"apr_1","approved":true}"#));
+    }
+
+    #[test]
+    fn a_malformed_confirm_body_is_refused_before_the_relay() {
+        for body in [
+            &br#"{"scope":"forever"}"#[..],
+            br#"{"items":"a1"}"#,
+            br#"{"items":[1]}"#,
+            br#"{"id":7}"#,
+            br#"{"extend":"yes"}"#,
+            b"[]",
+        ] {
+            assert!(confirm_body_problem(body).is_some(), "{body:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn o2_ais_typed_confirm_refusals_keep_their_status() {
+        let resolved = r#"{"code":"approval_resolved","message":"x","id":"apr_1","resolved_by":"a@x","at":17,"approved":false,"withdrawn":true}"#;
+        let response = confirm_refusal(409, resolved);
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = body_of(response).await;
+        assert_eq!(body["code"], "already_submitted");
+        assert_eq!(body["reason"], "approval_resolved");
+        assert_eq!(body["resolved_by"], "a@x");
+        assert_eq!(body["at"], 17);
+        assert_eq!(body["withdrawn"], true);
+        assert_ne!(body["message"], "x", "upstream text is not the message");
+
+        let expired = confirm_refusal(404, r#"{"code":"approval_expired","message":"x"}"#);
+        assert_eq!(expired.status(), StatusCode::NOT_FOUND);
+        assert_eq!(body_of(expired).await["reason"], "approval_expired");
+        assert_eq!(confirm_refusal(410, "{}").status(), StatusCode::GONE);
+        assert_eq!(
+            confirm_refusal(400, "not json").status(),
+            StatusCode::BAD_REQUEST
+        );
+
+        let failed = confirm_refusal(502, r#"{"code":"Weird Thing"}"#);
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body_of(failed).await["code"], "approval_delivery_failed");
+    }
+
+    #[tokio::test]
+    async fn a_moved_session_is_its_own_retryable_refusal() {
+        let detail = r#"{"detail":{"code":"session_owner_unavailable","message":"x"}}"#;
+        let moved = confirm_refusal(409, detail);
+        assert_eq!(moved.status(), StatusCode::CONFLICT);
+        let body = body_of(moved).await;
+        assert_eq!(body["code"], "session_owner_unavailable");
+        assert_eq!(body["retryable"], true);
+        let nested = r#"{"detail":{"code":"approval_mismatch","pending_id":"apr_2"}}"#;
+        let body = body_of(confirm_refusal(409, nested)).await;
+        assert_eq!(body["code"], "already_submitted");
+        assert_eq!(body["pending_id"], "apr_2");
     }
 
     #[test]
@@ -5058,8 +5484,7 @@ mod tests {
             (br#"{"approved": "true"}"#, false),
             (br#"{}"#, false),
         ] {
-            let bound = bind_confirm_body_to_org(body, "acme").unwrap();
-            let value: Value = serde_json::from_slice(&bound).unwrap();
+            let value = bind_confirm_body_to_org(body, "acme").unwrap();
             assert_eq!(
                 value["approved"],
                 approved,

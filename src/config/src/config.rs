@@ -123,7 +123,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 123: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
 // 124: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
 // 125: create paid_overage_attribution.
-pub const DB_SCHEMA_VERSION: u64 = 125;
+// 126: create ai_approvals.
+pub const DB_SCHEMA_VERSION: u64 = 126;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

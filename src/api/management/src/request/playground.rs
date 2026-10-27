@@ -471,6 +471,9 @@ fn split_params(
         (status = 502, description = "The provider failed before streaming", body = ()),
         (status = 504, description = "The provider timed out before streaming", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"readOnlyHint": true}))
+    )
 )]
 pub async fn run_playground_cell(
     Path(org_id): Path<String>,
@@ -617,6 +620,9 @@ pub async fn run_playground_cell(
         (status = 404, description = "A referenced scorer does not exist", body = ()),
         (status = 500, description = "Scorer resolution failed", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"readOnlyHint": true}))
+    )
 )]
 pub async fn score_playground_cell(
     Path(org_id): Path<String>,

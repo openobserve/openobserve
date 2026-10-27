@@ -774,6 +774,54 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     response
 }
 
+/// `/{org}/ai/...` routes are the assistant's own controls and `/{org}/mcp` checks each tool call.
+fn assistant_approval_exempt(path: &str) -> bool {
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    matches!(segments.as_slice(), [_org, "mcp"] | [_org, "ai", ..])
+}
+
+/// The assistant's REST changes (its approved deletes) run only with o2-ai's signed approval.
+pub async fn assistant_approval_middleware(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let changes = matches!(
+        method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    );
+    let path = request.uri().path();
+    let exempt = assistant_approval_exempt(path);
+    if !changes || exempt || !request.headers().contains_key(X_O2_ASSISTANT_SESSION_ID) {
+        return next.run(request).await;
+    }
+    let origin = match openobserve_mcp::ledger::Origin::checked(request.headers()) {
+        Ok(origin) => origin,
+        Err(problem) => return common::meta::http::HttpResponse::bad_request(problem),
+    };
+    let target = format!(
+        "/api{}",
+        request
+            .uri()
+            .path_and_query()
+            .map_or(path, |target| target.as_str())
+    );
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let org_id = match segments.next() {
+        Some("v2") => segments.next(),
+        first => first,
+    }
+    .unwrap_or_default()
+    .to_string();
+    let checked =
+        openobserve_mcp::approval::check_rest(&org_id, method.as_str(), &target, origin.as_ref())
+            .await;
+    match checked {
+        Ok(()) => next.run(request).await,
+        Err(refused) => {
+            log::warn!("[ai] refused assistant {method} {target}: {refused}");
+            common::meta::http::HttpResponse::forbidden(refused.to_string())
+        }
+    }
+}
+
 /// Handler for /metrics endpoint
 pub async fn get_metrics() -> impl IntoResponse {
     let body = if config::get_config().common.prometheus_enabled {
@@ -2201,6 +2249,7 @@ pub fn service_routes() -> Router {
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        .layer(middleware::from_fn(assistant_approval_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
         // refuses never reached a handler, so there is nothing for the audit trail to record.
         .layer(middleware::from_fn(password_policy_middleware))
@@ -4569,6 +4618,42 @@ mod tests {
             assert!(
                 allowed.split(',').any(|h| h.trim() == name),
                 "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
+    }
+
+    #[test]
+    fn assistant_approval_exempts_only_the_ai_and_mcp_routes() {
+        for path in [
+            "/default/ai/chat",
+            "/default/ai/confirm/s1",
+            "/ai/ai/settings",
+            "/mcp/ai/chat",
+            "/default/mcp",
+            "/default/mcp/",
+            "/ai/mcp",
+            "/v2/ai/chat",
+        ] {
+            assert!(assistant_approval_exempt(path), "{path} should be exempt");
+        }
+        for path in [
+            "/default/streams/ai/data_by_time_range",
+            "/default/streams/ai/delete_fields",
+            "/default/streams/ai/settings",
+            "/default/streams/mcp",
+            "/default/functions/mcp",
+            "/ai/streams/logs/settings",
+            "/ai/alerts/a1",
+            "/mcp/streams/logs",
+            "/v2/default/ai/chat",
+            "/v2/streams/ai/settings",
+            "/v2/default/alerts/a1",
+            "/default/mcp/extra",
+            "/",
+        ] {
+            assert!(
+                !assistant_approval_exempt(path),
+                "{path} must need approval"
             );
         }
     }

@@ -246,6 +246,7 @@ mod m20261021_000003_add_hide_attachments_to_ai_chat_shares;
 mod m20261021_000004_create_ai_chat_feedback;
 mod m20261021_000005_create_ai_chat_imports;
 mod m20261021_000006_create_paid_overage_attribution;
+mod m20261021_000007_create_ai_approvals;
 mod m20261024_000001_add_lease_to_org_cleanup_tasks;
 mod m20261026_000001_backfill_v1_rca_pointer;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
@@ -688,6 +689,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000004_create_ai_chat_feedback::Migration),
             Box::new(m20261021_000005_create_ai_chat_imports::Migration),
             Box::new(m20261021_000006_create_paid_overage_attribution::Migration),
+            Box::new(m20261021_000007_create_ai_approvals::Migration),
         ]
     }
 }
@@ -772,6 +774,7 @@ mod tests {
         (123, "m20261020_000005_create_ai_turn_marks"),
         (124, "m20261021_000005_create_ai_chat_imports"),
         (125, "m20261021_000006_create_paid_overage_attribution"),
+        (126, "m20261021_000007_create_ai_approvals"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

@@ -342,10 +342,7 @@ pub(crate) async fn record_confirm(
     if user_id.is_empty() {
         return;
     }
-    let approval_id = serde_json::from_slice::<Value>(request)
-        .ok()
-        .and_then(|body| body.get("id")?.as_str().map(str::to_string))
-        .unwrap_or_else(|| "confirm".to_string());
+    let approval_id = confirmed_id(request, response).unwrap_or_else(|| "confirm".to_string());
     let Some(items) = response.get("items").and_then(Value::as_array) else {
         return;
     };
@@ -373,6 +370,21 @@ pub(crate) async fn record_confirm(
             Err(e) => log::error!("[org_id:{org_id}] cannot stamp a confirmed action: {e}"),
         }
     }
+}
+
+/// The card a `/confirm` decided: o2-ai's answer first, else whichever id key the body used.
+fn confirmed_id(request: &[u8], response: &Value) -> Option<String> {
+    let body = serde_json::from_slice::<Value>(request).unwrap_or_default();
+    [
+        &response["id"],
+        &response["resolved"]["id"],
+        &body["id"],
+        &body["approval_id"],
+        &body["call_id"],
+    ]
+    .into_iter()
+    .find_map(|id| id.as_str().filter(|id| !id.is_empty()))
+    .map(str::to_string)
 }
 
 async fn store(action: Recorded) {
@@ -744,6 +756,7 @@ mod tests {
                 user_email: "a@x".into(),
                 session_id: "s".into(),
                 turn_id: Some("t".into()),
+                approval: None,
             },
             tool: "DeleteAlert".into(),
             op: Op::Delete,
@@ -948,6 +961,7 @@ mod tests {
             user_email: user.into(),
             session_id: SESSION.into(),
             turn_id: None,
+            approval: None,
         };
         assert!(!runs_here("o-bound", &origin("a@x")));
         let turn = registry::register("o-bound", SESSION, "t1", "a@x", None);
@@ -956,5 +970,14 @@ mod tests {
         assert!(!runs_here("o-other", &origin("a@x")));
         drop(turn);
         assert!(!runs_here("o-bound", &origin("a@x")));
+    }
+
+    #[test]
+    fn a_confirm_names_its_card_under_any_id_key() {
+        let answer = json!({"resolved": {"id": "apr_a"}});
+        assert_eq!(confirmed_id(b"{}", &answer).as_deref(), Some("apr_a"));
+        let body = br#"{"call_id":"apr_c"}"#;
+        assert_eq!(confirmed_id(body, &json!({})).as_deref(), Some("apr_c"));
+        assert_eq!(confirmed_id(b"not json", &json!({})), None);
     }
 }

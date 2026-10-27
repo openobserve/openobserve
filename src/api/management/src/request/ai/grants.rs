@@ -25,7 +25,10 @@ use config::utils::time::now_micros;
 use infra::table::ai_grants::{self, NewGrant, SCOPE_ALWAYS, SCOPE_CHAT};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_mcp::ledger;
+use openobserve_mcp::{
+    approval::{self, GrantQuery},
+    tools::{self, ToolClass},
+};
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -33,8 +36,6 @@ use utoipa::ToSchema;
 use super::{capabilities, error};
 
 const FIELD_MAX_CHARS: usize = 256;
-// A tool named for removal is never granted `always`, whatever its method says.
-const NEVER_STANDING: [&str; 5] = ["delete", "remove", "purge", "drop", "destroy"];
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct GrantView {
@@ -165,20 +166,23 @@ pub async fn delete_grant(
     }
 }
 
-/// Stores the grant an approved `/confirm` asked for with `scope`; a refused one is only logged.
+/// Registers the executor's check that a `grant_<id>` approval names a live grant.
+pub fn register_grant_check() {
+    approval::set_grant_check(grant_is_live);
+}
+
+/// Stores the grant o2-ai's `resolved` frame applied, never the scope the browser's body asked for.
 pub(crate) async fn record_from_confirm(
     org_id: &str,
     session_id: &str,
     user_id: &str,
-    body: &[u8],
+    resolved: &Value,
+    tool: Option<&str>,
 ) {
     if user_id.is_empty() {
         return;
     }
-    let Ok(body) = serde_json::from_slice::<Value>(body) else {
-        return;
-    };
-    let requested = match requested(&body, ledger::tool_operation) {
+    let requested = match requested(resolved, tool, tools::tool_class) {
         Ok(Some(requested)) => requested,
         Ok(None) => return,
         Err(reason) => {
@@ -186,14 +190,6 @@ pub(crate) async fn record_from_confirm(
             return;
         }
     };
-    // Only what the turn asked can stand; the approval itself still went through as a one-time one.
-    if !super::turn_marks::take_confirmation(org_id, session_id, user_id, &requested.tool).await {
-        log::info!(
-            "[org_id:{org_id}] standing approval of {} not stored: the turn asked no such confirmation",
-            requested.tool
-        );
-        return;
-    }
     let grant = NewGrant {
         org_id,
         user_email: user_id,
@@ -208,43 +204,67 @@ pub(crate) async fn record_from_confirm(
     }
 }
 
-/// `Ok(None)` when no grant is asked, `Err` why one is refused; the operation is never the body's.
+/// `Ok(None)` when no grant is asked, `Err` why one is refused; the class is the server's own.
 fn requested(
-    body: &Value,
-    operation_of: impl Fn(&str) -> Option<&'static str>,
+    resolved: &Value,
+    tool: Option<&str>,
+    class_of: impl Fn(&str) -> Option<ToolClass>,
 ) -> Result<Option<Requested>, &'static str> {
-    let scope = match body.get("scope").and_then(Value::as_str) {
+    let scope = match resolved.get("scope").and_then(Value::as_str) {
         Some(SCOPE_ALWAYS) => SCOPE_ALWAYS,
         Some(SCOPE_CHAT) => SCOPE_CHAT,
         _ => return Ok(None),
     };
-    if body.get("approved").and_then(Value::as_bool) != Some(true) {
+    if resolved.get("approved").and_then(Value::as_bool) != Some(true) {
         return Ok(None);
     }
-    let field = |key: &str| {
-        body.get(key)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|v| !v.is_empty() && v.chars().count() <= FIELD_MAX_CHARS)
-            .map(str::to_string)
-    };
-    let Some(tool) = field("tool") else {
+    let Some(tool) = tool
+        .map(str::trim)
+        .filter(|t| !t.is_empty() && t.chars().count() <= FIELD_MAX_CHARS)
+    else {
         return Err("the approval names no tool");
     };
-    let Some(operation) = operation_of(&tool) else {
+    let Some(class) = class_of(tool) else {
         return Err("the approval names no tool this server has");
     };
-    let lower = tool.to_ascii_lowercase();
-    let deletes =
-        operation == ledger::OPERATION_DELETE || NEVER_STANDING.iter().any(|w| lower.contains(w));
-    if scope == SCOPE_ALWAYS && deletes {
+    if class.read_only {
+        return Err("a read needs no standing approval");
+    }
+    if scope == SCOPE_ALWAYS && class.destructive {
         return Err("a delete is never approved for always");
     }
     Ok(Some(Requested {
-        tool,
-        operation: operation.to_string(),
+        tool: tool.to_string(),
+        operation: class.operation.to_string(),
         scope,
     }))
+}
+
+/// Whether the grant `query` names is still stored for that member, tool and chat.
+fn grant_is_live(query: GrantQuery) -> futures::future::BoxFuture<'static, bool> {
+    Box::pin(async move {
+        match ai_grants::get(&query.org_id, &query.grant_id).await {
+            Ok(Some(grant)) => grant_matches(&grant, &query),
+            Ok(None) => false,
+            Err(e) => {
+                log::error!(
+                    "[org_id:{}] cannot read AI grant {}: {e}",
+                    query.org_id,
+                    query.grant_id
+                );
+                false
+            }
+        }
+    })
+}
+
+fn grant_matches(grant: &ai_grants::Model, query: &GrantQuery) -> bool {
+    let chat_ok = match grant.scope.as_str() {
+        SCOPE_ALWAYS => true,
+        SCOPE_CHAT => grant.chat_id.as_deref() == Some(query.session_id.as_str()),
+        _ => false,
+    };
+    chat_ok && grant.tool == query.tool && grant.user_email.eq_ignore_ascii_case(&query.user_email)
 }
 
 #[cfg(test)]
@@ -254,26 +274,37 @@ mod tests {
     use super::*;
 
     /// The server's reading of the tools these tests name.
-    fn operation_of(tool: &str) -> Option<&'static str> {
+    fn class_of(tool: &str) -> Option<ToolClass> {
+        let class = |operation, destructive| ToolClass {
+            read_only: false,
+            destructive,
+            operation,
+            telemetry: false,
+        };
         match tool {
-            "UpdateDashboard" => Some("update"),
-            "DeleteAlert" | "BulkCleanup" => Some("delete"),
-            "DestroyThing" => Some("update"),
+            "UpdateDashboard" | "DestroyThing" => Some(class("update", false)),
+            "DeleteAlert" | "BulkCleanup" => Some(class("delete", true)),
+            "SearchSQL" => Some(ToolClass {
+                read_only: true,
+                ..class("read", false)
+            }),
             _ => None,
         }
     }
 
     #[test]
     fn only_an_approved_confirm_with_a_scope_asks_for_a_grant() {
-        let ask = |body: Value| requested(&body, operation_of);
-        assert_eq!(ask(json!({"approved": true})), Ok(None));
+        let ask = |body: Value, tool: Option<&str>| requested(&body, tool, class_of);
+        let dashboard = Some("UpdateDashboard");
+        assert_eq!(ask(json!({"approved": true}), dashboard), Ok(None));
         assert_eq!(
-            ask(json!({"approved": false, "scope": "always", "tool": "UpdateDashboard"})),
+            ask(json!({"approved": false, "scope": "always"}), dashboard),
             Ok(None)
         );
         assert_eq!(
             ask(
-                json!({"approved": true, "scope": "chat", "tool": "UpdateDashboard", "operation": "anything"})
+                json!({"approved": true, "scope": "chat", "tool": "DeleteAlert", "operation": "anything"}),
+                dashboard
             ),
             Ok(Some(Requested {
                 tool: "UpdateDashboard".into(),
@@ -281,23 +312,71 @@ mod tests {
                 scope: SCOPE_CHAT,
             }))
         );
-        assert!(ask(json!({"approved": true, "scope": "always"})).is_err());
-        assert!(
-            ask(json!({"approved": true, "scope": "always", "tool": "x".repeat(300)})).is_err()
-        );
-        assert!(ask(json!({"approved": true, "scope": "chat", "tool": "Unknown"})).is_err());
+        let always = json!({"approved": true, "scope": "always"});
+        assert!(ask(always.clone(), None).is_err());
+        assert!(ask(always.clone(), Some(&"x".repeat(300))).is_err());
+        assert!(ask(always.clone(), Some("Unknown")).is_err());
+        assert!(ask(always, Some("SearchSQL")).is_err());
     }
 
     #[test]
-    fn a_delete_is_granted_for_one_chat_at_most_whatever_the_body_says() {
-        for tool in ["DeleteAlert", "BulkCleanup", "DestroyThing"] {
-            let always =
-                json!({"approved": true, "scope": "always", "tool": tool, "operation": "update"});
-            assert!(requested(&always, operation_of).is_err(), "{tool}");
+    fn only_the_scope_o2_ai_resolved_is_granted() {
+        let dashboard = Some("UpdateDashboard");
+        assert_eq!(requested(&Value::Null, dashboard, class_of), Ok(None));
+        let once = json!({"type": "confirmation_resolved", "approved": true, "scope": "once"});
+        assert_eq!(requested(&once, dashboard, class_of), Ok(None));
+        let unscoped = json!({"type": "confirmation_resolved", "approved": true});
+        assert_eq!(requested(&unscoped, dashboard, class_of), Ok(None));
+    }
+
+    #[test]
+    fn a_delete_is_granted_for_one_chat_at_most_whatever_its_name() {
+        let always = json!({"approved": true, "scope": "always"});
+        for tool in ["DeleteAlert", "BulkCleanup"] {
+            assert!(requested(&always, Some(tool), class_of).is_err(), "{tool}");
         }
-        let chat = json!({"approved": true, "scope": "chat", "tool": "DeleteAlert"});
-        let granted = requested(&chat, operation_of).unwrap().unwrap();
+        let named_like_a_delete = requested(&always, Some("DestroyThing"), class_of);
+        assert!(named_like_a_delete.unwrap().is_some());
+        let chat = json!({"approved": true, "scope": "chat"});
+        let granted = requested(&chat, Some("DeleteAlert"), class_of)
+            .unwrap()
+            .unwrap();
         assert_eq!(granted.operation, "delete");
+    }
+
+    #[test]
+    fn a_grant_signs_only_its_member_tool_and_chat() {
+        let grant = |scope: &str, chat_id: Option<&str>| ai_grants::Model {
+            id: "g1".into(),
+            org_id: "o".into(),
+            user_email: "Alice@x".into(),
+            tool: "UpdateAlert".into(),
+            operation: "update".into(),
+            scope: scope.into(),
+            chat_id: chat_id.map(str::to_string),
+            granted_by: "Alice@x".into(),
+            granted_at: 3,
+        };
+        let query = GrantQuery {
+            org_id: "o".into(),
+            user_email: "alice@x".into(),
+            session_id: "s1".into(),
+            grant_id: "g1".into(),
+            tool: "UpdateAlert".into(),
+        };
+        assert!(grant_matches(&grant("always", None), &query));
+        assert!(grant_matches(&grant("chat", Some("s1")), &query));
+        assert!(!grant_matches(&grant("chat", Some("s2")), &query));
+        let other_tool = GrantQuery {
+            tool: "DeleteAlert".into(),
+            ..query.clone()
+        };
+        assert!(!grant_matches(&grant("always", None), &other_tool));
+        let other_user = GrantQuery {
+            user_email: "mallory@x".into(),
+            ..query
+        };
+        assert!(!grant_matches(&grant("always", None), &other_user));
     }
 
     #[test]

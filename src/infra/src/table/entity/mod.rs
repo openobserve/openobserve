@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod ai_access_requests;
 pub mod ai_actions;
+pub mod ai_approvals;
 pub mod ai_chat_feedback;
 pub mod ai_chat_imports;
 pub mod ai_chat_sessions;
