@@ -20,8 +20,10 @@ export interface RefreshReport {
 export type RefreshBody =
   | (RefreshReport & {
       limits_refreshed?: boolean;
-      /** Unix microseconds of this click's own attempt, matching `refresh.last_attempt_at`. */
+      /** Unix microseconds this click recorded as `refresh.last_attempt_at`. */
       attempt_at?: number;
+      /** False when this click recorded no attempt. */
+      attempt_recorded?: boolean;
       code?: number;
       reason?: string;
       message?: string;

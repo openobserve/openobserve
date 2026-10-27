@@ -152,7 +152,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { useI18nTyped } from "@/types/i18n";
-import type { RefreshResult } from "@/ts/interfaces/licenseRefresh";
+import type { RefreshBody, RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { refreshMessage, statusLabel, type RefreshStatus } from "@/utils/licenseRefresh";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtc, issuedOn } from "@/utils/licenseWaivers";
@@ -291,6 +291,12 @@ const outcomeIcon = computed(() =>
 );
 let newestAttempt = 0;
 let clearAfter: number | undefined;
+// a body with neither field may come from an older server, so only the next click replaces it
+const clickBoundary = (body: RefreshBody | undefined, before: number) => {
+  if (typeof body !== "object") return undefined;
+  if (typeof body.attempt_at === "number") return body.attempt_at;
+  return body.attempt_recorded === false ? before : undefined;
+};
 const dropClickedOutcome = () => {
   if (clearAfter === undefined || newestAttempt <= clearAfter) return;
   clearAfter = undefined;
@@ -319,8 +325,7 @@ const run = async (rotate: boolean) => {
       ? rotateInstanceKey(() => emit("refreshed"))
       : refreshLicenseLimits(() => emit("refreshed")));
     result.value = clicked;
-    // no attempt_at means no attempt was recorded or an older server answered
-    clearAfter = (typeof clicked.body === "object" ? clicked.body.attempt_at : undefined) ?? before;
+    clearAfter = clickBoundary(clicked.body, before);
     dropClickedOutcome();
     emit("refreshed");
   } finally {

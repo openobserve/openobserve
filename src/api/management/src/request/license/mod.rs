@@ -68,9 +68,12 @@ struct RefreshBody {
     limits_refreshed: bool,
     #[serde(flatten)]
     report: RefreshReport,
-    /// Unix microseconds of this click's own attempt, matching `refresh.last_attempt_at`.
+    /// Unix microseconds this click recorded as `refresh.last_attempt_at`.
     #[serde(skip_serializing_if = "Option::is_none")]
     attempt_at: Option<i64>,
+    /// `false` when this click recorded no attempt; absent when it did.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attempt_recorded: Option<bool>,
 }
 
 pub struct SaveLicenseRequest {
@@ -518,13 +521,13 @@ where
 fn refresh_response(
     limits_refreshed: bool,
     report: Result<RefreshReport, RefreshBusy>,
-    attempt_at: Option<i64>,
 ) -> Response {
     match report {
         Ok(report) => MetaHttpResponse::json(RefreshBody {
             limits_refreshed,
+            attempt_at: report.attempt_at,
+            attempt_recorded: report.attempt_at.is_none().then_some(false),
             report,
-            attempt_at,
         }),
         Err(RefreshBusy) => (
             StatusCode::CONFLICT,
@@ -533,42 +536,11 @@ fn refresh_response(
                 "reason": "refresh_in_progress",
                 "message": "A license refresh is already running. Try again in a moment.",
                 "limits_refreshed": limits_refreshed,
+                "attempt_recorded": false,
             })),
         )
             .into_response(),
     }
-}
-
-// the state is cluster-wide, so a later read may hold another node's attempt or an older one
-fn own_attempt_at(
-    before: Option<i64>,
-    after: &RefreshStatus,
-    user: &str,
-    report: &RefreshReport,
-) -> Option<i64> {
-    let at = after
-        .last_attempt_at
-        .filter(|at| before.is_none_or(|before| *at > before))?;
-    let same_outcome =
-        serde_json::to_value(&after.last_outcome).ok() == serde_json::to_value(Some(report)).ok();
-    (after.last_attempt_by.as_deref() == Some(user) && same_outcome).then_some(at)
-}
-
-async fn attempt_status() -> RefreshStatus {
-    refresh_status(true, true, false).await
-}
-
-async fn click_response<Fut>(user: &str, limits_refreshed: bool, click: Fut) -> Response
-where
-    Fut: std::future::Future<Output = Result<RefreshReport, RefreshBusy>>,
-{
-    let before = attempt_status().await.last_attempt_at;
-    let report = click.await;
-    let attempt_at = match &report {
-        Ok(report) => own_attempt_at(before, &attempt_status().await, user, report),
-        Err(RefreshBusy) => None,
-    };
-    refresh_response(limits_refreshed, report, attempt_at)
 }
 
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
@@ -703,8 +675,10 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
     }
 
     let limits_refreshed = get_license().await.is_some() && license::update().await.is_ok();
-    let click = click_refresh(&email, || async { license::update().await });
-    click_response(&email, limits_refreshed, click).await
+    refresh_response(
+        limits_refreshed,
+        click_refresh(&email, || async { license::update().await }).await,
+    )
 }
 
 pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Response {
@@ -714,7 +688,7 @@ pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Resp
     }
 
     let limits_refreshed = get_license().await.is_some() && license::update().await.is_ok();
-    click_response(&email, limits_refreshed, rotate_instance_key(&email)).await
+    refresh_response(limits_refreshed, rotate_instance_key(&email).await)
 }
 
 #[cfg(test)]
@@ -1426,6 +1400,7 @@ mod tests {
                 "reason": "refresh_in_progress",
                 "message": "A license refresh is already running. Try again in a moment.",
                 "limits_refreshed": true,
+                "attempt_recorded": false,
             })
         );
     }
@@ -1459,6 +1434,7 @@ mod tests {
             "successor_available",
             "retry_after_s",
             "rotate_requested",
+            "attempt_recorded",
         ];
         assert_eq!(body.as_object().map(|o| o.len()), Some(fields.len()));
         for field in fields {
@@ -1468,6 +1444,7 @@ mod tests {
         assert!(body["outcome"].is_null());
         assert_eq!(body["waivers_added"], 0);
         assert_eq!(body["rotate_requested"], false);
+        assert_eq!(body["attempt_recorded"], false);
     }
 
     #[tokio::test]
@@ -1481,7 +1458,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refresh_returns_its_own_attempt_time_and_none_when_refused_before_one() {
+    async fn refresh_passes_the_recorded_attempt_time_through_and_flags_an_unrecorded_one() {
         let _store = store_setup().await;
         load_refresh_license("online").await;
         // an unloaded stored key makes the click record a pending_reload attempt offline
@@ -1494,6 +1471,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["error"], "pending_reload");
         let attempt_at = body["attempt_at"].as_i64().expect("attempt_at");
+        assert!(body.get("attempt_recorded").is_none(), "{body}");
         let (_, got) = get_as(STORE_ROOT).await;
         assert_eq!(got["refresh"]["last_attempt_at"].as_i64(), Some(attempt_at));
 
@@ -1502,44 +1480,9 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["error"], "airgapped");
         assert!(body.get("attempt_at").is_none(), "{body}");
+        assert_eq!(body["attempt_recorded"], false, "{body}");
         let (_, got) = get_as(STORE_ROOT).await;
         assert_eq!(got["refresh"]["last_attempt_at"].as_i64(), Some(attempt_at));
-    }
-
-    #[test]
-    fn own_attempt_at_takes_only_a_newer_attempt_matching_this_click() {
-        let report = RefreshReport {
-            outcome: Some(o2_enterprise::enterprise::license::RefreshOutcome::Unchanged),
-            ..Default::default()
-        };
-        let after = |at: Option<i64>, by: &str, outcome: Option<RefreshReport>| RefreshStatus {
-            last_attempt_at: at,
-            last_attempt_by: Some(by.into()),
-            last_outcome: outcome,
-            ..refresh_status_fixture()
-        };
-        let mine = after(Some(20), "me@test", Some(report.clone()));
-        assert_eq!(
-            own_attempt_at(Some(10), &mine, "me@test", &report),
-            Some(20)
-        );
-        assert_eq!(own_attempt_at(None, &mine, "me@test", &report), Some(20));
-        assert_eq!(own_attempt_at(Some(20), &mine, "me@test", &report), None);
-        assert_eq!(own_attempt_at(Some(30), &mine, "me@test", &report), None);
-        let other_user = after(Some(20), "other@test", Some(report.clone()));
-        assert_eq!(
-            own_attempt_at(Some(10), &other_user, "me@test", &report),
-            None
-        );
-        let other_outcome = after(Some(20), "me@test", Some(RefreshReport::default()));
-        assert_eq!(
-            own_attempt_at(Some(10), &other_outcome, "me@test", &report),
-            None
-        );
-        assert_eq!(
-            own_attempt_at(Some(10), &after(None, "me@test", None), "me@test", &report),
-            None
-        );
     }
 
     fn refresh_status_fixture() -> o2_enterprise::enterprise::license::RefreshStatus {
@@ -1684,6 +1627,7 @@ mod tests {
         assert_eq!(body["code"], 409);
         assert_eq!(body["reason"], "refresh_in_progress");
         assert_eq!(body["limits_refreshed"], true);
+        assert_eq!(body["attempt_recorded"], false);
     }
 
     async fn load_successor_for_paste() {
