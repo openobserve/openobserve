@@ -1113,11 +1113,9 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const queryEditor = pm.chartTypeSelector.queryEditor;
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
-    // Focus on the editor and enter a PromQL query using keyboard.type for reliable Monaco input
+    // Fill the Monaco input directly; typing lets autocomplete corrupt the query
     await queryEditor.getByRole('code').click();
-    await page.keyboard.press('Control+a');
-    await page.keyboard.type('cpu_usage{}');
-    await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
+    await queryEditor.locator('.inputarea').fill('cpu_usage{}');
 
     // Apply
     await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
