@@ -6652,6 +6652,7 @@ mod tests {
         alert.is_real_time = false;
         alert.enabled = true;
         alert.query_condition = QueryCondition {
+            query_type: config::meta::alerts::QueryType::SQL,
             conditions: None,
             sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
             ..Default::default()
