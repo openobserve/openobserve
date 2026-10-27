@@ -13066,6 +13066,9 @@
     "alertTypeAnomaly": "Anomalia",
     "enterprise": "Enterprise",
     "enterpriseHint": "Gli avvisi di rilevamento anomalie richiedono OpenObserve Enterprise.",
+    "card": {
+      "customize": "Personalizza"
+    },
     "drawer": {
       "dataAvailable": "Dati disponibili",
       "streamNotFound": "Stream non trovato",

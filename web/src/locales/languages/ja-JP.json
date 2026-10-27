@@ -13066,6 +13066,9 @@
     "alertTypeAnomaly": "異常",
     "enterprise": "Enterprise",
     "enterpriseHint": "異常検知アラートには OpenObserve Enterprise が必要です。",
+    "card": {
+      "customize": "カスタマイズ"
+    },
     "drawer": {
       "dataAvailable": "データあり",
       "streamNotFound": "ストリームが見つかりません",

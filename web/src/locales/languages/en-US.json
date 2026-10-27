@@ -13069,6 +13069,9 @@
     "alertTypeAnomaly": "Anomaly",
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomaly detection alerts need OpenObserve Enterprise.",
+    "card": {
+      "customize": "Customize"
+    },
     "drawer": {
       "dataAvailable": "Data available",
       "streamNotFound": "Stream not found",

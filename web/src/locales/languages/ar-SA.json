@@ -13066,6 +13066,9 @@
     "alertTypeAnomaly": "شذوذ",
     "enterprise": "Enterprise",
     "enterpriseHint": "تتطلب تنبيهات اكتشاف الشذوذ OpenObserve Enterprise.",
+    "card": {
+      "customize": "تخصيص"
+    },
     "drawer": {
       "dataAvailable": "البيانات متاحة",
       "streamNotFound": "التدفق غير موجود",

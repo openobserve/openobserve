@@ -13061,6 +13061,9 @@
     "alertTypeAnomaly": "異常",
     "enterprise": "Enterprise",
     "enterpriseHint": "異常偵測警示需要 OpenObserve Enterprise。",
+    "card": {
+      "customize": "自訂"
+    },
     "drawer": {
       "dataAvailable": "資料可用",
       "streamNotFound": "找不到串流",
