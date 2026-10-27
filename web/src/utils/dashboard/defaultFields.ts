@@ -179,6 +179,11 @@ export const buildDefaultBuilderFields = (
   if (chartType === "state-timeline") return { x, y: [] };
   // One bar per label, so a time bucket is not a useful default label.
   if (chartType === "bar-gauge") return { x: [], y };
+  // A histogram summarises raw values, so it starts from a numeric column, never a count or the timestamp.
+  if (chartType === "distribution") {
+    const column = firstNumericField(groupedFields, streamName, timestampColumn);
+    return { x: [], y: column ? [rawValueYField(column)] : [] };
+  }
   // A time bucket is not an entity; the user picks the entity field.
   if (chartType === "hostmap") return { x: [], y };
   return { x, y };

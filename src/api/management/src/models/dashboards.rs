@@ -552,7 +552,10 @@ mod tests {
                     {"type": "draw_style", "value": "points"},
                     {"type": "line_style", "value": "solid"}
                 ]
-            }]
+            }],
+            "distribution_bucket_count": 20.0,
+            "distribution_bucket_size": 5.0,
+            "distribution_bucket_offset": 0.0
         });
         for part in [rest, rest2, rest3] {
             fields

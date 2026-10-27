@@ -29,6 +29,7 @@ import {
 import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOptions";
 import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
 import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
+import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
 import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
@@ -530,6 +531,19 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "distribution": {
+      if (!fields?.y?.length) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length) {
+        errors.push(t("dashboard.utils.fieldNotAllowedForDistribution", { label: xAxisLabel }));
+      }
+      break;
+    }
     case "hostmap": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
@@ -925,6 +939,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "h-stacked",
     "heatmap",
     "state-timeline",
+    "distribution",
     "hostmap",
     "metric",
     "gauge",
@@ -1129,6 +1144,8 @@ const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, bo
   ["donut_inner_radius", ["donut"], 0, 95, false],
   ["heatmap_cell_gap", ["heatmap"], 0, Infinity, false],
   ["map_cluster_radius", ["geomap"], 0, Infinity, true],
+  ["distribution_bucket_count", ["distribution"], 1, DISTRIBUTION_MAX_BUCKETS, false],
+  ["distribution_bucket_size", ["distribution"], 0, Infinity, true],
 ];
 
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
@@ -1170,6 +1187,13 @@ const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) =
   if (panel.type === "gauge" && isSetValue(config.gauge_neutral)) {
     if (asFiniteNumber(config.gauge_neutral) === null) {
       errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "gauge_neutral" }));
+    }
+  }
+  if (panel.type === "distribution" && isSetValue(config.distribution_bucket_offset)) {
+    if (asFiniteNumber(config.distribution_bucket_offset) === null) {
+      errors.push(
+        t("dashboard.utils.configValueNotNumeric", { setting: "distribution_bucket_offset" }),
+      );
     }
   }
   if (panel.type === "heatmap" && isSetValue(config.heatmap_hide_below)) {
