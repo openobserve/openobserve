@@ -20,10 +20,12 @@ const mountBanner = async ({
   canUpdate = true,
   expiry = NOW * 1000 + 10 * DAY_US,
   org = "acme",
+  mode = online ? "online" : "airgapped",
 } = {}) => {
   vi.mocked(licenseServer.get_license).mockResolvedValue({
     data: {
       license: { environment_type: online ? "online" : "airgapped" },
+      refresh: { mode },
       can_update_license: canUpdate,
     },
   } as never);
@@ -89,6 +91,19 @@ describe("LicenseExpiryBanner", () => {
     expect(w.text()).toContain("Contact OpenObserve for a renewed key.");
     expect(w.find('[data-test="license-expiry-refresh"]').exists()).toBe(false);
   });
+  it.each([
+    ["disabled", true],
+    ["not_v2", true],
+    ["disabled", false],
+  ])(
+    "an online license whose refresh mode is %s says contact OpenObserve (update rights %s)",
+    async (mode, canUpdate) => {
+      const { w } = await mountBanner({ mode, canUpdate });
+      expect(w.text()).toContain("Contact OpenObserve for a renewed key.");
+      expect(w.text()).not.toContain("Refresh now");
+      expect(w.find('[data-test="license-expiry-refresh"]').exists()).toBe(false);
+    },
+  );
   it.each([NOW * 1000 + 31 * DAY_US, NOW * 1000, NOW * 1000 - DAY_US])(
     "hidden beyond 30 days and after expiry (%s)",
     async (expiry) => {
