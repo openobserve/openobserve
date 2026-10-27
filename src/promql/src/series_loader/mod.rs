@@ -27,11 +27,7 @@ use config::{
         EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label,
         value::{Exemplar, Label, Labels, QueryContext, RangeValue},
     },
-    utils::{
-        hash::{Sum64, gxhash},
-        json,
-        time::hour_micros,
-    },
+    utils::{hash::key_sum64, json, time::hour_micros},
 };
 use datafusion::{
     arrow::{
@@ -335,10 +331,9 @@ fn batch_hash_values<'a>(batch: &'a RecordBatch, hash_field_type: &DataType) -> 
         Cow::Borrowed(hash_values.values().as_ref())
     } else {
         let hash_values = batch[HASH_LABEL].as_string::<i32>();
-        let mut hasher = gxhash::new();
         Cow::Owned(
             (0..hash_values.len())
-                .map(|i| hasher.sum64(hash_values.value(i)))
+                .map(|i| key_sum64(hash_values.value(i)))
                 .collect(),
         )
     }
@@ -715,7 +710,7 @@ mod tests {
         .unwrap();
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
         let df = ctx.read_batch(batch).unwrap();
-        let hash = |value: &str| gxhash::new().sum64(value);
+        let hash = |value: &str| key_sum64(value);
         for collect_timestamps in [false, true] {
             let (partitions, timestamps) = load_exemplars_from_datafusion(
                 "test",

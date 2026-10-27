@@ -24,7 +24,7 @@ use config::{
         HASH_LABEL,
         value::{Labels, QueryContext, RangeValue},
     },
-    utils::hash::{Sum64, gxhash},
+    utils::hash::key_sum64,
 };
 use datafusion::{
     arrow::{
@@ -275,7 +275,7 @@ async fn load_labels(
                 } else {
                     let hash_values = hash_column.downcast_ref::<StringArray>().unwrap();
                     for i in 0..batch.num_rows() {
-                        attach_row_labels(gxhash::new().sum64(hash_values.value(i)), i);
+                        attach_row_labels(key_sum64(hash_values.value(i)), i);
                     }
                 }
             }
@@ -588,7 +588,7 @@ mod tests {
             Field::new("instance", DataType::Utf8, false),
         ]));
         let series_id = "string-series-id";
-        let hash = gxhash::new().sum64(series_id);
+        let hash = key_sum64(series_id);
         let batch = RecordBatch::try_new(
             schema,
             vec![
