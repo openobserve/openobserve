@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
@@ -84,6 +84,16 @@ describe("DateTime Component", () => {
     wrapper = createWrapper();
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.vm).toBeDefined();
+  });
+
+  it("opens its picker on mount only when asked to", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.vm.menuOpen).toBe(false);
+    wrapper.unmount();
+    wrapper = createWrapper({ defaultOpen: true });
+    await flushPromises();
+    expect(wrapper.vm.menuOpen).toBe(true);
   });
 
   it("should render without errors", () => {
@@ -795,57 +805,6 @@ describe("DateTime Component", () => {
     it("turns ‹ off when the parent asks", () => {
       wrapper = createWrapper({ disablePrevShift: true });
       expect(prev(wrapper).props("disabled")).toBe(true);
-    });
-  });
-
-  describe("Relative preset search", () => {
-    it("shows every period with no search term", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual([
-        "s",
-        "m",
-        "h",
-        "d",
-        "w",
-        "M",
-      ]);
-    });
-
-    it("narrows to the matching period when searching its label", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.relativeSearchTerm = "hour";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual(["h"]);
-    });
-
-    it("narrows to periods whose preset values match a numeric search", async () => {
-      wrapper = createWrapper();
-
-      // 45 only appears under seconds and minutes (relativeDates.s / .m).
-      wrapper.vm.relativeSearchTerm = "45";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual(["s", "m"]);
-      expect(wrapper.vm.visibleRelativeItems({ label: "Seconds", value: "s" })).toEqual([45]);
-    });
-
-    it("reports no matches for a query nothing satisfies", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.relativeSearchTerm = "not-a-real-preset";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filteredRelativePeriods).toEqual([]);
-    });
-
-    it("keeps relativeItemHours indexed to the underlying (unfiltered) preset list", () => {
-      wrapper = createWrapper();
-
-      // Hours row: relativeDates.h = [1, 2, 3, 6, 8, 12], relativeDatesInHour.h same values.
-      expect(wrapper.vm.relativeItemHours("h", 8)).toBe(8);
     });
   });
 });

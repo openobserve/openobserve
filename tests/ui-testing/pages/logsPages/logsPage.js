@@ -11698,6 +11698,17 @@ export class LogsPage {
     }
 
     /**
+     * Wait until the open suggestion widget lists a row; value suggestions load from the server, so it first opens empty on "Loading...".
+     * @param {number} timeout - Timeout in ms (default: 10000)
+     */
+    async waitForSuggestionRows(timeout = 10000) {
+        await expect.poll(
+            () => this.page.locator('.suggest-widget.visible .monaco-list-row').count(),
+            { timeout, message: 'Suggestion widget never listed any rows' },
+        ).toBeGreaterThan(0);
+    }
+
+    /**
      * Get all suggestion label texts from the suggestion widget.
      * @returns {Promise<string[]>} Array of label text content
      */

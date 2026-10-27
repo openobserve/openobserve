@@ -96,7 +96,8 @@ const stable = (value: unknown): unknown => {
 };
 
 // Key order differs between server JSON and editor state, so compare canonically.
-const same = (a: unknown, b: unknown) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
+export const same = (a: unknown, b: unknown) =>
+  JSON.stringify(stable(a)) === JSON.stringify(stable(b));
 
 const isEmptyValue = (value: unknown) =>
   isBlank(value) ||

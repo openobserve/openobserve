@@ -100,7 +100,12 @@
       "traces-6591-explorer-state.spec.js",
       "traces-6591-details-interactions.spec.js",
       "traces-14317-error-filter-pagination.spec.js",
-      "traces-15130-time-window-error-state.spec.js"
+      "traces-15130-time-window-error-state.spec.js",
+      "traces-15041-waterfall-axis-rum-view.spec.js",
+      "traces-15189-saved-views-more-menu.spec.js",
+      "traces-15222-string-replay-flag.spec.js",
+      "traces-15248-llm-session-reply.spec.js",
+      "traces-15269-services-catalog-state.spec.js"
     ],
     "disabled": []
   },
@@ -201,11 +206,29 @@
     "browser": "chrome",
     "run_files": [
       "rum-11749-session-trace-correlation.spec.js",
-      "rum-product-analytics-schema-states.spec.js"
+      "rum-product-analytics-schema-states.spec.js",
+      "rum-15251-multi-tab-replay.spec.js",
+      "rum-15190-paths-build-funnel.spec.js",
+      "rum-15230-paths-drawer-user.spec.js",
+      "rum-15304-overview-synthetic-counts.spec.js",
+      "rum-15269-list-view-state.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
     "workers": 1,
     "_comment": "RUM bug-fix regressions. rum-product-analytics-schema-states seeds _rumdata up to ~5 hours old, right on the workflow default ZO_INGEST_ALLOWED_UPTO of 5 hours, so the shard raises it to 1440 like RUM-Analytics; workers 1 for long analytics searches."
+  },
+  {
+    "testfolder": "Synthetics-Regression",
+    "actual_folder": "RegressionSet/Synthetics",
+    "browser": "chrome",
+    "run_files": [
+      "synthetics-15269-list-state.spec.js",
+      "synthetics-15060-full-text-on-hover.spec.js"
+    ],
+    "disabled": [],
+    "synthetics_enabled": "true",
+    "workers": 2,
+    "_comment": "Own shard because the synthetics routes exist only when the server starts with ZO_SYNTHETICS_ENABLED=true. Workers 2: each test writes up to 14 checks/locations, and more concurrent writers trip SQLite's 'database is locked'."
   }
 ]

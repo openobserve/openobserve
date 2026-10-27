@@ -10,6 +10,14 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
+import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
+import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
+import {
+  shouldShowBarWidthConfig,
+  shouldShowScatterPointConfig,
+} from "@/utils/dashboard/configUtils";
+import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
+import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 
 /**
  * Validates a single condition item
@@ -790,6 +798,20 @@ export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[])
   }
 };
 
+const validateGaugeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
+  if (panel?.type !== "gauge") return;
+  const queries = panel?.queries ?? [];
+  queries.forEach((query: { config?: GaugeQueryConfig }, index: number) => {
+    if (isGaugeFixedRangeValid(query?.config)) return;
+    const error = t("dashboard.utils.gaugeMinBelowMax");
+    errors.push(
+      queries.length > 1
+        ? t("dashboard.utils.queryErrorPrefix", { index: index + 1, error })
+        : error,
+    );
+  });
+};
+
 /**
  * Validates panel fields without validating stream field existence
  *
@@ -956,6 +978,29 @@ export const validatePanel = (
   validatePanelContentByType(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
 
+  if (
+    ["area", "area-stacked", "line"].includes(panelData?.data?.type) &&
+    !isValidLineThickness(panelData?.data?.config?.line_thickness)
+  ) {
+    errors.push(t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }));
+  }
+
+  if (
+    panelData?.data &&
+    shouldShowScatterPointConfig(panelData) &&
+    !isScatterSymbolSizeValid(panelData.data.config?.symbol_size)
+  ) {
+    errors.push(t("dashboard.pointSizeInvalid", { max: SYMBOL_SIZE_MAX }));
+  }
+
+  if (
+    panelData?.data &&
+    shouldShowBarWidthConfig(panelData, isPromQLMode) &&
+    !isBarWidthValid(panelData.data.config?.bar_width)
+  ) {
+    errors.push(t("dashboard.barWidthInvalid", { max: BAR_WIDTH_MAX }));
+  }
+
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {
     const timestampColumn = store.state.zoConfig.timestamp_column || "_timestamp";
@@ -968,6 +1013,8 @@ export const validatePanel = (
       }
     });
   }
+
+  validateGaugeRanges(t, panelData?.data, errors);
 
   if (isPromQLMode) {
     // 1. Chart type: only specific chart types are supported for PromQL

@@ -22,8 +22,27 @@ import * as echarts from "echarts/core";
 import { MapChart } from "echarts/charts";
 import worldMap from "@/assets/dashboard/maps/map.json";
 import { withChartFont } from "@/utils/fonts";
+import { chartColor } from "@/utils/chartTheme";
+import useTheme from "@/composables/useTheme";
 
 echarts.use([MapChart]);
+// Registering once per app keeps panels and theme switches from re-parsing the GeoJSON.
+echarts.registerMap("world", worldMap as unknown as Parameters<typeof echarts.registerMap>[1]);
+
+interface MapsSeriesOption {
+  roam?: boolean;
+  zoom?: number;
+  center?: unknown;
+  [key: string]: unknown;
+}
+
+interface MapsChartOptions {
+  tooltip?: { textStyle?: Record<string, unknown>; [key: string]: unknown };
+  series?: MapsSeriesOption[];
+  [key: string]: unknown;
+}
+
+type MapView = Pick<MapsSeriesOption, "zoom" | "center">;
 
 export default defineComponent({
   name: "MapsRenderer",
@@ -46,19 +65,62 @@ export default defineComponent({
     };
 
     const DEFAULT_MAP_OPTIONS = {
+      backgroundColor: "transparent",
       tooltip: {},
       series: [{ type: "map", map: "world", data: [] }],
     };
-    const initChart = async () => {
-      if (chartRef.value) {
-        chart = echarts.init(chartRef.value);
-        echarts.registerMap("world", worldMap as any);
 
-        // Default empty chart configuration to ensure map is visible
+    // Options can outlive a theme switch, so tooltip colours resolve at render time.
+    const withThemedTooltip = (options: MapsChartOptions): MapsChartOptions =>
+      options.tooltip
+        ? {
+            ...options,
+            tooltip: {
+              ...options.tooltip,
+              backgroundColor: chartColor("--color-tooltip-bg"),
+              borderColor: chartColor("--color-tooltip-border"),
+              textStyle: {
+                ...options.tooltip.textStyle,
+                color: chartColor("--color-tooltip-text"),
+              },
+            },
+          }
+        : options;
 
-        chart.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
-      }
+    // Roam changes live only in the chart instance, so a rebuild must carry them over.
+    const currentView = (): MapView[] =>
+      ((chart?.getOption()?.series ?? []) as MapsSeriesOption[]).map(({ zoom, center }) => ({
+        zoom,
+        center,
+      }));
+
+    const withView = (options: MapsChartOptions, view: MapView[]): MapsChartOptions => ({
+      ...options,
+      series: options.series?.map((series, index) =>
+        series.roam && view[index]?.zoom !== undefined ? { ...series, ...view[index] } : series,
+      ),
+    });
+
+    const currentOptions = (view: MapView[] = []) => {
+      const options: MapsChartOptions | undefined = props.data.options;
+      return withThemedTooltip(
+        withView(options?.series?.length ? options : DEFAULT_MAP_OPTIONS, view),
+      );
     };
+
+    const { isDark } = useTheme();
+
+    const initChart = () => {
+      if (!chartRef.value) return;
+      const view = currentView();
+      chart?.dispose();
+      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
+      chart.setOption(withChartFont(currentOptions(view)), true);
+    };
+
+    watch(isDark, () => {
+      if (chart) initChart();
+    });
 
     onMounted(async () => {
       await nextTick();
@@ -67,7 +129,7 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
-      await initChart();
+      initChart();
       window.addEventListener("resize", windowResizeEventCallback);
     });
 
@@ -78,16 +140,10 @@ export default defineComponent({
 
     watch(
       () => props.data.options,
-      async (newOptions) => {
+      async () => {
         if (chart) {
           await nextTick();
-          if (newOptions && newOptions.series && newOptions.series.length > 0) {
-            chart?.setOption(withChartFont(newOptions), true);
-          } else {
-            // If no data provided, set a default empty map
-
-            chart?.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
-          }
+          chart?.setOption(withChartFont(currentOptions(currentView())), true);
         }
       },
       { deep: true },

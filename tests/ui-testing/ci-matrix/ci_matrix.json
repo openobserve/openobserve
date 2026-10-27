@@ -31,7 +31,8 @@
       "alerts-destinations-usage.spec.js",
       "alerts-save-query-mode.spec.js",
       "alerts-no-destination.spec.js",
-      "alerts-from-panel.spec.js"
+      "alerts-from-panel.spec.js",
+      "alertCalibration.spec.js"
     ],
     "disabled": [
       {
@@ -132,7 +133,8 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-favorites.spec.js"
+      "dashboard-favorites.spec.js",
+      "dashboard-tv-playlist.spec.js"
     ],
     "disabled": []
   },
@@ -490,7 +492,8 @@
       "rum-onboarding-snippets.spec.js",
       "sourcemap-ui.spec.js",
       "sourcemap-upload-pretty.spec.js",
-      "rum-form-validation.spec.js"
+      "rum-form-validation.spec.js",
+      "app-performance.spec.js"
     ],
     "disabled": []
   },
