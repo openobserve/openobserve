@@ -45,7 +45,10 @@ beforeEach(() => {
   refresh.mockResolvedValue({ ok: true, body: { outcome: "unchanged" } });
   rotate.mockResolvedValue({ ok: true, body: { outcome: "updated" } });
 });
-afterEach(() => wrapper?.unmount());
+afterEach(() => {
+  wrapper?.unmount();
+  vi.useRealTimers();
+});
 describe("LicenseOnlineRefreshCard", () => {
   it("never refreshes on mount or status changes", async () => {
     const w = card();
@@ -260,6 +263,8 @@ it.each([
   const body = { outcome: "renewed", renewed: { license_id: "old", expires_at: 1825113600000000 } };
   refresh.mockResolvedValue({ ok: true, body });
   rotate.mockResolvedValue({ ok: true, body: { outcome: "updated" } });
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(1792748530000);
   const w = card();
   await w.get(`[data-test="license-online-${action}"]`).trigger("click");
   await flushPromises();
@@ -270,4 +275,111 @@ it.each([
     refresh: status({ last_attempt_at: 1893456000000000, last_outcome: { outcome: "unchanged" } }),
   });
   expect(w.get('[data-test="license-online-outcome"]').text()).toBe("License is up to date");
+});
+
+describe("clicked outcome versus newer server attempts", () => {
+  const atSecond = (s: number) => s * 1_000_000;
+  const outcomeText = (w: VueWrapper) => w.get('[data-test="license-online-outcome"]').text();
+  beforeEach(() => vi.useFakeTimers({ toFake: ["Date"] }));
+
+  it("an attempt seen while the click is in flight does not hide a later server failure", async () => {
+    vi.setSystemTime(1792748550000);
+    let finish!: (value: unknown) => void;
+    refresh.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+    const w = card();
+    await w.get('[data-test="license-online-refresh"]').trigger("click");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748520),
+        last_outcome: { outcome: "unchanged" },
+      }),
+    });
+    finish({ ok: true, body: { outcome: "unchanged" } });
+    await flushPromises();
+    expect(outcomeText(w)).toBe("License is up to date");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748580),
+        last_outcome: { error: "blocked" },
+        last_error: "blocked",
+        registration: "blocked",
+      }),
+    });
+    expect(outcomeText(w)).toContain("blocked");
+  });
+
+  it("a click refused before any attempt gives way to the next real attempt", async () => {
+    vi.setSystemTime(1792748600000);
+    refresh.mockResolvedValue({ ok: false, status: 409, body: { reason: "refresh_in_progress" } });
+    const w = card();
+    await w.get('[data-test="license-online-refresh"]').trigger("click");
+    await flushPromises();
+    expect(outcomeText(w)).toContain("already running");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748520),
+        last_outcome: { outcome: "unchanged" },
+      }),
+    });
+    expect(outcomeText(w)).toBe("License is up to date");
+  });
+
+  it("an older or equal attempt never replaces the clicked outcome", async () => {
+    vi.setSystemTime(1792748530000);
+    const w = card({ last_outcome: { error: "blocked" } });
+    await w.get('[data-test="license-online-refresh"]').trigger("click");
+    await flushPromises();
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748520),
+        last_outcome: { outcome: "unchanged" },
+      }),
+    });
+    expect(outcomeText(w)).toBe("License is up to date");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748460),
+        last_outcome: { error: "blocked" },
+      }),
+    });
+    expect(outcomeText(w)).toBe("License is up to date");
+  });
+
+  it("another node's attempt recorded before the click's response keeps the clicked outcome", async () => {
+    vi.setSystemTime(1792748530000);
+    rotate.mockResolvedValue({ ok: true, body: { outcome: "updated" } });
+    const w = card();
+    await w.get('[data-test="license-online-rotate"]').trigger("click");
+    await flushPromises();
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748490),
+        last_outcome: { error: "blocked" },
+      }),
+    });
+    expect(outcomeText(w)).toBe("Installation key rotated.");
+  });
+
+  it("the server's response time wins over a skewed browser clock", async () => {
+    vi.setSystemTime(1893456000000);
+    refresh.mockResolvedValue({
+      ok: true,
+      body: { outcome: "unchanged" },
+      respondedAt: atSecond(1792748530) + 999_999,
+    });
+    const w = card();
+    await w.get('[data-test="license-online-refresh"]').trigger("click");
+    await flushPromises();
+    await w.setProps({
+      refresh: status({ last_attempt_at: atSecond(1792748530) + 500_000, last_outcome: null }),
+    });
+    expect(outcomeText(w)).toBe("License is up to date");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: atSecond(1792748540),
+        last_outcome: { error: "blocked" },
+      }),
+    });
+    expect(outcomeText(w)).toContain("blocked");
+  });
 });
