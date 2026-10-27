@@ -248,6 +248,16 @@
                 >
                   {{ t("about.add_new_license_key") }}
                 </OButton>
+                <OButton
+                  v-if="!licenseData.refresh && licenseData.can_update_license === true"
+                  data-test="refresh-license-limits-btn"
+                  variant="outline"
+                  size="sm-action"
+                  :loading="refreshingLimits"
+                  @click="refreshLimitsOnOldNode"
+                >
+                  {{ t("about.refresh_license_limits") }}
+                </OButton>
               </div>
             </OCardSection>
           </OCard>
@@ -572,6 +582,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
+import { refreshMessage } from "@/utils/licenseRefresh";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -623,7 +634,8 @@ export default defineComponent({
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
-    const { scheduleReload } = useLicenseRefresh();
+    const { scheduleReload, refreshLicenseLimits } = useLicenseRefresh();
+    const refreshingLimits = ref(false);
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
@@ -715,6 +727,22 @@ export default defineComponent({
     };
 
     const reloadLicenseData = () => loadLicenseData({ background: true });
+
+    // a node older than the online refresh sends no refresh status, so its card never renders
+    const refreshLimitsOnOldNode = async () => {
+      if (refreshingLimits.value) return;
+      refreshingLimits.value = true;
+      try {
+        const outcome = await refreshLicenseLimits(async () => {
+          await reloadLicenseData();
+        });
+        const message = refreshMessage(outcome.body, t, outcome.status);
+        toast({ variant: message.variant, message: message.text });
+        await reloadLicenseData();
+      } finally {
+        refreshingLimits.value = false;
+      }
+    };
 
     let boundaryRefetch: ReturnType<typeof setTimeout> | undefined;
     let boundaryUs = 0;
@@ -1186,6 +1214,8 @@ export default defineComponent({
       store,
       loading,
       reloadLicenseData,
+      refreshingLimits,
+      refreshLimitsOnOldNode,
       refetchAtBoundary,
       licenseData,
       licenseKey,

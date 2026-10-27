@@ -239,3 +239,35 @@ it("shows the proxy hint once when a saved network error and click outcome overl
   await flushPromises();
   expect(w.text().match(/Check outbound HTTPS/g)).toHaveLength(1);
 });
+
+it("env-key root can rotate when OpenObserve requests rotation", () => {
+  const w = card({ stored_key: "fetched-key", rotate_recommended: true }, { envKeyActive: true });
+  expect(w.text()).toContain("OpenObserve has asked this installation to rotate its key.");
+  expect(w.find('[data-test="license-online-rotate"]').exists()).toBe(true);
+  expect(w.find('[data-test="license-online-copy"]').exists()).toBe(true);
+});
+
+it("env-key root without a rotation request keeps copy in place of rotate", () => {
+  const w = card({ stored_key: "fetched-key" }, { envKeyActive: true });
+  expect(w.find('[data-test="license-online-copy"]').exists()).toBe(true);
+  expect(w.find('[data-test="license-online-rotate"]').exists()).toBe(false);
+});
+
+it.each([
+  ["refresh", "A renewed license was applied. It now expires on Nov 2, 2027."],
+  ["rotate", "Installation key rotated."],
+])("a newer server attempt replaces the clicked %s outcome", async (action, clicked) => {
+  const body = { outcome: "renewed", renewed: { license_id: "old", expires_at: 1825113600000000 } };
+  refresh.mockResolvedValue({ ok: true, body });
+  rotate.mockResolvedValue({ ok: true, body: { outcome: "updated" } });
+  const w = card();
+  await w.get(`[data-test="license-online-${action}"]`).trigger("click");
+  await flushPromises();
+  expect(w.get('[data-test="license-online-outcome"]').text()).toBe(clicked);
+  await w.setProps({ refresh: status({ last_attempt_at: 1792748520000000, last_outcome: body }) });
+  expect(w.get('[data-test="license-online-outcome"]').text()).toBe(clicked);
+  await w.setProps({
+    refresh: status({ last_attempt_at: 1893456000000000, last_outcome: { outcome: "unchanged" } }),
+  });
+  expect(w.get('[data-test="license-online-outcome"]').text()).toBe("License is up to date");
+});

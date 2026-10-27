@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -244,7 +244,7 @@ const canRotate = computed(
   () =>
     props.refresh.mode === "online" &&
     props.refresh.registration === "registered" &&
-    !canCopy.value,
+    (!canCopy.value || props.refresh.rotate_recommended),
 );
 const neverRefreshed = computed(
   () => props.refresh.mode === "online" && !props.refresh.last_attempt_at,
@@ -289,6 +289,21 @@ const outcomeIcon = computed(() =>
         ? "warning"
         : "info",
 );
+// the first new attempt after a click is the click's own; any later one is newer server state
+let clickAttempt: { at: number | null; own: boolean } | undefined;
+watch(
+  () => props.refresh.last_attempt_at,
+  (at) => {
+    if (!clickAttempt || busy.value || at === clickAttempt.at) return;
+    if (!clickAttempt.own) {
+      clickAttempt = { at, own: true };
+      return;
+    }
+    clickAttempt = undefined;
+    result.value = undefined;
+    rotated.value = false;
+  },
+);
 const copyStoredKey = () => {
   if (canCopy.value && props.refresh.stored_key) copyToClipboard(props.refresh.stored_key, t);
 };
@@ -296,6 +311,7 @@ const run = async (rotate: boolean) => {
   if (!props.canUpdate || busy.value || (rotate && !canRotate.value)) return;
   busy.value = true;
   rotated.value = rotate;
+  clickAttempt = { at: props.refresh.last_attempt_at, own: false };
   try {
     result.value = await (rotate
       ? rotateInstanceKey(() => emit("refreshed"))
