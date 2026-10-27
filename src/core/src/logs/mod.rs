@@ -657,7 +657,7 @@ async fn ingestion_log_enabled() -> bool {
         return false;
     }
     // the logging will be enabled through meta only
-    db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
+    db::organization::read_org_setting(META_ORG_ID, |s| s.toggle_ingestion_logs)
         .await
         .unwrap_or(false)
 }

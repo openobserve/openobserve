@@ -30,7 +30,10 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use super::entity::{oncall_team_members, oncall_teams};
+use super::{
+    entity::{oncall_team_members, oncall_teams},
+    ttl_cache::TtlCache,
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -43,7 +46,7 @@ use crate::{
 ///
 /// Backs [`get_cached`] only, never [`get`]: the screens that edit a team read
 /// through `get`, so an admin never sees what they just replaced.
-static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(Default::default);
+static TEAM_CACHE: TtlCache<Team> = TtlCache::new(TEAM_CACHE_TTL);
 
 /// The roster, for the paging path.
 ///
@@ -51,8 +54,7 @@ static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(
 /// past the third rung. `06` §6 budgets five minutes of staleness because the
 /// consequence is bounded and one-directional: a member removed moments ago may
 /// receive one more page. Nothing here can suppress a page.
-static MEMBERS_CACHE: LazyLock<RwHashMap<String, (Vec<TeamMember>, Instant)>> =
-    LazyLock::new(Default::default);
+static MEMBERS_CACHE: TtlCache<Vec<TeamMember>> = TtlCache::new(TEAM_CACHE_TTL);
 
 /// Whether an org has any team at all, for the firing path.
 ///
@@ -95,7 +97,7 @@ pub fn invalidate_members_cache(team_id: &str) {
 /// Drops every org-keyed on-call cache of a deleted org; rosters are keyed by team alone.
 pub fn invalidate_org(org_id: &str) {
     let prefix = format!("{org_id}/");
-    TEAM_CACHE.retain(|key, _| !key.starts_with(&prefix));
+    TEAM_CACHE.retain(|key| !key.starts_with(&prefix));
     ORG_HAS_TEAMS_CACHE.remove(org_id);
     super::oncall_schedules::invalidate_org(org_id);
     super::oncall_policies::invalidate_org(org_id);
@@ -376,14 +378,12 @@ pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Erro
 /// keep saying so.
 pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
     let key = team_cache_key(org_id, id);
-    if let Some(entry) = TEAM_CACHE.get(&key)
-        && entry.1.elapsed() < TEAM_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = TEAM_CACHE.get(&key) {
+        return Ok(Some(cached));
     }
     let found = get(org_id, id).await?;
     if let Some(team) = &found {
-        TEAM_CACHE.insert(key, (team.clone(), Instant::now()));
+        TEAM_CACHE.insert(key, team.clone());
     }
     Ok(found)
 }
@@ -423,13 +423,11 @@ pub async fn has_any_cached(org_id: &str) -> Result<bool, errors::Error> {
 /// roster IS cached, unlike a missing team: "this team has nobody on it" is a
 /// real, stable answer, and it is what a coverage gap is made of.
 pub async fn list_members_cached(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
-    if let Some(entry) = MEMBERS_CACHE.get(team_id)
-        && entry.1.elapsed() < TEAM_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = MEMBERS_CACHE.get(team_id) {
+        return Ok(cached);
     }
     let members = list_members(team_id).await?;
-    MEMBERS_CACHE.insert(team_id.to_string(), (members.clone(), Instant::now()));
+    MEMBERS_CACHE.insert(team_id.to_string(), members.clone());
     Ok(members)
 }
 
@@ -711,13 +709,21 @@ mod tests {
             })
         };
         for org in ["inv_team_a", "inv_team_ab"] {
-            TEAM_CACHE.insert(team_cache_key(org, "team_1"), (team(org), Instant::now()));
+            TEAM_CACHE.insert(team_cache_key(org, "team_1"), team(org));
             ORG_HAS_TEAMS_CACHE.insert(org.to_string(), (true, Instant::now()));
         }
         invalidate_org("inv_team_a");
-        assert!(!TEAM_CACHE.contains_key(&team_cache_key("inv_team_a", "team_1")));
+        assert!(
+            TEAM_CACHE
+                .get(&team_cache_key("inv_team_a", "team_1"))
+                .is_none()
+        );
         assert!(!ORG_HAS_TEAMS_CACHE.contains_key("inv_team_a"));
-        assert!(TEAM_CACHE.contains_key(&team_cache_key("inv_team_ab", "team_1")));
+        assert!(
+            TEAM_CACHE
+                .get(&team_cache_key("inv_team_ab", "team_1"))
+                .is_some()
+        );
         assert!(ORG_HAS_TEAMS_CACHE.contains_key("inv_team_ab"));
         invalidate_org("inv_team_ab");
     }

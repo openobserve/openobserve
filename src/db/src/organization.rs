@@ -87,29 +87,31 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
         }
     };
 
+    let mut settings = read_org_setting(org_id, OrganizationSetting::clone).await?;
+    settings.free_trial_expiry = trial_period_expiry;
+    Ok(settings)
+}
+
+/// Picks from the org's cached settings, caching the stored or default settings on a miss.
+pub async fn read_org_setting<T>(
+    org_id: &str,
+    pick: impl FnOnce(&OrganizationSetting) -> T,
+) -> Result<T, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        let mut ret = v.clone();
-        ret.free_trial_expiry = trial_period_expiry;
-        return Ok(ret);
+        return Ok(pick(v));
     }
 
-    // Try to get settings from DB, but use default if not found
-    let mut settings: OrganizationSetting = match db::get(&key).await {
+    let settings: OrganizationSetting = match db::get(&key).await {
         Ok(settings) => json::from_slice(&settings)?,
         Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
             OrganizationSetting::default()
         }
         Err(e) => return Err(e),
     };
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings.clone());
-    settings.free_trial_expiry = trial_period_expiry;
-    Ok(settings)
+    let picked = pick(&settings);
+    ORGANIZATION_SETTING.write().await.insert(key, settings);
+    Ok(picked)
 }
 
 /// Applies `apply` to the settings in the store's `get_for_update`; true if it wrote them.
@@ -118,105 +120,6 @@ where
     F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
 {
     update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await
-}
-
-/// Get the toggle ingestion logs setting for an org
-/// If the setting is not found, return false
-/// we add a separate function for avoid clone the setting
-pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.toggle_ingestion_logs);
-    }
-
-    // Try to get settings from DB, but use default if not found
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let toggle_ingestion_logs = settings.toggle_ingestion_logs;
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(toggle_ingestion_logs)
-}
-
-/// Get the usage stream enabled setting for an org.
-/// Without a stored setting this falls back to `default_usage_stream_enabled`, which is off.
-pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.usage_stream_enabled);
-    }
-
-    // Try to get settings from DB, but use default if not found
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let usage_stream_enabled = settings.usage_stream_enabled;
-
-    // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(usage_stream_enabled)
-}
-
-/// Whether automatic RED anomaly insights are on for an org; absent settings mean off.
-pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.red_insights_enabled);
-    }
-
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let red_insights_enabled = settings.red_insights_enabled;
-
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(red_insights_enabled)
-}
-
-/// Whether investigation threads show raw tool input and output; absent settings mean off.
-pub async fn get_org_setting_ai_rca_thread_tool_output(org_id: &str) -> Result<bool, Error> {
-    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.ai_rca_thread_tool_output);
-    }
-
-    let settings: OrganizationSetting = match db::get(&key).await {
-        Ok(settings) => json::from_slice(&settings)?,
-        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
-            OrganizationSetting::default()
-        }
-        Err(e) => return Err(e),
-    };
-    let ai_rca_thread_tool_output = settings.ai_rca_thread_tool_output;
-
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
-    Ok(ai_rca_thread_tool_output)
 }
 
 /// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.

@@ -57,6 +57,7 @@ vi.mock("@/utils/chartTheme", async (importOriginal) => {
 });
 
 import ThresholdsConfig from "./ThresholdsConfig.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
@@ -512,6 +513,11 @@ describe("ThresholdsConfig", () => {
   });
 
   describe("Show as", () => {
+    it("shows no stacked hint on unstacked charts", () => {
+      mountConfig({ chartType: "line", modelValue: twoSteps });
+      expect(find("dashboard-config-thresholds-show-as-info").exists()).toBe(false);
+    });
+
     it.each(["line", "area", "bar", "h-bar", "scatter"])(
       "offers four choices on %s",
       async (chartType) => {
@@ -520,19 +526,26 @@ describe("ThresholdsConfig", () => {
       },
     );
 
-    it("offers only Limit line and Shaded band on stacked area, with the hint", async () => {
-      mountConfig({ chartType: "area-stacked", modelValue: twoSteps });
-      expect(find("dashboard-config-thresholds").text()).toContain(
-        "Stacked areas are not recolored; limits are drawn as lines or bands.",
-      );
-      expect(await selectOptions()).toEqual(["line", "color_band"]);
-    });
+    it.each(["area-stacked", "stacked", "h-stacked"])(
+      "offers only Limit line and Shaded band on %s, with the hint",
+      async (chartType) => {
+        mountConfig({ chartType, modelValue: twoSteps });
+        expect(find("dashboard-config-thresholds-show-as-info").exists()).toBe(true);
+        expect(wrapper!.findComponent(OTooltip).props("content")).toBe(
+          "Stacked charts are not recolored; limits are drawn as lines or bands.",
+        );
+        expect(await selectOptions()).toEqual(["line", "color_band"]);
+      },
+    );
 
-    it("writes Limit line only as the stacked-area default", async () => {
-      const { model } = mountBound({ chartType: "area-stacked" });
-      await addStep();
-      expect(model.value.showAs).toBe("line");
-    });
+    it.each(["area-stacked", "stacked", "h-stacked"])(
+      "writes Limit line only as the %s default",
+      async (chartType) => {
+        const { model } = mountBound({ chartType });
+        await addStep();
+        expect(model.value.showAs).toBe("line");
+      },
+    );
 
     it("writes the picked choice", async () => {
       const { model } = mountBound({}, twoSteps);
@@ -569,17 +582,19 @@ describe("ThresholdsConfig", () => {
     });
   });
 
-  describe("metric value mappings note", () => {
-    it("shows only on metric with coloured value mappings", () => {
-      mountConfig({ chartType: "metric", hasColouredValueMappings: true });
+  describe("value mappings note", () => {
+    it.each(["metric", "gauge"])("shows on %s only with coloured value mappings", (chartType) => {
+      mountConfig({ chartType, hasColouredValueMappings: true });
       expect(find("dashboard-config-thresholds-mapping-note").text()).toBe(
         "Value mappings win over these steps",
       );
       wrapper!.unmount();
-      mountConfig({ chartType: "metric", hasColouredValueMappings: false });
+      mountConfig({ chartType, hasColouredValueMappings: false });
       expect(find("dashboard-config-thresholds-mapping-note").exists()).toBe(false);
-      wrapper!.unmount();
-      mountConfig({ chartType: "gauge", hasColouredValueMappings: true });
+    });
+
+    it("is hidden on other charts", () => {
+      mountConfig({ chartType: "line", hasColouredValueMappings: true });
       expect(find("dashboard-config-thresholds-mapping-note").exists()).toBe(false);
     });
   });

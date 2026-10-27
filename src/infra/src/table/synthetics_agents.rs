@@ -19,17 +19,16 @@
 //! `/synthetics/agent/register`; `last_seen_at` refreshed by register and by
 //! every job lease. A location whose agents are all stale is reported "down".
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
 };
 
-use super::entity::synthetics_agents::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::synthetics_agents::{ActiveModel, Column, Entity, Model},
+    ttl_cache::TtlCache,
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
@@ -78,8 +77,7 @@ impl From<Model> for SyntheticsAgentRecord {
 /// not invalidate — invalidating there would defeat the cache entirely, since it
 /// fires at exactly the rate of the reads being served. Anything that judges
 /// agent liveness (the staleness watcher, location health) must use [`get`].
-static AGENT_CACHE: LazyLock<RwHashMap<String, (SyntheticsAgentRecord, Instant)>> =
-    LazyLock::new(Default::default);
+static AGENT_CACHE: TtlCache<SyntheticsAgentRecord> = TtlCache::new(AGENT_CACHE_TTL);
 
 const AGENT_CACHE_TTL: Duration = Duration::from_secs(15);
 
@@ -255,14 +253,12 @@ pub async fn count_by_token(
 /// Reads an agent from cache when fresh — see [`AGENT_CACHE`] for the staleness
 /// contract. Use [`get`] when `last_seen_at` matters.
 pub async fn get_cached(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
-    if let Some(entry) = AGENT_CACHE.get(agent_id)
-        && entry.1.elapsed() < AGENT_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = AGENT_CACHE.get(agent_id) {
+        return Ok(Some(cached));
     }
     let found = get(agent_id).await?;
     if let Some(rec) = &found {
-        AGENT_CACHE.insert(agent_id.to_string(), (rec.clone(), Instant::now()));
+        AGENT_CACHE.insert(agent_id.to_string(), rec.clone());
     }
     Ok(found)
 }
