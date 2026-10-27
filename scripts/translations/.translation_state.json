@@ -8230,7 +8230,9 @@
       "loading": "dc380888c4e2c776"
     },
     "stepper": {
-      "steps": "1de3df70ddf4faab"
+      "stepOf": "dc1249ded00f30f1",
+      "steps": "1de3df70ddf4faab",
+      "swipeHint": "a03359b1b43e43a5"
     },
     "table": {
       "columnToggle": {
@@ -23159,10 +23161,11 @@
       "consentPrivate": "1fecde11315708cf",
       "continue": "31fbef162594de01",
       "copyRequest": "1ec58b153c9a4259",
-      "description": "d697f9d2c308ac56",
+      "description": "a533fcff315356c4",
+      "descriptionSelfHosted": "96989221e4b7d3e8",
       "existingDescription": "822f900b5126170a",
       "existingTitle": "c6aa908b5e210527",
-      "featureQuestions": "e8a9a046c1ca1f95",
+      "nextTitle": "6b5240c478c74c55",
       "notIncludedDetail": "56bdef6b8f02076e",
       "notIncludedNoContact": "37613a15e0ebe2ff",
       "notIncludedTitle": "984d14368983aa79",
@@ -23170,9 +23173,20 @@
       "popupHint": "2d58b7ade94ac34b",
       "requestCopied": "4de1caa16f6992e1",
       "requestText": "9de5b6e4adba56fc",
-      "selfHostedHint": "5353f13068a627eb",
       "setupApp": "747ad934c510c228",
       "setupAppOtherTeam": "5060ed45ae2370af",
+      "stepAddTitle": "3357cd3d0cee91e1",
+      "stepCheckDetail": "45135883e63dbe96",
+      "stepCheckDetailShort": "d26019d3290d4c9c",
+      "stepCheckTitle": "8d20ef955dff278e",
+      "stepCreateDetail": "880039a3148d9fb5",
+      "stepCreateDetailShort": "bf59ba37dea26e61",
+      "stepCreateTitle": "169cba285e41cebd",
+      "stepInstallDetail": "0e7f413bb193f094",
+      "stepInstallDetailShort": "d321fabe5d15c6f2",
+      "stepInstallTitle": "eec1ac3f89c2b1fe",
+      "stepLinkDetail": "63137937a4bb92d7",
+      "stepLinkTitle": "4a0c64663e7ccb24",
       "title": "b257fd6caadb0a7f",
       "upgradeButton": "c8104fc57680f535",
       "upgradeDetail": "be2a825db388788b",
@@ -23331,10 +23345,11 @@
     },
     "prereq": {
       "allPassed": "3d3c8e5b6819e6e9",
+      "canContinue": "4274dafa10f86863",
       "columnResult": "6e7d50e84f4731ef",
       "columnSetting": "818cd8d91aea3a16",
       "failedSummary": "84f464dd4d166e37",
-      "helmHint": "7bfe4fba992fa3eb",
+      "helmHint": "c572c402c0908207",
       "loadFailed": "24c5b5d3508c8658",
       "names": {
         "agent": "92c7d7f84c3ecbd9",
@@ -23343,8 +23358,10 @@
         "web_url": "2baf9bea4db8fbe3"
       },
       "recheck": "24fcca00ea509a05",
+      "requiredPass": "de3a2740d49c6d6b",
       "subtitle": "55ecdb6a59aea306",
-      "title": "8865a1bfff3feaa3"
+      "title": "8865a1bfff3feaa3",
+      "warningCount": "e61039578b119865"
     },
     "status": {
       "fail": "031a8f0f659df890",
@@ -23402,9 +23419,10 @@
         "generateToken": "dcf9b386371807c3",
         "http": "56d6f32151ad8474",
         "httpDescription": "6771576b273c0111",
-        "manual": "9ffc843f501acdc5",
         "manualHelp": "56509991cc19a256",
+        "manualLink": "c365dd98425915a4",
         "modeLabel": "72c0943bd205e4b3",
+        "noResponse": "c7473f9e8b2aa695",
         "openManifest": "86e9c39fd25b6ffa",
         "saveManual": "f412ebc3df40018a",
         "signingSecret": "e7ee22e117a12ad8",
@@ -23415,6 +23433,8 @@
         "tokenHelp": "cbb890f9d0394963",
         "tokenLabel": "0ebc8d143864a591",
         "tokenRequired": "cc9356e0094da25b",
+        "unreachableDetail": "2224b3c3247ed739",
+        "unreachableTitle": "43e223718e7197b9",
         "useToken": "91f475cbdce305b1"
       },
       "finish": "a6c7a84baa6750fc",
