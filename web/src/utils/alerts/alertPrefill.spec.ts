@@ -63,6 +63,15 @@ describe("periodMinutesFromRange", () => {
     );
   });
 
+  it("keeps a calendar period's length as a rolling window and says so", () => {
+    const result = periodMinutesFromRange({
+      type: "relative",
+      relativeTimePeriod: "calendar:day:-1",
+    });
+    expect(result.minutes).toBe(1440);
+    expect(result.warnings.map((w) => w.key)).toContain("absoluteToRolling");
+  });
+
   it("converts an absolute range to a rolling window and says so", () => {
     const start = 1_700_000_000_000_000;
     const result = periodMinutesFromRange({

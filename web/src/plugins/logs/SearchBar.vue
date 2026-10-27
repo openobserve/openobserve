@@ -942,6 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
@@ -1841,6 +1842,7 @@ import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
+import { applySessionTimezone } from "@/utils/storage";
 
 const defaultValue: any = () => {
   return {
@@ -3559,9 +3561,7 @@ export default defineComponent({
               ];
             }
 
-            if (extractedObj.data?.timezone) {
-              store.dispatch("setTimezone", extractedObj.data.timezone);
-            }
+            applySessionTimezone(store, extractedObj.data?.timezone);
 
             if (!Object.prototype.hasOwnProperty.call(extractedObj.data.stream, "streamType")) {
               extractedObj.data.stream.streamType = "logs";

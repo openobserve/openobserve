@@ -31,7 +31,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
-import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -943,10 +943,12 @@ export const usePanelDataLoader = (
         };
       }
 
-      // if selected time range is not matched with the cache time range
       if (
-        selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
+        cachedWindowDiffers(
+          cache?.cacheTimeRange,
+          selectedTimeObj?.value,
+          refreshAfterRestore.isCalendarRange(selectedTimeObj?.value),
+        )
       ) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }

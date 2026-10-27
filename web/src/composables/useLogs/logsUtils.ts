@@ -49,6 +49,7 @@ import {
   type ShownInputs,
 } from "@/composables/useLogs/useLogsUrl";
 import { activePermalink, columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 interface SQLColumn {
   expr?: {
@@ -201,6 +202,9 @@ export const logsUtils = () => {
       console.error("Invalid period: must be a non-empty string");
       return undefined;
     }
+
+    const calendar = resolveCalendarPeriod(period);
+    if (calendar) return { from: calendar.startTime / 1000, to: calendar.endTime / 1000 };
 
     const currentTime = new Date();
     const toTimestamp = currentTime.getTime();
