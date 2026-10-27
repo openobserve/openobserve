@@ -6279,6 +6279,7 @@
       "settingTitle": "Name",
       "settingDescription": "Beschreibung",
       "settingTimeRange": "Standardzeitraum",
+      "settingAutoRefresh": "Standard-Auto-Aktualisierung",
       "settingDynamicFilters": "dynamische Filter",
       "settingOther": "weitere Einstellungen",
       "impactSettings": "Ersetzt die von ihnen geänderten Dashboard-Einstellungen: {settings}",
@@ -7872,7 +7873,11 @@
       "updationFailed": "Dashboard-Aktualisierung fehlgeschlagen",
       "dynamicFiltersHelp": "Fügt eine Ad-hoc-Filterzeile über den Panels hinzu.",
       "appliesToEveryone": "Diese Einstellungen werden mit allen geteilt, die auf dieses Dashboard zugreifen können.",
-      "saveChanges": "Änderungen speichern"
+      "saveChanges": "Änderungen speichern",
+      "defaultAutoRefresh": "Standard-Auto-Aktualisierung",
+      "defaultAutoRefreshHelp": "Wird bei jedem Öffnen des Dashboards angewendet, es sei denn, der Link legt ein eigenes Intervall fest.",
+      "defaultAutoRefreshRaised": "Als {saved} gespeichert, unter dem Serverminimum, daher wird alle {effective} aktualisiert.",
+      "defaultAutoRefreshAbsoluteHint": "Der Standard-Zeitraum ist absolut, daher lädt jede Aktualisierung denselben Zeitraum neu. Live-Aktualisierungen erfordern einen relativen Zeitraum."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard erfolgreich hinzugefügt.",

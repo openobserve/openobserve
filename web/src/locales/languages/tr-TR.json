@@ -6279,6 +6279,7 @@
       "settingTitle": "ad",
       "settingDescription": "açıklama",
       "settingTimeRange": "varsayılan zaman aralığı",
+      "settingAutoRefresh": "varsayılan otomatik yenileme",
       "settingDynamicFilters": "dinamik filtreler",
       "settingOther": "diğer ayarlar",
       "impactSettings": "Değiştirdikleri pano ayarlarının yerine geçer: {settings}",
@@ -7872,7 +7873,11 @@
       "updationFailed": "Pano güncelleme başarısız",
       "dynamicFiltersHelp": "Panellerin üzerine geçici bir filtre satırı ekler.",
       "appliesToEveryone": "Bu ayarlar bu panoya erişebilen herkesle paylaşılır.",
-      "saveChanges": "Değişiklikleri kaydet"
+      "saveChanges": "Değişiklikleri kaydet",
+      "defaultAutoRefresh": "Varsayılan otomatik yenileme",
+      "defaultAutoRefreshHelp": "Bağlantı kendi aralığını belirtmediği sürece gösterge panosu her açıldığında uygulanır.",
+      "defaultAutoRefreshRaised": "{saved} olarak kaydedildi; sunucu minimumunun altında olduğundan her {effective} yenilenir.",
+      "defaultAutoRefreshAbsoluteHint": "Varsayılan zaman aralığı mutlak olduğundan her yenileme aynı aralığı yeniden yükler. Canlı güncellemeler için göreli bir zaman aralığı gerekir."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Pano başarıyla eklendi.",

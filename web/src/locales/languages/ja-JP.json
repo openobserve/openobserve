@@ -6279,6 +6279,7 @@
       "settingTitle": "名前",
       "settingDescription": "説明",
       "settingTimeRange": "デフォルトの期間",
+      "settingAutoRefresh": "デフォルトの自動更新",
       "settingDynamicFilters": "動的フィルター",
       "settingOther": "その他の設定",
       "impactSettings": "相手が変更したダッシュボード設定を置き換えます: {settings}",
@@ -7872,7 +7873,11 @@
       "updationFailed": "ダッシュボードの更新に失敗しました",
       "dynamicFiltersHelp": "パネルの上にアドホックなフィルター行を追加します。",
       "appliesToEveryone": "これらの設定は、このダッシュボードにアクセスできるすべてのユーザーと共有されます。",
-      "saveChanges": "変更を保存"
+      "saveChanges": "変更を保存",
+      "defaultAutoRefresh": "デフォルトの自動更新",
+      "defaultAutoRefreshHelp": "ダッシュボードを開くたびに適用されます。リンク側で独自の間隔が設定されている場合を除きます。",
+      "defaultAutoRefreshRaised": "{saved}で保存されましたが、サーバーの最小値未満のため、{effective}ごとに更新されます。",
+      "defaultAutoRefreshAbsoluteHint": "デフォルトの時間範囲が絶対範囲のため、更新のたびに同じ範囲を再読み込みします。ライブ更新には相対時間範囲が必要です。"
     },
     "addDashboardPage": {
       "addedSuccessfully": "ダッシュボードが正常に追加されました。",

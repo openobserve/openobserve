@@ -6279,6 +6279,7 @@
       "settingTitle": "nom",
       "settingDescription": "description",
       "settingTimeRange": "plage horaire par défaut",
+      "settingAutoRefresh": "actualisation automatique par défaut",
       "settingDynamicFilters": "filtres dynamiques",
       "settingOther": "autres paramètres",
       "impactSettings": "Remplace les paramètres du tableau de bord qu'ils ont modifiés : {settings}",
@@ -7872,7 +7873,11 @@
       "updationFailed": "Échec de la mise à jour du tableau de bord",
       "dynamicFiltersHelp": "Ajoute une ligne de filtre ad hoc au-dessus des panneaux.",
       "appliesToEveryone": "Ces paramètres sont partagés avec toutes les personnes ayant accès à ce tableau de bord.",
-      "saveChanges": "Enregistrer les modifications"
+      "saveChanges": "Enregistrer les modifications",
+      "defaultAutoRefresh": "Actualisation automatique par défaut",
+      "defaultAutoRefreshHelp": "Appliquée à chaque ouverture du tableau de bord, sauf si le lien définit son propre intervalle.",
+      "defaultAutoRefreshRaised": "Enregistré à {saved}, en dessous du minimum du serveur, l'actualisation se fait donc toutes les {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "La plage de temps par défaut est absolue, ainsi chaque actualisation recharge la même plage. Les mises à jour en temps réel nécessitent une plage de temps relative."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Tableau de bord ajouté avec succès.",

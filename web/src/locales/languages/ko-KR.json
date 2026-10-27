@@ -6279,6 +6279,7 @@
       "settingTitle": "이름",
       "settingDescription": "설명",
       "settingTimeRange": "기본 시간 범위",
+      "settingAutoRefresh": "기본 자동 새로고침",
       "settingDynamicFilters": "동적 필터",
       "settingOther": "기타 설정",
       "impactSettings": "상대가 변경한 대시보드 설정을 바꿉니다: {settings}",
@@ -7872,7 +7873,11 @@
       "updationFailed": "대시보드 업데이트 실패",
       "dynamicFiltersHelp": "패널 위에 임시 필터 행을 추가합니다.",
       "appliesToEveryone": "이 설정은 이 대시보드에 액세스할 수 있는 모든 사용자와 공유됩니다.",
-      "saveChanges": "변경 사항 저장"
+      "saveChanges": "변경 사항 저장",
+      "defaultAutoRefresh": "기본 자동 새로고침",
+      "defaultAutoRefreshHelp": "링크에서 자체 간격을 설정하지 않는 한 대시보드를 열 때마다 적용됩니다.",
+      "defaultAutoRefreshRaised": "저장된 값은 {saved}이며 서버 최솟값보다 낮아 {effective}마다 새로고침됩니다.",
+      "defaultAutoRefreshAbsoluteHint": "기본 시간 범위가 절대 범위이므로 새로고침할 때마다 동일한 범위를 다시 불러옵니다. 실시간 업데이트에는 상대 시간 범위가 필요합니다."
     },
     "addDashboardPage": {
       "addedSuccessfully": "대시보드가 성공적으로 추가되었습니다.",

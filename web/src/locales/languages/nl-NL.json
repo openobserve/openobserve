@@ -6279,6 +6279,7 @@
       "settingTitle": "naam",
       "settingDescription": "beschrijving",
       "settingTimeRange": "standaardtijdbereik",
+      "settingAutoRefresh": "standaard automatisch verversen",
       "settingDynamicFilters": "dynamische filters",
       "settingOther": "overige instellingen",
       "impactSettings": "Vervangt de dashboardinstellingen die zij hebben gewijzigd: {settings}",
@@ -7872,7 +7873,11 @@
       "updationFailed": "Dashboard bijwerken mislukt",
       "dynamicFiltersHelp": "Voegt een ad-hoc filterrij toe boven de panelen.",
       "appliesToEveryone": "Deze instellingen worden gedeeld met iedereen die toegang heeft tot dit dashboard.",
-      "saveChanges": "Wijzigingen opslaan"
+      "saveChanges": "Wijzigingen opslaan",
+      "defaultAutoRefresh": "Standaard automatisch verversen",
+      "defaultAutoRefreshHelp": "Toegepast telkens wanneer het dashboard opent, tenzij de link een eigen interval instelt.",
+      "defaultAutoRefreshRaised": "Opgeslagen als {saved}, onder het serverminimum, dus het ververst elke {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "Het standaard tijdsbereik is absoluut, dus elke verversing herlaadt hetzelfde bereik. Live updates vereisen een relatief tijdsbereik."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard succesvol toegevoegd.",

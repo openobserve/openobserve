@@ -6279,6 +6279,7 @@
       "settingTitle": "名稱",
       "settingDescription": "說明",
       "settingTimeRange": "預設時間範圍",
+      "settingAutoRefresh": "預設自動重新整理",
       "settingDynamicFilters": "動態篩選",
       "settingOther": "其他設定",
       "impactSettings": "取代他人變更的儀表板設定：{settings}",
@@ -7867,7 +7868,11 @@
       "updationFailed": "儀表板更新失敗",
       "dynamicFiltersHelp": "在面板上方新增一個臨時篩選列。",
       "appliesToEveryone": "這些設定會與所有可存取此儀表板的人共用。",
-      "saveChanges": "儲存變更"
+      "saveChanges": "儲存變更",
+      "defaultAutoRefresh": "預設自動重新整理",
+      "defaultAutoRefreshHelp": "每次開啟儀表板時套用，除非該連結設定了自己的間隔。",
+      "defaultAutoRefreshRaised": "已儲存為 {saved}，低於伺服器最小值，因此每 {effective} 重新整理。",
+      "defaultAutoRefreshAbsoluteHint": "預設時間範圍是絕對時間，因此每次重新整理都會重新載入相同範圍。即時更新需要相對時間範圍。"
     },
     "addDashboardPage": {
       "addedSuccessfully": "儀表板新增成功。",

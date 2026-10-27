@@ -15,6 +15,14 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+const notify = vi.hoisted(() => ({ positive: vi.fn(), error: vi.fn() }));
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showPositiveNotification: notify.positive,
+    showErrorNotification: notify.error,
+  }),
+}));
+
 // Mock utilities
 vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(),
@@ -666,6 +674,109 @@ describe("GeneralSettings", () => {
       // Both buttons render as <button> elements
       expect(saveBtn.element.tagName.toLowerCase()).toBe("button");
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
+    });
+  });
+
+  describe("Default auto refresh", () => {
+    const refreshSelect = () => wrapper.findComponent({ name: "AutoRefreshInterval" });
+    const helpText = () =>
+      wrapper.find('[data-test="dashboard-general-setting-default-refresh-help"]').text();
+    const formValues = () => wrapper.findComponent({ name: "OForm" }).vm.form.state.values;
+    const savedPayload = () => vi.mocked(updateDashboard).mock.calls[0][3] as any;
+
+    afterEach(() => {
+      store.state.zoConfig.min_auto_refresh_interval = undefined;
+    });
+
+    it("uses the toolbar refresh control, with intervals below the minimum disabled", async () => {
+      store.state.zoConfig.min_auto_refresh_interval = 30;
+      wrapper = await createWrapper();
+
+      expect(refreshSelect().props("minRefreshInterval")).toBe(30);
+      expect(refreshSelect().props("modelValue")).toBe(0);
+    });
+
+    it("writes the interval picked in the control into the form", async () => {
+      wrapper = await createWrapper();
+      refreshSelect().vm.$emit("update:modelValue", 900);
+      await flushPromises();
+
+      expect(formValues().defaultRefreshInterval).toBe(900);
+      expect(refreshSelect().props("modelValue")).toBe(900);
+    });
+
+    it("loads the saved default into the form", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 300,
+      });
+      wrapper = await createWrapper();
+
+      expect(formValues().defaultRefreshInterval).toBe(300);
+      expect(refreshSelect().text()).toContain("5 min");
+    });
+
+    it("shows the effective value when the saved one is below the server minimum", async () => {
+      store.state.zoConfig.min_auto_refresh_interval = 30;
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 10,
+      });
+      wrapper = await createWrapper();
+
+      expect(formValues().defaultRefreshInterval).toBe(30);
+      expect(helpText()).toContain("10 sec");
+      expect(helpText()).toContain("30 sec");
+    });
+
+    it("saves the picked interval in seconds", async () => {
+      wrapper = await createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      form.setFieldValue("defaultRefreshInterval", 60);
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(savedPayload().defaultRefreshInterval).toBe(60);
+    });
+
+    it("Save changes shows the success toast and emits save, leaving the drawer to the parent", async () => {
+      wrapper = await createWrapper();
+      await wrapper.find("form").trigger("submit");
+      await flushPromises();
+      await vi.waitFor(() => expect(wrapper.emitted("save")).toHaveLength(1));
+
+      expect(updateDashboard).toHaveBeenCalledTimes(1);
+      expect(notify.positive).toHaveBeenCalledWith("Dashboard updated successfully.");
+      expect(wrapper.emitted("close")).toBeUndefined();
+    });
+
+    it("drops the key when Off is saved, so the dashboard stays unchanged", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 60,
+      });
+      wrapper = await createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      form.setFieldValue("defaultRefreshInterval", 0);
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(savedPayload()).not.toHaveProperty("defaultRefreshInterval");
+    });
+
+    it("hints that live updates need a relative range only for an absolute default range", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 60,
+        defaultDatetimeDuration: { type: "absolute", startTime: 1, endTime: 2 },
+      });
+      wrapper = await createWrapper();
+      const hint = '[data-test="dashboard-general-setting-default-refresh-absolute-hint"]';
+      expect(wrapper.find(hint).exists()).toBe(true);
+
+      wrapper.findComponent({ name: "OForm" }).vm.form.setFieldValue("defaultRefreshInterval", 0);
+      await flushPromises();
+      expect(wrapper.find(hint).exists()).toBe(false);
     });
   });
 
