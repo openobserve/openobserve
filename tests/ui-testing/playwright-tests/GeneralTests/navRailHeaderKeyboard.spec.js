@@ -11,6 +11,7 @@ const ROW = '[data-test="header-language-submenu-trigger"]';
 const LIST = '[data-test="language-dropdown-item"]';
 const OPTION = '[data-test^="language-dropdown-item-"]';
 const PROFILE = '[data-test="header-my-account-profile-icon"]';
+const THEME_ROW = '[data-test="menu-link-predefined-themes-item"]';
 const EN_OPTION = '[data-test="language-dropdown-item-en-us"]';
 const LANGUAGE_COOKIE = "vue3-typescript-admin-languageKey";
 
@@ -38,10 +39,6 @@ async function arrowToRow(page) {
   expect(await isFocused(row)).toBe(true);
 }
 
-// Keyboard semantics (haspopup/expanded, open keys, Up/Down, Escape, focus ring) are
-// asserted by the component spec, web/src/components/Header.spec.ts "language row
-// keyboard (AC-10)". Only what jsdom cannot see lives here: real viewport clipping of
-// the rendered list, and the real page reload a language change performs.
 test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -56,11 +53,32 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await navigateToBase(page);
         expect(await page.evaluate(() => document.documentElement.dir || "ltr")).toBe(dir);
 
-        testLogger.step("Open the profile menu by keyboard, arrow to the Language row and open the list");
+        testLogger.step("Open the profile menu by keyboard and arrow to the Language row");
         await openProfileMenuByKeyboard(page);
         await arrowToRow(page);
+        const row = page.locator(ROW);
+        await expect(row).toHaveAttribute("aria-haspopup", "menu");
+        await expect(row).toHaveAttribute("aria-expanded", "false");
+
+        testLogger.step("Focus style matches the sibling items");
+        // ODropdownItem animates its colours over 150 ms; read after the transition has settled.
+        await page.waitForTimeout(300);
+        const rowBg = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+        await page.keyboard.press("ArrowDown");
+        const themeRow = page.locator(THEME_ROW);
+        expect(await isFocused(themeRow)).toBe(true);
+        await page.waitForTimeout(300);
+        const siblingBg = await themeRow.evaluate((el) => getComputedStyle(el).backgroundColor);
+        expect(rowBg).toBe(siblingBg);
+        await page.keyboard.press("ArrowUp");
+        expect(await isFocused(row)).toBe(true);
+
+        testLogger.step("Enter opens the list and focuses the selected language");
         await page.keyboard.press("Enter");
         await expect(page.locator(LIST)).toBeVisible();
+        await expect(row).toHaveAttribute("aria-expanded", "true");
+        const selected = page.locator(`${OPTION}.font-semibold`).first();
+        expect(await isFocused(selected)).toBe(true);
 
         testLogger.step("Every option is visible or reachable by the menu scroll and hit-testable");
         const options = page.locator(OPTION);
@@ -77,6 +95,36 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
           expect(hit, `option ${i} is hit-testable`).toBe(true);
         }
 
+        testLogger.step("Up and Down move between languages and stay in the list");
+        await selected.focus();
+        const selectedIndex = await options.evaluateAll((els) =>
+          els.findIndex((el) => el === document.activeElement),
+        );
+        await page.keyboard.press("ArrowDown");
+        const afterDown = await options.evaluateAll((els) =>
+          els.findIndex((el) => el === document.activeElement),
+        );
+        expect(afterDown).toBe((selectedIndex + 1) % count);
+        await page.keyboard.press("ArrowUp");
+        expect(await isFocused(selected)).toBe(true);
+        await expect(page.locator(LIST)).toBeVisible();
+
+        testLogger.step("Escape closes the list, refocuses the row and leaves the menu open");
+        await page.keyboard.press("Escape");
+        await expect(page.locator(LIST)).toBeHidden();
+        expect(await isFocused(row)).toBe(true);
+        await expect(row).toHaveAttribute("aria-expanded", "false");
+        await expect(page.locator(THEME_ROW)).toBeVisible();
+
+        testLogger.step("The inline-start arrow (toward the list) opens it too; the other arrow as well");
+        await page.keyboard.press(dir === "rtl" ? "ArrowRight" : "ArrowLeft");
+        await expect(page.locator(LIST)).toBeVisible();
+        expect(await isFocused(selected)).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(page.locator(LIST)).toBeHidden();
+        await page.keyboard.press(dir === "rtl" ? "ArrowLeft" : "ArrowRight");
+        await expect(page.locator(LIST)).toBeVisible();
+
         testLogger.step("Arrow to English and choose it with Enter: the page reloads in English");
         const english = page.locator(EN_OPTION);
         for (let i = 0; i < count && !(await isFocused(english)); i++) {
@@ -88,6 +136,15 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await reloaded;
         await expect(page.locator(PROFILE)).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.dir || "ltr")).toBe("ltr");
+
+        testLogger.step("The same choice works by mouse");
+        await page.locator(PROFILE).click();
+        await page.locator(ROW).click();
+        await expect(page.locator(LIST)).toBeVisible();
+        const mouseReload = page.waitForEvent("load");
+        await page.locator(EN_OPTION).click();
+        await mouseReload;
+        await expect(page.locator(PROFILE)).toBeVisible();
       });
     }
   }

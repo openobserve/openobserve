@@ -3,7 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { isCloudEnvironment, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const ORG_SEARCH_INPUT = '[data-test="org-management-search-input-field"]';
+const ORG_SEARCH_INPUT = '[data-test="org-management-search-input"]';
 
 test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
     // Serial: every case reads the same shared _meta org list and one case writes a

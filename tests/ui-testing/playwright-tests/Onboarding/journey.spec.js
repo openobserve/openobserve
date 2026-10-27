@@ -1,7 +1,7 @@
+const { execFileSync } = require('child_process');
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
-const { ingestBase } = require('../utils/ingest-url.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 const { GetStartedPage } = require('../../pages/generalPages/getStartedPage.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
@@ -69,12 +69,9 @@ test.describe('First data journey', () => {
 
         const sentUs = Date.now() * 1000;
         const marker = `journey-${Date.now()}`;
-        // The copied command is run outside the browser; its payload is posted straight to the same endpoint.
-        const ingested = await request.post(`${ingestBase(apiBase())}/api/${orgId}/default/_json`, {
-            headers: getAuthHeaders(),
-            data: [{ level: 'info', job: 'test', log: marker }],
-        });
-        expect(ingested.status()).toBe(200);
+        const command = copied.replace('test message for openobserve', marker);
+        const out = execFileSync('/bin/sh', ['-c', `${command} -s -o /dev/null -w "%{http_code}"`], { encoding: 'utf8' });
+        expect(out.trim()).toBe('200');
 
         await fe.expectState('received', 20000);
         await expect(fe.firstRecord).toContainText(marker);
