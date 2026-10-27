@@ -8290,10 +8290,10 @@
       "queryValues": "Wartości zapytania",
       "constant": "Stała",
       "textbox": "Pole tekstowe",
-      "custom": "Niestandardowa",
+      "custom": "Niestandardowy",
       "list": "{type} · {example}",
       "csv": "Przecinki: {example}",
-      "pipe": "Pionowe kreski: {example}",
+      "pipe": "Kreski pionowe: {example}",
       "doublequote": "Podwójne cudzysłowy: {example}",
       "singlequote": "Pojedyncze cudzysłowy: {example}"
     },

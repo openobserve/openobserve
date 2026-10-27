@@ -8287,7 +8287,7 @@
     "namePlaceholder": "Painel sem título",
     "renameHint": "Clique para renomear este painel",
     "variableSuggestion": {
-      "queryValues": "Valores da consulta",
+      "queryValues": "Valores de consulta",
       "constant": "Constante",
       "textbox": "Caixa de texto",
       "custom": "Personalizado",

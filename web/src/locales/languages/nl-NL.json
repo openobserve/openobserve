@@ -8293,7 +8293,7 @@
       "custom": "Aangepast",
       "list": "{type} · {example}",
       "csv": "Komma's: {example}",
-      "pipe": "Verticale streepjes: {example}",
+      "pipe": "Pipes: {example}",
       "doublequote": "Dubbele aanhalingstekens: {example}",
       "singlequote": "Enkele aanhalingstekens: {example}"
     },

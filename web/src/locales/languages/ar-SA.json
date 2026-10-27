@@ -8293,9 +8293,9 @@
       "custom": "مخصص",
       "list": "{type} · {example}",
       "csv": "فواصل: {example}",
-      "pipe": "خطوط عمودية: {example}",
-      "doublequote": "علامات اقتباس مزدوجة: {example}",
-      "singlequote": "علامات اقتباس مفردة: {example}"
+      "pipe": "شرطات عمودية: {example}",
+      "doublequote": "اقتباسات مزدوجة: {example}",
+      "singlequote": "اقتباسات فردية: {example}"
     },
     "add": "إضافة لوحة",
     "save": "حفظ",

@@ -8294,8 +8294,8 @@
       "list": "{type} · {example}",
       "csv": "Virgüller: {example}",
       "pipe": "Dikey çizgiler: {example}",
-      "doublequote": "Çift tırnak: {example}",
-      "singlequote": "Tek tırnak: {example}"
+      "doublequote": "Çift tırnaklar: {example}",
+      "singlequote": "Tek tırnaklar: {example}"
     },
     "add": "Panel Ekle",
     "save": "Kaydet",

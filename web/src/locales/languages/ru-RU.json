@@ -8290,7 +8290,7 @@
       "queryValues": "Значения запроса",
       "constant": "Константа",
       "textbox": "Текстовое поле",
-      "custom": "Свой",
+      "custom": "Пользовательский",
       "list": "{type} · {example}",
       "csv": "Запятые: {example}",
       "pipe": "Вертикальные черты: {example}",

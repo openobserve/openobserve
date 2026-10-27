@@ -8289,13 +8289,13 @@
     "variableSuggestion": {
       "queryValues": "Giá trị truy vấn",
       "constant": "Hằng số",
-      "textbox": "Ô văn bản",
+      "textbox": "Hộp văn bản",
       "custom": "Tùy chỉnh",
       "list": "{type} · {example}",
       "csv": "Dấu phẩy: {example}",
       "pipe": "Dấu gạch đứng: {example}",
-      "doublequote": "Dấu ngoặc kép: {example}",
-      "singlequote": "Dấu ngoặc đơn: {example}"
+      "doublequote": "Dấu nháy kép: {example}",
+      "singlequote": "Dấu nháy đơn: {example}"
     },
     "add": "Thêm Panel",
     "save": "Lưu",

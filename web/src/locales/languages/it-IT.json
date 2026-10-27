@@ -8287,13 +8287,13 @@
     "namePlaceholder": "Pannello senza titolo",
     "renameHint": "Fai clic per rinominare questo pannello",
     "variableSuggestion": {
-      "queryValues": "Valori della query",
+      "queryValues": "Valori query",
       "constant": "Costante",
       "textbox": "Casella di testo",
       "custom": "Personalizzato",
       "list": "{type} · {example}",
       "csv": "Virgole: {example}",
-      "pipe": "Barre verticali: {example}",
+      "pipe": "Pipe: {example}",
       "doublequote": "Virgolette doppie: {example}",
       "singlequote": "Virgolette singole: {example}"
     },

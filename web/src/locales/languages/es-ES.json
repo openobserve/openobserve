@@ -8287,7 +8287,7 @@
     "namePlaceholder": "Panel sin título",
     "renameHint": "Haga clic para cambiar el nombre de este panel",
     "variableSuggestion": {
-      "queryValues": "Valores de la consulta",
+      "queryValues": "Valores de consulta",
       "constant": "Constante",
       "textbox": "Cuadro de texto",
       "custom": "Personalizado",
