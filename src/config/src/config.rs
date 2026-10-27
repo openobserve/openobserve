@@ -665,11 +665,22 @@ pub fn load_config() -> Result<(), anyhow::Error> {
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
+static CHROME_SEMAPHORE: std::sync::OnceLock<tokio::sync::Semaphore> = std::sync::OnceLock::new();
 
 pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
     CHROME_LAUNCHER_OPTIONS
         .get_or_init(init_chrome_launch_options)
         .await
+}
+
+/// Caps concurrent headless Chrome processes at the CPU limit; hold a permit while one runs.
+pub fn chrome_semaphore() -> &'static tokio::sync::Semaphore {
+    CHROME_SEMAPHORE.get_or_init(|| {
+        let cfg = get_config();
+        // cpu_num is floored at 2 and real_cpu_num ignores the memory limit, so take the smaller.
+        let permits = cfg.limit.cpu_num.min(cfg.limit.real_cpu_num);
+        tokio::sync::Semaphore::new(max(1, permits))
+    })
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
@@ -6607,5 +6618,14 @@ mod tests {
         assert_eq!(select_ext_auth_salt("env", "stored"), "env");
         assert_eq!(select_ext_auth_salt("", "stored"), "stored");
         assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
+    }
+
+    #[test]
+    fn test_chrome_semaphore_never_exceeds_cpu_limit() {
+        let cfg = get_config();
+        let permits = chrome_semaphore().available_permits();
+        assert!(permits >= 1);
+        assert!(permits <= cfg.limit.real_cpu_num);
+        assert!(permits <= cfg.limit.cpu_num);
     }
 }
