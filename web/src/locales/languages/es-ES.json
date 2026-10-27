@@ -966,7 +966,19 @@
     "boolTrue": "Verdadero",
     "boolFalse": "Falso",
     "browserTimeWithZone": "Hora del navegador ({zone})",
-    "poweredBy": "Con tecnología de"
+    "poweredBy": "Con tecnología de",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} variable de tu borrador no se añadió porque su nombre ya está en uso | {count} variables de tu borrador no se añadieron porque sus nombres ya están en uso",
       "leaveTitle": "¿Salir con cambios sin guardar?",
       "leaveMessage": "Guarda el panel, conserva los cambios como borrador en este navegador o descártalos.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Conservar borrador",
       "addPanelDot": "Añadir panel · borrador sin guardar",
       "panelDot": "Cambios sin guardar en este navegador",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Predeterminado",
     "fetchReportError": "Error al obtener el informe!",
-    "cancelReportChangesConfirm": "¿Estás seguro de que quieres cancelar los cambios del informe?",
     "fetchReportsError": "Error al obtener los informes!",
     "updateReportStateError": "Error al actualizar el estado del informe!",
     "deleteReportError": "Error al eliminar el informe!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} fijados",
         "summaryEmpty": "No establecido",
         "submit": "Crear y ejecutar",
-        "leaveTitle": "¿Descartar este experimento?",
-        "leaveMessage": "Este experimento aún no se ha creado. Salir ahora descartará todo lo que has introducido.",
         "validation": {
           "nameRequired": "El nombre es obligatorio",
           "datasetRequired": "Selecciona un conjunto de datos",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "No se encontraron verificaciones.",
       "http": "HTTP / API",
       "httpDesc": "Verificar endpoints, códigos de estado y cuerpos de respuesta",
-      "leave": "Salir",
       "loadEditFailed": "Error al cargar la verificación para editar — el formulario muestra valores predeterminados, no guarde",
       "notFoundInOrg": "Esta verificación no existe en la organización actual.",
       "modalSubtitle": "Elija lo que desea monitorear",
@@ -19278,13 +19288,10 @@
       "saving": "Guardando verificación…",
       "ssh": "SSH",
       "sshDesc": "Confirmar la conectividad SSH a un servidor",
-      "stay": "Quedarse",
       "tcp": "Puerto TCP",
       "tcpDesc": "Verificar que un host y puerto sean accesibles",
       "tls": "Certificado SSL / TLS",
       "tlsDesc": "Monitorear la validez y caducidad del certificado SSL/TLS",
-      "unsavedBody": "Tiene cambios sin guardar. ¿Está seguro de que desea salir?",
-      "unsavedTitle": "Cambios sin guardar",
       "updateCheck": "Actualizar verificación",
       "updated": "Verificación actualizada exitosamente.",
       "folder": "carpeta",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "El editor visual no puede mostrar este YAML sin perder partes de él",
       "publishedWithWarnings": "v{version} publicada con {count} advertencia | v{version} publicada con {count} advertencias",
       "notFound": "No se encontró la configuración {name}",
+      "importNotApplied": "El archivo importado no se aplicó porque continuaste tu borrador anterior. Vuelve a importarlo para usarlo.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Aún referenciada por flotas: {fleets}, colectores: {collectors}, despliegues activos: {rollouts}. Cambia primero esas flotas a otra configuración."
     },
     "history": {

@@ -24,6 +24,7 @@ import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
 import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
+import { resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 
@@ -449,6 +450,7 @@ const store = createStore({
   actions: {
     login(context, payload) {
       context.commit("login", payload);
+      if (payload?.loginState) resumeEditorDraftSession();
     },
     logout(context) {
       context.commit("logout");

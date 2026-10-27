@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import { createStore } from "vuex";
 import { onBeforeRouteLeave } from "vue-router";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { addPanel, getDashboard, getPanel, updateDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -667,6 +668,41 @@ describe("AddPanel drafts and Save and keep editing", () => {
 
       expect(next).toHaveBeenCalledWith();
       expect(readPanelDraft(newScope)).toBeNull();
+    });
+
+    it("after Discard, a redirect of the same leave (sign-out going on to login) does not ask again", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Throw away");
+      const first = leave("/logout");
+      await flush();
+      leaveButton("discard").click();
+      await first.done;
+
+      const second = leave("/login");
+      await second.done;
+      expect(leaveDialog()).toBeNull();
+      expect(second.next).toHaveBeenCalledWith();
+    });
+
+    it("offers no Keep draft while signing out, and says drafts are discarded", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Signing out");
+      beginDraftSignOut();
+      try {
+        const { done } = leave("/logout");
+        await flush();
+        expect(leaveButton("keep")).toBeNull();
+        expect(
+          document.body.querySelector('[data-test="dashboard-panel-leave-sign-out"]'),
+        ).not.toBeNull();
+        expect(
+          document.body.querySelector('[data-test="dashboard-panel-leave-message"]')?.textContent,
+        ).toContain("Save the panel or discard your changes.");
+        leaveButton("discard").click();
+        await done;
+      } finally {
+        cancelDraftSignOut();
+      }
     });
 
     it("Save saves without opening the dashboard, deletes the draft and continues the navigation", async () => {

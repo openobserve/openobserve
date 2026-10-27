@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :persistent="saving"
     :title="t('dashboard.panelDraft.leaveTitle')"
-    :primary-button-label="t('panel.save')"
+    :primary-button-label="canSave ? t('panel.save') : undefined"
     primary-button-data-test="dashboard-panel-leave-save"
     :primary-button-loading="saving"
     :secondary-button-label="canKeepDraft ? t('dashboard.panelDraft.keepDraft') : undefined"
@@ -33,9 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('choose', 'keep')"
     @click:neutral="emit('choose', 'discard')"
   >
-    <p class="text-text-body text-sm" data-test="dashboard-panel-leave-message">
-      {{ t("dashboard.panelDraft.leaveMessage") }}
-    </p>
+    <div class="flex flex-col gap-3">
+      <p class="text-text-body text-sm" data-test="dashboard-panel-leave-message">
+        {{
+          !canSave
+            ? t("dashboard.panelDraft.leaveMessageDiscardOnly")
+            : canKeepDraft
+              ? t("dashboard.panelDraft.leaveMessage")
+              : t("dashboard.panelDraft.leaveMessageNoDraft")
+        }}
+      </p>
+      <p
+        v-if="signingOut"
+        class="text-text-secondary text-sm"
+        data-test="dashboard-panel-leave-sign-out"
+      >
+        {{ t("common.editorDraft.signOutDiscards") }}
+      </p>
+    </div>
   </ODialog>
 </template>
 
@@ -44,11 +59,16 @@ import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { PanelLeaveChoice } from "./panelDraft.types";
 
-defineProps<{
-  open: boolean;
-  saving?: boolean;
-  canKeepDraft?: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    open: boolean;
+    saving?: boolean;
+    canKeepDraft?: boolean;
+    signingOut?: boolean;
+    canSave?: boolean;
+  }>(),
+  { canSave: true },
+);
 
 const emit = defineEmits<{
   choose: [choice: PanelLeaveChoice];

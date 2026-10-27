@@ -235,6 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <EditorDraftSignOutDialog
+      v-model:open="signOutDraftsOpen"
+      :count="signOutDraftCount"
+      @confirm="performSignout"
+    />
     <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
@@ -256,11 +261,8 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  useLocalCurrentUser,
   useLocalOrganization,
-  useLocalUserInfo,
   getImageURL,
-  invalidateLoginData,
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
@@ -301,6 +303,9 @@ import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
+import { countAllDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -365,6 +370,7 @@ export default defineComponent({
     ODrawer,
     OButton,
     FirstDataNotice,
+    EditorDraftSignOutDialog,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -381,6 +387,21 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
+      // Signing out clears every draft in this browser, so the user is told first.
+      const count = countAllDraftsFor(String(this.store.state.userInfo?.email ?? ""));
+      if (count > 0) {
+        this.signOutDraftCount = count;
+        this.signOutDraftsOpen = true;
+        return;
+      }
+      this.performSignout();
+    },
+    performSignout() {
+      void signOutThroughLeaveGuards(this.$router, this.store, {
+        beforeLogout: () => this.stopSessionServices(),
+      });
+    },
+    stopSessionServices() {
       this.closeSocket();
 
       // AI chat streams outlive their component by design, so navigating away
@@ -397,18 +418,6 @@ export default defineComponent({
         openobserveRum.clearUser();
         openobserveRum.clearAccount();
       }
-
-      // Always call backend logout to clear auth cookies (auth_tokens, auth_ext)
-      // before clearing local state — prevents stale credentials from causing
-      // 401 errors on the next login attempt (see #10900)
-      invalidateLoginData();
-
-      this.store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      this.$router.push("/logout");
     },
     goToHome() {
       this.$router.push({
@@ -440,6 +449,8 @@ export default defineComponent({
     // Once, here: the mixin calls inject() and onMounted(), which outside setup() warn and do nothing.
     const layoutMixin = mainLayoutMixin.setup();
     const miniMode = ref(false);
+    const signOutDraftsOpen = ref(false);
+    const signOutDraftCount = ref(0);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
     const isChatOverlay = computed(() => !lgUp.value);
@@ -1715,6 +1726,8 @@ export default defineComponent({
     }
 
     return {
+      signOutDraftsOpen,
+      signOutDraftCount,
       isDark,
       t,
       raw,

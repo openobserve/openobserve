@@ -285,7 +285,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <PanelLeaveDialog
       :open="leaveDialogOpen"
       :saving="leaveSaving"
-      :can-keep-draft="draftsEnabled"
+      :can-keep-draft="draftsEnabled && !draftSigningOut"
+      :signing-out="draftSigningOut"
+      :can-save="!draftSignOutDiscardOnly"
       @choose="onLeaveChoice"
     />
 
@@ -397,6 +399,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import PanelDraftRestoreDialog from "@/components/dashboards/panelDraft/PanelDraftRestoreDialog.vue";
 import PanelLeaveDialog from "@/components/dashboards/panelDraft/PanelLeaveDialog.vue";
+import { draftSigningOut, draftSignOutDiscardOnly } from "@/utils/drafts/draftSession";
 import type {
   PanelDraftRestoreChoice,
   PanelLeaveChoice,
@@ -1591,6 +1594,8 @@ export default defineComponent({
       } else {
         discardDraft();
       }
+      // A redirect (sign-out goes on to login) re-runs this guard, which must not ask again.
+      panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
       cleanupSessionVariables();
       return true;
     };
@@ -2457,6 +2462,8 @@ export default defineComponent({
       submitPanel,
       saveAndStay,
       draftsEnabled,
+      draftSigningOut,
+      draftSignOutDiscardOnly,
       restoreDraft,
       restoreDialogOpen,
       restoreChangedOnServer,

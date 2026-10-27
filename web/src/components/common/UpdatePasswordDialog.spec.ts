@@ -44,8 +44,25 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 const pushMock = vi.fn();
+// Runs the global guards like vue-router does, so the shared sign-out flow can finish.
+const routerGuards: ((to: { path: string }) => unknown)[] = [];
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({
+    push: async (path: string) => {
+      pushMock(path);
+      for (const guard of [...routerGuards]) {
+        // A guard returning false aborts the navigation, which push reports as a failure.
+        if ((await guard({ path })) === false) return { type: "aborted" };
+      }
+      return undefined;
+    },
+    beforeEach: (guard: (to: { path: string }) => unknown) => {
+      routerGuards.push(guard);
+      return () => {
+        if (routerGuards.includes(guard)) routerGuards.splice(routerGuards.indexOf(guard), 1);
+      };
+    },
+  }),
 }));
 
 const invalidateLoginDataMock = vi.fn();
@@ -60,6 +77,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 import passwordPolicyService from "@/services/passwordPolicy";
+import { draftSignOutDiscardOnly } from "@/utils/drafts/draftSession";
 import userService from "@/services/users";
 
 const STRICT_COMPLEXITY = {
@@ -268,6 +286,30 @@ describe("UpdatePasswordDialog", () => {
       "acme",
       "maya@acme.io",
     );
+  });
+
+  it("signs out with editors offering only Discard, and stays open when an editor keeps the user", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+    let sawDiscardOnly = false;
+    const editorGuard = (to: { path: string }) => {
+      if (to.path !== "/logout") return true;
+      sawDiscardOnly = draftSignOutDiscardOnly.value;
+      return false;
+    };
+    routerGuards.unshift(editorGuard);
+    try {
+      await (wrapper.vm as unknown as { signOut: () => Promise<void> }).signOut();
+      await flushPromises();
+    } finally {
+      routerGuards.splice(routerGuards.indexOf(editorGuard), 1);
+    }
+
+    expect(sawDiscardOnly).toBe(true);
+    expect(draftSignOutDiscardOnly.value).toBe(false);
+    expect(invalidateLoginDataMock).not.toHaveBeenCalled();
+    expect(isOpen.value).toBe(true);
   });
 
   it("signs the user out on success, because the cookie is the old password", async () => {

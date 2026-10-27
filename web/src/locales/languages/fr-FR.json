@@ -966,7 +966,19 @@
     "boolTrue": "Vrai",
     "boolFalse": "Faux",
     "browserTimeWithZone": "Heure du navigateur ({zone})",
-    "poweredBy": "Propulsé par"
+    "poweredBy": "Propulsé par",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} variable de votre brouillon n'a pas été ajoutée car son nom est déjà utilisé | {count} variables de votre brouillon n'ont pas été ajoutées car leurs noms sont déjà utilisés",
       "leaveTitle": "Quitter avec des modifications non enregistrées ?",
       "leaveMessage": "Enregistrez le panneau, conservez vos modifications comme brouillon dans ce navigateur ou supprimez-les.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Conserver le brouillon",
       "addPanelDot": "Ajouter un panneau · brouillon non enregistré",
       "panelDot": "Modifications non enregistrées dans ce navigateur",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Par défaut",
     "fetchReportError": "Erreur lors de la récupération du rapport !",
-    "cancelReportChangesConfirm": "Êtes-vous sûr de vouloir annuler les modifications du rapport ?",
     "fetchReportsError": "Erreur lors de la récupération des rapports !",
     "updateReportStateError": "Erreur lors de la mise à jour de l'état du rapport !",
     "deleteReportError": "Erreur lors de la suppression du rapport !",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} épinglé(s)",
         "summaryEmpty": "Non défini",
         "submit": "Créer et exécuter",
-        "leaveTitle": "Abandonner cette expérience ?",
-        "leaveMessage": "Cette expérience n'a pas encore été créée. Quitter maintenant abandonnera tout ce que vous avez saisi.",
         "validation": {
           "nameRequired": "Le nom est requis",
           "datasetRequired": "Sélectionnez un jeu de données",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Aucune vérification trouvée.",
       "http": "HTTP / API",
       "httpDesc": "Vérifiez les points de terminaison, les codes d'état et les corps de réponse",
-      "leave": "Quitter",
       "loadEditFailed": "Impossible de charger la vérification pour modification — le formulaire affiche les valeurs par défaut, ne pas enregistrer",
       "notFoundInOrg": "Ce check n'existe pas dans l'organisation actuelle.",
       "modalSubtitle": "Choisissez ce que vous voulez surveiller",
@@ -19278,13 +19288,10 @@
       "saving": "Enregistrement de la vérification…",
       "ssh": "SSH",
       "sshDesc": "Confirmer la connectivité SSH à un serveur",
-      "stay": "Rester",
       "tcp": "Port TCP",
       "tcpDesc": "Vérifier qu'un hôte et un port sont accessibles",
       "tls": "Certificat SSL / TLS",
       "tlsDesc": "Surveiller la validité et l'expiration des certificats SSL/TLS",
-      "unsavedBody": "Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter ?",
-      "unsavedTitle": "Modifications non enregistrées",
       "updateCheck": "Mettre à jour la vérification",
       "updated": "Vérification mise à jour avec succès.",
       "folder": "dossier",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "L'éditeur visuel ne peut pas afficher ce YAML sans en perdre des parties",
       "publishedWithWarnings": "v{version} publiée avec {count} avertissement | v{version} publiée avec {count} avertissements",
       "notFound": "Configuration {name} introuvable",
+      "importNotApplied": "Le fichier importé n'a pas été appliqué, car vous avez repris votre brouillon précédent. Importez-le à nouveau pour l'utiliser.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Encore référencée par des flottes : {fleets}, des collecteurs : {collectors}, des déploiements actifs : {rollouts}. Faites d'abord passer ces flottes à une autre configuration."
     },
     "history": {

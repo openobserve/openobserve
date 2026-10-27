@@ -966,7 +966,19 @@
     "boolTrue": "صحيح",
     "boolFalse": "خطأ",
     "browserTimeWithZone": "وقت المتصفح ({zone})",
-    "poweredBy": "بدعم من"
+    "poweredBy": "بدعم من",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "لم تتم إضافة {count} متغير من مسودتك لأن اسمه مستخدم بالفعل | لم تتم إضافة {count} من المتغيرات من مسودتك لأن أسماءها مستخدمة بالفعل",
       "leaveTitle": "المغادرة مع وجود تغييرات غير محفوظة؟",
       "leaveMessage": "احفظ اللوحة، أو احتفظ بتغييراتك كمسودة في هذا المتصفح، أو تجاهلها.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "الاحتفاظ بالمسودة",
       "addPanelDot": "إضافة لوحة · مسودة غير محفوظة",
       "panelDot": "تغييرات غير محفوظة في هذا المتصفح",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "الافتراضي",
     "fetchReportError": "خطأ أثناء جلب التقرير!",
-    "cancelReportChangesConfirm": "هل أنت متأكد أنك تريد إلغاء تغييرات التقرير؟",
     "fetchReportsError": "خطأ أثناء جلب التقارير!",
     "updateReportStateError": "خطأ أثناء تحديث حالة التقرير!",
     "deleteReportError": "خطأ أثناء حذف التقرير!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} مثبتا",
         "summaryEmpty": "لم يتم تحديد",
         "submit": "إنشاء وتشغيل",
-        "leaveTitle": "هل تريد تجاهل هذه التجربة؟",
-        "leaveMessage": "لم يتم إنشاء هذه التجربة بعد. الخروج الآن يتخلص من كل ما أدخلته.",
         "validation": {
           "nameRequired": "الاسم مطلوب",
           "datasetRequired": "اختر مجموعة بيانات",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "لم يتم العثور على فحوصات.",
       "http": "HTTP / API",
       "httpDesc": "نقاط الطرف، رموز الحالة، وأجسام الاستجابة",
-      "leave": "غادر",
       "loadEditFailed": "فشل في تحميل فحص التحرير — النموذج يظهر الإعدادات الافتراضية، لا يتم حفظه",
       "notFoundInOrg": "هذا الفحص غير موجود في المؤسسة الحالية.",
       "modalSubtitle": "اختر ما تريد مراقبته",
@@ -19278,13 +19288,10 @@
       "saving": "جارٍ حفظ الفحص…",
       "ssh": "SSH",
       "sshDesc": "تأكيد اتصال SSH بخادم",
-      "stay": "ابق",
       "tcp": "منفذ TCP",
       "tcpDesc": "تحقق من إمكانية الوصول إلى المضيف والمنفذ",
       "tls": "شهادة SSL / TLS",
       "tlsDesc": "راقب صلاحية شهادة SSL/TLS وانتهاء صلاحيتها",
-      "unsavedBody": "لديك تغييرات غير محفوظة. هل أنت متأكد أنك تريد المغادرة؟",
-      "unsavedTitle": "تغييرات غير محفوظة",
       "updateCheck": "تحديث التحقق",
       "updated": "تحقق من التحديث بنجاح.",
       "folder": "المجلد",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "لا يستطيع المحرر المرئي عرض YAML هذا دون فقدان أجزاء منه",
       "publishedWithWarnings": "تم نشر v{version} مع {count} تحذير | تم نشر v{version} مع {count} تحذيرات",
       "notFound": "لم يتم العثور على التكوين {name}",
+      "importNotApplied": "لم يتم تطبيق الملف المستورد لأنك تابعت مسودتك السابقة. استورده مرة أخرى لاستخدامه.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "لا يزال مُشارًا إليه من الأساطيل: {fleets}، وCollectors: {collectors}، وعمليات الطرح النشطة: {rollouts}. غيّر تلك الأساطيل إلى تكوين آخر أولًا."
     },
     "history": {

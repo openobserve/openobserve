@@ -966,7 +966,19 @@
     "boolTrue": "真",
     "boolFalse": "假",
     "browserTimeWithZone": "浏览器时间（{zone}）",
-    "poweredBy": "技术支持"
+    "poweredBy": "技术支持",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "草稿中的 {count} 个变量因名称已被使用而未添加 | 草稿中的 {count} 个变量因名称已被使用而未添加",
       "leaveTitle": "有未保存的更改，确定离开？",
       "leaveMessage": "保存面板，将更改作为草稿保留在此浏览器中，或放弃更改。",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "保留草稿",
       "addPanelDot": "添加面板 · 未保存的草稿",
       "panelDot": "此浏览器中有未保存的更改",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "默认",
     "fetchReportError": "获取报告时出错！",
-    "cancelReportChangesConfirm": "您确定要取消报告更改吗？",
     "fetchReportsError": "获取报告时出错！",
     "updateReportStateError": "更新报告状态时出错！",
     "deleteReportError": "删除报告时出错！",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} 已固定",
         "summaryEmpty": "未设置",
         "submit": "创建并运行",
-        "leaveTitle": "放弃此实验？",
-        "leaveMessage": "此实验尚未创建。现在离开将丢弃您输入的所有内容。",
         "validation": {
           "nameRequired": "名称为必填项",
           "datasetRequired": "选择数据集",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "未找到检查。",
       "http": "HTTP / API",
       "httpDesc": "检查端点、状态码和响应体",
-      "leave": "离开",
       "loadEditFailed": "加载检查进行编辑失败 — 表单显示默认值，请勿保存",
       "notFoundInOrg": "此检查在当前组织中不存在。",
       "modalSubtitle": "选择您要监控的内容",
@@ -19278,13 +19288,10 @@
       "saving": "正在保存检查…",
       "ssh": "SSH",
       "sshDesc": "确认与服务器的SSH连接",
-      "stay": "留下",
       "tcp": "TCP 端口",
       "tcpDesc": "验证主机和端口是否可达",
       "tls": "SSL / TLS 证书",
       "tlsDesc": "监控SSL/TLS证书有效性和到期",
-      "unsavedBody": "您有未保存的更改。确定要离开吗？",
-      "unsavedTitle": "未保存的更改",
       "updateCheck": "更新检查",
       "updated": "检查已成功更新。",
       "folder": "文件夹",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "可视化编辑器无法在不丢失部分内容的情况下显示此 YAML",
       "publishedWithWarnings": "已发布 v{version}，有 {count} 个警告 | 已发布 v{version}，有 {count} 个警告",
       "notFound": "未找到配置 {name}",
+      "importNotApplied": "由于你继续了之前的草稿，导入的文件未被应用。如需使用，请重新导入。",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "仍被以下对象引用：机群：{fleets}，Collector：{collectors}，进行中的上线：{rollouts}。请先将这些机群切换到其他配置。"
     },
     "history": {

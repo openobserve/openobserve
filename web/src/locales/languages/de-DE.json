@@ -966,7 +966,19 @@
     "boolTrue": "Wahr",
     "boolFalse": "Falsch",
     "browserTimeWithZone": "Browser-Zeit ({zone})",
-    "poweredBy": "Bereitgestellt von"
+    "poweredBy": "Bereitgestellt von",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} Variable aus Ihrem Entwurf wurde nicht hinzugefügt, weil ihr Name bereits verwendet wird | {count} Variablen aus Ihrem Entwurf wurden nicht hinzugefügt, weil ihre Namen bereits verwendet werden",
       "leaveTitle": "Mit nicht gespeicherten Änderungen verlassen?",
       "leaveMessage": "Speichern Sie das Panel, behalten Sie Ihre Änderungen als Entwurf in diesem Browser oder verwerfen Sie sie.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Entwurf behalten",
       "addPanelDot": "Panel hinzufügen · nicht gespeicherter Entwurf",
       "panelDot": "Nicht gespeicherte Änderungen in diesem Browser",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Standard",
     "fetchReportError": "Fehler beim Abrufen des Berichts!",
-    "cancelReportChangesConfirm": "Möchten Sie die Änderungen am Bericht wirklich abbrechen?",
     "fetchReportsError": "Fehler beim Abrufen der Berichte!",
     "updateReportStateError": "Fehler beim Aktualisieren des Berichtsstatus!",
     "deleteReportError": "Fehler beim Löschen des Berichts!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} festgelegt",
         "summaryEmpty": "Nicht festgelegt",
         "submit": "Erstellen & ausführen",
-        "leaveTitle": "Dieses Experiment verwerfen?",
-        "leaveMessage": "Dieses Experiment wurde noch nicht erstellt. Wenn Sie jetzt gehen, wird alles, was Sie eingegeben haben, verworfen.",
         "validation": {
           "nameRequired": "Name ist erforderlich",
           "datasetRequired": "Datensatz auswählen",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Keine Prüfungen gefunden.",
       "http": "HTTP / API",
       "httpDesc": "Endpunkte, Statuscodes und Antworttexte prüfen",
-      "leave": "Verlassen",
       "loadEditFailed": "Die Prüfung konnte nicht zum Bearbeiten geladen werden – das Formular zeigt Standardwerte, nicht speichern",
       "notFoundInOrg": "Dieser Check existiert in der aktuellen Organisation nicht.",
       "modalSubtitle": "Wählen Sie aus, was Sie überwachen möchten",
@@ -19278,13 +19288,10 @@
       "saving": "Prüfung wird gespeichert…",
       "ssh": "SSH",
       "sshDesc": "SSH-Konnektivität zu einem Server bestätigen",
-      "stay": "Bleiben",
       "tcp": "TCP-Port",
       "tcpDesc": "Überprüfen, ob ein Host und Port erreichbar sind",
       "tls": "SSL / TLS-Zertifikat",
       "tlsDesc": "Gültigkeit und Ablauf von SSL/TLS-Zertifikaten überwachen",
-      "unsavedBody": "Sie haben ungespeicherte Änderungen. Möchten Sie wirklich gehen?",
-      "unsavedTitle": "Ungespeicherte Änderungen",
       "updateCheck": "Prüfung aktualisieren",
       "updated": "Prüfung erfolgreich aktualisiert.",
       "folder": "Ordner",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "Der visuelle Editor kann dieses YAML nicht anzeigen, ohne Teile davon zu verlieren",
       "publishedWithWarnings": "v{version} mit {count} Warnung veröffentlicht | v{version} mit {count} Warnungen veröffentlicht",
       "notFound": "Konfiguration {name} wurde nicht gefunden",
+      "importNotApplied": "Die importierte Datei wurde nicht übernommen, weil Sie Ihren früheren Entwurf fortgesetzt haben. Importieren Sie sie erneut, um sie zu verwenden.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Wird noch verwendet von Fleets: {fleets}, Collector: {collectors}, aktiven Rollouts: {rollouts}. Stellen Sie diese Fleets zuerst auf eine andere Konfiguration um."
     },
     "history": {

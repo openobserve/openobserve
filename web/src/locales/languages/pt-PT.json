@@ -966,7 +966,19 @@
     "boolTrue": "Verdadeiro",
     "boolFalse": "Falso",
     "browserTimeWithZone": "Hora do navegador ({zone})",
-    "poweredBy": "Desenvolvido por"
+    "poweredBy": "Desenvolvido por",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} variável do rascunho não foi adicionada porque o nome já está em uso | {count} variáveis do rascunho não foram adicionadas porque os nomes já estão em uso",
       "leaveTitle": "Sair com alterações não guardadas?",
       "leaveMessage": "Guarde o painel, mantenha as alterações como rascunho neste navegador ou descarte-as.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Manter rascunho",
       "addPanelDot": "Adicionar painel · rascunho não guardado",
       "panelDot": "Alterações não guardadas neste navegador",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Padrão",
     "fetchReportError": "Erro ao obter o relatório!",
-    "cancelReportChangesConfirm": "Tem a certeza de que pretende cancelar as alterações do relatório?",
     "fetchReportsError": "Erro ao obter os relatórios!",
     "updateReportStateError": "Erro ao atualizar o estado do relatório!",
     "deleteReportError": "Erro ao eliminar relatório!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} fixados",
         "summaryEmpty": "Não definido",
         "submit": "Criar e executar",
-        "leaveTitle": "Descartar este experimento?",
-        "leaveMessage": "Este experimento ainda não foi criado. Sair agora descarta tudo o que introduziu.",
         "validation": {
           "nameRequired": "O nome é obrigatório",
           "datasetRequired": "Selecione um conjunto de dados",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Nenhuma verificação encontrada.",
       "http": "HTTP / API",
       "httpDesc": "Verifique endpoints, códigos de estado e corpos de resposta",
-      "leave": "Sair",
       "loadEditFailed": "Falha ao carregar a verificação para edição — o formulário mostra valores padrão, não guarde",
       "notFoundInOrg": "Esta verificação não existe na organização atual.",
       "modalSubtitle": "Escolha o que pretende monitorizar",
@@ -19278,13 +19288,10 @@
       "saving": "A guardar verificação…",
       "ssh": "SSH",
       "sshDesc": "Confirme a conectividade SSH com um servidor",
-      "stay": "Permanecer",
       "tcp": "Porta TCP",
       "tcpDesc": "Verifique se um host e porta estão acessíveis",
       "tls": "Certificado SSL / TLS",
       "tlsDesc": "Monitorize a validade e expiração do certificado SSL/TLS",
-      "unsavedBody": "Tem alterações não guardadas. Tem a certeza de que pretende sair?",
-      "unsavedTitle": "Alterações não guardadas",
       "updateCheck": "Atualizar verificação",
       "updated": "Verificação atualizada com sucesso.",
       "folder": "pasta",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "O editor visual não consegue mostrar este YAML sem perder partes do mesmo",
       "publishedWithWarnings": "v{version} publicada com {count} aviso | v{version} publicada com {count} avisos",
       "notFound": "A configuração {name} não foi encontrada",
+      "importNotApplied": "O ficheiro importado não foi aplicado porque continuou o seu rascunho anterior. Importe-o novamente para o utilizar.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Ainda referenciada por frotas: {fleets}, coletores: {collectors}, implementações ativas: {rollouts}. Mude primeiro essas frotas para outra configuração."
     },
     "history": {

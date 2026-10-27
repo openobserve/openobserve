@@ -966,7 +966,19 @@
     "boolTrue": "Waar",
     "boolFalse": "Onwaar",
     "browserTimeWithZone": "Browsertijd ({zone})",
-    "poweredBy": "Mogelijk gemaakt door"
+    "poweredBy": "Mogelijk gemaakt door",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} variabele uit je concept is niet toegevoegd omdat de naam al in gebruik is | {count} variabelen uit je concept zijn niet toegevoegd omdat de namen al in gebruik zijn",
       "leaveTitle": "Verlaten met niet-opgeslagen wijzigingen?",
       "leaveMessage": "Sla het paneel op, bewaar je wijzigingen als concept in deze browser of verwijder ze.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Concept bewaren",
       "addPanelDot": "Paneel toevoegen · niet-opgeslagen concept",
       "panelDot": "Niet-opgeslagen wijzigingen in deze browser",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Standaard",
     "fetchReportError": "Fout bij het ophalen van het rapport!",
-    "cancelReportChangesConfirm": "Weet je zeker dat je de rapportwijzigingen wilt annuleren?",
     "fetchReportsError": "Fout bij het ophalen van de rapporten!",
     "updateReportStateError": "Fout bij het bijwerken van de rapportstatus!",
     "deleteReportError": "Fout bij het verwijderen van het rapport!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} vastgezet",
         "summaryEmpty": "Niet ingesteld",
         "submit": "Aanmaken en uitvoeren",
-        "leaveTitle": "Dit experiment verwijderen?",
-        "leaveMessage": "Dit experiment is nog niet aangemaakt. Als je nu weggaat, wordt alles wat je hebt ingevoerd verwijderd.",
         "validation": {
           "nameRequired": "Naam is verplicht",
           "datasetRequired": "Selecteer een dataset",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Geen checks gevonden.",
       "http": "HTTP / API",
       "httpDesc": "Controleer eindpunten, statuscodes en responslichamen",
-      "leave": "Verlaten",
       "loadEditFailed": "Kan de controle niet laden voor bewerking — het formulier toont standaardwaarden, niet opslaan",
       "notFoundInOrg": "Deze controle bestaat niet in de huidige organisatie.",
       "modalSubtitle": "Kies wat u wilt monitoren",
@@ -19278,13 +19288,10 @@
       "saving": "Bezig met opslaan van controle…",
       "ssh": "SSH",
       "sshDesc": "Bevestig SSH-connectiviteit met een server",
-      "stay": "Blijven",
       "tcp": "TCP-poort",
       "tcpDesc": "Controleer of een host en poort bereikbaar zijn",
       "tls": "SSL / TLS-certificaat",
       "tlsDesc": "Monitor SSL/TLS-certificaatgeldigheid en -verval",
-      "unsavedBody": "U heeft niet-opgeslagen wijzigingen. Weet u zeker dat u wilt vertrekken?",
-      "unsavedTitle": "Niet-opgeslagen wijzigingen",
       "updateCheck": "Controle bijwerken",
       "updated": "Controle succesvol bijgewerkt.",
       "folder": "map",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "De visuele editor kan deze YAML niet tonen zonder delen ervan te verliezen",
       "publishedWithWarnings": "v{version} gepubliceerd met {count} waarschuwing | v{version} gepubliceerd met {count} waarschuwingen",
       "notFound": "Configuratie {name} niet gevonden",
+      "importNotApplied": "Het geïmporteerde bestand is niet toegepast omdat u met uw eerdere concept verder bent gegaan. Importeer het opnieuw om het te gebruiken.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Nog in gebruik door fleets: {fleets}, collectors: {collectors}, actieve uitrollen: {rollouts}. Zet die fleets eerst op een andere configuratie."
     },
     "history": {

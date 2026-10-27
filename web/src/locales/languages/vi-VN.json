@@ -966,7 +966,19 @@
     "boolTrue": "Đúng",
     "boolFalse": "Sai",
     "browserTimeWithZone": "Giờ trình duyệt ({zone})",
-    "poweredBy": "Cung cấp bởi"
+    "poweredBy": "Cung cấp bởi",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} biến từ bản nháp không được thêm vì tên đã được sử dụng | {count} biến từ bản nháp không được thêm vì tên đã được sử dụng",
       "leaveTitle": "Rời đi khi còn thay đổi chưa lưu?",
       "leaveMessage": "Lưu panel, giữ thay đổi dưới dạng bản nháp trong trình duyệt này hoặc hủy chúng.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Giữ bản nháp",
       "addPanelDot": "Thêm panel · bản nháp chưa lưu",
       "panelDot": "Có thay đổi chưa lưu trong trình duyệt này",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Mặc định",
     "fetchReportError": "Lỗi khi tải báo cáo!",
-    "cancelReportChangesConfirm": "Bạn có chắc chắn muốn hủy các thay đổi báo cáo?",
     "fetchReportsError": "Lỗi khi tải các báo cáo!",
     "updateReportStateError": "Lỗi khi cập nhật trạng thái báo cáo!",
     "deleteReportError": "Lỗi khi xóa báo cáo!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} đã ghim",
         "summaryEmpty": "Chưa đặt",
         "submit": "Tạo & chạy",
-        "leaveTitle": "Hủy bỏ thí nghiệm này?",
-        "leaveMessage": "Thí nghiệm này chưa được tạo. Rời khỏi bây giờ sẽ hủy bỏ mọi thứ bạn đã nhập.",
         "validation": {
           "nameRequired": "Tên là bắt buộc",
           "datasetRequired": "Chọn một tập dữ liệu",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Không tìm thấy kiểm tra nào.",
       "http": "HTTP / API",
       "httpDesc": "Kiểm tra điểm cuối, mã trạng thái và nội dung phản hồi",
-      "leave": "Rời đi",
       "loadEditFailed": "Không thể tải kiểm tra để chỉnh sửa — biểu mẫu hiển thị mặc định, không lưu",
       "notFoundInOrg": "Kiểm tra này không tồn tại trong tổ chức hiện tại.",
       "modalSubtitle": "Chọn những gì bạn muốn giám sát",
@@ -19278,13 +19288,10 @@
       "saving": "Đang lưu kiểm tra…",
       "ssh": "SSH",
       "sshDesc": "Xác nhận kết nối SSH đến máy chủ",
-      "stay": "Ở lại",
       "tcp": "Cổng TCP",
       "tcpDesc": "Xác minh máy chủ và cổng có thể truy cập",
       "tls": "Chứng chỉ SSL / TLS",
       "tlsDesc": "Giám sát hiệu lực và hết hạn chứng chỉ SSL/TLS",
-      "unsavedBody": "Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời đi?",
-      "unsavedTitle": "Thay đổi chưa lưu",
       "updateCheck": "Cập nhật kiểm tra",
       "updated": "Đã cập nhật kiểm tra thành công.",
       "folder": "thư mục",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "Trình chỉnh sửa trực quan không thể hiển thị YAML này mà không làm mất một số phần của nó",
       "publishedWithWarnings": "Đã phát hành v{version} với {count} cảnh báo | Đã phát hành v{version} với {count} cảnh báo",
       "notFound": "Không tìm thấy cấu hình {name}",
+      "importNotApplied": "Tệp đã nhập chưa được áp dụng vì bạn đã tiếp tục bản nháp trước đó. Hãy nhập lại để sử dụng.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Vẫn được tham chiếu bởi các fleet: {fleets}, collector: {collectors}, đợt triển khai đang hoạt động: {rollouts}. Hãy đổi các fleet đó sang cấu hình khác trước."
     },
     "history": {

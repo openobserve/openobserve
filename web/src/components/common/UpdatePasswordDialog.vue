@@ -101,7 +101,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import userService from "@/services/users";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { reuseRejection } from "@/utils/passwordComplexity";
-import { invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import { signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 
 import PasswordRequirementList from "./PasswordRequirementList.vue";
 import {
@@ -156,13 +156,9 @@ watch(
   { immediate: true },
 );
 
-const signOut = () => {
-  invalidateLoginData();
-  store.dispatch("logout");
-  useLocalCurrentUser("", true);
-  useLocalUserInfo("", true);
-  close();
-  router.push("/logout");
+// The server refuses every save until the password changes, and a changed one leaves the cookie stale, so editors offer only Discard.
+const signOut = async () => {
+  if (await signOutThroughLeaveGuards(router, store, { discardOnly: true })) close();
 };
 
 const submit = async (values: UpdatePasswordForm) => {
@@ -192,6 +188,6 @@ const submit = async (values: UpdatePasswordForm) => {
 
   // The session cookie IS the password, so the browser's credential went stale the moment the change landed.
   toast({ variant: "success", message: t("passwordReset.updated") });
-  signOut();
+  void signOut();
 };
 </script>

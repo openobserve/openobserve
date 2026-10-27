@@ -966,7 +966,19 @@
     "boolTrue": "참",
     "boolFalse": "거짓",
     "browserTimeWithZone": "브라우저 시간 ({zone})",
-    "poweredBy": "제공"
+    "poweredBy": "제공",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "이름이 이미 사용 중이어서 초안의 변수 {count}개가 추가되지 않았습니다 | 이름이 이미 사용 중이어서 초안의 변수 {count}개가 추가되지 않았습니다",
       "leaveTitle": "저장되지 않은 변경 사항이 있습니다. 나가시겠습니까?",
       "leaveMessage": "패널을 저장하거나, 변경 사항을 이 브라우저에 초안으로 보관하거나, 삭제하세요.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "초안 보관",
       "addPanelDot": "패널 추가 · 저장되지 않은 초안",
       "panelDot": "이 브라우저에 저장되지 않은 변경 사항이 있습니다",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "기본",
     "fetchReportError": "보고서를 불러오는 중 오류가 발생했습니다!",
-    "cancelReportChangesConfirm": "보고서 변경 사항을 취소하시겠습니까?",
     "fetchReportsError": "보고서를 불러오는 중 오류가 발생했습니다!",
     "updateReportStateError": "보고서 상태를 업데이트하는 중 오류가 발생했습니다!",
     "deleteReportError": "보고서를 삭제하는 중 오류가 발생했습니다!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count}개 고정됨",
         "summaryEmpty": "설정되지 않음",
         "submit": "생성 및 실행",
-        "leaveTitle": "이 실험을 폐기하시겠습니까?",
-        "leaveMessage": "이 실험은 아직 생성되지 않았습니다. 지금 떠나면 입력한 모든 내용이 삭제됩니다.",
         "validation": {
           "nameRequired": "이름은 필수입니다.",
           "datasetRequired": "데이터셋 선택",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "검사가 없습니다.",
       "http": "HTTP / API",
       "httpDesc": "엔드포인트, 상태 코드 및 응답 본문 확인",
-      "leave": "떠나기",
       "loadEditFailed": "검사를 불러오지 못했습니다 — 양식에 기본값이 표시되며 저장하지 마십시오",
       "notFoundInOrg": "이 체크는 현재 조직에 존재하지 않습니다.",
       "modalSubtitle": "모니터링할 항목 선택",
@@ -19278,13 +19288,10 @@
       "saving": "검사 저장 중…",
       "ssh": "SSH",
       "sshDesc": "서버에 대한 SSH 연결 확인",
-      "stay": "머무르기",
       "tcp": "TCP 포트",
       "tcpDesc": "호스트와 포트가 연결 가능한지 확인",
       "tls": "SSL / TLS 인증서",
       "tlsDesc": "SSL/TLS 인증서 유효성 및 만료 모니터링",
-      "unsavedBody": "저장되지 않은 변경 사항이 있습니다. 정말 떠나시겠습니까?",
-      "unsavedTitle": "저장되지 않은 변경 사항",
       "updateCheck": "검사 업데이트",
       "updated": "검사가 성공적으로 업데이트되었습니다.",
       "folder": "폴더",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "시각 편집기는 일부 내용을 잃지 않고는 이 YAML을 표시할 수 없습니다",
       "publishedWithWarnings": "v{version}을(를) 경고 {count}개와 함께 게시했습니다 | v{version}을(를) 경고 {count}개와 함께 게시했습니다",
       "notFound": "구성 {name}을(를) 찾을 수 없습니다",
+      "importNotApplied": "이전 초안을 계속했기 때문에 가져온 파일이 적용되지 않았습니다. 사용하려면 다시 가져오세요.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "아직 참조 중: 플릿 {fleets}, 수집기 {collectors}, 활성 롤아웃 {rollouts}. 먼저 해당 플릿을 다른 구성으로 변경하세요."
     },
     "history": {

@@ -75,6 +75,7 @@ import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { capturePrefill } from "@/components/login/firstSourceOptions";
@@ -246,6 +247,8 @@ export default defineComponent({
       }
 
       store.dispatch("logout");
+      // No editor is open on the login page, so there are no leave guards to run first.
+      endEditorDraftSession();
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 

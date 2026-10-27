@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getCurrentInstance, onBeforeUnmount, ref } from "vue";
+import { draftSessionEnded } from "@/utils/drafts/draftSession";
 
 export const PANEL_DRAFT_VERSION = 1;
 export const PANEL_DRAFT_PREFIX = "o2_panel_draft:";
@@ -176,6 +177,8 @@ export const hasPanelDraft = (scope: PanelDraftScope): boolean => {
 
 /** Returns false when the draft could not be stored, even after pruning for space. */
 export const writePanelDraft = (scope: PanelDraftScope, input: PanelDraftInput): boolean => {
+  // After an explicit sign-out nothing may write a draft back until the next login.
+  if (draftSessionEnded.value) return false;
   const storage = getStorage();
   if (!storage) return false;
   const key = panelDraftKey(scope);
@@ -243,6 +246,22 @@ export const deletePanelDraftsFor = (target: {
   return removed;
 };
 
+/** How many live panel drafts this user has in this browser. */
+export const countPanelDraftsFor = (userEmail: string, now: number = Date.now()): number => {
+  void panelDraftRevision.value;
+  const storage = getStorage();
+  if (!storage) return 0;
+  try {
+    return draftKeys(storage).filter(
+      (key) =>
+        key.startsWith(`${PANEL_DRAFT_PREFIX}${userEmail}:`) &&
+        isLive(parseDraft(storage.getItem(key)), now),
+    ).length;
+  } catch {
+    return 0;
+  }
+};
+
 /** Runs on logout so no draft outlives the session that wrote it. */
 export const clearAllPanelDrafts = () => {
   const storage = getStorage();
@@ -303,6 +322,10 @@ export const usePanelDraftAutosave = (options: PanelDraftAutosaveOptions) => {
     timer = setTimeout(flush, options.delay ?? PANEL_DRAFT_AUTOSAVE_MS);
   };
 
+  const flushPending = () => {
+    if (timer) flush();
+  };
+
   const adopt = () => {
     owned = true;
   };
@@ -330,5 +353,5 @@ export const usePanelDraftAutosave = (options: PanelDraftAutosaveOptions) => {
   // A write still pending at unmount would run against the reset editor and delete the draft.
   if (getCurrentInstance()) onBeforeUnmount(stop);
 
-  return { schedule, flush, cancel, adopt, release, stop };
+  return { schedule, flush, flushPending, cancel, adopt, release, stop };
 };

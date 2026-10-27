@@ -667,16 +667,25 @@ describe("AddUser", () => {
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
     });
 
-    it("signout() clears auth state and redirects to /logout", () => {
+    it("signout() runs the leave guards, then clears auth state", async () => {
       store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
       store.state.organizations = [];
       const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(undefined as any);
-      const push = vi.fn();
+      const guards: ((to: { path: string }) => unknown)[] = [];
+      const push = vi.fn(async (path: string) => {
+        for (const guard of [...guards]) await guard({ path });
+      });
+      const beforeEach = (guard: (to: { path: string }) => unknown) => {
+        guards.push(guard);
+        return () => {
+          if (guards.includes(guard)) guards.splice(guards.indexOf(guard), 1);
+        };
+      };
       const w = mount(AddUser, {
         global: {
           plugins: [store, i18n],
           stubs: { ODialog: ODialogStub },
-          mocks: { $router: { push } },
+          mocks: { $router: { push, beforeEach } },
         },
         props: {
           open: true,
@@ -690,6 +699,7 @@ describe("AddUser", () => {
       });
 
       w.vm.signout();
+      await flushPromises();
 
       expect(invalidateLoginData).toHaveBeenCalled();
       expect(dispatchSpy).toHaveBeenCalledWith("logout");

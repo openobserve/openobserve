@@ -966,7 +966,19 @@
     "boolTrue": "真",
     "boolFalse": "偽",
     "browserTimeWithZone": "ブラウザ時間（{zone}）",
-    "poweredBy": "提供"
+    "poweredBy": "提供",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "名前が既に使われているため、下書きの {count} 個の変数は追加されませんでした | 名前が既に使われているため、下書きの {count} 個の変数は追加されませんでした",
       "leaveTitle": "未保存の変更を残して移動しますか？",
       "leaveMessage": "パネルを保存するか、変更をこのブラウザーに下書きとして残すか、破棄してください。",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "下書きを残す",
       "addPanelDot": "パネルを追加 · 未保存の下書き",
       "panelDot": "このブラウザーに未保存の変更があります",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "デフォルト",
     "fetchReportError": "レポートの取得中にエラーが発生しました！",
-    "cancelReportChangesConfirm": "レポートの変更をキャンセルしてもよろしいですか？",
     "fetchReportsError": "レポートの取得中にエラーが発生しました！",
     "updateReportStateError": "レポートの状態の更新中にエラーが発生しました！",
     "deleteReportError": "レポートの削除中にエラーが発生しました！",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} 固定中",
         "summaryEmpty": "未設定",
         "submit": "作成して実行",
-        "leaveTitle": "この実験を破棄しますか？",
-        "leaveMessage": "この実験はまだ作成されていません。今離れると、入力したすべての内容が破棄されます。",
         "validation": {
           "nameRequired": "名前は必須です",
           "datasetRequired": "データセットを選択",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "チェックが見つかりません。",
       "http": "HTTP / API",
       "httpDesc": "エンドポイント、ステータスコード、応答本文をチェック",
-      "leave": "離れる",
       "loadEditFailed": "編集用のチェックの読み込みに失敗しました - フォームにはデフォルト値が表示されているため、保存しないでください",
       "notFoundInOrg": "このチェックは現在の組織に存在しません。",
       "modalSubtitle": "監視するものを選択",
@@ -19278,13 +19288,10 @@
       "saving": "チェックを保存中...",
       "ssh": "SSH",
       "sshDesc": "サーバーへのSSH接続を確認",
-      "stay": "滞在",
       "tcp": "TCPポート",
       "tcpDesc": "ホストとポートが到達可能かを確認",
       "tls": "SSL/TLS証明書",
       "tlsDesc": "SSL/TLS証明書の有効性と期限を監視",
-      "unsavedBody": "未保存の変更があります。本当に離脱しますか？",
-      "unsavedTitle": "未保存の変更",
       "updateCheck": "チェックを更新",
       "updated": "チェックが正常に更新されました。",
       "folder": "フォルダ",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "ビジュアルエディターでは、この YAML の一部が失われるため表示できません",
       "publishedWithWarnings": "v{version} を公開しました（警告 {count} 件） | v{version} を公開しました（警告 {count} 件）",
       "notFound": "構成 {name} が見つかりません",
+      "importNotApplied": "以前の下書きを続行したため、インポートしたファイルは適用されていません。使用するには再度インポートしてください。",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "まだ参照されています。フリート: {fleets}、コレクター: {collectors}、アクティブなロールアウト: {rollouts}。先にそれらのフリートを別の構成に変更してください。"
     },
     "history": {

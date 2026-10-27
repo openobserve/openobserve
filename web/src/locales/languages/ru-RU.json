@@ -966,7 +966,19 @@
     "boolTrue": "Истина",
     "boolFalse": "Ложь",
     "browserTimeWithZone": "Время браузера ({zone})",
-    "poweredBy": "Работает на"
+    "poweredBy": "Работает на",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} переменная из черновика не добавлена, так как её имя уже используется | Не добавлено переменных из черновика, так как их имена уже используются: {count}",
       "leaveTitle": "Выйти с несохранёнными изменениями?",
       "leaveMessage": "Сохраните панель, оставьте изменения как черновик в этом браузере или отмените их.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Оставить черновик",
       "addPanelDot": "Добавить панель · несохранённый черновик",
       "panelDot": "Несохранённые изменения в этом браузере",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "По умолчанию",
     "fetchReportError": "Ошибка при получении отчёта!",
-    "cancelReportChangesConfirm": "Вы уверены, что хотите отменить изменения в отчёте?",
     "fetchReportsError": "Ошибка при получении отчётов!",
     "updateReportStateError": "Ошибка при обновлении состояния отчёта!",
     "deleteReportError": "Ошибка при удалении отчёта!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} закреплено",
         "summaryEmpty": "Не задано",
         "submit": "Создать и запустить",
-        "leaveTitle": "Отменить этот эксперимент?",
-        "leaveMessage": "Этот эксперимент еще не создан. Если вы уйдете сейчас, все введенные данные будут отброшены.",
         "validation": {
           "nameRequired": "Требуется имя",
           "datasetRequired": "Выберите набор данных",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Проверки не найдены.",
       "http": "HTTP / API",
       "httpDesc": "Проверяйте конечные точки, коды состояния и тела ответов",
-      "leave": "Уйти",
       "loadEditFailed": "Не удалось загрузить проверку для редактирования — форма показывает значения по умолчанию, не сохраняйте",
       "notFoundInOrg": "Эта проверка не существует в текущей организации.",
       "modalSubtitle": "Выберите, что вы хотите мониторить",
@@ -19278,13 +19288,10 @@
       "saving": "Сохранение проверки…",
       "ssh": "SSH",
       "sshDesc": "Подтвердите SSH-подключение к серверу",
-      "stay": "Остаться",
       "tcp": "TCP-порт",
       "tcpDesc": "Убедитесь, что хост и порт доступны",
       "tls": "Сертификат SSL/TLS",
       "tlsDesc": "Отслеживайте действительность и срок действия сертификата SSL/TLS",
-      "unsavedBody": "У вас есть несохранённые изменения. Вы уверены, что хотите уйти?",
-      "unsavedTitle": "Несохранённые изменения",
       "updateCheck": "Обновить проверку",
       "updated": "Проверка успешно обновлена.",
       "folder": "папка",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "Визуальный редактор не может показать этот YAML без потери его частей",
       "publishedWithWarnings": "Опубликована v{version} с {count} предупреждением | Опубликована v{version}, предупреждений: {count}",
       "notFound": "Конфигурация {name} не найдена",
+      "importNotApplied": "Импортированный файл не применён, так как вы продолжили прежний черновик. Импортируйте его снова, чтобы использовать.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Всё ещё используется парками: {fleets}, коллекторами: {collectors}, активными развертываниями: {rollouts}. Сначала переведите эти парки на другую конфигурацию."
     },
     "history": {

@@ -966,7 +966,19 @@
     "boolTrue": "Prawda",
     "boolFalse": "Fałsz",
     "browserTimeWithZone": "Czas przeglądarki ({zone})",
-    "poweredBy": "Obsługiwane przez"
+    "poweredBy": "Obsługiwane przez",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "{count} zmienna ze szkicu nie została dodana, ponieważ jej nazwa jest już używana | Zmienne ze szkicu niedodane, ponieważ ich nazwy są już używane: {count}",
       "leaveTitle": "Wyjść z niezapisanymi zmianami?",
       "leaveMessage": "Zapisz panel, zachowaj zmiany jako szkic w tej przeglądarce lub je odrzuć.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Zachowaj szkic",
       "addPanelDot": "Dodaj panel · niezapisany szkic",
       "panelDot": "Niezapisane zmiany w tej przeglądarce",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Domyślnie",
     "fetchReportError": "Błąd podczas pobierania raportu!",
-    "cancelReportChangesConfirm": "Czy na pewno chcesz anulować zmiany w raporcie?",
     "fetchReportsError": "Błąd podczas pobierania raportów!",
     "updateReportStateError": "Błąd podczas aktualizowania stanu raportu!",
     "deleteReportError": "Błąd podczas usuwania raportu!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "Przypięte: {count}",
         "summaryEmpty": "Nie ustawiono",
         "submit": "Utwórz i uruchom",
-        "leaveTitle": "Odrzucić ten eksperyment?",
-        "leaveMessage": "Ten eksperyment nie został jeszcze utworzony. Opuszczenie teraz spowoduje odrzucenie wszystkich wprowadzonych danych.",
         "validation": {
           "nameRequired": "Nazwa jest wymagana",
           "datasetRequired": "Wybierz zbiór danych",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Nie znaleziono sprawdzeń.",
       "http": "HTTP / API",
       "httpDesc": "Sprawdź punkty końcowe, kody statusu i treści odpowiedzi",
-      "leave": "Opuść",
       "loadEditFailed": "Nie udało się załadować sprawdzenia do edycji — formularz pokazuje wartości domyślne, nie zapisuj",
       "notFoundInOrg": "To sprawdzenie nie istnieje w bieżącej organizacji.",
       "modalSubtitle": "Wybierz, co chcesz monitorować",
@@ -19278,13 +19288,10 @@
       "saving": "Zapisywanie sprawdzenia…",
       "ssh": "SSH",
       "sshDesc": "Potwierdź łączność SSH z serwerem",
-      "stay": "Pozostań",
       "tcp": "Port TCP",
       "tcpDesc": "Sprawdź, czy host i port są osiągalne",
       "tls": "Certyfikat SSL/TLS",
       "tlsDesc": "Monitoruj ważność i wygaśnięcie certyfikatu SSL/TLS",
-      "unsavedBody": "Masz niezapisane zmiany. Czy na pewno chcesz opuścić?",
-      "unsavedTitle": "Niezapisane zmiany",
       "updateCheck": "Aktualizuj sprawdzenie",
       "updated": "Sprawdzenie zaktualizowano pomyślnie.",
       "folder": "folder",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "Edytor wizualny nie może pokazać tego YAML bez utraty jego części",
       "publishedWithWarnings": "Opublikowano v{version} z ostrzeżeniem: {count} | Opublikowano v{version} z ostrzeżeniami: {count}",
       "notFound": "Nie znaleziono konfiguracji {name}",
+      "importNotApplied": "Zaimportowany plik nie został zastosowany, ponieważ kontynuowano wcześniejszą wersję roboczą. Zaimportuj go ponownie, aby go użyć.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Nadal używana przez floty: {fleets}, kolektory: {collectors}, aktywne wdrożenia: {rollouts}. Najpierw zmień konfigurację tych flot na inną."
     },
     "history": {

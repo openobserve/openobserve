@@ -966,7 +966,19 @@
     "boolTrue": "Doğru",
     "boolFalse": "Yanlış",
     "browserTimeWithZone": "Tarayıcı Zamanı ({zone})",
-    "poweredBy": "Destekleyen"
+    "poweredBy": "Destekleyen",
+    "editorDraft": {
+      "changesNotKept": "Your change to the {fields} was not kept. Re-enter it before saving. | Your changes to the {fields} were not kept. Re-enter them before saving.",
+      "reenterField": "Re-enter this value: your change was not kept in the draft.",
+      "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
+      "headerField": "{name} header",
+      "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
+      "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
+      "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
+      "signOutTitle": "Sign out and discard drafts?",
+      "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
+      "signOutConfirm": "Sign out"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -6202,6 +6214,8 @@
       "variablesSkipped": "Adı zaten kullanıldığı için taslaktaki {count} değişken eklenmedi | Adları zaten kullanıldığı için taslaktaki {count} değişken eklenmedi",
       "leaveTitle": "Kaydedilmemiş değişikliklerle çıkılsın mı?",
       "leaveMessage": "Paneli kaydedin, değişikliklerinizi bu tarayıcıda taslak olarak saklayın veya atın.",
+      "leaveMessageNoDraft": "Save the panel or discard your changes.",
+      "leaveMessageDiscardOnly": "This panel cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "keepDraft": "Taslağı sakla",
       "addPanelDot": "Panel ekle · kaydedilmemiş taslak",
       "panelDot": "Bu tarayıcıda kaydedilmemiş değişiklikler var",
@@ -13918,7 +13932,6 @@
     },
     "destinationDefault": "Varsayılan",
     "fetchReportError": "Rapor getirilirken hata oluştu!",
-    "cancelReportChangesConfirm": "Rapor değişikliklerini iptal etmek istediğinize emin misiniz?",
     "fetchReportsError": "Raporlar getirilirken hata oluştu!",
     "updateReportStateError": "Rapor durumu güncellenirken hata oluştu!",
     "deleteReportError": "Rapor silinirken hata oluştu!",
@@ -16082,8 +16095,6 @@
         "summaryScorers": "{count} sabitlendi",
         "summaryEmpty": "Ayarlanmadı",
         "submit": "Oluştur ve çalıştır",
-        "leaveTitle": "Bu deney atılsın mı?",
-        "leaveMessage": "Bu deney henüz oluşturulmadı. Şimdi ayrılmak girdiğiniz her şeyi atar.",
         "validation": {
           "nameRequired": "Ad zorunludur",
           "datasetRequired": "Bir veri kümesi seçin",
@@ -19264,7 +19275,6 @@
       "emptyTitle": "Hiçbir kontrol bulunamadı.",
       "http": "HTTP / API",
       "httpDesc": "Uç noktaları, durum kodlarını ve yanıt gövdelerini kontrol edin",
-      "leave": "Ayrıl",
       "loadEditFailed": "Kontrol düzenleme için yüklenemedi — form varsayılanları gösteriyor, kaydetmeyin",
       "notFoundInOrg": "Bu kontrol mevcut kuruluşta bulunmuyor.",
       "modalSubtitle": "İzlemek istediğiniz şeyi seçin",
@@ -19278,13 +19288,10 @@
       "saving": "Kontrol kaydediliyor…",
       "ssh": "SSH",
       "sshDesc": "Bir sunucuya SSH bağlantısını doğrulayın",
-      "stay": "Kal",
       "tcp": "TCP Bağlantı Noktası",
       "tcpDesc": "Bir ana bilgisayar ve bağlantı noktasının erişilebilir olduğunu doğrulayın",
       "tls": "SSL / TLS Sertifikası",
       "tlsDesc": "SSL/TLS sertifikasının geçerliliğini ve süresini izleyin",
-      "unsavedBody": "Kaydedilmemiş değişiklikleriniz var. Ayrılmak istediğinize emin misiniz?",
-      "unsavedTitle": "Kaydedilmemiş değişiklikler",
       "updateCheck": "Kontrolü güncelle",
       "updated": "Kontrol başarıyla güncellendi.",
       "folder": "klasör",
@@ -27471,6 +27478,8 @@
       "visualUnavailable": "Görsel düzenleyici bu YAML'ı bazı kısımlarını kaybetmeden gösteremiyor",
       "publishedWithWarnings": "v{version} {count} uyarıyla yayınlandı | v{version} {count} uyarıyla yayınlandı",
       "notFound": "{name} yapılandırması bulunamadı",
+      "importNotApplied": "Önceki taslağınıza devam ettiğiniz için içe aktarılan dosya uygulanmadı. Kullanmak için yeniden içe aktarın.",
+      "reenterSecrets": "Re-enter {keys} in the YAML before saving: your change was not kept in the draft. | Re-enter {keys} in the YAML before saving: your changes were not kept in the draft.",
       "deleteInUse": "Hâlâ şunlar tarafından kullanılıyor: filolar: {fleets}, toplayıcılar: {collectors}, etkin dağıtımlar: {rollouts}. Önce bu filoları başka bir yapılandırmaya geçirin."
     },
     "history": {

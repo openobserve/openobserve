@@ -17,6 +17,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import store from "./index";
 import { resolveLogSeverity } from "@/utils/logs/statusParser";
 import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+import {
+  endEditorDraftSession,
+  readEditorDraft,
+  writeEditorDraft,
+} from "@/utils/drafts/editorDraftStore";
 
 // `store` is an imported singleton mutated by every test in this file, so the
 // DECLARED initial state cannot be observed from inside a test that has already
@@ -74,6 +79,39 @@ describe("root store", () => {
       expect(readPanelDraft(scope)).toBeNull();
       expect(localStorage.getItem("unrelated")).toBe("keep");
       localStorage.removeItem("unrelated");
+    });
+
+    it("keeps editor drafts on a session-expiry logout, so the open editor's work survives re-login", async () => {
+      const scope = {
+        kind: "function" as const,
+        org: "o",
+        entityId: "fn",
+        userEmail: "me@x.io",
+      };
+      writeEditorDraft(scope, { data: { name: "fn" } });
+      localStorage.setItem("unrelated", "keep");
+
+      await store.dispatch("logout");
+
+      expect(readEditorDraft(scope)).not.toBeNull();
+      expect(writeEditorDraft(scope, { data: { name: "flushed on unload" } })).toBe(true);
+      expect(localStorage.getItem("unrelated")).toBe("keep");
+      localStorage.clear();
+    });
+
+    it("re-enables draft writes on login after an explicit sign-out", async () => {
+      const scope = {
+        kind: "function" as const,
+        org: "o",
+        entityId: "fn",
+        userEmail: "me@x.io",
+      };
+      endEditorDraftSession();
+      expect(writeEditorDraft(scope, { data: { name: "late" } })).toBe(false);
+
+      await store.dispatch("login", { loginState: true, userInfo: { email: "me@x.io" } });
+      expect(writeEditorDraft(scope, { data: { name: "fn" } })).toBe(true);
+      localStorage.clear();
     });
   });
 
