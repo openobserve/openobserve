@@ -641,7 +641,8 @@
       "consent.spec.js",
       "credits.spec.js",
       "history.spec.js",
-      "xtab.spec.js"
+      "xtab.spec.js",
+      "sharing.spec.js"
     ],
     "disabled": []
   }

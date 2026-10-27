@@ -36,7 +36,12 @@ import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionCheck
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
-import { scrubAuthParams } from "./utils/rum/scrubAuthParams";
+import {
+  scrubAuthParams,
+  scrubSharePath,
+  scrubShareTokens,
+  type ShareScrubbable,
+} from "./utils/rum/scrubAuthParams";
 import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
@@ -128,11 +133,7 @@ const getConfig = async () => {
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
-    // A failed chunk load leaves the assistant off; the rest of the app is unaffected.
-    if (isAssistantV2())
-      initAssistant(res.data.commit_hash?.slice(0, 12) ?? "unknown").catch((err) =>
-        console.error("Assistant runtime failed to load", err),
-      );
+    startAssistantOffPublicShare(res.data.commit_hash?.slice(0, 12) ?? "unknown");
     if (res.data.rum?.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
@@ -176,8 +177,8 @@ const getConfig = async () => {
             ]
           : [],
         beforeSend: (event) => {
-          event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
-          event.view.referrer = scrubAuthParams(event.view.referrer);
+          event.view.url = scrubSharePath(scrubAuthParams(event.view.url) ?? event.view.url);
+          event.view.referrer = scrubSharePath(scrubAuthParams(event.view.referrer));
           if (event.type === "resource") {
             event.resource.url = scrubAuthParams(event.resource.url) ?? event.resource.url;
           }
@@ -188,6 +189,7 @@ const getConfig = async () => {
                 scrubAuthParams(event.error.resource.url) ?? event.error.resource.url;
             }
           }
+          scrubShareTokens(event as ShareScrubbable);
           if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
           if (event.type === "action" && event.action.target?.name) {
             event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
@@ -230,10 +232,13 @@ const getConfig = async () => {
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
         beforeSend: (log) => {
-          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
-          if (log.view?.referrer) log.view.referrer = scrubAuthParams(log.view.referrer);
-          if (log.http?.url) log.http.url = scrubAuthParams(log.http.url) ?? log.http.url;
-          log.message = scrubAuthParams(log.message) ?? log.message;
+          if (log.view?.url)
+            log.view.url = scrubSharePath(scrubAuthParams(log.view.url) ?? log.view.url);
+          if (log.view?.referrer)
+            log.view.referrer = scrubSharePath(scrubAuthParams(log.view.referrer));
+          if (log.http?.url)
+            log.http.url = scrubSharePath(scrubAuthParams(log.http.url) ?? log.http.url);
+          log.message = scrubSharePath(scrubAuthParams(log.message) ?? log.message);
           // Filter out specific logs before sending
           const logMessage = log.message || "";
 
@@ -258,6 +263,27 @@ const getConfig = async () => {
     }
   });
 };
+
+const PUBLIC_SHARE_PATH = /(?:^|\/)ai\/public\//;
+
+let assistantStarted = false;
+
+// A public shared page never loads the runtime; leaving it for the app starts it then.
+function startAssistantOffPublicShare(uiVersion: string) {
+  if (!isAssistantV2()) return;
+  const start = () => {
+    if (assistantStarted) return;
+    assistantStarted = true;
+    // A failed chunk load leaves the assistant off; the rest of the app is unaffected.
+    initAssistant(uiVersion).catch((err) => console.error("Assistant runtime failed to load", err));
+  };
+  if (!PUBLIC_SHARE_PATH.test(window.location.pathname)) return start();
+  const stop = router.afterEach((to) => {
+    if (PUBLIC_SHARE_PATH.test(to.path)) return;
+    stop();
+    start();
+  });
+}
 
 // Dynamic imports only: with the flag off nothing of the assistant runtime is loaded.
 async function initAssistant(uiVersion: string) {

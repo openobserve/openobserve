@@ -49,6 +49,7 @@ import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { assistantUsageQuery, capabilitiesQuery } from "@/services/assistant.queries";
 import { assistantKeys } from "@/services/assistant.querykeys";
+import { aiChatShareKeys } from "@/services/ai_chat_share.querykeys";
 import type { TelemetryContextGetters, TelemetryRole } from "@/services/assistantAnalytics";
 import { orgTimeZone } from "@/utils/formatters";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
@@ -217,6 +218,7 @@ function buildRuntime(): AssistantRuntime {
 
     const hints = createHintChannel("");
     deps.hints = hints;
+    hints.on("share_changed", (hint) => invalidateShares(store, context, hint.sid));
     const approvals = createApprovalsRuntime({
       state: () => store.state,
       annotate: (sid, blockId, patch) => store.annotate(sid, blockId, patch),
@@ -537,6 +539,16 @@ function observe<T>(
 // The meter moves within one turn, and a grant elsewhere changes the mode.
 function refreshUsage(org: string): void {
   if (org) void queryClient.invalidateQueries({ queryKey: assistantKeys.usage(org) });
+}
+
+// A hint only names the chat; its links are re-read, never taken from the payload.
+function invalidateShares(
+  store: AssistantStoreInternal,
+  context: ShallowRef<AssistantRuntimeContext | null>,
+  sid: string,
+): void {
+  const org = store.state.sessions[sid]?.org ?? context.value?.getOrg()?.identifier;
+  if (org) void queryClient.invalidateQueries({ queryKey: aiChatShareKeys.forChat(org, sid) });
 }
 
 // The open Alerts and Dashboards lists hear about an approved change on their own refresh bus.

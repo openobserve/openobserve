@@ -50,6 +50,12 @@ const json = (route, body, status = 200) =>
     body: JSON.stringify(body),
   });
 
+// The server's share requests are deny_unknown_fields; hide_attachments exists only where /config advertises it.
+const CREATE_SHARE_FIELDS = ["mode", "visibility", "expires_in_secs", "redact_tools"];
+const UPDATE_SHARE_FIELDS = ["mode", "expires_in_secs", "refresh_snapshot", "redact_tools"];
+const unknownShareFields = (body, allowed, state) =>
+  Object.keys(body).find((k) => !allowed.includes(k) && !(k === "hide_attachments" && state.configPatch.ai_share_redact_attachments === true));
+
 /** Mutable per-context mock state; knobs past the first block are no-ops until their WP fills them in (99 §5). */
 export function createMockState(overrides = {}) {
   return {
@@ -245,6 +251,8 @@ async function handleAi(route, request, state) {
     const sid = decodeURIComponent(mt[1]);
     if (m === "POST") {
       const body = request.postDataJSON() || {};
+      const unknown = unknownShareFields(body, CREATE_SHARE_FIELDS, state);
+      if (unknown) return json(route, { code: 400, message: `unknown field \`${unknown}\`` }, 400), true;
       const chat = state.chats.find((c) => c.session_id === sid) || state.chats[0];
       const nowUs = Date.now() * 1000;
       const share = {
@@ -262,6 +270,7 @@ async function handleAi(route, request, state) {
         session_id: sid,
         title: chat.title,
         redact_tools: !!body.redact_tools,
+        ...(body.hide_attachments !== undefined && { hide_attachments: !!body.hide_attachments }),
       };
       state.shares.unshift(share);
       return json(route, share), true;
@@ -324,7 +333,14 @@ async function handleAi(route, request, state) {
       state.shares = state.shares.filter((s) => s.id !== id);
       return json(route, { revoked: true }), true;
     }
-    Object.assign(share || {}, request.postDataJSON() || {}, { updated_at: Date.now() * 1000 });
+    const patch = request.postDataJSON() || {};
+    const unknown = unknownShareFields(patch, UPDATE_SHARE_FIELDS, state);
+    if (unknown) return json(route, { code: 400, message: `unknown field \`${unknown}\`` }, 400), true;
+    const { expires_in_secs: secs, refresh_snapshot: refresh, ...rest } = patch;
+    const expiry = secs === undefined ? {} : { expires_at: secs === null ? null : Date.now() * 1000 + secs * 1e6 };
+    const chat = share && state.chats.find((c) => c.session_id === share.session_id);
+    const snapshot = refresh && chat ? { snapshot_seq: chat.last_committed_seq } : {};
+    Object.assign(share || {}, rest, expiry, snapshot, { updated_at: Date.now() * 1000 });
     return json(route, share || {}), true;
   }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/shared\/([^/]+)\/fork$/))) {

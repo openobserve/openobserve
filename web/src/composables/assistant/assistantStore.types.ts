@@ -117,6 +117,8 @@ export interface ForkSeed {
   ownerName: string;
   asOf: number;
   turns: unknown[];
+  redacted?: boolean;
+  hidden?: Record<string, { reason: "stream_forbidden"; stream: string }>;
 }
 
 export interface RecordMeta {

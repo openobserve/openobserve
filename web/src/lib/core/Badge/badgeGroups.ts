@@ -2073,6 +2073,23 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // O2 Assistant share chip and link tags.
+  assistantShare: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      org: { variant: "default-soft" },
+      public: { variant: "default-soft" },
+      expiring: { variant: "warning-quiet" },
+      mode: { variant: "default-soft" },
+      tools: { variant: "default-outline" },
+      attachments: { variant: "default-outline" },
+      outofdate: { variant: "default-outline" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // O2 Assistant claim chips: the number is the caller's `label`; muted when the step is not in view.
   assistantClaim: {
     mode: "plain",
