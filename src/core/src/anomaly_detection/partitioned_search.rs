@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     ops::ControlFlow,
     sync::{LazyLock, Mutex},
     time::{Duration, Instant},
@@ -74,6 +74,9 @@ const VOLATILE_FUNCTIONS: [&str; 11] = [
 
 /// Functions that turn one bucket into several rows, which the slice reader rejects as duplicates.
 const ROW_EXPANDING_FUNCTIONS: [&str; 1] = ["unnest"];
+
+/// Caps the result keys kept for the all-NULL diagnostic.
+const MAX_KEYS_SEEN: usize = 64;
 
 /// An unchanged fallback reason is logged once per config per interval, not on every tick.
 const FALLBACK_LOG_INTERVAL: Duration = Duration::from_secs(3600);
@@ -310,7 +313,7 @@ struct SeriesAccumulator {
     raw_buckets: HashSet<i64>,
     raw_hits: usize,
     omitted_nulls: usize,
-    keys_seen: Vec<String>,
+    keys_seen: BTreeSet<String>,
 }
 
 impl SeriesAccumulator {
@@ -344,13 +347,11 @@ impl SeriesAccumulator {
         if raw == 0 {
             return Ok(());
         }
-        if self.keys_seen.is_empty() {
-            self.keys_seen = super::columns_present(&response.hits);
-        }
         response.hits.iter().try_for_each(|hit| {
             let Some(row) = hit.as_object() else {
                 anyhow::bail!("row is not an object: {hit}");
             };
+            self.note_keys(row);
             self.add_row(hit, row, columns, slice, interval_us)
         })
     }
@@ -391,6 +392,22 @@ impl SeriesAccumulator {
         Ok(())
     }
 
+    /// Object rows drop NULL keys, so the diagnostic needs keys from every row, not one.
+    fn note_keys(&mut self, row: &serde_json::Map<String, serde_json::Value>) {
+        // Only an all-NULL run reports the keys, so collecting stops at the first usable point.
+        if !self.points.is_empty() {
+            return;
+        }
+        for key in row.keys() {
+            if self.keys_seen.len() >= MAX_KEYS_SEEN {
+                return;
+            }
+            if !self.keys_seen.contains(key) {
+                self.keys_seen.insert(key.clone());
+            }
+        }
+    }
+
     fn finish(mut self, budget: usize, value_column: &str) -> Result<Vec<QueryDataPoint>> {
         if self.raw_hits >= budget {
             anyhow::bail!(
@@ -404,7 +421,7 @@ impl SeriesAccumulator {
                 "query returned {} rows but none were usable: every '{value_column}' was SQL \
                  NULL, or the column is missing from the result (columns present: {:?})",
                 self.raw_hits,
-                self.keys_seen
+                self.keys_seen.iter().collect::<Vec<_>>()
             );
         }
         self.points.sort_by_key(|p| p.timestamp_us);
@@ -2226,11 +2243,45 @@ mod tests {
         assert!(err.contains("2 rows"), "{err}");
         assert!(err.contains("every 'value' was SQL NULL"), "{err}");
         assert!(err.contains("missing from the result"), "{err}");
-        let present = err.split("columns present: ").nth(1).unwrap_or_default();
         assert!(
-            present.contains("\"count\"") && present.contains("\"time_bucket\""),
+            err.contains(r#"columns present: ["count", "time_bucket"]"#),
             "{err}"
         );
+
+        let custom = columns("zo_sql_timestamp", "Cnt");
+        let mut series = SeriesAccumulator::default();
+        for (slice, hit) in [
+            (first, json!({ "zo_sql_timestamp": T0 })),
+            (
+                second,
+                json!({"zo_sql_timestamp": T0 + FIVE_MIN_US, "cnt": 4}),
+            ),
+        ] {
+            series
+                .add_slice(&response(vec![hit]), slice, FIVE_MIN_US, 100, &custom)
+                .unwrap();
+        }
+        let err = series.finish(100, "Cnt").unwrap_err().to_string();
+        assert!(
+            err.contains(r#"columns present: ["cnt", "zo_sql_timestamp"]"#),
+            "{err}"
+        );
+
+        let wide: serde_json::Map<_, _> = (0..2 * MAX_KEYS_SEEN)
+            .map(|i| (format!("k{i:03}"), json!(1)))
+            .chain([(BUCKET_COLUMN.to_string(), json!(T0))])
+            .collect();
+        let mut series = SeriesAccumulator::default();
+        series
+            .add_slice(
+                &response(vec![serde_json::Value::Object(wide)]),
+                first,
+                FIVE_MIN_US,
+                100,
+                &ResultColumns::generated(),
+            )
+            .unwrap();
+        assert_eq!(series.keys_seen.len(), MAX_KEYS_SEEN);
 
         let slice = [T0, T0 + 2 * FIVE_MIN_US];
         let no_bucket = response(vec![json!({ VALUE_COLUMN: 1 })]);
