@@ -347,8 +347,8 @@ test.describe('Logs bare-word search (item 1)', () => {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
     const logsPage = new PageManager(page).logsPage;
-    const schemaRoute = new RegExp(`/api/${ORG}/streams(/${NOFTS}/schema)?\\?type=logs`);
-    await page.route(schemaRoute, async (route) => {
+    const slowStreamRoute = new RegExp(`/api/${ORG}/streams(/${NOFTS}/schema)?\\?type=logs`);
+    await page.route(slowStreamRoute, async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 6000));
       await route.continue();
     });
