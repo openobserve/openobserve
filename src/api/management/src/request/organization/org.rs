@@ -28,6 +28,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, check_permissions},
     organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
+    overview,
 };
 #[cfg(feature = "cloud")]
 use {
@@ -378,6 +379,51 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     let org = org_id;
     let org_summary = organization::get_summary(&org).await;
     Json(org_summary)
+}
+
+/// GetOrganizationOverview
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/overview",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetOrganizationOverview",
+    summary = "Get organization overview",
+    description = "Returns the streams, alerts, pipelines and license limits sections the Overview page needs in one call. Each section carries its own status (ok, error or locked), so one failing section never fails the response, and results only include objects the caller may see. Responses are cached briefly per caller.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("top" = Option<u32>, Query, description = "Top streams per stream type by size. Default 5, max 20."),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn org_overview(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let top = match query.get("top").map(|v| v.parse::<usize>()) {
+        Some(Err(_)) => return MetaHttpResponse::bad_request("'top' must be a positive integer"),
+        Some(Ok(n)) => Some(n),
+        None => None,
+    };
+    let scope = match overview::resolve_scope(&org_id, &user_email.user_id).await {
+        Ok(scope) => scope,
+        Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+    };
+    let result = overview::get_overview(&org_id, &scope, overview::normalize_top_n(top)).await;
+    Json(result).into_response()
 }
 
 /// GetIngestToken

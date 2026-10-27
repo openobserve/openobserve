@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 38] = [
+const QUERIER_ROUTES: [(&str, usize); 39] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
+    ("overview", 2),             // /api/{org_id}/overview
     ("organizations", 1),        // /api/organizations
     ("settings", 2),             // /api/{org_id}/settings/...
     ("schema", 3),               // /api/{org_id}/streams/{stream_name}/schema
@@ -194,6 +195,9 @@ mod tests {
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
         assert!(!is_querier_route("/summary")); // Should fail as it needs org_id
+
+        assert!(is_querier_route("/api/org1/overview"));
+        assert!(!is_querier_route("/overview"));
 
         // Test streams route
         assert!(is_querier_route("/api/org1/streams"));

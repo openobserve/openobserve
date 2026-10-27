@@ -93,33 +93,28 @@ pub async fn get_streams(
     fetch_schema: bool,
     permitted_streams: Option<Vec<String>>,
 ) -> Vec<Stream> {
-    let indices = db::schema::list(org_id, stream_type, fetch_schema)
+    try_get_streams(org_id, stream_type, fetch_schema, permitted_streams)
         .await
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
 
-    let filtered_indices = if let Some(s_type) = stream_type {
-        let s_type = match s_type {
-            StreamType::EnrichmentTables => "enrichment_table",
-            _ => s_type.as_str(),
-        };
-        match permitted_streams {
-            Some(permitted_streams) => {
-                if permitted_streams.contains(&format!("{s_type}:_all_{org_id}")) {
-                    indices
-                } else {
-                    indices
-                        .into_iter()
-                        .filter(|stream_loc| {
-                            permitted_streams
-                                .contains(&format!("{}:{}", s_type, stream_loc.stream_name))
-                        })
-                        .collect::<Vec<_>>()
-                }
-            }
-            None => indices,
-        }
-    } else {
-        indices
+/// Like [`get_streams`] but reports a failed schema listing instead of returning an empty list.
+pub async fn try_get_streams(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    fetch_schema: bool,
+    permitted_streams: Option<Vec<String>>,
+) -> Result<Vec<Stream>, anyhow::Error> {
+    let indices = db::schema::list(org_id, stream_type, fetch_schema).await?;
+
+    let filtered_indices = match permitted_streams {
+        Some(permitted) => indices
+            .into_iter()
+            .filter(|loc| {
+                is_stream_permitted(&permitted, org_id, loc.stream_type, &loc.stream_name)
+            })
+            .collect::<Vec<_>>(),
+        None => indices,
     };
     let mut indices_res = Vec::with_capacity(filtered_indices.len());
     for stream_loc in filtered_indices {
@@ -155,7 +150,22 @@ pub async fn get_streams(
             ));
         }
     }
-    indices_res
+    Ok(indices_res)
+}
+
+/// Checks a stream against the caller's permitted object list, using the stream's own type.
+fn is_stream_permitted(
+    permitted: &[String],
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> bool {
+    let s_type = match stream_type {
+        StreamType::EnrichmentTables => "enrichment_table",
+        _ => stream_type.as_str(),
+    };
+    permitted.contains(&format!("{s_type}:_all_{org_id}"))
+        || permitted.contains(&format!("{s_type}:{stream_name}"))
 }
 
 pub fn stream_res(
@@ -1207,6 +1217,54 @@ mod tests {
 
     // unique org so the process-wide schema caches can host these tests in parallel
     const SETTINGS_TEST_ORG: &str = "settings_cache_test_org";
+
+    #[test]
+    fn test_is_stream_permitted_uses_each_streams_own_type() {
+        let permitted = vec!["logs:app".to_string(), "metrics:cpu".to_string()];
+        assert!(is_stream_permitted(
+            &permitted,
+            "o",
+            StreamType::Logs,
+            "app"
+        ));
+        assert!(is_stream_permitted(
+            &permitted,
+            "o",
+            StreamType::Metrics,
+            "cpu"
+        ));
+        assert!(!is_stream_permitted(
+            &permitted,
+            "o",
+            StreamType::Logs,
+            "cpu"
+        ));
+        assert!(!is_stream_permitted(
+            &permitted,
+            "o",
+            StreamType::Traces,
+            "app"
+        ));
+    }
+
+    #[test]
+    fn test_is_stream_permitted_all_grant_and_enrichment_key() {
+        let all = vec!["logs:_all_o".to_string()];
+        assert!(is_stream_permitted(&all, "o", StreamType::Logs, "anything"));
+        assert!(!is_stream_permitted(
+            &all,
+            "o",
+            StreamType::Metrics,
+            "anything"
+        ));
+        let enrich = vec!["enrichment_table:geo".to_string()];
+        assert!(is_stream_permitted(
+            &enrich,
+            "o",
+            StreamType::EnrichmentTables,
+            "geo"
+        ));
+    }
 
     #[test]
     fn test_associated_metadata_streams() {

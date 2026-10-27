@@ -2859,6 +2859,12 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
+    #[env_config(
+        name = "ZO_OVERVIEW_CACHE_TTL",
+        default = 30,
+        help = "Seconds the org overview response is cached per caller; 0 disables the cache."
+    )]
+    pub overview_cache_ttl: u64,
     // How long an o2-ai session->owner claim survives. Must exceed the longest
     // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
     #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds
