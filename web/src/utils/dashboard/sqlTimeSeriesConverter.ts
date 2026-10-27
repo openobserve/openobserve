@@ -20,6 +20,7 @@ import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { chartColor } from "../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
+import { stackTotalRows } from "./stackTotals";
 
 /**
  * Handles auto SQL time series conversion.
@@ -226,7 +227,14 @@ export const applyAutoSQLTimeSeries = (
           }
         });
 
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        const totals = stackTotalRows(
+          panelSchema.type,
+          name,
+          options.series,
+          seriesOverrides,
+          (it: any) => it.data?.[1],
+        );
+        return `${formatDate(date)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
       };
 
       options.tooltip.axisPointer = {
@@ -451,7 +459,14 @@ export const applyCustomSQLTimeSeries = (
             }
           });
 
-          return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it?.data?.[1],
+          );
+          return `${formatDate(date)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }

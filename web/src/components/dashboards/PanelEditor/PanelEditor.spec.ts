@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
+import { resolveConfig } from "./types/panelEditor";
 
 // Mock vuex store
 const mockStore = {
@@ -207,6 +208,14 @@ vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
     name: "PanelSchemaRenderer",
     props: ["searchType"],
     template: '<div class="panel-renderer-mock">PanelSchemaRenderer</div>',
+  },
+}));
+
+vi.mock("@/components/dashboards/VariablesValueSelector.vue", () => ({
+  default: {
+    name: "VariablesValueSelector",
+    emits: ["variablesData", "openAddVariable"],
+    template: '<div class="variables-selector-mock"></div>',
   },
 }));
 
@@ -959,6 +968,74 @@ describe("PanelEditor.vue", () => {
       expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
       delete config.heatmap_y_bucket;
       wrapper.unmount();
+    });
+  });
+
+  describe.each([
+    ["html", "CustomHTMLEditor"],
+    ["markdown", "CustomMarkdownEditor"],
+  ])("%s editor section", (type, editorName) => {
+    const configWithVariables = {
+      ...(resolveConfig as any)(),
+      showVariablesSelector: true,
+    };
+    let previousConfig: any;
+
+    beforeEach(() => {
+      previousConfig = (resolveConfig as any)();
+      (resolveConfig as any).mockReturnValue(configWithVariables);
+      mockDashboardPanelData.data.type = type;
+    });
+
+    afterEach(() => {
+      (resolveConfig as any).mockReturnValue(previousConfig);
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    it("forwards the selector's add-variable request", async () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", variablesData: { values: [] } },
+        global: mountGlobal,
+      });
+      await flushPromises();
+
+      wrapper.findComponent({ name: "VariablesValueSelector" }).vm.$emit("openAddVariable");
+
+      expect(wrapper.emitted("openAddVariable")).toHaveLength(1);
+    });
+
+    it("feeds start_time and end_time to the editor preview after the dashboard variables", async () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: {
+          pageType: "dashboard",
+          variablesData: { values: [{ name: "region", value: "us" }] },
+        },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            [editorName]: {
+              name: editorName,
+              props: ["initialVariableValues"],
+              template: "<div />",
+            },
+          },
+        },
+      });
+      await flushPromises();
+
+      const values = wrapper
+        .findComponent({ name: editorName })
+        .props("initialVariableValues").values;
+
+      expect(values).toEqual([
+        { name: "region", value: "us" },
+        {
+          name: "start_time",
+          value: mockDashboardPanelData.meta.dateTime.start_time.getTime(),
+        },
+        { name: "end_time", value: mockDashboardPanelData.meta.dateTime.end_time.getTime() },
+      ]);
     });
   });
 });

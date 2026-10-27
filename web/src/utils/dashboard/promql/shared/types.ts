@@ -22,6 +22,19 @@ export const TOOLTIP_SCROLL_STYLE =
   // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
   "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;";
 
+/** Chart types drawn by the modular PromQL converters, which honour `promql_series_limit`. */
+export const PROMQL_MODULAR_CHART_TYPES: readonly string[] = [
+  "pie",
+  "donut",
+  "table",
+  "heatmap",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "geomap",
+  "maps",
+];
+
 /**
  * PromQL result item structure
  */
@@ -159,4 +172,7 @@ export interface MapsConfig {
   aggregation?: string;
   emphasis_area_color?: string;
   select_area_color?: string;
+  unit?: string;
+  unit_custom?: string;
+  decimals?: number;
 }
