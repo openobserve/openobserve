@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · 中",
       "severityLow": "P4 · 低",
       "moreDimensions": "+{count} 件",
+      "moreAlertGroups": "+{count} 件",
+      "alertGroupTooltip": "{name}: {count} 回発火 | {name}: {count} 回発火",
       "filterAll": "すべて",
       "filterActive": "アクティブ",
       "alertCount": "アラート",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "最初から再分析しています…",
         "reanalyzingBuildOnPrevious": "前回のレポートを基に構築しています…",
+        "resumingFrom": "「{step}」から再開しています…",
         "showDetails": "詳細を表示",
         "hideDetails": "詳細を非表示",
         "stale": "この分析は異常に長時間実行されており、停止した可能性があります。{time} UTC以降、新しいメッセージはありません。キャンセルして再試行してください。",

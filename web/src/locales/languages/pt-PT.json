@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Médio",
       "severityLow": "P4 · Baixo",
       "moreDimensions": "+{count} mais",
+      "moreAlertGroups": "+{count} mais",
+      "alertGroupTooltip": "{name}: disparado {count} vez | {name}: disparado {count} vezes",
       "filterAll": "Todos",
       "filterActive": "Ativos",
       "alertCount": "Alertas",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "A reanalisar de raiz…",
         "reanalyzingBuildOnPrevious": "A continuar a partir do relatório anterior…",
+        "resumingFrom": "A retomar a partir de “{step}”…",
         "showDetails": "Mostrar detalhes",
         "hideDetails": "Ocultar detalhes",
         "stale": "Esta análise está a demorar mais do que o habitual e pode ter parado. Sem novas mensagens desde {time} UTC. Cancele-a e tente novamente.",

@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Moyenne",
       "severityLow": "P4 · Faible",
       "moreDimensions": "+{count} autres",
+      "moreAlertGroups": "+{count} autres",
+      "alertGroupTooltip": "{name} : déclenchée {count} fois | {name} : déclenchée {count} fois",
       "filterAll": "Tous",
       "filterActive": "Actif",
       "alertCount": "Alertes",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Réanalyse en cours depuis le début…",
         "reanalyzingBuildOnPrevious": "En s'appuyant sur le rapport précédent…",
+        "resumingFrom": "Reprise à partir de « {step} »…",
         "showDetails": "Afficher les détails",
         "hideDetails": "Masquer les détails",
         "stale": "Cette analyse dure anormalement longtemps et a peut-être cessé. Aucun nouveau message depuis {time} UTC. Annulez-la et réessayez.",

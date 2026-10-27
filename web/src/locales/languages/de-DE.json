@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Mittel",
       "severityLow": "P4 · Niedrig",
       "moreDimensions": "+{count} weitere",
+      "moreAlertGroups": "+{count} weitere",
+      "alertGroupTooltip": "{name}: {count} Mal ausgelöst | {name}: {count} Mal ausgelöst",
       "filterAll": "Alle",
       "filterActive": "Aktiv",
       "alertCount": "Alarme",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Erneute Analyse von Grund auf …",
         "reanalyzingBuildOnPrevious": "Aufbauend auf dem vorherigen Bericht …",
+        "resumingFrom": "Wird ab „{step}“ fortgesetzt…",
         "showDetails": "Details anzeigen",
         "hideDetails": "Details ausblenden",
         "stale": "Diese Analyse läuft ungewöhnlich lange und wurde möglicherweise beendet. Seit {time} UTC keine neuen Nachrichten. Brechen Sie sie ab und versuchen Sie es erneut.",
