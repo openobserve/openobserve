@@ -27056,7 +27056,7 @@
       "joinsFleet": "Les collecteurs installés avec ce jeton rejoignent la flotte {fleet} et exécutent {config} v{version}.",
       "joinsFleetNoConfig": "Les collecteurs installés avec ce jeton rejoignent la flotte {fleet}, qui n'a pas encore de configuration.",
       "envRefNote": "Utilisez des références {ref} pour les identifiants dans les configurations, afin que les secrets restent sur l'hôte.",
-      "httpTransport": "Le proxy ou l'équilibreur de charge ne peut pas transporter WebSocket (utilisez le polling HTTP)",
+      "websocketTransport": "Utiliser WebSocket (envoie la configuration instantanément ; le proxy doit le prendre en charge)",
       "kubernetesNote": "Déploie un DaemonSet qui exécute le superviseur et le collecteur dans un seul conteneur. Mettez à niveau en changeant le tag de l'image.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Passerelle (StatefulSet)",
