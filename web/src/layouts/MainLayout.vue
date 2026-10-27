@@ -507,28 +507,9 @@ export default defineComponent({
       () => isEnterpriseOrCloud && store.state.zoConfig?.workflows_enabled === true,
     );
 
-    // Backend `/config` flag `online_evals_enabled` — controlled by
-    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
-    // of whether the config response arrived before or after this component
-    // mounted.
-    const isOnlineEvalsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        Boolean(store.state.zoConfig?.online_evals_enabled)
-      );
-    });
-
-    // The AI Observability menu entry itself ships on true OSS builds too —
-    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
-    // of the module. AIObservabilityShell (Index.vue) renders Evaluate/
-    // Experiment/Annotate/Agent Graph/Agent Behavior too, but locked (lock
-    // icon + tooltip) rather than hidden, so this entry point itself doesn't
-    // need to wait on `isOnlineEvalsEnabled` for those.
-    // OSS ignores the map's `locked` here: its Monitor half works without a license.
+    // Monitor needs no flag or (on OSS) license; the eval sections gate on `online_evals_enabled` themselves.
     const aiObservabilityMenuState = computed<FeatureState>(() =>
-      isEnterpriseOrCloud
-        ? menuState(features.value, "ai_observability", isOnlineEvalsEnabled.value)
-        : "enabled",
+      isEnterpriseOrCloud ? featureState(features.value, "ai_observability") : "enabled",
     );
 
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and

@@ -223,6 +223,17 @@ describe("useManagementRoutes", () => {
       });
     });
 
+    it.each([
+      ["modelPricing", "ai_observability"],
+      ["modelPricingEditor", "ai_observability"],
+      ["llmProviders", "ai_observability"],
+      ["genAiAgentMapping", "ai_observability"],
+      ["aiToolsets", "ai_assistant"],
+    ])("tags %s with license feature %s", (name, key) => {
+      const route = routes[0].children.find((child: any) => child.name === name);
+      expect(route.meta.licenseFeature).toBe(key);
+    });
+
     it("AC-1.10 registers slack in OSS builds and sends it to General, never the locked page", () => {
       const slackRoute = routes[0].children.find((child: any) => child.name === "slack");
       expect(slackRoute).toBeDefined();

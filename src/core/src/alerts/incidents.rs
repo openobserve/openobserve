@@ -638,6 +638,17 @@ pub fn incidents_enabled() -> bool {
         ])
 }
 
+/// Whether O2's agent may answer an analysis: operator switch, agent target and assistant license.
+#[cfg(feature = "enterprise")]
+pub fn rca_agent_available() -> bool {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    cfg.ai.enabled
+        && cfg.ai.has_agent_target()
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
+}
+
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
@@ -2404,7 +2415,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && cfg.ai.has_agent_target();
+    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }

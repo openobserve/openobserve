@@ -534,7 +534,7 @@ pub async fn zo_config(
         false,
         incidents_enabled
             && o2cfg.incidents.rca_enabled
-            && o2cfg.ai.has_agent_target()
+            && openobserve_core::alerts::incidents::rca_agent_available()
             && check_features(&[Feature::RootCauseAnalysis])
     );
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
@@ -543,7 +543,10 @@ pub async fn zo_config(
     // Composite alerts are not available in super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
+    let online_evals_enabled = enterprise_value!(
+        false,
+        o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+    );
     let synthetics_enabled = cfg.synthetics.enabled;
     // Private agents stay enterprise, so an OSS build shows synthetics without them.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
@@ -2631,7 +2634,21 @@ mod tests {
         let json = zo_config_json().await;
         assert_eq!(
             json["incidents_rca_enabled"],
-            o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+            openobserve_core::alerts::incidents::incidents_enabled()
+                && o2cfg.incidents.rca_enabled
+                && openobserve_core::alerts::incidents::rca_agent_available()
+                && check_features(&[Feature::RootCauseAnalysis])
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_online_evals_need_the_observability_license() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["online_evals_enabled"],
+            o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
         );
     }
 

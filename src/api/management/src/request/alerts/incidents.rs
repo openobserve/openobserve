@@ -518,12 +518,12 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if !o2_cfg.ai.has_agent_target() {
+    if !openobserve_core::alerts::incidents::rca_agent_available() {
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
             .body(axum::body::Body::from(
-                serde_json::json!({"error": "RCA agent URL is not configured"}).to_string(),
+                serde_json::json!({"error": "RCA agent is not available"}).to_string(),
             ))
             .unwrap();
     }
@@ -1274,10 +1274,10 @@ async fn resume_run(
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
-    if !o2_cfg.ai.has_agent_target() {
+    if !openobserve_core::alerts::incidents::rca_agent_available() {
         return rca_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
-            "RCA agent URL is not configured",
+            "RCA agent is not available",
             Some("agent_not_configured"),
             None,
         );

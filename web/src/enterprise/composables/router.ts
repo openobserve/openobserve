@@ -64,7 +64,9 @@ const useEnvRoutes = () => {
 
   const homeChildRoutes = [
     licensedAIObservabilityShellRoute(),
-    ...useAIObservabilityExtraRoutes(),
+    ...useAIObservabilityExtraRoutes().map((route) =>
+      withLicenseFeature("ai_observability", route),
+    ),
     {
       path: "billings",
       name: "billings",
