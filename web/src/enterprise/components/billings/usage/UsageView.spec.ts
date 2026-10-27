@@ -18,6 +18,10 @@ import { defineComponent, reactive } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import assistantService, { parseAiUsage } from "@/services/assistant";
+import { assistantKeys } from "@/services/assistant.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 
 const mounts: Record<string, number> = {};
 const stub = (name: string) =>
@@ -64,6 +68,20 @@ vi.mock("@/services/billings", () => ({
     get_billing_group_membership: (...args: unknown[]) => membership(...args),
   },
 }));
+vi.mock("@/services/assistant", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/assistant")>()),
+  default: { usage: vi.fn() },
+}));
+vi.mock("@/services/paidOverage", () => ({
+  default: { get: vi.fn(async () => Promise.reject(new Error("no overage"))) },
+}));
+vi.mock("@/composables/assistant", async (importOriginal) => {
+  const { computed } = await import("vue");
+  return {
+    ...(await importOriginal<typeof import("@/composables/assistant")>()),
+    useAssistantCapability: () => computed(() => ({ isAdmin: true })),
+  };
+});
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<{ default: Record<string, unknown> }>();
   return { default: { ...actual.default, isCloud: "true" } };
@@ -435,5 +453,78 @@ describe("UsageView load failures", () => {
     expect(overview.props("details")).toMatchObject({ total_cost: 1 });
     expect(wrapper.find('[data-test="billings-usageview-refresh-failed"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="billings-usageview-error"]').exists()).toBe(false);
+  });
+});
+
+describe("UsageView AI credits summary", () => {
+  const PAYG = { mode: "pay_as_you_go", credits_used: 1200, credits_limit: 1000 };
+
+  // The unit setup installs the app client and clears it after each test.
+  const mountView = async (body: Record<string, unknown>) => {
+    vi.mocked(assistantService.usage).mockClear();
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    aiUsage.mockResolvedValue({ data: { ...body, requires_additional_credits: false } });
+    vi.mocked(assistantService.usage).mockResolvedValue(parseAiUsage(body));
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    return wrapper;
+  };
+  const meterText = (wrapper: Awaited<ReturnType<typeof mountView>>) =>
+    wrapper
+      .get('[data-test="billings-usage-ai-summary"] [data-test="assistant-credit-meter-text"]')
+      .text();
+  const modeTag = (wrapper: Awaited<ReturnType<typeof mountView>>) =>
+    wrapper.find(
+      '[data-test="billings-usage-ai-summary"] [data-test="assistant-credit-meter-mode"]',
+    );
+
+  const v2 = (on: boolean) => {
+    if (on) window.__O2_ASSISTANT_V2__ = true;
+    else delete window.__O2_ASSISTANT_V2__;
+    resetAssistantV2ForTests();
+  };
+
+  afterEach(() => v2(false));
+
+  it("shows the Plans card's meter text and mode with the new assistant on", async () => {
+    v2(true);
+    const wrapper = await mountView(PAYG);
+    expect(assistantService.usage).toHaveBeenCalledWith("default");
+    expect(meterText(wrapper)).toBe("1,000 included credits used · 200 billed · paid usage on");
+    expect(modeTag(wrapper).text()).toBe("Paid usage on");
+  });
+
+  it("reads the shared usage, so an invalidation after a turn shows the new numbers", async () => {
+    v2(true);
+    const wrapper = await mountView({ mode: "free", credits_used: 100, credits_limit: 1000 });
+    expect(meterText(wrapper)).toBe("100 of 1,000 included credits · they don't renew");
+    vi.mocked(assistantService.usage).mockResolvedValue(
+      parseAiUsage({ mode: "free", credits_used: 800, credits_limit: 1000 }),
+    );
+    await queryClient.invalidateQueries({ queryKey: assistantKeys.usage("default") });
+    await flushPromises();
+    expect(meterText(wrapper)).toBe("800 of 1,000 included credits · they don't renew");
+  });
+
+  it("gives free usage no mode badge, as on Plans", async () => {
+    v2(true);
+    const wrapper = await mountView({ mode: "free", credits_used: 100, credits_limit: 1000 });
+    expect(modeTag(wrapper).exists()).toBe(false);
+    expect(wrapper.get('[data-test="billings-usage-ai-summary"]').text()).not.toContain("Free");
+  });
+
+  it("says No included credits for a zero limit, never 0 of 0", async () => {
+    v2(true);
+    const wrapper = await mountView({ mode: "pay_as_you_go", credits_used: 0, credits_limit: 0 });
+    expect(meterText(wrapper)).toBe("No included credits");
+    expect(wrapper.get('[data-test="billings-usage-ai-summary"]').text()).not.toContain("0 of 0");
+  });
+
+  it("leaves the page unchanged and reads nothing extra with the new assistant off", async () => {
+    v2(false);
+    const wrapper = await mountView(PAYG);
+    expect(wrapper.find('[data-test="billings-usage-ai-summary"]').exists()).toBe(false);
+    expect(assistantService.usage).not.toHaveBeenCalled();
   });
 });

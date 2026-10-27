@@ -13,25 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { AssistantHostAdapter } from "@/composables/assistant/pure";
+import { HELPER_PREFIXES, type HelperLanguage } from "@/composables/assistant/pure";
 
-export type HelperLanguage = AssistantHostAdapter["language"];
+export { HELPER_PREFIXES, type HelperLanguage };
 
 /** The "needs the assistant" line quotes at most this much of the answer. */
 export const ANSWER_LINE_CHARS = 120;
 
 /** A buffer longer than this is never read as a sentence. */
 export const MAX_HINT_CHARS = 400;
-
-/** The request prefixes the history list hides until the server can tell helper turns apart (B-12). */
-export const HELPER_PREFIXES: Record<HelperLanguage, string> = {
-  sql: "Generate SQL query",
-  promql: "Generate PromQL query",
-  vrl: "Generate VRL function",
-  js: "Generate JavaScript function",
-  regex: "Generate SQL query",
-  json: "Generate SQL query",
-};
 
 const FENCE_TAGS: Record<HelperLanguage, string[]> = {
   sql: ["sql"],

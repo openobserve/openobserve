@@ -1431,4 +1431,10 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     category: "text",
     why: "the inverse foreground exists for filled controls, and the primary button is the fill it is sized against",
   },
+  {
+    fg: "--color-toast-action-fg",
+    bg: "--color-toast-action-bg",
+    category: "text",
+    why: "the toast action button paints its label on its own solid fill, never on the page",
+  },
 ];

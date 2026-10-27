@@ -368,4 +368,23 @@ describe("OToggleGroup labelled group", () => {
     });
     expect(wrapper.find('[role="group"]').attributes("aria-describedby")).toBe("line-1");
   });
+
+  it("leaves aria-describedby off the layout wrapper, which still takes the other attributes", () => {
+    const labelled = mount(OToggleGroup, {
+      props: { label: "Tier" },
+      attrs: { "aria-describedby": "line-1", "data-test": "tier", class: "mt-2" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(labelled.findAll("[aria-describedby]")).toHaveLength(1);
+    const wrapperEl = labelled.get('[data-test="tier"]');
+    expect(wrapperEl.attributes("role")).toBeUndefined();
+    expect(wrapperEl.attributes("aria-describedby")).toBeUndefined();
+    expect(wrapperEl.classes()).toContain("mt-2");
+    const bare = mount(OToggleGroup, {
+      attrs: { "aria-describedby": "line-1", "data-test": "tier" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(bare.get('[role="group"]').attributes("aria-describedby")).toBe("line-1");
+    expect(bare.get('[role="group"]').attributes("data-test")).toBe("tier");
+  });
 });

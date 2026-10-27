@@ -17,11 +17,13 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LocalRecord } from "@/composables/assistant/historyDb";
+import aiChatShare from "@/services/ai_chat_share";
 import { raw } from "@/types/i18n";
 import { setOrgTimeZoneSource } from "@/utils/formatters";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
+
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryList, {
   type AssistantHistoryListProps,
@@ -82,9 +84,9 @@ const SEED = [
 
 async function setup(
   props: Partial<AssistantHistoryListProps> = {},
-  { seed = SEED, canChat = "yes" as const } = {},
+  { seed = SEED, canChat = "yes" as const, persistence = false } = {},
 ) {
-  fake.current = fakeAssistant("available", { persistence: false, canChat }, {}, 80, true);
+  fake.current = fakeAssistant("available", { persistence, canChat }, {}, 80, true);
   for (const row of seed) fake.current.db.rows.set(row.id, structuredClone(row));
   const router = fakeRouter();
   const wrapper = mount(AssistantHistoryList, {
@@ -269,6 +271,49 @@ describe("AssistantHistoryList", () => {
     expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(false);
     await empty.get("button").trigger("click");
     expect(history.filter.value.kind).toBe("all");
+  });
+
+  it("offers a Shared filter only where the server keeps share links", async () => {
+    const options = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
+      wrapper
+        .get('[data-test="assistant-history-filter"]')
+        .findAll('[role="radio"], button')
+        .map((item) => item.text());
+    const local = await setup();
+    expect(options(local.wrapper)).not.toContain("Shared");
+    local.wrapper.unmount();
+    const server = await setup({}, { persistence: true });
+    expect(server.history.mode.value).toBe("server");
+    expect(options(server.wrapper)).toContain("Shared");
+    expect(aiChatShare.listMine).not.toHaveBeenCalled();
+    vi.mocked(aiChatShare.listMine).mockResolvedValueOnce({
+      data: { shares: [{ session_id: SEED[0].sessionId }] },
+    } as never);
+    const noted = vi.spyOn(server.history, "noteShared");
+    server.history.setFilter({ kind: "shared" });
+    await flushPromises();
+    expect(aiChatShare.listMine).toHaveBeenCalledTimes(1);
+    expect(noted).toHaveBeenLastCalledWith([SEED[0].sessionId]);
+    server.history.setFilter({ kind: "all" });
+  });
+
+  it("lists as shared only chats whose link has not expired", async () => {
+    const server = await setup({}, { persistence: true });
+    const micros = Date.now() * 1_000;
+    vi.mocked(aiChatShare.listMine).mockResolvedValueOnce({
+      data: {
+        shares: [
+          { session_id: SEED[0].sessionId, expires_at: micros - 1_000_000 },
+          { session_id: SEED[1].sessionId, expires_at: micros + 3_600_000_000 },
+          { session_id: SEED[2].sessionId, expires_at: null },
+        ],
+      },
+    } as never);
+    const noted = vi.spyOn(server.history, "noteShared");
+    server.history.setFilter({ kind: "shared" });
+    await flushPromises();
+    expect(noted).toHaveBeenLastCalledWith([SEED[1].sessionId, SEED[2].sessionId]);
+    server.history.setFilter({ kind: "all" });
   });
 
   it("windows the rows past the virtual threshold and keeps them a list", async () => {

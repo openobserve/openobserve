@@ -18,7 +18,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { isDroppableFrame, isFrame, isUnknownFrame, parseFrame } from "./frames";
+import { contextUsedKeys, isDroppableFrame, isFrame, isUnknownFrame, parseFrame } from "./frames";
 
 const FIXTURES = join(__dirname, "__fixtures__", "frames");
 
@@ -118,6 +118,61 @@ describe("WP-23 frame shapes (o2-ai PR #167)", () => {
     const frame = parseFrame(json);
     expect(frame.type).toBe(type);
     expect(frame).toEqual(JSON.parse(json));
+  });
+});
+
+describe("complete.context_used", () => {
+  const complete = (contextUsed: unknown) =>
+    parseFrame(JSON.stringify({ type: "complete", persisted: true, context_used: contextUsed }));
+
+  it("keeps a complete frame whose context_used holds o2-ai's key entries", () => {
+    const frame = complete([
+      { key: "stream", used: true },
+      { key: "query", used: true, reason: "truncated" },
+      { key: "time_range", used: false, reason: "empty" },
+    ]);
+    expect(isFrame(frame, "complete") && frame.persisted).toBe(true);
+    expect(isFrame(frame, "complete") && contextUsedKeys(frame.context_used)).toEqual([
+      "stream",
+      "query",
+    ]);
+  });
+
+  it("still reads a list of bare key names", () => {
+    const frame = complete(["stream", "stream"]);
+    expect(isFrame(frame, "complete") && contextUsedKeys(frame.context_used)).toEqual(["stream"]);
+    expect(contextUsedKeys(["query", 3, null])).toEqual(["query"]);
+  });
+
+  it("drops a malformed list without losing the frame", () => {
+    const frame = complete({ key: "stream" });
+    expect(isFrame(frame, "complete") && frame.persisted).toBe(true);
+    expect(isFrame(frame, "complete") && frame.context_used).toBeUndefined();
+  });
+
+  it("keeps the good entries when one entry is malformed, and cuts the list before reading it", () => {
+    const frame = complete([
+      { key: "stream", used: true },
+      { key: 5, used: "yes" },
+      "query",
+      null,
+      { key: "time_range", used: true, reason: 7 },
+    ]);
+    expect(isFrame(frame, "complete") && frame.persisted).toBe(true);
+    expect(isFrame(frame, "complete") && contextUsedKeys(frame.context_used)).toEqual([
+      "stream",
+      "query",
+      "time_range",
+    ]);
+    const long = complete(Array.from({ length: 1_000 }, () => 0));
+    expect(isFrame(long, "complete") && long.context_used).toHaveLength(200);
+  });
+
+  it("bounds the count and the key length", () => {
+    const many = Array.from({ length: 500 }, (_, i) => ({ key: `k${i}`, used: true }));
+    expect(contextUsedKeys(many)).toHaveLength(20);
+    expect(contextUsedKeys([{ key: "x".repeat(500), used: true }])?.[0]).toHaveLength(64);
+    expect(contextUsedKeys(undefined)).toBeUndefined();
   });
 });
 

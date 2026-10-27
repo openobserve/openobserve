@@ -97,6 +97,18 @@ afterEach(() => {
 });
 
 describe("AssistantThreadHeader", () => {
+  it("tags an incident analysis chat with its origin, and no other chat", async () => {
+    const { wrapper, store, sid } = await setup();
+    expect(wrapper.find('[data-test="assistant-thread-origin"]').exists()).toBe(false);
+    store.state.sessions[sid].origin = {
+      entryKind: "object_verb",
+      objectKind: "incident",
+      container: "rca",
+    };
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-thread-origin"]').text()).toBe("Incident");
+  });
+
   it("names a new chat and disables rename until a message is sent", async () => {
     const { wrapper } = await setup({}, { messages: false });
     const title = wrapper.get('[data-test="assistant-thread-title"]');

@@ -170,16 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OBanner>
-      <AssistantCreditNotice
-        v-else-if="creditThreshold"
-        :threshold="creditThreshold"
-        :can-manage="credits.canManage.value"
-        :resets-at="credits.usage.value?.resetsAt"
-        :org="org"
-        @dismiss="dismissCreditNotice"
-        @manage="creditNotice.noteAction('manage')"
-        @ask-admin="creditNotice.noteAction('ask_admin')"
-      />
       <OBanner
         v-else-if="historyUnavailable"
         variant="warning"
@@ -200,6 +190,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OBanner>
+      <AssistantCreditNotice
+        v-else-if="creditThreshold"
+        :threshold="creditThreshold"
+        :can-manage="credits.canManage.value"
+        :resets-at="credits.usage.value?.resetsAt"
+        :org="org"
+        @dismiss="dismissCreditNotice"
+        @manage="creditNotice.noteAction('manage')"
+        @ask-admin="creditNotice.noteAction('ask_admin')"
+      />
       <slot v-else name="notice" />
     </div>
 
@@ -924,7 +924,7 @@ const credits = useAssistantCredits(
 const creditNotice = useCreditNotice(
   () => store.state.userOrgKey,
   () => credits.usage.value,
-  () => metered.value && visible.value && !notice.value,
+  () => metered.value && visible.value && !notice.value && !historyUnavailable.value,
 );
 const creditThreshold = computed(() => creditNotice.threshold.value);
 

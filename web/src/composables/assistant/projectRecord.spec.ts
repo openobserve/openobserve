@@ -81,6 +81,52 @@ describe("projectRecord", () => {
     expect(blocks(out).find((b) => b.type === "approval_result")?.resolved?.at).toBe(960_000);
   });
 
+  it("reads how a card without a resolution frame was answered from the chat's approvals", () => {
+    const project = (approvals: any[]) =>
+      blocks(
+        projectRecord([turn([card, { type: "complete" }])], "owner", {
+          timezone: "UTC",
+          scrubModels: false,
+          t,
+          approvals,
+        }),
+      ).find((block) => block.type === "approval")?.approval;
+    expect(project([{ id: "c1", status: "approved", at: 1_000_123 }])).toMatchObject({
+      recorded: { status: "approved", at: 960_000 },
+    });
+    expect(project([{ id: "c1", status: "denied" }])?.recorded).toEqual({ status: "denied" });
+    expect(project([{ id: "c1", status: "expired" }])?.recorded).toEqual({ status: "expired" });
+    expect(project([{ id: "c1", status: "withdrawn" }])?.recorded).toEqual({ status: "withdrawn" });
+    expect(project([{ id: "c1", status: "pending" }])?.noDecision).toBe(true);
+    expect(project([{ id: "c1", status: "approved" }])?.noDecision).toBe(true);
+    expect(project([{ id: "other", status: "denied" }])?.noDecision).toBe(true);
+    expect(project([])?.recorded).toBeUndefined();
+  });
+
+  it("redacts a link to its kind and action, and a navigation action to the fixed label", () => {
+    const nav = {
+      type: "navigation_action",
+      resource_type: "logs",
+      action: "load_query",
+      label: "payments errors",
+      target: { stream: "payments", sql: "SELECT * FROM payments", from: 1, to: 2 },
+    };
+    const out = projectRecord([turn([nav, { type: "complete" }])], "viewer", {
+      timezone: "UTC",
+      scrubModels: true,
+      redacted: true,
+      t,
+    });
+    const link = blocks(out).find((block) => block.type === "link")?.link;
+    expect(link).toEqual({
+      resourceType: "logs",
+      action: "load_query",
+      target: {},
+      redacted: true,
+    });
+    expect(JSON.stringify(out)).not.toMatch(/payments|SELECT/);
+  });
+
   it("keeps only what a redacted card was, its count and its answer, naming no resource", () => {
     const resolved = {
       type: "confirmation_resolved",

@@ -115,6 +115,7 @@ import {
   publicSharedChatQuery,
   sharedChatQuery,
 } from "@/services/ai_chat_share.queries";
+import assistant from "@/services/assistant";
 import organizationsService from "@/services/organizations";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
@@ -127,6 +128,7 @@ import SharedChatNotices from "./SharedChatNotices.vue";
 import SharedChatState, { type SharedPageState } from "./SharedChatState.vue";
 import { projectSharedRecord, sharedMarkdown } from "./sharedRecord";
 import { usePollShared, type PollResult } from "./usePollShared";
+import { useReaderSession } from "./useReaderSession";
 
 const props = withDefaults(defineProps<SharedChatPageProps>(), { isPublic: false });
 
@@ -142,8 +144,11 @@ const runtime = runtimeHandle();
 const variant = computed(() => (props.isPublic ? "public" : "org"));
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 // A public route skips the login dispatch, so a signed-in reader is found in the session's user info.
-const sessionEmail = readSessionEmail();
-const email = computed<string>(() => vuex.state.userInfo?.email || sessionEmail);
+const { email, checking } = useReaderSession({
+  storeEmail: () => vuex.state.userInfo?.email || "",
+  storedEmail: readSessionEmail,
+  verify: assistant.sessionAlive,
+});
 const signedIn = computed(() => !!email.value);
 const ossBuild = config.isEnterprise !== "true" && config.isCloud !== "true";
 const aiEnabled = computed(() => vuex.state.zoConfig?.ai_enabled !== false);
@@ -213,7 +218,7 @@ const ownShare = computed(() =>
     : mySharesRead.data.value?.find((share) => share.token === props.token),
 );
 const viewer = computed(() => {
-  if (!signedIn.value) return "signedOut" as const;
+  if (!signedIn.value) return checking.value ? ("checking" as const) : ("signedOut" as const);
   if (ownShare.value) return "owner" as const;
   return "member" as const;
 });

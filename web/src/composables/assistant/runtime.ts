@@ -78,6 +78,7 @@ import { createIndexedDbHistory } from "./historyDb";
 import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
 import { forgetHistoryKeys, historyKeysOf, markKeptOnSignOut, readClearOnSignOut } from "./prefs";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
+import { openTabWithoutOpener } from "./openTab";
 import { setRuntimeHandle } from "./runtimeHandle";
 import { createTurnEngine, type TurnEngineDeps } from "./turnEngine";
 import {
@@ -155,14 +156,6 @@ export function resetAssistantRuntimeForTests(): void {
   runtime?.hints.close();
   runtime = null;
   setRuntimeHandle(null);
-}
-
-/** A new tab the opened page cannot script back; `noopener` would make `window.open` return null even on success. */
-export function openTabWithoutOpener(href: string): boolean {
-  const opened = window.open(href, "_blank");
-  if (!opened) return false;
-  opened.opener = null;
-  return true;
 }
 
 function lazyAssistantStore(): AssistantRuntimeStore {
@@ -394,6 +387,7 @@ function engineDeps(
         noteAdmitted: handle.noteAdmitted,
         persistence: () => handle.capability.value.persistence,
         attachments: () => handle.capability.value.attachments === true,
+        rcaChatMode: () => handle.capability.value.rcaChatMode === true,
       };
     },
     history: () => deps.history,

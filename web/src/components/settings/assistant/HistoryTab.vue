@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 
 import AssistantImportCard from "@/components/ai-assistant/history/AssistantImportCard.vue";
 import { useAssistantHistory, useChatExport } from "@/composables/assistant";
@@ -99,6 +99,9 @@ const capabilities = useQuery(
 );
 
 const persistence = computed(() => page.persistence.value);
+
+// The import offer counts this browser's chats, which nothing has read yet when Settings is the first page.
+onMounted(() => history.ensureLoaded());
 
 const retention = computed<I18nText | null>(() => {
   const days = page.capability.value.retentionDays;

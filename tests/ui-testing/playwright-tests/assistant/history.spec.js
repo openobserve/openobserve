@@ -451,4 +451,85 @@ test.describe("assistant history", () => {
     expect(kept).toBeLessThanOrEqual(10);
     expect(after).toBeLessThanOrEqual(before * 1.1);
   });
+
+  test("PERF-03 a 300-message chat from history paints in 300 ms and scrolls at ~60 fps (55 or more measured)", async ({ context, page }, info) => {
+    await start(context, page, { persistence: false });
+    await openOnLogs(page);
+    await page.evaluate(async () => {
+      const index = await import("/web/src/composables/assistant/index.ts");
+      const { createIndexedDbHistory } = await import("/web/src/composables/assistant/historyDb.ts");
+      const base = Date.now() - 86_400_000;
+      const answer = "The checkout service returned 5xx after the payments pool reset its connections. ".repeat(5);
+      const messages = [];
+      for (let n = 0; n < 150; n += 1) {
+        messages.push({ role: "user", content: `Chat 300 question ${n}`, sentAt: base + n });
+        messages.push({ role: "assistant", content: answer });
+      }
+      await createIndexedDbHistory().merge(
+        {
+          id: 700_000,
+          timestamp: new Date(base).toISOString(),
+          title: "Chat 300",
+          messages,
+          sessionId: crypto.randomUUID(),
+          userOrgKey: index.assistantStore.state.userOrgKey,
+        },
+        "seed",
+      );
+    });
+    await openOnLogs(page);
+    await assistant.openHistory();
+    await search().fill("Chat 300");
+    const rows = assistant.history().locator('[data-test="assistant-history-row"]');
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toContainText("Chat 300");
+    // Click to the first frame that shows the last message, measured in the page so no round trip counts.
+    const paintMs = await rows.evaluate(
+      (row) =>
+        new Promise((resolve, reject) => {
+          const start = performance.now();
+          const shown = () =>
+            document.querySelector('[data-test="assistant-transcript"]')?.textContent?.includes("Chat 300 question 149");
+          const observer = new MutationObserver(() => {
+            if (!shown()) return;
+            observer.disconnect();
+            requestAnimationFrame(() => resolve(performance.now() - start));
+          });
+          observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+          setTimeout(() => reject(new Error("the chat never painted its last message")), 30_000);
+          row.click();
+        }),
+    );
+    const { fps, worstFrameMs } = await assistant.transcript().evaluate(async (log) => {
+      log.scrollTop = 0;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      let frames = 0;
+      let worst = 0;
+      let last = performance.now();
+      let counting = true;
+      const tick = (at) => {
+        frames += 1;
+        worst = Math.max(worst, at - last);
+        last = at;
+        if (counting) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      const start = performance.now();
+      while (log.scrollTop + log.clientHeight < log.scrollHeight - 2 && performance.now() - start < 20_000) {
+        log.scrollTop += 120;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      counting = false;
+      return { fps: frames / ((performance.now() - start) / 1000), worstFrameMs: worst };
+    });
+    await expect(assistant.transcript()).toContainText("Chat 300 question 149");
+    const measured = `paint ${paintMs.toFixed(0)} ms; scroll ${fps.toFixed(1)} fps, worst frame ${worstFrameMs.toFixed(1)} ms`;
+    info.annotations.push({ type: "perf", description: measured });
+    console.log(`PERF-03 ${measured}`);
+    // The budgets are for the production bundle; the Vite dev build only reports its numbers.
+    if (harness.ENV.viteDev) return;
+    expect(paintMs).toBeLessThanOrEqual(300);
+    expect(fps).toBeGreaterThanOrEqual(55);
+    expect(worstFrameMs).toBeLessThanOrEqual(34);
+  });
 });

@@ -185,6 +185,8 @@ export interface AdoptInit {
   origin: SessionOrigin;
   messages: ChatMessage[];
   record: Partial<RecordMeta>;
+  /** The incident a reopened analysis chat ran for. */
+  incidentId?: string;
 }
 
 /** `open`'s options; `forcePinned` pins this open only, without touching `placement.mode`. */
@@ -674,6 +676,7 @@ function createSessionSlice(core: StoreCore) {
       Object.assign(session.record, init.record);
       if (init.chatId !== null) session.chatId = init.chatId;
       if (!known) session.origin = { ...init.origin };
+      if (init.incidentId && !session.incidentId) session.incidentId = init.incidentId;
       if (init.title !== null && TITLE_RANK[init.titleSource] >= TITLE_RANK[session.titleSource]) {
         session.title = init.title;
         session.titleSource = init.titleSource;

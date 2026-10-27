@@ -11,7 +11,8 @@ import { AssistantPage } from "../../pages/assistantPage.js";
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
 
-const DOOR_ID = /^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix)$/;
+// The query helper door is `ai-entry-query-generate` in every host (`60` §6, door id table).
+const DOOR_ID = /^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix|generate)$/;
 const fixture = (name) => JSON.parse(readFileSync(join(__dirname, "harness", "fixtures", name), "utf8"));
 
 test.describe("assistant doors", () => {
@@ -36,8 +37,7 @@ test.describe("assistant doors", () => {
   async function gotoLogs(page, extra) {
     await page.goto(logsUrl(extra), { waitUntil: "domcontentloaded" });
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
-    await expect(cell(page)).toBeVisible({ timeout: 30_000 });
+    await assistant.logRowCell();
   }
 
   // Keyboard route: the first cell holds the table's one tab stop and opens the toolbar on focus.
@@ -133,8 +133,7 @@ test.describe("assistant doors", () => {
     await assistant.open("header");
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(assistant.container()).toBeVisible({ timeout: 30_000 });
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
-    await expect(cell(page)).toBeVisible({ timeout: 30_000 });
+    await assistant.logRowCell();
     const drawer = await openRecordDrawer(page);
     const [drawerBox, panelBox] = [await drawer.boundingBox(), await assistant.container().boundingBox()];
     expect(Math.abs(drawerBox.x + drawerBox.width - panelBox.x)).toBeLessThanOrEqual(1);
@@ -233,6 +232,23 @@ test.describe("assistant doors", () => {
     await expect(door).toHaveAttribute("aria-disabled", "true");
   });
 
+  test("CTX-05 a door refuses the 21st row with the cap line and no In chat tick", { tag: ["@mock"] }, async ({ page }) => {
+    await gotoLogs(page);
+    const boxes = table(page).locator('tbody [role="checkbox"]');
+    for (let i = 0; i < 21; i += 1) await boxes.nth(i).click();
+    const door = page.locator('[data-test="ai-entry-log-rows-explain"]');
+    await expect(door).toHaveAttribute("aria-disabled", "true");
+    await door.hover();
+    await expect(page.getByText("Select up to 20 rows to explain at once", { exact: true }).first()).toBeVisible();
+    // The door stays focusable and clickable while inert, so the activation is forced past Playwright's aria-disabled check.
+    await door.click({ force: true });
+    await door.press("Enter");
+    await page.waitForTimeout(500);
+    await expect(door).toHaveAttribute("data-door-state", "unavailable");
+    expect(await streamRequests(page)).toBe(0);
+    expect(await stagedLabels(page)).toEqual([]);
+  });
+
   test("DOOR-05 the empty-state door names SQL mode and the absolute range", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click().catch(() => undefined);
@@ -240,6 +256,8 @@ test.describe("assistant doors", () => {
     await editor.click();
     await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.type('SELECT * FROM "e2e_automate" WHERE code = 987654');
+    // While the page's own search is in flight this button is Cancel, which would kill the run instead.
+    await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toHaveAttribute("title", "Run query", { timeout: 30_000 });
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     const door = page.locator('[data-test="ai-entry-empty-result-troubleshoot"]');
     await expect(door).toBeVisible({ timeout: 30_000 });
@@ -363,7 +381,9 @@ test.describe("assistant doors", () => {
     );
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
     await expect(async () => {
-      await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+      const run = page.locator('[data-test="logs-search-bar-refresh-btn"]');
+      await expect(run).toHaveAttribute("title", "Run query", { timeout: 5_000 });
+      await run.click();
       await expect(cell(page)).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 60_000 });
     await focusRowToolbar(page);

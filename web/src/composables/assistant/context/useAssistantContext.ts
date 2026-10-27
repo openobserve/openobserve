@@ -113,8 +113,18 @@ export function useAssistantContext(
   });
   const timeChip = computed(() => timeChipOf(window.value, org.value, t));
   const stagedChips = computed(() => staged(composer.value?.chips ?? []));
+  // With the interactive incident agent every chat turn carries the page's incident id, so it reads as sent.
+  const incidentSent = computed(() => store.state.capability.rcaChatMode === true);
   const pageChips = computed(() =>
-    supersededDropped(pageChipsOf(page.value, removedKeys.value, t), stagedChips.value, page.value),
+    supersededDropped(
+      pageChipsOf(page.value, removedKeys.value, t).map((chip) =>
+        incidentSent.value && chip.kind === "incident"
+          ? { ...chip, sent: "whitelist" as const }
+          : chip,
+      ),
+      stagedChips.value,
+      page.value,
+    ),
   );
   // Images live only in the composer's strip, never also in the tray (`40` §8).
   const chips = computed(() => [timeChip.value, ...pageChips.value, ...stagedChips.value]);
@@ -140,6 +150,8 @@ export function useAssistantContext(
         t,
       },
     );
+    if (incidentSent.value)
+      for (const row of rows) if (row.id === "incident_id") row.group = "sent";
     const attached = stagedChips.value.filter((chip) => !!serializedNameOf(chip));
     if (attached.length === 0) return rows;
     return [

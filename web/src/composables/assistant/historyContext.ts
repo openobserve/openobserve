@@ -29,16 +29,9 @@ import type {
   Sid,
   TurnEngine,
 } from "./assistantStore.types";
+import { HELPER_REQUEST_STARTS } from "./helperPrefixes";
 import type { HistoryDb, LocalRecord, LocalTurn } from "./historyDb";
 import { rememberHistoryKey } from "./prefs";
-
-/** The helper's request prefixes; a chat that starts with one is never listed until the server tags helper chats. */
-export const HELPER_PREFIXES = [
-  "Generate SQL query : ",
-  "Generate PromQL query",
-  "Generate VRL function",
-  "Generate JavaScript function",
-] as const;
 
 export const MAX_TITLE = 200;
 
@@ -217,7 +210,7 @@ export function isHelperChat(row: {
 }): boolean {
   if (row.agentType === "generate_query" || row.ephemeral) return true;
   const texts = [row.firstPrompt, row.title].filter((text): text is string => !!text);
-  return texts.some((text) => HELPER_PREFIXES.some((prefix) => text.startsWith(prefix)));
+  return texts.some((text) => HELPER_REQUEST_STARTS.some((start) => text.startsWith(start)));
 }
 
 /** The origin tag a door's session carries. */

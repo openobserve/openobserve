@@ -18,7 +18,8 @@
         "link": {
           "resourceType": "logs",
           "action": "load_query",
-          "target": {}
+          "target": {},
+          "redacted": true
         }
       },
       {

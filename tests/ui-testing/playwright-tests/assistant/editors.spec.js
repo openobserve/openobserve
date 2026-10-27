@@ -247,7 +247,7 @@ test.describe("assistant editors and width", () => {
       waitUntil: "domcontentloaded",
     });
     await ready(page);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
+    await assistant.logRowCell();
     const cell = page
       .locator('[data-test="logs-search-result-logs-table"] tbody tr')
       .filter({ has: page.locator("td[data-o2-focus-cell]") })

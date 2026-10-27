@@ -1233,6 +1233,24 @@ describe("reduce: typed phases (live)", () => {
     ]);
   });
 
+  it("keeps the expired and withdrawn flags of a confirmation_resolved", () => {
+    const state = makeState();
+    reduce(
+      state,
+      { type: "confirmation_resolved", id: "c1", approved: false, expired: true },
+      live(),
+    );
+    reduce(
+      state,
+      { type: "confirmation_resolved", id: "c2", approved: false, withdrawn: true },
+      live(),
+    );
+    expect(blocksOf(state).map((block) => block.resolved)).toEqual([
+      { id: "c1", approved: false, expired: true },
+      { id: "c2", approved: false, withdrawn: true },
+    ]);
+  });
+
   it("keeps a navigation frame the legacy tail flush drops, as a link card and never a prompt", () => {
     for (const phase of ["live", "replay"] as const) {
       const state = makeState({ messages: [assistant()] });
@@ -1406,6 +1424,23 @@ describe("reduce: evidence on the typed phases", () => {
       contextUsed: ["stream"],
       persisted: false,
     });
+  });
+
+  it("reads o2-ai's context_used entries into the footer's used keys", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "Done." }, live());
+    reduce(
+      state,
+      {
+        type: "complete",
+        context_used: [
+          { key: "stream", used: true },
+          { key: "query", used: false, reason: "empty" },
+        ],
+      },
+      live(),
+    );
+    expect(blocksOf(state).at(-1)?.footer?.contextUsed).toEqual(["stream"]);
   });
 
   it("keeps the trace of turn_started when complete carries none", () => {

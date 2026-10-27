@@ -290,7 +290,8 @@ function wireBody(req: ClientSendRequest): Record<string, unknown> {
     ...(typeof req.knownSeq === "number" && { known_seq: req.knownSeq }),
     context: req.context,
     ...(images && { images }),
-    ...(req.mode && req.mode !== "chat" && { mode: req.mode }),
+    // The builder names "chat" only where the server would otherwise pick the incident agent.
+    ...(req.mode && { mode: req.mode }),
     ...(req.ephemeral && { ephemeral: true }),
     ...(req.attachments?.length && { attachments: req.attachments }),
     ...(req.replyToApproval && { reply_to_approval: req.replyToApproval }),

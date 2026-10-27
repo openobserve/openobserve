@@ -112,6 +112,18 @@ describe("SharedChatHeader", () => {
     },
   );
 
+  it("shows no sign-in, open or continue action while the reader's session is being checked", () => {
+    const wrapper = header({ variant: "public", viewer: "checking" });
+    for (const id of [
+      "assistant-shared-signin",
+      "assistant-shared-open-mine",
+      "assistant-shared-open-app",
+      "assistant-shared-continue-locked",
+      "shared-chat-continue",
+    ])
+      expect(at(wrapper, id).exists()).toBe(false);
+  });
+
   it("offers Continue on the public page once the share names its org", () => {
     const wrapper = header({ variant: "public", chat: chat({ org_identifier: "default" }) });
     expect(at(wrapper, "shared-chat-continue").exists()).toBe(true);

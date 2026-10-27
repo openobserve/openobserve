@@ -24,36 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <h2 :id="headingId" class="text-text-heading text-base font-medium">
       {{ t("assistant.billing.title") }}
     </h2>
-    <OSkeleton
-      v-if="usageQuery.isPending.value"
-      type="rect"
-      class="h-16 w-full"
-      data-test="billing-ai-credits-loading"
-    />
-    <p
-      v-else-if="usageError"
-      class="text-text-body text-sm"
-      data-test="billing-ai-credits-unavailable"
-    >
-      {{ t("assistant.billing.usageUnavailable") }}
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        data-test="assistant-credit-meter-retry"
-        @click="retry"
-      >
-        {{ t("common.retry") }}
-      </OButton>
-    </p>
-    <div v-else-if="usage" class="flex flex-col gap-2" data-test="billing-ai-credits-summary">
-      <OTag type="aiMode" :value="usage.mode" class="self-start" />
-      <OProgressBar
-        :value="ratio"
-        size="sm"
-        variant="default"
-        :aria-label="t('assistant.billing.title')"
+    <div data-test="billing-ai-credits-summary">
+      <AssistantCreditMeter
+        size="card"
+        :usage="usage"
+        :overage="overage.data.value ?? null"
+        :status="meterStatus"
+        :can-manage="canManage"
+        :org-name="orgName"
+        @retry="retry"
+        @manage="focusPaidUsage"
       />
-      <p class="text-text-body text-sm" data-test="billing-ai-credits-used">{{ usedLine }}</p>
     </div>
     <!-- The paid usage section below states an overage read failure once, with its own Retry. -->
     <div
@@ -88,34 +69,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, useId } from "vue";
-import { useStore } from "vuex";
 
-import { useAssistantCapability } from "@/composables/assistant";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import AssistantCreditMeter from "@/components/ai-assistant/credits/AssistantCreditMeter.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { assistantUsageQuery } from "@/services/assistant.queries";
-import { paidOverageQuery } from "@/services/paidOverage.queries";
 import { useI18nTyped } from "@/types/i18n";
 
 import AssistantPaidUsageSettings from "./AssistantPaidUsageSettings.vue";
-import { creditsLineOf, dayOf, modeLineKey, modeOf } from "./assistantBilling";
+import { dayOf, modeLineKey, modeOf } from "./assistantBilling";
+import { useAssistantCreditMeter } from "./useAssistantCreditMeter";
 
 const emit = defineEmits<{ (e: "subscribe"): void }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
 const headingId = useId();
 
-const org = computed(() => (store.state.selectedOrganization?.identifier as string) ?? "");
-const capability = useAssistantCapability();
-const usageQuery = useQuery(computed(() => assistantUsageQuery(org.value)));
-const overage = useQuery(computed(() => paidOverageQuery(org.value, "ai_credits")));
-
-const usage = computed(() => usageQuery.data.value ?? null);
+const {
+  orgName,
+  capability,
+  usageQuery,
+  overage,
+  usage,
+  status: meterStatus,
+  canManage,
+  retry,
+} = useAssistantCreditMeter();
 const usageError = computed(() => usageQuery.isError.value);
 const mode = computed(() => modeOf(usage.value));
 const overageError = computed(() => overage.isError.value);
@@ -131,21 +109,6 @@ const modeLineKeyValue = computed(() =>
 const modeLine = computed(() =>
   modeLineKeyValue.value ? t(modeLineKeyValue.value, { date: resetsAt.value }) : "",
 );
-
-const ratio = computed(() => {
-  const limit = usage.value?.credits_limit ?? 0;
-  return limit > 0 ? Math.min(1, (usage.value?.credits_used ?? 0) / limit) : 0;
-});
-
-const usedLine = computed(() => {
-  if (!usage.value) return "";
-  const line = creditsLineOf(usage.value);
-  return t(line.key, line.params);
-});
-
-function retry() {
-  void usageQuery.refetch();
-}
 
 async function focusPaidUsage() {
   await nextTick();

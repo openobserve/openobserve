@@ -19,7 +19,8 @@ export {
   useAssistantSession,
   useAssistantStore,
 } from "./assistantStore";
-export { assistantStore, openTabWithoutOpener } from "./runtime";
+export { assistantStore } from "./runtime";
+export { openTabWithoutOpener } from "./openTab";
 export { useAssistantCapability } from "./useAssistantCapability";
 export {
   useAssistantCredits,

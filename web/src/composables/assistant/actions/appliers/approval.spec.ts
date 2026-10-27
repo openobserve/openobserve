@@ -303,7 +303,7 @@ describe("approval applier", () => {
     ).toBe("failed");
   });
 
-  it("waits longer for an approve the more items it acts on, and a deny the base time", async () => {
+  it("waits past the 60 s relay for a deny, and longer for an approve the more items it acts on", async () => {
     const { sid, env, dispatcher } = withCard();
     await dispatcher.approvals(sid, {
       kind: "approval",
@@ -315,7 +315,7 @@ describe("approval applier", () => {
       approvalId: "c9",
       decision: { approved: false, reason: "deny" },
     });
-    expect(env.confirm.mock.calls.map((call) => call[3])).toEqual([17_000, 15_000]);
+    expect(env.confirm.mock.calls.map((call) => call[3])).toEqual([67_000, 65_000]);
   });
 
   it("never grants a card whose tool deletes, whatever kind the wire names", () => {

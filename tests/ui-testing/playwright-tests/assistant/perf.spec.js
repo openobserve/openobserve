@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// WP-06 performance budgets of the transcript (`99` §2.1, PERF-02, PERF-03, PERF-07).
+// WP-06 performance budgets of the transcript (`99` §2.1, PERF-02, PERF-07; PERF-03 opens its chat from history in history.spec.js).
 
 import { test, expect } from "@playwright/test";
 
@@ -170,9 +170,6 @@ test.describe("assistant transcript performance", () => {
       expect(p95).toBeLessThanOrEqual(INPUT_P95_MS);
     });
   }
-
-  // The 300-message record comes from history, which renders a stored chat from WP-11 on.
-  test.fixme("PERF-03 a 300-message chat paints in 300 ms and scrolls at 60 fps (chat_300 through history, WP-11)", { tag: ["@mock"] }, async () => {});
 
   test("PERF-07 an open container at rest runs no interval or animation loop", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);

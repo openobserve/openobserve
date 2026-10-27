@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import assistant, { parseAiUsage, PROBE_TIMEOUT_MS } from "./assistant";
+import assistant, { parseAiUsage, parseChatDetail, PROBE_TIMEOUT_MS } from "./assistant";
 import http from "./http";
 
 vi.mock("./http", () => ({ default: vi.fn() }));
@@ -172,7 +172,7 @@ describe("assistant service", () => {
     expect(api.post).toHaveBeenCalledWith(
       "/api/org1/ai/confirm/sid-1",
       { approved: true, scope: "once" },
-      { ...managed, adapter: "fetch", fetchOptions: { keepalive: true }, timeout: 15_000 },
+      { ...managed, adapter: "fetch", fetchOptions: { keepalive: true }, timeout: 65_000 },
     );
   });
 
@@ -183,5 +183,51 @@ describe("assistant service", () => {
       ...managed,
       headers: { "x-o2-assistant-session-id": "sid-1" },
     });
+  });
+});
+
+describe("parseChatDetail approvals", () => {
+  const detail = (approvals: unknown) => parseChatDetail({ session_id: "s1", approvals });
+
+  it("reads each approval row's id, status and decision time", () => {
+    const parsed = detail([
+      {
+        id: "apr_1",
+        status: "approved",
+        scope: "once",
+        card: { type: "confirmation_required" },
+        resolved: { type: "confirmation_resolved", approved: true, at: 1_700_000_000_000, by: "u" },
+        expires_at: 1,
+      },
+      { id: "apr_2", status: "expired", resolved: null },
+      { id: "apr_3", status: "denied", resolved: { at: 0 } },
+    ]);
+    expect(parsed.approvals).toEqual([
+      { id: "apr_1", status: "approved", at: 1_700_000_000_000 },
+      { id: "apr_2", status: "expired" },
+      { id: "apr_3", status: "denied" },
+    ]);
+  });
+
+  it("reads a row the chat withdrew or that ran out of time as such, never as declined", () => {
+    const parsed = detail([
+      { id: "apr_w", status: "denied", resolved: { approved: false, withdrawn: true, at: 5 } },
+      { id: "apr_e", status: "denied", resolved: { approved: false, expired: true } },
+      { id: "apr_d", status: "denied", resolved: { approved: false, withdrawn: "yes" } },
+      { id: "apr_a", status: "approved", resolved: { approved: true, withdrawn: true, at: 7 } },
+    ]);
+    expect(parsed.approvals).toEqual([
+      { id: "apr_w", status: "withdrawn", at: 5 },
+      { id: "apr_e", status: "expired" },
+      { id: "apr_d", status: "denied" },
+      { id: "apr_a", status: "approved", at: 7 },
+    ]);
+  });
+
+  it("skips a malformed row, bounds the list and leaves the field off when absent", () => {
+    expect(detail([{ id: "apr_1", status: "maybe" }, { status: "denied" }]).approvals).toEqual([]);
+    const many = Array.from({ length: 900 }, (_, i) => ({ id: `apr_${i}`, status: "pending" }));
+    expect(detail(many).approvals).toHaveLength(500);
+    expect(parseChatDetail({ session_id: "s1" })).not.toHaveProperty("approvals");
   });
 });

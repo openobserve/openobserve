@@ -19,6 +19,7 @@ import { ref } from "vue";
 
 import type { AssistantCapabilitiesResponse } from "@/services/assistant";
 
+import CAPABILITIES_FIXTURE from "./__fixtures__/capabilities.json";
 import type { CreditMode, Tri } from "./assistantStore.types";
 import {
   createAssistantCapability,
@@ -255,6 +256,44 @@ describe("access without B-06 (00 §9)", () => {
 });
 
 describe("B-06 capabilities", () => {
+  it("reads every history flag of the server's capabilities answer", async () => {
+    const { handle } = setup({ b06: CAPABILITIES_FIXTURE.body as AssistantCapabilitiesResponse });
+    await flushPromises();
+    expect(cap(handle)).toMatchObject({
+      canChat: "yes",
+      health: "ok",
+      historySearch: true,
+      historyPins: true,
+      historyImport: true,
+      turnVersions: true,
+      feedbackStored: true,
+      rcaChatMode: true,
+      rcaFeedback: true,
+    });
+  });
+
+  it("leaves every history flag off unless the server advertises it", async () => {
+    const { handle } = setup({ b06: { can_chat: true, history_import: "yes" } as never });
+    await flushPromises();
+    for (const flag of [
+      "historySearch",
+      "historyPins",
+      "historyImport",
+      "turnVersions",
+      "feedbackStored",
+      "rcaChatMode",
+      "rcaFeedback",
+    ])
+      expect(cap(handle)).not.toHaveProperty(flag);
+  });
+
+  it("reads the server's unreachable health as down, so the gate says unhealthy", async () => {
+    const { handle } = setup({ b06: { can_chat: true, health: { status: "unreachable" } } });
+    await flushPromises();
+    expect(cap(handle).health).toBe("down");
+    expect(handle.gate.value).toBe("unhealthy");
+  });
+
   it("reads a server gate of off_for_org as that gate, so the copy is the off-for-org one (D5)", async () => {
     const { handle } = setup({ b06: { can_chat: true, gate: "off_for_org" } });
     await flushPromises();

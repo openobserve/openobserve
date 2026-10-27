@@ -106,6 +106,8 @@ test.describe("assistant composer and context", () => {
     // The exit animation runs after Tab moved focus on; the popover must not pull it back to the chip.
     await page.waitForTimeout(400);
     await expect(assistant.chips().nth(1).locator('[data-test="assistant-context-chip-remove"]')).toBeFocused();
+    // The pointer still rests on the stream chip, whose hover tooltip would cover the time chip until it leaves.
+    await page.mouse.move(0, 0);
 
     await assistant.chips().first().locator('[data-test="assistant-context-chip-button"]').click();
     const trigger = page.locator('[data-test="assistant-context-time-picker"] [data-test="datetimerange-trigger"]');

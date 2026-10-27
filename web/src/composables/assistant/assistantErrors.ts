@@ -23,6 +23,8 @@ import type {
 declare module "./assistantStore.types" {
   interface AssistantError {
     reason?: ProviderReason;
+    /** Which switch an `rca_disabled` refusal names. */
+    rcaReason?: RcaDisabledReason;
   }
 }
 
@@ -63,6 +65,8 @@ export const ASSISTANT_ERROR_CODES = [
   "permission_denied_tool",
   "approval_elsewhere",
   "account_changed",
+  "rca_disabled",
+  "analysis_in_progress",
 ] as const satisfies readonly AssistantErrorCode[];
 
 /** `80` §1.3; role-split codes carry the admin action, the member one is `.actionMember`. */
@@ -102,6 +106,8 @@ export const ERROR_LEDGER: Record<AssistantErrorCode, ErrorLedgerRow> = {
   permission_denied_tool: { phase: "post_admission", retryable: false, action: "open_settings" },
   approval_elsewhere: { phase: "pre_admission", retryable: false, action: "none" },
   account_changed: { phase: "pre_admission", retryable: false, action: "none" },
+  rca_disabled: { phase: "pre_admission", retryable: false, action: "ask_admin" },
+  analysis_in_progress: { phase: "pre_admission", retryable: false, action: "none" },
 };
 
 /** The closed `action` vocabulary of the B-01 envelope; the client words every button from the code (WP-17). */
@@ -155,6 +161,8 @@ export type WireAction = (typeof WIRE_ACTIONS)[number];
 
 export type ProviderReason = "overloaded" | "timed_out" | "model_unavailable" | "request_too_large";
 
+export type RcaDisabledReason = "rca_off" | "priority_off";
+
 /** One row of the ledger of `80` §1.3: the code's phase, whether Retry applies and its one action. */
 export interface ErrorLedgerRow {
   phase: "pre_admission" | "post_admission";
@@ -181,6 +189,7 @@ interface WireBody {
   session_id?: unknown;
   active_turn_id?: unknown;
   consent?: unknown;
+  reason?: unknown;
 }
 
 interface ErrorInput {
@@ -245,6 +254,8 @@ function build(
     error.retryAfterMs = body.retry_after * 1000;
   const reason = code === "provider_error" ? providerReason(body) : null;
   if (reason) error.reason = reason;
+  if (code === "rca_disabled" && (body.reason === "rca_off" || body.reason === "priority_off"))
+    error.rcaReason = body.reason;
   return error;
 }
 

@@ -127,6 +127,7 @@ import {
   type ApprovalBlockData,
   type ApprovalResultItem,
   type AssistantTurnView,
+  type ResolvedBlockData,
   type Sid,
 } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -147,6 +148,13 @@ import {
 
 /** A record that changed this recently is a decision just made, so it is spoken; an older one is history. */
 const FRESH_MS = 3_000;
+
+const RECORDED_STATE = {
+  approved: "approved",
+  denied: "declined",
+  expired: "expired",
+  withdrawn: "withdrawn",
+} as const satisfies Record<string, ApprovalResultState>;
 
 const props = withDefaults(
   defineProps<{
@@ -200,7 +208,7 @@ const view = computed<ApprovalResultView | null>(() => {
   if (resolved.value) {
     // A decision made in this tab already has its own record above.
     if (outcome) return null;
-    const state = resolved.value.approved ? "approved_elsewhere" : "declined_elsewhere";
+    const state = resolvedState(resolved.value);
     const at = resolved.value.at ?? Date.now();
     return {
       state,
@@ -215,6 +223,8 @@ const view = computed<ApprovalResultView | null>(() => {
     return outcome.state === "expired" && expiredOutcome()
       ? null
       : { state: outcome.state, outcome, result };
+  const recorded = recordedView(card.value);
+  if (recorded && !(recorded.state === "expired" && expiredOutcome())) return recorded;
   // No decision kept here: a live turn still runs on it elsewhere; a replay of it expired unanswered or was answered where this browser cannot see.
   if (props.turn?.outcome === "live" || expiredOutcome()) return null;
   return { state: "unconfirmed", outcome: null, result: null };
@@ -358,6 +368,22 @@ function approvalOf(id: string | undefined): ApprovalBlockData | null {
   for (const block of props.message?.contentBlocks ?? [])
     if (block.approval?.id === id) return block.approval;
   return null;
+}
+
+function resolvedState(
+  block: ResolvedBlockData,
+): "expired" | "withdrawn" | "approved_elsewhere" | "declined_elsewhere" {
+  if (block.expired) return "expired";
+  if (block.withdrawn) return "withdrawn";
+  return block.approved ? "approved_elsewhere" : "declined_elsewhere";
+}
+
+// The server's approval row of a replayed card reads as a decision of this user, never as another tab's.
+function recordedView(current: ApprovalBlockData): ApprovalResultView | null {
+  const recorded = current.recorded;
+  if (!recorded) return null;
+  const state = RECORDED_STATE[recorded.status];
+  return { state, outcome: { state, at: recorded.at ?? 0 }, result: null };
 }
 
 // A `confirmation_resolved` for this card renders its own line, so the card's block stays quiet.

@@ -449,6 +449,14 @@ export interface AssistantCapability {
   historySearch?: boolean;
   historyPins?: boolean;
   historyImport?: boolean;
+  /** The server answers a turn's versions (`turn_versions`). */
+  turnVersions?: boolean;
+  /** The server stores a vote with its turn (`feedback_stored`). */
+  feedbackStored?: boolean;
+  /** `mode: "chat"` with `incident_id` reaches the interactive incident agent (`rca_chat_mode`). */
+  rcaChatMode?: boolean;
+  /** The analysis report takes "Was this the cause?" and history items carry `trigger`/`ended_reason` (`rca_feedback`). */
+  rcaFeedback?: boolean;
   /** Absent off Cloud; doors read it for the cost line (`80` §3.3). */
   creditMode?: CreditMode;
   isAdmin: boolean;
@@ -492,7 +500,9 @@ export type AssistantErrorCode =
   | "data_level_blocked"
   | "permission_denied_tool"
   | "approval_elsewhere"
-  | "account_changed";
+  | "account_changed"
+  | "rca_disabled"
+  | "analysis_in_progress";
 
 /** The one action a terminal block offers (`80` §1.3); `none` renders Details only. */
 export type AssistantErrorAction =
@@ -829,6 +839,8 @@ export interface RequestTurn {
   persisted: boolean;
   /** B-09 `attachments` capability. */
   attachments: boolean;
+  /** A chat about an incident names `mode: "chat"`, or the server runs the autonomous analysis agent. */
+  rcaChatMode?: boolean;
   now: number;
   replyToApproval?: string;
 }

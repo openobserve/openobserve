@@ -29,7 +29,9 @@ import type {
 } from "./assistantStore.types";
 
 export { isAssistantV2 } from "./flags";
+export { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./helperPrefixes";
 export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
+export { openTabWithoutOpener } from "./openTab";
 export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";
 export { splitReportFindings } from "./reportFindings";
 export { useAssistantName } from "./useAssistantName";

@@ -75,6 +75,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
+    <div v-if="creditMeter" data-test="billings-usage-ai-summary">
+      <AssistantCreditMeter
+        size="card"
+        :usage="creditMeter.usage.value"
+        :overage="creditMeter.overage.data.value ?? null"
+        :status="creditMeter.status.value"
+        :can-manage="creditMeter.canManage.value"
+        :org-name="creditMeter.orgName.value"
+        @retry="creditMeter.retry"
+      />
+    </div>
+
     <!-- A failed Refresh keeps the last good numbers on screen and says so, rather than wiping them. -->
     <OBanner
       v-if="refreshFailed"
@@ -175,7 +187,10 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import AssistantCreditMeter from "@/components/ai-assistant/credits/AssistantCreditMeter.vue";
 import config from "@/aws-exports";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantCreditMeter } from "../useAssistantCreditMeter";
 import { siteURL } from "@/constants/config";
 import BillingService, { type AiUsage } from "@/services/billings";
 import UsageOverview from "./UsageOverview.vue";
@@ -324,10 +339,10 @@ const fetchMetering = async () => {
 
 const aiUsage = ref<AiUsage | null>(null);
 
-/** Cloud only, as on main; a failed read just leaves the warning out. */
 /** Overlapping Refreshes can answer out of order; only the newest load may publish. */
 let latestLoad = 0;
 
+/** Cloud only, as on main; a failed read just leaves the warning out. */
 const loadAiUsage = async (loadId: number) => {
   if (config.isCloud !== "true") return;
   try {
@@ -338,6 +353,9 @@ const loadAiUsage = async (loadId: number) => {
     if (loadId === latestLoad) aiUsage.value = null;
   }
 };
+
+// The Plans card's meter on the shared reads, so a turn or a consent change shows here too; Cloud and v2 only.
+const creditMeter = config.isCloud === "true" && isAssistantV2() ? useAssistantCreditMeter() : null;
 
 /** Why AI stopped, for a contract, a billing-group member, or an org that pays by subscription. */
 const aiCreditsMessage = computed(() => {

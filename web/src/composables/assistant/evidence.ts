@@ -37,6 +37,8 @@ export interface LinkBlockData {
   resourceType: string;
   action: string;
   target: Record<string, unknown>;
+  /** A redacted reader's copy: it names the kind of view, never its query, stream or window. */
+  redacted?: boolean;
 }
 
 /** What `complete` says about its turn, kept on the answer so a reload shows the same footer and vote. */

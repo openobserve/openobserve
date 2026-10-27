@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
+import assistant, { parseAiUsage } from "@/services/assistant";
 
 import UsageTab from "./UsageTab.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
@@ -41,7 +42,10 @@ vi.mock("@/services/assistant_settings", async (importOriginal) => {
 });
 vi.mock("@/services/assistant", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/assistant")>();
-  return { ...actual, default: { capabilities: vi.fn(), testCapabilities: vi.fn() } };
+  return {
+    ...actual,
+    default: { capabilities: vi.fn(), testCapabilities: vi.fn(), usage: vi.fn(async () => null) },
+  };
 });
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
@@ -84,6 +88,26 @@ describe("UsageTab", () => {
     await w.find('[data-test="settings-assistant-usage-manage-paid"]').trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("plans");
+  });
+
+  it("on Cloud renders the credit meter from the usage read, and Retry when it fails", async () => {
+    vi.mocked(assistant.usage).mockResolvedValueOnce(
+      parseAiUsage({ credits_used: 300, credits_limit: 1000, mode: "free" }),
+    );
+    fake.current = fakeAssistant("available", { edition: "cloud" });
+    const { w } = await mountTab();
+    const meter = w.get(
+      '[data-test="settings-assistant-usage-card"] [data-test="assistant-credit-meter"]',
+    );
+    expect(meter.attributes("data-state")).toBe("ready");
+    expect(meter.get('[data-test="assistant-credit-meter-text"]').text()).toMatch(
+      /^300 of 1,000 included credits · /,
+    );
+    expect(meter.find('[data-test="assistant-credit-meter-bar"]').exists()).toBe(true);
+    vi.mocked(assistant.usage).mockRejectedValueOnce(new Error("500"));
+    fake.current = fakeAssistant("available", { edition: "cloud" });
+    const failed = await mountTab({}, "acme-2");
+    expect(failed.w.find('[data-test="assistant-credit-meter-retry"]').exists()).toBe(true);
   });
 
   it("gives members no billing button they cannot open", async () => {

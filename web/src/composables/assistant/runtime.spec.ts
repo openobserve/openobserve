@@ -27,12 +27,9 @@ import { computeUserOrgKey } from "@/utils/userOrgKey";
 import { queryRunOf, runQueryApplier } from "./actions/appliers/query";
 import * as storeModule from "./assistantStore";
 import { assistantStore, openAssistant, useAssistantCapability } from "./index";
+import { openTabWithoutOpener } from "./openTab";
 import { pushRecall, readRecall } from "./prefs";
-import {
-  getAssistantRuntime,
-  openTabWithoutOpener,
-  resetAssistantRuntimeForTests,
-} from "./runtime";
+import { getAssistantRuntime, resetAssistantRuntimeForTests } from "./runtime";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 

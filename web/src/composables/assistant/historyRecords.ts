@@ -29,7 +29,13 @@ import { toAssistantError } from "./assistantErrors";
 import type { AdoptInit } from "./assistantStore";
 import type { BlockAnnotation, EntryOrigin, SessionOrigin, Sid } from "./assistantStore.types";
 import { goneElsewhere, originOf, readLocal, sidTime, type HistoryCtx } from "./historyContext";
-import { LIVE_SAVE_GRACE_MS, messageGroups, type LocalRecord, type LocalTurn } from "./historyDb";
+import {
+  LIVE_SAVE_GRACE_MS,
+  MAX_INCIDENT_ID,
+  messageGroups,
+  type LocalRecord,
+  type LocalTurn,
+} from "./historyDb";
 import { wireOrigin, type HistoryList } from "./historyList";
 import { saveSession, writeCache } from "./historyLocalStore";
 import { readAnnotations } from "./prefs";
@@ -81,7 +87,10 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     const messages = ahead
       ? cached.messages
       : withRecordedApprovals(
-          projectRecord(patchCards(turns, cached?.turns), "owner", ownerOptions(ctx)),
+          projectRecord(patchCards(turns, cached?.turns), "owner", {
+            ...ownerOptions(ctx),
+            ...(detail.approvals && { approvals: detail.approvals }),
+          }),
           readAnnotations(ctx.key() ?? "", sid),
         );
     const settled = !detail.active_turn && !turns.some((turn) => turn.status === "running");
@@ -255,6 +264,9 @@ function adoptBase(
     title: title ? raw(title) : null,
     titleSource: record?.titleSource ?? "generated",
     origin: sessionOriginOf(record?.origin ?? wireOrigin(summary)),
+    ...(typeof record?.incidentId === "string" && {
+      incidentId: record.incidentId.slice(0, MAX_INCIDENT_ID),
+    }),
   };
 }
 

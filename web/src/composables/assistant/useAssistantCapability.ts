@@ -216,7 +216,8 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
           if (!data) return;
           b06.value = data;
           b06At.value = at ?? Date.now();
-          if (data.health?.status) health.value = data.health.status;
+          const status = healthOf(data.health?.status);
+          if (status) health.value = status;
           if (data.can_chat === true && (access.value?.at ?? 0) < b06At.value) clearAccess();
         });
         onCleanup(stop);
@@ -350,6 +351,10 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (input.b06?.history_search === true) capability.historySearch = true;
   if (input.b06?.history_pins === true) capability.historyPins = true;
   if (input.b06?.history_import === true) capability.historyImport = true;
+  if (input.b06?.turn_versions === true) capability.turnVersions = true;
+  if (input.b06?.feedback_stored === true) capability.feedbackStored = true;
+  if (input.b06?.rca_chat_mode === true) capability.rcaChatMode = true;
+  if (input.b06?.rca_feedback === true) capability.rcaFeedback = true;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";
@@ -366,6 +371,12 @@ function gateOf(input: CapabilityInput, canChat: Tri): GateCode {
   if (input.b06?.gate === "off_for_org") return "off_for_org";
   if (input.health === "down") return "unhealthy";
   return canChat === "no" ? "no_permission" : "available";
+}
+
+// The server says `unreachable` where this client says `down`; its `unknown` leaves the probe's answer alone.
+function healthOf(status: unknown): AssistantCapability["health"] | null {
+  if (status === "ok") return "ok";
+  return status === "down" || status === "unreachable" ? "down" : null;
 }
 
 function resolveChat(input: CapabilityInput): {
