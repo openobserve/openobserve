@@ -6625,6 +6625,34 @@
     "heatmapLabel": "Carte thermique",
     "stateTimelineLabel": "Chronologie des états",
     "configSectionStateTimeline": "Chronologie des états",
+    "hostmapLabel": "Carte des hôtes",
+    "configSectionHostmap": "Carte des hôtes",
+    "hostmapEntityLabel": "Libellé de l'entité",
+    "hostmapEntityLabelPlaceholder": "Nom de la légende",
+    "hostmapEntityLabelTooltip": "Libellé de série qui nomme chaque cellule. Laissez vide pour nommer les cellules d'après leur légende.",
+    "hostmapGroupBy": "Regrouper par",
+    "hostmapThenBy": "Puis par",
+    "hostmapLabelPlaceholder": "Nom du libellé",
+    "hostmapReduction": "Valeur de la cellule",
+    "hostmapReductionLast": "Dernière",
+    "hostmapReductionAvg": "Moy.",
+    "hostmapReductionMin": "Min",
+    "hostmapReductionMax": "Max",
+    "hostmapGroupSort": "Trier les groupes par",
+    "hostmapCellSort": "Trier les cellules par",
+    "hostmapSortName": "Nom",
+    "hostmapSortValue": "Valeur la plus élevée",
+    "hostmapCellShape": "Forme de la cellule",
+    "hostmapShapeSquare": "Carré",
+    "hostmapShapeHexagon": "Hexagone",
+    "hostmapCellLabel": "Libellé de la cellule",
+    "hostmapCellLabelNone": "Aucun",
+    "hostmapCellLabelName": "Nom",
+    "hostmapCellLabelValue": "Valeur",
+    "hostmapCellLabelHint": "Les libellés ne s'affichent que si les cellules sont assez grandes pour être lues.",
+    "hostmapGroupByHint": "Ajoutez jusqu'à deux champs",
+    "hostmapCellName": "Nom de la cellule",
+    "hostmapCellGroup": "Groupe de la cellule",
     "stateTimelineMergeGaps": "Fusionner les écarts jusqu'à (secondes)",
     "stateTimelineMergeGapsTooltip": "Une période vide jusqu'à cette durée après un échantillon prolonge son état ; une période plus longue s'affiche comme une absence de données. Laissez vide pour ne tolérer qu'une légère gigue temporelle.",
     "stateTimelineRowHeight": "Hauteur des lignes (px)",
@@ -8090,6 +8118,17 @@
       "stateTimelineStateCap": "{shown} états sur {total} ont leur propre couleur ; les autres partagent l'autre couleur.",
       "stateTimelineOther": "Autre",
       "stateTimelineNoData": "Aucune donnée",
+      "hostmapNoData": "Aucune donnée",
+      "hostmapNoGroup": "(aucun)",
+      "hostmapCellCap": "Affichage de {shown} sur {total} cellules.",
+      "hostmapValueNotNumeric": "Le champ de valeur doit être numérique ou mappé : ajoutez un mappage de valeur pour ses valeurs textuelles.",
+      "hostmapTextUnmapped": "N'est pas un nombre et aucun mappage de valeur ne correspond.",
+      "hostmapGroupHighest": "Valeur la plus élevée : {value}",
+      "hostmapDuplicate": "{count} cellule partage ce nom | {count} cellules partagent ce nom",
+      "hostmapMoreLabels": "+{count} libellé supplémentaire | +{count} libellés supplémentaires",
+      "hostmapBelow": "Inférieur à {value}",
+      "hostmapAtLeast": "{value} ou plus",
+      "hostmapTooManyGroups": "La carte des hôtes peut regrouper au maximum {count} champs",
       "stateTimelineStart": "Début",
       "stateTimelineEnd": "Fin",
       "stateTimelineDuration": "Durée",
@@ -8360,6 +8399,10 @@
     "breakdownTooltipHBar": "Utilisez ces champs pour diviser les données en différentes sections sur l'axe Y pour une vue plus claire.",
     "breakdownTooltipDefault": "Utilisez ces champs pour diviser les données en différentes sections sur l'axe X pour une vue plus claire.",
     "breakdownTooltipStateTimeline": "Chaque valeur de ce champ obtient sa propre ligne dans la chronologie.",
+    "breakdownTooltipHostmap": "Les cellules sont encadrées par ces champs : le premier est le groupe externe, le second le groupe interne.",
+    "hostmapEntity": "Entité",
+    "hostmapValue": "Valeur",
+    "hostmapGroupBy": "Regrouper par",
     "otherColumn": "Autres colonnes",
     "metric": "Métrique",
     "filters": "Filtres",
@@ -17111,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Tous les agents",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "Tous les agents",
-      "kpisAriaLabel": "KPI de niveau 1",
-      "dataTypes": {
-        "numericShort": "Num",
-        "categoricalShort": "Cat",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "il y a {day}j"
+        }
       },
+      "healthyIf": "Sain si {rule}",
+      "noHealthyValue": "aucun",
+      "setThreshold": "Définir un seuil de santé",
+      "noScoresInWindow": "Aucun score dans cette fenêtre",
+      "outOf": "{count} sur {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Portée du score",
-        "filterHint": "Comparez cette configuration de score entre les portées des cibles d'évaluation.",
         "all": "Tout",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Résultats des scores"
-        },
-        "evaluationCost": {
-          "title": "Coût de l'évaluation"
-        },
-        "scorerSuccess": {
-          "title": "Succès du scoreur"
-        },
-        "scorerFailures": {
-          "title": "Échecs des évaluateurs"
-        },
-        "latencyP95": {
-          "title": "Latence du scoreur p95"
-        },
-        "vsPrev": "contre le précédent",
-        "noPriorData": "aucune donnée antérieure",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
       },
-      "detail": {
-        "loading": "Répartition du chargement par configuration...",
-        "noData": "Il n'y a pas encore de score pour cette configuration dans cette fenêtre.",
-        "empty": {
-          "title": "En attente de vos premiers scores",
-          "titleScoped": "Aucun score {scope} dans cette fenêtre",
-          "description": "Aucun score n'a été reçu pour cette configuration dans la plage temporelle sélectionnée. Ils apparaîtront ici automatiquement dès qu'un évaluateur l'utilisant s'exécutera.",
-          "descriptionScoped": "Aucun score {scope} n'a été enregistré pour cette configuration dans la plage horaire sélectionnée. Choisissez une autre portée ou élargissez la plage horaire."
-        },
-        "trendTitle": "Tendance",
-        "distributionTitle": "Répartition des scores",
-        "categoryDistributionTitle": "Distribution des catégories",
-        "healthyRateTitle": "Taux de santé dans le temps",
-        "trueRateTitle": "Taux de résultats vrais dans le temps",
-        "trueFalseTitle": "Vrai contre faux",
-        "legendAvg": "Moyenne",
-        "legendThreshold": "seuil {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "sain {direction} {value}",
-        "healthyThreshold": "Sain {threshold}",
-        "legendHealthy": "en bonne santé",
-        "legendUnhealthy": "mauvais pour la santé",
-        "legendHealthyRate": "Taux de santé",
-        "legendTrueRate": "Taux de résultats vrais",
-        "legendTrueCount": "vrai ({count})",
-        "legendFalseCount": "faux ({count})",
-        "kpis": {
-          "average": "Moyenne",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Malsain",
-          "healthy": "En bonne santé",
-          "trueRate": "Taux de résultats vrais",
-          "falseRate": "Taux de faux",
-          "coverage": "Couverture",
-          "targetsScored": "Cibles notées"
-        },
-        "health": {
-          "title": "Statut de santé",
-          "noThreshold": "Aucun seuil de santé n'est configuré. Les scores ne peuvent pas encore être classés comme sains ou en dégradation.",
-          "thresholdOnly": "Sain si {threshold}",
-          "summary": "{percent}% en dessous du seuil · Sain si {threshold}"
-        },
-        "ofScoreResults": "sur {count} résultats de score",
-        "range": "Plage {min}–{max}"
+      "tiles": {
+        "attention": "Configurations à surveiller",
+        "ofTotal": "sur {total}",
+        "attentionNote": "Les afficher",
+        "attentionTooltip": "Configurations avec au moins un score non sain",
+        "withoutResult": "Configurations sans résultat",
+        "withoutResultTooltip": "Configurations sans aucun score sur cette période, ou sans seuil de santé. Cliquez pour les afficher.",
+        "noScores": "{count} n'a obtenu aucun score | {count} n'ont obtenu aucun score",
+        "noThreshold": "{count} n'a pas de seuil | {count} n'ont pas de seuil",
+        "allGiveResult": "Chaque configuration donne un résultat"
       },
-      "runs": {
-        "title": "Scores d'évaluation",
-        "hint": "Les scores et le raisonnement proviennent de _llm_scores. Sélectionnez une exécution pour ouvrir la trace de son évaluateur et approfondir l'investigation.",
-        "filterLabel": "Filtrer les scores d'évaluation",
-        "noThresholdHint": "Définissez un seuil de santé sur cette configuration de score pour classer et mettre en évidence les scores malsains.",
-        "noReasoning": "Aucun raisonnement enregistré",
-        "unknownAgent": "Agent inconnu",
-        "unknownScope": "Portée inconnue",
-        "queryError": "Les scores d'évaluation n'ont pas pu être actualisés. La dernière page réussie est toujours affichée.",
-        "empty": "Aucun score d'évaluation dans cette plage horaire.",
-        "emptyUnhealthy": "Aucun score insatisfaisant dans cette plage horaire.",
-        "filters": {
-          "all": "Tous les scores",
-          "unhealthy": "Insatisfaisant"
-        },
-        "health": {
-          "healthy": "Satisfaisant",
-          "unhealthy": "Insatisfaisant"
-        },
-        "columns": {
-          "time": "Évalué",
-          "result": "Score",
-          "reasoning": "Raisonnement",
-          "target": "Cible",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filtrer les configurations…",
-        "relativeTime": {
-          "daysAgo": "il y a {day}j",
-          "monthsAgo": "il y a {month}mo"
-        },
-        "status": {
-          "healthy": "Satisfaisant",
-          "unhealthy": "Nécessite attention",
-          "noThreshold": "Seuil non défini",
-          "noData": "Aucune donnée de score"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% en dessous · Satisfaisant si {threshold}",
-          "noThresholdHint": "Définir un seuil satisfaisant",
-          "noDataHint": "Aucun score dans cette fenêtre"
-        },
+        "openUnhealthy": "Ouvrir les scores non sains",
+        "configLink": "Configuration",
+        "averageRange": "moyenne, de {min} à {max}",
+        "mostCommon": "le plus fréquent · {count} sur {total}",
         "columns": {
+          "scoreConfig": "Configuration de score",
           "health": "Santé",
-          "scoreConfig": "Configuration du score",
-          "type": "Tapez",
-          "quality": "Qualité",
-          "totalScores": "Total des scores",
-          "scopeMix": "Mix de portées",
-          "volumeTrend": "Tendance du volume",
+          "typicalScore": "Score typique",
+          "unhealthy": "Non sain",
+          "scores": "Scores",
           "updated": "Mis à jour"
         }
       },
-      "averageWithHealthyRate": "Moyenne · {rate}% sain"
+      "detail": {
+        "back": "Toutes les configurations",
+        "backToAll": "Retour à toutes les configurations",
+        "editConfig": "Modifier la configuration",
+        "notFound": "Configuration de score introuvable",
+        "notFoundDescription": "Elle a peut-être été supprimée, ou le lien pointe vers une ancienne configuration.",
+        "emptyTitle": "En attente de vos premiers scores",
+        "emptyTitleScoped": "Aucun score de {scope} dans cette fenêtre",
+        "emptyDescription": "Aucun score n'a été reçu pour cette configuration sur la période sélectionnée. Ils apparaîtront ici dès qu'un évaluateur qui l'utilise s'exécute.",
+        "distributionNumeric": "Distribution des scores",
+        "distributionValues": "Distribution des valeurs",
+        "averageValue": "moyenne {value}",
+        "legendHealthy": "Sain",
+        "legendUnhealthy": "Non sain",
+        "legendScores": "Scores",
+        "chartTooltip": "{count} score, {unhealthy} non sain | {count} scores, {unhealthy} non sains",
+        "chartTooltipCount": "{count} score | {count} scores",
+        "trendTitle": {
+          "score": "Tendance",
+          "healthyRate": "Taux de scores sains au fil du temps",
+          "trueRate": "Taux de valeurs vraies au fil du temps",
+          "count": "Scores au fil du temps"
+        },
+        "trendLegend": {
+          "healthyRate": "Taux de scores sains",
+          "trueRate": "Taux de vrai",
+          "count": "Scores"
+        },
+        "legendAvg": "Moyenne",
+        "legendThreshold": "seuil {direction} {value}",
+        "markLineHealthy": "sain {direction} {value}",
+        "filterRange": "de {from} à {to}",
+        "filterBelow": "Inférieur à {to}",
+        "filterAtLeast": "{from} ou plus",
+        "filterAny": "Toute valeur",
+        "filterByBar": "Filtrer les scores par valeur",
+        "barButton": "{label} : {count} score | {label} : {count} scores",
+        "clearFilter": "Effacer le filtre"
+      },
+      "review": {
+        "title": "Scores d'évaluation",
+        "all": "Tous",
+        "unhealthy": "Non sain",
+        "unhealthyDisabled": "Définissez un seuil de santé pour classer les scores",
+        "inputNotCaptured": "Entrée non capturée",
+        "outputNotCaptured": "Sortie non capturée",
+        "noMatch": "Aucun score ne correspond à ce filtre"
+      },
+      "pane": {
+        "noneSelected": "Aucun score sélectionné",
+        "healthy": "Sain",
+        "unhealthy": "Non sain",
+        "noThreshold": "Aucun seuil de santé défini",
+        "previous": "Score précédent",
+        "next": "Score suivant",
+        "reasoning": "Raisonnement",
+        "noReasoning": "Aucun raisonnement enregistré",
+        "fullTextUnavailable": "Affichage d'un court aperçu. La trace complète n'a pas pu être chargée.",
+        "open": {
+          "span": "Ouvrir le span",
+          "trace": "Ouvrir la trace",
+          "session": "Ouvrir la session"
+        },
+        "evaluatorTrace": "Trace de l'évaluateur",
+        "addToDataset": "Ajouter au jeu de données",
+        "datasetSession": "Les jeux de données acceptent une seule trace ou un seul span. Ouvrez la session pour ajouter l'une de ses traces.",
+        "datasetNoStream": "Ce score n'a pas de flux source à partir duquel effectuer l'ajout."
+      }
     },
     "singular": {
       "jobs": "Emploi Eval",
@@ -17963,22 +17985,18 @@
       }
     },
     "importCount": "Importer ({count})",
-    "count": "Nombre",
     "failedToDeriveSchema": "Échec de la dérivation du schéma",
     "failedToImportScoreConfig": "Échec de l'importation de la configuration de score",
     "failedToImportScorer": "Échec de l'importation du scoreur",
     "failedToFetchCatalog": "Échec de la récupération du catalogue ({status})",
     "failedToLoadCatalog": "Échec du chargement du catalogue",
     "failedToRunScorerTest": "Échec de l'exécution du test du scoreur",
-    "healthyRate": "Taux de santé",
     "invalidJsonFormat": "Format JSON invalide",
     "jsonIsEmpty": "JSON vide",
     "scorerTestFailed": "Échec du test du scoreur",
     "scorerTestSampleContext": "Profil du pays France : Paris est la capitale.",
     "scorerTestSampleInput": "La capitale de la France est Paris, située sur la Seine.",
     "scorerTestSampleOutput": "Paris est la capitale de la France.",
-    "topCategory": "Catégorie principale",
-    "trueRate": "Taux réel",
     "unknownError": "Erreur inconnue",
     "import": {
       "createdSuccessfully": "\"{name}\" créé avec succès",
@@ -20148,6 +20166,7 @@
       "evalTemplates": "Evaluations en ligne — Modèles",
       "scorers": "Évaluations en ligne — Évaluateurs",
       "evalJobs": "Evals en ligne — Offres d'emploi",
+      "quality": "Evals en ligne — Qualité",
       "scoreConfigs": "Evaluations en ligne — Configurations des scores",
       "actions": "Actions",
       "llmProviders": "Fournisseurs de LLM",
@@ -20263,6 +20282,7 @@
       "evalTemplatesRefresh": "Actualiser la liste",
       "scorersRefresh": "Actualiser la liste",
       "evalJobsRefresh": "Actualiser la liste",
+      "qualityBack": "Retour à toutes les configurations",
       "scoreConfigsRefresh": "Actualiser la liste",
       "actionsRefresh": "Actualiser la liste",
       "llmProvidersRefresh": "Actualiser la liste",
@@ -20509,11 +20529,10 @@
         "high": "Élevé"
       },
       "qualityStatus": {
-        "nothreshold": "Aucun seuil",
-        "nodata": "Aucune donnée",
+        "attention": "Nécessite une attention",
         "healthy": "Sain",
-        "warn": "Avertissement",
-        "unhealthy": "Non sain"
+        "unset": "Seuil non défini",
+        "nodata": "Aucune donnée de score"
       },
       "rumEventType": {
         "longtask": "Tâche longue",

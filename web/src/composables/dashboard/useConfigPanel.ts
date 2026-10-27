@@ -63,6 +63,7 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "gauge",
   "metric",
   "state-timeline",
+  "hostmap",
 ];
 
 export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
@@ -159,6 +160,7 @@ export function useConfigPanel(
   const { t, tm } = useI18nTyped();
 
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
+  const isHostmap = computed(() => dashboardPanelData.data.type === "hostmap");
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -389,6 +391,21 @@ export function useConfigPanel(
         label: t("dashboard.stateTimelineTooltipMode"),
         visible: isStateTimeline.value,
       },
+    },
+    hostmap: {
+      "entity-label": {
+        label: t("dashboard.hostmapEntityLabel"),
+        visible: isHostmap.value && !!promqlMode.value,
+      },
+      "group-by": {
+        label: [t("dashboard.hostmapGroupBy"), t("dashboard.hostmapThenBy")],
+        visible: isHostmap.value && !!promqlMode.value,
+      },
+      reduction: { label: t("dashboard.hostmapReduction"), visible: isHostmap.value },
+      "group-sort": { label: t("dashboard.hostmapGroupSort"), visible: isHostmap.value },
+      "cell-sort": { label: t("dashboard.hostmapCellSort"), visible: isHostmap.value },
+      "cell-shape": { label: t("dashboard.hostmapCellShape"), visible: isHostmap.value },
+      "cell-label": { label: t("dashboard.hostmapCellLabel"), visible: isHostmap.value },
     },
     axis: {
       "axis-width": {

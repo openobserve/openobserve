@@ -6625,6 +6625,34 @@
     "heatmapLabel": "خريطة الحرارة",
     "stateTimelineLabel": "الخط الزمني للحالة",
     "configSectionStateTimeline": "الخط الزمني للحالة",
+    "hostmapLabel": "خريطة المضيفين",
+    "configSectionHostmap": "خريطة المضيفين",
+    "hostmapEntityLabel": "تسمية الكيان",
+    "hostmapEntityLabelPlaceholder": "اسم وسيلة الإيضاح",
+    "hostmapEntityLabelTooltip": "تسمية السلسلة التي تسمّي كل خلية. اتركه فارغًا لتسمية الخلايا حسب وسيلة الإيضاح الخاصة بها.",
+    "hostmapGroupBy": "تجميع حسب",
+    "hostmapThenBy": "ثم حسب",
+    "hostmapLabelPlaceholder": "اسم التسمية",
+    "hostmapReduction": "قيمة الخلية",
+    "hostmapReductionLast": "الأخير",
+    "hostmapReductionAvg": "المتوسط",
+    "hostmapReductionMin": "الأدنى",
+    "hostmapReductionMax": "الأعلى",
+    "hostmapGroupSort": "ترتيب المجموعات حسب",
+    "hostmapCellSort": "ترتيب الخلايا حسب",
+    "hostmapSortName": "الاسم",
+    "hostmapSortValue": "أعلى قيمة",
+    "hostmapCellShape": "شكل الخلية",
+    "hostmapShapeSquare": "مربع",
+    "hostmapShapeHexagon": "سداسي",
+    "hostmapCellLabel": "تسمية الخلية",
+    "hostmapCellLabelNone": "لا شيء",
+    "hostmapCellLabelName": "الاسم",
+    "hostmapCellLabelValue": "القيمة",
+    "hostmapCellLabelHint": "لا تظهر التسميات إلا عندما تكون الخلايا كبيرة بما يكفي للقراءة.",
+    "hostmapGroupByHint": "أضف حتى حقلين",
+    "hostmapCellName": "اسم الخلية",
+    "hostmapCellGroup": "مجموعة الخلية",
     "stateTimelineMergeGaps": "دمج الفجوات حتى (بالثواني)",
     "stateTimelineMergeGapsTooltip": "يُمدّد أي فراغ لا يتجاوز هذه المدة حالة العينة؛ أما الفراغ الأطول فيظهر على أنه لا توجد بيانات. اتركه فارغًا للسماح فقط بتذبذب بسيط في التوقيت.",
     "stateTimelineRowHeight": "ارتفاع الصف (بكسل)",
@@ -8090,6 +8118,17 @@
       "stateTimelineStateCap": "{shown} من {total} حالة لها لونها الخاص؛ والباقي يتشارك اللون الآخر.",
       "stateTimelineOther": "أخرى",
       "stateTimelineNoData": "لا توجد بيانات",
+      "hostmapNoData": "لا توجد بيانات",
+      "hostmapNoGroup": "(لا شيء)",
+      "hostmapCellCap": "عرض {shown} من {total} خلية.",
+      "hostmapValueNotNumeric": "يجب أن يكون حقل القيمة رقميًا أو مُعيَّنًا: أضف تعيينًا للقيمة لقيمه النصية",
+      "hostmapTextUnmapped": "ليس رقمًا ولا يطابقه أي تعيين قيمة",
+      "hostmapGroupHighest": "الأعلى: {value}",
+      "hostmapDuplicate": "{count} خلية تشترك في هذا الاسم | {count} خلايا تشترك في هذا الاسم",
+      "hostmapMoreLabels": "+{count} تسمية إضافية | +{count} تسميات إضافية",
+      "hostmapBelow": "أقل من {value}",
+      "hostmapAtLeast": "{value} أو أكثر",
+      "hostmapTooManyGroups": "يمكن لخريطة المضيفين التجميع حسب {count} حقول كحد أقصى",
       "stateTimelineStart": "البداية",
       "stateTimelineEnd": "النهاية",
       "stateTimelineDuration": "المدة",
@@ -8360,6 +8399,10 @@
     "breakdownTooltipHBar": "استخدم هذه الحقول لتقسيم البيانات إلى أقسام مختلفة على محور Y للحصول على رؤية أوضح.",
     "breakdownTooltipDefault": "استخدم هذه الحقول لتقسيم البيانات إلى أقسام مختلفة على المحور X للحصول على رؤية أوضح.",
     "breakdownTooltipStateTimeline": "تحصل كل قيمة من هذا الحقل على صفها الخاص في الخط الزمني.",
+    "breakdownTooltipHostmap": "تُؤطَّر الخلايا بهذين الحقلين: الأول هو المجموعة الخارجية، والثاني هو الداخلية.",
+    "hostmapEntity": "الكيان",
+    "hostmapValue": "القيمة",
+    "hostmapGroupBy": "تجميع حسب",
     "otherColumn": "أعمدة أخرى",
     "metric": "القياس",
     "filters": "الفلاتر",
@@ -17111,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "جميع الوكلاء",
-      "agentLabel": "وكيل",
-      "agentPlaceholder": "جميع الوكلاء",
-      "kpisAriaLabel": "مؤشرات الأداء الرئيسية من المستوى الأول",
-      "dataTypes": {
-        "numericShort": "نوم",
-        "categoricalShort": "قط",
-        "booleanShort": "بول"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "منذ {day}d"
+        }
       },
+      "healthyIf": "سليم إذا {rule}",
+      "noHealthyValue": "لا يوجد",
+      "setThreshold": "عيّن عتبة صحية",
+      "noScoresInWindow": "لا توجد درجات في هذه النافذة",
+      "outOf": "{count} من {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "نطاق النقاط",
-        "filterHint": "قارن هذا التهيئة النقدية عبر نطاقات التقييم المستهدفة.",
         "all": "الجميع",
         "span": "الامتداد",
         "trace": "التتبع",
         "session": "الجلسة"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "نتائج النتائج"
-        },
-        "evaluationCost": {
-          "title": "تكلفة التقييم"
-        },
-        "scorerSuccess": {
-          "title": "نجاح أدوات التقييم"
-        },
-        "scorerFailures": {
-          "title": "إخفاقات أدوات التقييم"
-        },
-        "latencyP95": {
-          "title": "زمن استجابة أدوات التقييم p95"
-        },
-        "vsPrev": "مقابل السابق",
-        "noPriorData": "لا توجد بيانات سابقة",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "الامتداد",
+        "trace": "التتبع",
+        "session": "الجلسة"
+      },
+      "tiles": {
+        "attention": "إعدادات تحتاج إلى انتباه",
+        "ofTotal": "من {total}",
+        "attentionNote": "اعرضها",
+        "attentionTooltip": "إعدادات بها درجة غير سليمة واحدة على الأقل",
+        "withoutResult": "إعدادات بدون نتيجة",
+        "withoutResultTooltip": "الإعدادات التي لا تحتوي على درجات في هذا النطاق الزمني، أو التي لا تحتوي على عتبة صحية. انقر لعرضها.",
+        "noScores": "{count} بدون درجات | {count} بدون درجات",
+        "noThreshold": "{count} بدون عتبة | {count} بدون عتبة",
+        "allGiveResult": "كل إعداد يعطي نتيجة"
+      },
+      "table": {
+        "searchPlaceholder": "تصفية الإعدادات…",
+        "openUnhealthy": "افتح الدرجات غير السليمة",
+        "configLink": "الإعداد",
+        "averageRange": "المتوسط، {min} إلى {max}",
+        "mostCommon": "الأكثر شيوعًا · {count} من {total}",
+        "columns": {
+          "scoreConfig": "إعداد التقييم",
+          "health": "الحالة الصحية",
+          "typicalScore": "الدرجة النموذجية",
+          "unhealthy": "غير سليمة",
+          "scores": "الدرجات",
+          "updated": "آخر تحديث"
+        }
       },
       "detail": {
-        "loading": "جاري تحميل تقسيم كل إعداد...",
-        "noData": "لا توجد درجات حتى الآن لهذا التكوين في هذه النافذة.",
-        "empty": {
-          "title": "تنتظر نتائجك الأولى",
-          "titleScoped": "لا توجد درجات {scope} في هذه النافذة",
-          "description": "لم تصل أي درجات لهذا الإعداد في النطاق الزمني المحدد. ستظهر هنا تلقائيًا بمجرد تشغيل أداة تقييم تستخدمه.",
-          "descriptionScoped": "لم تصل أي درجات {scope} لهذا التكوين في النطاق الزمني المحدد. اختر نطاق آخر أو وسع النطاق الزمني."
+        "back": "كل الإعدادات",
+        "backToAll": "العودة إلى كل الإعدادات",
+        "editConfig": "تعديل الإعداد",
+        "notFound": "إعداد التقييم غير موجود",
+        "notFoundDescription": "ربما تم حذفه، أو يشير الرابط إلى إعداد قديم.",
+        "emptyTitle": "بانتظار أول درجاتك",
+        "emptyTitleScoped": "لا توجد درجات {scope} في هذه النافذة",
+        "emptyDescription": "لم تصل أي درجات لهذا الإعداد في النطاق الزمني المحدد. ستظهر هنا بمجرد تشغيل أداة تقييم تستخدمه.",
+        "distributionNumeric": "توزيع الدرجات",
+        "distributionValues": "توزيع القيم",
+        "averageValue": "المتوسط {value}",
+        "legendHealthy": "سليم",
+        "legendUnhealthy": "غير سليم",
+        "legendScores": "الدرجات",
+        "chartTooltip": "{count} درجة، {unhealthy} غير سليمة | {count} درجة، {unhealthy} غير سليمة",
+        "chartTooltipCount": "{count} درجة | {count} درجات",
+        "trendTitle": {
+          "score": "الاتجاه",
+          "healthyRate": "نسبة السليمة عبر الوقت",
+          "trueRate": "نسبة القيم الصحيحة عبر الوقت",
+          "count": "الدرجات عبر الوقت"
         },
-        "trendTitle": "الاتجاه",
-        "distributionTitle": "توزيع النقاط",
-        "categoryDistributionTitle": "توزيع الفئات",
-        "healthyRateTitle": "معدل صحي مع مرور الوقت",
-        "trueRateTitle": "المعدل الحقيقي مع مرور الوقت",
-        "trueFalseTitle": "صحيح مقابل خطأ",
+        "trendLegend": {
+          "healthyRate": "نسبة السليمة",
+          "trueRate": "معدل القيم الصحيحة",
+          "count": "الدرجات"
+        },
         "legendAvg": "AVG",
-        "legendThreshold": "عتبة {'{'}direction{'}'} {'{'}value{'}'}",
+        "legendThreshold": "العتبة {direction} {value}",
         "markLineHealthy": "{direction} {value} صحي",
-        "healthyThreshold": "{threshold} صحي",
-        "legendHealthy": "صحي",
-        "legendUnhealthy": "غير صحي",
-        "legendHealthyRate": "معدل صحي",
-        "legendTrueRate": "المعدل الحقيقي",
-        "legendTrueCount": "صحيح ({count})",
-        "legendFalseCount": "false ({count})",
-        "kpis": {
-          "average": "المتوسط",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "غير صحي",
-          "healthy": "سليم",
-          "trueRate": "المعدل الحقيقي",
-          "falseRate": "معدل الكاذب",
-          "coverage": "التغطية",
-          "targetsScored": "الأهداف المسجلة"
-        },
-        "health": {
-          "title": "الحالة الصحية",
-          "noThreshold": "لا يتم تحديد عتبة صحية. لا يمكن تصنيف الدرجات كصحية أو مهينة بعد.",
-          "thresholdOnly": "صحي إذا {threshold}",
-          "summary": "{percent}٪ تحت العتبة · صحي إذا {threshold}"
-        },
-        "ofScoreResults": "من إجمالي نتائج التقييم البالغ عددها {count}",
-        "range": "النطاق {min}–{max}"
+        "filterRange": "من {from} إلى {to}",
+        "filterBelow": "أقل من {to}",
+        "filterAtLeast": "{from} أو أكثر",
+        "filterAny": "أي قيمة",
+        "filterByBar": "فلترة الدرجات حسب القيمة",
+        "barButton": "{label}: {count} درجة | {label}: {count} درجة",
+        "clearFilter": "مسح الفلتر"
       },
-      "runs": {
+      "review": {
         "title": "درجات التقييم",
-        "hint": "تأتي الدرجات والتعليلات من _llm_scores. اختر تشغيلًا لفتح تتبع أداة التقييم الخاص بها لمزيد من التحقيق.",
-        "filterLabel": "تصفية درجات التقييم",
-        "noThresholdHint": "حدد عتبة صحية في هذا التكوين لتصنيف وتسليط الضوء على الدرجات غير الصحية.",
-        "noReasoning": "لم يتم تسجيل أي سبب",
-        "unknownAgent": "وكيل غير معروف",
-        "unknownScope": "نطاق غير معروف",
-        "queryError": "لم يكن بالإمكان تحديث درجات التقييم. لا تزال الصفحة الناجحة الأخيرة معروضة.",
-        "empty": "لا توجد درجات تقييم في هذا الإطار الزمني.",
-        "emptyUnhealthy": "لا توجد درجات غير صحية في هذا الإطار الزمني.",
-        "filters": {
-          "all": "جميع الدرجات",
-          "unhealthy": "غير صحي"
-        },
-        "health": {
-          "healthy": "سليم",
-          "unhealthy": "غير صحي"
-        },
-        "columns": {
-          "time": "تم التقييم",
-          "result": "الموسيقى التصويرية",
-          "reasoning": "الأسباب",
-          "target": "الهدف",
-          "agent": "وكيل"
-        }
+        "all": "الكل",
+        "unhealthy": "غير سليم",
+        "unhealthyDisabled": "عيّن عتبة سليمة لتصنيف الدرجات",
+        "inputNotCaptured": "لم يتم تسجيل المدخلات",
+        "outputNotCaptured": "لم يتم تسجيل المخرجات",
+        "noMatch": "لا توجد درجات تطابق هذا الفلتر"
       },
-      "overview": {
-        "searchPlaceholder": "تصفية الإعدادات…",
-        "relativeTime": {
-          "daysAgo": "منذ {day}d",
-          "monthsAgo": "منذ {month}mo"
+      "pane": {
+        "noneSelected": "لم يتم اختيار أي درجة",
+        "healthy": "سليم",
+        "unhealthy": "غير سليم",
+        "noThreshold": "لم يتم تعيين عتبة سليمة",
+        "previous": "الدرجة السابقة",
+        "next": "الدرجة التالية",
+        "reasoning": "التعليل",
+        "noReasoning": "لم يتم تسجيل أي تعليل",
+        "fullTextUnavailable": "يتم عرض معاينة قصيرة. تعذّر تحميل التتبع الكامل.",
+        "open": {
+          "span": "فتح الامتداد",
+          "trace": "فتح التتبع",
+          "session": "فتح الجلسة"
         },
-        "status": {
-          "healthy": "سليم",
-          "unhealthy": "يحتاج إلى اهتمام",
-          "noThreshold": "العتبة غير محددة",
-          "noData": "لا توجد بيانات نقاط"
-        },
-        "health": {
-          "thresholdSummary": "{percent}٪ أقل · صحي إذا {threshold}",
-          "noThresholdHint": "عيّن عتبة سليمة",
-          "noDataHint": "لا توجد نقاط في هذه النافذة"
-        },
-        "columns": {
-          "health": "الصحة",
-          "scoreConfig": "إعدادات النقاط",
-          "type": "النوع",
-          "quality": "الجودة",
-          "totalScores": "إجمالي النتائج",
-          "scopeMix": "مزيج التسكوب",
-          "volumeTrend": "اتجاه الحجم",
-          "updated": "تحديث"
-        }
-      },
-      "averageWithHealthyRate": "متوسط · {rate}٪ صحي"
+        "evaluatorTrace": "تتبع المقيِّم",
+        "addToDataset": "إضافة إلى مجموعة البيانات",
+        "datasetSession": "تقبل مجموعات البيانات تتبعًا واحدًا أو امتدادًا واحدًا. افتح الجلسة لإضافة أحد تتبعاتها.",
+        "datasetNoStream": "لا يوجد تدفق مصدر لهذه الدرجة للإضافة منه."
+      }
     },
     "singular": {
       "jobs": "مهمة التقييم",
@@ -17963,22 +17985,18 @@
       }
     },
     "importCount": "استيراد ({count})",
-    "count": "الكونت",
     "failedToDeriveSchema": "فشل في اشتقاق المخطط",
     "failedToImportScoreConfig": "فشل في استيراد إعدادات النقاط",
     "failedToImportScorer": "فشل استيراد أداة التقييم",
     "failedToFetchCatalog": "فشل في جلب الكتالوج ({status})",
     "failedToLoadCatalog": "فشل تحميل الكتالوج",
     "failedToRunScorerTest": "فشل تشغيل اختبار أداة التقييم",
-    "healthyRate": "معدل صحي",
     "invalidJsonFormat": "صيغة JSON غير صالحة",
     "jsonIsEmpty": "JSON فارغ",
     "scorerTestFailed": "فشل اختبار أداة التقييم",
     "scorerTestSampleContext": "ملف فرنسا في البلاد: باريس هي العاصمة.",
     "scorerTestSampleInput": "عاصمة فرنسا هي باريس، الواقعة على نهر السين.",
     "scorerTestSampleOutput": "باريس هي عاصمة فرنسا.",
-    "topCategory": "الفئة العليا",
-    "trueRate": "المعدل الحقيقي",
     "unknownError": "خطأ غير معروف",
     "import": {
       "createdSuccessfully": "\"{name}\" تم إنشاؤه بنجاح",
@@ -20148,6 +20166,7 @@
       "evalTemplates": "التقييمات الإلكترونية — القوالب",
       "scorers": "التقييمات عبر الإنترنت — أدوات التقييم",
       "evalJobs": "التقييمات عبر الإنترنت — المهام",
+      "quality": "التقييمات المباشرة — الجودة",
       "scoreConfigs": "التقييمات الإلكترونية — إعدادات النقاط",
       "actions": "الإجراءات",
       "llmProviders": "مزودو LLM",
@@ -20263,6 +20282,7 @@
       "evalTemplatesRefresh": "تحديث القائمة",
       "scorersRefresh": "تحديث القائمة",
       "evalJobsRefresh": "تحديث القائمة",
+      "qualityBack": "العودة إلى جميع الإعدادات",
       "scoreConfigsRefresh": "تحديث القائمة",
       "actionsRefresh": "تحديث القائمة",
       "llmProvidersRefresh": "تحديث القائمة",
@@ -20509,11 +20529,10 @@
         "high": "عالي"
       },
       "qualityStatus": {
-        "nothreshold": "لا عتبة",
-        "nodata": "لا توجد بيانات",
+        "attention": "يحتاج إلى انتباه",
         "healthy": "سليم",
-        "warn": "تحذير",
-        "unhealthy": "غير صحي"
+        "unset": "لم يتم تعيين العتبة",
+        "nodata": "لا توجد بيانات تقييم"
       },
       "rumEventType": {
         "longtask": "مهمة طويلة",

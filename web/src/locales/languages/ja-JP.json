@@ -6625,6 +6625,34 @@
     "heatmapLabel": "ヒートマップ",
     "stateTimelineLabel": "ステートタイムライン",
     "configSectionStateTimeline": "ステートタイムライン",
+    "hostmapLabel": "ホストマップ",
+    "configSectionHostmap": "ホストマップ",
+    "hostmapEntityLabel": "エンティティラベル",
+    "hostmapEntityLabelPlaceholder": "凡例名",
+    "hostmapEntityLabelTooltip": "各セルの名前となるシリーズラベルです。空欄の場合は凡例名でセルに名前を付けます。",
+    "hostmapGroupBy": "グループ化",
+    "hostmapThenBy": "さらにグループ化",
+    "hostmapLabelPlaceholder": "ラベル名",
+    "hostmapReduction": "セルの値",
+    "hostmapReductionLast": "最新",
+    "hostmapReductionAvg": "平均",
+    "hostmapReductionMin": "最小",
+    "hostmapReductionMax": "最大",
+    "hostmapGroupSort": "グループの並び替え基準",
+    "hostmapCellSort": "セルの並び替え基準",
+    "hostmapSortName": "名前",
+    "hostmapSortValue": "値が高い順",
+    "hostmapCellShape": "セルの形状",
+    "hostmapShapeSquare": "正方形",
+    "hostmapShapeHexagon": "六角形",
+    "hostmapCellLabel": "セルラベル",
+    "hostmapCellLabelNone": "なし",
+    "hostmapCellLabelName": "名前",
+    "hostmapCellLabelValue": "値",
+    "hostmapCellLabelHint": "ラベルはセルが読める大きさの場合にのみ表示されます。",
+    "hostmapGroupByHint": "最大 2 つまでフィールドを追加できます",
+    "hostmapCellName": "セル名",
+    "hostmapCellGroup": "セルグループ",
     "stateTimelineMergeGaps": "ギャップの結合上限 (秒)",
     "stateTimelineMergeGapsTooltip": "サンプルの状態が延長された後、この長さまでの空白は状態の継続とみなされます。それより長い場合はデータなしとして表示されます。空欄にすると、小さなタイミングのずれのみ許容されます。",
     "stateTimelineRowHeight": "行の高さ (px)",
@@ -8090,6 +8118,17 @@
       "stateTimelineStateCap": "{total} 個の状態のうち {shown} 個に個別の色が割り当てられ、残りは共通の色になります。",
       "stateTimelineOther": "その他",
       "stateTimelineNoData": "データなし",
+      "hostmapNoData": "データなし",
+      "hostmapNoGroup": "(なし)",
+      "hostmapCellCap": "{total} 個中 {shown} 個のセルを表示しています。",
+      "hostmapValueNotNumeric": "値フィールドは数値またはマッピング済みである必要があります: テキスト値には値マッピングを追加してください",
+      "hostmapTextUnmapped": "数値ではなく、一致する値マッピングもありません",
+      "hostmapGroupHighest": "最大: {value}",
+      "hostmapDuplicate": "{count} 個のセルがこの名前を共有しています | {count} 個のセルがこの名前を共有しています",
+      "hostmapMoreLabels": "+{count} 件のラベル | +{count} 件のラベル",
+      "hostmapBelow": "{value} 未満",
+      "hostmapAtLeast": "{value} 以上",
+      "hostmapTooManyGroups": "ホストマップでグループ化できるフィールドは最大 {count} 個です",
       "stateTimelineStart": "開始",
       "stateTimelineEnd": "終了",
       "stateTimelineDuration": "期間",
@@ -8360,6 +8399,10 @@
     "breakdownTooltipHBar": "これらのフィールドを使用してデータを Y 軸上のさまざまなセクションに分割すると、見やすくなります。",
     "breakdownTooltipDefault": "これらのフィールドを使用してデータを X 軸上のさまざまなセクションに分割すると、見やすくなります。",
     "breakdownTooltipStateTimeline": "このフィールドの各値はタイムラインでそれぞれ別の行になります。",
+    "breakdownTooltipHostmap": "セルはこれらのフィールドで分割されます: 1 つ目が外側のグループ、2 つ目が内側のグループです。",
+    "hostmapEntity": "エンティティ",
+    "hostmapValue": "値",
+    "hostmapGroupBy": "グループ化",
     "otherColumn": "その他の列",
     "metric": "メトリック",
     "filters": "フィルター",
@@ -17111,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "すべてのエージェント",
-      "agentLabel": "エージェント",
-      "agentPlaceholder": "すべてのエージェント",
-      "kpisAriaLabel": "Tier 1 KPI",
-      "dataTypes": {
-        "numericShort": "数値",
-        "categoricalShort": "カテゴリ",
-        "booleanShort": "ブール"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}日前"
+        }
       },
+      "healthyIf": "{rule} の場合に正常",
+      "noHealthyValue": "なし",
+      "setThreshold": "正常しきい値を設定",
+      "noScoresInWindow": "この期間にスコアはありません",
+      "outOf": "{total} 件中 {count} 件",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "スコア範囲",
-        "filterHint": "このスコア設定を評価ターゲットスコープ間で比較します。",
         "all": "すべて",
         "span": "スパン",
         "trace": "トレース",
         "session": "セッション"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "スコア結果"
-        },
-        "evaluationCost": {
-          "title": "評価コスト"
-        },
-        "scorerSuccess": {
-          "title": "スコアラー成功率"
-        },
-        "scorerFailures": {
-          "title": "スコアラーの失敗"
-        },
-        "latencyP95": {
-          "title": "スコアラーレイテンシ p95"
-        },
-        "vsPrev": "対前へ",
-        "noPriorData": "以前のデータなし",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "スパン",
+        "trace": "トレース",
+        "session": "セッション"
+      },
+      "tiles": {
+        "attention": "注意が必要な設定",
+        "ofTotal": "{total} 中",
+        "attentionNote": "表示する",
+        "attentionTooltip": "異常スコアが 1 件以上ある設定",
+        "withoutResult": "結果のない設定",
+        "withoutResultTooltip": "この期間にスコアがない、または正常しきい値がない設定です。クリックすると表示されます。",
+        "noScores": "{count} 件にスコアがありません | {count} 件にスコアがありません",
+        "noThreshold": "{count} 件にしきい値がありません | {count} 件にしきい値がありません",
+        "allGiveResult": "すべての設定が結果を返します"
+      },
+      "table": {
+        "searchPlaceholder": "設定を絞り込む…",
+        "openUnhealthy": "異常スコアを開く",
+        "configLink": "設定",
+        "averageRange": "平均、{min}〜{max}",
+        "mostCommon": "最多 · {total} 中 {count}",
+        "columns": {
+          "scoreConfig": "スコア設定",
+          "health": "健全性",
+          "typicalScore": "代表スコア",
+          "unhealthy": "異常",
+          "scores": "スコア",
+          "updated": "更新日時"
+        }
       },
       "detail": {
-        "loading": "設定ごとの内訳を読み込んでいます...",
-        "noData": "このウィンドウには、この構成のスコアはまだありません。",
-        "empty": {
-          "title": "最初のスコアを待っています",
-          "titleScoped": "このウィンドウに{scope}のスコアがありません",
-          "description": "選択した時間範囲では、この設定のスコアはまだ取得されていません。この設定を使用するスコアラーが実行されると、ここに自動的に表示されます。",
-          "descriptionScoped": "選択した時間範囲では、この設定に対して{scope}のスコアが届いていません。別のスコープを選択するか、時間範囲を広げてください。"
+        "back": "すべての設定",
+        "backToAll": "すべての設定に戻る",
+        "editConfig": "設定を編集",
+        "notFound": "スコア設定が見つかりません",
+        "notFoundDescription": "削除されたか、リンクが古い設定を指している可能性があります。",
+        "emptyTitle": "最初のスコアを待っています",
+        "emptyTitleScoped": "この期間に{scope}のスコアはありません",
+        "emptyDescription": "選択した期間にこの設定のスコアはありません。この設定を使用するスコアラーが実行されると、ここに表示されます。",
+        "distributionNumeric": "スコア分布",
+        "distributionValues": "値の分布",
+        "averageValue": "平均 {value}",
+        "legendHealthy": "正常",
+        "legendUnhealthy": "異常",
+        "legendScores": "スコア",
+        "chartTooltip": "スコア {count} 件、異常 {unhealthy} 件 | スコア {count} 件、異常 {unhealthy} 件",
+        "chartTooltipCount": "スコア {count} 件 | スコア {count} 件",
+        "trendTitle": {
+          "score": "トレンド",
+          "healthyRate": "正常率の推移",
+          "trueRate": "True 率の推移",
+          "count": "スコアの推移"
         },
-        "trendTitle": "トレンド",
-        "distributionTitle": "スコア分布",
-        "categoryDistributionTitle": "カテゴリ分布",
-        "healthyRateTitle": "経時的な健全率",
-        "trueRateTitle": "経時的な真率",
-        "trueFalseTitle": "真と偽",
+        "trendLegend": {
+          "healthyRate": "正常率",
+          "trueRate": "正解率",
+          "count": "スコア"
+        },
         "legendAvg": "平均",
-        "legendThreshold": "しきい値 {'{'}direction{'}'} {'{'}value{'}'}",
+        "legendThreshold": "しきい値 {direction} {value}",
         "markLineHealthy": "正常 {direction} {value}",
-        "healthyThreshold": "正常 {threshold}",
-        "legendHealthy": "健康",
-        "legendUnhealthy": "不健全です",
-        "legendHealthyRate": "健全率",
-        "legendTrueRate": "真率",
-        "legendTrueCount": "真 ({count})",
-        "legendFalseCount": "偽 ({count})",
-        "kpis": {
-          "average": "アベレージ",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "不健康",
-          "healthy": "ヘルシー",
-          "trueRate": "真率",
-          "falseRate": "偽率",
-          "coverage": "カバレッジ",
-          "targetsScored": "スコアリング対象数"
-        },
-        "health": {
-          "title": "健全性ステータス",
-          "noThreshold": "健全性しきい値が設定されていません。スコアはまだ健全または劣化として分類できません。",
-          "thresholdOnly": "{threshold} の場合健全",
-          "summary": "しきい値を{percent}%下回る · {threshold} の場合健全"
-        },
-        "ofScoreResults": "{count} 件のスコア結果のうち",
-        "range": "範囲 {min}–{max}"
+        "filterRange": "{from} 〜 {to}",
+        "filterBelow": "{to} 未満",
+        "filterAtLeast": "{from} 以上",
+        "filterAny": "すべての値",
+        "filterByBar": "値でスコアをフィルター",
+        "barButton": "{label}: {count} スコア | {label}: {count} スコア",
+        "clearFilter": "フィルターをクリア"
       },
-      "runs": {
+      "review": {
         "title": "評価スコア",
-        "hint": "スコアと推論は _llm_scores から得られます。ランを選択すると、その評価トレースが開き、さらに調査できます。",
-        "filterLabel": "評価スコアをフィルター",
-        "noThresholdHint": "このスコア設定に健全性しきい値を設定して、不健全なスコアを分類および強調表示します。",
-        "noReasoning": "推論が記録されていません",
-        "unknownAgent": "不明なエージェント",
-        "unknownScope": "不明なスコープ",
-        "queryError": "評価スコアを更新できませんでした。最後に成功したページが表示されています。",
-        "empty": "この時間範囲に評価スコアはありません。",
-        "emptyUnhealthy": "この時間範囲に異常スコアはありません。",
-        "filters": {
-          "all": "すべてのスコア",
-          "unhealthy": "異常"
-        },
-        "health": {
-          "healthy": "正常",
-          "unhealthy": "異常"
-        },
-        "columns": {
-          "time": "評価済み",
-          "result": "スコア",
-          "reasoning": "推論",
-          "target": "ターゲット",
-          "agent": "エージェント"
-        }
+        "all": "すべて",
+        "unhealthy": "異常",
+        "unhealthyDisabled": "スコアを分類するには正常なしきい値を設定してください",
+        "inputNotCaptured": "入力がキャプチャされていません",
+        "outputNotCaptured": "出力がキャプチャされていません",
+        "noMatch": "このフィルターに一致するスコアはありません"
       },
-      "overview": {
-        "searchPlaceholder": "フィルター構成...",
-        "relativeTime": {
-          "daysAgo": "{day}日前",
-          "monthsAgo": "{month}ヶ月前"
+      "pane": {
+        "noneSelected": "スコアが選択されていません",
+        "healthy": "正常",
+        "unhealthy": "異常",
+        "noThreshold": "正常なしきい値が設定されていません",
+        "previous": "前のスコア",
+        "next": "次のスコア",
+        "reasoning": "推論",
+        "noReasoning": "推論は記録されていません",
+        "fullTextUnavailable": "短いプレビューを表示しています。完全なトレースを読み込めませんでした。",
+        "open": {
+          "span": "スパンを開く",
+          "trace": "トレースを開く",
+          "session": "セッションを開く"
         },
-        "status": {
-          "healthy": "正常",
-          "unhealthy": "注意が必要",
-          "noThreshold": "しきい値が設定されていません",
-          "noData": "スコアデータがありません"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% 未満 · しきい値 {threshold} で正常",
-          "noThresholdHint": "正常しきい値を設定",
-          "noDataHint": "このウィンドウにスコアはありません"
-        },
-        "columns": {
-          "health": "ヘルス",
-          "scoreConfig": "スコア設定",
-          "type": "タイプ",
-          "quality": "品質",
-          "totalScores": "合計スコア",
-          "scopeMix": "スコープミックス",
-          "volumeTrend": "ボリュームトレンド",
-          "updated": "更新済み"
-        }
-      },
-      "averageWithHealthyRate": "平均 · {rate}% 正常"
+        "evaluatorTrace": "評価者のトレース",
+        "addToDataset": "データセットに追加",
+        "datasetSession": "データセットには 1 つのトレースまたはスパンを指定します。セッションを開いて、その中のトレースを追加してください。",
+        "datasetNoStream": "このスコアには追加元のソースストリームがありません。"
+      }
     },
     "singular": {
       "jobs": "評価ジョブ",
@@ -17963,22 +17985,18 @@
       }
     },
     "importCount": "インポート ({count})",
-    "count": "カウント",
     "failedToDeriveSchema": "スキーマの導出に失敗しました",
     "failedToImportScoreConfig": "スコア設定のインポートに失敗しました",
     "failedToImportScorer": "スコアラーのインポートに失敗しました",
     "failedToFetchCatalog": "カタログの取得に失敗しました ({status})",
     "failedToLoadCatalog": "カタログの読み込みに失敗しました",
     "failedToRunScorerTest": "スコアラーテストの実行に失敗しました",
-    "healthyRate": "正常率",
     "invalidJsonFormat": "JSON 形式が無効です",
     "jsonIsEmpty": "JSON が空です",
     "scorerTestFailed": "スコアラーテストが失敗しました",
     "scorerTestSampleContext": "フランスの国プロフィール: パリは首都です。",
     "scorerTestSampleInput": "フランスの首都はパリで、セーヌ川沿いにあります。",
     "scorerTestSampleOutput": "パリはフランスの首都です。",
-    "topCategory": "トップカテゴリ",
-    "trueRate": "真の率",
     "unknownError": "不明なエラー",
     "import": {
       "createdSuccessfully": "\"{name}\" を正常に作成しました",
@@ -20148,6 +20166,7 @@
       "evalTemplates": "オンライン評価 — テンプレート",
       "scorers": "オンライン評価 — スコアラー",
       "evalJobs": "オンライン評価 — 求人",
+      "quality": "オンライン評価 — 品質",
       "scoreConfigs": "オンライン評価 — スコア構成",
       "actions": "アクション",
       "llmProviders": "LLM プロバイダー",
@@ -20263,6 +20282,7 @@
       "evalTemplatesRefresh": "リストを更新",
       "scorersRefresh": "リストを更新",
       "evalJobsRefresh": "リストを更新",
+      "qualityBack": "すべての設定に戻る",
       "scoreConfigsRefresh": "リストを更新",
       "actionsRefresh": "リストを更新",
       "llmProvidersRefresh": "リストを更新",
@@ -20509,11 +20529,10 @@
         "high": "高"
       },
       "qualityStatus": {
-        "nothreshold": "しきい値なし",
-        "nodata": "データなし",
+        "attention": "要注意",
         "healthy": "正常",
-        "warn": "注意",
-        "unhealthy": "異常"
+        "unset": "しきい値が未設定",
+        "nodata": "スコアデータなし"
       },
       "rumEventType": {
         "longtask": "長時間タスク",

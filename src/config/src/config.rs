@@ -3193,6 +3193,12 @@ pub struct Limit {
     )]
     pub max_dashboard_state_timeline_series: usize,
     #[env_config(
+        name = "ZO_MAX_DASHBOARD_HOSTMAP_CELLS",
+        default = 5000,
+        help = "maximum cells a host map panel draws, also the PromQL series it loads; the rest are counted in a notice"
+    )]
+    pub max_dashboard_hostmap_cells: usize,
+    #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
         help = "Duration of each mini search partition in seconds"
@@ -4136,6 +4142,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.max_dashboard_state_timeline_series < 1 {
         cfg.limit.max_dashboard_state_timeline_series = 2000;
+    }
+    if cfg.limit.max_dashboard_hostmap_cells < 1 {
+        cfg.limit.max_dashboard_hostmap_cells = 5000;
     }
 
     // check query timeout
@@ -6528,6 +6537,19 @@ mod tests {
         cfg.limit.max_dashboard_state_timeline_series = 50;
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_hostmap_cells() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+        cfg.limit.max_dashboard_hostmap_cells = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+
+        cfg.limit.max_dashboard_hostmap_cells = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 300);
     }
 
     #[test]

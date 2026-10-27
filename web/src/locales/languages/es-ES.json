@@ -6625,6 +6625,34 @@
     "heatmapLabel": "Mapa de calor",
     "stateTimelineLabel": "Cronología de estados",
     "configSectionStateTimeline": "Cronología de estados",
+    "hostmapLabel": "Mapa de hosts",
+    "configSectionHostmap": "Mapa de hosts",
+    "hostmapEntityLabel": "Etiqueta de entidad",
+    "hostmapEntityLabelPlaceholder": "Nombre de la leyenda",
+    "hostmapEntityLabelTooltip": "La etiqueta de la serie que da nombre a cada celda. Déjalo vacío para nombrar las celdas según su leyenda.",
+    "hostmapGroupBy": "Agrupar por",
+    "hostmapThenBy": "Luego por",
+    "hostmapLabelPlaceholder": "Nombre de la etiqueta",
+    "hostmapReduction": "Valor de la celda",
+    "hostmapReductionLast": "Último",
+    "hostmapReductionAvg": "Prom.",
+    "hostmapReductionMin": "Mín.",
+    "hostmapReductionMax": "Máx.",
+    "hostmapGroupSort": "Ordenar grupos por",
+    "hostmapCellSort": "Ordenar celdas por",
+    "hostmapSortName": "Nombre",
+    "hostmapSortValue": "Valor más alto",
+    "hostmapCellShape": "Forma de la celda",
+    "hostmapShapeSquare": "Cuadrado",
+    "hostmapShapeHexagon": "Hexágono",
+    "hostmapCellLabel": "Etiqueta de la celda",
+    "hostmapCellLabelNone": "Ninguna",
+    "hostmapCellLabelName": "Nombre",
+    "hostmapCellLabelValue": "Valor",
+    "hostmapCellLabelHint": "Las etiquetas solo se muestran cuando las celdas son lo bastante grandes para leerse.",
+    "hostmapGroupByHint": "Añade hasta dos campos",
+    "hostmapCellName": "Nombre de la celda",
+    "hostmapCellGroup": "Grupo de la celda",
     "stateTimelineMergeGaps": "Fusionar huecos de hasta (segundos)",
     "stateTimelineMergeGapsTooltip": "Un tramo vacío de hasta esta duración después de una muestra extiende su estado; uno más largo se muestra como sin datos. Déjalo vacío para permitir solo pequeñas fluctuaciones de tiempo.",
     "stateTimelineRowHeight": "Altura de fila (px)",
@@ -8090,6 +8118,17 @@
       "stateTimelineStateCap": "{shown} de {total} estados tienen su propio color; el resto comparte el otro color.",
       "stateTimelineOther": "Otros",
       "stateTimelineNoData": "Sin datos",
+      "hostmapNoData": "Sin datos",
+      "hostmapNoGroup": "(ninguno)",
+      "hostmapCellCap": "Mostrando {shown} de {total} celdas.",
+      "hostmapValueNotNumeric": "El campo de valor debe ser numérico o estar asignado: añade una asignación de valores para sus valores de texto",
+      "hostmapTextUnmapped": "No es un número y ninguna asignación de valores coincide",
+      "hostmapGroupHighest": "Más alto: {value}",
+      "hostmapDuplicate": "{count} celda comparte este nombre | {count} celdas comparten este nombre",
+      "hostmapMoreLabels": "+{count} etiqueta más | +{count} etiquetas más",
+      "hostmapBelow": "Por debajo de {value}",
+      "hostmapAtLeast": "{value} o más",
+      "hostmapTooManyGroups": "El mapa de hosts puede agrupar por un máximo de {count} campos",
       "stateTimelineStart": "Inicio",
       "stateTimelineEnd": "Fin",
       "stateTimelineDuration": "Duración",
@@ -8360,6 +8399,10 @@
     "breakdownTooltipHBar": "Utilice estos campos para dividir los datos en diferentes secciones del eje Y para obtener una visión más clara.",
     "breakdownTooltipDefault": "Utilice estos campos para dividir los datos en diferentes secciones del eje X para una visualización más clara.",
     "breakdownTooltipStateTimeline": "Cada valor de este campo tiene su propia fila en la cronología.",
+    "breakdownTooltipHostmap": "Las celdas están delimitadas por estos campos: el primero es el grupo externo y el segundo, el interno.",
+    "hostmapEntity": "Entidad",
+    "hostmapValue": "Valor",
+    "hostmapGroupBy": "Agrupar por",
     "otherColumn": "Otras columnas",
     "metric": "Métrica",
     "filters": "Filtros",
@@ -17111,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Todos los agentes",
-      "agentLabel": "Agente",
-      "agentPlaceholder": "Todos los agentes",
-      "kpisAriaLabel": "KPIs de nivel 1",
-      "dataTypes": {
-        "numericShort": "Núm.",
-        "categoricalShort": "Cat.",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "hace {day}d"
+        }
       },
+      "healthyIf": "Saludable si {rule}",
+      "noHealthyValue": "ninguno",
+      "setThreshold": "Establecer un umbral saludable",
+      "noScoresInWindow": "No hay puntuaciones en esta ventana",
+      "outOf": "{count} de {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Ámbito de puntuación",
-        "filterHint": "Compare esta configuración de puntuación en los ámbitos de destino de evaluación.",
         "all": "Todo",
         "span": "Span",
         "trace": "Traza",
         "session": "Sesión"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Resultados de puntuación"
-        },
-        "evaluationCost": {
-          "title": "Costo de evaluación"
-        },
-        "scorerSuccess": {
-          "title": "Éxito del evaluador"
-        },
-        "scorerFailures": {
-          "title": "Fallos del evaluador"
-        },
-        "latencyP95": {
-          "title": "Latencia p95 del evaluador"
-        },
-        "vsPrev": "contra el anterior",
-        "noPriorData": "sin datos previos",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "traza",
+        "session": "sesión"
+      },
+      "tiles": {
+        "attention": "Configuraciones que necesitan atención",
+        "ofTotal": "de {total}",
+        "attentionNote": "Muéstralas",
+        "attentionTooltip": "Configuraciones con al menos una puntuación no saludable",
+        "withoutResult": "Configuraciones sin resultado",
+        "withoutResultTooltip": "Configuraciones sin puntuaciones en este intervalo de tiempo o sin un umbral saludable. Haz clic para mostrarlas.",
+        "noScores": "{count} no obtuvo puntuaciones | {count} no obtuvieron puntuaciones",
+        "noThreshold": "{count} no tiene umbral | {count} no tienen umbral",
+        "allGiveResult": "Todas las configuraciones dan un resultado"
+      },
+      "table": {
+        "searchPlaceholder": "Filtrar configuraciones…",
+        "openUnhealthy": "Abrir las puntuaciones no saludables",
+        "configLink": "Configuración",
+        "averageRange": "promedio, de {min} a {max}",
+        "mostCommon": "más común · {count} de {total}",
+        "columns": {
+          "scoreConfig": "Configuración de puntuación",
+          "health": "Salud",
+          "typicalScore": "Puntuación típica",
+          "unhealthy": "No saludables",
+          "scores": "Puntuaciones",
+          "updated": "Actualizado"
+        }
       },
       "detail": {
-        "loading": "Cargando el desglose por configuración...",
-        "noData": "Aún no hay puntuaciones para esta configuración en esta ventana.",
-        "empty": {
-          "title": "Esperando tus primeras puntuaciones",
-          "titleScoped": "No hay puntuaciones de {scope} en esta ventana",
-          "description": "No han llegado puntuaciones para esta configuración en el rango de tiempo seleccionado. Aparecerán aquí automáticamente una vez que se ejecute un evaluador que la utilice.",
-          "descriptionScoped": "No se han recibido puntuaciones de {scope} para esta configuración en el rango de tiempo seleccionado. Elija otro ámbito o amplíe el rango de tiempo."
+        "back": "Todas las configuraciones",
+        "backToAll": "Volver a todas las configuraciones",
+        "editConfig": "Editar configuración",
+        "notFound": "Configuración de puntuación no encontrada",
+        "notFoundDescription": "Es posible que se haya eliminado o que el enlace apunte a una configuración antigua.",
+        "emptyTitle": "Esperando tus primeras puntuaciones",
+        "emptyTitleScoped": "No hay puntuaciones de {scope} en esta ventana",
+        "emptyDescription": "No se han recibido puntuaciones para esta configuración en el intervalo de tiempo seleccionado. Aparecerán aquí en cuanto se ejecute un evaluador que la use.",
+        "distributionNumeric": "Distribución de puntuaciones",
+        "distributionValues": "Distribución de valores",
+        "averageValue": "promedio {value}",
+        "legendHealthy": "Correcto",
+        "legendUnhealthy": "Incorrecto",
+        "legendScores": "Puntuaciones",
+        "chartTooltip": "{count} puntuación, {unhealthy} no saludable | {count} puntuaciones, {unhealthy} no saludables",
+        "chartTooltipCount": "{count} puntuación | {count} puntuaciones",
+        "trendTitle": {
+          "score": "Tendencia",
+          "healthyRate": "Tasa de saludables a lo largo del tiempo",
+          "trueRate": "Tasa de valores verdaderos a lo largo del tiempo",
+          "count": "Puntuaciones a lo largo del tiempo"
         },
-        "trendTitle": "Tendencia",
-        "distributionTitle": "Distribución de puntajes",
-        "categoryDistributionTitle": "Distribución de categorías",
-        "healthyRateTitle": "Tasa saludable a lo largo del tiempo",
-        "trueRateTitle": "Tasa verdadera a lo largo del tiempo",
-        "trueFalseTitle": "Verdadero contra falso",
+        "trendLegend": {
+          "healthyRate": "Tasa de saludables",
+          "trueRate": "Tasa de verdaderos",
+          "count": "Puntuaciones"
+        },
         "legendAvg": "Promedio",
-        "legendThreshold": "umbral {'{'}direction{'}'} {'{'}value{'}'}",
+        "legendThreshold": "umbral {direction} {value}",
         "markLineHealthy": "saludable {direction} {value}",
-        "healthyThreshold": "Saludable {threshold}",
-        "legendHealthy": "saludable",
-        "legendUnhealthy": "insalubres",
-        "legendHealthyRate": "Tasa saludable",
-        "legendTrueRate": "Tasa verdadera",
-        "legendTrueCount": "verdadero ({count})",
-        "legendFalseCount": "falso ({count})",
-        "kpis": {
-          "average": "Promedio",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Insalubre",
-          "healthy": "Saludable",
-          "trueRate": "Tasa verdadera",
-          "falseRate": "Tasa falsa",
-          "coverage": "Cobertura",
-          "targetsScored": "Objetivos puntuados"
-        },
-        "health": {
-          "title": "Estado de salud",
-          "noThreshold": "No se ha configurado un umbral saludable. Las puntuaciones no se pueden clasificar como saludables o degradantes todavía.",
-          "thresholdOnly": "Saludable si {threshold}",
-          "summary": "{percent}% por debajo del umbral · Saludable si {threshold}"
-        },
-        "ofScoreResults": "de {count} resultados de puntuación",
-        "range": "Rango {min}–{max}"
+        "filterRange": "{from} a {to}",
+        "filterBelow": "Por debajo de {to}",
+        "filterAtLeast": "{from} o más",
+        "filterAny": "Cualquier valor",
+        "filterByBar": "Filtrar las puntuaciones por valor",
+        "barButton": "{label}: {count} puntuación | {label}: {count} puntuaciones",
+        "clearFilter": "Borrar filtro"
       },
-      "runs": {
+      "review": {
         "title": "Puntuaciones de evaluación",
-        "hint": "Las puntuaciones y el razonamiento provienen de _llm_scores. Selecciona una ejecución para abrir su traza del evaluador para investigar más a fondo.",
-        "filterLabel": "Filtrar puntuaciones de evaluación",
-        "noThresholdHint": "Establezca un umbral saludable en esta configuración de puntuación para clasificar y resaltar puntuaciones no saludables.",
-        "noReasoning": "No se registró razonamiento",
-        "unknownAgent": "Agente desconocido",
-        "unknownScope": "Ámbito desconocido",
-        "queryError": "No se pudieron actualizar las puntuaciones de evaluación. Aún se muestra la última página exitosa.",
-        "empty": "No hay puntuaciones de evaluación en este intervalo de tiempo.",
-        "emptyUnhealthy": "No hay puntuaciones no saludables en este intervalo de tiempo.",
-        "filters": {
-          "all": "Todas las puntuaciones",
-          "unhealthy": "No saludable"
-        },
-        "health": {
-          "healthy": "Saludable",
-          "unhealthy": "No saludable"
-        },
-        "columns": {
-          "time": "Evaluado",
-          "result": "Puntuación",
-          "reasoning": "Razonamiento",
-          "target": "Objetivo",
-          "agent": "Agente"
-        }
+        "all": "Todas",
+        "unhealthy": "No saludable",
+        "unhealthyDisabled": "Establece un umbral saludable para clasificar las puntuaciones",
+        "inputNotCaptured": "Entrada no capturada",
+        "outputNotCaptured": "Salida no capturada",
+        "noMatch": "Ninguna puntuación coincide con este filtro"
       },
-      "overview": {
-        "searchPlaceholder": "Filtrar configuraciones…",
-        "relativeTime": {
-          "daysAgo": "hace {day}d",
-          "monthsAgo": "hace {month}mo"
+      "pane": {
+        "noneSelected": "Ninguna puntuación seleccionada",
+        "healthy": "Saludable",
+        "unhealthy": "No saludable",
+        "noThreshold": "No se ha establecido ningún umbral saludable",
+        "previous": "Puntuación anterior",
+        "next": "Puntuación siguiente",
+        "reasoning": "Razonamiento",
+        "noReasoning": "No se ha registrado ningún razonamiento",
+        "fullTextUnavailable": "Se muestra una vista previa corta. No se ha podido cargar la traza completa.",
+        "open": {
+          "span": "Abrir span",
+          "trace": "Abrir traza",
+          "session": "Abrir sesión"
         },
-        "status": {
-          "healthy": "Saludable",
-          "unhealthy": "Requiere atención",
-          "noThreshold": "Umbral no establecido",
-          "noData": "Sin datos de puntuación"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% por debajo · Saludable si {threshold}",
-          "noThresholdHint": "Establecer un umbral saludable",
-          "noDataHint": "Sin puntuaciones en esta ventana"
-        },
-        "columns": {
-          "health": "Salud",
-          "scoreConfig": "Configuración de puntuación",
-          "type": "Tipo",
-          "quality": "Calidad",
-          "totalScores": "Puntuaciones totales",
-          "scopeMix": "Combinación de ámbitos",
-          "volumeTrend": "Tendencia de volumen",
-          "updated": "Actualizada"
-        }
-      },
-      "averageWithHealthyRate": "Promedio · {rate}% saludable"
+        "evaluatorTrace": "Traza del evaluador",
+        "addToDataset": "Añadir al conjunto de datos",
+        "datasetSession": "Los conjuntos de datos aceptan una sola traza o span. Abre la sesión para añadir una de sus trazas.",
+        "datasetNoStream": "Esta puntuación no tiene ningún stream de origen del que añadir."
+      }
     },
     "singular": {
       "jobs": "Trabajo de evaluación",
@@ -17963,22 +17985,18 @@
       }
     },
     "importCount": "Importar ({count})",
-    "count": "Conteo",
     "failedToDeriveSchema": "No se pudo derivar el esquema",
     "failedToImportScoreConfig": "No se pudo importar la configuración de puntuación",
     "failedToImportScorer": "No se pudo importar el evaluador",
     "failedToFetchCatalog": "No se pudo obtener el catálogo ({status})",
     "failedToLoadCatalog": "No se pudo cargar el catálogo",
     "failedToRunScorerTest": "No se pudo ejecutar la prueba del evaluador",
-    "healthyRate": "Tasa de salud",
     "invalidJsonFormat": "Formato JSON no válido",
     "jsonIsEmpty": "JSON está vacío",
     "scorerTestFailed": "La prueba del evaluador falló",
     "scorerTestSampleContext": "Perfil del país France: Paris es la capital.",
     "scorerTestSampleInput": "La capital de France es Paris, ubicada en el río Seine.",
     "scorerTestSampleOutput": "Paris es la capital de France.",
-    "topCategory": "Categoría principal",
-    "trueRate": "Tasa verdadera",
     "unknownError": "Error desconocido",
     "import": {
       "createdSuccessfully": "\"{name}\" creado con éxito",
@@ -20148,6 +20166,7 @@
       "evalTemplates": "Evaluaciones en línea — Plantillas",
       "scorers": "Evaluaciones en línea — Evaluadores",
       "evalJobs": "Evaluaciones en línea — Trabajos",
+      "quality": "Evaluaciones en línea — Calidad",
       "scoreConfigs": "Evaluaciones en línea — Configuraciones de puntuación",
       "actions": "Acciones",
       "llmProviders": "Proveedores de LLM",
@@ -20263,6 +20282,7 @@
       "evalTemplatesRefresh": "Actualizar lista",
       "scorersRefresh": "Actualizar lista",
       "evalJobsRefresh": "Actualizar lista",
+      "qualityBack": "Volver a todas las configuraciones",
       "scoreConfigsRefresh": "Actualizar lista",
       "actionsRefresh": "Actualizar lista",
       "llmProvidersRefresh": "Actualizar lista",
@@ -20509,11 +20529,10 @@
         "high": "Alto"
       },
       "qualityStatus": {
-        "nothreshold": "Sin umbral",
-        "nodata": "Sin datos",
+        "attention": "Requiere atención",
         "healthy": "Saludable",
-        "warn": "Advertencia",
-        "unhealthy": "No saludable"
+        "unset": "Umbral no establecido",
+        "nodata": "Sin datos de puntuación"
       },
       "rumEventType": {
         "longtask": "Tarea larga",

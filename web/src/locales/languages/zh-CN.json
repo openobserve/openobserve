@@ -6625,6 +6625,34 @@
     "heatmapLabel": "热力图",
     "stateTimelineLabel": "状态时间线",
     "configSectionStateTimeline": "状态时间线",
+    "hostmapLabel": "主机地图",
+    "configSectionHostmap": "主机地图",
+    "hostmapEntityLabel": "实体标签",
+    "hostmapEntityLabelPlaceholder": "图例名称",
+    "hostmapEntityLabelTooltip": "用于命名每个单元格的系列标签。留空则按图例命名单元格。",
+    "hostmapGroupBy": "分组依据",
+    "hostmapThenBy": "次级分组依据",
+    "hostmapLabelPlaceholder": "标签名称",
+    "hostmapReduction": "单元格值",
+    "hostmapReductionLast": "最新",
+    "hostmapReductionAvg": "平均",
+    "hostmapReductionMin": "最小",
+    "hostmapReductionMax": "最大",
+    "hostmapGroupSort": "分组排序依据",
+    "hostmapCellSort": "单元格排序依据",
+    "hostmapSortName": "名称",
+    "hostmapSortValue": "最高值",
+    "hostmapCellShape": "单元格形状",
+    "hostmapShapeSquare": "方形",
+    "hostmapShapeHexagon": "六边形",
+    "hostmapCellLabel": "单元格标签",
+    "hostmapCellLabelNone": "无",
+    "hostmapCellLabelName": "名称",
+    "hostmapCellLabelValue": "值",
+    "hostmapCellLabelHint": "仅当单元格足够大以便阅读时才显示标签。",
+    "hostmapGroupByHint": "最多添加两个字段",
+    "hostmapCellName": "单元格名称",
+    "hostmapCellGroup": "单元格分组",
     "stateTimelineMergeGaps": "合并空隙上限（秒）",
     "stateTimelineMergeGapsTooltip": "样本后不超过此时长的空白区间会延续其状态；更长的区间显示为无数据。留空则仅允许轻微的时间抖动。",
     "stateTimelineRowHeight": "行高（px）",
@@ -8090,6 +8118,17 @@
       "stateTimelineStateCap": "{total} 个状态中有 {shown} 个拥有独立颜色；其余共用另一种颜色。",
       "stateTimelineOther": "其他",
       "stateTimelineNoData": "无数据",
+      "hostmapNoData": "无数据",
+      "hostmapNoGroup": "（无）",
+      "hostmapCellCap": "正在显示 {total} 个单元格中的 {shown} 个。",
+      "hostmapValueNotNumeric": "值字段必须是数值或已映射：请为其文本值添加值映射",
+      "hostmapTextUnmapped": "不是数字，且没有匹配的值映射",
+      "hostmapGroupHighest": "最高：{value}",
+      "hostmapDuplicate": "{count} 个单元格使用此名称 | {count} 个单元格使用此名称",
+      "hostmapMoreLabels": "+{count} 个标签 | +{count} 个标签",
+      "hostmapBelow": "低于 {value}",
+      "hostmapAtLeast": "{value} 及以上",
+      "hostmapTooManyGroups": "主机地图最多可按 {count} 个字段分组",
       "stateTimelineStart": "开始",
       "stateTimelineEnd": "结束",
       "stateTimelineDuration": "持续时间",
@@ -8360,6 +8399,10 @@
     "breakdownTooltipHBar": "使用这些字段在 Y 轴上将数据拆分为不同的部分，以获得更清晰的视图。",
     "breakdownTooltipDefault": "使用这些字段在 X 轴上将数据拆分为不同的部分，以获得更清晰的视图。",
     "breakdownTooltipStateTimeline": "该字段的每个值在时间线中各自占一行。",
+    "breakdownTooltipHostmap": "单元格由这些字段划分：第一个是外部分组，第二个是内部分组。",
+    "hostmapEntity": "实体",
+    "hostmapValue": "值",
+    "hostmapGroupBy": "分组依据",
     "otherColumn": "其他列",
     "metric": "指标",
     "filters": "筛选",
@@ -17111,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "全部智能体",
-      "agentLabel": "智能体",
-      "agentPlaceholder": "所有智能体",
-      "kpisAriaLabel": "一级KPI",
-      "dataTypes": {
-        "numericShort": "数值",
-        "categoricalShort": "分类",
-        "booleanShort": "布尔"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} 天前"
+        }
       },
+      "healthyIf": "若 {rule} 则健康",
+      "noHealthyValue": "无",
+      "setThreshold": "设置健康阈值",
+      "noScoresInWindow": "此时间窗口内无评分",
+      "outOf": "{count} / {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "评分范围",
-        "filterHint": "在不同评估目标范围内比较此评分配置。",
         "all": "全部",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "评分结果"
-        },
-        "evaluationCost": {
-          "title": "评估成本"
-        },
-        "scorerSuccess": {
-          "title": "评分器成功率"
-        },
-        "scorerFailures": {
-          "title": "评分器失败"
-        },
-        "latencyP95": {
-          "title": "评分器延迟 p95"
-        },
-        "vsPrev": "vs 上一页",
-        "noPriorData": "无先前数据",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "Span",
+        "trace": "追踪",
+        "session": "会话"
+      },
+      "tiles": {
+        "attention": "需要关注的配置",
+        "ofTotal": "共 {total}",
+        "attentionNote": "查看",
+        "attentionTooltip": "至少有一个不健康评分的配置",
+        "withoutResult": "没有结果的配置",
+        "withoutResultTooltip": "此时间范围内没有评分的配置，或未设置健康阈值的配置。点击查看。",
+        "noScores": "{count} 个未获得评分 | {count} 个未获得评分",
+        "noThreshold": "{count} 个未设置阈值 | {count} 个未设置阈值",
+        "allGiveResult": "所有配置均有结果"
+      },
+      "table": {
+        "searchPlaceholder": "过滤配置…",
+        "openUnhealthy": "查看不健康评分",
+        "configLink": "配置",
+        "averageRange": "平均值，{min} 至 {max}",
+        "mostCommon": "最常见 · {count} / {total}",
+        "columns": {
+          "scoreConfig": "评分配置",
+          "health": "健康度",
+          "typicalScore": "典型评分",
+          "unhealthy": "不健康",
+          "scores": "评分",
+          "updated": "更新时间"
+        }
       },
       "detail": {
-        "loading": "正在加载每个配置的细分...",
-        "noData": "此窗口中此配置尚无分数。",
-        "empty": {
-          "title": "正在等待您的首批评分",
-          "titleScoped": "此窗口中无{scope}评分",
-          "description": "在所选时间范围内，此配置尚无评分。一旦使用它的评分器运行，评分将自动显示在此处。",
-          "descriptionScoped": "在所选时间范围内，此配置尚无{scope}评分。请选择其他范围或扩大时间范围。"
-        },
-        "trendTitle": "趋势",
-        "distributionTitle": "分数分布",
-        "categoryDistributionTitle": "类别分布",
-        "healthyRateTitle": "随时间变化的健康率",
-        "trueRateTitle": "随时间变化的真实率",
-        "trueFalseTitle": "对与错",
-        "legendAvg": "平均值",
-        "legendThreshold": "阈值 {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "健康 {direction} {value}",
-        "healthyThreshold": "健康 {threshold}",
+        "back": "所有配置",
+        "backToAll": "返回所有配置",
+        "editConfig": "编辑配置",
+        "notFound": "未找到评分配置",
+        "notFoundDescription": "它可能已被删除，或链接指向了旧配置。",
+        "emptyTitle": "等待首批评分",
+        "emptyTitleScoped": "此窗口内没有 {scope} 评分",
+        "emptyDescription": "所选时间范围内，此配置没有收到评分。使用该配置的评分器运行后，评分会显示在这里。",
+        "distributionNumeric": "评分分布",
+        "distributionValues": "值分布",
+        "averageValue": "平均值 {value}",
         "legendHealthy": "健康",
         "legendUnhealthy": "不健康",
-        "legendHealthyRate": "健康率",
-        "legendTrueRate": "真实率",
-        "legendTrueCount": "true ({count})",
-        "legendFalseCount": "false ({count})",
-        "kpis": {
-          "average": "平均值",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "不健康",
-          "healthy": "健康",
+        "legendScores": "评分",
+        "chartTooltip": "{count} 个评分，{unhealthy} 个不健康 | {count} 个评分，{unhealthy} 个不健康",
+        "chartTooltipCount": "{count} 个评分 | {count} 个评分",
+        "trendTitle": {
+          "score": "趋势",
+          "healthyRate": "健康率随时间变化",
+          "trueRate": "真实率随时间变化",
+          "count": "评分随时间变化"
+        },
+        "trendLegend": {
+          "healthyRate": "健康率",
           "trueRate": "真实率",
-          "falseRate": "假比率",
-          "coverage": "覆盖范围",
-          "targetsScored": "已评分目标"
+          "count": "评分"
         },
-        "health": {
-          "title": "健康状态",
-          "noThreshold": "尚未配置健康阈值。评分尚无法分类为健康或降级。",
-          "thresholdOnly": "如果{threshold}则健康",
-          "summary": "低于阈值{percent}% · 如果{threshold}则健康"
-        },
-        "ofScoreResults": "在 {count} 个评分结果中",
-        "range": "范围 {min}–{max}"
+        "legendAvg": "平均值",
+        "legendThreshold": "阈值 {direction} {value}",
+        "markLineHealthy": "健康 {direction} {value}",
+        "filterRange": "{from} 至 {to}",
+        "filterBelow": "低于 {to}",
+        "filterAtLeast": "{from} 及以上",
+        "filterAny": "任意值",
+        "filterByBar": "按值筛选评分",
+        "barButton": "{label}：{count} 个评分 | {label}：{count} 个评分",
+        "clearFilter": "清除过滤器"
       },
-      "runs": {
+      "review": {
         "title": "评估评分",
-        "hint": "评分和推理来自 _llm_scores。选择一次运行以打开其评估器追踪进行进一步调查。",
-        "filterLabel": "筛选评估评分",
-        "noThresholdHint": "在此评分配置上设置健康阈值，以分类和突出显示不健康的评分。",
+        "all": "全部",
+        "unhealthy": "不健康",
+        "unhealthyDisabled": "设置健康阈值以对评分进行分类",
+        "inputNotCaptured": "未捕获输入",
+        "outputNotCaptured": "未捕获输出",
+        "noMatch": "没有评分匹配此过滤器"
+      },
+      "pane": {
+        "noneSelected": "未选择评分",
+        "healthy": "健康",
+        "unhealthy": "不健康",
+        "noThreshold": "未设置健康阈值",
+        "previous": "上一个评分",
+        "next": "下一个评分",
+        "reasoning": "推理",
         "noReasoning": "未记录推理",
-        "unknownAgent": "未知智能体",
-        "unknownScope": "未知作用域",
-        "queryError": "评估分数无法刷新。仍显示最后成功的页面。",
-        "empty": "此时间范围内没有评估分数。",
-        "emptyUnhealthy": "此时间范围内没有不健康分数。",
-        "filters": {
-          "all": "所有分数",
-          "unhealthy": "不健康"
+        "fullTextUnavailable": "正在显示简短预览。无法加载完整追踪。",
+        "open": {
+          "span": "打开 Span",
+          "trace": "打开追踪",
+          "session": "打开会话"
         },
-        "health": {
-          "healthy": "健康",
-          "unhealthy": "不健康"
-        },
-        "columns": {
-          "time": "已评估",
-          "result": "分数",
-          "reasoning": "原因",
-          "target": "目标",
-          "agent": "智能体"
-        }
-      },
-      "overview": {
-        "searchPlaceholder": "筛选配置...",
-        "relativeTime": {
-          "daysAgo": "{day} 天前",
-          "monthsAgo": "{month} 个月前"
-        },
-        "status": {
-          "healthy": "健康",
-          "unhealthy": "需要注意",
-          "noThreshold": "阈值未设置",
-          "noData": "无分数数据"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% 低于 · 如果 {threshold} 则为健康",
-          "noThresholdHint": "设置健康阈值",
-          "noDataHint": "此窗口内无分数"
-        },
-        "columns": {
-          "health": "健康",
-          "scoreConfig": "分数配置",
-          "type": "类型",
-          "quality": "质量",
-          "totalScores": "总分数",
-          "scopeMix": "作用域混合",
-          "volumeTrend": "容量趋势",
-          "updated": "已更新"
-        }
-      },
-      "averageWithHealthyRate": "平均 · {rate}% 健康"
+        "evaluatorTrace": "评估器追踪",
+        "addToDataset": "添加到数据集",
+        "datasetSession": "数据集接受单条追踪或 Span。打开会话以添加其中的一条追踪。",
+        "datasetNoStream": "此评分没有可添加的源数据流。"
+      }
     },
     "singular": {
       "jobs": "评估任务",
@@ -17963,22 +17985,18 @@
       }
     },
     "importCount": "导入 ({count})",
-    "count": "计数",
     "failedToDeriveSchema": "无法推导架构",
     "failedToImportScoreConfig": "无法导入评分配置",
     "failedToImportScorer": "无法导入评分器",
     "failedToFetchCatalog": "无法获取目录（{status}）",
     "failedToLoadCatalog": "无法加载目录",
     "failedToRunScorerTest": "无法运行评分器测试",
-    "healthyRate": "健康率",
     "invalidJsonFormat": "无效的 JSON 格式",
     "jsonIsEmpty": "JSON 为空",
     "scorerTestFailed": "评分器测试失败",
     "scorerTestSampleContext": "法国国家概况：巴黎是首都。",
     "scorerTestSampleInput": "法国的首都是巴黎，位于塞纳河畔。",
     "scorerTestSampleOutput": "巴黎是法国的首都。",
-    "topCategory": "顶级类别",
-    "trueRate": "真实率",
     "unknownError": "未知错误",
     "import": {
       "createdSuccessfully": "“{name}”创建成功",
@@ -20148,6 +20166,7 @@
       "evalTemplates": "在线评估—模板",
       "scorers": "在线评估 — 评分器",
       "evalJobs": "在线评估 — 任务",
+      "quality": "在线评估 — 质量",
       "scoreConfigs": "在线评估—分数配置",
       "actions": "操作",
       "llmProviders": "LLM 提供商",
@@ -20263,6 +20282,7 @@
       "evalTemplatesRefresh": "刷新清单",
       "scorersRefresh": "刷新清单",
       "evalJobsRefresh": "刷新清单",
+      "qualityBack": "返回所有配置",
       "scoreConfigsRefresh": "刷新清单",
       "actionsRefresh": "刷新清单",
       "llmProvidersRefresh": "刷新清单",
@@ -20509,11 +20529,10 @@
         "high": "高"
       },
       "qualityStatus": {
-        "nothreshold": "无阈值",
-        "nodata": "无数据",
+        "attention": "需要关注",
         "healthy": "健康",
-        "warn": "警告",
-        "unhealthy": "不健康"
+        "unset": "未设置阈值",
+        "nodata": "无评分数据"
       },
       "rumEventType": {
         "longtask": "长任务",
