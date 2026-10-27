@@ -1035,6 +1035,28 @@ describe("useManagementRoutes assistant settings", () => {
     );
   });
 
+  it("keeps the legacy toolsets page with the flag off", () => {
+    window.__O2_ASSISTANT_V2__ = false;
+    resetAssistantV2ForTests();
+    const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
+    expect(legacy.component).toBeTypeOf("function");
+    expect(legacy.redirect).toBeUndefined();
+  });
+
+  it("redirects the legacy toolsets page to the tab, keeping its query", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    resetAssistantV2ForTests();
+    const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
+    expect(legacy.component).toBeUndefined();
+    expect(
+      legacy.redirect({ query: { action: "edit", id: "pagerduty", org_identifier: "acme" } }),
+    ).toEqual({
+      name: "assistantSettings",
+      params: { tab: "toolsets" },
+      query: { action: "edit", id: "pagerduty", org_identifier: "acme" },
+    });
+  });
+
   it("lets an enterprise build through to the route guard", () => {
     window.__O2_ASSISTANT_V2__ = true;
     resetAssistantV2ForTests();

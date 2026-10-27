@@ -1034,9 +1034,10 @@ export default defineComponent({
           (link: any) => link.name === "profiles" || link.name === "traces",
         );
         const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
+        // The assistant owns the sparkle glyph, so this LLM tooling entry gets its own name and icon.
         linksList.value.splice(insertAt, 0, {
-          title: t("menu.aiObservability"),
-          icon: "auto-awesome",
+          title: assistantV2 ? t("menu.llmObservability") : t("menu.aiObservability"),
+          icon: assistantV2 ? "insights" : "auto-awesome",
           link: "/ai",
           name: "aiObservability",
         });

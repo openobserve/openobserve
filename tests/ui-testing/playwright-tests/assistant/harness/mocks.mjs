@@ -885,3 +885,35 @@ export const TOOLSETS = {
     { id: "ts_2", name: "pagerduty", kind: "mcp", description: "PagerDuty MCP server", created_at: (NOW - 12 * 24 * H) * US, updated_at: (NOW - 12 * 24 * H) * US },
   ],
 };
+
+// Full records behind GET /ai/toolsets/{id}; the server returns every stored secret as "***".
+export const TOOLSET_RECORDS = {
+  ts_1: {
+    ...TOOLSETS.toolsets[0],
+    data: { command: "kubectl", allowed_subcommands: ["get", "describe", "logs"], requires_confirmation: true, timeout_seconds: 30, max_output_bytes: 100000, env: { KUBE_CONTEXT: "***" }, credential_files: {} },
+  },
+  ts_2: {
+    ...TOOLSETS.toolsets[1],
+    data: { url: "https://mcp.pagerduty.example/mcp", timeout_seconds: 30, headers: { Authorization: "***" } },
+  },
+};
+
+// Health fields per toolset, merged into the list while `toolsetHealthEnabled` is on.
+export const TOOLSET_HEALTH = {
+  ts_1: { enabled: true, status: { state: "ok", since: (NOW - 2 * H) * US }, last_used_at: (NOW - 2 * H) * US },
+  ts_2: { enabled: true, status: { state: "failing", since: (NOW - 3 * H) * US, last_error: "The MCP server refused the credentials." }, last_used_at: (NOW - 3 * H) * US },
+};
+
+// Standing approvals.
+export const GRANTS = [
+  { id: "gr_1", tool: "kubectl-readonly", operation: "logs", scope: "always", granted_by: "root@example.com", granted_at: (NOW - 26 * H) * US },
+  { id: "gr_2", tool: "pagerduty", operation: "acknowledge", scope: "chat", chat_id: "chat_1", granted_by: "priya@example.com", granted_at: (NOW - 4 * H) * US },
+];
+
+// Assistant activity, newest first.
+export const ACTIVITY = {
+  rows: [
+    { id: "act_1", at: (NOW - 1 * H) * US, action: "Created alert", target: { type: "alert", id: "a1", name: "Checkout 5xx", link: "/alerts", deleted: false }, on_behalf_of: "root@example.com", approval: { kind: "approved", by: "root@example.com" }, result: { state: "done" }, undo: { available: true, until: (NOW + 23 * H) * US }, chat_id: "chat_1" },
+    { id: "act_2", at: (NOW - 5 * H) * US, action: "Updated dashboard", target: { type: "dashboard", id: "d1", name: "Turn health", deleted: true }, on_behalf_of: "priya@example.com", approval: { kind: "standing" }, result: { state: "failed", message: "The dashboard changed since." }, undo: { available: false, reason: "unsupported" } },
+  ],
+};

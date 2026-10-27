@@ -12,7 +12,6 @@ const GAPS = [
   ["XTAB-10 a hidden tail holder hands the tail to the visible tab (needs the B-03 tail)", "WP-21"],
   ["SHARE-06 the continued chat opens with the shared turns read-only above the divider (history open)", "WP-11"],
   ["GATE-07 Download chat in the thread overflow beside the disabled Share", "WP-11"],
-  ["ADMIN-14 Settings › Assistant locked on OSS @edition", "WP-14b"],
 ];
 
 test.describe("assistant states not reachable yet", () => {

@@ -76,19 +76,28 @@ describe("Settings rail: Assistant", () => {
   it("has no Assistant item or group with the flag off", () => {
     const w = mountIndex(false);
     expect(assistantItem(w)).toBeUndefined();
-    expect((w.vm as any).sectionGroups.map((g: any) => g.label)).not.toContain("Assistant");
+    const labels = (w.vm as any).sectionGroups.map((g: any) => g.label);
+    expect(labels).not.toContain("Assistant");
+    expect(labels).toContain("Data & AI");
+    expect(labels).not.toContain("LLM observability");
   });
 
-  it("adds the Assistant group before Data & AI with one item", () => {
+  it("adds the Assistant group before Data and LLM observability with one item", () => {
     config.isEnterprise = "true";
     const w = mountIndex(true);
     const labels = (w.vm as any).sectionGroups.map((g: any) => g.label);
     expect(labels.indexOf("Assistant")).toBeGreaterThan(-1);
-    expect(labels.indexOf("Assistant")).toBeLessThan(labels.indexOf("Data & AI"));
+    expect(labels).not.toContain("Data & AI");
+    expect(labels.indexOf("Assistant")).toBeLessThan(labels.indexOf("Data"));
+    expect(labels.indexOf("Data")).toBeLessThan(labels.indexOf("LLM observability"));
+    const llm = (w.vm as any).sectionGroups.find((g: any) => g.label === "LLM observability");
+    expect(llm.items.map((i: any) => i.key)).toEqual(
+      expect.arrayContaining(["model_pricing", "llm_providers"]),
+    );
     const item = assistantItem(w);
     expect(item).toMatchObject({
       label: "Assistant",
-      description: "Status, access, data, history and usage",
+      description: "Status, access, data, history, usage, toolsets, permissions and activity",
       icon: "auto-awesome",
       dataTest: "settings-assistant-tab",
       locked: false,

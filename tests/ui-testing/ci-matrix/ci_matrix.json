@@ -644,7 +644,9 @@
       "xtab.spec.js",
       "sharing.spec.js",
       "helper.spec.js",
-      "admin.spec.js"
+      "admin.spec.js",
+      "admin-tools.spec.js",
+      "billing.spec.js"
     ],
     "disabled": [
       {
