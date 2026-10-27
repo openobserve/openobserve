@@ -487,7 +487,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_null_label_matches_no_source_rows() {
+    async fn test_null_label_matches_as_empty() {
         use promql_parser::label::Matcher;
 
         let schema = Arc::new(ArrowSchema::new(vec![Field::new(
@@ -501,13 +501,17 @@ mod tests {
         )
         .unwrap();
         let ctx = SessionContext::new();
-        for matcher in [
-            Matcher::new(MatchOp::Equal, "env", "prod"),
-            Matcher::new(MatchOp::Equal, "env", ""),
-            Matcher::new(MatchOp::NotEqual, "env", "prod"),
-            parsed_matchers(r#"m{env=~".*"}"#).matchers.remove(0),
-            parsed_matchers(r#"m{env!~"prod"}"#).matchers.remove(0),
+        for (matcher, expected) in [
+            (Matcher::new(MatchOp::Equal, "env", "prod"), 0),
+            (Matcher::new(MatchOp::Equal, "env", ""), 1),
+            (Matcher::new(MatchOp::NotEqual, "env", "prod"), 1),
+            (Matcher::new(MatchOp::NotEqual, "env", ""), 0),
+            (parsed_matchers(r#"m{env=~".*"}"#).matchers.remove(0), 1),
+            (parsed_matchers(r#"m{env=~"p.*"}"#).matchers.remove(0), 0),
+            (parsed_matchers(r#"m{env!~"prod"}"#).matchers.remove(0), 1),
+            (parsed_matchers(r#"m{env!~".*"}"#).matchers.remove(0), 0),
         ] {
+            let case = format!("{matcher:?}");
             let rows = apply_matchers(
                 ctx.read_batch(batch.clone()).unwrap(),
                 &Matchers::new(vec![matcher]),
@@ -516,7 +520,11 @@ mod tests {
             .collect()
             .await
             .unwrap();
-            assert_eq!(rows.iter().map(RecordBatch::num_rows).sum::<usize>(), 0);
+            assert_eq!(
+                rows.iter().map(RecordBatch::num_rows).sum::<usize>(),
+                expected,
+                "{case}"
+            );
         }
     }
 
