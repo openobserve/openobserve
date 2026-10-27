@@ -12,6 +12,7 @@ pub struct Model {
     pub user_id: String,
     pub trace_id: String,
     pub created_at: i64,
+    pub search_type: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -32,6 +33,7 @@ mod tests {
             user_id: "user".to_string(),
             trace_id: "trace-1".to_string(),
             created_at: 1000,
+            search_type: None,
         };
         assert_eq!(m.id, 42);
         assert_eq!(m.work_group, "global");
