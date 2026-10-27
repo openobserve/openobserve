@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
                     data-test="incident-alert-group-list"
                   >
-                    <template v-for="group in row.alert_groups" :key="group.alert_id">
+                    <template v-for="group in row.alert_groups.slice(2)" :key="group.alert_id">
                       <span class="truncate">{{ group.alert_name }}</span>
                       <span class="text-right tabular-nums">×{{ group.count }}</span>
                     </template>

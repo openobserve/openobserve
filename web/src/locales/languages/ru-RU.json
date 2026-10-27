@@ -10115,7 +10115,7 @@
       "severityMedium": "P3 · Средний",
       "severityLow": "P4 · Низкий",
       "moreDimensions": "+ещё {count}",
-      "moreAlertGroups": "+{count} ещё",
+      "moreAlertGroups": "+ещё {count}",
       "alertGroupTooltip": "{name}: сработало {count} раз | {name}: сработало {count} раз",
       "filterAll": "Все",
       "filterActive": "Активные",

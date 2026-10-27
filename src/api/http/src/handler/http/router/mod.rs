@@ -5153,8 +5153,7 @@ mod tests {
         );
     }
 
-    // OSS documents the enterprise-only operations (search jobs, gen_ai, cipher keys, fleet...)
-    // but does not route them, so the spec-vs-router check only holds for the enterprise build.
+    // OSS documents enterprise-only operations without routing them, so this holds only there.
     #[cfg(feature = "enterprise")]
     /// `METHOD /path` OpenAPI operations a non-router node does not route.
     const UNROUTED_OPENAPI_OPERATIONS: &[&str] = &[
@@ -5179,8 +5178,7 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
-    /// An unrouted documented path meets the auth layer's 401, so its MCP tool fails as
-    /// unauthorized.
+    /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
     #[tokio::test]
     async fn every_openapi_operation_reaches_the_route_it_documents() {
         let app = local_routes().route_layer(middleware::from_fn(

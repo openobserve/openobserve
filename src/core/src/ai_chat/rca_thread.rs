@@ -235,8 +235,7 @@ pub struct RcaThread {
     /// With `truncated`: the last seq that was saved (-1: none).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub saved_through_seq: Option<i64>,
-    /// Finished steps a Resume of this ended run keeps, by the fork's cut; `None` while the run
-    /// is live, or when a Resume has nothing to keep. The cancel banner counts these.
+    /// Finished steps a Resume of this ended run keeps; `None` while live or with none to keep.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reusable_steps: Option<u32>,
 }

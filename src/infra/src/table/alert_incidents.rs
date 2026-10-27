@@ -44,6 +44,15 @@ pub struct AutoResolved {
     pub muted_by_downtime_id: Option<String>,
 }
 
+/// The junction-table truth about one incident's firings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncidentAlertCounts {
+    /// Every firing; heals the denormalized `alert_count`.
+    pub total: i32,
+    /// Every alert that fired into the incident, most-fired first.
+    pub groups: Vec<IncidentAlertGroup>,
+}
+
 /// The row a new incident starts as. One construction site, so the plain create
 /// and the on-call promotion's transaction cannot drift as columns are added.
 fn new_incident(
@@ -720,17 +729,7 @@ pub async fn resolved_incidents_for_alert_with<C: ConnectionTrait>(
     Ok(ids.into_iter().filter(|id| resolved.contains(id)).collect())
 }
 
-/// The junction-table truth about one incident's firings.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IncidentAlertCounts {
-    /// Every firing; heals the denormalized `alert_count`.
-    pub total: i32,
-    /// Every alert that fired into the incident, most-fired first.
-    pub groups: Vec<IncidentAlertGroup>,
-}
-
-/// Folds one incident's (alert, count) groups into the firing total and the ranked list:
-/// count descending, then name ascending, so the order is stable across pages.
+/// Firing total plus groups ranked by count desc, then name, then id, stable across pages.
 pub fn rank_alert_groups(mut groups: Vec<IncidentAlertGroup>) -> IncidentAlertCounts {
     let total = groups.iter().map(|g| g.count).sum();
     groups.sort_by(|a, b| {
@@ -742,8 +741,7 @@ pub fn rank_alert_groups(mut groups: Vec<IncidentAlertGroup>) -> IncidentAlertCo
     IncidentAlertCounts { total, groups }
 }
 
-/// Per-incident firing totals and alert groups from the junction table (source of truth).
-/// Incidents with no links are absent from the map.
+/// Per-incident firing totals and alert groups; incidents with no links are absent.
 pub async fn get_alert_counts(
     incident_ids: &[String],
 ) -> Result<HashMap<String, IncidentAlertCounts>, errors::Error> {
@@ -759,8 +757,7 @@ pub async fn get_alert_counts_with<C: ConnectionTrait>(
         return Ok(HashMap::new());
     }
 
-    // One grouped scan over the page; the (incident_id, alert_id, alert_fired_at)
-    // PK serves it. Ranking happens in Rust to stay backend-neutral.
+    // One grouped scan the PK serves; ranking happens in Rust to stay backend-neutral.
     let rows: Vec<(String, String, Option<String>, i64)> = alert_incident_alerts::Entity::find()
         .filter(
             alert_incident_alerts::Column::IncidentId

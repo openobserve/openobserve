@@ -10115,7 +10115,7 @@
       "severityMedium": "P3 · Moyenne",
       "severityLow": "P4 · Faible",
       "moreDimensions": "+{count} autres",
-      "moreAlertGroups": "+{count} de plus",
+      "moreAlertGroups": "+{count} autres",
       "alertGroupTooltip": "{name} : déclenchée {count} fois | {name} : déclenchée {count} fois",
       "filterAll": "Tous",
       "filterActive": "Actif",

@@ -982,7 +982,7 @@ describe("IncidentList.vue", () => {
       expect(cell.find('[data-test="incident-alert-group-more"]').exists()).toBe(false);
     });
 
-    it("shows the top two alerts as chips and every alert in the +N more tooltip", async () => {
+    it("shows the top two alerts as chips and the rest in the +N more tooltip", async () => {
       const cell = await mountWith(
         createIncident({
           alert_groups: ["a", "b", "c", "d", "e", "f", "g"].map((id, i) => ({
@@ -1001,10 +1001,6 @@ describe("IncidentList.vue", () => {
         .findAll("span")
         .map((s) => s.text());
       expect(rows).toEqual([
-        "alert-a",
-        "×7",
-        "alert-b",
-        "×6",
         "alert-c",
         "×5",
         "alert-d",

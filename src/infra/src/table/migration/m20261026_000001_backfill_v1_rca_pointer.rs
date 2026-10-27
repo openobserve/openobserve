@@ -220,8 +220,7 @@ fn completed_times(events: &serde_json::Value) -> Vec<i64> {
         .collect()
 }
 
-/// One statement per page: each `(incident_id, at)` pair; never overwrites a real run pointer
-/// written since the page was read.
+/// One UPDATE per page that never overwrites a run pointer written since the page was read.
 fn set_pointers(pointers: &[(&str, i64)]) -> Option<UpdateStatement> {
     let ((first_id, first_at), rest) = pointers.split_first()?;
     let case = rest.iter().fold(
@@ -428,13 +427,11 @@ mod tests {
         assert_eq!(pointer(&db, "ran").await, ran);
     }
 
-    /// Paging resumes after the last row read, skipped rows included, and a page's pointers
-    /// land in one batched update per page.
+    /// Paging resumes past skipped rows, and each page's pointers land in one batched update.
     #[tokio::test]
     async fn up_reaches_v1_incidents_past_the_first_page() {
         let db = incidents_db().await;
-        // Even rows are v1 reports, odd rows are not: page 1 both skips rows and batches
-        // PAGE_SIZE / 2 pointers.
+        // Even rows are v1 reports: page 1 both skips rows and batches PAGE_SIZE / 2 pointers.
         for n in 0..PAGE_SIZE {
             let topology = if n % 2 == 0 {
                 r#"{"suggested_root_cause":"current"}"#
