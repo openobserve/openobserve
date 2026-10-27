@@ -231,7 +231,12 @@ mod m20261016_000001_create_rum_pa_app_settings;
 mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_add_health_to_org_ai_toolsets;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261020_000002_create_ai_grants;
+mod m20261020_000003_create_ai_actions;
+mod m20261020_000004_create_ai_access_requests;
+mod m20261020_000005_create_ai_turn_marks;
 mod m20261021_000001_create_public_dashboards;
 mod m20261021_000001_status_pages_add_favicon_img;
 mod m20261021_000002_add_search_type_to_search_queue;
@@ -666,6 +671,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
             Box::new(m20261026_000001_backfill_v1_rca_pointer::Migration),
             Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
+            Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
+            Box::new(m20261020_000002_create_ai_grants::Migration),
+            Box::new(m20261020_000003_create_ai_actions::Migration),
+            Box::new(m20261020_000004_create_ai_access_requests::Migration),
+            Box::new(m20261020_000005_create_ai_turn_marks::Migration),
         ]
     }
 }
@@ -747,6 +757,7 @@ mod tests {
         (120, "m20261021_000002_add_search_type_to_search_queue"),
         (121, "m20261026_000001_backfill_v1_rca_pointer"),
         (122, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
+        (123, "m20261020_000005_create_ai_turn_marks"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -896,6 +907,10 @@ mod tests {
             (
                 "m20261007_000001_create_ai_chat_turns",
                 "m20261016_000001_add_first_event_at_to_ai_chat_turns",
+            ),
+            (
+                "m20260414_000002_create_org_ai_toolsets",
+                "m20261020_000001_add_health_to_org_ai_toolsets",
             ),
         ] {
             assert!(

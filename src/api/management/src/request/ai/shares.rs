@@ -530,6 +530,12 @@ pub async fn create(
         Ok(expires_in) => expires_in,
         Err(msg) => return error::invalid_request(msg),
     };
+    let public = req.visibility == VISIBILITY_PUBLIC;
+    if !super::settings::sharing_allowed(&org_id, public).await {
+        return error::permission_denied(
+            "Sharing chats this way is turned off for this organization",
+        );
+    }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
         Err(e) => return admit_error_response(e),
@@ -867,6 +873,12 @@ pub async fn get_shared(
         Ok(None) => return not_found(),
         Err(resp) => return resp,
     };
+    // A link made before the org turned sharing off stops working with it.
+    if !super::settings::sharing_allowed(&org_id, served.share.visibility == VISIBILITY_PUBLIC)
+        .await
+    {
+        return not_found();
+    }
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
     read_shared(served, &params, Some(&auth), VISIBILITY_ORG).await
@@ -990,6 +1002,9 @@ pub async fn get_public(
         Ok(None) => return with_public_headers(not_found()),
         Err(resp) => return with_public_headers(resp),
     };
+    if !super::settings::sharing_allowed(&served.share.org_id, true).await {
+        return with_public_headers(not_found());
+    }
     let resp = read_shared(served, &params, None, VISIBILITY_PUBLIC).await;
     // Internal error details are for signed-in readers only.
     if resp.status().is_server_error() {

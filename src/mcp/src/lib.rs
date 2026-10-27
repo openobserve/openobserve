@@ -19,6 +19,7 @@
 //! to AI assistants and other MCP clients.
 
 pub mod handler;
+pub mod ledger;
 pub mod protocol;
 pub mod response_filter;
 pub mod schema;

@@ -52,10 +52,12 @@ pub enum AiErrorCode {
     SignedOut,
     StreamDropped,
     TurnExpired,
+    ChangedSince,
+    UndoExpired,
 }
 
 impl AiErrorCode {
-    pub const ALL: [AiErrorCode; 26] = [
+    pub const ALL: [AiErrorCode; 28] = [
         AiErrorCode::SessionExpired,
         AiErrorCode::PermissionDenied,
         AiErrorCode::NotEnabled,
@@ -82,6 +84,8 @@ impl AiErrorCode {
         AiErrorCode::SignedOut,
         AiErrorCode::StreamDropped,
         AiErrorCode::TurnExpired,
+        AiErrorCode::ChangedSince,
+        AiErrorCode::UndoExpired,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -112,6 +116,8 @@ impl AiErrorCode {
             AiErrorCode::SignedOut => "signed_out",
             AiErrorCode::StreamDropped => "stream_dropped",
             AiErrorCode::TurnExpired => "turn_expired",
+            AiErrorCode::ChangedSince => "changed_since",
+            AiErrorCode::UndoExpired => "undo_expired",
         }
     }
 
@@ -181,9 +187,10 @@ impl AiErrorCode {
             | AiErrorCode::AlreadySubmitted
             | AiErrorCode::SessionOwnerUnavailable
             | AiErrorCode::RestoreRequired
-            | AiErrorCode::StaleEpoch => StatusCode::CONFLICT,
+            | AiErrorCode::StaleEpoch
+            | AiErrorCode::ChangedSince => StatusCode::CONFLICT,
             AiErrorCode::NotFound => StatusCode::NOT_FOUND,
-            AiErrorCode::TurnExpired => StatusCode::GONE,
+            AiErrorCode::TurnExpired | AiErrorCode::UndoExpired => StatusCode::GONE,
             AiErrorCode::PersistenceFailed
             | AiErrorCode::ProviderError
             | AiErrorCode::ApprovalDeliveryFailed
@@ -235,7 +242,9 @@ impl AiErrorCode {
             | AiErrorCode::InvalidRequest
             | AiErrorCode::PersistenceFailed
             | AiErrorCode::NotFound
-            | AiErrorCode::Internal => Some(AiErrorAction::None),
+            | AiErrorCode::Internal
+            | AiErrorCode::ChangedSince
+            | AiErrorCode::UndoExpired => Some(AiErrorAction::None),
             AiErrorCode::AlreadySubmitted
             | AiErrorCode::RestoreRequired
             | AiErrorCode::StaleEpoch
@@ -401,6 +410,11 @@ pub fn invalid_request(message: impl Into<String>) -> Response {
     AiErrorEnvelope::new(AiErrorCode::InvalidRequest, message).into_response()
 }
 
+/// A JSON body as `T`; a malformed body or an unknown field is the 400 envelope, not axum's 422.
+pub fn json_body<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T, Response> {
+    serde_json::from_slice(body).map_err(|e| invalid_request(format!("Invalid request body: {e}")))
+}
+
 pub fn not_found(message: impl Into<String>) -> Response {
     AiErrorEnvelope::new(AiErrorCode::NotFound, message).into_response()
 }
@@ -487,6 +501,30 @@ pub fn normalize_error_frame(frame: &mut Map<String, Value>) {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn a_bad_or_unknown_field_body_is_the_400_envelope() {
+        #[derive(Debug, serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        #[allow(dead_code)]
+        struct Patch {
+            enabled: bool,
+        }
+        for body in [
+            r#"{"enabled":true,"x":1}"#,
+            r#"{"enabled":"yes"}"#,
+            "not json",
+        ] {
+            let response = json_body::<Patch>(body.as_bytes()).unwrap_err();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{body}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["code"], "invalid_request", "{body}");
+        }
+        assert!(json_body::<Patch>(br#"{"enabled":false}"#).is_ok());
+    }
+
     #[test]
     fn every_code_serialises_to_its_ledger_string() {
         let spelled: Vec<&str> = AiErrorCode::ALL.iter().map(|c| c.as_str()).collect();
@@ -519,6 +557,8 @@ mod tests {
                 "signed_out",
                 "stream_dropped",
                 "turn_expired",
+                "changed_since",
+                "undo_expired",
             ]
         );
         for code in AiErrorCode::ALL {

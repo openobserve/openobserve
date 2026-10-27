@@ -51,6 +51,8 @@ use super::error::{self, AiErrorCode, AiErrorEnvelope};
 
 const HEALTH_TTL: Duration = Duration::from_secs(30);
 const TEST_INTERVAL: Duration = Duration::from_secs(10);
+// A chat refused as unreachable re-checks o2-ai this often, so a retry after recovery passes.
+const UNREACHABLE_RECHECK: Duration = Duration::from_secs(5);
 // Stands in for the id segment of a route; resolution never reads it.
 const PROBE_ID: &str = "00000000-0000-0000-0000-000000000000";
 const UNREACHABLE: &str = "O2 Assistant did not answer its health check";
@@ -91,6 +93,9 @@ pub struct Capabilities {
     pub toolsets: Vec<ToolsetSummary>,
     pub toolset_secret_merge: bool,
     pub policy_enforced: bool,
+    /// Set only when the org turned the assistant off; `can_chat` is then false.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate: Option<Gate>,
 }
 
 impl Capabilities {
@@ -118,8 +123,22 @@ impl Capabilities {
             toolsets,
             toolset_secret_merge: true,
             policy_enforced: facts.policy_enforced,
+            gate: None,
         }
     }
+
+    /// An org that turned the assistant off refuses every turn, so nobody can chat.
+    fn off_for_org(mut self) -> Self {
+        self.can_chat = false;
+        self.gate = Some(Gate::OffForOrg);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Gate {
+    OffForOrg,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -284,6 +303,20 @@ impl HealthCache {
         self.record(now, &Checked::unreachable(at, CHAT_UNREACHABLE));
     }
 
+    /// The status of a check younger than the TTL; `Unknown` without one.
+    fn status_at(&self, now: Instant) -> HealthStatus {
+        match self.latest {
+            Some((at, status, _)) if now.saturating_duration_since(at) < HEALTH_TTL => status,
+            _ => HealthStatus::Unknown,
+        }
+    }
+
+    /// Whether the last check is old enough to repeat for a chat refused as unreachable.
+    fn recheck_due(&self, now: Instant) -> bool {
+        self.latest
+            .is_none_or(|(at, ..)| now.saturating_duration_since(at) >= UNREACHABLE_RECHECK)
+    }
+
     /// `org_id`'s facts from a member's credential win over the server's own, which no org shapes.
     fn snapshot(&self, org_id: &str) -> (Health, AgentFacts) {
         let (status, checked_at) = self
@@ -410,19 +443,24 @@ pub async fn get_capabilities(
     } else {
         None
     };
-    let health = current_health(&org_id, discover_auth).await;
+    let enabled = super::settings::org_ai(&org_id).await.enabled;
+    let health = if enabled {
+        current_health(&org_id, discover_auth).await
+    } else {
+        HEALTH.lock().unwrap().snapshot(&org_id)
+    };
     let toolsets = if permissions.toolsets {
         toolset_summaries(&org_id).await
     } else {
         Vec::new()
     };
-    Json(Capabilities::new(
-        health,
-        permissions,
-        Settings::from_config(),
-        toolsets,
-    ))
-    .into_response()
+    let capabilities = Capabilities::new(health, permissions, Settings::from_config(), toolsets);
+    let capabilities = if enabled {
+        capabilities
+    } else {
+        capabilities.off_for_org()
+    };
+    Json(capabilities).into_response()
 }
 
 #[utoipa::path(
@@ -482,6 +520,27 @@ pub(crate) fn mark_unreachable() {
         .mark_unreachable(Instant::now(), Utc::now());
 }
 
+/// This node's cached view of o2-ai; a known outage is re-checked in the background.
+pub(crate) fn cached_health(org_id: &str) -> HealthStatus {
+    let (status, due) = {
+        let cache = HEALTH.lock().unwrap();
+        let now = Instant::now();
+        (cache.status_at(now), cache.recheck_due(now))
+    };
+    if status == HealthStatus::Unreachable
+        && due
+        && let Some(refresh) = RefreshGuard::begin(&REFRESHING)
+    {
+        let org = org_id.to_string();
+        tokio::spawn(async move {
+            let checked = check_agent(&org, None).await;
+            HEALTH.lock().unwrap().record(Instant::now(), &checked);
+            drop(refresh);
+        });
+    }
+    status
+}
+
 /// A persisted turn that could not reach o2-ai marks health as a direct chat does.
 pub(crate) fn note_turn_frame(chunk: &[u8]) {
     if is_agent_unreachable_frame(chunk) {
@@ -489,7 +548,29 @@ pub(crate) fn note_turn_frame(chunk: &[u8]) {
     }
 }
 
-async fn is_member(org_id: &str, user_id: &str) -> bool {
+/// Whether this deployment lets chats be shared `(in the org, publicly)`.
+pub(crate) fn deployment_sharing() -> (bool, bool) {
+    let settings = Settings::from_config();
+    (settings.persistence, settings.public_links)
+}
+
+/// Whether o2-ai's discovery said it enforces the permission tier and data-sharing level.
+pub(crate) fn policy_enforced(org_id: &str) -> bool {
+    HEALTH.lock().unwrap().snapshot(org_id).1.policy_enforced
+}
+
+/// Whether `user_id` passes the permission check of `method` on `{org_id}/{segments}`.
+pub(crate) async fn may(org_id: &str, user_id: &str, segments: &[&str], method: &str) -> bool {
+    let path: Vec<&str> = std::iter::once(org_id)
+        .chain(segments.iter().copied())
+        .collect();
+    match resolve_permission(&path, method, org_id, "", None) {
+        Some(route) => route_allowed(org_id, user_id, route).await,
+        None => false,
+    }
+}
+
+pub(crate) async fn is_member(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
@@ -497,7 +578,7 @@ async fn is_member(org_id: &str, user_id: &str) -> bool {
 }
 
 /// The handler-side admin rule of the paid-overage PUT: an org admin or root.
-async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
+pub(crate) async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
@@ -690,7 +771,7 @@ fn test_result(checked: &Checked, elapsed: Duration) -> TestResult {
 }
 
 /// `Err` carries the wait until both `org_id` and `user_id` may run their next test.
-fn admit_test(
+pub(crate) fn admit_test(
     last: &mut HashMap<String, Instant>,
     org_id: &str,
     user_id: &str,
@@ -718,12 +799,7 @@ async fn toolset_summaries(org_id: &str) -> Vec<ToolsetSummary> {
     match infra::table::org_ai_toolsets::list_names(org_id).await {
         Ok(toolsets) => toolsets
             .into_iter()
-            .map(|(id, name)| ToolsetSummary {
-                id,
-                name,
-                // Every stored toolset is pushed to o2-ai; there is no per-toolset switch yet.
-                enabled: true,
-            })
+            .map(|(id, name, enabled)| ToolsetSummary { id, name, enabled })
             .collect(),
         Err(e) => {
             log::warn!("[org_id:{org_id}] capabilities could not list AI toolsets: {e}");
@@ -976,6 +1052,18 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn an_org_that_is_off_cannot_chat_and_says_so_while_others_carry_no_gate() {
+        let permissions = permissions(Role::Admin).await;
+        let on = Capabilities::new(sample_health(), permissions, sample_settings(), Vec::new());
+        let json = serde_json::to_value(&on).unwrap();
+        assert!(json.get("gate").is_none());
+        let off = serde_json::to_value(on.off_for_org()).unwrap();
+        assert_eq!(off["gate"], "off_for_org");
+        assert_eq!(off["can_chat"], false);
+        assert_eq!(off["can_write"], json["can_write"]);
+    }
+
     #[test]
     fn neither_handler_creates_a_chat_or_spends_a_credit() {
         let source = include_str!("capabilities.rs");
@@ -1100,6 +1188,30 @@ mod tests {
             cache
                 .fresh(start + Duration::from_secs(1), ORG, true)
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn a_known_outage_is_unreachable_until_it_ages_out_and_is_rechecked_soon() {
+        let mut cache = HealthCache::default();
+        let start = Instant::now();
+        assert_eq!(cache.status_at(start), HealthStatus::Unknown);
+        assert!(cache.recheck_due(start));
+        cache.mark_unreachable(start, Utc::now());
+        assert_eq!(
+            cache.status_at(start + Duration::from_secs(1)),
+            HealthStatus::Unreachable
+        );
+        assert!(!cache.recheck_due(start + Duration::from_secs(1)));
+        assert!(cache.recheck_due(start + UNREACHABLE_RECHECK));
+        assert_eq!(cache.status_at(start + HEALTH_TTL), HealthStatus::Unknown);
+        cache.record(
+            start + Duration::from_secs(2),
+            &checked(HealthStatus::Ok, answered()),
+        );
+        assert_eq!(
+            cache.status_at(start + Duration::from_secs(3)),
+            HealthStatus::Ok
         );
     }
 

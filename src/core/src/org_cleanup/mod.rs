@@ -1087,6 +1087,22 @@ async fn delete_org_fleet_resources(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_ai_assistant_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    infra::table::ai_access_requests::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_access_requests: {e}"))?;
+    infra::table::ai_actions::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_actions: {e}"))?;
+    infra::table::ai_grants::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_grants: {e}"))?;
+    infra::table::ai_turn_marks::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_turn_marks: {e}"))?;
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "enterprise"))]
     use infra::table::service_streams;
@@ -1217,6 +1233,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     crate::ai_chat::purge_org_replicas(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_replicas: {e}"))?;
+    delete_org_ai_assistant_resources(org_id).await?;
     // Turns and shares before their chat rows, so none is left without the chat it belongs to.
     ai_chat_turns::delete_by_org(org_id)
         .await

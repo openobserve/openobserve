@@ -230,6 +230,9 @@ async fn run() -> Result<(), anyhow::Error> {
             } else {
                 log::info!("MCP is disabled, skipping MCP tool registry");
             }
+            // The assistant's MCP changes reach the action ledger only through this recorder.
+            #[cfg(feature = "enterprise")]
+            openobserve_api_management::request::ai::activity::register_recorder();
 
             // init enterprise
             #[cfg(feature = "enterprise")]
