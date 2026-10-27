@@ -175,10 +175,8 @@ pub async fn check_backfill_job(
     if !pipeline.source.is_scheduled() {
         return Err(anyhow::anyhow!("Pipeline is not a scheduled pipeline"));
     }
-    if let Some(node_id) = pipeline.cross_org_node() {
-        return Err(anyhow::anyhow!(
-            "Pipeline node {node_id} belongs to another organization"
-        ));
+    if let Some(refusal) = pipeline.cross_org_refusal() {
+        return Err(anyhow::anyhow!(refusal));
     }
 
     // 1a. Validate deletion is not enabled for pipelines with remote destinations
@@ -1015,9 +1013,9 @@ mod tests {
             .await
             .unwrap();
         assert!(
-            checked
-                .as_ref()
-                .is_err_and(|e| e.to_string().contains("another organization")),
+            checked.as_ref().is_err_and(|e| e
+                .to_string()
+                .contains("points at organization backfill_org_b")),
             "{checked:?}"
         );
     }

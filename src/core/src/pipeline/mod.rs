@@ -86,11 +86,8 @@ fn default_node_orgs(pipeline: &mut Pipeline) {
 
 /// A node's org is where runs read and write, so it must be the request's org.
 fn refuse_cross_org_node(pipeline: &Pipeline) -> Result<(), PipelineError> {
-    match pipeline.cross_org_node() {
-        Some(node_id) => Err(PipelineError::InvalidPipeline(format!(
-            "Node {node_id} belongs to another organization; pipeline nodes must use organization {}",
-            pipeline.org
-        ))),
+    match pipeline.cross_org_refusal() {
+        Some(refusal) => Err(PipelineError::InvalidPipeline(refusal)),
         None => Ok(()),
     }
 }
@@ -679,7 +676,9 @@ mod tests {
     async fn save_refuses_a_node_in_another_org() {
         use super::{PipelineError, save_pipeline_checked};
 
-        for (source_org, dest_org, node) in [("b", "a", "src"), ("a", "b", "dst")] {
+        for (source_org, dest_org, node) in
+            [("b", "a", "scheduled query"), ("a", "b", "logs/dst_stream")]
+        {
             let pipeline = scheduled_pipeline("cross_org_pl", "a", source_org, dest_org);
             let result = save_pipeline_checked(pipeline, Some(&Unreached)).await;
             assert!(
@@ -722,7 +721,7 @@ mod tests {
         let updated = update_pipeline_checked(foreign, Some(&Unreached)).await;
         super::delete_pipeline(&stored.id).await.unwrap();
         assert!(
-            matches!(&updated, Err(PipelineError::InvalidPipeline(msg)) if msg.contains("src")),
+            matches!(&updated, Err(PipelineError::InvalidPipeline(msg)) if msg.contains("scheduled query")),
             "{updated:?}"
         );
     }

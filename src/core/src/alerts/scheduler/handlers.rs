@@ -68,6 +68,7 @@ use crate::{
 
 /// How soon a blocked org's trigger is looked at again when its org's status cannot be read.
 const UNREADABLE_ORG_RECHECK_MICROS: i64 = 60 * 1_000_000;
+const DISABLED_PIPELINE_RECHECK_DAYS: i64 = 7;
 
 /// One anomaly detection run as the trigger history records it, scheduled or manual.
 pub(crate) struct AnomalyRunRecord {
@@ -87,6 +88,33 @@ enum RetryOutcome {
     Retry,
     Reschedule,
     FinishOnce,
+}
+
+/// Why a stored pipeline's scheduled source cannot run.
+#[derive(Debug)]
+enum Unrunnable {
+    NotScheduled,
+    CrossOrg(String),
+}
+
+impl Unrunnable {
+    /// A cross-org refusal holds until the pipeline is edited, so it waits like a disabled one.
+    /// [pure]
+    fn retry_after(&self) -> Duration {
+        match self {
+            Unrunnable::NotScheduled => Duration::minutes(5),
+            Unrunnable::CrossOrg(_) => Duration::days(DISABLED_PIPELINE_RECHECK_DAYS),
+        }
+    }
+}
+
+impl std::fmt::Display for Unrunnable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unrunnable::NotScheduled => f.write_str("Pipeline is not scheduled"),
+            Unrunnable::CrossOrg(refusal) => f.write_str(refusal),
+        }
+    }
 }
 
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
@@ -5171,10 +5199,12 @@ async fn handle_derived_stream_triggers(
     if !pipeline.enabled {
         // Pipeline not enabled, check again next week
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 7 days."
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after {DISABLED_PIPELINE_RECHECK_DAYS} days."
         );
         // update trigger, check on next week
-        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+        new_trigger.next_run_at += Duration::days(DISABLED_PIPELINE_RECHECK_DAYS)
+            .num_microseconds()
+            .unwrap();
         let trigger_data_stream = TriggerData {
             _timestamp: now_micros(),
             org: new_trigger.org.clone(),
@@ -5207,12 +5237,12 @@ async fn handle_derived_stream_triggers(
     let derived_stream = match org_bound_derived_stream(&pipeline) {
         Ok(derived_stream) => derived_stream.clone(),
         Err(reason) => {
-            let err_msg =
-                format!("{reason}: {org_id}/{pipeline_name}/{pipeline_id}. Checking after 5 mins.");
-            new_trigger.next_run_at += Duration::try_minutes(5)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+            let wait = reason.retry_after();
+            let err_msg = format!(
+                "{reason}: {org_id}/{pipeline_name}/{pipeline_id}. Checking after {} mins.",
+                wait.num_minutes()
+            );
+            new_trigger.next_run_at += wait.num_microseconds().unwrap();
             let trigger_data_stream = TriggerData {
                 _timestamp: Utc::now().timestamp_micros(),
                 org: new_trigger.org.clone(),
@@ -6959,14 +6989,12 @@ async fn handle_backfill_triggers(
 /// The pipeline's scheduled source, refused when a node or the source names another org. [pure]
 fn org_bound_derived_stream(
     pipeline: &config::meta::pipeline::Pipeline,
-) -> Result<&DerivedStream, String> {
+) -> Result<&DerivedStream, Unrunnable> {
     let PipelineSource::Scheduled(derived_stream) = &pipeline.source else {
-        return Err("Pipeline is not scheduled".to_string());
+        return Err(Unrunnable::NotScheduled);
     };
-    if let Some(node_id) = pipeline.cross_org_node() {
-        return Err(format!(
-            "Pipeline node {node_id} belongs to another organization"
-        ));
+    if let Some(refusal) = pipeline.cross_org_refusal() {
+        return Err(Unrunnable::CrossOrg(refusal));
     }
     Ok(derived_stream)
 }
@@ -7291,19 +7319,23 @@ mod tests {
             })
         };
         let realtime = PipelineSource::Realtime(StreamParams::new("a", "in", StreamType::Logs));
+        let retry = Duration::try_minutes(5);
+        let recheck = Duration::try_days(DISABLED_PIPELINE_RECHECK_DAYS);
         let cases = [
-            (scheduled("a"), vec![query("a"), dest("a")], true),
-            (scheduled(""), vec![query(""), dest("")], true),
-            (scheduled("a"), vec![query("b"), dest("a")], false),
-            (scheduled("a"), vec![query("a"), dest("b")], false),
-            (scheduled("b"), vec![query("a"), dest("a")], false),
-            (realtime, vec![dest("a")], false),
+            (scheduled("a"), vec![query("a"), dest("a")], None),
+            (scheduled(""), vec![query(""), dest("")], None),
+            (scheduled("a"), vec![query("b"), dest("a")], recheck),
+            (scheduled("a"), vec![query("a"), dest("b")], recheck),
+            (scheduled("b"), vec![query("a"), dest("a")], recheck),
+            (realtime, vec![dest("a")], retry),
         ];
-        for (source, nodes, usable) in cases {
+        for (source, nodes, wait) in cases {
             let pipeline = pipeline(source, nodes);
             assert_eq!(
-                org_bound_derived_stream(&pipeline).is_ok(),
-                usable,
+                org_bound_derived_stream(&pipeline)
+                    .err()
+                    .map(|unbound| unbound.retry_after()),
+                wait,
                 "{pipeline:?}"
             );
         }
