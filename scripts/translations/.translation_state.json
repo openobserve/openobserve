@@ -12610,7 +12610,6 @@
       "dockerNote": "0a229149a30c95e6",
       "envRefNote": "90bf2de66efabe94",
       "hideToken": "ae132305cb4bfbfe",
-      "httpTransport": "81d5cb48cba0c378",
       "joinsFleet": "c45d8922b1583770",
       "joinsFleetNoConfig": "2de701a965749793",
       "kubernetesAgent": "23af97a573a52e77",
@@ -12628,7 +12627,8 @@
       "versionLatest": "a21ba40f66202b4a",
       "versionLine": "bc20a1e68d68772f",
       "viewCollectors": "09362e686190000d",
-      "waiting": "26dc16ea5373a3a6"
+      "waiting": "26dc16ea5373a3a6",
+      "websocketTransport": "cd8448d4f2c61c44"
     },
     "move": {
       "confirm": "6ecc3df6bffdd06c",
