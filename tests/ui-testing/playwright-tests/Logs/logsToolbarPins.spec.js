@@ -49,6 +49,18 @@ test.describe('Logs toolbar pins', () => {
     testLogger.info('Histogram renders pinned on a profile that never chose');
   });
 
+  test('saved views is pinned by default until the user decides', {
+    tag: ['@toolbarPins', '@logs', '@P0', '@all'],
+  }, async () => {
+    await pm.logsToolbarPinsPage.seedPinStorage();
+    await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
+
+    await pm.logsToolbarPinsPage.expectPinnedVisible('savedViews');
+    expect(await pm.logsToolbarPinsPage.readSavedViewsDecidedFlag()).toBeNull();
+
+    testLogger.info('Saved views renders pinned on a profile that never chose');
+  });
+
   test('unpinning the histogram survives a reload', {
     tag: ['@toolbarPins', '@logs', '@P0', '@all'],
   }, async () => {
@@ -126,7 +138,7 @@ test.describe('Logs toolbar pins', () => {
     // this moves by nav-rail click, never page.goto. The nav helpers assert a
     // document stamp survives, which enforces that.
     const pins = pm.logsToolbarPinsPage;
-    await pins.seedPinStorage();
+    await pins.seedPinStorage({ pins: [], decided: true });
     await pins.navigateToLogs(getOrgIdentifier());
     await pins.stampDocument();
 
