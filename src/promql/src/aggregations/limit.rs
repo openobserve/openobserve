@@ -163,7 +163,7 @@ impl Ord for Picked {
 /// Whether `limit_ratio(r, …)` keeps a hash: on `[0, 1)`, below `r`, or from `1 + r` if `r < 0`.
 fn ratio_keeps(ratio: f64, signature: u64) -> bool {
     let ratio = ratio.clamp(-1.0, 1.0);
-    let position = (signature >> 11) as f64 / (1u64 << 53) as f64;
+    let position = ratio_position(signature);
     if ratio > 0.0 {
         position < ratio
     } else if ratio < 0.0 {
@@ -171,6 +171,11 @@ fn ratio_keeps(ratio: f64, signature: u64) -> bool {
     } else {
         false
     }
+}
+
+/// Where a signature falls on `[0, 1)` for `limit_ratio`.
+pub(crate) fn ratio_position(signature: u64) -> f64 {
+    (signature >> 11) as f64 / (1u64 << 53) as f64
 }
 
 #[cfg(test)]

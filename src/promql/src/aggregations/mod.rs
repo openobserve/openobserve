@@ -48,6 +48,8 @@ pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
 pub(crate) use group::Group;
 pub(crate) use limit::Limit;
+#[cfg(test)]
+pub(crate) use limit::ratio_position;
 pub(crate) use max::Max;
 pub(crate) use min::Min;
 pub(crate) use quantile::quantile;

@@ -36,9 +36,9 @@ pub fn sum64_bytes(bytes: &[u8]) -> u64 {
     gxhash::sum64_bytes(bytes)
 }
 
-/// Streaming hasher, same on every arch but may change across Rust releases; never persist.
+/// Streaming hasher with fixed seeds; output differs by arch and ahash version, never persist it.
 pub fn new_key_hasher() -> impl std::hash::Hasher {
-    std::hash::DefaultHasher::new()
+    std::hash::BuildHasher::build_hasher(&ahash::RandomState::with_seeds(0, 0, 0, 0))
 }
 
 pub fn get_passcode_hash(pass: &str, salt: &str) -> String {

@@ -810,16 +810,7 @@ mod tests {
             panic!("{query} is not an aggregation");
         };
         let mut engine = engine(provider, 30);
-        let input = match expr.as_ref() {
-            Expr::Call(call) => generic_range_func_on(&mut engine, call).await,
-            Expr::VectorSelector(vs) => matrix_or_none(
-                engine
-                    .eval_vector_selector(vs, None, SelectorOutput::Value)
-                    .await
-                    .unwrap(),
-            ),
-            _ => panic!("{query} is not over a range function or a selector"),
-        };
+        let input = generic_input(&mut engine, &expr).await;
         let param = match param.as_deref() {
             Some(param) => Some(engine.exec_expr(param).await.unwrap()),
             None => None,
@@ -831,12 +822,44 @@ mod tests {
             .unwrap()
     }
 
+    /// The generic input of a ranking: a range function or an instant selector.
+    async fn generic_input(engine: &mut Engine, expr: &promql_parser::parser::Expr) -> Value {
+        use promql_parser::parser::Expr;
+
+        match expr {
+            Expr::Call(call) => generic_range_func_on(engine, call).await,
+            Expr::VectorSelector(vs) => matrix_or_none(
+                engine
+                    .eval_vector_selector(vs, None, SelectorOutput::Value)
+                    .await
+                    .unwrap(),
+            ),
+            _ => panic!("{expr} is not a range function or a selector"),
+        }
+    }
+
+    /// A positive `limit_ratio` that keeps exactly one of the two test series, whatever the hash.
+    async fn splitting_ratio(input: &str) -> f64 {
+        let mut engine = engine(provider(false, false), 30);
+        let Value::Matrix(series) =
+            generic_input(&mut engine, &promql_parser::parser::parse(input).unwrap()).await
+        else {
+            panic!("{input} is not a matrix");
+        };
+        let positions: Vec<f64> = series
+            .iter()
+            .map(|series| crate::aggregations::ratio_position(signature(&series.labels)))
+            .collect();
+        assert_eq!(positions.len(), 2, "{input}");
+        (positions[0] + positions[1]) / 2.0
+    }
+
     /// `topk`/`bottomk` over a range function or a bare selector, with and without `by()`, must
     /// match the generic path both when it streams and when it materializes on the same context.
     /// Both test series carry the same values, so `k=1` is decided by the tie-break alone.
     #[tokio::test]
     async fn test_topk_matches_generic_streaming_and_materialized() {
-        for query in [
+        let mut queries = [
             "topk(1, rate(m[1m]))",
             "bottomk(1, rate(m[1m]))",
             "topk(1, increase(m{instance=\"a\"}[1m] offset 30s))",
@@ -851,9 +874,15 @@ mod tests {
             "limitk(1, rate(m[1m]))",
             "limitk by(instance) (1, m)",
             "limitk(1, m offset 30s)",
-            "limit_ratio(0.85, rate(m[1m]))",
-            "limit_ratio(-0.5, m)",
-        ] {
+        ]
+        .map(String::from)
+        .to_vec();
+        let rate_ratio = splitting_ratio("rate(m[1m])").await;
+        queries.push(format!("limit_ratio({rate_ratio}, rate(m[1m]))"));
+        let selector_ratio = splitting_ratio("m").await - 1.0;
+        queries.push(format!("limit_ratio({selector_ratio}, m)"));
+        for query in &queries {
+            let query = query.as_str();
             let expected = generic_topk(provider(false, false), query).await;
             let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
             assert_same_matrix(expected.clone(), streamed, &format!("streamed {query}"));
