@@ -2,15 +2,14 @@
  * AlertLibraryPage - Page object for the Alert Library (browse / filter / preview / install).
  *
  * Covers the gallery page, the left rail (severity + category facets), the
- * readiness stat strip, cross-surface selection, the detail drawer and the
- * 5-step install wizard. Selectors are the feature's own data-test attributes.
+ * readiness stat strip, cross-surface selection, the card actions, the detail
+ * drawer and the Folder -> Tune -> Add install wizard. Selectors are the
+ * feature's own data-test attributes.
  *
- * Reuses: OSelect dropdown helper (reka trigger gotcha) and the O2 OInput
- * `-field` inner-input gotcha for text/number inputs.
+ * Reuses: the O2 OInput `-field` inner-input gotcha for text/number inputs.
  */
 
 import { expect } from '@playwright/test';
-import { openOSelectDropdown } from './oselectHelpers.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
@@ -55,22 +54,15 @@ export class AlertLibraryPage {
       drawerCustomize: '[data-test="alert-library-drawer-customize"]',
       // install wizard
       dialog: '[data-test="alert-library-install-dialog"]',
-      destinationStep: '[data-test="alert-library-install-destination-step"]',
-      destination: '[data-test="alert-library-install-destination"]',
-      destinationsEmpty: '[data-test="alert-library-install-destinations-empty"]',
-      destinationsFailed: '[data-test="alert-library-install-destinations-failed"]',
-      destinationsRetry: '[data-test="alert-library-install-destinations-retry"]',
-      openDestinations: '[data-test="alert-library-install-open-destinations"]',
-      installSelectAll: '[data-test="alert-library-install-select-all"]',
-      installClear: '[data-test="alert-library-install-clear"]',
-      installCount: '[data-test="alert-library-install-count"]',
+      folderStep: '[data-test="alert-library-install-folder-step"]',
+      tuneStep: '[data-test="alert-library-install-tune-step"]',
+      reviewStep: '[data-test="alert-library-install-review-step"]',
       tuneToggle: '[data-test="alert-library-install-tune-toggle"]',
       tuneFrequency: '[data-test="alert-library-install-tune-frequency"]',
       tuneSilence: '[data-test="alert-library-install-tune-silence"]',
       summary: '[data-test="alert-library-install-summary"]',
       confirmLarge: '[data-test="alert-library-install-confirm-large"]',
       next: '[data-test="alert-library-install-next"]',
-      back: '[data-test="alert-library-install-back"]',
       run: '[data-test="alert-library-install-run"]',
       retry: '[data-test="alert-library-install-retry"]',
       done: '[data-test="alert-library-install-done"]',
@@ -143,6 +135,8 @@ export class AlertLibraryPage {
   // ── cards / selection ─────────────────────────────────────────────────────
   card(id) { return this.page.locator(`[data-test="alert-library-card-${id}"]`); }
   cardTitle(id) { return this.page.locator(`[data-test="alert-library-card-title-${id}"]`); }
+  cardAdd(id) { return this.page.locator(`[data-test="alert-library-card-add-${id}"]`); }
+  cardCustomize(id) { return this.page.locator(`[data-test="alert-library-card-customize-${id}"]`); }
   needsDataChip(id) {
     return this.card(id).locator('[data-test="alert-library-card-needs-data"]');
   }
@@ -153,6 +147,13 @@ export class AlertLibraryPage {
     const dt = await first.getAttribute('data-test');
     return dt.replace('alert-library-card-title-', '');
   }
+
+  async addFromCard(id) {
+    await this.cardAdd(id).click();
+    await expect(this.page.locator(this.l.dialog)).toBeVisible({ timeout: 15000 });
+  }
+
+  async customizeFromCard(id) { await this.cardCustomize(id).click(); }
 
   async selectCard(id) {
     await this.page.locator(`[data-test="alert-library-select-${id}"]`).click();
@@ -211,28 +212,7 @@ export class AlertLibraryPage {
   }
 
   // ── install wizard ────────────────────────────────────────────────────────
-  async pickDestination(name) {
-    const root = this.page.locator(this.l.destination);
-    await root.waitFor({ state: 'visible', timeout: 10000 });
-    await openOSelectDropdown(this.page, root);
-    await this.page.waitForTimeout(500);
-    // Options are virtualized; narrow via the popover search box (the -search
-    // data-test IS the input) so the target row is actually rendered.
-    const search = this.page.locator('[data-test="alert-library-install-destination-search"]');
-    if (await search.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await search.fill(name, { force: true });
-      await this.page.waitForTimeout(400);
-    }
-    const options = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-    await expect(options.first()).toBeVisible({ timeout: 8000 });
-    // Fail loudly if the named destination is absent — never silently pick another.
-    const match = options.filter({ hasText: name }).first();
-    await expect(match, `destination "${name}" not in the wizard's list`).toBeVisible({ timeout: 8000 });
-    await match.click();
-  }
-
   async next() { await this.page.locator(this.l.next).click(); }
-  async back() { await this.page.locator(this.l.back).click(); }
 
   async enableTune() {
     const toggle = this.page.locator(this.l.tuneToggle);
@@ -249,11 +229,6 @@ export class AlertLibraryPage {
 
   async run() { await this.page.locator(this.l.run).click(); }
   async retryFailed() { await this.page.locator(this.l.retry).click(); }
-  async clearInDialog() { await this.page.locator(this.l.installClear).click(); }
-  async selectAllInDialog() { await this.page.locator(this.l.installSelectAll).click(); }
-  async toggleAlertInDialog(id) {
-    await this.page.locator(`[data-test="alert-library-install-alert-${id}"]`).click();
-  }
 
   async waitResult(id, status = 'installed', timeout = 30000) {
     await expect(this.page.locator(`[data-test="alert-library-install-result-${id}"]`))
@@ -303,11 +278,19 @@ export class AlertLibraryPage {
     await expect(this.page.locator(this.l.drawer)).toBeHidden();
   }
 
-  async expectSummaryDestination(text) {
-    await expect(this.page.locator(this.l.summary).locator('dd').first()).toHaveText(text);
+  async expectReadyFacetActive() {
+    await expect(this.page.locator(this.l.statReady)).toHaveAttribute('aria-pressed', 'true');
   }
-  async expectNextDisabled() { await expect(this.page.locator(this.l.next)).toBeDisabled(); }
-  async expectNextEnabled() { await expect(this.page.locator(this.l.next)).toBeEnabled(); }
+  async expectCardActions(id, { customize = true } = {}) {
+    await expect(this.cardAdd(id)).toBeVisible();
+    await expect(this.cardCustomize(id)).toHaveCount(customize ? 1 : 0);
+  }
+  async expectFolderStep() { await expect(this.page.locator(this.l.folderStep)).toBeVisible(); }
+  async expectTuneStep() { await expect(this.page.locator(this.l.tuneStep)).toBeVisible(); }
+  async expectReviewStep() { await expect(this.page.locator(this.l.reviewStep)).toBeVisible(); }
+  async expectNoDestinationAsked() {
+    await expect(this.page.locator(this.l.dialog)).not.toContainText('Destination');
+  }
   async expectRunDisabled() { await expect(this.page.locator(this.l.run)).toBeDisabled(); }
   async expectRunEnabled() { await expect(this.page.locator(this.l.run)).toBeEnabled(); }
   async expectLargeConfirmVisible() { await expect(this.page.locator(this.l.confirmLarge)).toBeVisible(); }
@@ -330,6 +313,9 @@ export class AlertLibraryPage {
   async expectRailCategoryVisible(id) {
     await expect(this.page.locator(`[data-test="alert-library-rail-category-${id}"]`)).toBeVisible();
   }
+  async expectRailPackHeading(pack) {
+    await expect(this.page.locator(`[data-test="alert-library-rail-pack-heading-${pack}"]`)).toBeVisible();
+  }
   async expectRailCategoryAbsent(id) {
     await expect(this.page.locator(`[data-test="alert-library-rail-category-${id}"]`)).toHaveCount(0);
   }
@@ -350,12 +336,6 @@ export class AlertLibraryPage {
     await expect(this.page.locator('[data-test^="alert-library-install-error-"]').first()).toBeVisible();
   }
   async expectRetryVisible() { await expect(this.page.locator(this.l.retry)).toBeVisible(); }
-
-  async expectDestinationsFailed() { await expect(this.page.locator(this.l.destinationsFailed)).toBeVisible(); }
-  async expectDestinationsRetryVisible() { await expect(this.page.locator(this.l.destinationsRetry)).toBeVisible(); }
-  async clickDestinationsRetry() { await this.page.locator(this.l.destinationsRetry).click(); }
-  async expectDestinationsEmpty() { await expect(this.page.locator(this.l.destinationsEmpty)).toBeVisible(); }
-  async expectOpenDestinationsVisible() { await expect(this.page.locator(this.l.openDestinations)).toBeVisible(); }
 
   // ── internals ─────────────────────────────────────────────────────────────
   async _fillField(rootSelector, value) {

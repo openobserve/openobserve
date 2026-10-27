@@ -14,20 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LibraryInstallDialog — the answers an install needs: Folder -> Tune -> Add.
-
-  The page already chose the alerts, so every one passed in is added. They are
-  added with no destination: they evaluate and record their history, and notify
-  once someone attaches a destination in the alert editor.
-
-  The batch arrives as `seed` from one alert's drawer or card, or `preselect`
-  from the gallery's selection. The seed wins.
-
-  Installs run SEQUENTIALLY and one failure never stops the rest — a duplicate
-  name in the middle of a batch of twelve must not cost the other eleven. Each
-  alert gets its own row and the failures get a retry.
--->
+<!-- Every alert passed in is added, with no destination: the page already chose them. -->
 <template>
   <ODialog
     :open="open"

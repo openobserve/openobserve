@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`alert-library-card-add-${entry.id}`"
           @click.stop="emit('install')"
         >
-          {{ t("alert_library.addAlert") }}
+          {{ t("alert_library.drawer.install") }}
         </OButton>
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
