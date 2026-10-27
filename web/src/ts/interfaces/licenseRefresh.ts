@@ -50,4 +50,6 @@ export interface RefreshResult {
   ok: boolean;
   body?: RefreshBody;
   status?: number;
+  /** Latest server time, in Unix microseconds, at which the response can have been sent. */
+  respondedAt?: number;
 }

@@ -22,6 +22,12 @@ import { refreshLicenseMutation, licenseQuery } from "@/services/license_server.
 import type { RefreshBody, RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
+// Date has whole seconds, so the response may have left up to 999_999 us after it
+const respondedAt = (date?: string) => {
+  const ms = Date.parse(date ?? "");
+  return Number.isNaN(ms) ? undefined : ms * 1000 + 999_999;
+};
+
 export function useLicenseRefresh() {
   const store = useStore();
   const refreshMutation = useMutation(refreshLicenseMutation(), queryClient);
@@ -76,7 +82,12 @@ export function useLicenseRefresh() {
         ? rotateMutation.mutateAsync()
         : refreshMutation.mutateAsync());
       scheduleReload(onSettled);
-      return { ok: true, body: response.data, status: response.status };
+      return {
+        ok: true,
+        body: response.data,
+        status: response.status,
+        respondedAt: respondedAt(response.headers?.date),
+      };
     } catch (error) {
       const e = error as { response?: { status?: number; data?: RefreshBody } };
       if (e.response?.status === 409) scheduleReload(onSettled);

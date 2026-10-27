@@ -289,19 +289,19 @@ const outcomeIcon = computed(() =>
         ? "warning"
         : "info",
 );
-// the first new attempt after a click is the click's own; any later one is newer server state
-let clickAttempt: { at: number | null; own: boolean } | undefined;
+let newestAttempt = 0;
+let clearAfter: number | undefined;
+const dropClickedOutcome = () => {
+  if (clearAfter === undefined || newestAttempt <= clearAfter) return;
+  clearAfter = undefined;
+  result.value = undefined;
+  rotated.value = false;
+};
 watch(
   () => props.refresh.last_attempt_at,
   (at) => {
-    if (!clickAttempt || busy.value || at === clickAttempt.at) return;
-    if (!clickAttempt.own) {
-      clickAttempt = { at, own: true };
-      return;
-    }
-    clickAttempt = undefined;
-    result.value = undefined;
-    rotated.value = false;
+    newestAttempt = Math.max(newestAttempt, at ?? 0);
+    dropClickedOutcome();
   },
 );
 const copyStoredKey = () => {
@@ -311,11 +311,17 @@ const run = async (rotate: boolean) => {
   if (!props.canUpdate || busy.value || (rotate && !canRotate.value)) return;
   busy.value = true;
   rotated.value = rotate;
-  clickAttempt = { at: props.refresh.last_attempt_at, own: false };
+  clearAfter = undefined;
+  const before = props.refresh.last_attempt_at ?? 0;
+  newestAttempt = before;
   try {
-    result.value = await (rotate
+    const clicked = await (rotate
       ? rotateInstanceKey(() => emit("refreshed"))
       : refreshLicenseLimits(() => emit("refreshed")));
+    result.value = clicked;
+    // a refused click recorded no attempt; an answered one recorded its own by the time it responded
+    clearAfter = clicked.ok ? Math.max(before, clicked.respondedAt ?? Date.now() * 1000) : before;
+    dropClickedOutcome();
     emit("refreshed");
   } finally {
     busy.value = false;
