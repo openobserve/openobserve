@@ -27,6 +27,7 @@ import {
   type CustomChartContext,
 } from "./convertCustomChartData";
 import { convertStateTimelineData } from "./convertStateTimelineData";
+import { convertHostmapData } from "./convertHostmapData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -241,6 +242,12 @@ export const convertPanelData = async (
           hoveredSeriesState,
           annotations,
         ),
+      };
+    }
+    case "hostmap": {
+      return {
+        chartType: panelSchema.type,
+        ...convertHostmapData(panelSchema, data, store, metadata, chartPanelRef),
       };
     }
     case "custom_chart": {

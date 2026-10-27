@@ -110,7 +110,7 @@ const ODrawerStub = {
 // underlying ODialog so the spec stays decoupled from that component.
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
     <div data-test="confirm-dialog-stub" :data-open="String(!!modelValue)">
@@ -570,7 +570,8 @@ describe("ModelPricingList.vue", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));
       await nextTick();
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
-      expect(wrapper.vm.confirmDialogMeta.message).toBe("Delete GPT-4o (org)?");
+      expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBe("modelPricing.confirmDeleteMessage");
+      expect(wrapper.vm.confirmDialogMeta.messageName).toBe("GPT-4o (org)");
       expect(wrapper.vm.showPricingDialog).toBe(false);
     });
 
@@ -1098,7 +1099,10 @@ describe("ModelPricingList.vue", () => {
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
       expect(wrapper.vm.confirmDialogMeta.title).toBe("Delete model?");
-      expect(wrapper.vm.confirmDialogMeta.message).toContain(mockModels[0].name);
+      const dialog = wrapper.findComponent(ConfirmDialogStub);
+      expect(dialog.props("messageKeypath")).toBe("modelPricing.confirmDeleteMessage");
+      expect(dialog.props("messageName")).toBe(mockModels[0].name);
+      expect(dialog.props("okVariant")).toBe("destructive");
     });
 
     it("calls modelPricingService.delete and notifies on confirm", async () => {

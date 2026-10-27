@@ -152,7 +152,7 @@ pub struct AlertHistoryResponse {
 /// authentication.
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts/history",
+    path = "/v2/{org_id}/alerts/history",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlertHistory",

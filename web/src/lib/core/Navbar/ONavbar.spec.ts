@@ -647,6 +647,17 @@ describe("ONavbar", () => {
       expect(nav.scrollTop).toBe(30);
     });
 
+    it("a query-only replace after a rail click leaves the half-faded tile where the pointer is", async () => {
+      await mountShort();
+      clickTile("x4");
+      await shortRouterInstance.push("/x4");
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
+      await shortRouterInstance.replace({ path: "/x4", query: { period: "15m" } });
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
+    });
+
     it("a flyout-item click marks through the injected function", async () => {
       await mountShort([
         { title: "Streams", icon: "x", link: "/streams", name: "streams" },

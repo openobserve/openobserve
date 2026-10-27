@@ -195,6 +195,13 @@ describe("RemoteTasksPage", () => {
     await wrapper.get('[data-test="ai-remote-tasks-delete-head-1"]').trigger("click");
     await flushPromises();
     expect(remove).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageKeypath: "aiObservability.remoteTasks.delete.message",
+        messageName: "summarizer",
+        confirmVariant: "destructive",
+      }),
+    );
 
     confirm.mockResolvedValue(true);
     remove.mockResolvedValue(undefined);

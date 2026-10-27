@@ -22,10 +22,7 @@ use std::{
 use bytes::Bytes;
 use config::{
     RwHashMap, get_config, is_local_disk_storage, metrics, spawn_pausable_job,
-    utils::{
-        hash::{Sum64, gxhash},
-        time::BASE_TIME,
-    },
+    utils::{hash::key_sum64, time::BASE_TIME},
 };
 use futures::StreamExt;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
@@ -440,7 +437,7 @@ fn get_bucket_idx(file: &str) -> usize {
     if cfg.memory_cache.bucket_num <= 1 {
         0
     } else {
-        let h = gxhash::new().sum64(file);
+        let h = key_sum64(file);
         (h as usize) % cfg.memory_cache.bucket_num
     }
 }
@@ -566,7 +563,7 @@ mod tests {
         let content = Bytes::from("Test content for stats function");
 
         // Use the set function to add data
-        let bucket_id = gxhash::new().sum64(&test_key);
+        let bucket_id = key_sum64(&test_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&test_key, content.clone()).await;
@@ -599,7 +596,7 @@ mod tests {
                 test_id, i
             );
 
-            let bucket_id = gxhash::new().sum64(&file_key);
+            let bucket_id = key_sum64(&file_key);
             let bucket_id = (bucket_id as usize) % FILES.len();
             let mut file_data = FILES[bucket_id].write().await;
             let _ = file_data.set(&file_key, content.clone()).await;
@@ -653,7 +650,7 @@ mod tests {
         // Add small data
         let small_key = format!("files/test/{}_small.parquet", test_id);
         let small_content = Bytes::from("Small");
-        let bucket_id = gxhash::new().sum64(&small_key);
+        let bucket_id = key_sum64(&small_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&small_key, small_content.clone()).await;
@@ -662,7 +659,7 @@ mod tests {
         // Add large data
         let large_key = format!("files/test/{}_large.parquet", test_id);
         let large_content = Bytes::from(vec![0u8; 1000]);
-        let bucket_id = gxhash::new().sum64(&large_key);
+        let bucket_id = key_sum64(&large_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&large_key, large_content.clone()).await;

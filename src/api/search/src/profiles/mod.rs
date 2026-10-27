@@ -50,7 +50,7 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
-const DEFAULT_RESULT_SIZE: i64 = 50_000;
+const DEFAULT_RESULT_SIZE: i64 = 99_999;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfileFilter {

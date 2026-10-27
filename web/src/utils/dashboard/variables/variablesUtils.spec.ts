@@ -857,6 +857,21 @@ describe("Variables Utils", () => {
     });
   });
 
+  describe("processVariableContent listSeparator", () => {
+    const data = { values: [{ name: "h", value: ["a", "b"] }] };
+
+    it("joins an unformatted multi-value with the given separator", () => {
+      expect(processVariableContent("$h", data, undefined, { listSeparator: ", " })).toBe("a, b");
+    });
+
+    it("leaves explicit formats and the default join alone", () => {
+      const options = { listSeparator: ", " };
+      expect(processVariableContent("${h:csv}", data, undefined, options)).toBe("a,b");
+      expect(processVariableContent("${h:pipe}", data, undefined, options)).toBe("a|b");
+      expect(processVariableContent("$h", data)).toBe("a,b");
+    });
+  });
+
   describe("processVariableContent All and cleared values", () => {
     const data = {
       values: [
