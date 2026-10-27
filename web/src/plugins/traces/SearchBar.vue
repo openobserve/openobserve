@@ -507,7 +507,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default flex min-h-0 flex-1 border-b"
     >
       <div class="relative flex h-full w-full flex-col overflow-hidden">
+        <OButton
+          v-if="!searchObj.meta.sqlMode"
+          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+          data-test="traces-search-bar-filter-builder-toggle"
+          :aria-pressed="filterBuilderOn"
+          variant="ghost"
+          size="icon-xs-sq"
+          class="absolute! top-0.75 right-1 z-51"
+          @click="toggleFilterBuilder"
+        >
+          <OTooltip
+            :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
+          />
+        </OButton>
+        <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-10">
+          <SqlFilterBuilder
+            :query="searchObj.data.editorValue"
+            :fields="filterBuilderFields"
+            :load-values="loadFilterBuilderValues"
+            :fields-loading="searchObj.loading"
+            mode-storage-key="o2.traces.filterBuilderMode"
+            data-test="traces-search-bar-filter-builder"
+            @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
+            @submit="searchData"
+            @exit="toggleFilterBuilder"
+          />
+        </div>
         <CodeQueryEditor
+          v-show="!showFilterBuilder"
           ref="queryEditorRef"
           editor-id="traces-query-editor"
           v-model:query="searchObj.data.editorValue"
@@ -523,7 +551,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @blur="onQueryEditorBlur"
         />
         <div
-          v-if="searchObj.data.editorValue == '' && searchObj.meta.queryEditorPlaceholderFlag"
+          v-if="
+            searchObj.data.editorValue == '' &&
+            searchObj.meta.queryEditorPlaceholderFlag &&
+            !showFilterBuilder
+          "
           class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
@@ -624,6 +656,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
+import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { toFilterFields } from "@/utils/query/filterBar";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -655,6 +690,7 @@ export default defineComponent({
     OSelect,
     OTooltip,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+    SqlFilterBuilder,
     SyntaxGuide,
     TracesSavedViewsMenuItems,
     SavedViewsListDialog,
@@ -739,6 +775,21 @@ export default defineComponent({
       updateStreamKeywords,
       resolveFieldValues,
     } = useSqlSuggestions();
+
+    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
+      useFilterBuilderPreference("o2.traces.queryInput");
+    const showFilterBuilder = computed(() => filterBuilderOn.value && !searchObj.meta.sqlMode);
+    const filterBuilderFields = computed(() =>
+      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+    );
+    const loadFilterBuilderValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search });
+    // Returns whether the change should search now, the same rule a field-list click follows.
+    const onFilterBuilderQuery = (sql: string): boolean => {
+      searchObj.data.editorValue = sql;
+      (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
+      return Boolean(store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode);
+    };
 
     onActivated(async () => {
       await nextTick();
@@ -1337,6 +1388,12 @@ export default defineComponent({
       autoCompleteKeywords,
       effectiveKeywords,
       resolveFieldValues,
+      filterBuilderOn,
+      toggleFilterBuilder,
+      showFilterBuilder,
+      filterBuilderFields,
+      loadFilterBuilderValues,
+      onFilterBuilderQuery,
       effectiveSuggestions,
       updateTimezone,
       dateTimeRef,
