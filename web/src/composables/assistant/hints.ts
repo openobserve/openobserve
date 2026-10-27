@@ -291,6 +291,8 @@ function otherHint(raw: Record<string, unknown>, at: number): AssistantHint | nu
       if (!ids(raw, "sid") || !optionalId(raw.callId) || typeof raw.approved !== "boolean")
         return null;
       return { v: 1, type: raw.type, sid: raw.sid, ...callId(raw), approved: raw.approved, at };
+    case "approval_stop":
+      return ids(raw, "sid") ? { v: 1, type: raw.type, sid: raw.sid, at } : null;
     case "consent_granted":
       if (!ids(raw, "org") || raw.feature !== "ai_credits") return null;
       return { v: 1, type: raw.type, org: raw.org, feature: "ai_credits", at };

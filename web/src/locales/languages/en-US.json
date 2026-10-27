@@ -8878,18 +8878,127 @@
     }
   },
   "assistant": {
+    "actions": {
+      "count": "{count} action in this chat | {count} actions in this chat",
+      "entry": "{operation} {name} · approved by {user} · {time}",
+      "heading": "Actions in this chat",
+      "noReview": "No review step",
+      "op": {
+        "create": "Created {entity}",
+        "delete": "Deleted {entity}",
+        "run_command": "Ran {entity}",
+        "update": "Updated {entity}"
+      },
+      "restored": "Restored",
+      "undo": "Undo",
+      "undoFailed": "Undo didn't work.",
+      "undoLimits": "Undo restores the object. Notifications already sent and data already deleted stay as they are.",
+      "undoNotYet": "Undo isn't available yet",
+      "undoUnconfirmed": "Undo was sent, but its result couldn't be confirmed.",
+      "undoing": "Undoing…",
+      "undone": "Undone · {name} restored",
+      "you": "you"
+    },
     "announce": {
+      "approval": "Waiting for your approval: {title}.",
+      "approvalExpires": "Waiting for your approval: {title}. Expires in {duration}.",
+      "approvalJump": "{line} Press {keys} to review it.",
+      "approvalJumpTouch": "{line} Review request is above the message box.",
       "closed": "{product} closed.",
       "closedRunning": "{product} closed. Still answering in the background.",
+      "consent": "{state} for {org}.",
       "failed": "Failed. {title}",
       "failedRetryIn": "Failed. {title} Retry in {s} s.",
       "failedWithAction": "Failed. {title} {action} available.",
+      "keysOpen": "Control I",
+      "keysOpenMac": "Command I",
       "notSent": "Not sent. {title}",
       "notSentRetryIn": "Not sent. {title} Retry in {s} s.",
       "notSentWithAction": "Not sent. {title} {action} available.",
       "opened": "{product} opened.",
       "sheetCollapsed": "Collapsed.",
       "sheetExpanded": "Expanded."
+    },
+    "approval": {
+      "approve": "Approve",
+      "approveDelete": "Delete {count} {entity}",
+      "arguments": "Arguments",
+      "askAgainPrompt": "Ask me again: {heading}",
+      "askedElsewhere": "Asked in another tab",
+      "cannotUndo": "Cannot be undone",
+      "changes": "Changes",
+      "command": "Command",
+      "deny": "Deny",
+      "details": "Details",
+      "edit": "Edit then approve",
+      "escapeHint": "Esc declines",
+      "expiresIn": "Expires in {time}",
+      "expiresSoon": "This request expires in 1 minute.",
+      "heading": {
+        "create": "Create {entity}",
+        "delete": "Delete {count} {entity}",
+        "permission": "Allow {tool}",
+        "runCommand": "Run command on {toolset}",
+        "update": "Update {entity} {name}"
+      },
+      "minutes": "{count} minute | {count} minutes",
+      "moreTargets": "and {count} more",
+      "moreTime": "More time",
+      "needsOk": "Needs your OK",
+      "newValues": "New values",
+      "nothingSelected": "Nothing selected",
+      "open": "Open",
+      "reason": {
+        "forbidden": "no permission",
+        "notFound": "not found",
+        "status": "error {code}",
+        "unknown": "error"
+      },
+      "reply": "Reply",
+      "result": {
+        "approved": "Approved · {time}",
+        "approvedElsewhere": "Approved in another tab · {time}",
+        "askAgain": "Ask again",
+        "checkList": "Check the list",
+        "checkListName": "Check the list (opens in a new tab)",
+        "declined": "Declined · nothing was changed",
+        "declinedElsewhere": "Denied in another tab · {time}",
+        "declinedNewChat": "Declined because you started a new chat",
+        "deliveryFailed": "Your decision didn't reach the assistant. Nothing was changed.",
+        "done": {
+          "create": "Created {entity}",
+          "delete": "Deleted {count} {entity}",
+          "permission": "Allowed {tool}",
+          "runCommand": "Ran the command on {toolset}",
+          "update": "Updated {entity} {name}"
+        },
+        "expired": "No answer in time, so the assistant didn't run this action.",
+        "failed": "Nothing was changed. {reason}",
+        "failedConsent": "Paid usage isn't enabled for this organization.",
+        "failedCredits": "AI credits are used up for this organization.",
+        "failedForbidden": "You don't have permission to make this change.",
+        "failedItem": "{name} failed: {reason}",
+        "itemsName": "Result of each item",
+        "narrowed": "The assistant will propose these {count} again for your approval",
+        "open": "Open {name} (opens in a new tab)",
+        "partial": "Deleted {done} of {total} {entity} · {failed} failed",
+        "replied": "Declined · replied: “{reply}”",
+        "sendAgain": "Send again",
+        "sending": "Sending your decision…",
+        "stop": "Stop",
+        "stopped": "Declined · you stopped the answer",
+        "unconfirmed": "Your decision was sent, but its result couldn't be confirmed.",
+        "unknown": "This browser has no record of how this request was answered.",
+        "waitingElsewhere": "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
+        "withdrawn": "This request is no longer valid. The conversation moved on."
+      },
+      "scope": {
+        "chat": "For this chat",
+        "label": "Allow",
+        "once": "Just this once",
+        "tool": "Always for {tool}"
+      },
+      "seconds": "{count} second | {count} seconds"
     },
     "askAdmin": {
       "adminsOf": "Admins of {org}",
@@ -8989,7 +9098,34 @@
       "sendEmpty": "Type a message or add context to send",
       "undo": "Undo",
       "waitingApproval": "Answer the request above to continue.",
-      "waitingConsent": "Decide on paid usage above to continue."
+      "waitingConsent": "Decide on paid usage above to continue.",
+      "replyCancel": "Cancel reply",
+      "replyRefused": "Your reply wasn't sent. This request can't be answered from this page."
+    },
+    "consent": {
+      "aMember": "a member",
+      "aboutPaidUsage": "About paid usage",
+      "ack": "I understand this applies to everyone in {org}",
+      "cancel": "Cancel",
+      "consequenceDirect": "Included credits are used up. If you enable it, every AI request from anyone in {org} is billed to its current billing cycle until an admin turns it off.",
+      "consequencePayer": "Included credits are used up. If you enable it, every AI request from anyone in {org} is billed to {payer}'s current billing cycle until an admin turns it off.",
+      "enable": "Enable paid usage",
+      "enabledBy": "Paid AI usage enabled for {org} by {user} · {time}",
+      "error": "Paid usage couldn't be updated. Try again.",
+      "manage": "Manage",
+      "manageInBilling": "Manage in Billing › Paid usage",
+      "manageInBillingName": "Manage in Billing › Paid usage (opens in a new tab)",
+      "manageName": "Manage paid usage (opens in a new tab)",
+      "memberOnly": "An admin of {org} can enable paid usage.",
+      "memberOnlyPayer": "An admin of payer organization {payer} can enable paid usage.",
+      "resolvedElsewhere": "Paid usage was turned on in another tab. Sending your message.",
+      "resolvedElsewhereFocus": "Paid usage was turned on elsewhere. Sending your message.",
+      "resolvedHere": "Paid AI usage enabled. Sending your message.",
+      "stillRequired": "Paid usage is not enabled for every required organization.",
+      "title": "Enable paid AI usage for {org}?",
+      "titlePayer": "Enable paid AI usage for payer organization {payer}?",
+      "titleResolved": "Paid AI usage is on for {org}",
+      "you": "you"
     },
     "context": {
       "addBack": "{label} · Add back",
@@ -9136,6 +9272,19 @@
         "regexNew": "Regex pattern · new"
       },
       "tooNarrow": "Opened in the sidebar: this editor is too narrow for a docked chat"
+    },
+    "entity": {
+      "alert": "alert | alerts",
+      "dashboard": "dashboard | dashboards",
+      "folder": "folder | folders",
+      "function": "function | functions",
+      "object": "object | objects",
+      "panel": "panel | panels",
+      "pipeline": "pipeline | pipelines",
+      "report": "report | reports",
+      "setting": "setting | settings",
+      "stream": "stream | streams",
+      "user": "user | users"
     },
     "entry": {
       "addField": "Add field to chat",
@@ -9692,6 +9841,24 @@
       "stopItSent": "Asked the other answer to stop.",
       "tryLater": "Try again later"
     },
+    "plan": {
+      "deselectHint": "Untick anything you want to keep.",
+      "heading": "I'll delete {count} {entity}:",
+      "itemsName": "Items to delete",
+      "largeBatch": "Large batch: {count} {entity}",
+      "onlyThese": "Delete only these: {names}",
+      "showAll": "Show all {count}",
+      "unlisted": "{count} more item has no name and is included | {count} more items have no name and are included"
+    },
+    "policy": {
+      "autoDeclined": "Auto-declined by the assistant's safety settings",
+      "denied": "Blocked by policy: {tool}. {detail}",
+      "deniedAdmin": "An admin can allow it in Settings › Assistant › Permissions.",
+      "deniedPlain": "Blocked by policy: {tool}.",
+      "unreviewed": "The assistant changed {count} {entity} without a review step.",
+      "unreviewedAction": "See what changed",
+      "unreviewedActionName": "See what changed (opens in a new tab)"
+    },
     "query": {
       "alert": "Create alert draft",
       "copy": "Copy query",
@@ -9803,7 +9970,9 @@
       "windowShowing": "{from} → {to} · Showing {shown} of {total} rows"
     },
     "strip": {
-      "goToAnswer": "Go to answer"
+      "goToAnswer": "Go to answer",
+      "review": "Review request",
+      "reviewExpires": "Review request · expires in {time}"
     },
     "thread": {
       "newChatTitle": "New chat"

@@ -202,8 +202,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @status-visible="(shown) => (statusRowVisible = shown)"
           @outcome-shown="onOutcomeShown"
         >
-          <!-- WP-10 renders the approval and consent cards at the end of the transcript -->
-          <template #cards><slot name="cards" /></template>
+          <template #cards>
+            <slot name="cards">
+              <div
+                v-if="decisions"
+                ref="decisionsEl"
+                class="flex min-w-0 flex-col gap-2"
+                data-test="assistant-decisions"
+              >
+                <AssistantActionTimeline
+                  v-if="decisions.ledger.length || decisions.unreviewed.length"
+                  :entries="decisions.ledger"
+                  :unreviewed="decisions.unreviewed"
+                  :sid="decisions.sid"
+                />
+                <AssistantApprovalCard
+                  v-if="approvalCard"
+                  ref="approvalCardEl"
+                  :key="approvalCard.id"
+                  :card="approvalCard"
+                  :org="decisions.org"
+                  :sending="approvalSending"
+                  :extendable="capability.approvalExtend === true"
+                  @decide="onDecide"
+                  @reply="onReply"
+                  @extend="onExtend"
+                  @announce="(text) => region?.announce(text)"
+                />
+                <AssistantApprovalResult
+                  v-else-if="approvalElsewhere"
+                  state="waiting_elsewhere"
+                  :sid="decisions.sid"
+                  @stop="stopElsewhere"
+                />
+                <AssistantConsentCard
+                  v-if="consentCard"
+                  ref="consentCardEl"
+                  :key="`consent:${consentCard.sid}:${consentCard.orgId}`"
+                  v-bind="consentCard"
+                  @enable="resolveConsent(true, true)"
+                  @cancel="resolveConsent(false)"
+                  @open-billing="trackConsent('view_billing')"
+                  @ask-admin="trackConsent('ask_admin')"
+                  @announce="(text) => region?.announce(text)"
+                />
+              </div>
+            </slot>
+          </template>
         </AssistantTranscript>
       </slot>
     </div>
@@ -241,6 +286,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="jumpToLatest"
           >
             {{ jumpLabel }}
+          </OButton>
+          <OButton
+            v-if="strip.review"
+            variant="outline"
+            size="sm"
+            :aria-label="t('assistant.strip.review')"
+            class="shrink-0 max-md:min-h-11 max-md:w-full pointer-coarse:min-h-11"
+            data-test="assistant-strip-review"
+            @click="reviewRequest"
+          >
+            {{ reviewLabel }}
           </OButton>
           <OButton
             v-if="strip.goToAnswer"
@@ -383,13 +439,6 @@ export const SHELL_ROUTE_CONTEXT: InjectionKey<ShellRouteContext> = Symbol("assi
 
 /** Tool-step announcements are spaced at least this far apart (`95` §2.2). */
 export const STEP_ANNOUNCE_MS = 3_000;
-
-let lastKeydownAt = 0;
-
-/** The last keydown inside any assistant root, so a card never takes focus from a typing user (`95` §4). */
-export function lastAssistantKeydownAt(): number {
-  return lastKeydownAt;
-}
 </script>
 
 <script setup lang="ts">
@@ -411,6 +460,16 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import AssistantActionTimeline from "@/components/ai-assistant/approvals/AssistantActionTimeline.vue";
+import AssistantApprovalCard from "@/components/ai-assistant/approvals/AssistantApprovalCard.vue";
+import AssistantApprovalResult from "@/components/ai-assistant/approvals/AssistantApprovalResult.vue";
+import {
+  assistantApprovalsHostKey,
+  type ApprovalCardDecision,
+  type ApprovalCardView,
+  type AssistantApprovalsHost,
+} from "@/components/ai-assistant/approvals/approvals.types";
+import AssistantConsentCard from "@/components/ai-assistant/credits/AssistantConsentCard.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -434,8 +493,13 @@ import AssistantTurnOutcome, {
 import AssistantTurnStatus from "@/components/ai-assistant/turn/AssistantTurnStatus.vue";
 import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome.vue";
 import {
+  approvalClock,
+  approvalOutcomeOf,
+  assistantApprovals,
+  assistantConsent,
   isRunning,
   markHintSeen,
+  noteAssistantKeydown,
   markSignedIn,
   queryRunOf,
   readHints,
@@ -447,6 +511,7 @@ import {
   useAssistantStore,
   useOtherAccountSignedIn,
   useSignedOutElsewhere,
+  stopElsewhere as stopHeldTurn,
   useTurnLock,
   type AssistantError,
   type Container,
@@ -472,7 +537,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { refreshSession } from "@/services/http";
 import type { ChatMessage, TurnOutcomeRecord } from "@/ts/interfaces/chat";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import AssistantContainerMenu from "./AssistantContainerMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
@@ -510,11 +575,14 @@ const lower = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const composer = ref<InstanceType<typeof AssistantComposer> | null>(null);
 const transcript = ref<InstanceType<typeof AssistantTranscript> | null>(null);
+const decisionsEl = ref<HTMLElement | null>(null);
+const approvalCardEl = ref<InstanceType<typeof AssistantApprovalCard> | null>(null);
+const consentCardEl = ref<InstanceType<typeof AssistantConsentCard> | null>(null);
 const statusRowVisible = ref(true);
 const online = ref(typeof navigator === "undefined" || navigator.onLine !== false);
 const signedIn = ref(false);
 const popupBlocked = ref(false);
-const dismissedRefusal = ref<unknown>(null);
+const dismissedRefusal = shallowRef<unknown>(null);
 const learnOpen = ref(false);
 const openedByUser = ref(false);
 const disclosureDismissed = ref(false);
@@ -705,7 +773,15 @@ const strip = computed(() => {
   // With no answer text there is nothing to go to; the outcome block is the latest content.
   const goToAnswer =
     ["done", "stopped", "failed"].includes(current.turn.state) && hasAnswerText(current.messages);
-  return status || jump || goToAnswer ? { status, jump, goToAnswer } : null;
+  // The keyboard bridge to a pending card; it stays while the card does, so the strip never shifts under a click.
+  const review =
+    (!!approvalCard.value && !approvalSending.value) ||
+    (!!consentCard.value &&
+      consentCard.value.state !== "resolved_here" &&
+      consentCard.value.state !== "resolved_elsewhere");
+  return status || jump || goToAnswer || review
+    ? { status, jump, goToAnswer: goToAnswer && !review, review }
+    : null;
 });
 
 const unseen = computed(() => session.value?.ui.unseen ?? 0);
@@ -719,6 +795,134 @@ const jumpName = computed(() =>
     ? t("assistant.scroll.jumpToLatestName", { count: unseen.value })
     : t("assistant.scroll.jumpToLatest"),
 );
+
+// The cards render in the visible container only; a hidden one shows the header light and its toast.
+const decisions = computed(() => {
+  const current = session.value;
+  if (!current || !visible.value || state.value !== "conversation") return null;
+  const unreviewed = current.messages.flatMap((message) =>
+    (message.contentBlocks ?? []).flatMap((block) =>
+      block.policy?.kind === "unreviewed" ? [block.policy] : [],
+    ),
+  );
+  return { sid: current.sid, org: current.org, ledger: current.ledger, unreviewed };
+});
+
+const approvalCard = computed<ApprovalCardView | null>(() => {
+  const current = session.value;
+  const pending = current?.pendingApproval;
+  if (!decisions.value || !current || !pending) return null;
+  const block = current.messages
+    .flatMap((message) => message.contentBlocks ?? [])
+    .find((candidate) => candidate.approval?.id === pending.id)?.approval;
+  return { typed: false, ...block, ...pending };
+});
+
+const approvalSending = computed(() => {
+  const id = approvalCard.value?.id;
+  return !!id && approvalOutcomeOf(session.value, id).outcome?.state === "sending";
+});
+
+const approvalElsewhere = computed(
+  () => !!decisions.value && turnLock.value === "approval_elsewhere",
+);
+
+const consentCard = computed(() => {
+  const current = session.value;
+  const pending = current?.pendingConsent;
+  if (!decisions.value || !current || !pending) return null;
+  const view = assistantConsent()?.view(current.sid) ?? { state: "shown" as const };
+  const { organization, payer } = pending.status;
+  const missing = [organization, payer].filter((o) => !!o && !o.enabled);
+  return {
+    sid: current.sid,
+    orgName: orgNameOf(pending.org),
+    orgId: pending.org,
+    payerName: payer?.org_id ?? "",
+    planType: payer ? ("payer" as const) : ("direct" as const),
+    payerOnly: !!payer && !payer.enabled && organization.enabled,
+    canEnable: missing.length > 0 && missing.every((o) => o!.can_manage),
+    variant: "card" as const,
+    state: view.state,
+    ...(view.error && { error: view.error }),
+    ...(view.via && { via: view.via }),
+    promptPreview: pending.snapshot.text,
+  };
+});
+
+const reviewClock = ref(Date.now());
+let reviewTimer: ReturnType<typeof setInterval> | null = null;
+const reviewLabel = computed(() => {
+  const until = approvalCard.value?.expiresAt;
+  if (typeof until !== "number") return t("assistant.strip.review");
+  return t("assistant.strip.reviewExpires", {
+    time: raw(approvalClock(until - reviewClock.value)),
+  });
+});
+
+const approvalsHost: AssistantApprovalsHost = {
+  pendingId: (sid) => store.state.sessions[sid]?.pendingApproval?.id ?? null,
+  currentUser: () => vuex.state.userInfo?.email ?? "",
+  sendAgain: (sid, id) => void assistantApprovals()?.sendAgain(sid, id),
+  askAgain: (sid, id) => void assistantApprovals()?.askAgain(sid, id),
+  stop: (sid) => void stopHeldTurn(sid),
+  undo: (sid, ledgerId) =>
+    assistantApprovals()?.undo(sid, ledgerId) ?? Promise.resolve({ ok: false, reason: "failed" }),
+};
+provide(assistantApprovalsHostKey, approvalsHost);
+
+function orgNameOf(id: string): string {
+  const selected = vuex.state.selectedOrganization;
+  return selected?.identifier === id && selected?.label ? String(selected.label) : id;
+}
+
+function onDecide({ decision, approvalId }: ApprovalCardDecision): void {
+  const sid = activeSid.value;
+  if (sid) void store.decideApproval(sid, decision, approvalId);
+}
+
+// Reply is the composer's own mode: one text entry, its Enter answers the card.
+function onReply(): void {
+  const sid = activeSid.value;
+  const id = approvalCard.value?.id;
+  if (!sid || !id) return;
+  store.startReply(sid, id);
+  void nextTick(() => composer.value?.focusInput("end"));
+}
+
+function onExtend(): void {
+  const sid = activeSid.value;
+  if (sid) void assistantApprovals()?.extend(sid);
+}
+
+function stopElsewhere(): void {
+  const sid = activeSid.value;
+  if (sid) approvalsHost.stop(sid);
+}
+
+function resolveConsent(accepted: boolean, acknowledged = false): void {
+  const sid = activeSid.value;
+  if (!sid) return;
+  void store.resolveConsent(sid, accepted, acknowledged);
+  if (!accepted) focusAfterAction();
+}
+
+function trackConsent(step: "view_billing" | "ask_admin"): void {
+  const card = consentCard.value;
+  if (!card) return;
+  trackAssistant("ai_consent", {
+    step,
+    surface: "chat",
+    org_match: card.orgId === org.value,
+    plan_type: card.planType,
+  });
+}
+
+function reviewRequest(): void {
+  decisionsEl.value?.scrollIntoView?.({ block: "nearest" });
+  if (approvalCardEl.value?.focusDefault()) return;
+  consentCardEl.value?.focusHeading();
+}
 
 function jumpToLatest(): void {
   trackAssistant("ai_scroll_jump", { unseen: unseen.value });
@@ -776,8 +980,13 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
   const query = { org_identifier: org.value };
   const started = document.activeElement;
   switch (action) {
-    case "retry":
     case "ask_again":
+      if ((outcome.kind === "expired" || outcome.code === "approval_expired") && askAgainCard(sid))
+        return focusAfterAction();
+      signedIn.value = false;
+      void store.retry(sid);
+      return focusAfterAction();
+    case "retry":
       signedIn.value = false;
       void store.retry(sid);
       return focusAfterAction();
@@ -808,6 +1017,18 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
     default:
       return;
   }
+}
+
+// An expired card asks for itself again in one short turn, never a resend of the original prompt.
+function askAgainCard(sid: string): boolean {
+  const id = [...(store.state.sessions[sid]?.messages ?? [])]
+    .reverse()
+    .flatMap((message) => [...(message.contentBlocks ?? [])].reverse())
+    .find((block) => block.approval)?.approval?.id;
+  const approvals = assistantApprovals();
+  if (!id || !approvals) return false;
+  void approvals.askAgain(sid, id);
+  return true;
 }
 
 function hasAnswerText(messages: ChatMessage[]): boolean {
@@ -928,7 +1149,36 @@ onBeforeUnmount(() => {
   offs.forEach((off) => off());
   if (stepTimer) clearTimeout(stepTimer);
   if (cooldownTimer) clearInterval(cooldownTimer);
+  if (reviewTimer) clearInterval(reviewTimer);
 });
+
+// The strip's countdown runs only while a card with a known expiry is shown.
+watch(
+  () => typeof approvalCard.value?.expiresAt === "number",
+  (counting) => {
+    if (reviewTimer) clearInterval(reviewTimer);
+    reviewTimer = counting ? setInterval(() => (reviewClock.value = Date.now()), 1_000) : null;
+  },
+  { immediate: true },
+);
+
+// A resolved card unmounts under the pressed button; focus goes to its record's action, else the composer.
+watch(
+  () => [session.value?.pendingApproval?.id ?? null, !!session.value?.pendingConsent] as const,
+  async ([id, consent], [before, hadConsent]) => {
+    if ((!before || id) && (!hadConsent || consent)) return;
+    await nextTick();
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const action = before
+      ? root.value?.querySelector<HTMLElement>(
+          `[data-approval-id="${CSS.escape(before)}"] :is(a, button)`,
+        )
+      : null;
+    if (action) action.focus();
+    else focusEntry();
+  },
+);
 
 watch(
   cooldownUntil,
@@ -976,7 +1226,7 @@ function dismissDisclosure(): void {
 }
 
 function recordKeydown(): void {
-  lastKeydownAt = Date.now();
+  noteAssistantKeydown();
 }
 
 function focusEntry(): void {
@@ -1020,6 +1270,9 @@ function newChat(): void {
   const previous = session.value;
   const { text = "", chips = [], images = [] } = previous?.composer ?? {};
   const drafted = !!text.trim() || chips.length > 0 || images.length > 0;
+  // A card the old chat still waits on is declined, so the new chat starts free.
+  if (previous?.pendingApproval)
+    void store.decideApproval(previous.sid, { approved: false, reason: "new_chat" });
   store.setActive(null);
   const sid = ensureSession();
   if (!previous || !drafted || previous.sid === sid) return;

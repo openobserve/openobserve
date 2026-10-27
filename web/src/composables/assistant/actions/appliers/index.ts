@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { registerApprovalAppliers } from "./approval";
 import { registerClipboardAppliers } from "./clipboard";
 import { registerDraftAppliers } from "./drafts";
 import { registerEditorAppliers } from "./editor";
@@ -20,8 +21,10 @@ import { registerExplorerAppliers } from "./explorer";
 import { registerNavigationAppliers } from "./navigation";
 import { registerQueryAppliers } from "./query";
 import { registerThreadAppliers } from "./thread";
+import { registerUndoAppliers } from "./undo";
 
 export function registerBuiltInAppliers(): void {
+  registerApprovalAppliers();
   registerClipboardAppliers();
   registerDraftAppliers();
   registerEditorAppliers();
@@ -29,4 +32,5 @@ export function registerBuiltInAppliers(): void {
   registerNavigationAppliers();
   registerQueryAppliers();
   registerThreadAppliers();
+  registerUndoAppliers();
 }

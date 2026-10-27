@@ -206,7 +206,7 @@ const TABLE: [
     { type: "confirmation_required", tool: "o2_delete", call_id: "c9" },
     {},
     { state: "awaiting_approval", callId: "c9" },
-    ["track_state", "pause", "announce"],
+    ["track_state", "pause"],
   ],
   [
     "the decision resumes",

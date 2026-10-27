@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   answerProgress,
+  approvalOf,
   extractStreamText,
   interruptSteps,
   reduce,
@@ -25,6 +26,8 @@ import {
   type StreamPhase,
   type StreamState,
 } from "./reducer";
+import { foldTurns } from "./record";
+import { approvalOutcomeOf } from "./useAssistantApprovals";
 import type { ChatMessage, NavigationAction } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -1180,7 +1183,13 @@ describe("reduce: typed phases (live)", () => {
       { type: "status", message: "thinking" },
     ];
     for (const frame of frames) expect(reduce(state, frame, live())).toEqual([]);
-    expect(state.messages).toEqual([]);
+    // Only the change made without a card shows, as its one quiet notice.
+    expect(blocksOf(state)).toEqual([
+      {
+        type: "policy",
+        policy: { kind: "unreviewed", resourceType: "alert", count: 1, tools: 0, frames: 1 },
+      },
+    ]);
     expect(state.extras).toMatchObject({
       serverTurnId: "srv-1",
       traceId: "tr-0",
@@ -1215,10 +1224,13 @@ describe("reduce: typed phases (live)", () => {
       live(),
     );
     reduce(state, { type: "confirmation_resolved", id: "c9", approved: false }, live());
-    expect(blocksOf(state)[0]).toMatchObject({
-      pendingConfirmation: false,
-      stepState: "interrupted",
-    });
+    expect(blocksOf(state)).toEqual([
+      expect.objectContaining({
+        type: "approval",
+        approval: expect.objectContaining({ id: "c9" }),
+      }),
+      { type: "approval_result", resolved: { id: "c9", approved: false } },
+    ]);
   });
 
   it("keeps a navigation frame the legacy tail flush drops, as a link card and never a prompt", () => {
@@ -1462,5 +1474,266 @@ describe("reduce: evidence on the typed phases", () => {
     );
     const link = blocksOf(state).find((block) => block.type === "link");
     expect(link?.link?.target.query).toEqual({ folder: "f" });
+  });
+});
+
+describe("reduce: approval cards", () => {
+  const live = () => makeCtx({ phase: "live", isActive: false });
+  const replay = () => makeCtx({ phase: "replay", isActive: false });
+  const blocksOf = (state: StreamState) => state.messages.at(-1)?.contentBlocks ?? [];
+
+  it("turns today's delete batch into a typed delete card, its targets from the items", () => {
+    expect(
+      approvalOf({
+        type: "confirmation_required",
+        tool: "o2_delete",
+        message: "Delete?",
+        args: {
+          items: [{ resource_type: "Alert", name: "checkout-latency-old", id: "2Yx9alert" }],
+        },
+      }),
+    ).toMatchObject({
+      id: "",
+      kind: "delete",
+      destructive: true,
+      editable: false,
+      grantable: false,
+      typed: false,
+      question: "Delete?",
+      targets: [{ type: "alert", id: "2Yx9alert", name: "checkout-latency-old" }],
+    });
+  });
+
+  it("takes the kind from the wire, a CLI command or the fallback, never from a tool-name prefix", () => {
+    expect(approvalOf({ tool: "DeleteStream" }).kind).toBe("permission");
+    expect(approvalOf({ tool: "acme", args: { command: "deploy" } }).kind).toBe("run_command");
+    expect(approvalOf({ tool: "o2_UpdateAlert", kind: "update", targets: [] }).kind).toBe("update");
+    expect(approvalOf({ tool: "bash", kind: "opencode_permission" }).kind).toBe("permission");
+  });
+
+  it("never grants scope on a destructive card, and caps what the model sent", () => {
+    const card = approvalOf({
+      tool: "o2_delete",
+      kind: "delete",
+      grantable: true,
+      impact: Array.from({ length: 40 }, () => "x".repeat(500)),
+      message: "q".repeat(5_000),
+    });
+    expect(card.grantable).toBe(false);
+    expect(card.impact).toHaveLength(20);
+    expect(card.impact?.[0]).toHaveLength(300);
+    expect(card.question).toHaveLength(2_000);
+  });
+
+  it("appends the card's block once and hands the frame to the approvals runtime in a live turn", () => {
+    const state = makeState();
+    const frame = { type: "confirmation_required", tool: "o2_delete", call_id: "c9" };
+    const effects = reduce(state, frame, live());
+    reduce(state, frame, live());
+    expect(blocksOf(state).filter((block) => block.type === "approval")).toHaveLength(1);
+    expect(effects).toContainEqual({ kind: "approval", frame });
+  });
+
+  it("numbers an untyped card within its own turn, so the history fold gives the same id, record and Undo", () => {
+    const batch = (name: string) => ({
+      type: "confirmation_required",
+      tool: "o2_delete",
+      args: { items: [{ resource_type: "alert", name }] },
+    });
+    const state = makeState();
+    const turn = (turnId: string, text: string) =>
+      state.messages.push(
+        { role: "user", content: raw(text), turnId },
+        { role: "assistant", content: raw(""), contentBlocks: [], turnId },
+      );
+    turn("t1", "q1");
+    const first = reduce(state, batch("a"), live());
+    turn("t2", "q2");
+    reduce(state, { type: "message_delta", content: "Two of them." }, live());
+    reduce(state, batch("b"), live());
+    reduce(state, { type: "message_delta", content: "And one more." }, live());
+    reduce(state, batch("c"), live());
+    const idsOf = (messages: ChatMessage[]) =>
+      messages.flatMap((m) =>
+        (m.contentBlocks ?? []).flatMap((block) => (block.approval ? [block.approval.id] : [])),
+      );
+    expect(idsOf(state.messages)).toEqual(["t1:1", "t2:1", "t2:2"]);
+    expect(first).toContainEqual({ kind: "approval", frame: { ...batch("a"), id: "t1:1" } });
+    const folded = foldTurns(
+      [
+        { turn_id: "t1", user: { text: "q1" }, frames: [batch("a")], status: "completed" },
+        {
+          turn_id: "t2",
+          user: { text: "q2" },
+          frames: [
+            { type: "message_delta", content: "Two of them." },
+            batch("b"),
+            { type: "message_delta", content: "And one more." },
+            batch("c"),
+          ],
+          status: "completed",
+        },
+      ] as never,
+      t,
+      "owner",
+      "replay",
+    ).messages;
+    expect(idsOf(folded)).toEqual(idsOf(state.messages));
+    const session = {
+      annotations: {
+        "approval:t2:2": { approvalOutcome: { state: "done" as const, at: 1 } },
+      },
+      ledger: [{ id: "led-1", approvalId: "t2:2" }],
+    };
+    const replayed = idsOf(folded)[2];
+    expect(approvalOutcomeOf(session, replayed).outcome?.state).toBe("done");
+    expect(session.ledger.filter((entry) => entry.approvalId === replayed)).toHaveLength(1);
+    expect(approvalOf({ tool: "bash", approval_id: "ap-1" }).id).toBe("ap-1");
+  });
+
+  it("takes a frame redelivered right after its own card as that card, not a second one", () => {
+    const state = makeState({
+      messages: [{ role: "assistant", content: raw(""), contentBlocks: [], turnId: "t1" }],
+    });
+    const frame = {
+      type: "confirmation_required",
+      tool: "o2_delete",
+      args: { items: [{ resource_type: "alert", name: "a" }] },
+    };
+    reduce(state, frame, live());
+    const held = makeCtx({ phase: "live", isActive: false, pendingApprovalId: "t1:1" });
+    const again = reduce(state, frame, held);
+    expect(blocksOf(state).filter((block) => block.type === "approval")).toHaveLength(1);
+    expect(again.some((effect) => effect.kind === "approval")).toBe(false);
+  });
+
+  it("takes the same frame after the card was decided as a new card asked again", () => {
+    const state = makeState({
+      messages: [{ role: "assistant", content: raw(""), contentBlocks: [], turnId: "t1" }],
+    });
+    const frame = {
+      type: "confirmation_required",
+      tool: "bash",
+      message: "Run ls?",
+      args: { command: "ls" },
+    };
+    reduce(state, frame, live());
+    const asked = reduce(
+      state,
+      frame,
+      makeCtx({ phase: "live", isActive: false, pendingApprovalId: null }),
+    );
+    const ids = blocksOf(state).flatMap((block) => (block.approval ? [block.approval.id] : []));
+    expect(ids).toEqual(["t1:1", "t1:2"]);
+    expect(asked).toContainEqual({ kind: "approval", frame: { ...frame, id: "t1:2" } });
+  });
+
+  it("counts every item the server acts on, named or not, and edits only a batch it fully lists", () => {
+    const items = [
+      ...Array.from({ length: 250 }, (_, i) => ({
+        resource_type: "alert",
+        name: `a${i}`,
+        id: `${i}`,
+      })),
+      { resource_type: "alert", id: "nameless" },
+    ];
+    const card = approvalOf({ tool: "o2_delete", args: { items } });
+    expect(card.targets).toHaveLength(200);
+    expect(card.total).toBe(251);
+    expect(card.editable).toBe(false);
+    expect(approvalOf({ tool: "o2_delete", args: { items: items.slice(0, 3) } })).toMatchObject({
+      editable: true,
+    });
+    expect(
+      approvalOf({
+        tool: "o2_UpdateAlert",
+        kind: "update",
+        editable: true,
+        targets: [{ name: "x" }],
+      }).editable,
+    ).toBe(false);
+  });
+
+  it("only lets the wire make a card more careful, and parses no prototype from it", () => {
+    expect(
+      approvalOf({ tool: "o2_delete", kind: "delete", destructive: false, grantable: true }),
+    ).toMatchObject({ destructive: true, grantable: false });
+    expect(approvalOf({ tool: "x", kind: "update", destructive: true }).destructive).toBe(true);
+    const frame = JSON.parse(
+      '{"tool":"o2_UpdateAlert","kind":"update","before":{"__proto__":{"enabled":true}},"after":{"enabled":true}}',
+    );
+    const before = approvalOf(frame).before as Record<string, unknown>;
+    expect(Object.getPrototypeOf(before)).toBe(Object.prototype);
+    expect(before.enabled).toBeUndefined();
+  });
+
+  it("puts a CLI command on the card, ending in an ellipsis when it was cut", () => {
+    expect(approvalOf({ tool: "acme", args: { command: "kubectl get pods" } }).command).toBe(
+      "kubectl get pods",
+    );
+    const long = approvalOf({ tool: "acme", args: { command: "x".repeat(3_000) } }).command;
+    expect(long).toHaveLength(2_001);
+    expect(long?.endsWith("…")).toBe(true);
+  });
+
+  it("replays a card as its record only: no runtime effect", () => {
+    const state = makeState();
+    const effects = reduce(state, { type: "confirmation_required", tool: "o2_delete" }, replay());
+    expect(effects.some((effect) => effect.kind === "approval")).toBe(false);
+    expect(blocksOf(state)[0]?.type).toBe("approval");
+  });
+
+  it("surfaces a mutating tool that ran with no card before it, and merges more of its kind", () => {
+    const state = makeState();
+    for (const id of ["c1", "c2"]) {
+      reduce(state, { type: "tool_call", tool: "o2_UpdateDashboards", call_id: id }, live());
+      reduce(state, { type: "tool_result", tool: "o2_UpdateDashboards", call_id: id }, live());
+    }
+    expect(blocksOf(state).filter((block) => block.type === "policy")).toEqual([
+      {
+        type: "policy",
+        policy: { kind: "unreviewed", resourceType: "dashboard", count: 2, tools: 2, frames: 0 },
+      },
+    ]);
+  });
+
+  it("counts a tool result and its typed resource_changed as one change", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "o2_UpdateAlert", call_id: "c1" }, live());
+    reduce(state, { type: "tool_result", tool: "o2_UpdateAlert", call_id: "c1" }, live());
+    reduce(
+      state,
+      { type: "resource_changed", resource_type: "alert", id: "a1", op: "update" },
+      live(),
+    );
+    expect(blocksOf(state).find((block) => block.type === "policy")?.policy).toMatchObject({
+      count: 1,
+      resourceId: "a1",
+    });
+  });
+
+  it("says nothing of a change the answer already asked about", () => {
+    const state = makeState();
+    reduce(state, { type: "confirmation_required", tool: "o2_delete" }, live());
+    reduce(state, { type: "resource_changed", resource_type: "alert", op: "delete" }, live());
+    expect(blocksOf(state).some((block) => block.type === "policy")).toBe(false);
+  });
+
+  it("keeps the server's detail on a denied step for its notice", () => {
+    const state = makeState();
+    reduce(
+      state,
+      {
+        type: "permission_denied",
+        tool: "o2_UpdateAlert",
+        policy: "admin",
+        detail: "Writes are off.",
+      },
+      live(),
+    );
+    expect(blocksOf(state)[0]).toMatchObject({
+      errorType: "permission_denied_tool",
+      details: { detail: "Writes are off.", policy: "admin" },
+    });
   });
 });

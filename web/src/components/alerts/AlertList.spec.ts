@@ -523,6 +523,20 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
+  it("re-reads the list when the assistant changed alerts after an approval, and ignores other events", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await flushPromises();
+    const { useAiDashboardEvents } = await import("@/composables/useAiDashboardEvents");
+    const reads = (alertsSvc.listByFolderId as any).mock.calls.length;
+    useAiDashboardEvents().emit({ type: "dashboard_updated" });
+    await flushPromises();
+    expect((alertsSvc.listByFolderId as any).mock.calls.length).toBe(reads);
+    useAiDashboardEvents().emit({ type: "alerts_changed" });
+    await flushPromises();
+    expect((alertsSvc.listByFolderId as any).mock.calls.length).toBeGreaterThan(reads);
+  });
+
   // A destination made in the form's new tab never expires this tab's cache, so only a forced read shows it.
   it("re-reads destinations from the server when the form asks for a refresh", async () => {
     const wrapper: any = await mountAlertList();

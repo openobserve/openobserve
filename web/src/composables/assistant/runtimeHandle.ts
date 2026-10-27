@@ -61,6 +61,11 @@ export function markSignedIn(): void {
   current.value?.lifecycle.onSignedIn();
 }
 
+/** Stop on a turn another tab's card holds: that tab declines the card before the cancel. */
+export function stopElsewhere(sid: string): Promise<void> {
+  return current.value?.lifecycle.stopElsewhere(sid) ?? Promise.resolve();
+}
+
 /** Why nothing may start a turn in `sid` right now (Send, Continue, Retry, Ask again, Regenerate, Edit), or `null`. */
 export function useTurnLock(sid: () => string | null): ComputedRef<TurnLockReason | null> {
   return computed(() => current.value?.lifecycle.turnLock(sid()) ?? null);

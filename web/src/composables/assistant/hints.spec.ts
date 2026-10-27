@@ -143,6 +143,16 @@ describe("createHintChannel over BroadcastChannel", () => {
     expect(toHint({ ...pending, expiresAt: "soon" })).toEqual(pending);
   });
 
+  it("takes a Stop asked from a tab waiting on a card, by session only", () => {
+    expect(toHint({ v: 1, type: "approval_stop", sid: "s1", at })).toEqual({
+      v: 1,
+      type: "approval_stop",
+      sid: "s1",
+      at,
+    });
+    expect(toHint({ v: 1, type: "approval_stop", at })).toBeNull();
+  });
+
   it("re-binds to the new user+org for receiving", async () => {
     const a = channel("k1");
     const b = channel("k1");

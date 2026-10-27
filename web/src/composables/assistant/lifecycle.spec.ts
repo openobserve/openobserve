@@ -28,6 +28,7 @@ import {
   APPROVAL_HEARTBEAT_MS,
   APPROVAL_STALE_MS,
   LIVE_TURN_TTL_MS,
+  STOP_RELAY_MS,
   createLifecycle,
   readLiveTurns,
   registerLifecycleDialogs,
@@ -543,6 +544,69 @@ describe("other tabs", () => {
     });
     receive({ v: 1, type: "approval_resolved", sid: "z", approved: true, at: 2 });
     expect(lifecycle.remoteLight()).toBeNull();
+  });
+});
+
+describe("Stop on another tab's card", () => {
+  it("leaves the cancel to a holder that beats back, and cancels itself only for a silent one", async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hints, receive, lifecycle } = setup();
+      const cancel = vi.spyOn(store, "cancelTurn").mockResolvedValue(true);
+      receive({ v: 1, type: "approval_pending", sid: "z", turnId: "t", callId: "c", at: 1 });
+      const stopping = lifecycle.stopElsewhere("z");
+      expect(hints.postFor).toHaveBeenCalledWith(
+        "k1",
+        expect.objectContaining({ type: "approval_stop", sid: "z" }),
+      );
+      receive({ v: 1, type: "approval_pending", sid: "z", turnId: "t", callId: "c", at: 2 });
+      await vi.advanceTimersByTimeAsync(0);
+      await stopping;
+      await vi.advanceTimersByTimeAsync(STOP_RELAY_MS);
+      expect(cancel).not.toHaveBeenCalled();
+      receive({ v: 1, type: "approval_pending", sid: "y", turnId: "t", callId: "c", at: 3 });
+      const silent = lifecycle.stopElsewhere("y");
+      await vi.advanceTimersByTimeAsync(STOP_RELAY_MS);
+      await silent;
+      expect(cancel).toHaveBeenCalledWith("y", null);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels at once when the card is released instead of answered, so a Stop is never dropped", async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, receive, lifecycle } = setup();
+      const cancel = vi.spyOn(store, "cancelTurn").mockResolvedValue(true);
+      receive({ v: 1, type: "approval_pending", sid: "z", turnId: "t", callId: "c", at: 1 });
+      const stopping = lifecycle.stopElsewhere("z");
+      receive({ v: 1, type: "approval_resolved", sid: "z", approved: true, at: 2 });
+      await vi.advanceTimersByTimeAsync(0);
+      await stopping;
+      expect(cancel).toHaveBeenCalledWith("z", null);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("beats back at once when the waiting tab asks, then stops its own turn, which declines the card first", async () => {
+    const { store, hints, receive } = setup();
+    const sid = running(store);
+    store.state.sessions[sid].pendingApproval = { id: "c" } as never;
+    await nextTick();
+    hints.postFor.mockClear();
+    const stop = vi.spyOn(store, "stop").mockResolvedValue();
+    receive({ v: 1, type: "approval_stop", sid, at: 1 });
+    expect(hints.postFor).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "approval_pending", sid }),
+    );
+    expect(stop).toHaveBeenCalledWith(sid);
+    receive({ v: 1, type: "approval_stop", sid: "other", at: 1 });
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 });
 

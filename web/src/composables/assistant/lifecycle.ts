@@ -42,6 +42,9 @@ export const APPROVAL_HEARTBEAT_MS = 20_000;
 /** Another tab's approval card counts as gone once its holder has been silent this long; a hidden tab's timers can run once a minute, so this spans more than two such beats. */
 export const APPROVAL_STALE_MS = 150_000;
 
+/** A holding tab that sends no beat back within this long is gone, and the waiting tab cancels the turn itself. */
+export const STOP_RELAY_MS = 3_000;
+
 /** One `{org, sid, origin, turnId, at}` of the user's live-turn ledger (ids only). */
 export interface LiveTurn {
   org: string;
@@ -95,6 +98,8 @@ export interface AssistantLifecycleRuntime extends AssistantLifecycle {
   remoteLight(): { state: "needs_you" | "working"; sid: Sid } | null;
   /** True while another tab holds this session's approval card. */
   approvalElsewhere(sid: Sid): boolean;
+  /** Stop on a turn another tab's card holds: that tab declines the card first, then the turn is cancelled. */
+  stopElsewhere(sid: Sid): Promise<void>;
   /** Why no turn may start in `sid` from this tab right now, or `null`. */
   turnLock(sid: Sid | null): TurnLockReason | null;
   dispose(): void;
@@ -240,6 +245,11 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
     hints.on("approval_resolved", (hint) => {
       if (remote.get(hint.sid)?.state === "needs_you") remote.delete(hint.sid);
     }),
+    hints.on("approval_stop", (hint) => {
+      if (!store.state.sessions[hint.sid]?.pendingApproval) return;
+      mirror.beat();
+      void store.stop(hint.sid);
+    }),
     ...(["prefs_changed", "history_changed", "share_changed", "consent_granted"] as const).map(
       (type) => hints.on(type, (hint) => store.applyHint(hint)),
     ),
@@ -282,6 +292,30 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
     approvalElsewhere: (sid) => {
       const entry = remote.get(sid);
       return entry?.state === "needs_you" && cardLive(entry, deps.now());
+    },
+    async stopElsewhere(sid) {
+      const userOrgKey = store.state.sessions[sid]?.userOrgKey ?? store.state.userOrgKey;
+      const before = remote.get(sid);
+      if (userOrgKey)
+        hints.postFor(userOrgKey, { v: 1, type: "approval_stop", sid, at: deps.now() });
+      // Only a fresh beat from a holder that still has the card means it declines and cancels itself; a release, a sweep or silence leaves the cancel to this tab.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let off = () => {};
+      const answered = await new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), STOP_RELAY_MS);
+        off = watch(
+          () => remote.get(sid),
+          (entry) => {
+            if (entry === before) return;
+            resolve(entry?.state === "needs_you");
+          },
+        );
+      });
+      clearTimeout(timer);
+      off();
+      if (answered) return;
+      remote.delete(sid);
+      await store.cancelTurn(sid, null);
     },
     turnLock(sid) {
       if (otherAccount.value) return "account_changed";
@@ -352,8 +386,9 @@ async function settleOnSwitch(
   await Promise.all(
     sessions.map((session) => {
       if (choice === "stop") return store.stop(session.sid);
+      // The deny goes out with keepalive and records its own answer; the switch never waits on it.
       if (session.pendingApproval)
-        return store.decideApproval(session.sid, { approved: false, reason: "withdrawn" });
+        return void store.decideApproval(session.sid, { approved: false, reason: "withdrawn" });
       return session.pendingConsent || session.turn.state === "awaiting_consent"
         ? store.stop(session.sid)
         : undefined;
@@ -393,7 +428,7 @@ function cancelLiveTurn(deps: LifecycleDeps, entry: LiveTurn): void {
 }
 
 // Every turn this tab starts is announced on its own org's channel and the user channel, and kept in the ledger until it ends.
-function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void } {
+function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void; beat(): void } {
   const { store, hints } = deps;
   const live = new Map<Sid, LiveMirror>();
   const pendingCards = new Map<Sid, HeldCard>();
@@ -544,6 +579,7 @@ function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void 
       [...pendingCards.keys()].forEach(releaseCard);
       beat();
     },
+    beat: beatNow,
     stop: () => {
       stop();
       if (heartbeat) clearInterval(heartbeat);

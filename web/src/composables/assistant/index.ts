@@ -31,6 +31,7 @@ export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
 export { STALL_MS, turnStatusText } from "./turnStateMachine";
 export { useAssistantStarters } from "./useAssistantStarters";
 export {
+  assistantFocusCard,
   assistantGoToAnswer,
   registerAssistantFocusTarget,
   registerContainerCloser,
@@ -107,10 +108,29 @@ export {
   markSignedIn,
   useOtherAccountSignedIn,
   useSignedOutElsewhere,
+  stopElsewhere,
   turnLockKey,
   useTurnLock,
 } from "./runtimeHandle";
 export { queryRunOf } from "./actions/appliers/query";
+export {
+  DELETE_TTL_MS,
+  PERMISSION_TTL_MS,
+  approvalClock,
+  approvalEntity,
+  approvalHeading,
+  approvalOutcomeOf,
+  approvalTargetHref,
+  entityKeyOf,
+  assistantApprovals,
+  useAssistantApprovals,
+} from "./useAssistantApprovals";
+export { assistantConsent } from "./consent";
+export {
+  assistantKeydownAt,
+  noteAssistantKeydown,
+  useAssistantIdleFocus,
+} from "./useAssistantIdleFocus";
 export type { TurnStatusText } from "./turnStateMachine";
 export type { AssistantContextView } from "./context/useAssistantContext";
 export type { ChipState, SeesRow, TimeWindow } from "./context/contextChips";
@@ -132,6 +152,20 @@ export type {
   ProposalProvenance,
 } from "./useEditorProposal";
 export type { AssistantHintChannel } from "./hints";
+export type { ApprovalsRuntime } from "./useAssistantApprovals";
+export type {
+  AssistantConsentCardProps,
+  ConsentCardState,
+  ConsentRuntime,
+  ConsentView,
+} from "./consent";
+export type { AssistantIdleFocus } from "./useAssistantIdleFocus";
+export type {
+  ApprovalBlockData,
+  ConsentNoteData,
+  PolicyBlockData,
+  ResolvedBlockData,
+} from "./reducer";
 export type { AssistantLifecycle, LeaveGuard, LifecycleQuestion, OpenQuestion } from "./lifecycle";
 export type { InsertOutcome } from "./actions/appliers/editor";
 export type { AssistantScope, AssistantStartersInput, Starter } from "./useAssistantStarters";

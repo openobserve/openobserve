@@ -16,6 +16,7 @@
 import { vi } from "vitest";
 import { computed } from "vue";
 
+import type { ConfirmBody, ConfirmResponse, UndoResponse } from "@/services/assistant";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -92,12 +93,17 @@ export function makeEnv(
     hosts,
     capability: vi.fn(() => CAPABILITY),
     currentOrg: vi.fn(() => "org1"),
+    currentUser: vi.fn(() => "a@b.c"),
     now: () => 2_000_000,
     t,
     openTab: vi.fn(() => true),
     copy: vi.fn(async () => true),
     search: vi.fn(async () => ({}) as Record<string, unknown>),
     feedback: vi.fn(async () => undefined),
+    confirm: vi.fn(
+      async (_org: string, _sid: string, _body: ConfirmBody) => ({}) as ConfirmResponse,
+    ),
+    undo: vi.fn(async (_org: string, _ledgerId: string) => ({}) as UndoResponse),
     requestAlert: vi.fn(),
     requestDashboard: vi.fn(),
   } satisfies ActionEnv;
