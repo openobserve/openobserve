@@ -1167,6 +1167,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border border-t border-solid"
     >
       <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OSelect
+          v-show="isConfigOptionVisible('stateTimeline', 'display')"
+          :label="t('dashboard.stateTimelineDisplay')"
+          v-model="stateTimelineDisplayModel"
+          :options="stateTimelineDisplayOptions"
+          data-test="dashboard-config-state_timeline_display"
+          :data-test-selected-value="stateTimelineDisplayModel"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.stateTimelineDisplayTooltip')" max-width="15.625rem" />
+          </template>
+        </OSelect>
+
         <OInput
           v-show="isConfigOptionVisible('stateTimeline', 'merge-gaps')"
           v-model.number="dashboardPanelDataModel.data.config.merge_gaps"
@@ -1189,7 +1202,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
 
-        <div class="flex gap-2" v-show="isConfigOptionVisible('stateTimeline', 'row-size')">
+        <div
+          class="flex flex-col gap-2"
+          v-show="isConfigOptionVisible('stateTimeline', 'row-size')"
+        >
           <OInput
             class="min-w-0 flex-1"
             v-model.number="dashboardPanelDataModel.data.config.row_height"
@@ -1228,45 +1244,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         />
 
-        <OToggleGroup
+        <OSelect
           v-show="isConfigOptionVisible('stateTimeline', 'row-sort')"
-          type="single"
-          label-position="top"
           :label="t('dashboard.stateTimelineRowSort')"
           v-model="rowSortModel"
+          :options="rowSortOptions"
           data-test="dashboard-config-state-timeline-row-sort"
           :data-test-selected-value="rowSortModel"
-        >
-          <OToggleGroupItem
-            v-for="opt in rowSortOptions"
-            :key="opt.value"
-            :value="opt.value"
-            size="sm"
-            data-test="dashboard-config-state-timeline-row-sort-option"
-            :data-test-label="opt.label"
-            >{{ opt.label }}</OToggleGroupItem
-          >
-        </OToggleGroup>
+        />
 
-        <OToggleGroup
+        <OSelect
           v-show="isConfigOptionVisible('stateTimeline', 'tooltip-mode')"
-          type="single"
-          label-position="top"
           :label="t('dashboard.stateTimelineTooltipMode')"
           v-model="tooltipModeModel"
+          :options="tooltipModeOptions"
           data-test="dashboard-config-state-timeline-tooltip-mode"
           :data-test-selected-value="tooltipModeModel"
-        >
-          <OToggleGroupItem
-            v-for="opt in tooltipModeOptions"
-            :key="opt.value"
-            :value="opt.value"
-            size="sm"
-            data-test="dashboard-config-state-timeline-tooltip-mode-option"
-            :data-test-label="opt.label"
-            >{{ opt.label }}</OToggleGroupItem
-          >
-        </OToggleGroup>
+        />
 
         <OToggleGroup
           v-show="isConfigOptionVisible('stateTimeline', 'state-value-align')"
@@ -3360,6 +3354,13 @@ import {
   STATE_VALUE_ALIGNS,
 } from "@/utils/dashboard/panelTypeOptions";
 import {
+  DEFAULT_STATE_ROW_SORT,
+  DEFAULT_STATE_TOOLTIP_MODE,
+  DEFAULT_CELLS_VALUE_ALIGN,
+  DEFAULT_STATE_TIMELINE_DISPLAY,
+  STATE_TIMELINE_DISPLAYS,
+} from "@/utils/dashboard/convertStateTimelineData";
+import {
   DEFAULT_BAR_RADIUS,
   DEFAULT_LINE_STYLE,
   DEFAULT_SCATTER_SIZE_MAX,
@@ -3673,26 +3674,6 @@ export default defineComponent({
         dashboardPanelData.data.config.show_state_text = v;
       },
     });
-    const rowSortModel = computed({
-      get: (): string => dashboardPanelData.data.config.row_sort ?? "name",
-      set: (v: string) => {
-        dashboardPanelData.data.config.row_sort = v;
-      },
-    });
-    const tooltipModeModel = computed({
-      get: (): string => dashboardPanelData.data.config.tooltip_mode ?? "segment",
-      set: (v: string) => {
-        dashboardPanelData.data.config.tooltip_mode = v;
-      },
-    });
-    const tooltipModeOptions: { label: I18nText; value: string }[] = [
-      { label: t("dashboard.stateTimelineTooltipSegment"), value: "segment" },
-      { label: t("dashboard.stateTimelineTooltipAllRows"), value: "all_rows" },
-    ];
-    const rowSortOptions: { label: I18nText; value: string }[] = [
-      { label: t("dashboard.stateTimelineSortName"), value: "name" },
-      { label: t("dashboard.stateTimelineSortNonOkTime"), value: "non_ok_time" },
-    ];
     const config = () => dashboardPanelData.data.config as Record<string, any>;
     // An empty or cleared field drops the key, so the panel renders as if it was never set.
     const setNumberConfig = (key: string, value: unknown) => {
@@ -3719,6 +3700,33 @@ export default defineComponent({
       options: readonly O[],
       fallback: unknown,
     ) => withDefaultChoice(t, TOGGLE_AUTO, options, fallback);
+    const rowSortModel = choiceModel("row_sort", ["name", "non_ok_time"]);
+    const rowSortOptions = withDefault(
+      [
+        { label: t("dashboard.stateTimelineSortName"), value: "name" },
+        { label: t("dashboard.stateTimelineSortNonOkTime"), value: "non_ok_time" },
+      ],
+      DEFAULT_STATE_ROW_SORT,
+    );
+    const stateTimelineDisplayModel = choiceModel(
+      "state_timeline_display",
+      STATE_TIMELINE_DISPLAYS as readonly string[],
+    );
+    const stateTimelineDisplayOptions = withDefault(
+      [
+        { label: t("dashboard.stateTimelineDisplayBands"), value: "bands" },
+        { label: t("dashboard.stateTimelineDisplayCells"), value: "cells" },
+      ],
+      DEFAULT_STATE_TIMELINE_DISPLAY,
+    );
+    const tooltipModeModel = choiceModel("tooltip_mode", ["segment", "all_rows"]);
+    const tooltipModeOptions = withDefault(
+      [
+        { label: t("dashboard.stateTimelineTooltipSegment"), value: "segment" },
+        { label: t("dashboard.stateTimelineTooltipAllRows"), value: "all_rows" },
+      ],
+      DEFAULT_STATE_TOOLTIP_MODE,
+    );
     const chartTooltipModeModel = choiceModel("tooltip_mode", ["single", "all", "hidden"]);
     const chartTooltipModeOptions = withDefault(
       [
@@ -3905,13 +3913,17 @@ export default defineComponent({
       "state_value_align",
       STATE_VALUE_ALIGNS as readonly string[],
     );
-    const stateValueAlignOptions = withDefault(
-      [
-        { label: t("dashboard.alignLeft"), value: "left" },
-        { label: t("dashboard.alignCenter"), value: "center" },
-        { label: t("dashboard.alignRight"), value: "right" },
-      ],
-      DEFAULT_STATE_VALUE_ALIGN,
+    const stateValueAlignOptions = computed(() =>
+      withDefault(
+        [
+          { label: t("dashboard.alignLeft"), value: "left" },
+          { label: t("dashboard.alignCenter"), value: "center" },
+          { label: t("dashboard.alignRight"), value: "right" },
+        ],
+        dashboardPanelData.data.config.state_timeline_display === "cells"
+          ? DEFAULT_CELLS_VALUE_ALIGN
+          : DEFAULT_STATE_VALUE_ALIGN,
+      ),
     );
     const scatterFieldOptions = computed(() => [
       { label: t("dashboard.sortNone"), value: null },
@@ -5011,6 +5023,8 @@ export default defineComponent({
       tableFooterCalcsModel,
       tableFooterCalcOptions,
       stateValueAlignModel,
+      stateTimelineDisplayModel,
+      stateTimelineDisplayOptions,
       stateValueAlignOptions,
       setTextConfig,
       chartTooltipModeModel,

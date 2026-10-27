@@ -1581,6 +1581,28 @@ describe("useConfigPanel – distribution options", () => {
     expect(visible("heatmap", "data", "distribution-buckets")).toBe(false);
   });
 });
+describe("useConfigPanel – state timeline display", () => {
+  const visible = (config: any, option: string) =>
+    makeComposable(makePanelData("state-timeline", config), ref(false)).isConfigOptionVisible(
+      "stateTimeline",
+      option,
+    );
+
+  it("offers the display choice on state timeline only", () => {
+    expect(visible({}, "display")).toBe(true);
+    expect(
+      makeComposable(makePanelData("line", {}), ref(false)).isConfigOptionVisible(
+        "stateTimeline",
+        "display",
+      ),
+    ).toBe(false);
+  });
+
+  it("hides merge gaps in cells mode, where every bucket is its own cell", () => {
+    expect(visible({}, "merge-gaps")).toBe(true);
+    expect(visible({ state_timeline_display: "cells" }, "merge-gaps")).toBe(false);
+  });
+});
 
 describe("useConfigPanel – sparkline search visibility", () => {
   it("drops the sparkline option for an all-instant PromQL metric only", async () => {
