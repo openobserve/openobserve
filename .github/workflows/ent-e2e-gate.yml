@@ -14,11 +14,13 @@ name: Playwright E2E Crosscheck
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
 #       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
 #       · PR base is a release line (not main) with a same-named ENT branch → build against THAT branch
-#       · no ENT counterpart                      → build against ENT main
-#     then POLL and mirror pass/fail.
+#       · no ENT counterpart                      → build against ENT main, testing the PR merged into
+#                                                   OSS main (refs/pull/N/merge; branch head if not mergeable)
+#     then POLL and mirror pass/fail. A lost test runner is re-run once before it is reported.
 #
 # A single STICKY comment per PR (found by a hidden marker) reports running → passed / failed, lists the
-# failing specs (or an enterprise build failure), and links the sister ENT PR/branch + the ENT run.
+# failing specs, and links the sister ENT PR/branch + the ENT run. A build failure is attributed by the
+# engine's baseline step: the PR broke it, or the enterprise ref is broken against OSS main (still red).
 #
 # Pure CI — no AI/LLM. Deterministic dispatch + poll of o2-enterprise/oss-pr-ent-gate.yml.
 #
@@ -78,8 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
     # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
-    # the gate ("timed out") while ENT is still legitimately running.
-    timeout-minutes: 90
+    # the gate ("timed out") while ENT is still legitimately running. A lost runner adds one re-run.
+    timeout-minutes: 150
     steps:
       - name: Triage — relevant paths? opted out?
         id: triage
@@ -187,11 +189,28 @@ jobs:
             echo "::notice::No ENT counterpart for '$HEAD_REF' (base '$BASE_REF') — building against main."
           fi
 
+          # Against ENT main, test the PR merged into OSS main: a stale branch would miss OSS code ENT main already uses.
+          OSS_REF="$HEAD_REF"
+          if [ "$ENT_CODE_REF" = "main" ] && [ "$BASE_REF" = "main" ]; then
+            MERGEABLE=""
+            for _ in 1 2 3 4 5; do
+              MERGEABLE=$(gh api "repos/openobserve/openobserve/pulls/$PR" -q '.mergeable' 2>/dev/null || echo "")
+              if [ "$MERGEABLE" = "true" ] || [ "$MERGEABLE" = "false" ]; then break; fi
+              sleep 6
+            done
+            if [ "$MERGEABLE" = "true" ]; then
+              OSS_REF="refs/pull/$PR/merge"
+              SISTER_NOTE="$SISTER_NOTE Tested as this PR merged into OSS \`main\`."
+            else
+              echo "::warning::PR #$PR is not cleanly mergeable into main (mergeable=$MERGEABLE) — testing the branch head as-is."
+            fi
+          fi
+
           # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
           DISPATCH_TS=$(date -u +%s)
-          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF) for OSS PR #$PR ($HEAD_REF)…"
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF, oss=$OSS_REF) for OSS PR #$PR ($HEAD_REF)…"
           gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
-            -f oss_branch="$HEAD_REF" \
+            -f oss_branch="$OSS_REF" \
             -f oss_pr="$PR" \
             -f oss_sha="$HEAD_SHA" \
             -f enterprise_ref="$ENT_CODE_REF"
@@ -232,55 +251,80 @@ jobs:
 
           [ENT run]($RUN_URL)"
 
-          # Poll to completion (~75 min budget — covers a cold-cache ENT build+run worst case).
-          STATUS=""; CONCL=""
-          for i in $(seq 1 300); do           # 300 * 15s = 75 min
-            read -r STATUS CONCL < <(gh run view "$RUN_ID" --repo "$REPO" \
-              --json status,conclusion -q '.status + " " + (.conclusion // "")' 2>/dev/null || echo "unknown ")
-            if [ "$STATUS" = "completed" ]; then break; fi
-            sleep 15
-          done
+          # A lost runner is infra, not the PR: re-run the failed ENT job once before reporting it.
+          ATTEMPT=1
+          while :; do
+            # Poll to completion (~75 min budget — covers a cold-cache ENT build+run worst case).
+            STATUS=""; CONCL=""
+            for i in $(seq 1 300); do           # 300 * 15s = 75 min
+              read -r STATUS CONCL < <(gh run view "$RUN_ID" --repo "$REPO" \
+                --json status,conclusion -q '.status + " " + (.conclusion // "")' 2>/dev/null || echo "unknown ")
+              if [ "$STATUS" = "completed" ]; then break; fi
+              sleep 15
+            done
 
-          if [ "$STATUS" != "completed" ]; then
+            if [ "$STATUS" != "completed" ]; then
           sticky "### ⏳ Playwright E2E Crosscheck — timed out
 
           $MARKER
           The [enterprise e2e run]($RUN_URL) didn't finish within the poll window. The gate stays red — re-push to retry.
           $SISTER_NOTE"
-            echo "::error::ENT run did not finish within the poll window."
-            exit 1
-          fi
+              echo "::error::ENT run did not finish within the poll window."
+              exit 1
+            fi
 
-          if [ "$CONCL" = "success" ]; then
+            if [ "$CONCL" = "success" ]; then
           sticky "### ✅ Playwright E2E Crosscheck — passed
 
           $MARKER
           The enterprise-only e2e specs passed against this PR. $SISTER_NOTE
 
           [ENT run]($RUN_URL)"
-            echo "::notice::✅ Enterprise e2e specs passed against this PR."
-            exit 0
-          fi
+              echo "::notice::✅ Enterprise e2e specs passed against this PR."
+              exit 0
+            fi
 
-          # cancelled/skipped/empty ≈ a newer push superseded this run (engine cancel-in-progress).
-          # NOT a failure — the newer run is authoritative and updates the sticky itself. Defer.
-          if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
-            echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring, not failing."
-            exit 0
-          fi
+            # cancelled/skipped/empty ≈ a newer push superseded this run (engine cancel-in-progress).
+            # NOT a failure — the newer run is authoritative and updates the sticky itself. Defer.
+            if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
+              echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring, not failing."
+              exit 0
+            fi
 
-          # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
-          # and for specs list the failing files from the engine's failed-specs artifact.
-          BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
-          TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
-          # A test job that failed with no failed step was killed from outside (runner lost), not by a spec.
-          TEST_FAILED_STEPS=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests")|.steps[]|select(.conclusion=="failure")]|length' 2>/dev/null || echo "")
+            # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
+            # and for specs list the failing files from the engine's failed-specs artifact.
+            BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
+            TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
+            # A test job that failed with no failed step was killed from outside (runner lost), not by a spec.
+            TEST_FAILED_STEPS=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests")|.steps[]|select(.conclusion=="failure")]|length' 2>/dev/null || echo "")
+
+            if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_FAILED_STEPS" = "0" ] && [ "$ATTEMPT" = "1" ]; then
+              ATTEMPT=2
+              echo "::warning::ENT test runner was lost — re-running the failed ENT job once."
+              if gh run rerun "$RUN_ID" --repo "$REPO" --failed; then
+          sticky "### 🔄 Playwright E2E Crosscheck — runner lost, re-running
+
+          $MARKER
+          The enterprise test runner stopped before the specs finished (infra, not this PR), so the failed job is being re-run automatically.
+          $SISTER_NOTE
+
+          [ENT run]($RUN_URL)"
+                sleep 20
+                continue
+              fi
+              echo "::warning::Could not re-run the ENT job — reporting the lost runner."
+            fi
+            break
+          done
+
+          # The engine's baseline step builds the same ENT ref against OSS main after a failed build.
+          BASELINE_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.steps[]|select(.name|startswith("Baseline"))|.conclusion' 2>/dev/null || echo "")
 
           if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_FAILED_STEPS" = "0" ]; then
           sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
 
           $MARKER
-          The enterprise test runner stopped before the specs finished (infra, not this PR). Re-run the failed job of this check.
+          The enterprise test runner stopped before the specs finished (infra, not this PR), and the automatic re-run didn't get past it. Re-run the failed job of this check.
 
           $SISTER_NOTE · [ENT run]($RUN_URL)"
           elif [ "$TEST_CONCL" = "failure" ]; then
@@ -299,6 +343,20 @@ jobs:
           $SISTER_NOTE · [ENT run]($RUN_URL)
 
           Fix and re-push, or add \`skip-ent-e2e\` if this is a known-safe change."
+          elif [ "$BUILD_CONCL" = "failure" ] && [ "$BASELINE_CONCL" = "failure" ]; then
+          sticky "### 🚫 Playwright E2E Crosscheck — enterprise \`$ENT_CODE_REF\` is broken (not this PR)
+
+          $MARKER
+          Enterprise \`$ENT_CODE_REF\` doesn't compile against OSS \`main\` either, so this build failure is not caused by this PR. Usually a paired OSS + enterprise change where the enterprise half merged first. The check stays red: re-run it once the OSS half is on \`main\`.
+
+          $SISTER_NOTE · [ENT run]($RUN_URL)"
+          elif [ "$BUILD_CONCL" = "failure" ] && [ "$BASELINE_CONCL" = "success" ]; then
+          sticky "### 🚫 Playwright E2E Crosscheck — this PR breaks the enterprise build
+
+          $MARKER
+          Enterprise compiles against OSS \`main\` but not with this PR's changes, so the specs never ran. Check the build log for OSS code the enterprise side still uses.
+
+          $SISTER_NOTE · [ENT run]($RUN_URL)"
           elif [ "$BUILD_CONCL" = "failure" ]; then
           sticky "### 🚫 Playwright E2E Crosscheck — enterprise build failed
 
@@ -314,5 +372,5 @@ jobs:
 
           $SISTER_NOTE"
           fi
-          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL test=$TEST_CONCL failed_steps=$TEST_FAILED_STEPS)."
+          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL baseline=$BASELINE_CONCL test=$TEST_CONCL failed_steps=$TEST_FAILED_STEPS)."
           exit 1

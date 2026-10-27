@@ -26,6 +26,7 @@ pub mod cast_to_timestamp_udf;
 #[cfg(feature = "enterprise")]
 pub mod cipher_udf;
 pub mod date_format_udf;
+pub mod fold_native_frames_udf;
 pub mod fuzzy_match_udf;
 pub mod histogram_udf;
 pub mod match_all_hash_udf;

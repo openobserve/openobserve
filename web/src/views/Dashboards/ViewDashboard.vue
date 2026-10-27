@@ -630,6 +630,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
+import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashboardAnnotationSources";
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -681,7 +682,7 @@ import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
@@ -962,6 +963,10 @@ export default defineComponent({
     // A wall screen has no Refresh button to apply a variable change, so kiosk applies it live.
     const applyVariablesLive = computed(() => isAutoRunOn.value || kioskMode.value);
     provide("dashboardAutoRun", applyVariablesLive);
+    provide(ANNOTATION_PREVIEW_CONTEXT_KEY, {
+      timeRange: () => currentTimeObjPerPanel.value?.__global,
+      variables: () => variablesManager.value?.committedVariablesData?.global ?? [],
+    });
 
     const showRangeInPicker = (value: any) =>
       dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
@@ -1451,10 +1456,10 @@ export default defineComponent({
       return globalTime;
     };
 
-    // Compute time for a single specific panel (for panel-level refresh)
-    const computeSinglePanelTime = (panelId: string) => {
+    // Compute time for a single specific panel (for panel-level refresh); true when it set one
+    const computeSinglePanelTime = (panelId: string): boolean => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
-        return;
+        return false;
       }
 
       // Find the panel across all tabs
@@ -1469,7 +1474,7 @@ export default defineComponent({
 
       const globalTime = getAppliedGlobalTime();
       if (!targetPanel || !globalTime) {
-        return;
+        return false;
       }
 
       // Check if panel has its own time configuration
@@ -1477,10 +1482,9 @@ export default defineComponent({
         // Panel has panel-level time - only update this specific panel's time
         // DO NOT update __global to avoid triggering refreshes in other panels
         const effectiveTime = computePanelTime(targetPanel, globalTime);
-        if (effectiveTime) {
-          // CRITICAL: Update only this panel's time property, don't replace entire object
-          currentTimeObjPerPanel.value[panelId] = effectiveTime;
-        }
+        if (!effectiveTime) return false;
+        // CRITICAL: Update only this panel's time property, don't replace entire object
+        currentTimeObjPerPanel.value[panelId] = effectiveTime;
       } else {
         // Panel depends on global time
         // Create a panel-specific time entry (even though it normally uses __global)
@@ -1488,6 +1492,7 @@ export default defineComponent({
         // CRITICAL: Update only this panel's time property, don't replace entire object
         currentTimeObjPerPanel.value[panelId] = globalTime;
       }
+      return true;
     };
 
     provide(DASHBOARD_FRESH_PANEL_TIME, (panelId) => {
@@ -1584,9 +1589,9 @@ export default defineComponent({
     watch(selectedDate, async () => {
       const appliedTime = getAppliedGlobalTime();
       if (appliedTime && dateTimePicker.value) {
-        // CRITICAL: Clear panelIdToBeRefreshed to ensure all panels refresh
+        // CRITICAL: Clear panelRefreshTargets to ensure all panels refresh
         // When global date time changes, all panels should update
-        panelIdToBeRefreshed.value = null;
+        panelRefreshTargets.clear();
 
         currentTimeObj.value = appliedTime;
 
@@ -1812,9 +1817,9 @@ export default defineComponent({
     };
 
     const runRefresh = async (withoutCache = false) => {
-      // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
+      // CRITICAL FIX: Clear panelRefreshTargets for global refresh
       // This allows all panels to refresh, not just the one previously refreshed
-      panelIdToBeRefreshed.value = null;
+      panelRefreshTargets.clear();
 
       // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
       shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
@@ -2575,17 +2580,16 @@ export default defineComponent({
     const shouldRefreshWithoutCachePerPanel = ref({});
 
     const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
-      // Set the panel ID to be refreshed
-      panelIdToBeRefreshed.value = panelId;
-
       // Store the shouldRefreshWithoutCache value for this panel
       shouldRefreshWithoutCachePerPanel.value = {
         ...shouldRefreshWithoutCachePerPanel.value,
         [panelId]: shouldRefreshWithoutCache || false,
       };
 
-      // Recompute time for this specific panel only
-      computeSinglePanelTime(panelId);
+      // Only a shown panel whose time was set loads, so only it can settle and end the refresh.
+      if (computeSinglePanelTime(panelId) && getPanelFromTab(selectedTabId.value, panelId)) {
+        panelRefreshTargets.set(panelId, false);
+      }
 
       setTimeString();
     };

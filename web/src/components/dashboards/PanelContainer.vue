@@ -155,11 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
@@ -242,6 +240,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
+          name="error-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-error"
+          :label="failedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="failedAnnotationSourcesLabel"
+          />
+        </OIcon>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-truncated"
+          :label="truncatedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="truncatedAnnotationSourcesLabel"
+          />
+        </OIcon>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
         <!-- On a wall screen only a failure may draw the eye; the failed panel says so in its body. -->
@@ -465,6 +493,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
+        @sankey-notice-update="handleSankeyNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -635,6 +665,7 @@ import {
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -778,6 +809,22 @@ export default defineComponent({
         ? PanleSchemaRendererRef.value?.exemplarsError || ""
         : "",
     );
+    const failedAnnotationSourcesLabel = computed(() => {
+      const failed = PanleSchemaRendererRef.value?.failedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.failedOnPanel",
+        { names: failed.join(", ") },
+        failed.length,
+      );
+    });
+    const truncatedAnnotationSourcesLabel = computed(() => {
+      const truncated = PanleSchemaRendererRef.value?.truncatedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.truncatedOnPanel",
+        { names: truncated.join(", "), limit: ANNOTATION_SOURCE_ROW_LIMIT },
+        truncated.length,
+      );
+    });
 
     // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
     // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
@@ -833,11 +880,14 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      sankeyNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -912,6 +962,9 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
+        !!sankeyNotice.value?.returnLinks ||
+        !!sankeyNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
@@ -1370,6 +1423,8 @@ export default defineComponent({
       setExemplarOverride,
       exemplarToggleAtRest,
       exemplarErrorMessage,
+      failedAnnotationSourcesLabel,
+      truncatedAnnotationSourcesLabel,
       curatedBadge,
       curatedBadgeParams,
       curatedBadgeText,
@@ -1436,6 +1491,8 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       canInspectFromNotice,

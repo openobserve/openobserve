@@ -15,19 +15,16 @@
 
 //! A team's schedule: rotations in one JSON column, because they are read and written as a set.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
 use config::{
-    RwHashMap, ider,
+    ider,
     meta::oncall::{Rotation, Schedule, Unavailability},
     utils::time::now_micros,
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
-use super::entity::oncall_schedules;
+use super::{entity::oncall_schedules, ttl_cache::TtlCache};
 use crate::{db::get_orm_client_rw, errors};
 
 /// The team's schedule with its covers, for the paging path (`06` §3).
@@ -48,8 +45,7 @@ use crate::{db::get_orm_client_rw, errors};
 /// exists for, and `oncall_overrides` emits one on every write.
 ///
 /// Backs [`get_by_team_cached`] only. Every screen still reads [`get_by_team`].
-static SCHEDULE_CACHE: LazyLock<RwHashMap<String, (Schedule, Instant)>> =
-    LazyLock::new(Default::default);
+static SCHEDULE_CACHE: TtlCache<Schedule> = TtlCache::new(SCHEDULE_CACHE_TTL);
 
 /// One minute. See [`SCHEDULE_CACHE`] — the backstop for a coordinator event
 /// that never arrived, not the invalidation mechanism, and what it backstops is
@@ -73,7 +69,7 @@ pub fn invalidate_cache(org_id: &str, team_id: &str) {
 /// single team to name. Bounded by the org's team count.
 pub fn invalidate_org(org_id: &str) {
     let prefix = format!("{org_id}/");
-    SCHEDULE_CACHE.retain(|key, _| !key.starts_with(&prefix));
+    SCHEDULE_CACHE.retain(|key| !key.starts_with(&prefix));
 }
 
 /// Invalidates every schedule in the org locally, and tells every other node.
@@ -257,14 +253,12 @@ pub async fn get_by_team_cached(
     team_id: &str,
 ) -> Result<Option<Schedule>, errors::Error> {
     let key = schedule_cache_key(org_id, team_id);
-    if let Some(entry) = SCHEDULE_CACHE.get(&key)
-        && entry.1.elapsed() < SCHEDULE_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = SCHEDULE_CACHE.get(&key) {
+        return Ok(Some(cached));
     }
     let found = get_by_team(org_id, team_id).await?;
     if let Some(schedule) = &found {
-        SCHEDULE_CACHE.insert(key, (schedule.clone(), Instant::now()));
+        SCHEDULE_CACHE.insert(key, schedule.clone());
     }
     Ok(found)
 }
