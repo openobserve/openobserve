@@ -1,0 +1,19 @@
+{
+  "_source": "o2-ai src/opencode/events.py confirmation_required frame (o2_delete batch)",
+  "_item": "today",
+  "frame": {
+    "type": "confirmation_required",
+    "tool": "o2_delete",
+    "args": {
+      "items": [
+        {
+          "resource_type": "alert",
+          "name": "checkout-latency-old",
+          "id": "2Yx9alert",
+          "params": {}
+        }
+      ]
+    },
+    "message": "Do you really want to delete the \"checkout-latency-old\" alert?"
+  }
+}

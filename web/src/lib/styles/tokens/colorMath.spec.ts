@@ -389,8 +389,8 @@ describe("the real token sheets", () => {
   });
 
   describe.each([
-    ["light", 1075, 1063],
-    ["dark", 1076, 1064],
+    ["light", 1085, 1071],
+    ["dark", 1086, 1072],
   ] as const)("%s theme", (theme, total, resolved) => {
     const scope = THEMES[theme];
     const names = colorTokens(scope);

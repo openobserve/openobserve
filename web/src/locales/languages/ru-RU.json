@@ -8873,6 +8873,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Анализирую...",
+        "thinking": "Думаю...",
+        "processing": "Обрабатываю...",
+        "examiningData": "Изучаю данные...",
+        "reviewingContext": "Просматриваю контекст...",
+        "formulatingResponse": "Формулирую ответ...",
+        "checkingDetails": "Проверяю детали...",
+        "gatheringInsights": "Собираю информацию...",
+        "evaluatingOptions": "Оцениваю варианты...",
+        "synthesizingInformation": "Синтезирую информацию...",
+        "workingOnIt": "Работаю над этим...",
+        "almostThere": "Почти готово...",
+        "divingDeeper": "Углубляюсь...",
+        "connectingTheDots": "Соединяю точки...",
+        "crunchingNumbers": "Вычисляю...",
+        "exploringPossibilities": "Изучаю возможности...",
+        "refiningAnswer": "Уточняю ответ...",
+        "stillThinking": "Всё ещё думаю...",
+        "makingProgress": "Продвигаюсь...",
+        "piecingTogether": "Собираю фрагменты..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Пробный период",

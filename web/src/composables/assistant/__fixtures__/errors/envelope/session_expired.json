@@ -1,0 +1,10 @@
+{
+  "_source": "B-01 error envelope contract (00 §18); not produced until B-01 lands",
+  "shape": "B-01",
+  "status": 401,
+  "body": {
+    "code": "session_expired",
+    "message": "B-01 envelope for session_expired",
+    "retryable": false
+  }
+}

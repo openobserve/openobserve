@@ -617,5 +617,15 @@
       "slo-alerts.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "testfolder": "Assistant",
+    "_comment": "O2 Assistant mocked harness on the production bundle the binary embeds. Every assistant WP appends its spec files here in the PR that creates them; @edition flows skip here and run in the assistant_editions job.",
+    "actual_folder": "assistant",
+    "browser": "chrome",
+    "run_files": [
+      "legacy-smoke.spec.js"
+    ],
+    "disabled": []
   }
 ]

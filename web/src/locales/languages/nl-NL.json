@@ -8873,6 +8873,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Analyseren...",
+        "thinking": "Denken...",
+        "processing": "Verwerken...",
+        "examiningData": "Gegevens onderzoeken...",
+        "reviewingContext": "Context bekijken...",
+        "formulatingResponse": "Antwoord formuleren...",
+        "checkingDetails": "Details controleren...",
+        "gatheringInsights": "Inzichten verzamelen...",
+        "evaluatingOptions": "Opties evalueren...",
+        "synthesizingInformation": "Informatie synthetiseren...",
+        "workingOnIt": "Bezig...",
+        "almostThere": "Bijna klaar...",
+        "divingDeeper": "Dieper graven...",
+        "connectingTheDots": "Verbanden leggen...",
+        "crunchingNumbers": "Cijfers verwerken...",
+        "exploringPossibilities": "Mogelijkheden verkennen...",
+        "refiningAnswer": "Antwoord verfijnen...",
+        "stillThinking": "Nog aan het denken...",
+        "makingProgress": "Vorderingen maken...",
+        "piecingTogether": "Samenstellen..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Proefperiode",
