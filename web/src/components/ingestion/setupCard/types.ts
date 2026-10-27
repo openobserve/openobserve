@@ -59,6 +59,21 @@ export type StepChipKind = "terminal" | "editor" | "run" | "traces";
  */
 export type StepCompleteOn = "copy" | "detect" | "action";
 
+/** A card-level setup path: the one-command installer, or the step-by-step manual sequence. */
+export type SetupMode = "auto" | "manual";
+
+/**
+ * One entry of the card's setup-mode toggle (see RichCardContent.setupModes).
+ * Steps tagged with this `id` render only while it is selected.
+ */
+export interface RichCardSetupMode {
+  id: SetupMode;
+  /** Toggle label. Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the toggle label, translated by the renderer. */
+  labelKey?: I18nKey;
+}
+
 export interface RichCardChip {
   kind: StepChipKind;
   /** Already-resolved chip text. Omit when `labelKey` is set. */
@@ -192,6 +207,11 @@ export interface RichCardStep {
   required?: boolean;
   /** The step that hosts the live status bar + "most likely fix" box. */
   detectionAnchor?: boolean;
+  /**
+   * Render this step only while the card's setup-mode toggle is on this mode.
+   * Untagged steps render in every mode; ignored when the card has no `setupModes`.
+   */
+  mode?: SetupMode;
 }
 
 export interface RichCardDetect {
@@ -345,6 +365,12 @@ export interface RichCardInput {
 export interface RichCardContent {
   provider: RichCardProvider;
   steps: RichCardStep[];
+  /**
+   * Setup paths the user chooses between with a toggle above the steps (the
+   * first is selected initially). Steps carry `mode` to belong to one path;
+   * completion and the active step only consider the visible steps.
+   */
+  setupModes?: RichCardSetupMode[];
   /** Omitted by cards with nothing to ingest (e.g. MCP) — no `detectionAnchor` then. */
   detect?: RichCardDetect;
   /** When set, the card shows a stream-name input (see RichCardStreamInput). */

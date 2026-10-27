@@ -53,10 +53,12 @@ import type {
   CardSubstitutions,
   RichCardContent,
   RichCardInput,
+  RichCardSetupMode,
   RichCardStep,
   RichCardStepVariant,
   RichCardStepVariantGroup,
   RichCardStreamInput,
+  SetupMode,
   StepChipKind,
 } from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
@@ -126,6 +128,31 @@ const watchedStream = computed(() =>
     ? streamName.value.trim() || props.content.streamInput.default || "default"
     : props.content.detect?.streamName || "default",
 );
+// ── setup mode (optional) ────────────────────────────────────────────────────
+// Completion and the active step read visibleSteps, so a hidden mode's steps never block progress.
+const setupMode = ref<SetupMode | undefined>(props.content.setupModes?.[0]?.id);
+const visibleSteps = computed(() =>
+  props.content.setupModes?.length
+    ? props.content.steps.filter((s) => !s.mode || s.mode === setupMode.value)
+    : props.content.steps,
+);
+const selectSetupMode = (id: unknown) => {
+  setupMode.value = String(id) as SetupMode;
+};
+const setupModeTabs = ref<HTMLElement | null>(null);
+const showManualMode = () => {
+  if (!props.content.setupModes?.some((m) => m.id === "manual")) return;
+  selectSetupMode("manual");
+  nextTick(() =>
+    setupModeTabs.value?.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    }),
+  );
+};
+const setupModeLabel = (mode: RichCardSetupMode): I18nText =>
+  mode.labelKey ? t(mode.labelKey) : (mode.label ?? raw(""));
+
 // ── free-form inputs (optional) ──────────────────────────────────────────────
 // Steps can declare `inputs` (e.g. SQL Server host/port on the configure step).
 // Each field's value substitutes its `{id}` placeholder in any code block
@@ -228,8 +255,8 @@ const onBarDetected = (result: { count: number }) => detect.markConnected(result
 
 // Re-copies through the first step's own block, so the clipboard and the toast match a click on it.
 const copyFirstSnippet = () => {
-  const index = props.content.steps.findIndex((st) => displayCode(st));
-  const step = props.content.steps[index];
+  const index = visibleSteps.value.findIndex((st) => displayCode(st));
+  const step = visibleSteps.value[index];
   if (!step) return;
   // A hidden command can't be copied; show the step and its warning instead.
   if (missingRequired(activeVariant(step))) return scrollToStep(index);
@@ -340,7 +367,7 @@ const onStepAction = (step: RichCardStep, index: number) => {
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
 // model is 1-based step numbers (0 = none active, i.e. all done).
-const activeIndex = computed(() => props.content.steps.findIndex((s) => !isStepDone(s)));
+const activeIndex = computed(() => visibleSteps.value.findIndex((s) => !isStepDone(s)));
 const activeStepNumber = computed(() => (activeIndex.value >= 0 ? activeIndex.value + 1 : 0));
 
 // ── next-step auto-advance scroll ────────────────────────────────────────────
@@ -396,7 +423,8 @@ const inlineMd = (s: string) =>
 // plain "see X below" leaves the user hunting. The href is a literal "#" and
 // the target comes from a fixed alternation, so authored content can't inject a
 // URL here (inlineMd has already escaped everything else).
-const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting)\)/g;
+// `[label](#manual)` instead switches a card with setup modes to its manual path.
+const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting|manual)\)/g;
 const noteMd = (s: string) =>
   inlineMd(s).replace(
     JUMP_LINK_RE,
@@ -410,6 +438,7 @@ const onNoteClick = (e: MouseEvent) => {
   e.preventDefault();
   if (el.dataset.jump === "advanced") openAdvanced();
   else if (el.dataset.jump === "troubleshooting") openTroubleshooting();
+  else if (el.dataset.jump === "manual") showManualMode();
 };
 
 const chipIcon = (kind: StepChipKind) =>
@@ -574,6 +603,25 @@ function fireConfetti() {
         />
       </div>
 
+      <div
+        v-if="content.setupModes?.length"
+        ref="setupModeTabs"
+        class="variant-tabs setup-modes"
+        data-test="ai-setup-mode-tabs"
+      >
+        <OToggleGroup :model-value="setupMode" @update:model-value="selectSetupMode">
+          <OToggleGroupItem
+            v-for="m in content.setupModes"
+            :key="m.id"
+            :value="m.id"
+            size="sm"
+            :data-test="`ai-setup-mode-${m.id}`"
+          >
+            {{ setupModeLabel(m) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+
       <!-- Steps — lib OStepper in expanded (checklist) mode: all panels visible,
            each step independently `done`, the first not-done step highlighted. -->
       <OStepper
@@ -584,7 +632,7 @@ function fireConfetti() {
         class="steps"
       >
         <OStep
-          v-for="(step, i) in content.steps"
+          v-for="(step, i) in visibleSteps"
           :key="step.id"
           :name="i + 1"
           :title="stepTitle(step)"
@@ -951,7 +999,7 @@ function fireConfetti() {
             ></p>
             <OCodeBlock
               :lang="extras.uninstall.code.lang"
-              :code="extras.uninstall.code.raw"
+              :code="subStream(extras.uninstall.code.raw) || ''"
               data-test="ai-uninstall-code"
             />
           </div>
@@ -1185,6 +1233,10 @@ function fireConfetti() {
    the toggle's own visuals come from the design system. ---- */
 .variant-tabs {
   margin: 0 0 0.875rem;
+}
+
+.setup-modes {
+  margin-bottom: 1.25rem;
 }
 
 .variant-icon {

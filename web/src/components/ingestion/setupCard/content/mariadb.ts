@@ -28,6 +28,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
   DBM_CONTRIB_VERSION,
   MARIADB_DBM_CONFIG_YAML,
@@ -88,6 +89,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       // blocking events into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
@@ -120,10 +122,19 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
           },
         ],
       },
+      dbQuickInstallStep(t, subs, {
+        db: "mariadb",
+        hostLabelKey: "ingestion.setupCard.mariadbHostLabel",
+        defaultPort: "3306",
+        defaultUser: "otel",
+        defaultDatabase: "mysql",
+        dbm: true,
+      }),
       // Pinned so all four Tier-1 cards install the same collector.
-      collectorInstallStep(t, DBM_CONTRIB_VERSION),
+      manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -150,6 +161,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorMariadbDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -218,6 +230,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       },
       {
         id: "dbm-configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmConfigureTitle",
         descriptionKey: "ingestion.setupCard.dbmConfigureMariadbDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -253,6 +266,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       },
       {
         id: "dbm-run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmRunTitle",
         descriptionKey: "ingestion.setupCard.dbmRunMariadbDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -271,6 +285,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       dbmVerifyStep("full", true, "60s", "noSampleText"),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",
   };
 }
