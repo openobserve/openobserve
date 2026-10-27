@@ -283,7 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <AddUser
-      v-model:open="showAddUserDialog"
+      :open="showAddUserDialog"
+      @update:open="onAddUserOpenChange"
       v-model="selectedUser"
       :isUpdated="isUpdated"
       :userRole="currentUserRole"
@@ -1236,6 +1237,11 @@ export default defineComponent({
       });
     };
 
+    const onAddUserOpenChange = (open: boolean) => {
+      if (open) showAddUserDialog.value = true;
+      else hideForm();
+    };
+
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200) {
@@ -1576,6 +1582,7 @@ export default defineComponent({
       addRoutePush,
       addMember,
       hideForm,
+      onAddUserOpenChange,
       isUpdated,
       showAddUserDialog,
       selectedUser,

@@ -1051,6 +1051,51 @@ describe("User Component", () => {
     });
   });
 
+  describe("AddUser dialog dismissal (#15546)", () => {
+    it("clears action/email from the URL when the dialog is cancelled", async () => {
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
+      wrapper.vm.showAddUserDialog = true;
+      await flushPromises();
+
+      wrapper.findComponent(AddUserStub).vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.showAddUserDialog).toBe(false);
+      expect(replaceSpy).toHaveBeenCalledWith({
+        name: "users",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      replaceSpy.mockRestore();
+    });
+
+    it("does not reopen the edit dialog when it was cancelled while the page was still loading", async () => {
+      sharedUsersState.users = [];
+      let resolveRoles: (v: any) => void = () => {};
+      mockUsersService.getRoles.mockReturnValue(new Promise((r) => (resolveRoles = r)) as any);
+      await router.push({
+        name: "users",
+        query: {
+          action: "update",
+          email: "test@example.com",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      const late = mountUser();
+      await flushPromises();
+
+      late.findComponent(AddUserStub).vm.$emit("update:open", false);
+      await flushPromises();
+      expect(router.currentRoute.value.query.action).toBeUndefined();
+
+      resolveRoles({ data: [{ label: "admin", value: "admin" }] });
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 150));
+
+      expect((late.vm as any).showAddUserDialog).toBe(false);
+      late.unmount();
+    });
+  });
+
   describe("hideForm", () => {
     it("should hide add user dialog and navigate", () => {
       const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
