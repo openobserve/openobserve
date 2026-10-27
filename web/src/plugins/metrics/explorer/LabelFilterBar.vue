@@ -23,6 +23,7 @@ import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetri
 import {
   emptyFilterGroup,
   escapePromRegexLiteral,
+  splitPromRegexLiterals,
   type FilterCondition,
   type FilterField,
   type FilterGroup,
@@ -41,6 +42,9 @@ const TO_OPERATOR: Record<string, FilterOperatorId> = {
   "=~": "regex",
   "!~": "not_regex",
 };
+
+// `is any of` is written as an anchored alternation, so a plain one reads back as a list.
+const LIST_OPERATOR: Record<string, FilterOperatorId> = { "=~": "in", "!~": "not_in" };
 
 const props = defineProps<{
   filters: LabelFilter[];
@@ -69,14 +73,18 @@ const fields = computed<FilterField[]>(() =>
 
 const tree = computed<FilterGroup>(() => ({
   ...emptyFilterGroup(),
-  items: props.filters.map((filter) => ({
-    kind: "condition",
-    id: labelFilterKey(filter),
-    connector: "AND",
-    field: String(filter.label),
-    operator: TO_OPERATOR[filter.operator ?? "="] ?? "eq",
-    values: [filter.value],
-  })),
+  items: props.filters.map((filter) => {
+    const listOperator = LIST_OPERATOR[filter.operator ?? "="];
+    const list = listOperator ? splitPromRegexLiterals(filter.value) : null;
+    return {
+      kind: "condition",
+      id: labelFilterKey(filter),
+      connector: "AND",
+      field: String(filter.label),
+      operator: list ? listOperator! : (TO_OPERATOR[filter.operator ?? "="] ?? "eq"),
+      values: list ?? [filter.value],
+    };
+  }),
 }));
 
 const { placeholder: filterHint } = useFilterHint(

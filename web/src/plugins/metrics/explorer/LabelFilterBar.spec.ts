@@ -133,6 +133,18 @@ describe("LabelFilterBar", () => {
     expect(wrapper!.emitted("add")![0][0]).toEqual({ label: "job", operator: symbol, value: "x" });
   });
 
+  it("shows a plain alternation as is any of, and keeps a real pattern as a regex", () => {
+    createWrapper({
+      filters: [filter("job", "a\\.b|c", "=~"), filter("pod", "api-.*", "=~")],
+    });
+    const job = wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text();
+    expect(job).toContain("is any of");
+    expect(job).toContain("a.b, c");
+    expect(wrapper!.find('[data-test="metrics-explorer-label-chip-pod-operator"]').text()).toBe(
+      "=~",
+    );
+  });
+
   it("turns is any of into an escaped regex alternation", async () => {
     createWrapper({ loadValues: vi.fn().mockResolvedValue([]) });
     await focus();
