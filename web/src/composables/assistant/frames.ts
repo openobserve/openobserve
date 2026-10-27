@@ -317,7 +317,7 @@ export function parseFrame(json: string): ParsedFrame {
   } catch {
     return { type: "unknown", raw: json };
   }
-  const parsed = assistantFrameSchema.safeParse(fromAnalysisRoute(value));
+  const parsed = assistantFrameSchema.safeParse(value);
   return parsed.success ? parsed.data : { type: "unknown", raw: json };
 }
 
@@ -354,14 +354,4 @@ function usedKeyOf(entry: unknown): string | null {
   if (!entry || typeof entry !== "object") return null;
   const { key, used } = entry as { key?: unknown; used?: unknown };
   return typeof key === "string" && key && used === true ? key : null;
-}
-
-// The incident analysis route streams `start` and `chunk`; they are the shared `status` and `message_delta`.
-function fromAnalysisRoute(value: unknown): unknown {
-  if (!value || typeof value !== "object") return value;
-  const frame = value as { type?: unknown; content?: unknown };
-  if (frame.type === "chunk" && typeof frame.content === "string")
-    return { type: "message_delta", content: frame.content };
-  if (frame.type === "start") return { type: "status" };
-  return value;
 }

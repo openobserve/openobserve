@@ -268,7 +268,6 @@ describe("B-06 capabilities", () => {
       turnVersions: true,
       feedbackStored: true,
       rcaChatMode: true,
-      rcaFeedback: true,
     });
   });
 
@@ -282,7 +281,6 @@ describe("B-06 capabilities", () => {
       "turnVersions",
       "feedbackStored",
       "rcaChatMode",
-      "rcaFeedback",
     ])
       expect(cap(handle)).not.toHaveProperty(flag);
   });

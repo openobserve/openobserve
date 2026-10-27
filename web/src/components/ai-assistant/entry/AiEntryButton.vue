@@ -429,18 +429,6 @@ export const AI_ENTRY_DOORS: readonly DoorRegistration[] = [
     objectKind: "query",
   },
   {
-    dataTest: "ai-entry-incident-report-ask",
-    entryKind: "object_verb",
-    entryVerb: "ask",
-    objectKind: "incident",
-  },
-  {
-    dataTest: "ai-entry-oncall-verdict-ask",
-    entryKind: "oncall_card",
-    entryVerb: "ask",
-    objectKind: "alert_firing",
-  },
-  {
     dataTest: "ai-entry-autoobserve-ask-ask",
     entryKind: "autoobserve_card",
     entryVerb: "ask",

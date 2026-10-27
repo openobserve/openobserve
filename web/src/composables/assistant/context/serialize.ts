@@ -105,12 +105,11 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
       user_timezone: browserTimezone(),
       locale: uiIntlLocale(),
     },
-    ...(turn?.mode && turn.mode !== "chat" && { mode: turn.mode }),
+    ...(turn?.mode && { mode: turn.mode }),
     ...(incidentId && { mode: "chat" as const }),
     ...(turn?.ephemeral && { ephemeral: true }),
     ...(typed && attached.length > 0 && { attachments: attached.map(toAttachment) }),
     ...(turn?.replyToApproval && { replyToApproval: turn.replyToApproval }),
-    ...(turn?.mode === "rca" && session.incidentId && { incident: incidentOf(session) }),
   };
   if (turn?.persisted) {
     const seq = session.record.cachedLastSeq;
@@ -245,15 +244,6 @@ function block(name: string, body: string, nonce: string): string {
   return `--- ${name} [${nonce}] ---\n${body}\n--- end [${nonce}] ---`;
 }
 
-function incidentOf(session: AssistantSession): NonNullable<SendRequest["incident"]> {
-  return {
-    id: session.incidentId ?? "",
-    reanalysis: session.rcaRun?.reanalysis === true,
-    buildOnPrevious: session.rcaRun?.buildOnPrevious === true,
-  };
-}
-
-// The incident the page is on, unless the reader removed its chip from the tray.
 function incidentIdOf(page: PageContext | null, composer: WireComposer): string | null {
   const value = page?.incident_id;
   if (typeof value !== "string" || !value || value.length > MAX_INCIDENT_ID) return null;

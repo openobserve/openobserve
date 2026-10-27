@@ -354,7 +354,6 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (input.b06?.turn_versions === true) capability.turnVersions = true;
   if (input.b06?.feedback_stored === true) capability.feedbackStored = true;
   if (input.b06?.rca_chat_mode === true) capability.rcaChatMode = true;
-  if (input.b06?.rca_feedback === true) capability.rcaFeedback = true;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";

@@ -121,6 +121,7 @@ export interface EngineCapability {
   persistence(): boolean;
   /** B-09 typed attachments; absent means delimiter blocks. */
   attachments?(): boolean;
+  /** The server routes an explicit `mode: "chat"` past an incident's RCA default. */
   rcaChatMode?(): boolean;
 }
 
@@ -156,7 +157,7 @@ interface TurnRecord {
   client: ClientContext;
   input: TurnInput;
   source: TurnSource;
-  mode?: "chat" | "generate_query" | "rca";
+  mode?: "chat" | "generate_query";
   ephemeral?: boolean;
   userIndex: number;
   newSession: boolean;
@@ -200,7 +201,7 @@ interface LastTurn {
   source: TurnSource;
   editedFrom?: number;
   idSends: number;
-  mode?: "chat" | "generate_query" | "rca";
+  mode?: "chat" | "generate_query";
 }
 
 /** A Retry's own snapshot and source; `clearsComposer` when the composer held what is resent. */
@@ -896,7 +897,6 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         origin: session.origin,
         record: session.record,
         turnId,
-        ...(session.incidentId && { incidentId: session.incidentId }),
       };
       return deps.client.stop(session.org, target).then(
         () => true,
@@ -934,7 +934,7 @@ function defaultRequestBuilder(
         client,
         user_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      ...(rec?.mode && rec.mode !== "chat" && { mode: rec.mode }),
+      ...wireModeOf(rec?.mode, deps.capability()),
       ...(rec?.ephemeral && { ephemeral: true }),
       ...(rec?.replyToApproval && { replyToApproval: rec.replyToApproval }),
     };
@@ -952,7 +952,7 @@ function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
   return {
     pageContext: rec.rawContext as PageContext | null,
     turnId: rec.turnId,
-    ...(rec.mode && { mode: rec.mode }),
+    ...wireModeOf(rec.mode, capability),
     ...(rec.ephemeral && { ephemeral: true }),
     userIndex: rec.userIndex,
     persisted: capability.persistence(),
@@ -961,6 +961,15 @@ function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
     now: deps.now(),
     ...(rec.replyToApproval && { replyToApproval: rec.replyToApproval }),
   };
+}
+
+// A server without the capability predates explicit chat mode, so the turn keeps its default route.
+function wireModeOf(
+  mode: TurnRecord["mode"],
+  capability: EngineCapability,
+): { mode?: "chat" | "generate_query" } {
+  if (mode === "generate_query") return { mode };
+  return capability.rcaChatMode?.() === true ? { mode: "chat" } : {};
 }
 
 function newRecord(
@@ -1285,14 +1294,7 @@ function surfaceOf(container: ClientContext["container"]): EffectScope["surface"
 }
 
 function stopTarget(session: AssistantSession, rec: TurnRecord) {
-  const incidentId = session.incidentId ?? rec.pageContext.incident_id;
-  return {
-    sid: rec.sid,
-    origin: session.origin,
-    record: session.record,
-    turnId: rec.turnId,
-    ...(typeof incidentId === "string" && { incidentId }),
-  };
+  return { sid: rec.sid, origin: session.origin, record: session.record, turnId: rec.turnId };
 }
 
 function clientContextOf(session: AssistantSession, uiVersion: string): ClientContext {

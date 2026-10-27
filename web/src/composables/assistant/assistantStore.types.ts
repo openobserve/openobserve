@@ -455,8 +455,6 @@ export interface AssistantCapability {
   feedbackStored?: boolean;
   /** `mode: "chat"` with `incident_id` reaches the interactive incident agent (`rca_chat_mode`). */
   rcaChatMode?: boolean;
-  /** The analysis report takes "Was this the cause?" and history items carry `trigger`/`ended_reason` (`rca_feedback`). */
-  rcaFeedback?: boolean;
   /** Absent off Cloud; doors read it for the cost line (`80` §3.3). */
   creditMode?: CreditMode;
   isAdmin: boolean;
@@ -569,10 +567,6 @@ export interface AssistantSession {
   ledger: ActionLedgerEntry[];
   /** Set when a turn ends while no container shows the session. */
   unread: boolean;
-  /** An incident analysis session's incident; its turns go to the incident route. */
-  incidentId?: string;
-  /** The flags of the analysis the next send starts (`reanalysis`, `build_on_previous`). */
-  rcaRun?: { reanalysis: boolean; buildOnPrevious: boolean };
 }
 
 export interface AssistantState {
@@ -701,7 +695,7 @@ export interface AssistantStoreApi {
 
   send(
     sid: Sid,
-    opts?: { turnId?: string; mode?: "chat" | "generate_query" | "rca"; ephemeral?: boolean },
+    opts?: { turnId?: string; mode?: "chat" | "generate_query"; ephemeral?: boolean },
   ): Promise<TurnTerminal>;
   /** Abort plus a keepalive cancel on the route of `session.origin`, then stopping → stopped. */
   stop(sid: Sid): Promise<void>;
@@ -811,14 +805,12 @@ export interface SendRequest {
   message: { text: string; images?: ImageAttachment[] };
   knownSeq?: number;
   context: PageContextWire & { client: ClientContext; user_timezone: string; locale?: string };
-  mode?: "chat" | "generate_query" | "rca";
+  mode?: "chat" | "generate_query";
   ephemeral?: boolean;
   /** B-09: the chips as typed attachments instead of delimiter blocks in `message.text`. */
   attachments?: WireAttachment[];
   /** The approval card a Reply or Ask again answers. */
   replyToApproval?: string;
-  /** `mode: "rca"` posts to this incident's analysis route instead of the chat stream. */
-  incident?: { id: string; reanalysis: boolean; buildOnPrevious: boolean };
 }
 
 /** One B-09 attachment (`00` §6.3). */
@@ -832,7 +824,7 @@ export interface WireAttachment {
 export interface RequestTurn {
   pageContext: PageContext | null;
   turnId: string;
-  mode?: "chat" | "generate_query" | "rca";
+  mode?: "chat" | "generate_query";
   ephemeral?: boolean;
   /** Index of this turn's user message, for the browser-only transcript. */
   userIndex: number;
@@ -857,7 +849,7 @@ export interface TurnEngine {
     sid: Sid,
     opts?: {
       turnId?: string;
-      mode?: "chat" | "generate_query" | "rca";
+      mode?: "chat" | "generate_query";
       ephemeral?: boolean;
       /** `regenerate` resends the latest prompt as a new attempt of the same turn; the composer is untouched. */
       input?: TurnInput;

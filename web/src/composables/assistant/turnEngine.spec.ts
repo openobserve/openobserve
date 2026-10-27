@@ -83,6 +83,7 @@ let clock = 0;
 function setup(
   opts: {
     persistence?: boolean;
+    rcaChatMode?: boolean;
     tail?: boolean;
     hidden?: boolean;
     client?: AssistantClient;
@@ -112,6 +113,7 @@ function setup(
     noteAgentUnavailable: vi.fn(),
     noteAdmitted: vi.fn(),
     persistence: () => persistence.value,
+    rcaChatMode: () => opts.rcaChatMode === true,
   };
   let visible: (() => void) | null = null;
   const visibility = {
@@ -227,6 +229,25 @@ afterEach(() => {
 });
 
 describe("turnEngine: send", () => {
+  it.each([
+    [true, undefined, "chat"],
+    [true, "chat", "chat"],
+    [false, undefined, undefined],
+    [false, "chat", undefined],
+    [true, "generate_query", "generate_query"],
+  ] as const)(
+    "with rca_chat_mode=%s a %s turn goes as mode %s",
+    async (rcaChatMode, mode, wire) => {
+      const h = setup({ rcaChatMode });
+      h.type("why is checkout failing?");
+      void h.store.send(h.current.sid, mode ? { mode } : undefined);
+      await settle();
+      const { req } = h.last();
+      if (wire) expect(req.mode).toBe(wire);
+      else expect(req).not.toHaveProperty("mode");
+    },
+  );
+
   it("snapshots, appends the message, clears the composer and drafts, then sends", async () => {
     const h = setup();
     h.type("why is checkout failing?");

@@ -25,14 +25,19 @@ import {
 import { raw } from "@/types/i18n";
 
 import type { GateCode } from "./assistantStore.types";
-import { useDeepLinkDoor, type DeepLinkDoorDeps } from "./useDeepLinkDoor";
+import { DEEP_LINK_RESOLVERS, useDeepLinkDoor, type DeepLinkDoorDeps } from "./useDeepLinkDoor";
 
-const { fake, track } = vi.hoisted(() => ({ fake: { current: null as any }, track: vi.fn() }));
+const { fake, track, incidents } = vi.hoisted(() => ({
+  fake: { current: null as any },
+  track: vi.fn(),
+  incidents: { get: vi.fn(), getRcaRun: vi.fn() },
+}));
 
 vi.mock("./useAssistantCapability", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./useAssistantCapability")>()),
   useAssistantCapability: () => fake.current.handle,
 }));
+vi.mock("@/services/incidents", () => ({ __esModule: true, default: incidents }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
   trackAssistant: track,
@@ -174,5 +179,45 @@ describe("useDeepLinkDoor (DG-13)", () => {
     const { open, notify } = await visit("/logs?keep=1");
     expect(open).not.toHaveBeenCalled();
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("the incident deep link", () => {
+  const ctx = { org: "default", timeZone: "UTC", verb: "explain" as const };
+
+  it("attaches Time, Incident and Report chips, the Report keyed by the report run", async () => {
+    incidents.get.mockResolvedValue({
+      data: {
+        id: "inc-1",
+        title: "Checkout latency",
+        severity: "P2",
+        status: "open",
+        first_alert_at: 1_700_000_000_000_000,
+        last_alert_at: 1_700_000_600_000_000,
+        rca: {
+          report_run: { run_id: "run-7", started_at: 1_700_000_000_000_000 },
+          history: [{ run_id: "run-7" }],
+        },
+      },
+    });
+    incidents.getRcaRun.mockResolvedValue({ data: { run_id: "run-7", report: "## Cause" } });
+    const payload = await DEEP_LINK_RESOLVERS.incident!.resolve("inc-1", ctx);
+    expect(payload?.text).toBe("Explain this incident analysis report");
+    expect(payload?.chips.map((c) => c.kind)).toEqual(["time", "incident", "report"]);
+    expect(payload?.chips[0].ref).toMatchObject({
+      from: 1_700_000_000_000 - 15 * 60_000,
+      to: 1_700_000_600_000 + 15 * 60_000,
+    });
+    expect(payload?.chips[2].ref).toMatchObject({ type: "incident_report", id: "run-7" });
+    expect(String(payload?.chips[2].label)).toBe("Run 1 · Nov 14, 22:13 UTC · 8 B");
+  });
+
+  it("stages the incident without a Report chip before any analysis finished", async () => {
+    incidents.get.mockResolvedValue({
+      data: { id: "inc-1", title: "Checkout latency", rca: null },
+    });
+    const payload = await DEEP_LINK_RESOLVERS.incident!.resolve("inc-1", ctx);
+    expect(payload?.text).toBe("Explain this incident");
+    expect(payload?.chips.map((c) => c.kind)).toEqual(["incident"]);
   });
 });

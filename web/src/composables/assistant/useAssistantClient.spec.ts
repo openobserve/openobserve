@@ -31,13 +31,16 @@ vi.mock("@/utils/zincutils", () => ({ useLocalCurrentUser: vi.fn(), useLocalUser
 
 vi.mock("axios");
 
+const { incidents } = vi.hoisted(() => ({ incidents: { get: vi.fn(), getRcaRun: vi.fn() } }));
+vi.mock("@/services/incidents", () => ({ __esModule: true, default: incidents }));
+
 import axios from "axios";
 
 import config from "@/aws-exports";
 import store from "@/stores";
 
 import type { SendRequest } from "./assistantStore.types";
-import { useAssistantClient, type FrameSink } from "./useAssistantClient";
+import { readIncidentReport, useAssistantClient, type FrameSink } from "./useAssistantClient";
 
 const sse = (frames: object[], init: ResponseInit = {}) =>
   new Response(frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(""), {
@@ -138,10 +141,12 @@ describe("useAssistantClient: send", () => {
     expect(body).not.toHaveProperty("mode");
   });
 
-  it("sends the mode the request builder named, chat included", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(sse([]));
+  it("sends an explicit chat mode as the request names it, and never an RCA route", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(sse([{ type: "complete" }]));
     await useAssistantClient({ fetchImpl }).send(request({ mode: "chat" }), sink(), signal());
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).mode).toBe("chat");
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe("http://o2.test/api/org%201/ai/chat_stream");
+    expect(JSON.parse(init.body)).toMatchObject({ mode: "chat" });
   });
 
   it("carries the transcript only when the request does (browser-only chats)", async () => {
@@ -304,7 +309,6 @@ describe("useAssistantClient: 401 (round 1 E-01)", () => {
     const unauthorized = Object.assign(new Error("401"), { response: { status: 401 } });
     const services = {
       cancelTurn: vi.fn().mockRejectedValue(unauthorized),
-      cancelIncidentAnalysis: vi.fn(),
       confirm: vi.fn().mockRejectedValue(unauthorized),
       feedback: vi.fn().mockRejectedValue(unauthorized),
     };
@@ -346,11 +350,10 @@ describe("useAssistantClient: 401 (round 1 E-01)", () => {
 describe("useAssistantClient: tail, stop, confirm, feedback", () => {
   const services = () => ({
     cancelTurn: vi.fn().mockResolvedValue(undefined),
-    cancelIncidentAnalysis: vi.fn().mockResolvedValue(undefined),
     confirm: vi.fn().mockResolvedValue({ deleted: 1 }),
     feedback: vi.fn().mockResolvedValue(undefined),
   });
-  const session = (container: "sidebar" | "rca") => ({
+  const session = (container: "sidebar") => ({
     sid: "sid-1",
     origin: { entryKind: "header_button" as const, objectKind: "incident" as const, container },
     record: {} as never,
@@ -397,17 +400,6 @@ describe("useAssistantClient: tail, stop, confirm, feedback", () => {
       turnId: "turn-1",
     });
     expect(svc.cancelTurn).toHaveBeenCalledWith("org1", "sid-1", "turn-1");
-    expect(svc.cancelIncidentAnalysis).not.toHaveBeenCalled();
-  });
-
-  it("stops an incident analysis on the incident route (round 1 E-10)", async () => {
-    const svc = services();
-    await useAssistantClient({ services: svc }).stop("org1", {
-      ...session("rca"),
-      incidentId: "inc-7",
-    });
-    expect(svc.cancelIncidentAnalysis).toHaveBeenCalledWith("org1", "inc-7");
-    expect(svc.cancelTurn).not.toHaveBeenCalled();
   });
 
   it("rejects when the cancel fails, so the engine can say it was not confirmed", async () => {
@@ -438,100 +430,45 @@ describe("useAssistantClient: tail, stop, confirm, feedback", () => {
   });
 });
 
-describe("useAssistantClient: incident analysis", () => {
-  const rca = (reanalysis: boolean) =>
-    request({
-      mode: "rca",
-      incident: { id: "inc-1", reanalysis, buildOnPrevious: false },
-    } as never);
-  const transport = {
-    streamRca: (
-      org: string,
-      incidentId: string,
-      signal: AbortSignal,
-      opts: { params?: { reanalysis?: boolean }; fetchImpl?: typeof fetch },
-    ) =>
-      opts.fetchImpl!(
-        `/api/v2/${org}/alerts/incidents/${incidentId}/rca?reanalysis=${!!opts.params?.reanalysis}`,
-        { method: "POST", signal },
-      ),
-  };
-  const follow = (events: object[][], report = "## Saved") => {
-    let read = 0;
-    return {
-      events: vi.fn(async () => events[Math.min(read++, events.length - 1)] as never),
-      report: vi.fn(async () => report),
-      wait: async () => undefined,
-    };
-  };
-
-  it("follows a 202 re-analysis through the event log instead of reading it as an empty stream", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(json(202, { message: "Analysis started" }));
-    const deps = follow([
-      [{ type: "ai_analysis_begin", timestamp: 1 }],
-      [
-        { type: "ai_analysis_begin", timestamp: 1 },
-        { type: "ai_analysis_complete", timestamp: 2 },
-      ],
-    ]);
-    const s = sink();
-    const result = await useAssistantClient({ fetchImpl, follow: deps, incidents: transport }).send(
-      rca(true),
-      s,
-      signal(),
-    );
-    expect(result.ok).toBe(true);
-    await expect(s.done).resolves.toBe("eof");
-    expect(String(fetchImpl.mock.calls[0][0])).toContain("reanalysis=true");
-    expect(s.frames).toEqual([
-      { type: "status" },
-      { type: "message_delta", content: "## Saved" },
-      { type: "complete" },
-    ]);
+describe("readIncidentReport", () => {
+  const incident = (rca: unknown) => ({
+    data: {
+      id: "inc-1",
+      title: "Checkout latency",
+      severity: "P2",
+      status: "open",
+      first_alert_at: 1_000_000,
+      last_alert_at: 2_000_000,
+      rca,
+    },
   });
 
-  it("reconnects through the log when a stream drops before its terminal frame", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(sse([{ type: "message_delta", content: "## Sa" }]));
-    const deps = follow(
-      [
-        [
-          { type: "ai_analysis_begin", timestamp: 1 },
-          { type: "ai_analysis_complete", timestamp: 2 },
-        ],
-      ],
-      "## Saved",
+  it("reads incident.rca's report run, then that run's report", async () => {
+    incidents.get.mockResolvedValue(
+      incident({
+        run_id: "run-3",
+        report_run: { run_id: "run-2", started_at: 5 },
+        history: [{ run_id: "run-3" }, { run_id: "run-2" }, { run_id: "run-1" }],
+      }),
     );
-    const s = sink();
-    await useAssistantClient({ fetchImpl, follow: deps, incidents: transport }).send(
-      rca(false),
-      s,
-      signal(),
-    );
-    await expect(s.done).resolves.toBe("eof");
-    expect(s.frames).toEqual([
-      { type: "message_delta", content: "## Sa" },
-      { type: "message_delta", content: "ved" },
-      { type: "complete" },
-    ]);
+    incidents.getRcaRun.mockResolvedValue({ data: { run_id: "run-2", report: "## Cause" } });
+    const read = await readIncidentReport("org1", "inc-1");
+    expect(incidents.getRcaRun).toHaveBeenCalledWith("org1", "inc-1", "run-2");
+    expect(read?.run).toEqual({ id: "run-2", number: 2, startedAt: 5, report: "## Cause" });
+    expect(read?.incident).toMatchObject({ id: "inc-1", title: "Checkout latency" });
   });
 
-  it("refuses an analysis as unavailable when no transport is wired, without a request", async () => {
-    const fetchImpl = vi.fn();
-    const result = await useAssistantClient({ fetchImpl }).send(rca(false), sink(), signal());
-    expect(result).toMatchObject({ ok: false, error: { code: "agent_unavailable" } });
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  it("does not follow a stream that ended with its own terminal frame", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(sse([{ type: "complete" }]));
-    const deps = follow([[]]);
-    const s = sink();
-    await useAssistantClient({ fetchImpl, follow: deps, incidents: transport }).send(
-      rca(false),
-      s,
-      signal(),
-    );
-    await expect(s.done).resolves.toBe("eof");
-    expect(deps.events).not.toHaveBeenCalled();
+  it("keeps the incident with no run when there is no report run, an empty report or an unreadable run", async () => {
+    incidents.get.mockResolvedValueOnce(incident(null));
+    expect(await readIncidentReport("org1", "inc-1")).toMatchObject({
+      incident: { id: "inc-1" },
+      run: null,
+    });
+    expect(incidents.getRcaRun).not.toHaveBeenCalled();
+    incidents.get.mockResolvedValue(incident({ report_run: { run_id: "run-1", started_at: 1 } }));
+    incidents.getRcaRun.mockResolvedValueOnce({ data: { run_id: "run-1", report: "  " } });
+    expect((await readIncidentReport("org1", "inc-1"))?.run).toBeNull();
+    incidents.getRcaRun.mockRejectedValueOnce(Object.assign(new Error("403"), { status: 403 }));
+    expect((await readIncidentReport("org1", "inc-1"))?.run).toBeNull();
   });
 });

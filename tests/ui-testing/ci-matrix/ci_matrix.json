@@ -644,17 +644,13 @@
       "xtab.spec.js",
       "sharing.spec.js",
       "helper.spec.js",
+      "rca.spec.js",
       "admin.spec.js",
       "admin-tools.spec.js",
       "billing.spec.js",
       "a11y.spec.js",
       "stack.spec.js"
     ],
-    "disabled": [
-      {
-        "file": "rca.spec.js",
-        "reason": "Waits for the rca-panel, which nothing mounts until the Incident Analysis hand-off lands"
-      }
-    ]
+    "disabled": []
   }
 ]
