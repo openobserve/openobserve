@@ -59,6 +59,7 @@ function mountBar(props: Record<string, unknown> = {}) {
 
 const sql = (state: { tree: FilterGroup }, list = fields) => filterTreeToSql(state.tree, list);
 const input = () =>
+  document.body.querySelector<HTMLInputElement>('[data-test="query-filter-bar-search"]') ??
   document.body.querySelector<HTMLInputElement>('[data-test="query-filter-bar-input"]');
 const rows = () =>
   Array.from(document.body.querySelectorAll('[data-test^="query-filter-bar-suggest-item-"]'));
@@ -81,7 +82,7 @@ async function press(key: string) {
 }
 
 async function openBar() {
-  await wrapper!.find('[data-test="query-filter-bar-add"]').trigger("click");
+  await wrapper!.find('[data-test="query-filter-bar-input"]').trigger("click");
   await flushPromises();
 }
 
@@ -98,7 +99,7 @@ async function editPart(field: string, part: string) {
 }
 
 describe("QueryFilterBar", () => {
-  it("opens the field list with a search box when the bar is clicked", async () => {
+  it("opens the field list when the caret is clicked", async () => {
     mountBar();
     await openBar();
     expect(input()).not.toBeNull();
@@ -123,11 +124,11 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("status");
   });
 
-  it("starts typing into the search box from the bar", async () => {
+  it("opens the picker when the user types at the caret", async () => {
     mountBar();
-    await wrapper!.find('[data-test="query-filter-bar-add"]').trigger("keydown", { key: "s" });
-    await flushPromises();
+    await type("s");
     expect(rowKeys()).toEqual(["status"]);
+    expect(document.body.querySelector('[data-test="query-filter-bar-search"]')).toBeNull();
   });
 
   it("only offers operators that fit the field type", async () => {
@@ -246,6 +247,23 @@ describe("QueryFilterBar", () => {
     expect(sql(state)).toBe("level = 'error'");
   });
 
+  it("backspace at a shut caret removes chips without opening the picker", async () => {
+    const state = mountBar({ modelValue: parseSqlFilter("level = 'error' AND status = 1")! });
+    await press("Backspace");
+    await press("Backspace");
+    expect(sql(state)).toBe("level = 'error'");
+    expect(rows()).toHaveLength(0);
+  });
+
+  it("searches inside the picker while a chip part is edited, and at the caret otherwise", async () => {
+    mountBar({ modelValue: parseSqlFilter("level = 'error'")! });
+    await editPart("level", "field");
+    expect(document.body.querySelector('[data-test="query-filter-bar-search"]')).not.toBeNull();
+    await openBar();
+    expect(document.body.querySelector('[data-test="query-filter-bar-search"]')).toBeNull();
+    expect(document.activeElement?.getAttribute("data-test")).toBe("query-filter-bar-input");
+  });
+
   describe("editing one part of a chip", () => {
     const withService: FilterField[] = [...fields, { name: "service", type: "string" }];
 
@@ -313,7 +331,7 @@ describe("QueryFilterBar", () => {
       await editPart("level", "value");
       await type("warn");
       await press("Escape");
-      expect(input()).toBeNull();
+      expect(document.body.querySelector('[data-test="query-filter-bar-search"]')).toBeNull();
       expect(sql(state)).toBe("level = 'error' AND status = 1");
     });
 

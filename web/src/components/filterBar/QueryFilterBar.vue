@@ -123,13 +123,12 @@ function focus() {
 
 defineExpose<QueryFilterBarExpose>({ focus });
 
-function onActivate(typed: string) {
+function onActivate() {
   if (props.disabled) return;
   if (editingId.value) editor.reset();
   armedId.value = null;
   open.value = true;
   emit("focus");
-  if (typed) editor.onTextChange(typed);
 }
 
 function close() {
@@ -179,6 +178,7 @@ const draftOperator = computed(() => {
     :open="open"
     :suggestions="suggestions"
     :search-placeholder="searchPlaceholder"
+    :search-in-list="Boolean(editingId)"
     :anchor="anchor"
     :empty-text="emptyText"
     :loading="step === 'value' ? valuesLoading : step === 'field' && fieldsLoading"
@@ -214,8 +214,9 @@ const draftOperator = computed(() => {
     <OTag
       v-if="showPendingConnector"
       clickable
-      size="sm"
-      variant="default-outline"
+      size="xs"
+      shape="rounded"
+      variant="default-soft"
       :label="raw(pendingConnector)"
       :aria-label="t('filterBar.toggleConnector')"
       :data-test="`${dataTest}-pending-connector`"

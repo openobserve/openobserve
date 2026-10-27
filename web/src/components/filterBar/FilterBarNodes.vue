@@ -51,8 +51,9 @@ const valueLabel = (condition: FilterCondition): I18nText | undefined =>
     <OTag
       v-if="connectors && index > 0"
       clickable
-      size="sm"
-      variant="default-outline"
+      size="xs"
+      shape="rounded"
+      variant="default-soft"
       :label="raw(item.connector)"
       :aria-label="t('filterBar.toggleConnector')"
       :data-test="`${dataTest}-connector-${index}`"

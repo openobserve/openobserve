@@ -75,7 +75,7 @@ describe("SqlFilterBuilder", () => {
     await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
     await flushPromises();
     expect(wrapper!.emitted("update:query")).toEqual([[""]]);
-    expect(wrapper!.find('[data-test="b-bar-add"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="b-bar-input"]').exists()).toBe(true);
   });
 
   it("draws an OR query with its connector", () => {
