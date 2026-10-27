@@ -113,6 +113,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_incr_pending_file_skips_too_long_stream() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
         let stream_name = "m".repeat(schema::STREAM_KEY_MAX_LEN);
         incr_pending_file("org", StreamType::Metrics, &stream_name, hour_micros(1)).await;
         let key = format!("org/{}/{stream_name}", StreamType::Metrics);

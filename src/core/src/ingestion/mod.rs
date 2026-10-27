@@ -1916,10 +1916,12 @@ mod tests {
         }
     }
 
-    /// A stream created before the length check exists has an unchanged schema, so it skips
-    /// check_for_schema; the batch check must still reject it.
+    /// An existing stream with an unchanged schema skips check_for_schema, so the batch rejects it.
     #[tokio::test]
     async fn test_resolve_batch_schema_rejects_existing_too_long_stream() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
         let stream_name = "s".repeat(schema::STREAM_KEY_MAX_LEN);
         let fields = vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true),

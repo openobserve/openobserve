@@ -729,7 +729,10 @@ mod tests {
     fn test_reject_long_stream() {
         assert!(reject_long_stream("org", "http_requests_total").is_none());
         let name = "envoy_".repeat(50);
-        let message = reject_long_stream("org", &name).unwrap();
-        assert!(message.starts_with("Stream name too long"), "{message}");
+        let rejection = reject_long_stream("org", &name);
+        assert_eq!(rejection.is_some(), schema::file_list_keys_bounded());
+        if let Some(message) = rejection {
+            assert!(message.starts_with("Stream name too long"), "{message}");
+        }
     }
 }
