@@ -70,7 +70,7 @@ opt-level = 1
 codegen-units = 16
 debug = false
 debug-assertions = true
-strip = true
+strip = false
 lto = false
 incremental = false
 
