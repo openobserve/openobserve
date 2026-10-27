@@ -8874,6 +8874,16 @@
   },
   "assistant": {
     "beta": "Beta",
+    "client": {
+      "storageBlocked": "Drafts won't be kept if you reload this page."
+    },
+    "entry": {
+      "addedBehindCard": "Added to chat. Answer the pending question to send.",
+      "addedToDraft": "Added to your message. Press Send when ready.",
+      "open": "Open",
+      "orgChanged": "This page belongs to another organization. Reload it to ask about it.",
+      "queuedWhileRunning": "Added to the chat. Send it when the current answer finishes."
+    },
     "name": "O2 Assistant"
   },
   "llmObservability": {
@@ -20155,7 +20165,8 @@
       "oncall": "On-Call",
       "synthetics": "Synthetics",
       "fleet": "Fleet",
-      "kubernetes": "Kubernetes"
+      "kubernetes": "Kubernetes",
+      "assistant": "{product}"
     },
     "pages": {
       "global": "Global",
@@ -20213,7 +20224,10 @@
       "syntheticsJourney": "Synthetics journey",
       "downtimes": "Downtimes",
       "fleetConfigEditor": "Configuration editor",
-      "fleetOverview": "Fleet pipelines"
+      "fleetOverview": "Fleet pipelines",
+      "assistant": "{product}",
+      "assistantComposer": "{product} composer",
+      "queryEditor": "Query editor"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -20297,6 +20311,15 @@
       "aiChatToggle": "Toggle AI chat",
       "k8sPalette": "Search Kubernetes resources",
       "aiChatClose": "Close AI chat",
+      "assistantClose": "Close {product}",
+      "assistantComposerNewline": "New line",
+      "assistantComposerRecall": "Recall previous prompt",
+      "assistantComposerSend": "Send message",
+      "assistantGoToAnswer": "Go to the latest answer",
+      "assistantHelper": "Ask AI to write this query",
+      "assistantHistory": "Open chats",
+      "assistantOpen": "Open {product}",
+      "editorTabFocusMode": "Let Tab leave the editor",
       "logsSaveView": "Save as saved view",
       "logsExport": "Export results as CSV",
       "tracesCopyUrl": "Copy trace share URL",

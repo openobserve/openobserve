@@ -269,3 +269,109 @@ describe("403 handling", () => {
     },
   );
 });
+
+describe("401 handling", () => {
+  let onRejected: (error: any) => Promise<any>;
+  const instance = {
+    interceptors: {
+      response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
+    },
+    get: vi.fn(),
+    request: vi.fn(),
+  };
+  const unauthorized = (extra: Record<string, unknown> = {}) => ({
+    response: { status: 401, data: {} },
+    request: { responseURL: "http://localhost:5080/api/acme/ai/capabilities" },
+    config: { url: "/api/acme/ai/capabilities", assistantManaged: true, ...extra },
+  });
+
+  beforeEach(() => {
+    vi.mocked(store.dispatch).mockClear();
+    instance.get.mockReset().mockResolvedValue({ status: 200 });
+    instance.request.mockReset().mockResolvedValue({ data: { can_chat: true } });
+    vi.mocked(axios.create).mockReturnValue(instance as any);
+    http();
+  });
+
+  afterEach(() => {
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+  });
+
+  it("refreshes the SSO token and retries an assistant request once, without logging out", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    await expect(onRejected(unauthorized())).resolves.toEqual({ data: { can_chat: true } });
+    expect(instance.get).toHaveBeenCalledWith("/config/dex_refresh");
+    expect(instance.request).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "/api/acme/ai/capabilities", assistantRetried: true }),
+    );
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("hands a failed SSO refresh and a second 401 back to the assistant caller", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    instance.get.mockRejectedValueOnce(new Error("refresh failed"));
+    const failed = unauthorized();
+    await expect(onRejected(failed)).rejects.toBe(failed);
+    const retried = unauthorized({ assistantRetried: true });
+    await expect(onRejected(retried)).rejects.toBe(retried);
+    expect(instance.get).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects with the retry's own error when the refresh worked but the retry failed", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const retryError = { response: { status: 403, data: {} }, config: {} };
+    instance.request.mockRejectedValueOnce(retryError);
+    const first = unauthorized();
+    await expect(onRejected(first)).rejects.toBe(retryError);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("sends one dex_refresh for concurrent assistant and normal 401s", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    let finish!: (res: { status: number }) => void;
+    instance.get.mockReturnValueOnce(new Promise((r) => (finish = r)));
+    const capabilities = onRejected(unauthorized());
+    const probe = onRejected(unauthorized({ url: "/api/acme/ai/chats/x/cancel" }));
+    const normal = attemptTokenRefresh("/api/acme/streams");
+    finish({ status: 200 });
+    await Promise.all([capabilities, probe, normal]);
+    expect(instance.get.mock.calls.filter(([url]) => url === "/config/dex_refresh")).toHaveLength(
+      1,
+    );
+    expect(instance.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs out only the normal caller when an assistant-started refresh fails", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    let fail!: (err: Error) => void;
+    instance.get.mockReturnValueOnce(new Promise((_r, reject) => (fail = reject)));
+    const failed = unauthorized();
+    const assistantCall = onRejected(failed);
+    const normal = attemptTokenRefresh("/api/acme/streams");
+    fail(new Error("refresh token rotated"));
+    await expect(assistantCall).rejects.toBe(failed);
+    await expect(normal).rejects.toThrow("Refresh failed");
+    expect(instance.get.mock.calls.filter(([url]) => url === "/config/dex_refresh")).toHaveLength(
+      1,
+    );
+    expect(store.dispatch).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+  });
+
+  it("hands an assistant-managed 401 back to the caller without logging out", async () => {
+    const error = {
+      response: { status: 401, data: {} },
+      request: { responseURL: "http://localhost:5080/api/acme/ai/capabilities" },
+      config: { url: "/api/acme/ai/capabilities", assistantManaged: true },
+    };
+    await expect(onRejected(error)).rejects.toBe(error);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+});

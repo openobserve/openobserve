@@ -637,8 +637,6 @@ export interface AssistantStoreApi {
 
   /** Re-reads; never applies the payload as state. */
   applyHint(hint: AssistantHint): void;
-  /** Focus and `visibilitychange` re-reads. */
-  onVisible(): void;
   onOrgSwitch(next: { org: string; userOrgKey: string }): Promise<"proceed" | "cancel">;
   onSignOut(): Promise<"proceed" | "cancel">;
   reset(): void;
@@ -753,6 +751,8 @@ export interface HistoryService {
   clearAll(): Promise<MutationResult>;
   importLocal(): AsyncGenerator<{ done: number; total: number; failed: string[] }>;
   rows: ComputedRef<HistoryRow[]>;
+  /** False while `open` cannot re-read a transcript, so the store never releases one. */
+  canReload: ComputedRef<boolean>;
   mode: ComputedRef<"server" | "local">;
   hasMore: ComputedRef<boolean>;
   loadOlder(): Promise<void>;

@@ -200,7 +200,9 @@ describe("assistant repo guards", () => {
   });
 
   it("builds ai_* events only in services/assistantAnalytics.ts", () => {
-    const call = /\b\w*(?:track|addAction)\w*\s*\(\s*(?:[\w.]+\s*,\s*)?["'`]ai_[a-z_]+/;
+    // `trackAssistant` is the sanctioned door into the builder, so its call sites are not offenders.
+    const call =
+      /\b(?!trackAssistant\b)\w*(?:track|addAction)\w*\s*\(\s*(?:[\w.]+\s*,\s*)?["'`]ai_[a-z_]+/;
     expect(
       offenders(
         (f) =>
@@ -261,6 +263,14 @@ describe("assistant repo guards", () => {
     );
     expect(literal).toEqual([]);
     expect(locale.assistant.name).toBe("O2 Assistant");
+  });
+
+  it("names the product in shortcut copy only through {product}", () => {
+    const literal = leaves(locale.shortcuts, "shortcuts").filter(([, value]) =>
+      value.includes("O2 Assistant"),
+    );
+    expect(literal).toEqual([]);
+    expect(locale.shortcuts.actions.assistantOpen).toBe("Open {product}");
   });
 
   it("keeps the product literal in code only in useAssistantName.ts", () => {

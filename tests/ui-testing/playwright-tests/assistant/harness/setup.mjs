@@ -36,6 +36,9 @@ export const ENV = {
   viteDev: VITE_DEV,
 };
 
+// The `role` knob as the login response names it; "custom" stands for any custom role (00 §9 probes it).
+const ROLE_NAMES = { admin: "admin", editor: "editor", viewer: "viewer", user: "user", custom: "sre-oncall" };
+
 const json = (route, body, status = 200) =>
   route.fulfill({
     status,
@@ -134,8 +137,22 @@ async function patchedConfig(route, request, state) {
     ...(state.persistence !== undefined && { ai_chat_persistence_enabled: state.persistence }),
     ...(state.publicLinks !== undefined && { public_ai_chat_enabled: state.publicLinks }),
     ...(state.aiEnabled !== undefined && { ai_enabled: state.aiEnabled }),
+    // A non-admin role only means something with RBAC on; the OSS test backend reports it off.
+    ...(state.role !== "admin" && { rbac_enabled: true }),
   };
   return route.fulfill({ status: response.status(), headers: { ...cleanHeaders(response, request), "content-type": "application/json" }, body: JSON.stringify({ ...body, ...state.configPatch, ...knobs }) });
+}
+
+/** Rewrites the signed-in role so the capability heuristic and the access probe see the `role` knob. */
+async function patchedLogin(route, request, state) {
+  const url = ENV.backend ? request.url().replace(ENV.apiOrigin, ENV.backend) : request.url();
+  const response = await route.fetch({ url });
+  let body = {};
+  try {
+    body = await response.json();
+  } catch (_) {}
+  const patched = body && body.status === true ? { ...body, role: ROLE_NAMES[state.role] ?? state.role } : body;
+  return route.fulfill({ status: response.status(), headers: { ...cleanHeaders(response, request), "content-type": "application/json" }, body: JSON.stringify(patched) });
 }
 
 /** Route handler for one request; returns true if it was mocked. */
@@ -149,6 +166,7 @@ async function handleAi(route, request, state) {
   if (/^\/api\/[^/]+\/alerts\/deduplication\/semantic-groups$/.test(p)) return json(route, []), true;
   if (/^\/api\/[^/]+\/re_patterns(\/built_in)?$/.test(p) && request.method() === "GET") return json(route, { patterns: [] }), true;
   if (p === "/config" || /^\/api\/[^/]+\/config$/.test(p)) return patchedConfig(route, request, state), true;
+  if (state.role !== "admin" && m === "POST" && /\/auth\/login$/.test(p)) return patchedLogin(route, request, state), true;
 
   if ((mt = p.match(/^\/api\/public\/ai_chats\/([^/]+)$/))) {
     if (state.sharedChatStatus !== 200) return json(route, { code: state.sharedChatStatus, message: "Share not found or expired" }, state.sharedChatStatus), true;
@@ -172,6 +190,19 @@ async function handleAi(route, request, state) {
     return json(route, { code: 401, message: "Unauthorized Access" }, 401), true;
   }
 
+  // B-06: absent (404) unless `capabilitiesEnabled`; `capabilities` overrides the answer.
+  if ((mt = p.match(/^\/api\/[^/]+\/ai\/capabilities(\/test)?$/))) {
+    if (!state.capabilitiesEnabled) return json(route, { code: 404, message: "Not Found" }, 404), true;
+    if (mt[1]) return json(route, { ok: true, duration_ms: 120 }), true;
+    const role = ROLE_NAMES[state.role] ?? state.role;
+    const admin = role === "admin";
+    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: false, policy_enforced: false, ...state.capabilities }), true;
+  }
+  // The access probe (00 §9) arrives by XHR (the shim answers fetch cancels); a viewer is refused, any other role reaches the handler.
+  if (m === "POST" && /^\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel$/.test(p)) {
+    if (state.role === "viewer") return json(route, { code: 403, message: "Forbidden" }, 403), true;
+    return json(route, { code: 404, message: "conversation not found" }, 404), true;
+  }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats$/))) {
     if (m === "DELETE") return json(route, { deleted: state.chats.length }), true;
     if (state.historyStatus !== 200) return json(route, { code: state.historyStatus, message: "history store unavailable" }, state.historyStatus), true;
