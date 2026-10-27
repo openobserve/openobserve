@@ -7,17 +7,12 @@ import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import type { QualityScore } from "@/services/online-evals.service";
 import QualityScorePane from "./QualityScorePane.vue";
 
-const { push, traceDetails, timeRanges, sessionTurns } = vi.hoisted(() => ({
+const { push, search } = vi.hoisted(() => ({
   push: vi.fn(() => Promise.resolve()),
-  traceDetails: vi.fn(),
-  timeRanges: vi.fn(),
-  sessionTurns: vi.fn(),
+  search: vi.fn(),
 }));
 
-vi.mock("@/services/search", () => ({
-  default: { get_trace_details: traceDetails, get_trace_time_ranges: timeRanges },
-}));
-vi.mock("@/services/sessions", () => ({ default: { details: sessionTurns } }));
+vi.mock("@/services/search", () => ({ default: { search } }));
 
 // The real box renders; only the heavy content renderer is replaced.
 vi.mock("@/plugins/traces/LLMContentRenderer.vue", () => ({
@@ -52,6 +47,8 @@ const score = (overrides: Partial<QualityScore> = {}): QualityScore => ({
   taskId: null,
   inputPreview: "Write VRL to parse JSON from my nginx logs.",
   outputPreview: null,
+  inputSpanId: "span-in",
+  outputSpanId: "span-out",
   ...overrides,
 });
 
@@ -63,25 +60,23 @@ const DrawerStub = defineComponent({
 });
 
 const hits = (spans: Record<string, unknown>[]) => Promise.resolve({ data: { hits: spans } });
-const WINDOW = {
-  start_time: 1791199600000000 - 3_600_000_000,
-  end_time: 1791199600000000 + 3_600_000_000,
+const span = (id: string, input: string, output: string) => ({
+  span_id: id,
+  gen_ai_input_messages: input,
+  gen_ai_output_messages: output,
+});
+/** The one search request the pane sent: its SQL and window. */
+const sent = (call = 0) => {
+  const [options] = search.mock.calls[call];
+  return {
+    sql: options.query.query.sql,
+    start_time: options.query.query.start_time,
+    end_time: options.query.query.end_time,
+    page_type: options.page_type,
+  };
 };
-const ranges = (
-  result: Record<string, unknown>,
-  partialCoverage = false,
-): Promise<{ data: Record<string, unknown> }> =>
-  Promise.resolve({ data: { results: [result], partial_coverage: partialCoverage } });
-// The real range the index finds: 10 seconds from the target time, padded by a minute each side when read.
-const FOUND = {
-  status: "found",
-  stream: "agents",
-  range: { start_time: 1791199600000000, end_time: 1791199610000000 },
-};
-const FOUND_WINDOW = {
-  start_time: 1791199600000000 - 60_000_000,
-  end_time: 1791199610000000 + 60_000_000,
-};
+// A minute before the target time, up to the score write.
+const WINDOW = { start_time: 1791199600000000 - 60_000_000, end_time: 1791199632199574 };
 const io = (wrapper: ReturnType<typeof mountPane>) =>
   wrapper.findAll('[data-test="quality-score-pane-io"] .llm').map((box) => box.text());
 const skeletons = (wrapper: ReturnType<typeof mountPane>) =>
@@ -109,10 +104,7 @@ describe("QualityScorePane", () => {
   beforeEach(() => {
     vi.spyOn(window, "open").mockImplementation(() => null);
     push.mockClear();
-    traceDetails.mockReset().mockImplementation(() => hits([]));
-    // The index cannot answer by default, so a trace is read from an hour either side of its time.
-    timeRanges.mockReset().mockImplementation(() => ranges({ status: "timeout" }));
-    sessionTurns.mockReset().mockImplementation(() => hits([]));
+    search.mockReset().mockImplementation(() => hits([]));
   });
 
   it("shows the health and the rule, but no target link, value or time", () => {
@@ -136,9 +128,9 @@ describe("QualityScorePane", () => {
   });
 
   it("shows Input and Output side by side, with the missing output said inside its box", async () => {
-    // A session the index cannot place keeps its preview.
+    // A score without span ids keeps its preview.
     const wrapper = mountPane({
-      score: score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" }),
+      score: score({ inputSpanId: null, outputSpanId: null }),
     });
     await flushPromises();
     const io = wrapper.find('[data-test="quality-score-pane-io"]');
@@ -319,19 +311,24 @@ describe("QualityScorePane", () => {
     expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
   });
 
-  it("shows skeletons in both boxes while the trace loads, then the span score's full text", async () => {
+  it("shows skeletons in both boxes while the span loads, then the span score's full text", async () => {
     let resolve: (value: unknown) => void = () => {};
-    traceDetails.mockReturnValue(new Promise((done) => (resolve = done)));
+    search.mockReturnValue(new Promise((done) => (resolve = done)));
     const wrapper = mountPane({
-      score: score({ targetScope: "span", spanId: "span-2", targetId: "span-2" }),
+      score: score({
+        targetScope: "span",
+        spanId: "span-2",
+        targetId: "span-2",
+        inputSpanId: "span-2",
+        outputSpanId: "span-2",
+      }),
     });
     await flushPromises();
-    expect(traceDetails).toHaveBeenCalledWith({
-      org_identifier: "default",
-      stream_name: "default",
-      trace_id: "70d86ea9c0ffee",
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual({
+      sql: `SELECT * FROM "default" WHERE span_id IN ('span-2')`,
       ...WINDOW,
-      hint_ts: 1791199600000000,
+      page_type: "traces",
     });
     // While loading: a skeleton in each box and in the reasoning, the frames kept, no preview and no note.
     expect(skeletons(wrapper)).toEqual(["input", "output"]);
@@ -345,12 +342,11 @@ describe("QualityScorePane", () => {
     resolve({
       data: {
         hits: [
-          { span_id: "span-1", gen_ai_input_messages: "Other span", gen_ai_output_messages: "x" },
-          {
-            span_id: "span-2",
-            gen_ai_input_messages: "Write VRL to parse JSON from my nginx logs. Full prompt.",
-            gen_ai_output_messages: "parse_json!(.message)",
-          },
+          span(
+            "span-2",
+            "Write VRL to parse JSON from my nginx logs. Full prompt.",
+            "parse_json!(.message)",
+          ),
         ],
       },
     });
@@ -366,117 +362,11 @@ describe("QualityScorePane", () => {
     );
   });
 
-  it("reads a trace score from the root chat span, as the scorer does", async () => {
-    traceDetails.mockImplementation(() =>
+  it("reads a session's input and output from the two spans its scorer recorded, in one query", async () => {
+    search.mockImplementation(() =>
       hits([
-        { span_id: "tool", _timestamp: 1, gen_ai_tool_name: "search", gen_ai_input_messages: "q" },
-        { span_id: "child", _timestamp: 2, parent_span_id: "root", gen_ai_input_messages: "Child" },
-        {
-          span_id: "root",
-          _timestamp: 3,
-          parent_span_id: "",
-          gen_ai_input_messages: "Root question",
-          gen_ai_output_messages: "Root answer",
-        },
-      ]),
-    );
-    const wrapper = mountPane();
-    await flushPromises();
-    expect(io(wrapper)).toEqual(["Root question", "Root answer"]);
-  });
-
-  it("keeps the preview and says the full text is not available when the fetch fails or finds no LLM span", async () => {
-    traceDetails.mockRejectedValue(new Error("boom"));
-    const failed = mountPane();
-    await flushPromises();
-    expect(io(failed)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(unavailable(failed).text()).toBe(
-      "Showing a short preview. The full trace could not be loaded.",
-    );
-    expect(skeletons(failed)).toEqual([]);
-
-    traceDetails
-      .mockReset()
-      .mockImplementation(() => hits([{ span_id: "x", service_name: "api" }]));
-    const empty = mountPane();
-    await flushPromises();
-    expect(io(empty)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(unavailable(empty).text()).toBe(
-      "Showing a short preview. The full trace could not be loaded.",
-    );
-  });
-
-  it("reads a trace from the real range and stream the time index finds", async () => {
-    timeRanges.mockImplementation(() => ranges(FOUND));
-    traceDetails.mockImplementation(() =>
-      hits([
-        { span_id: "root", gen_ai_input_messages: "Full question", gen_ai_output_messages: "A" },
-      ]),
-    );
-    const wrapper = mountPane({ score: score({ sourceStream: null }) });
-    await flushPromises();
-    expect(timeRanges).toHaveBeenCalledWith({
-      org_identifier: "default",
-      trace_ids: ["70d86ea9c0ffee"],
-      hint_ts: 1791199600000000,
-    });
-    expect(traceDetails).toHaveBeenCalledWith({
-      org_identifier: "default",
-      stream_name: "agents",
-      trace_id: "70d86ea9c0ffee",
-      ...FOUND_WINDOW,
-      hint_ts: FOUND_WINDOW.start_time + (FOUND_WINDOW.end_time - FOUND_WINDOW.start_time) / 2,
-    });
-    expect(io(wrapper)).toEqual(["Full question", "A"]);
-    expect(unavailable(wrapper).exists()).toBe(false);
-  });
-
-  it("does not read a trace the index surely does not have, and says so", async () => {
-    timeRanges.mockImplementation(() => ranges({ status: "not_found" }));
-    const wrapper = mountPane();
-    await flushPromises();
-    expect(traceDetails).not.toHaveBeenCalled();
-    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(skeletons(wrapper)).toEqual([]);
-    expect(unavailable(wrapper).exists()).toBe(true);
-  });
-
-  it.each([
-    ["finds nothing with partial coverage", () => ranges({ status: "not_found" }, true)],
-    ["times out", () => ranges({ status: "timeout" })],
-    ["fails", () => Promise.reject(new Error("boom"))],
-  ])("falls back to an hour either side when the index %s", async (_, answer) => {
-    timeRanges.mockImplementation(answer);
-    mountPane();
-    await flushPromises();
-    expect(traceDetails).toHaveBeenCalledWith(expect.objectContaining(WINDOW));
-  });
-
-  it("says so without reading when the index cannot answer and the score has no stream", async () => {
-    const wrapper = mountPane({ score: score({ sourceStream: null }) });
-    await flushPromises();
-    expect(traceDetails).not.toHaveBeenCalled();
-    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(unavailable(wrapper).exists()).toBe(true);
-  });
-
-  it("reads a session's question from its first turn and its answer from its last", async () => {
-    timeRanges.mockImplementation(() => ranges({ ...FOUND, session_id: "sess-1" }));
-    // Turns come back newest first; the first turn is the earliest.
-    sessionTurns.mockImplementation(() =>
-      hits([
-        { trace_id: "t-last", start_time: 3 },
-        { trace_id: "t-mid", start_time: 2 },
-        { trace_id: "t-first", start_time: 1 },
-      ]),
-    );
-    traceDetails.mockImplementation(({ trace_id }: { trace_id: string }) =>
-      hits([
-        {
-          span_id: trace_id,
-          gen_ai_input_messages: `Question of ${trace_id}`,
-          gen_ai_output_messages: `Answer of ${trace_id}`,
-        },
+        span("last-turn", "Last question", "Last answer"),
+        span("first-turn", "First question", "First answer"),
       ]),
     );
     const wrapper = mountPane({
@@ -485,73 +375,96 @@ describe("QualityScorePane", () => {
         sessionId: "sess-1",
         targetId: "sess-1",
         traceId: null,
+        sourceStream: "agents",
+        inputSpanId: "first-turn",
+        outputSpanId: "last-turn",
       }),
     });
     await flushPromises();
-    expect(timeRanges).toHaveBeenCalledWith({
-      org_identifier: "default",
-      session_ids: ["sess-1"],
-      hint_ts: 1791199600000000,
-    });
-    expect(sessionTurns).toHaveBeenCalledWith({
-      orgId: "default",
-      streamName: "agents",
-      sessionId: "sess-1",
-      startTime: FOUND_WINDOW.start_time,
-      endTime: FOUND_WINDOW.end_time,
-    });
-    expect(traceDetails.mock.calls.map(([options]) => options.trace_id).sort()).toEqual([
-      "t-first",
-      "t-last",
-    ]);
-    expect(io(wrapper)).toEqual(["Question of t-first", "Answer of t-last"]);
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(sent().sql).toBe(`SELECT * FROM "agents" WHERE span_id IN ('first-turn', 'last-turn')`);
+    expect(io(wrapper)).toEqual(["First question", "Last answer"]);
     expect(unavailable(wrapper).exists()).toBe(false);
-    expect(wrapper.find('[data-test="quality-score-pane-open-target"]').text()).toBe(
-      "Open session",
+  });
+
+  it("sends no query and keeps the preview with the note when the score has no span ids", async () => {
+    const wrapper = mountPane({ score: score({ inputSpanId: null, outputSpanId: null }) });
+    await flushPromises();
+    expect(search).not.toHaveBeenCalled();
+    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(skeletons(wrapper)).toEqual([]);
+    expect(unavailable(wrapper).text()).toBe(
+      "Showing a short preview. The full trace could not be loaded.",
     );
   });
 
-  it("keeps a session's preview and says so when its range or turns cannot be read", async () => {
-    const session = score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" });
-    const unknown = mountPane({ score: session });
+  it("reads the side with a span id and keeps the preview on the side without one", async () => {
+    search.mockImplementation(() => hits([span("span-in", "Full question", "ignored")]));
+    const wrapper = mountPane({
+      score: score({ outputSpanId: null, outputPreview: "Short answer" }),
+    });
     await flushPromises();
-    expect(sessionTurns).not.toHaveBeenCalled();
-    expect(io(unknown)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(unavailable(unknown).exists()).toBe(true);
-    unknown.unmount();
-
-    timeRanges.mockImplementation(() => ranges(FOUND));
-    const noTurns = mountPane({ score: { ...session, id: "s-other", sessionId: "sess-2" } });
-    await flushPromises();
-    expect(traceDetails).not.toHaveBeenCalled();
-    expect(unavailable(noTurns).exists()).toBe(true);
+    expect(sent().sql).toBe(`SELECT * FROM "default" WHERE span_id IN ('span-in')`);
+    expect(io(wrapper)).toEqual(["Full question", "Short answer"]);
+    expect(unavailable(wrapper).exists()).toBe(true);
   });
 
-  it("fetches a trace once for every score on it, coming back included", async () => {
-    traceDetails.mockImplementation(() =>
-      hits([
-        { span_id: "root", parent_span_id: "", gen_ai_input_messages: "Root question" },
-        { span_id: "span-2", parent_span_id: "root", gen_ai_input_messages: "Span question" },
-      ]),
+  it("escapes quotes in a span id", async () => {
+    mountPane({ score: score({ inputSpanId: "a'b", outputSpanId: null }) });
+    await flushPromises();
+    expect(sent().sql).toBe(`SELECT * FROM "default" WHERE span_id IN ('a''b')`);
+  });
+
+  it("escapes quotes in the stream name and searches the score's own stream type", async () => {
+    mountPane({
+      score: score({ sourceStream: 'odd"name', sourceStreamType: "logs", outputSpanId: null }),
+    });
+    await flushPromises();
+    expect(sent().sql).toBe(`SELECT * FROM "odd""name" WHERE span_id IN ('span-in')`);
+    expect(sent().page_type).toBe("logs");
+  });
+
+  it("keeps the preview and says the full text is not available when the query fails or finds no span", async () => {
+    search.mockRejectedValue(new Error("boom"));
+    const failed = mountPane();
+    await flushPromises();
+    expect(io(failed)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(failed).text()).toBe(
+      "Showing a short preview. The full trace could not be loaded.",
+    );
+    expect(skeletons(failed)).toEqual([]);
+
+    search.mockReset().mockImplementation(() => hits([]));
+    const empty = mountPane({ score: score({ id: "s2", inputSpanId: "gone" }) });
+    await flushPromises();
+    expect(io(empty)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(empty).exists()).toBe(true);
+  });
+
+  it("does not query without a source stream", async () => {
+    const wrapper = mountPane({ score: score({ sourceStream: null }) });
+    await flushPromises();
+    expect(search).not.toHaveBeenCalled();
+    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(wrapper).exists()).toBe(true);
+  });
+
+  it("reads each score's spans once, coming back included", async () => {
+    search.mockImplementation(() =>
+      hits([span("span-in", "First question", "x"), span("span-2", "Span question", "y")]),
     );
     const wrapper = mountPane();
     await flushPromises();
-    expect(io(wrapper)[0]).toBe("Root question");
+    expect(io(wrapper)[0]).toBe("First question");
     await wrapper.setProps({
-      score: score({
-        id: "s2",
-        targetScope: "span",
-        spanId: "span-2",
-        targetId: "span-2",
-        refTimestamp: 1791199600000000 + 5_000_000,
-      }),
+      score: score({ id: "s2", inputSpanId: "span-2", outputSpanId: "span-2" }),
     });
     await flushPromises();
     expect(io(wrapper)[0]).toBe("Span question");
     await wrapper.setProps({ score: score() });
     await flushPromises();
-    expect(io(wrapper)[0]).toBe("Root question");
-    expect(traceDetails).toHaveBeenCalledTimes(1);
+    expect(io(wrapper)[0]).toBe("First question");
+    expect(search).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the frame and shows skeletons in the header, both boxes and the reasoning while the scores page loads", async () => {
@@ -567,7 +480,7 @@ describe("QualityScorePane", () => {
     );
     expect(reasoning.text()).not.toContain("No reasoning recorded");
     expect(wrapper.find('[data-test="quality-score-pane-add-to-dataset"]').exists()).toBe(false);
-    expect(traceDetails).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
 
     // The page lands: the header shows, and the boxes and the reasoning wait for the full text.
     await wrapper.setProps({ score: score(), loading: false });

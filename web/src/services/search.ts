@@ -403,18 +403,13 @@ const search = {
   get_trace_time_ranges: ({
     org_identifier,
     trace_ids,
-    session_ids,
     start_time,
     end_time,
     hint_ts,
     streams,
     signal,
   }: TraceTimeRangeOptions) => {
-    const params = new URLSearchParams(
-      session_ids?.length
-        ? { session_id: session_ids.join(",") }
-        : { trace_id: (trace_ids ?? []).join(",") },
-    );
+    const params = new URLSearchParams({ trace_id: trace_ids.join(",") });
     if (start_time != null && end_time != null) {
       params.set("start_time", String(start_time));
       params.set("end_time", String(end_time));

@@ -27,24 +27,3 @@ export const traceDagKeys = {
   detail: (org: string, streamName: string, traceId: string, startTime: number, endTime: number) =>
     orgKey(org, "traces", "dag", traceId, streamName, startTime, endTime),
 };
-
-/** Where a trace or a session ran and when, from the trace time index. */
-export const traceTimeRangeKeys = {
-  all: (org: string) => orgKey(org, "traces", "timeRange"),
-  detail: (org: string, kind: "trace" | "session", id: string) =>
-    orgKey(org, "traces", "timeRange", kind, id),
-};
-
-/** A session's turns, one entry per session; the window only helps the server find it. */
-export const sessionTurnsKeys = {
-  all: (org: string) => orgKey(org, "traces", "sessionTurns"),
-  detail: (org: string, streamName: string, sessionId: string) =>
-    orgKey(org, "traces", "sessionTurns", streamName, sessionId),
-};
-
-/** One entry per trace: the window only helps the server find it, so it is not part of the key. */
-export const traceDetailsKeys = {
-  all: (org: string) => orgKey(org, "traces", "details"),
-  detail: (org: string, streamName: string, traceId: string) =>
-    orgKey(org, "traces", "details", streamName, traceId),
-};

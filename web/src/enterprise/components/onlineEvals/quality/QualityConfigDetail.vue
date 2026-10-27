@@ -126,7 +126,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="quality-detail-trend"
         >
           <div class="h-55 w-full">
+            <OSkeleton
+              v-if="timelineQuery.isPending.value"
+              type="rect"
+              class="h-full w-full"
+              data-test="quality-detail-trend-loading"
+            />
+            <OEmptyState
+              v-else-if="timelineQuery.error.value"
+              class="h-full"
+              size="inline"
+              preset="load-error"
+              :action-label="t('emptyState.loadError.action')"
+              action-icon="refresh"
+              data-test="quality-detail-trend-error"
+              @action="retryTimeline"
+            />
             <QualityTrendChart
+              v-else
               :timeline="timeline"
               :kind="trend"
               :range="numericRange"
@@ -336,6 +353,7 @@ const { t } = useI18nTyped();
 
 const {
   scoresQuery,
+  timelineQuery,
   filter,
   page,
   distribution,
@@ -410,8 +428,13 @@ function clearFilter() {
   filter.value = null;
 }
 
+function retryTimeline() {
+  void timelineQuery.refetch();
+}
+
 function retry() {
   void scoresQuery.refetch();
+  if (timelineQuery.error.value) retryTimeline();
 }
 
 // Keep the selected row in view as previous and next move through the list.
@@ -434,7 +457,11 @@ watch(
 );
 
 watch(
-  () => [scoresQuery.dataUpdatedAt.value, scoresQuery.isFetching.value] as const,
+  () =>
+    [
+      scoresQuery.dataUpdatedAt.value,
+      scoresQuery.isFetching.value || timelineQuery.isFetching.value,
+    ] as const,
   ([updatedAt, fetching]) => emit("status", { updatedAt, fetching }),
   { immediate: true },
 );

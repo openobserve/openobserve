@@ -55,9 +55,7 @@ export interface OrgTraceTimeRangeResponse {
 
 export interface TraceTimeRangeOptions {
   org_identifier: string;
-  /** Send exactly one of `trace_ids` and `session_ids`; the server rejects both or neither. */
-  trace_ids?: string[];
-  session_ids?: string[];
+  trace_ids: string[];
   /** µs; sent only together with `end_time` — the server rejects a lone bound. */
   start_time?: number;
   end_time?: number;

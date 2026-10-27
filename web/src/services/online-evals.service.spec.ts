@@ -272,6 +272,23 @@ describe("quality APIs", () => {
     });
     expect(result).toBe(page);
   });
+
+  it("quality.timeline hits the per-config timeline path with whole-µs times and drops empty optionals", async () => {
+    const body = { timeline: [] };
+    mockGet.mockResolvedValue({ data: body });
+    const result = await onlineEvalsService.quality.timeline("acme", "7512827247535849473", {
+      start_time: 1.5,
+      end_time: 2,
+      scope: "session",
+      agent_name: "",
+      agent_env: "prod",
+    });
+    expect(mockGet).toHaveBeenCalledWith(
+      "/api/acme/score_configs/7512827247535849473/quality/timeline",
+      { params: { start_time: 1, end_time: 2, scope: "session", agent_env: "prod" } },
+    );
+    expect(result).toBe(body);
+  });
 });
 
 describe("jobs.create analytics", () => {

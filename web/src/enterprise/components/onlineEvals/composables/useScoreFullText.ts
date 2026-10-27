@@ -16,129 +16,68 @@
 import { computed, type Ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import type { QualityScore } from "@/services/online-evals.service";
-import {
-  sessionTurnsQuery,
-  traceDetailsQuery,
-  traceTimeRangeQuery,
-} from "@/services/search.queries";
+import { qualitySpansQuery } from "@/services/online-evals.service.queries";
 import { extractLLMData } from "@/utils/llmUtils";
-import { traceQueryWindow } from "@/utils/rum/traceWindow";
-import { contentSpan, targetTraceId, targetWindow } from "../utils/qualityFormat";
+
+// The judge runs after its target ends, so its spans sit before the score write; the margin covers clocks running behind.
+const WINDOW_MARGIN_US = 60_000_000;
 
 function asText(value: unknown): string {
   if (value == null) return "";
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-/**
- * The full input and output a score was given, read back from its trace or session.
- * The trace time index says where and when the target ran, so the read uses its real range.
- * A trace or span the index cannot answer for is still read from an hour either side of
- * the target time. A session needs its real range, because a guessed window can miss turns.
- */
+/** The full input and output a score was given, read in one query from the spans its scorer recorded. */
 export function useScoreFullText(score: () => QualityScore | null, orgId: Ref<string>) {
-  const lookup = computed(() => {
+  const spanIds = computed(() => {
     const target = score();
-    if (!target) return null;
-    if (target.targetScope === "session") {
-      return target.sessionId ? { kind: "session" as const, id: target.sessionId } : null;
-    }
-    const traceId = targetTraceId(target);
-    return traceId ? { kind: "trace" as const, id: traceId } : null;
+    return [...new Set([target?.inputSpanId, target?.outputSpanId])].filter(
+      (id): id is string => !!id,
+    );
   });
-
-  const rangeQuery = useQuery(() =>
-    Object.assign(
-      traceTimeRangeQuery(
-        orgId.value,
-        lookup.value?.kind ?? "trace",
-        lookup.value?.id ?? "",
-        score()?.refTimestamp ?? 0,
-      ),
-      { enabled: !!lookup.value },
-    ),
+  const enabled = computed(
+    () => !!orgId.value && !!score()?.sourceStream && spanIds.value.length > 0,
   );
 
-  // Null while the range loads, and when nothing can be read: a definite "not found", or no stream to read from.
-  const source = computed(() => {
+  const spansQuery = useQuery(() => {
     const target = score();
-    if (!target || !lookup.value || rangeQuery.isPending.value) return null;
-    const result = rangeQuery.data.value?.result;
-    if (result?.status === "found" && result.range) {
-      const stream = result.stream ?? target.sourceStream;
-      return stream ? { stream, ...traceQueryWindow(result.range, 0, 0) } : null;
-    }
-    const definite = result?.status === "not_found" && !rangeQuery.data.value?.partialCoverage;
-    if (definite || lookup.value.kind === "session" || !target.sourceStream) return null;
-    return { stream: target.sourceStream, ...targetWindow(target) };
-  });
-
-  const turnsQuery = useQuery(() => {
-    const where = lookup.value?.kind === "session" ? source.value : null;
     return Object.assign(
-      sessionTurnsQuery(
+      qualitySpansQuery(
         orgId.value,
-        where?.stream ?? "",
-        lookup.value?.id ?? "",
-        where?.startTime ?? 0,
-        where?.endTime ?? 0,
+        target?.sourceStreamType || "traces",
+        target?.sourceStream ?? "",
+        spanIds.value,
+        (target?.refTimestamp ?? 0) - WINDOW_MARGIN_US,
+        target?.timestamp ?? 0,
       ),
-      { enabled: !!where },
+      { enabled: enabled.value },
     );
   });
 
-  // A session's question is its first turn and its answer its last, as the backend judge reads them.
-  // ponytail: the judge skips turns without a chat span; reading every turn to match that costs one fetch per turn.
-  const traceIds = computed<[string, string] | null>(() => {
-    if (!source.value) return null;
-    if (lookup.value?.kind === "trace") return [lookup.value.id, lookup.value.id];
-    const turns = [...(turnsQuery.data.value ?? [])].sort((a, b) => a.start_time - b.start_time);
-    if (!turns.length) return null;
-    return [turns[0].trace_id, turns[turns.length - 1].trace_id];
-  });
-
-  const spansQuery = (index: 0 | 1) =>
-    useQuery(() => {
-      const where = source.value;
-      const traceId = traceIds.value?.[index] ?? "";
-      return Object.assign(
-        traceDetailsQuery(
-          orgId.value,
-          where?.stream ?? "",
-          traceId,
-          where?.startTime ?? 0,
-          where?.endTime ?? 0,
-        ),
-        { enabled: !!where && !!traceId },
-      );
-    });
-  const firstSpans = spansQuery(0);
-  const lastSpans = spansQuery(1);
+  const sideText = (spanId: string | null | undefined, side: "input" | "output") => {
+    const span = spanId ? spansQuery.data.value?.find((row) => row.span_id === spanId) : undefined;
+    return span ? asText(extractLLMData(span)?.[side]) : "";
+  };
 
   const fullText = computed(() => {
     const target = score();
-    const first = firstSpans.data.value;
-    const last = lastSpans.data.value;
-    if (!target || !traceIds.value || !first || !last) return null;
-    const inputSpan = contentSpan(target, first);
-    // A trace target reads both texts from the same span list.
-    const outputSpan = first === last ? inputSpan : contentSpan(target, last);
-    const input = asText(extractLLMData(inputSpan)?.input);
-    const output = asText(extractLLMData(outputSpan)?.output);
-    return input || output ? { input, output } : null;
+    return {
+      input: sideText(target?.inputSpanId, "input"),
+      output: sideText(target?.outputSpanId, "output"),
+    };
   });
 
-  const loading = computed(() => {
-    if (!lookup.value) return false;
-    if (rangeQuery.isPending.value) return true;
-    if (!source.value) return false;
-    if (lookup.value.kind === "session" && turnsQuery.isPending.value) return true;
-    if (!traceIds.value) return false;
-    return firstSpans.isPending.value || lastSpans.isPending.value;
-  });
+  const loading = computed(() => enabled.value && spansQuery.isPending.value);
 
-  // The score points at a trace or session, but its full text could not be read.
-  const unavailable = computed(() => !!lookup.value && !loading.value && !fullText.value);
+  // A side whose full text could not be read shows its short preview instead.
+  const unavailable = computed(() => {
+    const target = score();
+    if (!target || loading.value) return false;
+    return (
+      (!fullText.value.input && !!target.inputPreview) ||
+      (!fullText.value.output && !!target.outputPreview)
+    );
+  });
 
   return { fullText, loading, unavailable };
 }

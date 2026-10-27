@@ -34,4 +34,9 @@ export const onlineEvalKeys = {
     orgKey(org, "onlineEvals", "quality", "list", params),
   qualityScores: (org: string, entityId: string, params: Record<string, unknown>) =>
     orgKey(org, "onlineEvals", "quality", "scores", entityId, params),
+  qualityTimeline: (org: string, entityId: string, params: Record<string, unknown>) =>
+    orgKey(org, "onlineEvals", "quality", "timeline", entityId, params),
+  /** Spans never change once written, so the read window stays out of the key. */
+  qualitySpans: (org: string, streamType: string, stream: string, spanIds: string[]) =>
+    orgKey(org, "onlineEvals", "quality", "spans", streamType, stream, spanIds),
 };

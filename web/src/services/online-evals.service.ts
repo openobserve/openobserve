@@ -368,12 +368,14 @@ export interface QualityScore {
   taskId: string | null;
   inputPreview: string | null;
   outputPreview: string | null;
+  /** The spans the scorer read the input and output from; null when it recorded none. */
+  inputSpanId: string | null;
+  outputSpanId: string | null;
 }
 
 export interface QualityScorePage {
   average: number | null;
   distribution: QualityDistributionBucket[];
-  timeline: QualityTimelineBucket[];
   list: QualityScore[];
   total: number;
   from: number;
@@ -505,6 +507,17 @@ const onlineEvalsService = {
         await http().get(`/api/${orgId}/score_configs/${encodeURIComponent(entityId)}/quality`, {
           params: qualityQuery(params),
         })
+      ).data,
+    timeline: async (
+      orgId: string,
+      entityId: string,
+      params: QualityListParams,
+    ): Promise<{ timeline: QualityTimelineBucket[] }> =>
+      (
+        await http().get(
+          `/api/${orgId}/score_configs/${encodeURIComponent(entityId)}/quality/timeline`,
+          { params: qualityQuery(params) },
+        )
       ).data,
   },
 

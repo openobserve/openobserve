@@ -454,7 +454,6 @@ import { resolveAiDateWindow, type AiDateState } from "@/enterprise/composables/
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
-import { traceDetailsKeys } from "@/services/search.querykeys";
 import { downloadFile } from "@/utils/dom";
 import type { I18nKey } from "@/types/i18n";
 import {
@@ -804,19 +803,11 @@ async function onQualityRefresh() {
     await Promise.all([reloadLists(true), loadQualityAgents(true)]);
     // Once the moved window has reached the keys, expire every quality read the Refresh has not already fetched; the active ones refetch.
     await nextTick();
-    const notRefreshed = (query: Query) =>
-      query.state.dataUpdatedAt < startedAt && query.state.fetchStatus !== "fetching";
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: onlineEvalKeys.quality(orgId.value),
-        predicate: notRefreshed,
-      }),
-      // The score pane's full text comes from the trace.
-      queryClient.invalidateQueries({
-        queryKey: traceDetailsKeys.all(orgId.value),
-        predicate: notRefreshed,
-      }),
-    ]);
+    await queryClient.invalidateQueries({
+      queryKey: onlineEvalKeys.quality(orgId.value),
+      predicate: (query: Query) =>
+        query.state.dataUpdatedAt < startedAt && query.state.fetchStatus !== "fetching",
+    });
   } finally {
     qualityRefreshing.value = false;
   }

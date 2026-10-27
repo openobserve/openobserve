@@ -302,7 +302,7 @@ function updateDrawerOpen(open: boolean) {
   if (!open) drawerTarget.value = null;
 }
 
-// The preview shows at once; the full text replaces it once the trace or session loads.
+// A side whose span the scorer did not record, or that cannot be read, keeps its preview.
 const {
   fullText,
   loading: fullTextLoading,
@@ -310,8 +310,8 @@ const {
 } = useScoreFullText(() => props.score, orgId);
 // Skeletons while the scores page or the selected score's full text loads.
 const contentLoading = computed(() => props.loading || fullTextLoading.value);
-const inputText = computed(() => fullText.value?.input || props.score?.inputPreview || "");
-const outputText = computed(() => fullText.value?.output || props.score?.outputPreview || "");
+const inputText = computed(() => fullText.value.input || props.score?.inputPreview || "");
+const outputText = computed(() => fullText.value.output || props.score?.outputPreview || "");
 
 // Same tab: browser Back returns to this score through the page and score in the URL.
 function navigate(location: RouteLocationRaw) {

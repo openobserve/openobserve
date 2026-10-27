@@ -16,7 +16,6 @@ import {
   chartFilterLabel,
   chartFilterParams,
   chartFilterToQuery,
-  contentSpan,
   distributionDataType,
   trendKind,
   trendPoints,
@@ -405,6 +404,8 @@ describe("link windows", () => {
     taskId: null,
     inputPreview: null,
     outputPreview: null,
+    inputSpanId: null,
+    outputSpanId: null,
   };
 
   it("opens the target trace an hour either side of its start, with the span selected", () => {
@@ -459,80 +460,6 @@ describe("link windows", () => {
       },
     });
     expect(evaluatorTraceLink({ ...score, evaluatorTraceId: null }, "org1")).toBeNull();
-  });
-});
-
-describe("the span a score's full text comes from", () => {
-  const base: QualityScore = {
-    id: "s1",
-    timestamp: 5,
-    refTimestamp: 4,
-    sourceType: "llm_judge",
-    targetScope: "trace",
-    targetId: "trace-1",
-    spanId: null,
-    traceId: "trace-1",
-    sessionId: null,
-    sourceStream: "default",
-    sourceStreamType: "traces",
-    value: 1,
-    unhealthy: false,
-    reasoning: null,
-    evaluatorTraceId: null,
-    taskId: null,
-    inputPreview: null,
-    outputPreview: null,
-  };
-  const span = (id: string, at: number, fields: Record<string, unknown> = {}) => ({
-    span_id: id,
-    _timestamp: at,
-    parent_span_id: "parent",
-    ...fields,
-  });
-  const chat = { gen_ai_input_messages: "question", gen_ai_output_messages: "answer" };
-  const tool = { ...chat, gen_ai_tool_name: "search" };
-
-  it("reads a span score's own span by its id", () => {
-    const spans = [span("a", 1, chat), span("b", 2, chat)];
-    const spanScore = { ...base, targetScope: "span" as const, spanId: "b", targetId: "b" };
-    expect(contentSpan(spanScore, spans)?.span_id).toBe("b");
-    expect(contentSpan({ ...spanScore, spanId: null }, spans)?.span_id).toBe("b");
-    expect(contentSpan({ ...spanScore, spanId: "missing" }, spans)).toBeUndefined();
-  });
-
-  it("picks a trace's root chat span before an earlier chat span", () => {
-    const spans = [
-      span("child", 1, chat),
-      span("root", 2, { ...chat, parent_span_id: "" }),
-      span("tool", 0, { ...tool, parent_span_id: "" }),
-    ];
-    expect(contentSpan(base, spans)?.span_id).toBe("root");
-    // An all-zero parent id and a row without parent fields are roots too.
-    expect(contentSpan(base, [span("z", 3, { ...chat, parent_span_id: "0000" })])?.span_id).toBe(
-      "z",
-    );
-    expect(contentSpan(base, [{ span_id: "bare", _timestamp: 3, ...chat }])?.span_id).toBe("bare");
-  });
-
-  it("falls back to the first chat span by time, then to any span with LLM input or output", () => {
-    const noRootChat = [
-      span("late", 9, chat),
-      span("early", 3, chat),
-      span("root-tool", 1, { ...tool, parent_span_id: "" }),
-    ];
-    expect(contentSpan(base, noRootChat)?.span_id).toBe("early");
-    const toolsOnly = [span("t2", 5, tool), span("t1", 4, { ...tool, operation_name: "tool.run" })];
-    expect(contentSpan(base, toolsOnly)?.span_id).toBe("t1");
-    const executeTool = [
-      span("x", 1, { ...chat, gen_ai_operation_name: "execute_tool" }),
-      span("c", 2, { llm_output: "reply" }),
-    ];
-    expect(contentSpan(base, executeTool)?.span_id).toBe("c");
-  });
-
-  it("finds nothing without LLM input or output", () => {
-    expect(contentSpan(base, [span("plain", 1, { gen_ai_input_messages: "  " })])).toBeUndefined();
-    expect(contentSpan(base, [])).toBeUndefined();
   });
 });
 

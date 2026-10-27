@@ -16,8 +16,8 @@
 import { computed, ref, watch, type Ref } from "vue";
 import { useQuery, type Query } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
-import type { QualityAgentParams, QualityScorePage } from "@/services/online-evals.service";
-import { qualityScoresQuery } from "@/services/online-evals.service.queries";
+import type { QualityAgentParams } from "@/services/online-evals.service";
+import { qualityScoresQuery, qualityTimelineQuery } from "@/services/online-evals.service.queries";
 import {
   chartFilterParams,
   summarizeDistribution,
@@ -47,10 +47,13 @@ export function useQualityDetail(opts: {
   const selectedId = ref<string | null>(opts.initial?.scoreId ?? null);
   const selectedIndex = ref(0);
 
-  // What the list shows; a change starts it over. The window stays out, so a Refresh keeps the page.
-  const listParams = computed(() => ({
+  const scopeParams = computed(() => ({
     ...opts.agentParams.value,
     ...(opts.scope.value !== "all" ? { scope: opts.scope.value } : {}),
+  }));
+  // What the list shows; a change starts it over. The window stays out, so a Refresh keeps the page.
+  const listParams = computed(() => ({
+    ...scopeParams.value,
     ...(opts.only.value === "unhealthy" ? { unhealthy_only: true } : {}),
     ...chartFilterParams(filter.value),
   }));
@@ -72,6 +75,14 @@ export function useQualityDetail(opts: {
     { flush: "sync" },
   );
 
+  // Keep what is on screen while another page, filter or window loads, never across configs (key[5] is the entity id).
+  const readOptions = () => ({
+    enabled: !!orgId.value && !!opts.configId.value && opts.enabled.value,
+    // A new function on every read: while it stays the same, the query reuses its last placeholder unchecked.
+    placeholderData: <T>(previous: T | undefined, previousQuery?: Query<any, any, any, any>) =>
+      previousQuery?.queryKey?.[5] === opts.configId.value ? previous : undefined,
+  });
+
   const scoresQuery = useQuery(() =>
     Object.assign(
       qualityScoresQuery(orgId.value, opts.configId.value, {
@@ -81,14 +92,18 @@ export function useQualityDetail(opts: {
         from: page.value * SCORES_PAGE_SIZE,
         size: SCORES_PAGE_SIZE,
       }),
-      {
-        enabled: !!orgId.value && !!opts.configId.value && opts.enabled.value,
-        // Keep the chart and counts on screen while another page or filter loads, but never across configs (key[5] is the entity id).
-        placeholderData: (
-          previous: QualityScorePage | undefined,
-          previousQuery?: Query<any, any, any, any>,
-        ) => (previousQuery?.queryKey?.[5] === opts.configId.value ? previous : undefined),
-      },
+      readOptions(),
+    ),
+  );
+
+  const timelineQuery = useQuery(() =>
+    Object.assign(
+      qualityTimelineQuery(orgId.value, opts.configId.value, {
+        start_time: opts.dateWindow.value.startUs,
+        end_time: opts.dateWindow.value.endUs,
+        ...scopeParams.value,
+      }),
+      readOptions(),
     ),
   );
 
@@ -103,7 +118,7 @@ export function useQualityDetail(opts: {
 
   const data = computed(() => scoresQuery.data.value);
   const distribution = computed(() => data.value?.distribution ?? []);
-  const timeline = computed(() => data.value?.timeline ?? []);
+  const timeline = computed(() => timelineQuery.data.value ?? []);
   const summary = computed(() => summarizeDistribution(distribution.value));
   const list = computed(() => data.value?.list ?? []);
   const total = computed(() => data.value?.total ?? 0);
@@ -154,6 +169,7 @@ export function useQualityDetail(opts: {
 
   return {
     scoresQuery,
+    timelineQuery,
     filter,
     page,
     distribution,

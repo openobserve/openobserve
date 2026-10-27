@@ -4,16 +4,20 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
-import type { QualityScorePage, ScoreConfig } from "@/services/online-evals.service";
+import type {
+  QualityScorePage,
+  QualityTimelineBucket,
+  ScoreConfig,
+} from "@/services/online-evals.service";
 import type { QualityChartFilter, QualityRow } from "../utils/qualityFormat";
 
-const { scores } = vi.hoisted(() => ({ scores: vi.fn() }));
+const { scores, timeline } = vi.hoisted(() => ({ scores: vi.fn(), timeline: vi.fn() }));
 
 vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    default: { ...actual.default, quality: { list: vi.fn(), scores } },
+    default: { ...actual.default, quality: { list: vi.fn(), scores, timeline } },
   };
 });
 
@@ -61,6 +65,8 @@ const score = (id: string) => ({
   taskId: null,
   inputPreview: null,
   outputPreview: null,
+  inputSpanId: id,
+  outputSpanId: id,
 });
 
 function row(overrides: Partial<QualityRow> = {}): QualityRow {
@@ -83,31 +89,32 @@ function row(overrides: Partial<QualityRow> = {}): QualityRow {
   };
 }
 
+const TIMELINE: QualityTimelineBucket[] = [
+  {
+    start: 0,
+    end: 7_200_000_000,
+    count: 100,
+    unhealthy: 60,
+    trueCount: null,
+    average: null,
+    p95: null,
+  },
+  {
+    start: 7_200_000_000,
+    end: 14_400_000_000,
+    count: 14,
+    unhealthy: 7,
+    trueCount: null,
+    average: null,
+    p95: null,
+  },
+];
+
 const PAGE: QualityScorePage = {
   average: null,
   distribution: [
     { key: "low", count: 47, unhealthy: 0 },
     { key: "medium", count: 67, unhealthy: 67 },
-  ],
-  timeline: [
-    {
-      start: 0,
-      end: 7_200_000_000,
-      count: 100,
-      unhealthy: 60,
-      trueCount: null,
-      average: null,
-      p95: null,
-    },
-    {
-      start: 7_200_000_000,
-      end: 14_400_000_000,
-      count: 14,
-      unhealthy: 7,
-      trueCount: null,
-      average: null,
-      p95: null,
-    },
   ],
   list: [],
   total: 114,
@@ -156,6 +163,7 @@ function mountDetail(
 describe("QualityConfigDetail", () => {
   beforeEach(() => {
     scores.mockReset().mockResolvedValue(PAGE);
+    timeline.mockReset().mockResolvedValue({ timeline: TIMELINE });
   });
   afterEach(() => {
     document.body.innerHTML = "";
@@ -192,9 +200,51 @@ describe("QualityConfigDetail", () => {
     expect(trend.find(".h-55").exists()).toBe(true);
   });
 
+  it("shows a skeleton in the trend card while the trend loads, then the chart", async () => {
+    let resolve: (value: { timeline: QualityTimelineBucket[] }) => void = () => {};
+    timeline.mockReturnValue(new Promise((done) => (resolve = done)));
+    const wrapper = mountDetail();
+    await flushPromises();
+    const trend = () => wrapper.find('[data-test="quality-detail-trend"]');
+    expect(trend().find('[data-test="quality-detail-trend-loading"]').exists()).toBe(true);
+    expect(trend().findComponent({ name: "QualityTrendChart" }).exists()).toBe(false);
+    resolve({ timeline: TIMELINE });
+    await flushPromises();
+    expect(trend().find('[data-test="quality-detail-trend-loading"]').exists()).toBe(false);
+    expect(trend().findComponent({ name: "QualityTrendChart" }).props("timeline")).toEqual(
+      TIMELINE,
+    );
+  });
+
+  it("keeps the trend without a refetch or a skeleton while the score list pages", async () => {
+    const wrapper = mountDetail();
+    await flushPromises();
+    scores.mockImplementationOnce(() => new Promise(() => {}));
+    wrapper.findComponent({ name: "OTable" }).vm.$emit("update:current-page", 2);
+    await flushPromises();
+    expect(scores).toHaveBeenCalledTimes(2);
+    expect(timeline).toHaveBeenCalledTimes(1);
+    const trend = wrapper.find('[data-test="quality-detail-trend"]');
+    expect(trend.find('[data-test="quality-detail-trend-loading"]').exists()).toBe(false);
+    expect(trend.findComponent({ name: "QualityTrendChart" }).props("timeline")).toEqual(TIMELINE);
+  });
+
+  it("shows a load error with a retry in the trend card when only the trend fails", async () => {
+    timeline.mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper = mountDetail();
+    await flushPromises();
+    expect(wrapper.find('[data-test="quality-detail-error"]').exists()).toBe(false);
+    const error = wrapper.find('[data-test="quality-detail-trend-error"]');
+    expect(error.exists()).toBe(true);
+    await error.find("button").trigger("click");
+    await flushPromises();
+    expect(timeline).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-test="quality-detail-trend-error"]').exists()).toBe(false);
+  });
+
   it("titles the trend by what it plots when the config has no threshold", async () => {
-    const timeline = PAGE.timeline.map((bucket) => ({ ...bucket, unhealthy: null }));
-    scores.mockResolvedValue({ ...PAGE, timeline });
+    const noThreshold = TIMELINE.map((bucket) => ({ ...bucket, unhealthy: null }));
+    timeline.mockResolvedValue({ timeline: noThreshold });
     const counts = mountDetail();
     await flushPromises();
     expect(counts.find('[data-test="quality-detail-trend"]').text()).toContain("Scores over time");
@@ -207,7 +257,6 @@ describe("QualityConfigDetail", () => {
     scores.mockResolvedValue({
       ...PAGE,
       distribution: [{ key: 0, lower: 0, upper: 1, count: 114, unhealthy: null }],
-      timeline,
     });
     const averages = mountDetail({ dataType: "numeric" });
     await flushPromises();

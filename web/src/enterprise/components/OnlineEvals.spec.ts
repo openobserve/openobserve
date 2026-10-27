@@ -4,7 +4,6 @@ import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
-import { traceDetailsKeys } from "@/services/search.querykeys";
 import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import type { QualityScoresParams } from "@/services/online-evals.service";
 
@@ -19,6 +18,7 @@ const { START, END, DAY, mocks, route, replace, picker } = await vi.hoisted(asyn
     mocks: {
       list: vi.fn(),
       scores: vi.fn(),
+      timeline: vi.fn(),
       listAgents: vi.fn(),
     },
     route: reactive({ name: "aiEvaluations", query: {} as Record<string, string> }),
@@ -38,7 +38,7 @@ vi.mock("@/services/online-evals.service", async (importOriginal) => {
       scoreConfigs: { ...actual.default.scoreConfigs, list: empty },
       scorers: { ...actual.default.scorers, list: empty },
       jobs: { ...actual.default.jobs, list: empty },
-      quality: { list: mocks.list, scores: mocks.scores },
+      quality: { list: mocks.list, scores: mocks.scores, timeline: mocks.timeline },
     },
   };
 });
@@ -115,6 +115,8 @@ const scoreRow = (id: string) => ({
   taskId: null,
   inputPreview: null,
   outputPreview: null,
+  inputSpanId: null,
+  outputSpanId: null,
 });
 
 const PAGE = {
@@ -169,6 +171,8 @@ async function openOnSecondPage() {
   await wrapper.find('[data-test="next-page"]').trigger("click");
   await flushPromises();
   expect(scoreCalls().map((params) => params.from)).toEqual([0, 10]);
+  // The trend takes no page, so paging leaves it alone.
+  expect(mocks.timeline).toHaveBeenCalledTimes(1);
   for (const mock of Object.values(mocks)) mock.mockClear();
   return wrapper;
 }
@@ -187,6 +191,7 @@ function resetMocks() {
   replace.mockClear();
   mocks.list.mockReset().mockResolvedValue([]);
   mocks.listAgents.mockReset().mockResolvedValue({ agents: [] });
+  mocks.timeline.mockReset().mockResolvedValue({ timeline: [] });
   mocks.scores.mockReset().mockImplementation((_org, _id, params) =>
     Promise.resolve({
       ...PAGE,
@@ -298,6 +303,7 @@ describe("OnlineEvals Quality round trip through a link", () => {
     expect(restored.find('[data-test="pane-stub"]').text()).toBe("s11");
     expect(mocks.list).not.toHaveBeenCalled();
     expect(mocks.scores).not.toHaveBeenCalled();
+    expect(mocks.timeline).not.toHaveBeenCalled();
     expect(mocks.listAgents).not.toHaveBeenCalled();
   });
 });
@@ -315,22 +321,23 @@ describe("OnlineEvals Quality Refresh", () => {
 
     expect(mocks.list).toHaveBeenCalledTimes(1);
     expect(mocks.listAgents).toHaveBeenCalledTimes(1);
+    expect(mocks.timeline).toHaveBeenCalledTimes(1);
     expect(scoreCalls()).toEqual([expect.objectContaining({ from: 10, start_time: START })]);
     expect(cachedPage(0).every((query) => query.state.isInvalidated)).toBe(true);
     expect(cachedPage(10).every((query) => !query.state.isInvalidated)).toBe(true);
   });
 
-  it("forces the score pane's cached trace too, like the other reads on the view", async () => {
+  it("forces the score pane's cached spans too, like the other reads on the view", async () => {
     const wrapper = await openOnSecondPage();
     // Loaded before the Refresh, so the "not fetched by this Refresh" rule applies.
     const updatedAt = Date.now() - 1000;
-    const traceKey = traceDetailsKeys.detail("default", "default", "trace-1");
-    queryClient.setQueryData(traceKey, [], { updatedAt });
-    const otherOrg = traceDetailsKeys.detail("other", "default", "trace-1");
+    const spansKey = onlineEvalKeys.qualitySpans("default", "default", ["span-1"]);
+    queryClient.setQueryData(spansKey, [], { updatedAt });
+    const otherOrg = onlineEvalKeys.qualitySpans("other", "default", ["span-1"]);
     queryClient.setQueryData(otherOrg, [], { updatedAt });
     await wrapper.find('[data-test="quality-refresh-btn"]').trigger("click");
     await flushPromises();
-    expect(queryClient.getQueryState(traceKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(spansKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherOrg)?.isInvalidated).toBe(false);
   });
 

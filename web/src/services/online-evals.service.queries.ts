@@ -19,8 +19,10 @@ import onlineEvalsService, {
   type QualityListParams,
   type QualityScorePage,
   type QualityScoresParams,
+  type QualityTimelineBucket,
 } from "./online-evals.service";
 import { onlineEvalKeys } from "./online-evals.service.querykeys";
+import search from "./search";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { quantizeRange, stableFilters } from "@/composables/query/queryClient";
 
@@ -72,6 +74,39 @@ export const qualityScoresQuery = (org: string, entityId: string, params: Qualit
     queryKey: onlineEvalKeys.qualityScores(org, entityId, quantizedKey(params)),
     queryFn: (): Promise<QualityScorePage> =>
       onlineEvalsService.quality.scores(org, entityId, params),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+// Takes no page, filter or "only" params, so paging and drilling into the list never refetch the trend.
+export const qualityTimelineQuery = (org: string, entityId: string, params: QualityListParams) =>
+  queryOptions({
+    queryKey: onlineEvalKeys.qualityTimeline(org, entityId, quantizedKey(params)),
+    queryFn: async (): Promise<QualityTimelineBucket[]> =>
+      (await onlineEvalsService.quality.timeline(org, entityId, params)).timeline ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+/** The spans a score's judge read, by id, from a window in microseconds that holds them. */
+export const qualitySpansQuery = (
+  org: string,
+  streamType: string,
+  stream: string,
+  spanIds: string[],
+  startTime: number,
+  endTime: number,
+) =>
+  queryOptions({
+    queryKey: onlineEvalKeys.qualitySpans(org, streamType, stream, spanIds),
+    queryFn: async (): Promise<Record<string, unknown>[]> => {
+      const ids = spanIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(", ");
+      const sql = `SELECT * FROM "${stream.replace(/"/g, '""')}" WHERE span_id IN (${ids})`;
+      const response = await search.search({
+        org_identifier: org,
+        query: { query: { sql, start_time: startTime, end_time: endTime, from: 0 } },
+        page_type: streamType,
+      });
+      return response.data?.hits ?? [];
+    },
     staleTime: MEDIUM_STALE_TIME,
   });
 

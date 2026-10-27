@@ -8,16 +8,17 @@ import type {
   QualityScore,
   QualityScorePage,
   QualityScoresParams,
+  QualityTimelineBucket,
 } from "@/services/online-evals.service";
 import type { QualityOnly, QualityScope } from "../utils/qualityFormat";
 
-const { scores } = vi.hoisted(() => ({ scores: vi.fn() }));
+const { scores, timeline } = vi.hoisted(() => ({ scores: vi.fn(), timeline: vi.fn() }));
 
 vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    default: { ...actual.default, quality: { list: vi.fn(), scores } },
+    default: { ...actual.default, quality: { list: vi.fn(), scores, timeline } },
   };
 });
 
@@ -46,6 +47,8 @@ const score = (index: number): QualityScore => ({
   taskId: null,
   inputPreview: null,
   outputPreview: null,
+  inputSpanId: null,
+  outputSpanId: null,
 });
 
 function page(params: QualityScoresParams): QualityScorePage {
@@ -90,12 +93,68 @@ function mountDetail(
 }
 
 const lastParams = () => scores.mock.calls[scores.mock.calls.length - 1][2] as QualityScoresParams;
+const BUCKET: QualityTimelineBucket = {
+  start: 10,
+  end: 20,
+  count: 25,
+  unhealthy: 6,
+  trueCount: null,
+  average: 0.5,
+  p95: 0.9,
+};
 
 describe("useQualityDetail", () => {
   beforeEach(() => {
     TOTAL = 25;
     NEW_SCORES = 0;
     scores.mockReset().mockImplementation((_org, _id, params) => Promise.resolve(page(params)));
+    timeline.mockReset().mockResolvedValue({ timeline: [BUCKET] });
+  });
+
+  it("reads the trend with the window, scope and agent only, so paging, only and the chart filter never refetch it", async () => {
+    const { state, api } = mountDetail();
+    await flushPromises();
+    expect(timeline).toHaveBeenCalledTimes(1);
+    expect(timeline).toHaveBeenCalledWith("default", "cfg-1", { start_time: 10, end_time: 20 });
+    expect(api().timeline.value).toEqual([BUCKET]);
+
+    api().setPage(2);
+    await flushPromises();
+    state.only.value = "unhealthy";
+    await flushPromises();
+    api().filter.value = { kind: "bucket", from: 0, to: 0 };
+    await flushPromises();
+    api().next();
+    await flushPromises();
+    expect(scores.mock.calls.length).toBeGreaterThan(3);
+    expect(timeline).toHaveBeenCalledTimes(1);
+    expect(api().timeline.value).toEqual([BUCKET]);
+
+    state.scope.value = "trace";
+    state.agentParams.value = { agent_name: "alpha" };
+    await flushPromises();
+    expect(timeline).toHaveBeenLastCalledWith("default", "cfg-1", {
+      start_time: 10,
+      end_time: 20,
+      scope: "trace",
+      agent_name: "alpha",
+    });
+  });
+
+  it("keeps the trend on screen while a new window loads, but not across configs", async () => {
+    const { state, api } = mountDetail();
+    await flushPromises();
+    timeline.mockReturnValue(new Promise(() => {}));
+    state.dateWindow.value = { startUs: 70_000_000, endUs: 80_000_000 };
+    await flushPromises();
+    expect(timeline).toHaveBeenCalledTimes(2);
+    expect(api().timelineQuery.isPending.value).toBe(false);
+    expect(api().timeline.value).toEqual([BUCKET]);
+
+    state.configId.value = "cfg-2";
+    await flushPromises();
+    expect(api().timelineQuery.isPending.value).toBe(true);
+    expect(api().timeline.value).toEqual([]);
   });
 
   it("asks for the first page of 10 and takes the counts from distribution[]", async () => {

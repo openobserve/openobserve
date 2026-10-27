@@ -434,7 +434,7 @@ export function qualityRangeQuery(
   };
 }
 
-/** The window in microseconds that the target links and the full-text fetch search: an hour either side of the target time. */
+/** The window in microseconds that the target links search: an hour either side of the target time. */
 export const targetWindow = (score: QualityScore) => ({
   startTime: score.refTimestamp - LINK_WINDOW_US,
   endTime: score.refTimestamp + LINK_WINDOW_US,
@@ -467,73 +467,6 @@ export function targetLink(score: QualityScore, org: string): RouteLocationRaw |
     name: "traceDetails",
     query: { ...query, trace_id: traceId, ...(spanId ? { span_id: spanId } : {}) },
   };
-}
-
-// The conversation and tool fields the scorer reads, as in the backend's eval_jobs/tasks.rs.
-const LLM_INPUT_FIELDS = [
-  "gen_ai_input_messages",
-  "gen_ai.input.messages",
-  "llm.input",
-  "_o2_llm_input",
-  "gen_ai.content.prompt",
-  "llm_input",
-];
-const LLM_OUTPUT_FIELDS = [
-  "gen_ai_output_messages",
-  "gen_ai.output.messages",
-  "llm.output",
-  "_o2_llm_output",
-  "gen_ai.content.completion",
-  "llm_output",
-  "_o2_llm_response",
-];
-const TOOL_NAME_FIELDS = ["gen_ai.tool.name", "gen_ai_tool_name", "tool_name"];
-const PARENT_FIELDS = ["reference_parent_span_id", "parent_span_id", "parentSpanId"];
-
-type SpanRow = Record<string, unknown>;
-
-const present = (value: unknown) => value != null && !(typeof value === "string" && !value.trim());
-const hasLlmIo = (row: SpanRow) =>
-  [...LLM_INPUT_FIELDS, ...LLM_OUTPUT_FIELDS].some((field) => present(row[field]));
-const isToolRow = (row: SpanRow) => {
-  const operation = String(row.operation_name ?? "");
-  return (
-    TOOL_NAME_FIELDS.some((field) => present(row[field])) ||
-    [row["gen_ai.operation.name"], row.gen_ai_operation_name].some(
-      (value) => typeof value === "string" && value.trim() === "execute_tool",
-    ) ||
-    operation.startsWith("execute_tool ") ||
-    operation.startsWith("tool.")
-  );
-};
-const isChatRow = (row: SpanRow) => hasLlmIo(row) && !isToolRow(row);
-const isRootRow = (row: SpanRow) =>
-  PARENT_FIELDS.filter((field) => field in row).every((field) => {
-    const value = row[field];
-    return value == null || (typeof value === "string" && /^0*$/.test(value.trim()));
-  });
-const orderNumber = (value: unknown) => {
-  const number = Number(value);
-  return value != null && Number.isFinite(number) ? number : Number.MAX_SAFE_INTEGER;
-};
-
-/** The span whose text a score was given: the span itself, or for a trace the root chat span, then the first chat span, then the first span with LLM input or output, as the backend scorer picks it. */
-export function contentSpan(score: QualityScore, spans: SpanRow[]): SpanRow | undefined {
-  if (score.targetScope === "span") {
-    const spanId = score.spanId ?? score.targetId;
-    return spans.find((span) => span.span_id === spanId);
-  }
-  const sorted = [...spans].sort(
-    (a, b) =>
-      orderNumber(a._timestamp) - orderNumber(b._timestamp) ||
-      orderNumber(a._o2_ingest_ts) - orderNumber(b._o2_ingest_ts) ||
-      String(a.span_id ?? "").localeCompare(String(b.span_id ?? "")),
-  );
-  return (
-    sorted.find((span) => isRootRow(span) && isChatRow(span)) ??
-    sorted.find(isChatRow) ??
-    sorted.find(hasLlmIo)
-  );
 }
 
 /** Opens the judge's own trace on `_evaluator`, around the score write time. */
