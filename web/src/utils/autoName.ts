@@ -85,7 +85,7 @@ interface PanelAutoNameInput {
 const FIELDLESS_CHART_TYPES = ["markdown", "html", "custom_chart"];
 
 /** Chart types whose stream does not describe what they show, so no generated name beats a stream one. */
-export const NO_AUTO_NAME_TYPES: readonly string[] = ["node-graph", "alert-list"];
+export const NO_AUTO_NAME_TYPES: readonly string[] = ["node-graph", "alert-list", "flame-graph"];
 
 /** Time bucketing is HOW a chart is drawn, not WHAT it measures. */
 const TIME_AGGREGATIONS = ["histogram", "date_bin"];

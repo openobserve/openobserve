@@ -45,6 +45,7 @@ describe("searchLabelsConfig", () => {
     "background",
     "sparkline",
     "alertList",
+    "flameGraph",
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {

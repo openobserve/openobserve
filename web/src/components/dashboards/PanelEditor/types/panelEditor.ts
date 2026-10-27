@@ -670,6 +670,7 @@ export const ALL_CHART_TYPES = [
   "html",
   "markdown",
   "alert-list",
+  "flame-graph",
   "custom_chart",
 ] as const;
 

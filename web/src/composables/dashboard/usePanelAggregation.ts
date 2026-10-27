@@ -33,8 +33,14 @@ const NON_BUILDER_TYPES = ["html", "markdown", "custom_chart", "alert-list"];
 // Starter SQL seeded in this editor session, per query; saved or typed SQL is never a starter, whatever its shape.
 const seededStarters = new WeakMap<object, string>();
 
+/** The SQL a new flame graph panel starts from: folded stacks and their summed samples. */
+export const defaultFlameGraphPanelQuery = (stream: string): string =>
+  stream ? `SELECT stack, sum(samples) AS value FROM "${stream}" GROUP BY stack` : "";
+
 // The SQL each custom-SQL panel type starts from, keyed by panel type.
-const STARTER_QUERIES: Record<string, (stream: string, timestampColumn: string) => string> = {};
+const STARTER_QUERIES: Record<string, (stream: string, timestampColumn: string) => string> = {
+  "flame-graph": (stream) => defaultFlameGraphPanelQuery(stream),
+};
 
 /** Records the query's current SQL as the starter it was just seeded with. */
 export const markPanelStarterQuery = (query: any) => {

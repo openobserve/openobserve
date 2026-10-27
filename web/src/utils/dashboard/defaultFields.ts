@@ -158,6 +158,7 @@ export const SKIP_SEED_TYPES = [
   "markdown",
   "heatmap",
   "alert-list",
+  "flame-graph",
 ];
 
 /**

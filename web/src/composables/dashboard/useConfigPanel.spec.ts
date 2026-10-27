@@ -223,6 +223,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "background",
     "sparkline",
     "alertList",
+    "flameGraph",
   ];
 
   it("lists each section once", () => {
@@ -1075,6 +1076,23 @@ describe("useConfigPanel – alert list section", () => {
     expect(c.isSectionVisible("data")).toBe(true);
     expect(c.isSectionVisible("general")).toBe(true);
     expect(c.isSectionVisible("alertList")).toBe(false);
+  });
+});
+describe("useConfigPanel – flame graph sections", () => {
+  it("shows the flame graph only its own section, general and data", () => {
+    const c = makeComposable(makePanelData("flame-graph"));
+    expect(ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id))).toEqual([
+      "general",
+      "data",
+      "flameGraph",
+    ]);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("flameGraph")).toBe(false);
   });
 });
 

@@ -556,6 +556,8 @@ mod tests {
             "alert_list_max": 10.0,
             "alert_list_sort": "time",
             "alert_list_folder": "",
+            "flame_graph_stack_field": "folded",
+            "flame_graph_value_field": "value",
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

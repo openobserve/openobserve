@@ -35,13 +35,13 @@ export const isRawValueChart = (type: unknown): boolean =>
 export const DISTRIBUTION_ROW_LIMIT = 10000;
 
 /** Panel types drawn as HTML by their own renderer instead of an ECharts option. */
-export const HTML_PANEL_TYPES: readonly string[] = ["alert-list"];
+export const HTML_PANEL_TYPES: readonly string[] = ["alert-list", "flame-graph"];
 
 export const isHtmlPanel = (type: unknown): boolean =>
   typeof type === "string" && HTML_PANEL_TYPES.includes(type);
 
 /** HTML panel types that read the rows of a hand-written SQL query; the builder cannot express them. */
-export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = [];
+export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = ["flame-graph"];
 
 export const isCustomSqlPanel = (type: unknown): boolean =>
   typeof type === "string" && CUSTOM_SQL_PANEL_TYPES.includes(type);

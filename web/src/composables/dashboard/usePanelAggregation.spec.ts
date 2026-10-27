@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
-import { usePanelAggregation } from "./usePanelAggregation";
+import {
+  defaultFlameGraphPanelQuery,
+  isPanelStarterQuery,
+  usePanelAggregation,
+} from "./usePanelAggregation";
 
 const DEFAULT_CUSTOM_CHART_TEXT = "option = {};";
 const getDefaultCustomChartText = vi.fn(() => DEFAULT_CUSTOM_CHART_TEXT);
@@ -758,7 +762,58 @@ describe("usePanelAggregation", () => {
       });
     });
 
-    describe("starter queries", () => {
+    describe("flame graph and starter queries", () => {
+      const twoQueries = (type: string) => {
+        const panelData = makePanelData(type);
+        panelData.data.queries.push(makeDefaultQuery({ query: "SELECT 2" }));
+        panelData.layout.currentQueryIndex = 1;
+        panelData.data.queries[1].fields.stream = "demo_app";
+        panelData.data.queries[1].config.time_shift = [{ offSet: "1h" }] as any;
+        return panelData;
+      };
+
+      it("flame graph resets to a starter custom SQL query on the chosen stream", () => {
+        const panelData = twoQueries("flame-graph");
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(1);
+        expect(panelData.data.queries[0]).toMatchObject({
+          customQuery: true,
+          query: 'SELECT stack, sum(samples) AS value FROM "demo_app" GROUP BY stack',
+        });
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+        expect(panelData.data.queryType).toBe("sql");
+        expect((panelData.layout as any).showQueryBar).toBe(true);
+        expect(defaultFlameGraphPanelQuery("")).toBe("");
+      });
+
+      it("keeps hand-written SQL on a switch to flame graph", () => {
+        const typed = makePanelData("flame-graph");
+        Object.assign(typed.data.queries[0], {
+          customQuery: true,
+          query: 'SELECT stack, count(*) AS value FROM "test_stream" GROUP BY stack',
+        });
+        makeAggregation(typed).resetAggregationFunction();
+        expect(typed.data.queries[0]).toMatchObject({
+          customQuery: true,
+          query: 'SELECT stack, count(*) AS value FROM "test_stream" GROUP BY stack',
+        });
+      });
+
+      it("returns an untouched flame graph starter to the builder on a switch to a line chart", () => {
+        const panelData = makePanelData("flame-graph");
+        panelData.data.queries[0].fields.stream = "test_stream";
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries[0].query).toBe(defaultFlameGraphPanelQuery("test_stream"));
+        expect(isPanelStarterQuery(panelData.data.queries[0])).toBe(true);
+        panelData.data.type = "line";
+        makeAggregation(panelData).resetAggregationFunction();
+        const [query] = panelData.data.queries;
+        expect(query.customQuery).toBe(false);
+        expect(query.query).toBe("");
+        expect(query.fields.x.map((field: any) => field.alias)).toEqual(["x_axis_1"]);
+        expect(query.fields.y.map((field: any) => field.functionName)).toEqual(["count"]);
+      });
+
       it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {
         const panelData = makePanelData("state-timeline");
         Object.assign(panelData.data.queries[0], {

@@ -103,6 +103,7 @@ export const usePanelFields = ({
       case "distribution":
       case "node-graph":
       case "alert-list":
+      case "flame-graph":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -148,6 +149,7 @@ export const usePanelFields = ({
       case "funnel":
       case "node-graph":
       case "alert-list":
+      case "flame-graph":
         return true;
       case "hostmap":
         return (
@@ -180,6 +182,7 @@ export const usePanelFields = ({
         );
       case "node-graph":
       case "alert-list":
+      case "flame-graph":
         return true;
       case "metric":
         return (
