@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('common.timeRangeRemoveRecent', { range: item.label })"
             @keydown.left.prevent="focusSibling($event, '[data-date-time-rail-recent]')"
             class="absolute! end-1.5 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+            :class="item.selected ? 'text-button-primary-foreground!' : ''"
             @click.stop="removeFocusedRecent(item.id, $event)"
           />
         </div>

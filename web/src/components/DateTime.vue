@@ -80,12 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         id="date-time-menu"
         class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] max-sm:flex-col max-sm:overflow-y-auto"
-        :class="showRail ? 'w-131.25 max-sm:w-81.25' : 'w-81.25'"
+        :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
         @keydown.capture="onPickerKeydown"
       >
         <div
           v-if="showRail"
-          class="border-border-default relative w-50 shrink-0 border-e max-sm:w-full max-sm:border-e-0 max-sm:border-b"
+          class="border-border-default relative w-77 shrink-0 border-e max-sm:w-full max-sm:border-e-0 max-sm:border-b"
           data-test="date-time-rail-frame"
         >
           <DateTimeRail
@@ -404,6 +404,7 @@ import {
 import {
   CALENDAR_RAIL_ITEMS,
   exceedsRangeRestriction,
+  formatAbsoluteInstant,
   formatRecentRange,
   type TimeRangeRailItem,
 } from "@/utils/timeRangeRail";
@@ -419,7 +420,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { fromZonedTime } from "date-fns-tz";
 
 const MICROS_PER_SECOND = 1_000_000;
 // Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
@@ -757,30 +758,19 @@ export default defineComponent({
 
     const recentRailItems = computed<TimeRangeRailItem[]>(() => {
       const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
-      return timeRangeHistory.entries.value.map((entry, index) => {
-        const { label, extraDays } = formatRecentRange(
+      return timeRangeHistory.entries.value.map((entry, index) => ({
+        id: String(index),
+        label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
+        suffix: null,
+        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
+        selected:
+          current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
+        disabled: exceedsRangeRestriction(
           entry.startUs,
           entry.endUs,
-          store.state.timezone,
-          intlLocale.value,
-          tooltipNow.value,
-        );
-        return {
-          id: String(index),
-          label,
-          suffix: extraDays > 0 ? t("common.plusDays", { count: extraDays }) : null,
-          tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
-          selected:
-            current !== null &&
-            current.startUTC === entry.startUs &&
-            current.endUTC === entry.endUs,
-          disabled: exceedsRangeRestriction(
-            entry.startUs,
-            entry.endUs,
-            props.queryRangeRestrictionInHour,
-          ),
-        };
-      });
+          props.queryRangeRestrictionInHour,
+        ),
+      }));
     });
 
     const periodUnits = ["s", "m", "h", "d", "w", "M"];
@@ -1021,20 +1011,7 @@ export default defineComponent({
     };
 
     function convertUnixTime(unixTimeMicros: number) {
-      // Convert microseconds to milliseconds and create a new Date object
-      var date = toZonedTime(unixTimeMicros / 1000, store.state.timezone);
-
-      // Extract hour, minute, day, month, and year
-      const hours = ("0" + date.getHours()).slice(-2); // pad with leading zero if needed
-      const minutes = ("0" + date.getMinutes()).slice(-2); // pad with leading zero if needed
-      const seconds = ("0" + date.getSeconds()).slice(-2); // pad with leading zero if needed
-
-      // Build formatted strings
-      var dateString = new Date(date).toLocaleDateString("en-ZA");
-      var timeString = hours + ":" + minutes + ":" + seconds;
-
-      // Return both strings
-      return { date: dateString, time: timeString };
+      return formatAbsoluteInstant(unixTimeMicros, store.state.timezone);
     }
 
     const refresh = () => {

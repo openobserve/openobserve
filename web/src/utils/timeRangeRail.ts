@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { formatInTimeZone } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 
 import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 
-const DAY_MS = 86_400_000;
+const MICROS_PER_SECOND = 1_000_000;
 
 export const CALENDAR_RAIL_ITEMS: readonly CalendarRailPreset[] = [
   { id: "today", token: "calendar:day:0", labelKey: "common.today", soFar: true },
@@ -55,51 +55,33 @@ export interface TimeRangeRailItem {
   disabled: boolean;
 }
 
-export interface RecentRangeLabel {
-  label: I18nText;
-  /** 1 when the range ends on the day after it starts, else 0. */
-  extraDays: number;
-}
+/** The trigger's absolute-range date/time split: "yyyy/MM/dd" + "HH:mm:ss", in the given zone. */
+export const formatAbsoluteInstant = (
+  unixTimeMicros: number,
+  timezone: string,
+): { date: string; time: string } => {
+  const date = toZonedTime(unixTimeMicros / 1000, timezone);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return { date: date.toLocaleDateString("en-ZA"), time: `${hours}:${minutes}:${seconds}` };
+};
 
-/** "Oct 26 · 15:45–16:20", "Oct 25 22:00–01:30" (+1 day) or "Oct 19 – Oct 21", in the picker timezone. */
+/** "2026/10/01 00:00:00 - 2026/10/27 09:43:21", matching the trigger's absolute-range label exactly. */
 export const formatRecentRange = (
   startUs: number,
   endUs: number,
   timezone: string | null | undefined,
-  locale: string = "en-US",
-  nowMs: number = Date.now(),
-): RecentRangeLabel => {
+): I18nText => {
   const zone = safeTimezone(timezone);
-  const startMs = Math.floor(startUs / 1000);
-  // An end exactly at midnight is exclusive, so the range ends on the previous day, as calendar tooltips show it.
+  // An end exactly at midnight is exclusive, so the row shows the previous day's last second, as the trigger does.
   const endsAtMidnight =
     endUs > startUs &&
-    formatInTimeZone(Math.floor(endUs / 1000), zone, "HH:mm:ss.SSS") === "00:00:00.000";
-  const endMs = Math.floor((endsAtMidnight ? endUs - 1 : endUs) / 1000);
-  const currentYear = formatInTimeZone(nowMs, zone, "yyyy");
-  const day = (ms: number) => {
-    const withYear = formatInTimeZone(ms, zone, "yyyy") !== currentYear;
-    return new Intl.DateTimeFormat(locale, {
-      month: "short",
-      day: "numeric",
-      ...(withYear ? { year: "numeric" } : {}),
-      timeZone: zone,
-    }).format(ms);
-  };
-  const time = (ms: number) => formatInTimeZone(ms, zone, "HH:mm");
-  const dayDiff = Math.round(
-    (Date.parse(formatInTimeZone(endMs, zone, "yyyy-MM-dd")) -
-      Date.parse(formatInTimeZone(startMs, zone, "yyyy-MM-dd"))) /
-      DAY_MS,
-  );
-
-  if (dayDiff <= 0) {
-    return { label: raw(`${day(startMs)} · ${time(startMs)}–${time(endMs)}`), extraDays: 0 };
-  }
-  if (dayDiff === 1) {
-    return { label: raw(`${day(startMs)} ${time(startMs)}–${time(endMs)}`), extraDays: 1 };
-  }
-  return { label: raw(`${day(startMs)} – ${day(endMs)}`), extraDays: 0 };
+    endUs % MICROS_PER_SECOND === 0 &&
+    formatAbsoluteInstant(endUs, zone).time === "00:00:00";
+  const start = formatAbsoluteInstant(startUs, zone);
+  const end = formatAbsoluteInstant(endsAtMidnight ? endUs - 1 : endUs, zone);
+  return raw(`${start.date} ${start.time} - ${end.date} ${end.time}`);
 };
 
 /** Whether a range is longer than the page's query-range limit; 0 means no limit. */

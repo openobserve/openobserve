@@ -732,8 +732,12 @@ describe("DateTime rail", () => {
       await flushPromises();
       await openMenu();
 
-      expect(el("date-time-rail-recent-0")?.textContent?.trim()).toBe("Oct 8 · 04:30–05:00");
-      expect(el("date-time-rail-recent-1")?.textContent?.trim()).toBe("Oct 6 · 23:30–23:59");
+      expect(el("date-time-rail-recent-0")?.textContent?.trim()).toBe(
+        "2026/10/08 04:30:00 - 2026/10/08 05:00:00",
+      );
+      expect(el("date-time-rail-recent-1")?.textContent?.trim()).toBe(
+        "2026/10/06 23:30:00 - 2026/10/06 23:59:59",
+      );
 
       el("date-time-rail-recent-1")!.click();
       await flushPromises();
