@@ -62,8 +62,7 @@ async fn validate_no_javascript_functions(pipeline: &Pipeline) -> Result<(), Pip
     Ok(())
 }
 
-/// An absent source org_id would slip past the realtime exclusivity check and never
-/// match the execution cache key, both of which compare fully-qualified StreamParams.
+/// Fills a blank org on the realtime source and every Stream/Query node with the pipeline's org.
 fn default_node_orgs(pipeline: &mut Pipeline) {
     let org = pipeline.org.clone();
     if let PipelineSource::Realtime(stream) = &mut pipeline.source
