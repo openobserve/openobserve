@@ -173,6 +173,11 @@ vi.mock("./useAnnotations", () => ({
 let shouldStreamingThrow = false;
 let streamOverride: ((payload: any, callbacks: any) => any) | null = null;
 
+const { mockGetStream } = vi.hoisted(() => ({ mockGetStream: vi.fn() }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
+
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi.fn().mockImplementation((payload, callbacks) => {
@@ -1560,6 +1565,96 @@ describe("usePanelDataLoader", () => {
 
         expect(loader.errorDetail.value.message).toBeDefined();
       });
+    });
+  });
+
+  describe("enrichment table panels", () => {
+    it("searches the table's own span instead of the dashboard range", async () => {
+      const tableStartUs = Date.UTC(2020, 0, 1) * 1000;
+      mockGetStream.mockResolvedValueOnce({
+        stats: { doc_time_min: tableStartUs, doc_time_max: tableStartUs },
+      });
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+
+      expect(mockGetStream).toHaveBeenCalledWith("geo", "enrichment_tables", false);
+      const { start_time, end_time } = payloads[0].queryReq.query;
+      expect(start_time).toBe(tableStartUs - 1_000_000);
+      expect(end_time).toBeGreaterThanOrEqual((Date.now() - 60_000) * 1000);
+    });
+  });
+
+  describe("enrichment table panels superseded while the stats load", () => {
+    it("fires only the newer run's query", async () => {
+      global.AbortController = class {
+        signal = { aborted: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+        abort() {
+          this.signal.aborted = true;
+        }
+      } as unknown as typeof AbortController;
+      let releaseFirst: (v: unknown) => void = () => {};
+      mockGetStream
+        .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+        .mockResolvedValueOnce({ stats: { doc_time_min: 5_000_000, doc_time_max: 5_000_000 } });
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+
+      const first = loader.loadData();
+      await vi.waitFor(() => expect(mockGetStream).toHaveBeenCalledTimes(1));
+      await loader.loadData();
+      releaseFirst({ stats: { doc_time_min: 9_000_000, doc_time_max: 9_000_000 } });
+      await first;
+
+      expect(payloads.map((p: any) => p.queryReq.query.start_time)).toEqual([4_000_000]);
     });
   });
 

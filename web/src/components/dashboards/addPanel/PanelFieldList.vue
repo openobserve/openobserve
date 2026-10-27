@@ -523,8 +523,14 @@ function onStreamChange(val: SelectModelValue) {
 
 // ── Stream type options ────────────────────────────────────────────────
 
+// Only a dashboard panel searches an enrichment table over its whole lifetime, so only it offers one.
 const streamTypeOptions = computed(() =>
-  ["logs", "metrics", "traces"].map((t: string) => ({ label: raw(t), value: t })),
+  [
+    "logs",
+    "metrics",
+    "traces",
+    ...(dashboardPanelDataPageKey === "dashboard" ? ["enrichment_tables"] : []),
+  ].map((t: string) => ({ label: raw(t), value: t })),
 );
 
 // ── Stream list ────────────────────────────────────────────────────────

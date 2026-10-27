@@ -700,6 +700,11 @@ pub struct PanelConfig {
     hostmap_cell_shape: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_cell_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    no_data_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    y_axis_min_interval: Option<OrdF64>,
 }
 
 /// Heatmap y buckets: "size" mode is fixed-width, "log" mode one per power of `base` (2 or 10).
@@ -865,6 +870,40 @@ pub enum Config {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Vec<Mapping>>,
     },
+    LineStyle {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    LineWidth {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[schema(value_type = Option<f64>)]
+        value: Option<OrdF64>,
+    },
+    FillOpacity {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[schema(value_type = Option<f64>)]
+        value: Option<OrdF64>,
+    },
+    ShowPoints {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<bool>,
+    },
+    DrawStyle {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    StackGroup {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    YAxis {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    HideFrom {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<SeriesHideFrom>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -878,6 +917,17 @@ pub struct ConditionalRule {
     pub text_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bg_color: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct SeriesHideFrom {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chart: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legend: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tooltip: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -2849,5 +2899,137 @@ mod tests {
         ] {
             assert!(json.get(key).is_none(), "{key}");
         }
+    }
+
+    #[test]
+    fn test_override_config_series_style_entry_round_trip() {
+        let input = serde_json::json!({
+            "field": {"matchBy": "series_regex", "value": "^spine"},
+            "config": [
+                {"type": "line_style", "value": "dashed"},
+                {"type": "line_width", "value": 3.0},
+                {"type": "fill_opacity", "value": 40.0},
+                {"type": "show_points", "value": true},
+                {"type": "draw_style", "value": "bars"},
+                {"type": "stack_group", "value": "fabric"},
+                {"type": "y_axis", "value": "right"},
+                {"type": "hide_from", "value": {"legend": true, "tooltip": true}}
+            ]
+        });
+        let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
+        let config = entry.config.as_ref().unwrap();
+        assert_eq!(config.len(), 8);
+        assert_eq!(
+            config[0],
+            Config::LineStyle {
+                value: Some("dashed".to_string())
+            }
+        );
+        assert_eq!(
+            config[1],
+            Config::LineWidth {
+                value: Some(OrdF64::from(3.0))
+            }
+        );
+        assert_eq!(
+            config[2],
+            Config::FillOpacity {
+                value: Some(OrdF64::from(40.0))
+            }
+        );
+        assert_eq!(config[3], Config::ShowPoints { value: Some(true) });
+        assert_eq!(
+            config[4],
+            Config::DrawStyle {
+                value: Some("bars".to_string())
+            }
+        );
+        assert_eq!(
+            config[5],
+            Config::StackGroup {
+                value: Some("fabric".to_string())
+            }
+        );
+        assert_eq!(
+            config[6],
+            Config::YAxis {
+                value: Some("right".to_string())
+            }
+        );
+        assert!(matches!(
+            &config[7],
+            Config::HideFrom { value: Some(h) }
+                if h.chart.is_none() && h.legend == Some(true) && h.tooltip == Some(true)
+        ));
+        let json = serde_json::to_value(&entry).unwrap();
+        assert_eq!(json, input);
+        let back: OverrideConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn test_override_config_series_style_types_skip_unset_value() {
+        let cases = [
+            (Config::LineStyle { value: None }, "line_style"),
+            (Config::LineWidth { value: None }, "line_width"),
+            (Config::FillOpacity { value: None }, "fill_opacity"),
+            (Config::ShowPoints { value: None }, "show_points"),
+            (Config::DrawStyle { value: None }, "draw_style"),
+            (Config::StackGroup { value: None }, "stack_group"),
+            (Config::YAxis { value: None }, "y_axis"),
+            (Config::HideFrom { value: None }, "hide_from"),
+        ];
+        for (cfg, typ) in cases {
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json, serde_json::json!({"type": typ}));
+            let back: Config = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_override_config_show_points_false_is_kept() {
+        let cfg: Config =
+            serde_json::from_value(serde_json::json!({"type": "show_points", "value": false}))
+                .unwrap();
+        assert_eq!(cfg, Config::ShowPoints { value: Some(false) });
+        assert_eq!(
+            serde_json::to_value(&cfg).unwrap(),
+            serde_json::json!({"type": "show_points", "value": false})
+        );
+    }
+
+    #[test]
+    fn test_panel_config_no_data_text_and_min_interval_round_trip() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "no_data_text": "Set $site_meter first",
+            "y_axis_min_interval": 1
+        }))
+        .unwrap();
+        assert_eq!(cfg.no_data_text.as_deref(), Some("Set $site_meter first"));
+        assert_eq!(cfg.y_axis_min_interval, Some(OrdF64::from(1.0)));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["no_data_text"], "Set $site_meter first");
+        assert_eq!(json["y_axis_min_interval"], 1.0);
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_no_data_text_and_min_interval_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("no_data_text").is_none());
+        assert!(json.get("y_axis_min_interval").is_none());
     }
 }

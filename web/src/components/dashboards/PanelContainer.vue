@@ -653,6 +653,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { toPanelFileName } from "@/utils/dashboard/panelTitle";
@@ -1443,6 +1444,8 @@ export default defineComponent({
     const alertDisabledReason = computed(() => {
       const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
       if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // The alert form offers no enrichment-table stream type, so the prefill would be rejected.
+      if (isEnrichmentTablePanel(props.data)) return t("panel.enrichmentTableAlertUnsupported");
       // A formula's stream comes from its inputs' text; any other query needs its own.
       if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
         return t("panel.panelQueryMustHaveStream");

@@ -26,6 +26,8 @@ import {
 } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import useStreams from "@/composables/useStreams";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { extractFields } from "@/utils/query/sqlUtils";
 import {
@@ -92,6 +94,7 @@ export function usePanelDrilldown({
   onExemplarClick?: (params: any) => void | Promise<void>;
 }) {
   // Cross-linking: store cross-links from result_schema response
+  const { getStream } = useStreams(t);
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
 
   // Panel query's WHERE, parsed by the backend (result_schema); "" falls back to client extraction.
@@ -282,7 +285,10 @@ export function usePanelDrilldown({
     return { originalQuery, streamName };
   };
 
-  const calculateTimeRange = (hoveredTimestamp: number | null, interval: number | undefined) => {
+  const calculateTimeRange = async (
+    hoveredTimestamp: number | null,
+    interval: number | undefined,
+  ) => {
     if (interval && hoveredTimestamp) {
       const startTime = hoveredTimestamp; // hovertedTimestamp is in microseconds
       return {
@@ -290,6 +296,9 @@ export function usePanelDrilldown({
         endTime: startTime + interval,
       };
     }
+    // The panel read the whole enrichment table, so the logs page opens on that same span.
+    const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+    if (tableRange) return { startTime: tableRange.from, endTime: tableRange.to };
     return {
       startTime: selectedTimeObj.value.start_time.getTime(),
       endTime: selectedTimeObj.value.end_time.getTime(),
@@ -869,7 +878,7 @@ export function usePanelDrilldown({
         const calculatedTimeRange = segment
           ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
           : ((isHeatmap ? heatmapColumnRange(drilldownParams[0]) : null) ??
-            calculateTimeRange(hoveredTimestamp, intervalMicro.value));
+            (await calculateTimeRange(hoveredTimestamp, intervalMicro.value)));
 
         let modifiedQuery = originalQuery;
 
