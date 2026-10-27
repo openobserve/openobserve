@@ -42,16 +42,17 @@ describe("installCommand", () => {
     expect(cmd).toContain("--org 'acme'");
     expect(cmd).toContain("--token 'o2ft_abc123'");
     expect(cmd).toContain("--version '0.163.1'");
-    expect(cmd).not.toContain("--transport");
+    expect(cmd).toContain("--transport ws");
   });
 
   it("uses the macOS script on macOS", () => {
     expect(installCommand("macos", target)).toContain("/agents/main/fleet/install.sh");
   });
 
-  it("adds --transport http only when the proxy cannot carry WebSocket", () => {
+  it("always names the transport, so the scripts' own default never decides it", () => {
     expect(installCommand("linux", { ...target, http: true })).toContain("--transport http");
     expect(installCommand("windows", { ...target, http: true })).toContain("-Transport http");
+    expect(installCommand("windows", target)).toContain("-Transport ws");
   });
 
   it("leaves the version to the script when the org sets none", () => {
@@ -98,6 +99,9 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set image.repository=o2cr.ai/openobserve/otel-fleet-collector");
     expect(cmd).toContain("--set image.tag='0.163.1'");
     expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
+    expect(installCommand("kubernetes", { ...target, http: true })).toContain(
+      "--set opamp.endpoint='https://o2.example.com/api/acme/v1/opamp'",
+    );
   });
 
   it("installs agents as the otel-fleet-collector release with the chart's agent default", () => {

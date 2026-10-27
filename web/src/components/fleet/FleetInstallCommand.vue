@@ -53,10 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         : t("fleet.install.versionLatest")
     }}</OText>
     <OCheckbox
-      v-if="platform !== 'kubernetes'"
-      v-model="http"
-      :label="t('fleet.install.httpTransport')"
-      data-test="fleet-install-command-http"
+      v-model="websocket"
+      :label="t('fleet.install.websocketTransport')"
+      data-test="fleet-install-command-websocket"
     />
     <OCodeBlock
       :code="command"
@@ -108,7 +107,7 @@ const settings = useFleetSettings().settings;
 const version = computed(() => settings.value?.target_collector_version || null);
 
 const platform = ref<InstallPlatform>("linux");
-const http = ref(false);
+const websocket = ref(false);
 const role = ref<KubernetesRole>("agent");
 
 const platformOptions = INSTALL_PLATFORMS.map((value) => ({
@@ -140,7 +139,7 @@ const build = (token: string) =>
     org: orgId.value,
     token,
     version: version.value,
-    http: http.value && platform.value !== "kubernetes",
+    http: !websocket.value,
     role: role.value,
   });
 const command = computed(() => build(props.token));
