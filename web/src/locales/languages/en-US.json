@@ -26460,7 +26460,7 @@
         "saveManual": "Save credentials",
         "useToken": "Use a configuration token instead",
         "unreachableTitle": "Couldn't reach OpenObserve. Nothing was created.",
-        "unreachableDetail": "The request to this server got no answer, so your token was not sent to Slack. Check that this tab's address matches the server (http vs https), that the server is up, then try Create the app again.",
+        "unreachableDetail": "The request to this server got no answer, so nothing was sent to Slack. Check that this tab's address matches the server (http vs https) and that the server is up, then try again.",
         "noResponse": "{request} · no response",
         "tokenRequired": "Paste the configuration refresh token",
         "clientIdRequired": "Enter the client ID",

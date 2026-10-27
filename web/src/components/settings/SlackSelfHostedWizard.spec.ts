@@ -948,6 +948,27 @@ describe("SlackSelfHostedWizard on an instance workspace's team (M3, R-81, R-82)
     expect(toast).not.toHaveBeenCalled();
   });
 
+  it("S10 the unreachable banner in Set up manually names no token and no Create button", async () => {
+    vi.mocked(slack.createInstallation).mockReturnValue(
+      Promise.reject(
+        Object.assign(new Error("Network Error"), { code: "ERR_NETWORK", request: {} }),
+      ) as any,
+    );
+    const w = await mountWizard();
+    await toCreate(w);
+    await w.find('[data-test="slack-wizard-manual"]').trigger("click");
+    await flushPromises();
+    await w.find('[data-test="slack-wizard-client-id"] input').setValue("1.2");
+    await w.find('[data-test="slack-wizard-client-secret"] input').setValue("sec");
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() =>
+      expect(w.find('[data-test="slack-wizard-unreachable"]').exists()).toBe(true),
+    );
+    const banner = w.find('[data-test="slack-wizard-unreachable"]').text();
+    expect(banner).toContain("http vs https");
+    expect(banner).not.toMatch(/token|Create the app/i);
+  });
+
   it("a refused config token shows the server message verbatim", async () => {
     vi.mocked(slack.createInstallation).mockReturnValue(
       Promise.reject(refusal(400, TOKEN_REFUSED, {})) as any,
