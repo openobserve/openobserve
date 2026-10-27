@@ -126,6 +126,7 @@ export {
 } from "./useEditorProposal";
 export { createHintChannel } from "./hints";
 export {
+  askLeaveGuard,
   assistantLifecycle,
   registerLifecycleDialogs,
   runLeaveGuards,

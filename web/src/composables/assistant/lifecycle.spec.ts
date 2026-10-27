@@ -670,6 +670,27 @@ describe("lifecycle questions", () => {
     await expect(first).resolves.toBe("proceed");
   });
 
+  it("asks one guard for a move inside its page and leaves every other guard armed", async () => {
+    const { askLeaveGuard, useAssistantLeaveGuard } = await import("./lifecycle");
+    const other = { host: "alert" as const, isDirty: () => true, name: () => raw("checkout") };
+    const mine = { host: "settings" as const, isDirty: () => true, name: () => raw("policy") };
+    useAssistantLeaveGuard(other);
+    useAssistantLeaveGuard(mine);
+    const asked = askLeaveGuard(mine);
+    await flushPromises();
+    expect(useLifecycleQuestion().value?.question).toEqual({ kind: "leave_guard", name: "policy" });
+    useLifecycleQuestion().value!.answer("discard");
+    await expect(asked).resolves.toBe(true);
+    const all = runLeaveGuards();
+    await flushPromises();
+    expect(useLifecycleQuestion().value?.question).toEqual({
+      kind: "leave_guard",
+      name: "checkout",
+    });
+    useLifecycleQuestion().value!.answer("keep");
+    await expect(all).resolves.toBe(false);
+  });
+
   it("takes the safe default when no dialog host is mounted", async () => {
     unregisterDialogs();
     unregisterDialogs = () => undefined;

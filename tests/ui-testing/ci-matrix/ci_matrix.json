@@ -643,7 +643,8 @@
       "history.spec.js",
       "xtab.spec.js",
       "sharing.spec.js",
-      "helper.spec.js"
+      "helper.spec.js",
+      "admin.spec.js"
     ],
     "disabled": [
       {

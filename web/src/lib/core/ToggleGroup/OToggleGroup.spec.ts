@@ -343,3 +343,22 @@ describe("OToggleGroup", () => {
     });
   });
 });
+
+describe("OToggleGroup labelled group", () => {
+  it("names the group by its label", () => {
+    const wrapper = mountGroup({ label: "Tier" }, [{ value: "a", label: "A" }]);
+    const group = wrapper.find('[role="group"]');
+    const labelId = group.attributes("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(wrapper.find(`[id="${labelId}"]`).text()).toBe("Tier");
+  });
+
+  it("puts aria-describedby on the group a screen reader enters", () => {
+    const wrapper = mount(OToggleGroup, {
+      props: { label: "Tier" },
+      attrs: { "aria-describedby": "line-1" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(wrapper.find('[role="group"]').attributes("aria-describedby")).toBe("line-1");
+  });
+});

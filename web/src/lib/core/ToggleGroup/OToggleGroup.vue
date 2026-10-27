@@ -7,7 +7,17 @@ import type {
 } from "./OToggleGroup.types";
 import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
 import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
-import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount, useAttrs } from "vue";
+import {
+  computed,
+  provide,
+  ref,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  useAttrs,
+  useId,
+} from "vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroupMenuScope from "./OToggleGroupMenuScope.vue";
@@ -35,6 +45,9 @@ const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefine
 
 const { isMobile } = useBreakpoint();
 const attrs = useAttrs();
+const labelId = useId();
+// A description belongs to the group a screen reader enters, not to the layout wrapper around it.
+const describedBy = computed(() => attrs["aria-describedby"] as string | undefined);
 const asDropdown = computed(
   () =>
     props.mobileDropdown &&
@@ -309,6 +322,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
         icon-right="arrow-drop-down"
         class="shrink-0"
         :disabled="disabled"
+        :aria-describedby="describedBy"
         :data-test="dropdownTestId"
       >
         <OToggleGroupMenuScope mode="trigger" :is-active="isActiveValue" :select="selectValue">
@@ -323,6 +337,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
 
   <div v-else-if="hasLabel" :class="wrapperClasses">
     <span
+      :id="labelId"
       :class="[
         'o-input-label text-compact leading-tight select-none',
         disabled
@@ -339,6 +354,8 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       :disabled="disabled"
       :orientation="orientation"
       :data-variant="variant"
+      :aria-labelledby="labelId"
+      :aria-describedby="describedBy"
       :class="[
         'relative inline-flex items-stretch',
         orientation === 'vertical' ? 'flex-col' : 'flex-row',

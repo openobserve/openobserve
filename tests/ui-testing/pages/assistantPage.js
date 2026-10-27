@@ -229,7 +229,25 @@ export class AssistantPage {
     return this.page.locator(`[data-test="${ids[kind]}"]`);
   }
 
-  settings(_tab) {
-    return notYet("WP-14");
+  /** The Settings › Assistant panel of one tab. */
+  settings(tab) {
+    return this.page.locator(`[data-test="settings-assistant-panel-${tab}"]`);
+  }
+
+  settingsTab(tab) {
+    return this.page.locator(`[data-test="settings-assistant-tab-${tab}"]`);
+  }
+
+  settingsControl(id) {
+    return this.page.locator(`[data-test="settings-assistant-${id}"]`);
+  }
+
+  /** The control inside an OSwitch, which carries `aria-checked` and `disabled`. */
+  settingsSwitch(id) {
+    return this.settingsControl(id).locator('[role="switch"]');
+  }
+
+  confirmDialog() {
+    return this.page.locator('[data-test="confirm-dialog-provider"]');
   }
 }
