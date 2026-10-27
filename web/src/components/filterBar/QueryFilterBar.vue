@@ -145,7 +145,7 @@ function onBlur() {
 async function onEdit(id: string) {
   editor.editCondition(id);
   await nextTick();
-  focus();
+  inputRef.value?.focusSelect();
 }
 
 function onRemove(id: string) {

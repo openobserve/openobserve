@@ -98,6 +98,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const armedId = ref<string | null>(null);
   const values = ref<string[]>([]);
   const valuesLoading = ref(false);
+  // The value of a chip being edited, until the user types over it.
+  const editedValue = ref<string | null>(null);
 
   const valueCache = new Map<string, string[]>();
   let valueTimer: ReturnType<typeof setTimeout> | undefined;
@@ -119,6 +121,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   });
 
   function reset() {
+    editedValue.value = null;
     text.value = "";
     step.value = "field";
     draft.value = null;
@@ -199,8 +202,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   });
 
   const valueSuggestions = computed<ChipInputSuggestion[]>(() => {
-    const needle = text.value.trim();
-    const source = draftType.value === "boolean" ? ["true", "false"] : values.value;
+    const needle = editedValue.value === null ? text.value.trim() : "";
+    const loaded = draftType.value === "boolean" ? ["true", "false"] : values.value;
+    const current = editedValue.value;
+    const source = current === null ? loaded : [current, ...loaded.filter((v) => v !== current)];
     const chosen = new Set(draft.value?.values ?? []);
     const ranked = rankByMatch(source, needle).slice(0, MAX_ROWS);
     const rows: ChipInputSuggestion[] = ranked.map((value) => ({
@@ -275,7 +280,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   watch([step, () => draft.value?.field, text], ([currentStep, field, typed]) => {
     if (currentStep !== "value" || !field) return;
     clearTimeout(valueTimer);
-    const search = typed.trim();
+    const search = editedValue.value === null ? typed.trim() : "";
     valueTimer = setTimeout(() => fetchValues(field, search), search ? VALUE_DEBOUNCE_MS : 0);
   });
 
@@ -407,6 +412,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   // Advanced mode reads `(`, `)`, `and ` and `or ` as tokens the moment they are typed.
   function onTextChange(value: string) {
     text.value = value;
+    editedValue.value = null;
     armedId.value = null;
     if (step.value !== "field" || !advanced.value) return;
     const typed = value.trimStart().toLowerCase();
@@ -487,6 +493,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       values: arity === "many" ? [...node.values] : [],
     };
     text.value = arity === "one" ? (node.values[0] ?? "") : "";
+    editedValue.value = arity === "one" ? (node.values[0] ?? "") : null;
     step.value = arity === "none" ? "operator" : "value";
     open.value = true;
   }

@@ -81,4 +81,6 @@ export interface ChipInputSlots {
 
 export interface ChipInputExpose {
   focus: () => void;
+  /** Focuses the field with its text selected, so typing replaces it. */
+  focusSelect: () => void;
 }

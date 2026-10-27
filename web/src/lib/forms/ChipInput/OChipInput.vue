@@ -80,7 +80,12 @@ function focus() {
   inputRef.value?.focus();
 }
 
-defineExpose<ChipInputExpose>({ focus });
+function focusSelect() {
+  focus();
+  inputRef.value?.select();
+}
+
+defineExpose<ChipInputExpose>({ focus, focusSelect });
 
 function move(step: number) {
   const count = props.suggestions.length;

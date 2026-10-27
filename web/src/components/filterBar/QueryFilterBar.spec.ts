@@ -193,6 +193,23 @@ describe("QueryFilterBar", () => {
     expect(filterTreeToSql(state.tree, fields)).toBe("level = 'warn' AND status = 1");
   });
 
+  it("lists every value with the current one first while an edited chip is untouched", async () => {
+    const state = mountBar({ modelValue: parseSqlFilter("level = 'warn'")! });
+    await wrapper!.find('[data-test="query-filter-bar-chip-level"]').trigger("click");
+    await vi.waitFor(() => expect(rowKeys()).toEqual(["warn", "error", "info"]));
+    const field = input().element;
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 4]);
+    await press("Enter");
+    expect(filterTreeToSql(state.tree, fields)).toBe("level = 'warn'");
+    await wrapper!.find('[data-test="query-filter-bar-chip-level"]').trigger("click");
+    await vi.waitFor(() => expect(rowKeys()).toContain("info"));
+    rows()
+      .find((row) => row.getAttribute("data-test")!.endsWith("-info"))!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    expect(filterTreeToSql(state.tree, fields)).toBe("level = 'info'");
+  });
+
   it.each([
     ["one Escape", () => press("Escape")],
     ["leaving the bar", () => input().trigger("blur")],
