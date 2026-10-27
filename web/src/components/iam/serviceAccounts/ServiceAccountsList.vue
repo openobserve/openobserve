@@ -555,7 +555,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
-import config from "@/aws-exports";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AddServiceAccount from "./AddServiceAccount.vue";
@@ -1278,7 +1277,6 @@ export default defineComponent({
       t,
       router,
       store,
-      config,
       serviceAccountsState,
       columns,
       loading,
