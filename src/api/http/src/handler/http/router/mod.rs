@@ -1117,6 +1117,14 @@ pub fn config_routes() -> Router {
 #[cfg(feature = "enterprise")]
 fn ai_chat_routes(router: Router) -> Router {
     router
+        .route(
+            "/{org_id}/ai/capabilities",
+            get(ai::capabilities::get_capabilities),
+        )
+        .route(
+            "/{org_id}/ai/capabilities/test",
+            post(ai::capabilities::test_capabilities),
+        )
         .route("/{org_id}/ai/chat", post(ai::chat::chat))
         .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
         .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
