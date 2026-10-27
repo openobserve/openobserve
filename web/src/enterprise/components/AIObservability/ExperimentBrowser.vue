@@ -233,17 +233,23 @@
                 @click.stop="toggleBaseline(row)"
               />
             </OTooltip>
+            <!-- A clone draft is keyed by its source run, so its dot sits on the action that reopens it. -->
             <OButton
               size="icon-sm"
               variant="ghost"
               icon-left="content-copy"
               :disabled="cloningId === row.id"
-              :aria-label="t('aiObservability.experiments.clone')"
+              :aria-label="cloneLabel(row.id)"
               class="max-md:hidden"
               :data-test="`ai-experiment-clone-${row.id}`"
               @click.stop="cloneExperiment(row)"
             >
-              <OTooltip side="bottom" :content="t('aiObservability.experiments.clone')" />
+              <OTooltip side="bottom" :content="cloneLabel(row.id)" />
+              <EditorDraftDot
+                v-if="experimentDrafts.ids.has(row.id)"
+                corner
+                :data-test="`ai-experiment-draft-dot-${row.id}`"
+              />
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
@@ -278,6 +284,11 @@
                 @select="cloneExperiment(row)"
               >
                 <span>{{ t("aiObservability.experiments.clone") }}</span>
+                <EditorDraftDot
+                  v-if="experimentDrafts.ids.has(row.id)"
+                  :saved-at="experimentDrafts.savedAt(row.id)"
+                  :data-test="`ai-experiment-draft-dot-${row.id}-menu`"
+                />
               </ODropdownItem>
             </ODropdown>
           </div>
@@ -323,6 +334,8 @@ import {
 } from "@/enterprise/views/AIObservability/experimentRoutes";
 import { canCloneInForm } from "./ExperimentForm.schema";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
 const props = withDefaults(
   defineProps<{
@@ -350,6 +363,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const experimentDrafts = useEditorDraftIds("experiment");
+
+function cloneLabel(id: string) {
+  const label = t("aiObservability.experiments.clone");
+  return experimentDrafts.ids.has(id) ? t("common.editorDraft.newDot", { label }) : label;
+}
 const route = useRoute();
 const router = useRouter();
 const initialDataset =
