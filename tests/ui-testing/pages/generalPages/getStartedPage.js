@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 const { expect } = require('@playwright/test');
+const { gotoWithRetry } = require('../../playwright-tests/utils/navigation.js');
 
 const SOURCE_IDS = [
     'kubernetes', 'linux', 'windows', 'webserver', 'otel', 'http',
@@ -47,7 +48,8 @@ class GetStartedPage {
 
     // Puts this browser into the first-login state MainLayout opens the dialog for.
     async openAsFirstLogin(path, { orgId, prefill } = {}) {
-        await this.page.goto(path);
+        // Bare goto defaults to 30s and waitUntil 'load'; the suite's helper retries transient stalls.
+        await gotoWithRetry(this.page, path, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await this.page.evaluate(({ org, pre }) => {
             localStorage.setItem('isFirstTimeLogin', 'true');
             localStorage.removeItem(`o2.onboarding.firstSource.${org}`);
