@@ -599,7 +599,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
-      :message="t('panel.deletePanelMessage')"
+      message-keypath="panel.deletePanelMessage"
+      :message-name="data.title"
+      ok-variant="destructive"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"

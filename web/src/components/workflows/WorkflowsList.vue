@@ -320,7 +320,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <ConfirmDialog
     :title="confirmDialogMeta.title"
-    :message="confirmDialogMeta.message"
+    message-keypath="workflow.deleteMessage"
+    :message-name="confirmDialogMeta.messageName"
+    ok-variant="destructive"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
@@ -764,7 +766,7 @@ const toggleWorkflow = (row: any) => {
 const confirmDialogMeta: any = ref({
   show: false,
   title: "",
-  message: "",
+  messageName: "",
   data: null,
   onConfirm: () => {},
 });
@@ -778,7 +780,7 @@ const resetConfirmDialog = () => {
 const openDeleteDialog = (row: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("workflow.deleteTitle");
-  confirmDialogMeta.value.message = t("workflow.deleteMessage");
+  confirmDialogMeta.value.messageName = row.name;
   confirmDialogMeta.value.data = row;
   confirmDialogMeta.value.onConfirm = deleteWorkflow;
 };

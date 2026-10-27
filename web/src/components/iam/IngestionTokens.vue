@@ -553,9 +553,11 @@ export default defineComponent({
       if (!generate) {
         const confirmed = await confirm({
           title: t("ingestion.splunkTokenRevokeTitle"),
-          message: t("ingestion.splunkTokenRevokeMessage"),
+          messageKeypath: "ingestion.splunkTokenRevokeMessage",
+          messageName: name,
           confirmLabel: t("ingestion.splunkTokenRevoke"),
           cancelLabel: t("common.cancel"),
+          confirmVariant: "destructive",
         });
         if (!confirmed) return;
       }

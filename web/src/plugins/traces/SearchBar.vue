@@ -1214,7 +1214,9 @@ export default defineComponent({
       savedViewsDialogOpen.value = false;
       const confirmed = await confirm({
         title: t("search.deleteSavedView"),
-        message: t("search.deleteSavedViewConfirm"),
+        messageKeypath: "search.deleteSavedViewConfirm",
+        messageName: view.view_name,
+        confirmVariant: "destructive",
       });
       if (!confirmed) return;
       try {

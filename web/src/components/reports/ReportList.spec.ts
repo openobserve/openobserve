@@ -551,9 +551,11 @@ describe("ReportList", () => {
     it("should open delete dialog with correct message", async () => {
       await wrapper.vm.confirmDeleteReport(REPORT_SCHEDULED);
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(
-        `Are you sure you want to delete report "${REPORT_SCHEDULED.name}"`,
-      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
+      expect(dialog!.props("messageName")).toBe(REPORT_SCHEDULED.name);
+      expect(dialog!.props("okVariant")).toBe("destructive");
       expect(wrapper.vm.deleteDialog.data).toEqual({
         report_id: REPORT_SCHEDULED.report_id,
         name: REPORT_SCHEDULED.name,
@@ -625,6 +627,10 @@ describe("ReportList", () => {
     it("should set confirmBulkDelete to true", () => {
       wrapper.vm.openBulkDeleteDialog();
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.props("title") === i18n.global.t("reports.deleteReportsTitle"));
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
   });
 

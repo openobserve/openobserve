@@ -407,7 +407,7 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
       size="md"
       :title="confirmTitle"
       :primary-button-label="t('slackApp.orgAccess.remove')"
-      primary-button-variant="outline-destructive"
+      primary-button-variant="destructive"
       :secondary-button-label="t('common.cancel')"
       initial-focus="secondary"
       data-test="slack-org-access-confirm"
@@ -421,9 +421,19 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
           class="flex flex-col gap-3"
           data-test="slack-org-access-removal"
         >
-          <p class="m-0">
-            {{ t("slackApp.orgAccess.removeLead", { org: removal.org_name, team }) }}
-          </p>
+          <i18n-t
+            keypath="slackApp.orgAccess.removeLead"
+            tag="p"
+            class="m-0"
+            data-test="slack-org-access-removal-lead"
+          >
+            <template #org
+              ><span class="text-text-heading font-semibold break-all">{{
+                removal.org_name
+              }}</span></template
+            >
+            <template #team>{{ team }}</template>
+          </i18n-t>
           <ul class="m-0 flex list-disc flex-col gap-1 ps-5">
             <li v-if="removal.channels.length">
               {{

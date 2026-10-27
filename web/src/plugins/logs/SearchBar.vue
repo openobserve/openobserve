@@ -1661,7 +1661,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('search.deleteSavedView')"
-      :message="t('search.deleteSavedViewConfirm')"
+      message-keypath="search.deleteSavedViewConfirm"
+      :message-name="deleteViewName"
+      ok-variant="destructive"
       @update:ok="confirmDeleteSavedViews"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -1963,6 +1965,7 @@ export default defineComponent({
       this.savedViewDropdownModel = false;
       this.savedViewsListDialog = false;
       this.deleteViewID = item.view_id;
+      this.deleteViewName = item.view_name;
       this.confirmDelete = true;
     },
     handleUpdateSavedView(item: any) {
@@ -2375,6 +2378,7 @@ export default defineComponent({
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
+    const deleteViewName = ref("");
     const savedViewDropdownModel = ref(false);
     const savedViewsListDialog = ref(false);
     const moreOptionsDropdownModel = ref(false);
@@ -5016,6 +5020,7 @@ export default defineComponent({
       handleSavedView,
       deleteSavedViews,
       deleteViewID,
+      deleteViewName,
       confirmDelete,
       savedViewDropdownModel,
       savedViewsListDialog,
