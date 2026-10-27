@@ -6260,6 +6260,7 @@
       "settingTitle": "nombre",
       "settingDescription": "descripción",
       "settingTimeRange": "intervalo de tiempo predeterminado",
+      "settingAutoRefresh": "actualización automática predeterminada",
       "settingDynamicFilters": "filtros dinámicos",
       "settingOther": "otros ajustes",
       "impactSettings": "Reemplaza los ajustes del dashboard que cambiaron: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "Error al actualizar el Dashboard",
       "dynamicFiltersHelp": "Agrega una fila de filtro ad-hoc sobre los paneles.",
       "appliesToEveryone": "Estos ajustes se comparten con todos los que pueden acceder a este Dashboard.",
-      "saveChanges": "Guardar cambios"
+      "saveChanges": "Guardar cambios",
+      "defaultAutoRefresh": "Actualización automática predeterminada",
+      "defaultAutoRefreshHelp": "Se aplica cada vez que se abre el dashboard, a menos que el enlace establezca su propio intervalo.",
+      "defaultAutoRefreshRaised": "Guardado como {saved}, por debajo del mínimo del servidor, por lo que se actualiza cada {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "El intervalo de tiempo predeterminado es absoluto, por lo que cada actualización recarga el mismo intervalo. Las actualizaciones en tiempo real necesitan un intervalo de tiempo relativo."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard agregado correctamente.",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "Gráficos de ejemplo",
     "namePlaceholder": "Panel sin título",
     "renameHint": "Haga clic para cambiar el nombre de este panel",
+    "variableSuggestion": {
+      "queryValues": "Valores de consulta",
+      "constant": "Constante",
+      "textbox": "Cuadro de texto",
+      "custom": "Personalizado",
+      "list": "{type} · {example}",
+      "csv": "Comas: {example}",
+      "pipe": "Barras verticales: {example}",
+      "doublequote": "Comillas dobles: {example}",
+      "singlequote": "Comillas simples: {example}"
+    },
     "add": "Añadir panel",
     "save": "Guardar",
     "cancel": "Cancelar",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · Medio",
       "severityLow": "P4 · Bajo",
       "moreDimensions": "+{count} más",
+      "moreAlertGroups": "+{count} más",
+      "alertGroupTooltip": "{name}: disparada {count} vez | {name}: disparada {count} veces",
       "filterAll": "Todos",
       "filterActive": "Activo",
       "alertCount": "Alertas",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Reanalizando desde cero…",
         "reanalyzingBuildOnPrevious": "Basándose en el informe anterior…",
+        "resumingFrom": "Reanudando desde “{step}”…",
         "showDetails": "Mostrar detalles",
         "hideDetails": "Ocultar detalles",
         "stale": "Este análisis lleva más tiempo de lo habitual y puede que se haya detenido. No hay mensajes nuevos desde las {time} UTC. Cancélalo y vuelve a intentarlo.",

@@ -54,6 +54,8 @@ export interface Incident {
   rca: RcaSummary | null;
   /** Why no automatic run started for this incident (e.g. "l0_off"), or null. */
   rca_off_reason?: string | null;
+  /** List only: every alert that fired into the incident and how often, most-fired first. */
+  alert_groups?: { alert_id: string; alert_name: string; count: number }[];
 }
 
 export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
@@ -102,6 +104,8 @@ export interface RcaSummaryFields {
   stage_count: number;
   steps: number;
   tool_calls: number;
+  /** Ended run: the finished steps a Resume keeps, the drawer's count too. */
+  reusable_steps?: number | null;
   steered_by: string[];
   unblocked_by: string | null;
   /** The error reason of a failed run, or the blocked detail. */
@@ -301,6 +305,8 @@ export interface RcaThread {
   truncated: boolean;
   /** With `truncated`: the last saved seq (-1: none). */
   saved_through_seq?: number;
+  /** Ended run: the finished steps a Resume keeps; absent when live or nothing to keep. */
+  reusable_steps?: number;
 }
 
 export type RcaSteerKind = "message" | "answer" | "hypothesis_action" | "guidance";

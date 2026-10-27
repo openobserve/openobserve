@@ -6260,6 +6260,7 @@
       "settingTitle": "nazwa",
       "settingDescription": "opis",
       "settingTimeRange": "domyślny zakres czasu",
+      "settingAutoRefresh": "domyślne automatyczne odświeżanie",
       "settingDynamicFilters": "filtry dynamiczne",
       "settingOther": "inne ustawienia",
       "impactSettings": "Zastępuje zmienione przez nich ustawienia pulpitu: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "Aktualizacja pulpitu nie powiodła się",
       "dynamicFiltersHelp": "Dodaje wiersz filtra ad hoc nad panelami.",
       "appliesToEveryone": "Te ustawienia są udostępniane wszystkim, którzy mają dostęp do tego pulpitu.",
-      "saveChanges": "Zapisz zmiany"
+      "saveChanges": "Zapisz zmiany",
+      "defaultAutoRefresh": "Domyślne automatyczne odświeżanie",
+      "defaultAutoRefreshHelp": "Stosowane przy każdym otwarciu pulpitu, chyba że link ustawia własny interwał.",
+      "defaultAutoRefreshRaised": "Zapisano jako {saved}, poniżej minimum serwera, więc odświeża się co {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "Domyślny zakres czasu jest bezwzględny, więc każde odświeżenie ponownie wczytuje ten sam zakres. Aktualizacje na żywo wymagają względnego zakresu czasu."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Pulpit dodany pomyślnie.",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "Przykładowe wykresy",
     "namePlaceholder": "Panel bez tytułu",
     "renameHint": "Kliknij, aby zmienić nazwę tego panelu",
+    "variableSuggestion": {
+      "queryValues": "Wartości zapytania",
+      "constant": "Stała",
+      "textbox": "Pole tekstowe",
+      "custom": "Niestandardowy",
+      "list": "{type} · {example}",
+      "csv": "Przecinki: {example}",
+      "pipe": "Kreski pionowe: {example}",
+      "doublequote": "Podwójne cudzysłowy: {example}",
+      "singlequote": "Pojedyncze cudzysłowy: {example}"
+    },
     "add": "Dodaj panel",
     "save": "Zapisz",
     "cancel": "Anuluj",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · Średni",
       "severityLow": "P4 · Niski",
       "moreDimensions": "+{count} więcej",
+      "moreAlertGroups": "+{count} więcej",
+      "alertGroupTooltip": "{name}: wyzwolono {count} raz | {name}: wyzwolono {count} razy",
       "filterAll": "Wszystkie",
       "filterActive": "Aktywne",
       "alertCount": "Alerty",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Ponowna analiza od zera…",
         "reanalyzingBuildOnPrevious": "Kontynuowanie na podstawie poprzedniego raportu…",
+        "resumingFrom": "Wznawianie od „{step}”…",
         "showDetails": "Pokaż szczegóły",
         "hideDetails": "Ukryj szczegóły",
         "stale": "Ta analiza trwa nietypowo długo i mogła się zatrzymać. Brak nowych wiadomości od {time} UTC. Anuluj ją i spróbuj ponownie.",

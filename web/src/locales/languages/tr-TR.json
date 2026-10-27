@@ -6260,6 +6260,7 @@
       "settingTitle": "ad",
       "settingDescription": "açıklama",
       "settingTimeRange": "varsayılan zaman aralığı",
+      "settingAutoRefresh": "varsayılan otomatik yenileme",
       "settingDynamicFilters": "dinamik filtreler",
       "settingOther": "diğer ayarlar",
       "impactSettings": "Değiştirdikleri pano ayarlarının yerine geçer: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "Pano güncelleme başarısız",
       "dynamicFiltersHelp": "Panellerin üzerine geçici bir filtre satırı ekler.",
       "appliesToEveryone": "Bu ayarlar bu panoya erişebilen herkesle paylaşılır.",
-      "saveChanges": "Değişiklikleri kaydet"
+      "saveChanges": "Değişiklikleri kaydet",
+      "defaultAutoRefresh": "Varsayılan otomatik yenileme",
+      "defaultAutoRefreshHelp": "Bağlantı kendi aralığını belirtmediği sürece gösterge panosu her açıldığında uygulanır.",
+      "defaultAutoRefreshRaised": "{saved} olarak kaydedildi; sunucu minimumunun altında olduğundan her {effective} yenilenir.",
+      "defaultAutoRefreshAbsoluteHint": "Varsayılan zaman aralığı mutlak olduğundan her yenileme aynı aralığı yeniden yükler. Canlı güncellemeler için göreli bir zaman aralığı gerekir."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Pano başarıyla eklendi.",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "Örnek Grafikler",
     "namePlaceholder": "Başlıksız Panel",
     "renameHint": "Bu paneli yeniden adlandırmak için tıklayın",
+    "variableSuggestion": {
+      "queryValues": "Sorgu değerleri",
+      "constant": "Sabit",
+      "textbox": "Metin kutusu",
+      "custom": "Özel",
+      "list": "{type} · {example}",
+      "csv": "Virgüller: {example}",
+      "pipe": "Dikey çizgiler: {example}",
+      "doublequote": "Çift tırnaklar: {example}",
+      "singlequote": "Tek tırnaklar: {example}"
+    },
     "add": "Panel Ekle",
     "save": "Kaydet",
     "cancel": "İptal",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · Orta",
       "severityLow": "P4 · Düşük",
       "moreDimensions": "+{count} daha",
+      "moreAlertGroups": "+{count} daha",
+      "alertGroupTooltip": "{name}: {count} kez tetiklendi | {name}: {count} kez tetiklendi",
       "filterAll": "Tümü",
       "filterActive": "Aktif",
       "alertCount": "Uyarılar",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Sıfırdan yeniden analiz ediliyor…",
         "reanalyzingBuildOnPrevious": "Önceki raporu temel alarak ilerliyor…",
+        "resumingFrom": "“{step}” adımından devam ediliyor…",
         "showDetails": "Ayrıntıları göster",
         "hideDetails": "Ayrıntıları gizle",
         "stale": "Bu analiz olağandışı uzun süredir çalışıyor ve durmuş olabilir. {time} UTC'den beri yeni mesaj yok. İptal edip tekrar deneyin.",

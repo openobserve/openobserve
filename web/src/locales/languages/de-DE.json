@@ -6260,6 +6260,7 @@
       "settingTitle": "Name",
       "settingDescription": "Beschreibung",
       "settingTimeRange": "Standardzeitraum",
+      "settingAutoRefresh": "Standard-Auto-Aktualisierung",
       "settingDynamicFilters": "dynamische Filter",
       "settingOther": "weitere Einstellungen",
       "impactSettings": "Ersetzt die von ihnen geänderten Dashboard-Einstellungen: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "Dashboard-Aktualisierung fehlgeschlagen",
       "dynamicFiltersHelp": "Fügt eine Ad-hoc-Filterzeile über den Panels hinzu.",
       "appliesToEveryone": "Diese Einstellungen werden mit allen geteilt, die auf dieses Dashboard zugreifen können.",
-      "saveChanges": "Änderungen speichern"
+      "saveChanges": "Änderungen speichern",
+      "defaultAutoRefresh": "Standard-Auto-Aktualisierung",
+      "defaultAutoRefreshHelp": "Wird bei jedem Öffnen des Dashboards angewendet, es sei denn, der Link legt ein eigenes Intervall fest.",
+      "defaultAutoRefreshRaised": "Als {saved} gespeichert, unter dem Serverminimum, daher wird alle {effective} aktualisiert.",
+      "defaultAutoRefreshAbsoluteHint": "Der Standard-Zeitraum ist absolut, daher lädt jede Aktualisierung denselben Zeitraum neu. Live-Aktualisierungen erfordern einen relativen Zeitraum."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard erfolgreich hinzugefügt.",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "Beispieldiagramme",
     "namePlaceholder": "Unbenanntes Panel",
     "renameHint": "Klicken, um dieses Panel umzubenennen",
+    "variableSuggestion": {
+      "queryValues": "Abfragewerte",
+      "constant": "Konstante",
+      "textbox": "Textfeld",
+      "custom": "Benutzerdefiniert",
+      "list": "{type} · {example}",
+      "csv": "Kommas: {example}",
+      "pipe": "Pipes: {example}",
+      "doublequote": "Doppelte Anführungszeichen: {example}",
+      "singlequote": "Einfache Anführungszeichen: {example}"
+    },
     "add": "Panel hinzufügen",
     "save": "Speichern",
     "cancel": "Abbrechen",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · Mittel",
       "severityLow": "P4 · Niedrig",
       "moreDimensions": "+{count} weitere",
+      "moreAlertGroups": "+{count} weitere",
+      "alertGroupTooltip": "{name}: {count} Mal ausgelöst | {name}: {count} Mal ausgelöst",
       "filterAll": "Alle",
       "filterActive": "Aktiv",
       "alertCount": "Alarme",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Erneute Analyse von Grund auf …",
         "reanalyzingBuildOnPrevious": "Aufbauend auf dem vorherigen Bericht …",
+        "resumingFrom": "Wird ab „{step}“ fortgesetzt…",
         "showDetails": "Details anzeigen",
         "hideDetails": "Details ausblenden",
         "stale": "Diese Analyse läuft ungewöhnlich lange und wurde möglicherweise beendet. Seit {time} UTC keine neuen Nachrichten. Brechen Sie sie ab und versuchen Sie es erneut.",

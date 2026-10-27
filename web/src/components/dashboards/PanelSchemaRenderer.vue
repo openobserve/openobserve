@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
-          :label="raw(panelSchema?.title)"
+          :label="raw(panelTitle)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
@@ -325,6 +325,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import {
@@ -645,6 +646,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
+    const panelTitle = usePanelTitle({
+      title: () => props.panelSchema?.title,
+      variablesData: () => props.variablesData,
+      context: () => ({ tabId: props.tabId, panelId: props.panelSchema?.id }),
+    });
 
     // ============================================================================
     // Hidden Queries Feature Setup
@@ -2543,6 +2549,7 @@ export default defineComponent({
       onChartMouseOut,
       failedAnnotationSources,
       truncatedAnnotationSources,
+      panelTitle,
       t,
       raw,
       store,
@@ -2600,12 +2607,12 @@ export default defineComponent({
         const csv = getPanelCsvString();
         if (!csv) return null;
         return {
-          title: title ?? panelSchema.value?.title ?? "panel",
+          title: title ?? panelTitle.value ?? "panel",
           csv,
         };
       },
       logDataAsJSON: (title: string) => {
-        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.group(`[oo] ${title ?? panelTitle.value ?? "panel"}`);
         console.groupEnd();
       },
       loadingProgressPercentage,

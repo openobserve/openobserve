@@ -6260,6 +6260,7 @@
       "settingTitle": "名称",
       "settingDescription": "描述",
       "settingTimeRange": "默认时间范围",
+      "settingAutoRefresh": "默认自动刷新",
       "settingDynamicFilters": "动态筛选",
       "settingOther": "其他设置",
       "impactSettings": "替换他人更改的仪表板设置：{settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "仪表盘更新失败。",
       "dynamicFiltersHelp": "在面板上方添加一个临时筛选行。",
       "appliesToEveryone": "这些设置与所有可访问此仪表盘的人共享。",
-      "saveChanges": "保存更改"
+      "saveChanges": "保存更改",
+      "defaultAutoRefresh": "默认自动刷新",
+      "defaultAutoRefreshHelp": "每次打开仪表盘时应用，除非链接设置了自己的间隔。",
+      "defaultAutoRefreshRaised": "已保存为 {saved}，低于服务器最小值，因此每 {effective} 刷新一次。",
+      "defaultAutoRefreshAbsoluteHint": "默认时间范围是绝对时间，因此每次刷新都会重新加载同一范围。实时更新需要相对时间范围。"
     },
     "addDashboardPage": {
       "addedSuccessfully": "仪表盘添加成功。",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "示例图表",
     "namePlaceholder": "未命名面板",
     "renameHint": "点击重命名此面板",
+    "variableSuggestion": {
+      "queryValues": "查询值",
+      "constant": "常量",
+      "textbox": "文本框",
+      "custom": "自定义",
+      "list": "{type} · {example}",
+      "csv": "逗号：{example}",
+      "pipe": "竖线：{example}",
+      "doublequote": "双引号：{example}",
+      "singlequote": "单引号：{example}"
+    },
     "add": "添加面板",
     "save": "保存",
     "cancel": "取消",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · 中",
       "severityLow": "P4 · 低",
       "moreDimensions": "+{count} 更多",
+      "moreAlertGroups": "+{count} 更多",
+      "alertGroupTooltip": "{name}：已触发 {count} 次 | {name}：已触发 {count} 次",
       "filterAll": "全部",
       "filterActive": "活跃",
       "alertCount": "告警",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "正在从头重新分析…",
         "reanalyzingBuildOnPrevious": "正在基于上一份报告继续分析…",
+        "resumingFrom": "正在从“{step}”继续…",
         "showDetails": "显示详情",
         "hideDetails": "隐藏详情",
         "stale": "此分析运行时间异常长，可能已停止。自 {time} UTC 起没有新消息。请取消后重试。",

@@ -278,6 +278,17 @@ describe("PanelSchemaRenderer", () => {
   };
 
   /** The loader's state for the next mount: data and metadata as the executors store them. */
+  it("names the chart after the resolved panel title, not the raw template", async () => {
+    wrapper = createWrapper({
+      panelSchema: { ...defaultProps.panelSchema, title: "Hosts in ${rack}" },
+      variablesData: { values: [{ name: "rack", value: ["r1", "r2"] }] },
+    });
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ChartRenderer" }).attributes("label")).toBe(
+      "Hosts in r1, r2",
+    );
+  });
+
   const mockLoadedData = (data: unknown[], metadataQueries: Record<string, unknown>[]) =>
     vi.mocked(usePanelDataLoader).mockReturnValueOnce({
       data: ref(data),

@@ -6260,6 +6260,7 @@
       "settingTitle": "nome",
       "settingDescription": "descrição",
       "settingTimeRange": "intervalo de tempo predefinido",
+      "settingAutoRefresh": "atualização automática predefinida",
       "settingDynamicFilters": "filtros dinâmicos",
       "settingOther": "outras definições",
       "impactSettings": "Substitui as definições do dashboard que alteraram: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "Falha ao atualizar dashboard",
       "dynamicFiltersHelp": "Adiciona uma linha de filtro ad-hoc acima dos painéis.",
       "appliesToEveryone": "Estas definições são partilhadas com todos os que podem aceder a este dashboard.",
-      "saveChanges": "Guardar alterações"
+      "saveChanges": "Guardar alterações",
+      "defaultAutoRefresh": "Atualização automática predefinida",
+      "defaultAutoRefreshHelp": "Aplicada sempre que o dashboard é aberto, a menos que a ligação defina o seu próprio intervalo.",
+      "defaultAutoRefreshRaised": "Guardado como {saved}, abaixo do mínimo do servidor, pelo que atualiza a cada {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "O intervalo de tempo predefinido é absoluto, pelo que cada atualização recarrega o mesmo intervalo. As atualizações em tempo real precisam de um intervalo de tempo relativo."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard adicionado com sucesso.",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "Exemplos de gráficos",
     "namePlaceholder": "Painel sem título",
     "renameHint": "Clique para renomear este painel",
+    "variableSuggestion": {
+      "queryValues": "Valores de consulta",
+      "constant": "Constante",
+      "textbox": "Caixa de texto",
+      "custom": "Personalizado",
+      "list": "{type} · {example}",
+      "csv": "Vírgulas: {example}",
+      "pipe": "Barras verticais: {example}",
+      "doublequote": "Aspas duplas: {example}",
+      "singlequote": "Aspas simples: {example}"
+    },
     "add": "Adicionar painel",
     "save": "Guardar",
     "cancel": "Cancelar",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · Médio",
       "severityLow": "P4 · Baixo",
       "moreDimensions": "+{count} mais",
+      "moreAlertGroups": "+{count} mais",
+      "alertGroupTooltip": "{name}: disparado {count} vez | {name}: disparado {count} vezes",
       "filterAll": "Todos",
       "filterActive": "Ativos",
       "alertCount": "Alertas",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "A reanalisar de raiz…",
         "reanalyzingBuildOnPrevious": "A continuar a partir do relatório anterior…",
+        "resumingFrom": "A retomar a partir de “{step}”…",
         "showDetails": "Mostrar detalhes",
         "hideDetails": "Ocultar detalhes",
         "stale": "Esta análise está a demorar mais do que o habitual e pode ter parado. Sem novas mensagens desde {time} UTC. Cancele-a e tente novamente.",

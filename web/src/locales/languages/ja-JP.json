@@ -6260,6 +6260,7 @@
       "settingTitle": "名前",
       "settingDescription": "説明",
       "settingTimeRange": "デフォルトの期間",
+      "settingAutoRefresh": "デフォルトの自動更新",
       "settingDynamicFilters": "動的フィルター",
       "settingOther": "その他の設定",
       "impactSettings": "相手が変更したダッシュボード設定を置き換えます: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "ダッシュボードの更新に失敗しました",
       "dynamicFiltersHelp": "パネルの上にアドホックなフィルター行を追加します。",
       "appliesToEveryone": "これらの設定は、このダッシュボードにアクセスできるすべてのユーザーと共有されます。",
-      "saveChanges": "変更を保存"
+      "saveChanges": "変更を保存",
+      "defaultAutoRefresh": "デフォルトの自動更新",
+      "defaultAutoRefreshHelp": "ダッシュボードを開くたびに適用されます。リンク側で独自の間隔が設定されている場合を除きます。",
+      "defaultAutoRefreshRaised": "{saved}で保存されましたが、サーバーの最小値未満のため、{effective}ごとに更新されます。",
+      "defaultAutoRefreshAbsoluteHint": "デフォルトの時間範囲が絶対範囲のため、更新のたびに同じ範囲を再読み込みします。ライブ更新には相対時間範囲が必要です。"
     },
     "addDashboardPage": {
       "addedSuccessfully": "ダッシュボードが正常に追加されました。",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "サンプルチャート",
     "namePlaceholder": "無題のパネル",
     "renameHint": "クリックしてこのパネルの名前を変更",
+    "variableSuggestion": {
+      "queryValues": "クエリ値",
+      "constant": "定数",
+      "textbox": "テキストボックス",
+      "custom": "カスタム",
+      "list": "{type} · {example}",
+      "csv": "カンマ区切り: {example}",
+      "pipe": "パイプ区切り: {example}",
+      "doublequote": "二重引用符: {example}",
+      "singlequote": "単一引用符: {example}"
+    },
     "add": "パネルを追加",
     "save": "保存",
     "cancel": "キャンセル",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · 中",
       "severityLow": "P4 · 低",
       "moreDimensions": "+{count} 件",
+      "moreAlertGroups": "+{count} 件",
+      "alertGroupTooltip": "{name}: {count} 回発火 | {name}: {count} 回発火",
       "filterAll": "すべて",
       "filterActive": "アクティブ",
       "alertCount": "アラート",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "最初から再分析しています…",
         "reanalyzingBuildOnPrevious": "前回のレポートを基に構築しています…",
+        "resumingFrom": "「{step}」から再開しています…",
         "showDetails": "詳細を表示",
         "hideDetails": "詳細を非表示",
         "stale": "この分析は異常に長時間実行されており、停止した可能性があります。{time} UTC以降、新しいメッセージはありません。キャンセルして再試行してください。",

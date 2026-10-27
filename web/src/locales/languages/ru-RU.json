@@ -6260,6 +6260,7 @@
       "settingTitle": "название",
       "settingDescription": "описание",
       "settingTimeRange": "период по умолчанию",
+      "settingAutoRefresh": "автообновление по умолчанию",
       "settingDynamicFilters": "динамические фильтры",
       "settingOther": "другие настройки",
       "impactSettings": "Заменяет изменённые ими настройки дашборда: {settings}",
@@ -7881,7 +7882,11 @@
       "updationFailed": "Не удалось обновить дашборд",
       "dynamicFiltersHelp": "Добавляет строку ad-hoc фильтра над панелями.",
       "appliesToEveryone": "Эти настройки доступны всем, у кого есть доступ к этому дашборду.",
-      "saveChanges": "Сохранить изменения"
+      "saveChanges": "Сохранить изменения",
+      "defaultAutoRefresh": "Автообновление по умолчанию",
+      "defaultAutoRefreshHelp": "Применяется при каждом открытии дашборда, если ссылка не задаёт собственный интервал.",
+      "defaultAutoRefreshRaised": "Сохранено как {saved}, что ниже серверного минимума, поэтому обновление происходит каждые {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "Диапазон времени по умолчанию абсолютный, поэтому при каждом обновлении загружается тот же диапазон. Для обновления в реальном времени нужен относительный диапазон времени."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Дашборд успешно добавлен.",
@@ -8293,6 +8298,17 @@
     "exampleCharts": "Примеры графиков",
     "namePlaceholder": "Панель без названия",
     "renameHint": "Нажмите, чтобы переименовать эту панель",
+    "variableSuggestion": {
+      "queryValues": "Значения запроса",
+      "constant": "Константа",
+      "textbox": "Текстовое поле",
+      "custom": "Пользовательский",
+      "list": "{type} · {example}",
+      "csv": "Запятые: {example}",
+      "pipe": "Вертикальные черты: {example}",
+      "doublequote": "Двойные кавычки: {example}",
+      "singlequote": "Одинарные кавычки: {example}"
+    },
     "add": "Добавить панель",
     "save": "Сохранить",
     "cancel": "Отмена",
@@ -10158,6 +10174,8 @@
       "severityMedium": "P3 · Средний",
       "severityLow": "P4 · Низкий",
       "moreDimensions": "+ещё {count}",
+      "moreAlertGroups": "+ещё {count}",
+      "alertGroupTooltip": "{name}: сработало {count} раз | {name}: сработало {count} раз",
       "filterAll": "Все",
       "filterActive": "Активные",
       "alertCount": "Оповещения",
@@ -10319,6 +10337,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Повторный анализ с нуля…",
         "reanalyzingBuildOnPrevious": "На основе предыдущего отчёта…",
+        "resumingFrom": "Возобновление с шага «{step}»…",
         "showDetails": "Показать подробности",
         "hideDetails": "Скрыть подробности",
         "stale": "Этот анализ выполняется необычно долго и мог остановиться. Новых сообщений с {time} UTC нет. Отмените его и попробуйте снова.",
