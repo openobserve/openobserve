@@ -291,11 +291,14 @@ const outcomeIcon = computed(() =>
 );
 let newestAttempt = 0;
 let clearAfter: number | undefined;
-// a body with neither field may come from an older server, so only the next click replaces it
-const clickBoundary = (body: RefreshBody | undefined, before: number) => {
-  if (typeof body !== "object") return undefined;
-  if (typeof body.attempt_at === "number") return body.attempt_at;
-  return body.attempt_recorded === false ? before : undefined;
+// only a 2xx report lacking both fields may come from an older server, so only the next click replaces it
+const clickBoundary = (clicked: RefreshResult, before: number) => {
+  const body = clicked.body;
+  if (typeof body === "object" && body !== null) {
+    if (typeof body.attempt_at === "number") return body.attempt_at;
+    if (body.attempt_recorded === false) return before;
+  }
+  return clicked.ok ? undefined : before;
 };
 const dropClickedOutcome = () => {
   if (clearAfter === undefined || newestAttempt <= clearAfter) return;
@@ -325,7 +328,7 @@ const run = async (rotate: boolean) => {
       ? rotateInstanceKey(() => emit("refreshed"))
       : refreshLicenseLimits(() => emit("refreshed")));
     result.value = clicked;
-    clearAfter = clickBoundary(clicked.body, before);
+    clearAfter = clickBoundary(clicked, before);
     dropClickedOutcome();
     emit("refreshed");
   } finally {
