@@ -249,6 +249,31 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       );
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([]);
     });
+
+    it("re-applying an existing stream after a missing one clears the not-found error", async () => {
+      await reApply({
+        type: "ai_chat_query",
+        stream: "app_query_metrics",
+        stream_type: "logs",
+        period: "15m",
+      });
+      expect(wrapper.vm.searchObj.data.filterErrMsg).toContain("app_query_metrics");
+      await router.replace({
+        name: "logs",
+        query: {
+          org_identifier: org,
+          type: "search_history_re_apply",
+          stream: "k8s_json",
+          stream_type: "logs",
+          period: "15m",
+        },
+      });
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["k8s_json"]),
+      );
+      await flushPromises();
+      expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+    });
   });
 
   describe("entry points and explicit runs after landing", () => {
