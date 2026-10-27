@@ -311,7 +311,11 @@ describe("clicked outcome versus newer server attempts", () => {
 
   it("a click refused before any attempt gives way to the next real attempt", async () => {
     vi.setSystemTime(1792748600000);
-    refresh.mockResolvedValue({ ok: false, status: 409, body: { reason: "refresh_in_progress" } });
+    refresh.mockResolvedValue({
+      ok: false,
+      status: 409,
+      body: { reason: "refresh_in_progress", attempt_recorded: false },
+    });
     const w = card();
     await w.get('[data-test="license-online-refresh"]').trigger("click");
     await flushPromises();
@@ -325,9 +329,9 @@ describe("clicked outcome versus newer server attempts", () => {
     expect(outcomeText(w)).toBe("License is up to date");
   });
 
-  it("an answer without an attempt time gives way only to an attempt newer than the pre-click one", async () => {
+  it("an unrecorded attempt gives way only to an attempt newer than the pre-click one", async () => {
     vi.setSystemTime(1792748530000);
-    refresh.mockResolvedValue({ ok: true, body: { error: "airgapped" } });
+    refresh.mockResolvedValue({ ok: true, body: { error: "airgapped", attempt_recorded: false } });
     const w = card({ last_outcome: { outcome: "unchanged" } });
     await w.get('[data-test="license-online-refresh"]').trigger("click");
     await flushPromises();
@@ -443,5 +447,60 @@ describe("clicked outcome versus newer server attempts", () => {
       }),
     });
     expect(outcomeText(w)).toBe("Installation key rotated.");
+  });
+
+  it("an older server's rotation keeps its confirmation when its own status arrives", async () => {
+    vi.setSystemTime(1792748530000);
+    rotate.mockResolvedValue({ ok: true, status: 200, body: { outcome: "updated" } });
+    const w = card();
+    await w.get('[data-test="license-online-rotate"]').trigger("click");
+    await flushPromises();
+    expect(outcomeText(w)).toBe("Installation key rotated.");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: 1792748529100000,
+        last_success_at: 1792748529100000,
+        last_outcome: { outcome: "updated", waivers_added: 0, waivers_removed: 0 },
+      }),
+    });
+    expect(outcomeText(w)).toBe("Installation key rotated.");
+  });
+
+  it("an older server's failed click is not replaced by a pre-click attempt seen during the request", async () => {
+    vi.setSystemTime(1792748530000);
+    let finish!: (value: unknown) => void;
+    rotate.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+    const w = card();
+    await w.get('[data-test="license-online-rotate"]').trigger("click");
+    await w.setProps({
+      refresh: status({
+        last_attempt_at: 1792748520000000,
+        last_outcome: { outcome: "unchanged" },
+      }),
+    });
+    finish({ ok: true, status: 200, body: { error: "instance_key_unreadable" } });
+    await flushPromises();
+    expect(outcomeText(w)).toContain("cannot be read");
+  });
+
+  it("an answer with neither attempt field keeps its outcome until the next click", async () => {
+    vi.setSystemTime(1792748530000);
+    refresh.mockResolvedValueOnce({ ok: true, body: { error: "airgapped" } });
+    const w = card({ last_outcome: { outcome: "unchanged" } });
+    await w.get('[data-test="license-online-refresh"]').trigger("click");
+    await flushPromises();
+    const clicked = outcomeText(w);
+    expect(clicked).not.toContain("blocked");
+    await w.setProps({ refresh: blocked(atSecond(1792748600)) });
+    expect(outcomeText(w)).toBe(clicked);
+    refresh.mockResolvedValueOnce({
+      ok: true,
+      body: { outcome: "unchanged", attempt_at: atSecond(1792748610) },
+    });
+    await w.get('[data-test="license-online-refresh"]').trigger("click");
+    await flushPromises();
+    expect(outcomeText(w)).toBe("License is up to date");
+    await w.setProps({ refresh: blocked(atSecond(1792748620)) });
+    expect(outcomeText(w)).toContain("blocked");
   });
 });
