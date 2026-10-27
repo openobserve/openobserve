@@ -23,12 +23,11 @@ use std::{
 use anyhow::{Context, Result};
 use config::meta::{
     histogram_origin::divides_histogram_origin,
-    search::{Request, SearchPartitionRequest, SearchPartitionResponse},
+    search::{Request, Response, SearchPartitionRequest, SearchPartitionResponse},
     stream::StreamType,
 };
 use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 use search::sql::visitor::histogram_interval::validate_and_adjust_histogram_interval;
-use search_service::SchemaResponse;
 use sqlparser::{
     ast::{
         BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
@@ -130,19 +129,6 @@ impl ResultColumns {
             bucket: BUCKET_COLUMN.to_string(),
             value: VALUE_COLUMN.to_string(),
         }
-    }
-
-    /// Proves both columns exist in the result schema, so an absent value key is SQL NULL.
-    fn check_declared(&self, result_columns: &[String]) -> Result<()> {
-        let declared = |name: &str| result_columns.iter().any(|c| c == name);
-        if declared(&self.bucket) && declared(&self.value) {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "result columns {result_columns:?} do not include both '{}' and '{}'",
-            self.bucket,
-            self.value
-        )
     }
 }
 
@@ -287,7 +273,7 @@ impl<'a> SupportedRun<'a> {
         }
         let (raw_hits, omitted_nulls) = (series.raw_hits, series.omitted_nulls);
         let points = series
-            .finish(self.budget)
+            .finish(self.budget, &self.columns.value)
             .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] {e}", self.anomaly_id))?;
         log::info!(
             "[anomaly_detection {}] supported search done: trace_id {}, executed {} searches, raw \
@@ -324,18 +310,18 @@ struct SeriesAccumulator {
     raw_buckets: HashSet<i64>,
     raw_hits: usize,
     omitted_nulls: usize,
+    keys_seen: Vec<String>,
 }
 
 impl SeriesAccumulator {
     fn add_slice(
         &mut self,
-        result: &SchemaResponse,
+        response: &Response,
         slice: [i64; 2],
         interval_us: i64,
         budget: usize,
         columns: &ResultColumns,
     ) -> Result<()> {
-        let response = &result.response;
         if response.is_partial {
             if response.function_error.is_empty() {
                 anyhow::bail!("search returned partial results");
@@ -358,7 +344,9 @@ impl SeriesAccumulator {
         if raw == 0 {
             return Ok(());
         }
-        columns.check_declared(&result.columns)?;
+        if self.keys_seen.is_empty() {
+            self.keys_seen = super::columns_present(&response.hits);
+        }
         response.hits.iter().try_for_each(|hit| {
             let Some(row) = hit.as_object() else {
                 anyhow::bail!("row is not an object: {hit}");
@@ -388,7 +376,7 @@ impl SeriesAccumulator {
         if !self.raw_buckets.insert(bucket) {
             anyhow::bail!("bucket {bucket} was returned more than once");
         }
-        // Object rows omit SQL NULL fields, and the schema check proved the column exists.
+        // Object rows omit SQL NULL fields; a column absent from every row fails in finish.
         let Some(value_cell) = row.get(&columns.value).filter(|v| !v.is_null()) else {
             self.omitted_nulls += 1;
             return Ok(());
@@ -403,7 +391,7 @@ impl SeriesAccumulator {
         Ok(())
     }
 
-    fn finish(mut self, budget: usize) -> Result<Vec<QueryDataPoint>> {
+    fn finish(mut self, budget: usize, value_column: &str) -> Result<Vec<QueryDataPoint>> {
         if self.raw_hits >= budget {
             anyhow::bail!(
                 "{} rows across the run reached the {budget}-row budget, so the result may be \
@@ -413,8 +401,10 @@ impl SeriesAccumulator {
         }
         if self.raw_hits > 0 && self.points.is_empty() {
             anyhow::bail!(
-                "query returned {} rows but none were usable: every value was SQL NULL",
-                self.raw_hits
+                "query returned {} rows but none were usable: every '{value_column}' was SQL \
+                 NULL, or the column is missing from the result (columns present: {:?})",
+                self.raw_hits,
+                self.keys_seen
             );
         }
         self.points.sort_by_key(|p| p.timestamp_us);
@@ -430,7 +420,7 @@ trait SliceSearch {
         req: &SearchPartitionRequest,
     ) -> Result<SearchPartitionResponse>;
 
-    async fn search(&self, trace_id: &str, req: &Request) -> Result<SchemaResponse>;
+    async fn search(&self, trace_id: &str, req: &Request) -> Result<Response>;
 }
 
 struct EngineSearch<'a> {
@@ -458,8 +448,8 @@ impl SliceSearch for EngineSearch<'_> {
         .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
-    async fn search(&self, trace_id: &str, req: &Request) -> Result<SchemaResponse> {
-        search_service::search_with_schema(trace_id, self.org_id, self.stream_type, None, req)
+    async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
+        search_service::search(trace_id, self.org_id, self.stream_type, None, req)
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))
     }
@@ -1190,7 +1180,6 @@ mod tests {
         },
     };
 
-    use config::meta::search::Response;
     use datafusion::arrow::{
         array::{ArrayRef, Float64Array, TimestampMicrosecondArray},
         record_batch::RecordBatch,
@@ -1228,7 +1217,7 @@ mod tests {
     #[derive(Default)]
     struct ScriptedSearch {
         plan: Option<std::result::Result<SearchPartitionResponse, String>>,
-        responses: Mutex<VecDeque<std::result::Result<SchemaResponse, String>>>,
+        responses: Mutex<VecDeque<std::result::Result<Response, String>>>,
         searched: Mutex<Vec<(String, i64, i64, i64)>>,
         planned: AtomicUsize,
         gate: Option<tokio::sync::Notify>,
@@ -1237,7 +1226,7 @@ mod tests {
     impl ScriptedSearch {
         fn new(
             plan: Option<SearchPartitionResponse>,
-            responses: Vec<std::result::Result<SchemaResponse, String>>,
+            responses: Vec<std::result::Result<Response, String>>,
         ) -> Self {
             Self {
                 plan: plan.map(Ok),
@@ -1267,7 +1256,7 @@ mod tests {
             }
         }
 
-        async fn search(&self, trace_id: &str, req: &Request) -> Result<SchemaResponse> {
+        async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
             assert!(req.query.query_type.is_empty(), "{}", req.query.query_type);
             let call = (
                 trace_id.to_string(),
@@ -1289,7 +1278,7 @@ mod tests {
         }
     }
 
-    /// Uses the leader JSON row conversion and schema columns so null handling matches production.
+    /// Uses the leader JSON row conversion so null handling matches production.
     struct ArrowSearch {
         plan: Option<SearchPartitionResponse>,
         batches: Mutex<VecDeque<RecordBatch>>,
@@ -1308,7 +1297,7 @@ mod tests {
                 .expect("planner response was not configured"))
         }
 
-        async fn search(&self, _trace_id: &str, req: &Request) -> Result<SchemaResponse> {
+        async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
             assert!(req.query.query_type.is_empty(), "{}", req.query.query_type);
             self.searched.fetch_add(1, Ordering::SeqCst);
             let batch = self
@@ -2136,13 +2125,10 @@ mod tests {
         assert!(validated_plan(&adjusted, window, GRID_5M).is_err());
     }
 
-    fn response(hits: Vec<serde_json::Value>) -> SchemaResponse {
-        SchemaResponse {
-            response: Response {
-                hits,
-                ..Default::default()
-            },
-            columns: vec![BUCKET_COLUMN.to_string(), VALUE_COLUMN.to_string()],
+    fn response(hits: Vec<serde_json::Value>) -> Response {
+        Response {
+            hits,
+            ..Default::default()
         }
     }
 
@@ -2155,10 +2141,10 @@ mod tests {
         json!({ BUCKET_COLUMN: bucket })
     }
 
-    fn parse_one(resp: &SchemaResponse, slice: [i64; 2]) -> Result<Vec<QueryDataPoint>> {
+    fn parse_one(resp: &Response, slice: [i64; 2]) -> Result<Vec<QueryDataPoint>> {
         let mut series = SeriesAccumulator::default();
         series.add_slice(resp, slice, FIVE_MIN_US, 100, &ResultColumns::generated())?;
-        series.finish(100)
+        series.finish(100, VALUE_COLUMN)
     }
 
     #[test]
@@ -2219,63 +2205,61 @@ mod tests {
             .add_slice(&resp, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
             .unwrap();
         assert_eq!((series.raw_hits, series.omitted_nulls), (4, 2));
-        let points = series.finish(100).unwrap();
+        let points = series.finish(100, VALUE_COLUMN).unwrap();
         let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
         assert_eq!(got, vec![(T0, 1.0), (T0 + 3 * FIVE_MIN_US, 3.0)]);
     }
 
     #[test]
-    fn a_column_missing_from_the_result_is_an_error_not_a_null() {
+    fn a_column_missing_from_every_row_fails_the_run_naming_the_keys_seen() {
+        let first = [T0, T0 + FIVE_MIN_US];
+        let second = [T0 + FIVE_MIN_US, T0 + 2 * FIVE_MIN_US];
+        let mut series = SeriesAccumulator::default();
+        for (slice, bucket) in [(first, T0), (second, T0 + FIVE_MIN_US)] {
+            let rows = response(vec![json!({BUCKET_COLUMN: bucket, "count": 3})]);
+            series
+                .add_slice(&rows, slice, FIVE_MIN_US, 100, &ResultColumns::generated())
+                .unwrap();
+        }
+        assert_eq!(series.omitted_nulls, 2);
+        let err = series.finish(100, VALUE_COLUMN).unwrap_err().to_string();
+        assert!(err.contains("2 rows"), "{err}");
+        assert!(err.contains("every 'value' was SQL NULL"), "{err}");
+        assert!(err.contains("missing from the result"), "{err}");
+        let present = err.split("columns present: ").nth(1).unwrap_or_default();
+        assert!(
+            present.contains("\"count\"") && present.contains("\"time_bucket\""),
+            "{err}"
+        );
+
         let slice = [T0, T0 + 2 * FIVE_MIN_US];
-        let mut no_value = response(vec![null_row(T0)]);
-        no_value.columns = vec![BUCKET_COLUMN.to_string()];
-        let err = parse_one(&no_value, slice).unwrap_err().to_string();
-        assert!(err.contains("result columns [\"time_bucket\"]"), "{err}");
-        assert!(err.contains("'value'"), "{err}");
-
-        let mut no_bucket = response(vec![row(T0, json!(1))]);
-        no_bucket.columns = vec![VALUE_COLUMN.to_string()];
+        let no_bucket = response(vec![json!({ VALUE_COLUMN: 1 })]);
         let err = parse_one(&no_bucket, slice).unwrap_err().to_string();
-        assert!(err.contains("'time_bucket'"), "{err}");
+        assert!(err.contains("no usable 'time_bucket'"), "{err}");
 
-        let mut no_columns = response(vec![row(T0, json!(1))]);
-        no_columns.columns.clear();
-        assert!(parse_one(&no_columns, slice).is_err());
-
-        let mut extra = response(vec![
+        let extra = response(vec![
             json!({BUCKET_COLUMN: T0, VALUE_COLUMN: 1.0, "other": 2.0}),
         ]);
-        extra.columns.insert(0, "other".to_string());
         assert_eq!(parse_one(&extra, slice).unwrap()[0].value, 1.0);
 
-        let mut empty = response(vec![]);
-        empty.columns.clear();
-        assert!(parse_one(&empty, slice).unwrap().is_empty());
+        assert!(parse_one(&response(vec![]), slice).unwrap().is_empty());
     }
 
     #[test]
     fn custom_columns_are_read_by_name_from_object_rows() {
         let slice = [T0, T0 + 3 * FIVE_MIN_US];
         let custom = columns("zo_sql_timestamp", "zo_sql_num");
-        let resp = SchemaResponse {
-            response: Response {
-                hits: vec![
-                    json!({"zo_sql_num": 7, "n": 99, "zo_sql_timestamp": T0}),
-                    json!({"n": 99, "zo_sql_timestamp": T0 + FIVE_MIN_US}),
-                    json!({"zo_sql_timestamp": T0 + 2 * FIVE_MIN_US, VALUE_COLUMN: 5}),
-                ],
-                ..Default::default()
-            },
-            columns: ["zo_sql_num", "n", "zo_sql_timestamp", VALUE_COLUMN]
-                .map(str::to_string)
-                .to_vec(),
-        };
+        let resp = response(vec![
+            json!({"zo_sql_num": 7, "n": 99, "zo_sql_timestamp": T0}),
+            json!({"n": 99, "zo_sql_timestamp": T0 + FIVE_MIN_US}),
+            json!({"zo_sql_timestamp": T0 + 2 * FIVE_MIN_US, VALUE_COLUMN: 5}),
+        ]);
         let mut series = SeriesAccumulator::default();
         series
             .add_slice(&resp, slice, FIVE_MIN_US, 100, &custom)
             .unwrap();
         assert_eq!(series.omitted_nulls, 2);
-        let points = series.finish(100).unwrap();
+        let points = series.finish(100, VALUE_COLUMN).unwrap();
         let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
         assert_eq!(got, vec![(T0, 7.0)]);
 
@@ -2315,7 +2299,7 @@ mod tests {
                     &ResultColumns::generated(),
                 )
                 .unwrap();
-            let points = series.finish(100).unwrap();
+            let points = series.finish(100, VALUE_COLUMN).unwrap();
             assert_eq!(
                 points
                     .iter()
@@ -2328,7 +2312,7 @@ mod tests {
             all_null
                 .add_slice(&nulls, first, FIVE_MIN_US, 100, &ResultColumns::generated())
                 .unwrap();
-            let err = all_null.finish(100).unwrap_err().to_string();
+            let err = all_null.finish(100, VALUE_COLUMN).unwrap_err().to_string();
             assert!(err.contains("NULL"), "{err}");
         }
 
@@ -2344,7 +2328,7 @@ mod tests {
                 )
                 .unwrap();
         }
-        assert!(empty_run.finish(100).unwrap().is_empty());
+        assert!(empty_run.finish(100, VALUE_COLUMN).unwrap().is_empty());
     }
 
     #[test]
@@ -2371,13 +2355,10 @@ mod tests {
     fn partial_responses_keep_their_reason_and_exhausted_budgets_fail() {
         let slice = [T0, T0 + FIVE_MIN_US];
         let mut partial = response(vec![row(T0, json!(1))]);
-        partial.response.is_partial = true;
+        partial.is_partial = true;
         let err = parse_one(&partial, slice).unwrap_err().to_string();
         assert_eq!(err, "search returned partial results");
-        partial.response.function_error = vec!["querier timeout".to_string()];
-        let err = parse_one(&partial, slice).unwrap_err().to_string();
-        assert!(err.contains("querier timeout"), "{err}");
-        partial.columns.clear();
+        partial.function_error = vec!["querier timeout".to_string()];
         let err = parse_one(&partial, slice).unwrap_err().to_string();
         assert!(err.contains("querier timeout"), "{err}");
 
@@ -2386,20 +2367,6 @@ mod tests {
         let mut series = SeriesAccumulator::default();
         let err = series
             .add_slice(&full, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("budget"), "{err}");
-        let mut unchecked = full;
-        unchecked.columns.clear();
-        let mut series = SeriesAccumulator::default();
-        let err = series
-            .add_slice(
-                &unchecked,
-                wide,
-                FIVE_MIN_US,
-                2,
-                &ResultColumns::generated(),
-            )
             .unwrap_err()
             .to_string();
         assert!(err.contains("budget"), "{err}");
@@ -2413,7 +2380,7 @@ mod tests {
         series
             .add_slice(&two, wide, FIVE_MIN_US, 2, &ResultColumns::generated())
             .unwrap();
-        assert!(series.finish(2).is_err());
+        assert!(series.finish(2, VALUE_COLUMN).is_err());
     }
 
     fn three_slices() -> SearchPartitionResponse {
@@ -2424,7 +2391,7 @@ mod tests {
         ])
     }
 
-    fn slice_ok(bucket: i64, value: f64) -> std::result::Result<SchemaResponse, String> {
+    fn slice_ok(bucket: i64, value: f64) -> std::result::Result<Response, String> {
         Ok(response(vec![row(bucket, json!(value))]))
     }
 
@@ -2536,8 +2503,8 @@ mod tests {
         assert_eq!(engine.searched().len(), 2);
 
         let mut partial = response(vec![row(T0 + FIVE_MIN_US, json!(2))]);
-        partial.response.is_partial = true;
-        partial.response.function_error = vec!["file list truncated".to_string()];
+        partial.is_partial = true;
+        partial.function_error = vec!["file list truncated".to_string()];
         let engine = ScriptedSearch::new(
             Some(three_slices()),
             vec![
@@ -2601,20 +2568,15 @@ mod tests {
         );
     }
 
-    /// Mirrors the leader: real JSON rows, empty objects dropped, columns from the batch schema.
-    fn object_response(batch: &RecordBatch) -> SchemaResponse {
+    /// Mirrors the leader: real JSON rows with empty objects dropped.
+    fn object_response(batch: &RecordBatch) -> Response {
         let rows = config::utils::arrow::record_batches_to_json_rows(&[batch]).unwrap();
-        SchemaResponse {
-            response: Response {
-                hits: rows
-                    .into_iter()
-                    .filter(|v| !v.is_empty())
-                    .map(serde_json::Value::Object)
-                    .collect(),
-                ..Default::default()
-            },
-            columns: search_service::cluster::schema_columns(&batch.schema()),
-        }
+        response(
+            rows.into_iter()
+                .filter(|v| !v.is_empty())
+                .map(serde_json::Value::Object)
+                .collect(),
+        )
     }
 
     fn arrow_rows(rows: &[(i64, Option<f64>)]) -> RecordBatch {
@@ -2646,7 +2608,7 @@ mod tests {
             (T0 + 2 * FIVE_MIN_US, Some(f64::INFINITY)),
         ]);
         let resp = object_response(&batch);
-        let hits = &resp.response.hits;
+        let hits = &resp.hits;
         assert!(
             hits[1].get(VALUE_COLUMN).is_none()
                 && hits[2]
@@ -2668,17 +2630,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_entirely_null_value_column_is_declared_and_its_points_are_skipped() {
+    async fn an_entirely_null_value_partition_is_skipped_never_zeroed() {
         let all_null = arrow_rows(&[(T0 + FIVE_MIN_US, None)]);
         let resp = object_response(&all_null);
-        assert_eq!(resp.columns, vec![BUCKET_COLUMN, VALUE_COLUMN]);
         assert!(
-            resp.response
-                .hits
-                .iter()
-                .all(|hit| hit.get(VALUE_COLUMN).is_none()),
+            !resp.hits.is_empty() && resp.hits.iter().all(|hit| hit.get(VALUE_COLUMN).is_none()),
             "{:?}",
-            resp.response.hits
+            resp.hits
         );
 
         let engine = arrow_engine(
@@ -2697,6 +2655,7 @@ mod tests {
         let engine = arrow_engine(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![only_nulls]);
         let err = run_arrow(&engine).await.unwrap_err().to_string();
         assert!(err.contains("SQL NULL"), "{err}");
+        assert!(err.contains(r#"columns present: ["time_bucket"]"#), "{err}");
     }
 
     #[tokio::test]

@@ -23,20 +23,15 @@ pub mod cacher;
 pub mod flight;
 pub mod http;
 
-/// Result column names in schema field order.
-pub fn schema_columns(schema: &Schema) -> Vec<String> {
-    schema
-        .fields()
-        .iter()
-        .map(|f| f.name().to_string())
-        .collect()
-}
-
 pub fn handle_table_response(
     schema: Arc<Schema>,
     sources: Vec<json::Value>,
 ) -> (Vec<String>, Vec<json::Value>) {
-    let columns = schema_columns(&schema);
+    let columns = schema
+        .fields()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect::<Vec<_>>();
     let mut table = Vec::with_capacity(sources.len());
     for row in &sources {
         let mut new_row = Vec::with_capacity(columns.len());
@@ -113,16 +108,6 @@ mod tests {
         let (columns, table) = handle_table_response(schema, sources);
         assert_eq!(columns, vec!["col1", "col2"]);
         assert_eq!(table, vec![json::json!(["a", 1]), json::json!(["b", 2]),]);
-    }
-
-    #[test]
-    fn test_schema_columns_keeps_field_order() {
-        let schema = Schema::new(vec![
-            Field::new("b", DataType::Utf8, true),
-            Field::new("a", DataType::Int64, true),
-        ]);
-        assert_eq!(schema_columns(&schema), vec!["b", "a"]);
-        assert!(schema_columns(&Schema::empty()).is_empty());
     }
 
     #[test]

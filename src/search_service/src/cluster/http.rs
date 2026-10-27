@@ -32,8 +32,7 @@ use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
 use crate::{
-    QueryTracker, SchemaResponse, SearchResult, cluster::flight, sql::Sql,
-    utils::is_default_query_limit_exceeded,
+    QueryTracker, SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
 };
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
@@ -44,7 +43,7 @@ pub async fn search(
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
     _need_super_cluster: bool,
-) -> Result<SchemaResponse> {
+) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();
     let query_type = query.query_type.to_lowercase();
@@ -80,12 +79,10 @@ pub async fn search(
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);
-    let mut columns = Vec::new();
 
     // hits
     if !merge_batches.is_empty() {
         let schema = merge_batches[0].schema();
-        columns = super::schema_columns(&schema);
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
@@ -292,10 +289,7 @@ pub async fn search(
         result.took,
     );
 
-    Ok(SchemaResponse {
-        response: result,
-        columns,
-    })
+    Ok(result)
 }
 
 // internal search function that return record batches
