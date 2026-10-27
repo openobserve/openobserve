@@ -22,7 +22,7 @@ test.describe("IAM Users edit dialog cancel Regression", () => {
     await expect(iam.getUpdateRoleDialogLocator()).toBeHidden();
     await expect(page).not.toHaveURL(iam.getUrlWithUserActionPattern());
 
-    // The dialog opens on a 100ms timer after the deferred page-init URL read.
+    // Outlast the dialog's 100ms open timer so a late reopen is caught.
     await page.waitForTimeout(2000);
     await expect(iam.getUpdateRoleDialogLocator()).toBeHidden();
     testLogger.info('Edit dialog stayed closed and URL is clean after Cancel');

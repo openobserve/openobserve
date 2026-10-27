@@ -1068,6 +1068,16 @@ describe("User Component", () => {
       replaceSpy.mockRestore();
     });
 
+    it("drops a pending open timer when the form is hidden", async () => {
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
+      wrapper.vm.addUser({ row: { email: "test@example.com" } }, true);
+      wrapper.vm.hideForm();
+      await new Promise((r) => setTimeout(r, 150));
+
+      expect(wrapper.vm.showAddUserDialog).toBe(false);
+      replaceSpy.mockRestore();
+    });
+
     it("does not reopen the edit dialog when it was cancelled while the page was still loading", async () => {
       sharedUsersState.users = [];
       queryClient.clear();
