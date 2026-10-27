@@ -352,9 +352,9 @@ describe("LibraryCard", () => {
       alert_type: "anomaly_detection",
     };
 
-    it("offers Add alert and Customize in editor on a scheduled card", () => {
+    it("offers Add to alerts and Customize in editor on a scheduled card", () => {
       const wrapper = mountCard();
-      expect(wrapper.find(ADD).text()).toBe("Add alert");
+      expect(wrapper.find(ADD).text()).toBe("Add to alerts");
       expect(wrapper.find(CUSTOMIZE).text()).toBe("Customize in editor");
     });
 
@@ -363,7 +363,7 @@ describe("LibraryCard", () => {
       expect(wrapper.find(CUSTOMIZE).exists()).toBe(true);
     });
 
-    it("emits install from Add alert without opening the card", async () => {
+    it("emits install from Add to alerts without opening the card", async () => {
       const wrapper = mountCard();
       await wrapper.find(ADD).trigger("click");
       expect(wrapper.emitted("install")).toHaveLength(1);
