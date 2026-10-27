@@ -65,8 +65,8 @@ use crate::{
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
-// API version prefixes: an org with one of these ids makes `/api/v2/...` paths ambiguous.
-const RESERVED_ORG_IDS: [&str; 3] = ["v1", "v2", "v3"];
+// API version and public dashboard route prefixes: such an org id makes `/api/<id>/` ambiguous.
+const RESERVED_ORG_IDS: [&str; 4] = ["v1", "v2", "v3", "public_dashboards"];
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -1699,6 +1699,14 @@ mod tests {
     #[test]
     fn test_validate_auto_created_org_id_rejects_api_version_prefixes() {
         for org_id in ["v1", "v2", "v3", "V2"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_the_public_dashboards_prefix() {
+        for org_id in ["public_dashboards", "Public_Dashboards"] {
             let err = validate_auto_created_org_id(org_id).unwrap_err();
             assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
         }

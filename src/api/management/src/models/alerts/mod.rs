@@ -578,6 +578,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -788,6 +790,7 @@ impl From<meta_search::SearchEventType> for SearchEventType {
             meta_search::SearchEventType::SearchJob => Self::SearchJob,
             meta_search::SearchEventType::Download => Self::Download,
             meta_search::SearchEventType::Insights => Self::Insights,
+            meta_search::SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -1000,6 +1003,7 @@ impl From<SearchEventType> for meta_search::SearchEventType {
             SearchEventType::SearchJob => Self::SearchJob,
             SearchEventType::Download => Self::Download,
             SearchEventType::Insights => Self::Insights,
+            SearchEventType::PublicDashboard => Self::PublicDashboard,
         }
     }
 }
@@ -1291,6 +1295,10 @@ mod tests {
         assert!(matches!(M::from(SearchEventType::SearchJob), M::SearchJob));
         assert!(matches!(M::from(SearchEventType::Download), M::Download));
         assert!(matches!(M::from(SearchEventType::Insights), M::Insights));
+        assert!(matches!(
+            M::from(SearchEventType::PublicDashboard),
+            M::PublicDashboard
+        ));
     }
 
     #[test]
