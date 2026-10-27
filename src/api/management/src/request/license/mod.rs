@@ -392,32 +392,35 @@ where
 
 // a write can commit before its acknowledgement is lost, so only a proven miss undoes the raise
 async fn undo_unless_landed<R, RF>(
-    raise: &HwmRaise,
+    raise: Option<&HwmRaise>,
     raw_key: &str,
     read_back: R,
     error: anyhow::Error,
-) -> Response
+) -> Option<Response>
 where
     R: FnOnce() -> RF,
     RF: std::future::Future<Output = Result<Option<bytes::Bytes>, infra::errors::Error>>,
 {
     match key_landed(raw_key, read_back).await {
         Ok(true) => {
-            log::warn!("[LICENSE] the key landed despite its store error; keeping the rev raise");
+            log::warn!("[LICENSE] the key landed despite its store error : {error}");
+            return None;
         }
         Ok(false) => {
-            if let Err(undo) = undo_raise(raise).await {
+            if let Some(raise) = raise
+                && let Err(undo) = undo_raise(raise).await
+            {
                 log::error!("[LICENSE] could not undo the rev high-water mark raise : {undo}");
             }
         }
         Err(e) => {
             log::error!("[LICENSE] cannot read back the license key, keeping the rev raise : {e}");
-            return MetaHttpResponse::internal_error(format!(
+            return Some(MetaHttpResponse::internal_error(format!(
                 "{STORE_OUTCOME_UNKNOWN_MSG} Store error: {error}"
-            ));
+            )));
         }
     }
-    MetaHttpResponse::internal_error(error)
+    Some(MetaHttpResponse::internal_error(error))
 }
 
 // the gate raises the hwm before the key lands, so a failed store must lower it again
@@ -441,9 +444,9 @@ where
     let committed = match commit(fence).await {
         Ok(committed) => committed,
         Err(e) => {
-            return match raise {
-                Some(raise) => undo_unless_landed(&raise, raw_key, read_back, e).await,
-                None => MetaHttpResponse::internal_error(e),
+            return match undo_unless_landed(raise.as_ref(), raw_key, read_back, e).await {
+                Some(failed) => failed,
+                None => reload_nodes().await,
             };
         }
     };
@@ -463,6 +466,10 @@ where
             }
         }
     }
+    reload_nodes().await
+}
+
+async fn reload_nodes() -> Response {
     match license::update().await {
         Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -1699,7 +1706,7 @@ mod tests {
             stored_license_key,
         )
         .await;
-        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(resp.status(), StatusCode::CREATED);
         assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("key-9")));
         assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
         let (status, body) = paste(lic("lic-1", 5), true).await;
@@ -1823,6 +1830,30 @@ mod tests {
             |fence| async move {
                 assert!(fence.commit("key-9").await.unwrap());
                 Ok(false)
+            },
+            stored_license_key,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("key-9")));
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
+        assert!(license_reload_signalled().await);
+    }
+
+    #[tokio::test]
+    async fn a_write_that_landed_before_its_store_error_is_stored_and_reloads_the_nodes() {
+        let _store = store_setup().await;
+        let coordinator = infra::db::get_coordinator().await;
+        let _ = coordinator
+            .delete(db::license::LICENSE_KEY_PREFIX, false, false, None)
+            .await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |fence| async move {
+                assert!(fence.commit("key-9").await.unwrap());
+                Err(anyhow::anyhow!("acknowledgement lost"))
             },
             stored_license_key,
         )
