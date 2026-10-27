@@ -277,6 +277,17 @@ describe("PanelSchemaRenderer", () => {
   };
 
   /** The loader's state for the next mount: data and metadata as the executors store them. */
+  it("names the chart after the resolved panel title, not the raw template", async () => {
+    wrapper = createWrapper({
+      panelSchema: { ...defaultProps.panelSchema, title: "Hosts in ${rack}" },
+      variablesData: { values: [{ name: "rack", value: ["r1", "r2"] }] },
+    });
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ChartRenderer" }).attributes("label")).toBe(
+      "Hosts in r1, r2",
+    );
+  });
+
   const mockLoadedData = (data: unknown[], metadataQueries: Record<string, unknown>[]) =>
     vi.mocked(usePanelDataLoader).mockReturnValueOnce({
       data: ref(data),
@@ -673,6 +684,57 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
         false,
       );
+    });
+
+    it("shows the panel's empty-state text with dashboard variables substituted", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { no_data_text: "Set site_meter: candidates for $site_meter" },
+        },
+        variablesData: { values: [{ name: "site_meter", value: "pm-07", type: "custom" }] },
+      });
+      await flushPromises();
+
+      const empty = wrapper.find('[data-test="no-data"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("Set site_meter: candidates for pm-07");
+      expect(empty.text()).not.toContain("No Data");
+    });
+
+    it("shows No Data when the panel sets no empty-state text", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="no-data"]').text()).toContain("No Data");
     });
 
     it("clears a stale custom_chart error when switching to another chart type", async () => {

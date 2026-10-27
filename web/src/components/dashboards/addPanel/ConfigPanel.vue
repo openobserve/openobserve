@@ -97,6 +97,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <OTemplateInput
+          v-if="shouldShowNoDataText(dashboardPanelData)"
+          v-show="isConfigOptionVisible('general', 'no-data-text')"
+          class="max-w-75"
+          :model-value="dashboardPanelDataModel.data.config.no_data_text ?? ''"
+          :suggestions="variableSuggestions"
+          delimiter="dollar"
+          :label="t('dashboard.noDataText')"
+          :placeholder="t('panel.noData')"
+          data-test="dashboard-config-no-data-text"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.no_data_text =
+                String(value ?? '').trim() !== '' ? String(value) : null)
+          "
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.noDataTextTooltip')" max-width="15.625rem" />
+          </template>
+        </OTemplateInput>
+
         <OInput
           v-if="promqlMode"
           v-show="isConfigOptionVisible('general', 'step')"
@@ -1305,6 +1326,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
+        <OInput
+          v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-min-interval')"
+          class="max-w-75"
+          :model-value="dashboardPanelDataModel.data.config.y_axis_min_interval ?? ''"
+          type="number"
+          :min="0"
+          :placeholder="t('dashboard.auto')"
+          :label="t('dashboard.yAxisMinInterval')"
+          :help-text="t('dashboard.yAxisMinIntervalHelp')"
+          data-test="dashboard-config-y_axis_min_interval"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.y_axis_min_interval = toMinInterval(value))
+          "
+        />
+
         <OSwitch
           v-if="shouldShowGridlines(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'gridlines')"
@@ -1888,7 +1926,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('open-series-overrides')"
           data-test="dashboard-addpanel-config-series-overrides-add-btn"
         >
-          {{ t("dashboard.addSeriesOverride") }}
+          {{
+            seriesOverrideCount
+              ? t("dashboard.editSeriesOverrides", { count: seriesOverrideCount })
+              : t("dashboard.addSeriesOverride")
+          }}
         </OButton>
       </div>
     </OCollapsible>
@@ -2536,6 +2578,7 @@ import {
 } from "@/utils/dashboard/promqlChartSeriesProps";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -2575,6 +2618,7 @@ import {
   watch,
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { getVariableSuggestions } from "@/utils/dashboard/variableSuggestions";
 import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
 import { isGaugeFixedRangeValid } from "@/utils/dashboard/gaugeDial";
 import Drilldown from "./Drilldown.vue";
@@ -2636,6 +2680,8 @@ import {
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
+  shouldShowNoDataText,
+  toMinInterval,
   shouldShowAxisConfig,
   shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
@@ -2657,6 +2703,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OInput,
+    OTemplateInput,
     OTextarea,
     OSelect,
     OToggleGroup,
@@ -2683,7 +2730,7 @@ export default defineComponent({
   },
   props: ["variablesData", "panelData"],
   emits: ["open-field-overrides", "open-series-overrides"],
-  setup() {
+  setup(props: any) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { t } = useI18nTyped();
     const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
@@ -2693,6 +2740,10 @@ export default defineComponent({
 
     // Alias for template v-model mutation sites; same reference, no behavior change.
     const dashboardPanelDataModel = computed(() => dashboardPanelData);
+
+    const variableSuggestions = computed(() =>
+      getVariableSuggestions(props.variablesData?.values, t),
+    );
 
     // Segmented toggle (OToggleGroup) proxies for few-option config selects.
     // OToggleGroup drops null/empty values (its single-select deselect guard),
@@ -3731,7 +3782,10 @@ export default defineComponent({
     };
 
     return {
+      variableSuggestions,
       raw,
+      shouldShowNoDataText,
+      toMinInterval,
       isHeatmapColorRangeInvalid,
       axisLabelModeModel,
       axisLabelModeOptions,

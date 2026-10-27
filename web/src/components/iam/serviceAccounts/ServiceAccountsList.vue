@@ -555,7 +555,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
-import config from "@/aws-exports";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AddServiceAccount from "./AddServiceAccount.vue";
@@ -677,8 +676,9 @@ export default defineComponent({
     // OpenObserve authenticates API requests with HTTP Basic auth —
     // base64("<identifier>:<token>"), NOT a Bearer token. The service account's
     // email is the username and the token is the password.
+    // The host the UI's own API calls use; Cloud regions accept the account only there (e.g. us2.openobserve.ai).
     const tokenEndpoint = computed(() =>
-      config.isCloud === "true" ? "https://api.openobserve.ai" : window.location.origin,
+      new URL(store.state.API_ENDPOINT || "/", window.location.origin).href.replace(/\/$/, ""),
     );
 
     const tokenBasicCredential = computed(() =>
@@ -1277,7 +1277,6 @@ export default defineComponent({
       t,
       router,
       store,
-      config,
       serviceAccountsState,
       columns,
       loading,

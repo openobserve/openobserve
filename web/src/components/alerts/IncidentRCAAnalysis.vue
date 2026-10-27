@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :stage-index="rca.summary.stage_index"
         :stage="rca.summary.stage"
         :live-mode="currentRun?.mode ?? null"
+        :live-resume-step="liveResumeStep"
         :failed-mode="viewedRun?.mode ?? currentRun?.mode ?? null"
         :has-earlier-report="hasEarlierReport"
         :error="cardError"
@@ -293,7 +294,12 @@ import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { humanizeElapsed, isLiveRca, userLocalPart } from "@/utils/incidents/rcaCell";
+import {
+  formatRcaLocalClock,
+  humanizeElapsed,
+  isLiveRca,
+  userLocalPart,
+} from "@/utils/incidents/rcaCell";
 import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
 import {
   finishedStepCount,
@@ -427,6 +433,12 @@ const aiEnabled = computed(
 
 const live = computed(() => isLiveRca(props.rca));
 const currentRun = computed(() => props.rca?.current_run ?? null);
+/** Step a resumed live run restarted from. */
+const liveResumeStep = computed(() =>
+  currentRun.value?.trigger === "resume"
+    ? (currentRun.value.context_used?.resumed_from?.from_step.title ?? null)
+    : null,
+);
 
 const findRun = (runId: string | null | undefined) =>
   runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;
@@ -702,14 +714,14 @@ const pausedQuestion = computed(() => {
   );
 });
 
-/** The answer deadline in the viewer's local time. */
+/** The answer deadline in the viewer's local time, with its zone. */
 const deadlineText = computed(() => {
   if (!waitingInput.value) return null;
   const deadline = steering.value?.open_question?.deadline_at ?? props.rca?.summary.deadline_at;
-  return deadline ? formatTimestampInTimezone(deadline, "HH:mm", timezone.value) : null;
+  return deadline ? formatRcaLocalClock(deadline, timezone.value) : null;
 });
 
-/** "Unblocked by <author> at <time>" from the newest read answer. */
+/** "Unblocked by <author> at <time> <zone>" from the newest read answer, in local time. */
 const unblocked = computed<RcaUnblockedLine | null>(() => {
   if (cardState.value !== "analyzed") return null;
   const answer = rcaUnblockingAnswer(steering.value?.items ?? []);
@@ -718,7 +730,7 @@ const unblocked = computed<RcaUnblockedLine | null>(() => {
   const question = thread.value?.questions?.find((q) => q.question_id === answer.question_id);
   return {
     author: userLocalPart(author),
-    time: formatTimestampInTimezone(answer.read_at, "HH:mm", timezone.value),
+    time: formatRcaLocalClock(answer.read_at, timezone.value),
     need: rcaNeedSubject(question?.need),
   };
 });

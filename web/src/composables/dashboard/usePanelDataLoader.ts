@@ -39,6 +39,9 @@ import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
+import useStreams from "@/composables/useStreams";
+import { gt } from "@/types/i18n";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 
 import {
   isSkippedByPanelRefresh,
@@ -93,6 +96,7 @@ export const usePanelDataLoader = (
   let isVariablesTriggeredLoad = false;
 
   const store = useStore();
+  const { getStream } = useStreams(gt);
 
   const getRegionClusterParams = () => {
     if (regionClusterParams?.value?.regions || regionClusterParams?.value?.clusters) {
@@ -527,6 +531,13 @@ export const usePanelDataLoader = (
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
+      }
+
+      // Enrichment rows carry their upload time, so the dashboard range would hide them; Explore does the same.
+      const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+      if (tableRange) {
+        startISOTimestamp = tableRange.from;
+        endISOTimestamp = tableRange.to;
       }
 
       renderedTimeRange = { start: startISOTimestamp, end: endISOTimestamp };
