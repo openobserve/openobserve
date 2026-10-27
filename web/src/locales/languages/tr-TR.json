@@ -17052,143 +17052,122 @@
     },
     "quality": {
       "allAgents": "Tüm Aracılar",
-      "agentLabel": "Ajan",
-      "agentPlaceholder": "Tüm acenteler",
-      "kpisAriaLabel": "1. Kademe KPI'lar",
-      "dataTypes": {
-        "numericShort": "Sayı",
-        "categoricalShort": "Kategori",
-        "booleanShort": "Boole"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}g önce"
+        }
       },
+      "healthyIf": "{rule} ise sağlıklı",
+      "noHealthyValue": "yok",
+      "setThreshold": "Sağlıklı eşik belirle",
+      "noScoresInWindow": "Bu pencerede puan yok",
+      "outOf": "{count} / {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Skor kapsamı",
-        "filterHint": "Bu Skor Yapılandırmasını değerlendirme hedef kapsamlarında karşılaştırın.",
         "all": "Tümü",
         "span": "Span",
         "trace": "İz",
         "session": "Oturum"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Skor Sonuçları"
-        },
-        "evaluationCost": {
-          "title": "Değerlendirme Maliyeti"
-        },
-        "scorerSuccess": {
-          "title": "Puanlayıcı Başarısı"
-        },
-        "scorerFailures": {
-          "title": "Puanlayıcı Başarısızlıkları"
-        },
-        "latencyP95": {
-          "title": "Puanlayıcı Gecikmesi p95"
-        },
-        "vsPrev": "öncekine karşı",
-        "noPriorData": "önceki veri yok",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "iz",
+        "session": "oturum"
       },
-      "detail": {
-        "loading": "Yapılandırma başına dökümü yükleniyor...",
-        "noData": "Bu pencerede bu yapılandırma için henüz puan yok.",
-        "empty": {
-          "title": "İlk puanlarınız bekleniyor",
-          "titleScoped": "Bu pencerede {scope} skoru yok",
-          "description": "Seçili zaman aralığında bu yapılandırma için henüz puan gelmedi. Bunu kullanan bir puanlayıcı çalıştığında otomatik olarak burada görünecekler.",
-          "descriptionScoped": "Seçilen zaman aralığında bu yapılandırma için {scope} skoru bulunamadı. Başka bir kapsam seçin veya zaman aralığını genişletin."
-        },
-        "trendTitle": "Eğilim",
-        "distributionTitle": "Puan dağılımı",
-        "categoryDistributionTitle": "Kategori dağılımı",
-        "healthyRateTitle": "Zaman içinde sağlıklı oranı",
-        "trueRateTitle": "Zaman içinde doğru oranı",
-        "trueFalseTitle": "Doğru vs Yanlış",
-        "legendAvg": "Ort",
-        "legendThreshold": "eşik {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "sağlıklı {direction} {value}",
-        "healthyThreshold": "Sağlıklı {threshold}",
-        "legendHealthy": "sağlıklı",
-        "legendUnhealthy": "sağlıksız",
-        "legendHealthyRate": "Sağlıklı oranı",
-        "legendTrueRate": "Doğru oranı",
-        "legendTrueCount": "doğru ({count})",
-        "legendFalseCount": "yanlış ({count})",
-        "kpis": {
-          "average": "Ortalama",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Sağlıksız",
-          "healthy": "Sağlıklı",
-          "trueRate": "Doğru oranı",
-          "falseRate": "Yanlış oranı",
-          "coverage": "Kapsam",
-          "targetsScored": "Skorlanan hedefler"
-        },
-        "health": {
-          "title": "Sağlık durumu",
-          "noThreshold": "Sağlıklı eşik yapılandırılmamış. Skorlar henüz sağlıklı veya bozuluyor olarak sınıflandırılamaz.",
-          "thresholdOnly": "Sağlıklı ise {threshold}",
-          "summary": "{percent}% eşiğin altında · {threshold} ise sağlıklı"
-        },
-        "ofScoreResults": "{count} skor sonucundan",
-        "range": "Aralık {min}–{max}"
+      "tiles": {
+        "attention": "Dikkat gerektiren yapılandırmalar",
+        "ofTotal": "{total} içinden",
+        "attentionNote": "Göster",
+        "attentionTooltip": "En az bir sağlıksız puan içeren yapılandırmalar",
+        "withoutResult": "Sonucu olmayan yapılandırmalar",
+        "withoutResultTooltip": "Bu zaman aralığında puanı olmayan veya sağlıklı eşiği bulunmayan yapılandırmalar. Göstermek için tıklayın.",
+        "noScores": "{count} tanesi puan almadı | {count} tanesi puan almadı",
+        "noThreshold": "{count} tanesinin eşiği yok | {count} tanesinin eşiği yok",
+        "allGiveResult": "Her yapılandırma bir sonuç verir"
       },
-      "runs": {
-        "title": "Değerlendirme skorları",
-        "hint": "Puanlar ve gerekçeler _llm_scores'ten gelir. Daha fazla inceleme için değerlendirici izini açmak üzere bir çalıştırma seçin.",
-        "filterLabel": "Değerlendirme skorlarını filtrele",
-        "noThresholdHint": "Sağlıksız skorları sınıflandırmak ve vurgulamak için bu Skor Yapılandırmasında bir sağlıklı eşik belirleyin.",
-        "noReasoning": "Gerekçe kaydedilmedi",
-        "unknownAgent": "Bilinmeyen ajan",
-        "unknownScope": "Bilinmeyen kapsam",
-        "queryError": "Değerlendirme puanları yenilenemedi. Son başarılı sayfa hâlâ gösteriliyor.",
-        "empty": "Bu zaman aralığında değerlendirme puanı yok.",
-        "emptyUnhealthy": "Bu zaman aralığında sağlıksız puan yok.",
-        "filters": {
-          "all": "Tüm puanlar",
-          "unhealthy": "Sağlıksız"
-        },
-        "health": {
-          "healthy": "Sağlıklı",
-          "unhealthy": "Sağlıksız"
-        },
+      "table": {
+        "searchPlaceholder": "Yapılandırmaları filtrele…",
+        "openUnhealthy": "Sağlıksız puanları aç",
+        "configLink": "Yapılandırma",
+        "averageRange": "ortalama, {min} ile {max} arası",
+        "mostCommon": "en yaygın · {count} / {total}",
         "columns": {
-          "time": "Değerlendirildi",
-          "result": "Puan",
-          "reasoning": "Gerekçe",
-          "target": "Hedef",
-          "agent": "Ajan"
-        }
-      },
-      "overview": {
-        "searchPlaceholder": "Yapılandırmaları filtrele...",
-        "relativeTime": {
-          "daysAgo": "{day}g önce",
-          "monthsAgo": "{month} ay önce"
-        },
-        "status": {
-          "healthy": "Sağlıklı",
-          "unhealthy": "İlgi gerektiriyor",
-          "noThreshold": "Eşik ayarlanmamış",
-          "noData": "Puan verisi yok"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% altında · {threshold} ise sağlıklı",
-          "noThresholdHint": "Sağlıklı eşik belirle",
-          "noDataHint": "Bu pencerede puan yok"
-        },
-        "columns": {
-          "health": "Sağlık",
           "scoreConfig": "Puan Yapılandırması",
-          "type": "Tür",
-          "quality": "Kalite",
-          "totalScores": "Toplam Skorlar",
-          "scopeMix": "Kapsam Karışımı",
-          "volumeTrend": "Hacim Trendi",
+          "health": "Sağlık",
+          "typicalScore": "Tipik puan",
+          "unhealthy": "Sağlıksız",
+          "scores": "Puanlar",
           "updated": "Güncellendi"
         }
       },
-      "averageWithHealthyRate": "Ortalama · %{rate} sağlıklı"
+      "detail": {
+        "back": "Tüm yapılandırmalar",
+        "backToAll": "Tüm yapılandırmalara dön",
+        "editConfig": "Yapılandırmayı düzenle",
+        "notFound": "Puan Yapılandırması bulunamadı",
+        "notFoundDescription": "Silinmiş olabilir veya bağlantı eski bir yapılandırmayı işaret ediyor.",
+        "emptyTitle": "İlk puanlarınızı bekliyoruz",
+        "emptyTitleScoped": "Bu pencerede {scope} puanı yok",
+        "emptyDescription": "Seçili zaman aralığında bu yapılandırma için hiç puan gelmedi. Onu kullanan bir puanlayıcı çalıştığında burada görünürler.",
+        "distributionNumeric": "Puan dağılımı",
+        "distributionValues": "Değer dağılımı",
+        "averageValue": "ortalama {value}",
+        "legendHealthy": "Sağlıklı",
+        "legendUnhealthy": "Sağlıksız",
+        "legendScores": "Puanlar",
+        "chartTooltip": "{count} puan, {unhealthy} sağlıksız | {count} puan, {unhealthy} sağlıksız",
+        "chartTooltipCount": "{count} puan | {count} puan",
+        "trendTitle": {
+          "score": "Eğilim",
+          "healthyRate": "Zaman içinde sağlıklılık oranı",
+          "trueRate": "Zaman içinde doğru olma oranı",
+          "count": "Zaman içinde puanlar"
+        },
+        "trendLegend": {
+          "healthyRate": "Sağlıklılık oranı",
+          "trueRate": "Doğru oranı",
+          "count": "Puanlar"
+        },
+        "legendAvg": "Ort",
+        "legendThreshold": "eşik {direction} {value}",
+        "markLineHealthy": "sağlıklı {direction} {value}",
+        "filterRange": "{from} - {to}",
+        "filterBelow": "{to} altı",
+        "filterAtLeast": "{from} ve üzeri",
+        "filterAny": "Herhangi bir değer",
+        "filterByBar": "Puanları değere göre filtrele",
+        "barButton": "{label}: {count} puan | {label}: {count} puan",
+        "clearFilter": "Filtreyi temizle"
+      },
+      "review": {
+        "title": "Değerlendirme puanları",
+        "all": "Tümü",
+        "unhealthy": "Sağlıksız",
+        "unhealthyDisabled": "Puanları sınıflandırmak için sağlıklı bir eşik belirleyin",
+        "inputNotCaptured": "Girdi yakalanmadı",
+        "outputNotCaptured": "Çıktı yakalanmadı",
+        "noMatch": "Bu filtreyle eşleşen puan yok"
+      },
+      "pane": {
+        "noneSelected": "Puan seçilmedi",
+        "healthy": "Sağlıklı",
+        "unhealthy": "Sağlıksız",
+        "noThreshold": "Sağlıklı eşik belirlenmedi",
+        "previous": "Önceki puan",
+        "next": "Sonraki puan",
+        "reasoning": "Akıl yürütme",
+        "noReasoning": "Akıl yürütme kaydedilmedi",
+        "fullTextUnavailable": "Kısa bir önizleme gösteriliyor. Tam iz yüklenemedi.",
+        "open": {
+          "span": "Span'ı aç",
+          "trace": "İzi aç",
+          "session": "Oturumu aç"
+        },
+        "evaluatorTrace": "Değerlendirici izi",
+        "addToDataset": "Veri kümesine ekle",
+        "datasetSession": "Veri kümeleri tek bir iz veya span kabul eder. İzlerinden birini eklemek için oturumu açın.",
+        "datasetNoStream": "Bu puanın eklenebileceği bir kaynak akışı yok."
+      }
     },
     "singular": {
       "jobs": "Değerlendirme İşi",
@@ -17904,22 +17883,18 @@
       }
     },
     "importCount": "İçe Aktar ({count})",
-    "count": "Sayı",
     "failedToDeriveSchema": "Şema çıkarılamadı",
     "failedToImportScoreConfig": "Skor yapılandırması içe aktarılamadı",
     "failedToImportScorer": "Puanlayıcı içe aktarılamadı",
     "failedToFetchCatalog": "Katalog alınamadı ({status})",
     "failedToLoadCatalog": "Katalog yüklenemedi",
     "failedToRunScorerTest": "Puanlayıcı testi çalıştırılamadı",
-    "healthyRate": "Sağlık oranı",
     "invalidJsonFormat": "Geçersiz JSON biçimi",
     "jsonIsEmpty": "JSON boş",
     "scorerTestFailed": "Puanlayıcı testi başarısız oldu",
     "scorerTestSampleContext": "Fransa ülke profili: Paris başkenttir.",
     "scorerTestSampleInput": "Fransa'nın başkenti, Seine nehri üzerinde bulunan Paris'tir.",
     "scorerTestSampleOutput": "Paris, Fransa'nın başkentidir.",
-    "topCategory": "Üst kategori",
-    "trueRate": "Gerçek oran",
     "unknownError": "Bilinmeyen hata",
     "import": {
       "createdSuccessfully": "\"{name}\" başarıyla oluşturuldu",
@@ -20089,6 +20064,7 @@
       "evalTemplates": "Çevrimiçi Değerlendirmeler - Şablonlar",
       "scorers": "Çevrimiçi Değerlendirmeler — Puanlayıcılar",
       "evalJobs": "Çevrimiçi Değerlendirmeler — İşler",
+      "quality": "Çevrimiçi Değerlendirmeler — Kalite",
       "scoreConfigs": "Çevrimiçi Değerlendirmeler - Puan Yapılandırmaları",
       "actions": "Eylemler",
       "llmProviders": "LLM Sağlayıcıları",
@@ -20204,6 +20180,7 @@
       "evalTemplatesRefresh": "Listeyi yenile",
       "scorersRefresh": "Listeyi yenile",
       "evalJobsRefresh": "Listeyi yenile",
+      "qualityBack": "Tüm yapılandırmalara dön",
       "scoreConfigsRefresh": "Listeyi yenile",
       "actionsRefresh": "Listeyi yenile",
       "llmProvidersRefresh": "Listeyi yenile",
@@ -20450,11 +20427,10 @@
         "high": "Yüksek"
       },
       "qualityStatus": {
-        "nothreshold": "Eşik Yok",
-        "nodata": "Veri Yok",
+        "attention": "Dikkat gerekiyor",
         "healthy": "Sağlıklı",
-        "warn": "Uyarı",
-        "unhealthy": "Sağlıksız"
+        "unset": "Eşik belirlenmedi",
+        "nodata": "Puan verisi yok"
       },
       "rumEventType": {
         "longtask": "Uzun Görev",
