@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { chartColor } from "@/utils/chartTheme";
-import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 
 // The _anomalies schema decides which kind columns the queries may reference;
@@ -39,10 +38,6 @@ vi.mock("@/services/search", () => ({
   default: { search: vi.fn() },
 }));
 
-vi.mock("@/services/alerts", () => ({
-  default: { get_by_alert_id: vi.fn() },
-}));
-
 // `__esModule` is load-bearing: the component reaches this through defineAsyncComponent.
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   __esModule: true,
@@ -56,14 +51,21 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 
 const search = vi.mocked(searchService.search);
-const getAlert = vi.mocked(alertsService.get_by_alert_id);
 
 const stubs = {
   // The renderer runs a real query pipeline; the panel CONFIG handed to it is
   // what this spec is about.
   PanelSchemaRenderer: {
     name: "PanelSchemaRenderer",
-    props: ["panelSchema", "selectedTimeObj", "height", "width", "variablesData", "searchType"],
+    props: [
+      "panelSchema",
+      "selectedTimeObj",
+      "height",
+      "width",
+      "variablesData",
+      "searchType",
+      "shouldRefreshWithoutCache",
+    ],
     template: '<div class="panel-stub" />',
   },
 };
@@ -123,8 +125,6 @@ beforeEach(() => {
   anomaliesSchema.fail = false;
   search.mockReset();
   respond([HIT]);
-  getAlert.mockReset();
-  getAlert.mockResolvedValue({ data: ANOMALY } as any);
 });
 
 afterEach(() => {
@@ -143,6 +143,11 @@ describe("AnomalyDetectionChart", () => {
       expect(request.query.query.end_time - request.query.query.start_time).toBe(
         60 * 60 * 1000 * 1000,
       );
+    });
+
+    it("bypasses the result cache, which would keep a tail the detector writes later empty", async () => {
+      wrapper = await mountChart();
+      expect(search.mock.calls[search.mock.calls.length - 1]?.[3]).toBe(false);
     });
 
     it("formats a traces duration percentile in time units", async () => {
@@ -279,68 +284,6 @@ describe("AnomalyDetectionChart", () => {
       expect(request.query.query.end_time - request.query.query.start_time).toBe(
         24 * 60 * 60 * 1000 * 1000,
       );
-    });
-  });
-
-  describe("detector cursor", () => {
-    const MINUTE_US = 60 * 1000 * 1000;
-    const minutesAgoUs = (n: number) => Date.now() * 1000 - n * MINUTE_US;
-    const panelEndUs = (w: any) =>
-      w
-        .findAllComponents({ name: "PanelSchemaRenderer" })[0]
-        .props("selectedTimeObj")
-        .end_time.getTime();
-
-    it("ends the query at the cursor, so the unwritten tail is never result-cached", async () => {
-      const cursor = minutesAgoUs(20);
-      wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: cursor });
-      expect(lastSearch().query.query.end_time).toBe(cursor);
-      await openInternals(wrapper);
-      expect(panelEndUs(wrapper)).toBe(cursor);
-    });
-
-    it("queries the whole range when the detector has no cursor yet", async () => {
-      wrapper = await mountChart();
-      const { start_time, end_time } = lastSearch().query.query;
-      expect(end_time - start_time).toBe(60 * MINUTE_US);
-    });
-
-    it("queries the whole range when the cursor predates it", async () => {
-      wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: minutesAgoUs(90) });
-      const { start_time, end_time } = lastSearch().query.query;
-      expect(end_time - start_time).toBe(60 * MINUTE_US);
-    });
-
-    it("re-reads the cursor on a range change, since a run may have advanced it", async () => {
-      wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: minutesAgoUs(50) });
-      const advanced = minutesAgoUs(5);
-      getAlert.mockResolvedValue({
-        data: { ...ANOMALY, last_processed_timestamp: advanced },
-      } as any);
-      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
-      await settle();
-      expect(getAlert).toHaveBeenCalledWith(expect.any(String), "cfg1");
-      expect(lastSearch().query.query.end_time).toBe(advanced);
-    });
-
-    it("queries once per range change, not once per cursor and window write", async () => {
-      wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: minutesAgoUs(50) });
-      getAlert.mockResolvedValue({
-        data: { ...ANOMALY, last_processed_timestamp: minutesAgoUs(5) },
-      } as any);
-      const before = search.mock.calls.length;
-      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
-      await settle();
-      expect(search.mock.calls.length - before).toBe(1);
-    });
-
-    it("keeps the older cursor when the re-read fails", async () => {
-      const cursor = minutesAgoUs(50);
-      wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: cursor });
-      getAlert.mockRejectedValue(new Error("unavailable"));
-      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
-      await settle();
-      expect(lastSearch().query.query.end_time).toBe(cursor);
     });
   });
 
@@ -493,6 +436,13 @@ describe("AnomalyDetectionChart", () => {
         1,
       );
       expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(2);
+    });
+
+    it("bypasses the result cache for both panels, like the metric query", async () => {
+      wrapper = await mountChart();
+      await openInternals(wrapper);
+      const panels = wrapper.findAllComponents({ name: "PanelSchemaRenderer" });
+      expect(panels.map((p: any) => p.props("shouldRefreshWithoutCache"))).toEqual([true, true]);
     });
 
     it("plots the threshold as a series, so a retrain steps it rather than flattening it", async () => {
