@@ -112,6 +112,23 @@ export function warningSql(scope: EventScope, kind: string | null, namespaced: b
   );
 }
 
+export function eventCountsSql(cluster: string) {
+  return (
+    "SELECT count(*) AS total, count(CASE WHEN type = 'Warning' THEN 1 END) AS warnings FROM (" +
+    `SELECT body_object_type AS type, ROW_NUMBER() OVER (PARTITION BY ${EK} ORDER BY _timestamp DESC) AS rn ` +
+    `FROM "${EVENTS_STREAM}" WHERE body_object_kind = 'Event'${clusterTerm(cluster)}` +
+    ") WHERE rn = 1"
+  );
+}
+
+export function parseEventCounts(
+  hits: any[] | undefined,
+): { total: number; warnings: number } | null {
+  const hit = hits?.[0];
+  if (!hit) return null;
+  return { total: Number(hit.total) || 0, warnings: Number(hit.warnings) || 0 };
+}
+
 export function eventsSql(scope: EventScope, limit: number) {
   return eventsQuery(`${clusterTerm(scope.cluster)}${eventNsFilter(scope.namespaces)}`, limit);
 }

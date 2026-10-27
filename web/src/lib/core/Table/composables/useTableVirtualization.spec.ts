@@ -34,4 +34,46 @@ describe("useTableVirtualization", () => {
     expect(count).toBeLessThan(Math.ceil(window.innerHeight / 28) + 10);
     scope.stop();
   });
+
+  describe("measuring a row with its expanded detail", () => {
+    const rowWithDetail = () => {
+      const body = document.createElement("tbody");
+      const row = document.createElement("tr");
+      row.setAttribute("data-index", "0");
+      row.getBoundingClientRect = () => ({ height: 22 }) as DOMRect;
+      const detail = document.createElement("tr");
+      detail.setAttribute("data-row-expansion", "");
+      detail.getBoundingClientRect = () => ({ height: 140 }) as DOMRect;
+      body.append(row, detail);
+      return row;
+    };
+    const measureWith = (includeExpansionRow: boolean) => {
+      const rows = ref([{ index: 0, original: {} }] as Row<any>[]);
+      const scope = effectScope();
+      const virtualization = scope.run(() =>
+        useTableVirtualization({
+          rows,
+          parentRef: ref(null),
+          rowHeight: 22,
+          dynamicRowHeight: true,
+          includeExpansionRow,
+        }),
+      )!;
+      const size = virtualization.rowVirtualizer.value.options.measureElement!(
+        rowWithDetail(),
+        undefined,
+        virtualization.rowVirtualizer.value,
+      );
+      scope.stop();
+      return size;
+    };
+
+    it("adds the detail row's height when asked", () => {
+      expect(measureWith(true)).toBe(162);
+    });
+
+    it("measures the data row alone otherwise", () => {
+      expect(measureWith(false)).toBe(22);
+    });
+  });
 });

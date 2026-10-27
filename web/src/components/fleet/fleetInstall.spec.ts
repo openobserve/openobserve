@@ -19,7 +19,9 @@ import {
   INSTALL_ENV,
   installCommand,
   opampEndpoint,
+  platformForOs,
   resolveBaseUrl,
+  uninstallCommand,
 } from "./fleetInstall";
 
 const target = {
@@ -40,16 +42,17 @@ describe("installCommand", () => {
     expect(cmd).toContain("--org 'acme'");
     expect(cmd).toContain("--token 'o2ft_abc123'");
     expect(cmd).toContain("--version '0.163.1'");
-    expect(cmd).not.toContain("--transport");
+    expect(cmd).toContain("--transport ws");
   });
 
   it("uses the macOS script on macOS", () => {
     expect(installCommand("macos", target)).toContain("/agents/main/fleet/install.sh");
   });
 
-  it("adds --transport http only when the proxy cannot carry WebSocket", () => {
+  it("always names the transport, so the scripts' own default never decides it", () => {
     expect(installCommand("linux", { ...target, http: true })).toContain("--transport http");
     expect(installCommand("windows", { ...target, http: true })).toContain("-Transport http");
+    expect(installCommand("windows", target)).toContain("-Transport ws");
   });
 
   it("leaves the version to the script when the org sets none", () => {
@@ -76,6 +79,7 @@ describe("installCommand", () => {
     expect(cmd).toContain("  config_apply_timeout: 30s");
     expect(cmd).toContain("O2_ENDPOINT: http://host.docker.internal:5080/api/acme");
     expect(cmd).toContain("-v otel-fleet-state:/var/lib/opampsupervisor");
+    expect(cmd).toContain("docker rm -f otel-fleet-collector >/dev/null 2>&1 || true");
     expect(cmd).toContain('--hostname "$(hostname)"');
     expect(cmd).toContain("o2cr.ai/openobserve/otel-fleet-collector:0.163.1");
     const remote = installCommand("docker", { ...target, version: null });
@@ -95,6 +99,9 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set image.repository=o2cr.ai/openobserve/otel-fleet-collector");
     expect(cmd).toContain("--set image.tag='0.163.1'");
     expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
+    expect(installCommand("kubernetes", { ...target, http: true })).toContain(
+      "--set opamp.endpoint='https://o2.example.com/api/acme/v1/opamp'",
+    );
   });
 
   it("installs agents as the otel-fleet-collector release with the chart's agent default", () => {
@@ -118,6 +125,61 @@ describe("installCommand", () => {
     expect(installCommand("docker", { ...target, role: "gateway" })).toBe(
       installCommand("docker", target),
     );
+  });
+});
+
+describe("uninstallCommand", () => {
+  it("runs the same scripts with their uninstall switch on Linux, macOS and Windows", () => {
+    const unix = uninstallCommand("linux");
+    expect(unix).toBe(uninstallCommand("macos"));
+    expect(unix).toContain("/fleet/install.sh | sudo bash -s -- --uninstall");
+    expect(uninstallCommand("windows")).toContain("/fleet/install.ps1))) -Uninstall");
+  });
+
+  it("removes the container, the state volume and the directory the Docker install created", () => {
+    const install = installCommand("docker", target);
+    const cmd = uninstallCommand("docker");
+    expect(cmd).toContain("docker rm -f otel-fleet-collector");
+    expect(cmd).toContain("docker volume rm otel-fleet-state");
+    expect(cmd).toContain("rm -rf otel-fleet");
+    expect(install).toContain("--name otel-fleet-collector");
+    expect(install).toContain("-v otel-fleet-state:");
+  });
+
+  it("uninstalls the Helm release from the namespace the install used", () => {
+    expect(uninstallCommand("kubernetes")).toBe(
+      "helm uninstall otel-fleet-collector --namespace openobserve-collector",
+    );
+    expect(installCommand("kubernetes", target)).toContain("--namespace openobserve-collector");
+  });
+
+  it("uninstalls a gateway's own release, not the agents'", () => {
+    expect(uninstallCommand("kubernetes", "gateway")).toBe(
+      `helm uninstall ${GATEWAY_RELEASE} --namespace openobserve-collector`,
+    );
+    expect(installCommand("kubernetes", { ...target, role: "gateway" })).toContain(
+      `--install ${GATEWAY_RELEASE} `,
+    );
+  });
+
+  it("never carries the token", () => {
+    for (const p of ["linux", "macos", "windows", "docker", "kubernetes"] as const)
+      expect(uninstallCommand(p)).not.toContain("o2ft_");
+  });
+});
+
+describe("platformForOs", () => {
+  it("picks the platform every collector reports", () => {
+    expect(platformForOs(["macos"])).toBe("macos");
+    expect(platformForOs(["windows", "windows"])).toBe("windows");
+    expect(platformForOs(["kubernetes"])).toBe("kubernetes");
+  });
+
+  it("falls back to Linux for mixed, unknown or missing systems", () => {
+    expect(platformForOs(["macos", "linux"])).toBe("linux");
+    expect(platformForOs(["freebsd"])).toBe("linux");
+    expect(platformForOs([null])).toBe("linux");
+    expect(platformForOs([])).toBe("linux");
   });
 });
 

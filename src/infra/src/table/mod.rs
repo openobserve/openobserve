@@ -135,6 +135,7 @@ pub mod timed_annotation_panels;
 pub mod timed_annotations;
 #[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
+mod ttl_cache;
 pub mod user_auth_state;
 pub mod user_password_history;
 pub mod users;

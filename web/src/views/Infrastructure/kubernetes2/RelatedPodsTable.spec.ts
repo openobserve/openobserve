@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
@@ -137,10 +138,10 @@ describe("RelatedPodsTable", () => {
     );
   });
 
-  it("colours the status text by tone and links name and node", async () => {
+  it("shows the status as a tone pill and links name and node", async () => {
     const wrapper = mountTable();
-    expect(cell(wrapper, "web-1", "status").find("span").classes()).toContain(
-      "text-status-error-text",
+    expect(cell(wrapper, "web-1", "status").findComponent(OTag).props("variant")).toBe(
+      "error-soft",
     );
     await cell(wrapper, "web-1", "node").find("button").trigger("click");
     await cell(wrapper, "web-1", "name").find("button").trigger("click");

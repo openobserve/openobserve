@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h, onMounted, type Component } from "vue";
 import { createStore } from "vuex";
+import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
+import { routerKey } from "vue-router";
 import i18n from "@/locales";
 import type { QueryId } from "./kubernetesQueries";
 import { buildInventory, type Series, type WarningEvent } from "./kubernetesModel";
@@ -44,6 +46,24 @@ vi.mock("@/composables/useStreamingSearch", () => ({
     resetAuthToken: vi.fn(),
   }),
 }));
+
+const { listAlerts, listIncidents, push } = vi.hoisted(() => ({
+  listAlerts: vi.fn(),
+  listIncidents: vi.fn(),
+  push: vi.fn(),
+}));
+vi.mock("@/services/alerts", async (orig) => {
+  const actual: any = await orig();
+  return { ...actual, default: { ...actual.default, listByFolderId: listAlerts } };
+});
+vi.mock("@/services/incidents", async (orig) => {
+  const actual: any = await orig();
+  return { ...actual, default: { ...actual.default, list: listIncidents } };
+});
+vi.mock("@/composables/useLockedAffordance", async () => {
+  const { computed } = await import("vue");
+  return { useLockedAffordance: () => computed(() => ({ allowed: true, message: "" })) };
+});
 
 const tooltipStub = defineComponent({
   name: "OTooltip",
@@ -124,6 +144,26 @@ const WARNINGS: WarningEvent[] = [
 describe("ClusterOverview", () => {
   let wrapper: VueWrapper<any>;
 
+  const overviewStore = () =>
+    createStore({
+      state: {
+        selectedOrganization: { identifier: "org1" },
+        zoConfig: { incidents_enabled: true },
+      },
+    });
+
+  const provideGlobals = () => ({
+    plugins: [
+      i18n,
+      overviewStore(),
+      [
+        VueQueryPlugin,
+        { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+      ],
+    ] as any[],
+    provide: { [routerKey as symbol]: { push } },
+  });
+
   const mountView = async (
     entries: Partial<Record<QueryId, Series[]>> = BASE,
     props: Record<string, any> = {},
@@ -139,10 +179,10 @@ describe("ClusterOverview", () => {
         refreshNonce: 0,
         hasStream: () => true,
         loading: false,
-        lastUpdatedAt: null,
+        lastUpdatedAt: END,
         ...props,
       },
-      global: { plugins: [i18n], stubs: { OTooltip: tooltipStub } },
+      global: { ...provideGlobals(), stubs: { OTooltip: tooltipStub } },
     });
     await flushPromises();
     return wrapper;
@@ -150,75 +190,248 @@ describe("ClusterOverview", () => {
 
   const text = (testId: string) => wrapper.find(`[data-test="${testId}"]`).text();
 
-  const bar = (testId: string) =>
-    wrapper
-      .findAllComponents({ name: "OProgressBar" })
-      .find((c) => c.attributes("data-test") === testId)!;
-
   const renderer = () => wrapper.findComponent({ name: "PanelSchemaRenderer" });
+
+  beforeEach(() => {
+    push.mockClear();
+    listAlerts.mockResolvedValue({ data: { list: [] } });
+    listIncidents.mockResolvedValue({ data: { incidents: [], total: 0 } });
+  });
 
   afterEach(() => wrapper?.unmount());
 
-  describe("gauges (AC 35)", () => {
-    it("shows CPU Usage, Requests and Limits over O1 allocatable with the usage-bar variant", async () => {
+  describe("capacity cards", () => {
+    const barOf = (testId: string) =>
+      wrapper
+        .findAllComponents({ name: "OSegmentedBar" })
+        .find((c) => c.attributes("data-test") === testId)!;
+
+    it("shows CPU Usage, Requests and Limits as cores over allocatable", async () => {
       await mountView();
       expect(text("k8s2-overview-cpu-usage")).toContain("8.00 cores · 50%");
       expect(text("k8s2-overview-cpu-requests")).toContain("4.00 cores · 25%");
       expect(text("k8s2-overview-cpu-limits")).toContain("20.00 cores · 125%");
-      expect(bar("k8s2-overview-cpu-usage-bar").props()).toMatchObject({
-        value: 0.5,
-        variant: "default",
-      });
-      expect(bar("k8s2-overview-cpu-limits-bar").props()).toMatchObject({
-        value: 1,
-        variant: "danger",
-      });
       expect(text("k8s2-overview-cpu-allocatable")).toBe("Allocatable: 16.00 cores");
+    });
+
+    it("places usage, requests, limits and allocatable on one track that stretches for overcommit", async () => {
+      await mountView();
+      const props = barOf("k8s2-overview-cpu-bar").props();
+      expect(props.segments).toEqual([expect.objectContaining({ id: "usage", pct: 40 })]);
+      const at = (id: string) => props.markers!.find((m: any) => m.id === id)!.pct;
+      expect(at("limits")).toBe(100);
+      expect(at("allocatable")).toBeCloseTo(80);
+      expect(at("requests")).toBeCloseTo(20);
     });
 
     it("shows Memory rows as bytes at the share of allocatable", async () => {
       await mountView();
       expect(text("k8s2-overview-memory-usage")).toContain("48.0GB · 75%");
-      expect(bar("k8s2-overview-memory-usage-bar").props()).toMatchObject({
-        value: 0.75,
-        variant: "warning",
-      });
       expect(text("k8s2-overview-memory-allocatable")).toBe("Allocatable: 64.0GB");
     });
 
-    it("shows the limits warning only where limits exceed allocatable, and no Capacity", async () => {
+    it("warns only where limits exceed allocatable, with the percent over", async () => {
       await mountView();
-      expect(wrapper.find('[data-test="k8s2-overview-cpu-limits-higher"]').text()).toBe(
-        "Specified limits are higher than allocatable",
-      );
+      expect(text("k8s2-overview-cpu-limits-higher")).toContain("Limits are 25% over allocatable");
       expect(wrapper.find('[data-test="k8s2-overview-memory-limits-higher"]').exists()).toBe(false);
-      expect(wrapper.text()).not.toContain("Capacity");
     });
 
-    it("counts a recreated pod once for Phase Running, over allocatable pods", async () => {
-      await mountView();
-      expect(text("k8s2-overview-pods-running")).toContain("Phase Running");
-      expect(text("k8s2-overview-pods-running")).toContain("2 of 110 · 2%");
-      expect(text("k8s2-overview-pods-note")).toBe(
-        "Counts pods in phase Running. Workloads › Overview counts Running only when the pod is also Ready.",
-      );
+    it("notes partial data when requests and limits are not reported", async () => {
+      const { O2: _o2, O3: _o3, ...sparse } = BASE;
+      await mountView(sparse);
+      expect(text("k8s2-overview-partial")).toContain("not reported");
+      expect(text("k8s2-overview-cpu-limits")).toContain("—");
+      expect(wrapper.find('[data-test="k8s2-overview-cpu-limits-higher"]').exists()).toBe(false);
     });
 
-    it("mounts no ChartRenderer and no ring, only OProgressBar gauges", async () => {
-      await mountView();
-      expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(false);
-      expect(wrapper.findAllComponents({ name: "OProgressBar" })).toHaveLength(7);
-    });
-
-    it("shows No nodes available when O1 has nothing for the cluster", async () => {
+    it("shows No nodes available once a load finished with nothing for the cluster", async () => {
       await mountView({ ...BASE, O1: [] });
       expect(text("k8s2-overview-no-nodes")).toContain("No nodes available");
-      expect(wrapper.findAllComponents({ name: "OProgressBar" })).toHaveLength(0);
+      expect(wrapper.find('[data-test="k8s2-overview-side-loading"]').exists()).toBe(false);
+    });
+
+    it("shows skeletons, never the empty state, while the first load is in flight", async () => {
+      await mountView({}, { loading: true, lastUpdatedAt: null });
+      expect(wrapper.find('[data-test="k8s2-overview-no-nodes"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="k8s2-overview-side-loading"]').length).toBe(3);
+      expect(wrapper.find('[data-test="k8s2-overview-chart-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-overview-attention-loading"]').exists()).toBe(true);
+    });
+  });
+
+  describe("pod slots", () => {
+    it("states used slots over allocatable pods with a legend of counts", async () => {
+      await mountView();
+      expect(text("k8s2-overview-pods-slots")).toBe("3 of 110 pod slots used (3%)");
+      expect(text("k8s2-overview-pods-legend-pending")).toBe("Pending 1");
+      expect(wrapper.find('[data-test="k8s2-overview-pods-legend-completed"]').exists()).toBe(true);
+    });
+  });
+
+  describe("KPI tiles", () => {
+    it("shows nodes, pods, warnings and alerts tiles", async () => {
+      await mountView();
+      expect(text("k8s2-overview-kpi-nodes")).toContain("1 / 1");
+      expect(
+        wrapper
+          .find('[data-test="k8s2-overview-kpi-pods"] [data-test="o-stat-card-sub-icon"]')
+          .attributes("aria-label"),
+      ).toContain("1 pending");
+      expect(text("k8s2-overview-kpi-pods")).toMatch(/\d+ \/ 3/);
+      expect(text("k8s2-overview-kpi-warnings")).toContain("3");
+      expect(text("k8s2-overview-kpi-alerts")).toContain("0");
+      expect(text("k8s2-overview-kpi-alerts")).toContain("Firing · org-wide");
+    });
+
+    it("emits navigate with the destination view when a tile is clicked", async () => {
+      await mountView();
+      await wrapper.find('[data-test="k8s2-overview-kpi-nodes"]').trigger("click");
+      await wrapper.find('[data-test="k8s2-overview-kpi-pods"]').trigger("click");
+      await wrapper.find('[data-test="k8s2-overview-kpi-warnings"]').trigger("click");
+      expect(wrapper.emitted("navigate")).toEqual([
+        [{ view: "nodes" }],
+        [{ view: "pods", status: "failing" }],
+        [{ view: "events", status: "warnings" }],
+      ]);
+    });
+
+    it("shows a no-access state instead of tiles when forbidden", async () => {
+      await mountView(BASE, { forbidden: true });
+      expect(wrapper.find('[data-test="k8s2-overview-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-overview-kpis"]').exists()).toBe(false);
+    });
+
+    it("keeps the nodes tile neutral when no node is reported", async () => {
+      await mountView({ ...BASE, N1: [], O1: [] });
+      expect(text("k8s2-overview-kpi-nodes")).toContain("0 / 0");
+      expect(
+        wrapper.find('[data-test="k8s2-overview-kpi-nodes"]').classes().join(" "),
+      ).not.toContain("success");
+    });
+
+    it("counts firing alerts and open incidents, and links to them", async () => {
+      listAlerts.mockResolvedValue({
+        data: {
+          list: [
+            {
+              alert_id: "a1",
+              name: "High error rate",
+              enabled: true,
+              last_outcome: "firing",
+              last_triggered_at: END - 5 * MIN,
+            },
+            { alert_id: "a2", name: "Quiet", enabled: true, last_outcome: "normal" },
+          ],
+        },
+      });
+      listIncidents.mockResolvedValue({
+        data: {
+          incidents: [
+            {
+              id: "inc1",
+              title: "Checkout degraded",
+              severity: "P2",
+              first_alert_at: END - 10 * MIN,
+              group_values: {},
+            },
+            {
+              id: "inc2",
+              title: "Other cluster",
+              severity: "P3",
+              first_alert_at: END,
+              group_values: { k8s_cluster: "dev" },
+            },
+          ],
+          total: 2,
+        },
+      });
+      await mountView();
+      await vi.waitFor(() =>
+        expect(text("k8s2-overview-kpi-alerts")).toContain("Firing · 1 open incident"),
+      );
+      expect(text("k8s2-overview-kpi-alerts")).toContain("Firing · 1 open incident");
+      expect(text("k8s2-overview-incident-card")).toContain("Checkout degraded");
+      expect(text("k8s2-overview-alert-a1")).toContain("High error rate");
+      expect(wrapper.find('[data-test="k8s2-overview-alert-a2"]').exists()).toBe(false);
+      await wrapper.find('[data-test="k8s2-overview-incident-open"]').trigger("click");
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "incidentDetail", params: { id: "inc1" } }),
+      );
+      await wrapper.find('[data-test="k8s2-overview-alerts-open"]').trigger("click");
+      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
+    });
+
+    it("hides the incident and alert cards when there are none", async () => {
+      await mountView();
+      await flushPromises();
+      expect(wrapper.find('[data-test="k8s2-overview-incident-card"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="k8s2-overview-alerts-card"]').exists()).toBe(false);
+    });
+
+    it("shows the alerts tile as unavailable when the reads fail", async () => {
+      listAlerts.mockRejectedValue(new Error("403"));
+      listIncidents.mockRejectedValue(new Error("403"));
+      await mountView();
+      await vi.waitFor(() => expect(text("k8s2-overview-kpi-alerts")).toContain("—"));
+      expect(text("k8s2-overview-kpi-alerts")).toContain("Unavailable");
+    });
+  });
+
+  describe("needs attention", () => {
+    const failing = {
+      ...BASE,
+      P1: [ksm({ ...pod("crash-1"), phase: "Running" })],
+      P2: [ksm({ ...pod("crash-1"), container: "app", reason: "CrashLoopBackOff" })],
+      P11: [],
+    };
+
+    it("lists failing pods with open, logs and a disabled Explain", async () => {
+      await mountView(failing);
+      const row = wrapper.find(`[data-test^="k8s2-overview-attention-row-"]`);
+      expect(row.exists()).toBe(true);
+      const explain = wrapper.find('button[data-test^="k8s2-overview-attention-explain-"]');
+      expect(explain.attributes("aria-disabled")).toBe("true");
+      expect(explain.text()).toContain("AI explanations are not available yet");
+    });
+
+    it("makes the workload name the one focusable control, not the row", async () => {
+      await mountView(failing);
+      const row = wrapper.find('[data-test^="k8s2-overview-attention-row-"]');
+      expect(row.attributes("role")).toBeUndefined();
+      expect(row.attributes("tabindex")).toBeUndefined();
+      await wrapper.find('button[data-test^="k8s2-overview-attention-open-"]').trigger("click");
+      expect(wrapper.emitted("open")).toEqual([
+        [{ kind: "pod", cluster: "prod", namespace: "shop", name: "crash-1" }],
+      ]);
+    });
+
+    it("emits open on a row click and action logs from the Logs button", async () => {
+      await mountView(failing);
+      await wrapper.find('[data-test^="k8s2-overview-attention-row-"]').trigger("click");
+      expect(wrapper.emitted("open")?.[0]).toEqual([
+        { kind: "pod", cluster: "prod", namespace: "shop", name: "crash-1" },
+      ]);
+      await wrapper.find('[data-test^="k8s2-overview-attention-logs-"]').trigger("click");
+      expect(wrapper.emitted("action")?.[0]).toEqual([
+        "logs",
+        { kind: "pod", cluster: "prod", namespace: "shop", name: "crash-1" },
+      ]);
+      expect(wrapper.emitted("open")).toHaveLength(1);
+    });
+
+    it("shows the empty state when nothing needs attention", async () => {
+      await mountView({
+        ...BASE,
+        P1: [ksm({ ...pod("ok"), phase: "Running" })],
+        P11: [ksm({ ...pod("ok"), condition: "Ready" })],
+        N1: [],
+      });
+      expect(wrapper.find('[data-test="k8s2-overview-attention-empty"]').exists()).toBe(true);
     });
   });
 
   describe("60-minute chart (AC 37)", () => {
-    it("sends one CPU usage query over the hour ending at END, with an Allocatable mark line", async () => {
+    it("sends one CPU usage query over the hour ending at END, with allocatable, limits and requests mark lines", async () => {
       await mountView();
       const props = renderer().props();
       expect(props.panelSchema.type).toBe("bar");
@@ -228,6 +441,8 @@ describe("ClusterOverview", () => {
       ]);
       expect(props.panelSchema.config.mark_line).toEqual([
         { type: "yAxis", value: 16, name: "Allocatable" },
+        { type: "yAxis", value: 20, name: "Limits" },
+        { type: "yAxis", value: 4, name: "Requests" },
       ]);
       expect(props.selectedTimeObj).toEqual({
         start_time: new Date(END - 60 * MIN),
@@ -240,6 +455,12 @@ describe("ClusterOverview", () => {
       expect(wrapper.text()).not.toMatch(/Master|Worker/);
     });
 
+    it("keeps a mark line whose value is a reported zero", async () => {
+      await mountView({ ...BASE, O2: [] });
+      const marks = renderer().props().panelSchema.config.mark_line;
+      expect(marks.find((m: any) => m.name === "Requests")?.value).toBe(0);
+    });
+
     it("switching to Memory swaps the metric and the mark-line value", async () => {
       await mountView();
       wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "memory");
@@ -248,7 +469,7 @@ describe("ClusterOverview", () => {
       expect(schema.queries[0].query).toBe(
         'sum(k8s_node_memory_working_set{k8s_cluster_name="prod"})',
       );
-      expect(schema.config.mark_line[0].value).toBe(64 * GI);
+      expect(schema.config.mark_line.map((m: any) => m.value)).toEqual([64 * GI, 32 * GI, 16 * GI]);
     });
 
     it("uses the k8s_cluster spelling when the usage series carried it", async () => {
@@ -302,10 +523,11 @@ describe("ClusterOverview", () => {
           refreshNonce: 0,
           hasStream: () => true,
           loading: false,
-          lastUpdatedAt: null,
+          lastUpdatedAt: END,
         },
         global: {
-          plugins: [i18n, store],
+          ...provideGlobals(),
+          plugins: [...provideGlobals().plugins, store],
           stubs: { OTooltip: tooltipStub, PanelSchemaRenderer: real },
         },
       });
