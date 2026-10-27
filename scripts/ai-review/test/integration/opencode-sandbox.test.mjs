@@ -38,7 +38,7 @@ function stripJsonc(text) {
 function stubProvider() {
   const requests = [];
   const chunk = (delta, finish = null, usage) => `data: ${JSON.stringify({
-    id: "c1", object: "chat.completion.chunk", created: 1, model: "deepseek-v4-pro",
+    id: "c1", object: "chat.completion.chunk", created: 1, model: "deepseek-flash",
     choices: [{ index: 0, delta, finish_reason: finish }],
     ...(usage ? { usage } : {}),
   })}\n\n`;
@@ -132,7 +132,7 @@ test("sanitized PR + sandboxed opencode: planted loaders are inert and reads out
     await selfCheck(client, REVIEW_AGENTS);
     const result = await client.prompt({
       agent: "ai-review-security",
-      model: { providerID: "deepseek-review", modelID: "deepseek-v4-pro" },
+      model: { providerID: "deepseek-review", modelID: "deepseek-flash" },
       system: "You are a reviewer.",
       text: "Review src/main.rs",
       title: "sandbox",
@@ -178,7 +178,7 @@ test("without sanitize, the env flags still keep project tools and agent overrid
     await selfCheck(client, REVIEW_AGENTS);
     await client.prompt({
       agent: "ai-review-security",
-      model: { providerID: "deepseek-review", modelID: "deepseek-v4-pro" },
+      model: { providerID: "deepseek-review", modelID: "deepseek-flash" },
       system: "You are a reviewer.",
       text: "Review src/main.rs",
       title: "flags-only",
