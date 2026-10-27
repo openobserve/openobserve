@@ -96,7 +96,7 @@ use searcher::Searcher;
 pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
 
 /// Streams no customer can write that every org still reads while search is blocked.
-pub const OPERATIONAL_STREAMS: [&str; 2] = ["_o2_alert_calibration_digests", AI_CHAT_EVENTS_STREAM];
+pub const OPERATIONAL_STREAMS: [&str; 1] = [AI_CHAT_EVENTS_STREAM];
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -1451,11 +1451,28 @@ mod tests {
     }
 
     #[test]
+    fn every_exempt_operational_stream_is_refused_by_otlp_ingest() {
+        for stream in OPERATIONAL_STREAMS {
+            assert!(
+                config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream),
+                "{stream}"
+            );
+        }
+    }
+
+    #[test]
+    fn otlp_writable_calibration_digests_stay_gated() {
+        let digests = "_o2_alert_calibration_digests";
+        assert!(!config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(digests));
+        assert!(!is_operational_stream(digests));
+        for org in ["acme", META_ORG_ID] {
+            assert!(!is_license_exempt_stream(org, Some(digests)), "{org}");
+        }
+    }
+
+    #[test]
     fn operational_allowlist_is_exactly_the_design_list() {
-        assert_eq!(
-            OPERATIONAL_STREAMS,
-            ["_o2_alert_calibration_digests", "_o2_ai_chat_events"]
-        );
+        assert_eq!(OPERATIONAL_STREAMS, ["_o2_ai_chat_events"]);
     }
 
     #[cfg(feature = "enterprise")]
