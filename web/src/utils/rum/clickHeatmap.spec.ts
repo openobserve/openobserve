@@ -15,134 +15,100 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  groupBySelector,
   placeGroup,
   sharePercent,
-  summarizeClicks,
-  toClickPoint,
+  sortElements,
+  toElementGroup,
+  type ElementGroup,
 } from "./clickHeatmap";
 
-const click = (selector: string, x: number, y: number, width = 100, height = 50) => ({
+const group = (selector: string, over: Partial<ElementGroup> = {}): ElementGroup => ({
   selector,
-  x,
-  y,
-  width,
-  height,
+  name: "",
+  clicks: 1,
+  sessions: 1,
+  rage: 0,
+  dead: 0,
+  error: 0,
+  frustrated: 0,
+  ...over,
 });
 
-describe("groupBySelector", () => {
-  it("counts clicks per element and ranks the busiest first", () => {
-    const groups = groupBySelector([click("#a", 1, 1), click("#b", 1, 1), click("#b", 2, 2)]);
-    expect(groups.map((g) => [g.selector, g.clicks])).toEqual([
-      ["#b", 2],
-      ["#a", 1],
+describe("toElementGroup", () => {
+  it("reads a ranking row and coerces numeric strings", () => {
+    expect(
+      toElementGroup({
+        selector: "#buy",
+        name: " Buy now ",
+        clicks: "12",
+        sessions: 5,
+        rage: "2",
+        dead: 3,
+        err: 1,
+        frustrated: "4",
+      }),
+    ).toEqual({
+      selector: "#buy",
+      name: "Buy now",
+      clicks: 12,
+      sessions: 5,
+      rage: 2,
+      dead: 3,
+      error: 1,
+      frustrated: 4,
+    });
+  });
+
+  it("drops rows with no selector and zeroes missing counts", () => {
+    expect(toElementGroup({ selector: "", clicks: 3 })).toBeNull();
+    expect(toElementGroup({ clicks: 3 })).toBeNull();
+    expect(toElementGroup({ selector: "#a" })).toMatchObject({ clicks: 0, name: "", error: 0 });
+  });
+});
+
+describe("sortElements", () => {
+  it("ranks by clicks, then sessions, then frustrated clicks, then selector", () => {
+    const sorted = sortElements([
+      group("#z", { clicks: 5, sessions: 2, frustrated: 0 }),
+      group("#b", { clicks: 5, sessions: 3, frustrated: 0 }),
+      group("#c", { clicks: 5, sessions: 3, frustrated: 2 }),
+      group("#a", { clicks: 5, sessions: 3, frustrated: 2 }),
+      group("#top", { clicks: 9 }),
     ]);
+    expect(sorted.map((g) => g.selector)).toEqual(["#top", "#a", "#c", "#b", "#z"]);
+  });
+
+  it("does not mutate its input", () => {
+    const input = [group("#b"), group("#a")];
+    sortElements(input);
+    expect(input.map((g) => g.selector)).toEqual(["#b", "#a"]);
   });
 });
 
 describe("placeGroup", () => {
-  it("scales the recorded offset to the element's current rect", () => {
-    const [group] = groupBySelector([click("#a", 50, 25, 100, 50)]);
-    const rect = { left: 200, top: 300, width: 400, height: 100 } as DOMRect;
-    expect(placeGroup(group, rect, 0, 10)).toEqual([{ x: 400, y: 360 }]);
+  const rect = { left: 200, top: 300, width: 400, height: 100 } as DOMRect;
+
+  it("glows at the element centre in page coordinates", () => {
+    const spot = placeGroup(group("#a", { clicks: 10 }), 10, rect, 0, 10);
+    expect(spot).toMatchObject({ x: 400, y: 360, weight: 1 });
   });
 
-  it("centres the click when the element size was not recorded", () => {
-    const [group] = groupBySelector([click("#a", 5, 5, 0, 0)]);
-    const rect = { left: 0, top: 0, width: 100, height: 40 } as DOMRect;
-    expect(placeGroup(group, rect, 0, 0)).toEqual([{ x: 50, y: 20 }]);
-  });
-});
-
-describe("toClickPoint", () => {
-  it("reads position and target from JSON text columns", () => {
-    expect(
-      toClickPoint({
-        pos: '{"x":36,"y":35}',
-        tgt: '{"selector":"#lnk-docs","width":92,"height":46}',
-      }),
-    ).toMatchObject({ selector: "#lnk-docs", x: 36, y: 35, width: 92, height: 46 });
+  it("dims quieter elements but never below the floor", () => {
+    expect(placeGroup(group("#a", { clicks: 1 }), 100, rect, 0, 0).weight).toBeCloseTo(0.307);
+    expect(placeGroup(group("#a", { clicks: 0 }), 0, rect, 0, 0).weight).toBe(0.3);
   });
 
-  it("reads flat columns from older SDKs", () => {
-    expect(toClickPoint({ sel: "#a", x: 1, y: 2, w: 10, h: 20 })).toMatchObject({
-      selector: "#a",
-      x: 1,
-      y: 2,
-      width: 10,
-      height: 20,
-    });
-  });
-
-  it("skips rows with unparseable or missing data", () => {
-    expect(toClickPoint({ pos: "not json", tgt: "{}" })).toBeNull();
-    expect(toClickPoint({ pos: '{"x":1,"y":2}', tgt: '{"width":5}' })).toBeNull();
+  it("clamps the glow radius to the element size within bounds", () => {
+    const tiny = { left: 0, top: 0, width: 10, height: 10 } as DOMRect;
+    const huge = { left: 0, top: 0, width: 2000, height: 10 } as DOMRect;
+    expect(placeGroup(group("#a"), 1, tiny, 0, 0).radius).toBe(28);
+    expect(placeGroup(group("#a"), 1, huge, 0, 0).radius).toBe(90);
   });
 });
 
-describe("insights", () => {
-  const rows = [
-    { ...click("#buy", 1, 1), name: "Buy now", sessionId: "s1", frustrated: true },
-    { ...click("#buy", 2, 2), name: "Buy now", sessionId: "s1" },
-    { ...click("#buy", 3, 3), name: "Buy", sessionId: "s2" },
-    { ...click("#docs", 1, 1), name: "Docs", sessionId: "s2" },
-  ];
-
-  it("names an element by its most common label and counts distinct sessions", () => {
-    const [top, other] = groupBySelector(rows);
-    expect(top).toMatchObject({
-      selector: "#buy",
-      name: "Buy now",
-      clicks: 3,
-      sessions: 2,
-      frustrated: 1,
-    });
-    expect(other).toMatchObject({ selector: "#docs", sessions: 1, frustrated: 0 });
-  });
-
-  it("summarizes the whole page", () => {
-    const summary = summarizeClicks(rows, groupBySelector(rows));
-    expect(summary).toMatchObject({ clicks: 4, sessions: 2, frustrated: 1 });
-    expect(summary.top?.selector).toBe("#buy");
-  });
-
+describe("sharePercent", () => {
   it("rounds shares to one decimal and survives an empty page", () => {
     expect(sharePercent(1, 3)).toBe(33.3);
     expect(sharePercent(0, 0)).toBe(0);
-  });
-
-  it("reads name, session and frustration off a row", () => {
-    const point = toClickPoint({
-      pos: '{"x":1,"y":2}',
-      tgt: '{"selector":"#a"}',
-      name: " Docs ",
-      sid: "s9",
-      frus: "[]",
-    });
-    expect(point).toMatchObject({ name: "Docs", sessionId: "s9", frustrated: false });
-    expect(
-      toClickPoint({ pos: '{"x":1,"y":2}', tgt: '{"selector":"#a"}', frus: "rage_click" })
-        ?.frustrated,
-    ).toBe(true);
-  });
-});
-
-describe("ranking and frustration edge cases", () => {
-  it("breaks click ties by sessions, then frustration, then selector so the order is stable", () => {
-    const rows = [
-      { ...click("#b", 1, 1), sessionId: "s1" },
-      { ...click("#a", 1, 1), sessionId: "s1" },
-      { ...click("#c", 1, 1), sessionId: "s1" },
-      { ...click("#c", 2, 2), sessionId: "s2" },
-      { ...click("#d", 1, 1), sessionId: "s1", frustrated: true },
-      { ...click("#d", 2, 2), sessionId: "s1" },
-    ];
-    expect(groupBySelector(rows).map((g) => g.selector)).toEqual(["#c", "#d", "#a", "#b"]);
-  });
-
-  it("treats an array-valued frustration column as frustrated only when it has entries", () => {
-    const base = { pos: '{"x":1,"y":2}', tgt: '{"selector":"#a"}' };
-    expect(toClickPoint({ ...base, frus: ["rage_click"] })?.frustrated).toBe(true);
-    expect(toClickPoint({ ...base, frus: [] })?.frustrated).toBe(false);
   });
 });

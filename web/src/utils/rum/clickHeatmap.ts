@@ -13,24 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export interface ClickPoint {
-  selector: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  name?: string;
-  sessionId?: string;
-  frustrated?: boolean;
-}
-
 export interface ElementGroup {
   selector: string;
   name: string;
   clicks: number;
   sessions: number;
+  rage: number;
+  dead: number;
+  error: number;
   frustrated: number;
-  points: ClickPoint[];
 }
 
 export interface ClickSummary {
@@ -50,111 +41,68 @@ export interface OutlineRect {
 export interface HeatSpot {
   x: number;
   y: number;
+  weight?: number;
+  radius?: number;
 }
 
-function parseObject(value: unknown): Record<string, unknown> | null {
-  if (value && typeof value === "object") return value as Record<string, unknown>;
-  if (typeof value !== "string") return null;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
+const count = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
-/** Position and target arrive as JSON text columns on current SDKs and as flat columns on older ones. */
-export function toClickPoint(row: Record<string, unknown>): ClickPoint | null {
-  const pos = parseObject(row.pos);
-  const target = parseObject(row.tgt);
-  const selector = target?.selector ?? row.sel;
-  const x = Number(pos?.x ?? row.x);
-  const y = Number(pos?.y ?? row.y);
-  if (!selector || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const name = typeof row.name === "string" ? row.name.trim() : "";
-  const frustration = Array.isArray(row.frus)
-    ? row.frus.join(",")
-    : typeof row.frus === "string"
-      ? row.frus.trim()
-      : "";
+/** Reads one ranking row; rows without a selector cannot be placed and are dropped. */
+export function toElementGroup(row: Record<string, unknown>): ElementGroup | null {
+  const selector = typeof row.selector === "string" ? row.selector : "";
+  if (!selector) return null;
   return {
-    selector: String(selector),
-    x,
-    y,
-    width: Number(target?.width ?? row.w) || 0,
-    height: Number(target?.height ?? row.h) || 0,
-    name,
-    sessionId: row.sid == null ? undefined : String(row.sid),
-    frustrated: frustration !== "" && frustration !== "[]",
+    selector,
+    name: typeof row.name === "string" ? row.name.trim() : "",
+    clicks: count(row.clicks),
+    sessions: count(row.sessions),
+    rage: count(row.rage),
+    dead: count(row.dead),
+    error: count(row.err),
+    frustrated: count(row.frustrated),
   };
 }
 
-export function groupBySelector(points: ClickPoint[]): ElementGroup[] {
-  const groups = new Map<
-    string,
-    ElementGroup & { names: Map<string, number>; sids: Set<string> }
-  >();
-  for (const p of points) {
-    const g = groups.get(p.selector) ?? {
-      selector: p.selector,
-      name: "",
-      clicks: 0,
-      sessions: 0,
-      frustrated: 0,
-      points: [],
-      names: new Map<string, number>(),
-      sids: new Set<string>(),
-    };
-    g.clicks += 1;
-    if (p.frustrated) g.frustrated += 1;
-    if (p.sessionId) g.sids.add(p.sessionId);
-    if (p.name) g.names.set(p.name, (g.names.get(p.name) ?? 0) + 1);
-    g.points.push(p);
-    groups.set(p.selector, g);
-  }
-  return [...groups.values()]
-    .map(({ names, sids, ...g }) => ({
-      ...g,
-      sessions: sids.size,
-      name: [...names.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "",
-    }))
-    .sort(
-      (a, b) =>
-        b.clicks - a.clicks ||
-        b.sessions - a.sessions ||
-        b.frustrated - a.frustrated ||
-        a.selector.localeCompare(b.selector),
-    );
-}
-
-export function summarizeClicks(points: ClickPoint[], groups: ElementGroup[]): ClickSummary {
-  return {
-    clicks: points.length,
-    sessions: new Set(points.map((p) => p.sessionId).filter(Boolean)).size,
-    frustrated: points.filter((p) => p.frustrated).length,
-    top: groups[0] ?? null,
-  };
+/** Busiest first; ties fall to sessions, then frustrated clicks, then selector so the order is stable. */
+export function sortElements(groups: ElementGroup[]): ElementGroup[] {
+  return [...groups].sort(
+    (a, b) =>
+      b.clicks - a.clicks ||
+      b.sessions - a.sessions ||
+      b.frustrated - a.frustrated ||
+      (a.selector < b.selector ? -1 : a.selector > b.selector ? 1 : 0),
+  );
 }
 
 export function sharePercent(clicks: number, total: number): number {
   return total > 0 ? Math.round((clicks / total) * 1000) / 10 : 0;
 }
 
-/** Positions are relative to the clicked element, so each click is scaled to the element's size when it was recorded. */
+const MIN_HEAT_WEIGHT = 0.3;
+const MIN_SPOT_RADIUS = 28;
+const MAX_SPOT_RADIUS = 90;
+
+/** Positions are not fetched, so each element glows at its centre, brighter the more it was clicked. */
 export function placeGroup(
   group: ElementGroup,
+  maxClicks: number,
   rect: DOMRect,
   scrollX: number,
   scrollY: number,
-): HeatSpot[] {
-  return group.points.map((p) => {
-    const fx = p.width > 0 ? Math.min(Math.max(p.x / p.width, 0), 1) : 0.5;
-    const fy = p.height > 0 ? Math.min(Math.max(p.y / p.height, 0), 1) : 0.5;
-    return {
-      x: rect.left + scrollX + fx * rect.width,
-      y: rect.top + scrollY + fy * rect.height,
-    };
-  });
+): HeatSpot {
+  const share = maxClicks > 0 ? Math.min(group.clicks / maxClicks, 1) : 0;
+  return {
+    x: rect.left + scrollX + rect.width / 2,
+    y: rect.top + scrollY + rect.height / 2,
+    weight: MIN_HEAT_WEIGHT + (1 - MIN_HEAT_WEIGHT) * share,
+    radius: Math.min(
+      Math.max(Math.max(rect.width, rect.height) / 2, MIN_SPOT_RADIUS),
+      MAX_SPOT_RADIUS,
+    ),
+  };
 }
 
 function hslToRgb(h: number): [number, number, number] {
@@ -193,11 +141,12 @@ export function renderHeat(canvas: HTMLCanvasElement, spots: HeatSpot[], radius 
   if (!spots.length) return;
 
   for (const s of spots) {
-    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius);
-    grad.addColorStop(0, "rgba(0,0,0,0.25)");
+    const r = s.radius ?? radius;
+    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
+    grad.addColorStop(0, `rgba(0,0,0,${0.75 * (s.weight ?? 1 / 3)})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
-    ctx.fillRect(s.x - radius, s.y - radius, radius * 2, radius * 2);
+    ctx.fillRect(s.x - r, s.y - r, r * 2, r * 2);
   }
 
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);

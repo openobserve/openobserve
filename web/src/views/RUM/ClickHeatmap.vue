@@ -31,7 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="w-40"
         data-test="rum-heatmap-range-select"
-        @update:model-value="loadPages"
+        @update:model-value="loadApps"
+      />
+      <OSelect
+        v-model="appId"
+        :aria-label="t('rum.heatmap.appLabel')"
+        :options="appOptions"
+        size="sm"
+        searchable
+        class="w-48 max-md:hidden"
+        data-test="rum-heatmap-app-select"
+        @update:model-value="onAppChange"
       />
       <OSelect
         v-model="deviceClass"
@@ -40,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="w-36 max-md:hidden"
         data-test="rum-heatmap-device-select"
-        @update:model-value="loadPage"
+        @update:model-value="loadPage(false)"
       />
       <OSelect
         v-model="pageUrl"
@@ -51,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchable
         class="w-80 max-md:w-48"
         data-test="rum-heatmap-page-select"
-        @update:model-value="loadPage"
+        @update:model-value="loadPage()"
       />
     </template>
 
@@ -62,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-heatmap-empty"
     />
     <div v-else class="flex h-full min-h-0 flex-col">
-      <div v-if="points.length" class="shrink-0 px-4 pt-4" data-test="rum-heatmap-stats">
+      <div v-if="summary.clicks" class="shrink-0 px-4 pt-4" data-test="rum-heatmap-stats">
         <OStatStrip :items="statItems" :loading="loading" />
       </div>
       <div class="flex min-h-0 flex-1 gap-4 p-4 max-lg:flex-col">
@@ -71,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-surface border-border-default min-w-0 flex-1 overflow-auto border"
         >
           <OBanner
-            v-if="pageUrl && !loading && !points.length"
+            v-if="pageUrl && !loading && !groups.length"
             variant="warning"
             dense
             :content="
@@ -110,6 +120,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary text-xs" data-test="rum-heatmap-placed">
             {{ t("rum.heatmap.placed", { placed: placedCount, total: groups.length }) }}
           </span>
+          <span
+            v-if="unknownDeviceClicks"
+            class="text-text-secondary text-xs"
+            data-test="rum-heatmap-unknown-device"
+          >
+            {{ t("rum.heatmap.unknownDevice", { count: addCommasToNumber(unknownDeviceClicks) }) }}
+          </span>
           <OTable
             :data="tableRows"
             :columns="columns"
@@ -144,6 +161,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </span>
             </template>
+            <template #cell-frustrated="{ row }">
+              <span
+                :title="
+                  t('rum.heatmap.frustrationSplit', {
+                    rage: row.rage,
+                    dead: row.dead,
+                    error: row.error,
+                  })
+                "
+              >
+                {{ row.frustrated }}
+              </span>
+            </template>
             <template #cell-share="{ row }">
               <span v-if="row.clicks">{{ t("rum.heatmap.sharePct", { pct: row.share }) }}</span>
             </template>
@@ -155,7 +185,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  computed,
+  markRaw,
+  nextTick,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  ref,
+} from "vue";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -172,22 +211,33 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { rumFieldSql } from "@/utils/rum/fields";
 import { createMultiViewDecoder } from "@/utils/rum/sessionReplayViews";
 import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
+import useAnalyticsSearch, { type SearchSpec } from "@/composables/rum/useAnalyticsSearch";
+import rumProductAnalytics from "@/services/rumProductAnalytics";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import {
   drawOutline,
-  groupBySelector,
   placeGroup,
   renderHeat,
   sharePercent,
-  summarizeClicks,
-  type ClickPoint,
+  sortElements,
+  toElementGroup,
+  type ClickSummary,
   type ElementGroup,
   type HeatSpot,
   type OutlineRect,
-  toClickPoint,
 } from "@/utils/rum/clickHeatmap";
+import {
+  deviceClause,
+  deviceSplitSql,
+  pageListSql,
+  rankingSql,
+  totalsSql,
+  type DeviceBucket,
+  type DeviceClass,
+} from "@/utils/rum/clickHeatmapQueries";
+import { appProbeSql, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
 
 interface ElementRow {
   selector: string;
@@ -198,12 +248,14 @@ interface ElementRow {
   share: number;
   sessions: number;
   frustrated: number;
+  rage: number;
+  dead: number;
+  error: number;
 }
 
-const MAX_CLICKS = 5000;
+const APP_LIMIT = 100;
+const RANK_PANELS = ["devices", "totals", "ranking"] as const;
 const SNAPSHOT_LOOKBACK_HOURS = 720;
-const TABLET_MIN_WIDTH = 768;
-const DESKTOP_MIN_WIDTH = 1024;
 const OUTLINE_SCROLL_MARGIN = 96;
 const MAX_UNUSED = 30;
 const UNUSED_LABEL_MAX = 40;
@@ -220,13 +272,20 @@ const RANGE_HOURS: Record<string, number> = { "1h": 1, "24h": 24, "7d": 168, "30
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
+const search = useAnalyticsSearch();
 
 const rangeKey = ref("24h");
-const deviceClass = ref("all");
+const deviceClass = ref<DeviceClass>("all");
+const appId = ref("");
+const appOptions = ref<{ label: ReturnType<typeof raw>; value: string }[]>([]);
 const pageUrl = ref("");
 const pageOptions = ref<{ label: ReturnType<typeof raw>; value: string }[]>([]);
 const loading = ref(false);
-const points = ref<ClickPoint[]>([]);
+const groups = ref<ElementGroup[]>([]);
+const totals = ref({ clicks: 0, sessions: 0, frustrated: 0 });
+const deviceClicks = ref<Partial<Record<DeviceBucket, number>>>({});
+const schemaFlags = ref<Record<string, boolean>>({});
+const exclusions = ref<AnalyticsScope["exclusions"]>(undefined);
 const placedSelectors = ref<Set<string>>(new Set());
 const snapshotLoading = ref(false);
 const snapshotReady = ref(false);
@@ -239,7 +298,8 @@ let stageScale = 1;
 let pageSize = { width: 0, height: 0 };
 let resizeObserver: ResizeObserver | null = null;
 const selectedSelector = ref("");
-const capped = ref(false);
+let deactivated = false;
+let settingsKey = "";
 
 let player: any = null;
 let overlay: HTMLCanvasElement | null = null;
@@ -253,16 +313,21 @@ const rangeOptions = computed(() => [
   { label: t("rum.heatmap.range30d"), value: "30d" },
 ]);
 
+const deviceLabel = (key: string, device: DeviceBucket) => {
+  const n = deviceClicks.value[device];
+  return n ? raw(`${t(key)} (${addCommasToNumber(n)})`) : t(key);
+};
+
 const deviceOptions = computed(() => [
   { label: t("rum.heatmap.deviceAll"), value: "all" },
-  { label: t("rum.heatmap.deviceDesktop"), value: "desktop" },
-  { label: t("rum.heatmap.deviceTablet"), value: "tablet" },
-  { label: t("rum.heatmap.devicePhone"), value: "phone" },
+  { label: deviceLabel("rum.heatmap.deviceDesktop", "desktop"), value: "desktop" },
+  { label: deviceLabel("rum.heatmap.deviceTablet", "tablet"), value: "tablet" },
+  { label: deviceLabel("rum.heatmap.devicePhone", "phone"), value: "phone" },
 ]);
 
-const groups = computed<ElementGroup[]>(() => groupBySelector(points.value));
+const unknownDeviceClicks = computed(() => deviceClicks.value.unknown ?? 0);
 const placedCount = computed(() => placedSelectors.value.size);
-const summary = computed(() => summarizeClicks(points.value, groups.value));
+const summary = computed<ClickSummary>(() => ({ ...totals.value, top: groups.value[0] ?? null }));
 const clicksMax = computed(() => groups.value[0]?.clicks ?? 0);
 const unusedRows = ref<ElementRow[]>([]);
 const tableRows = computed<ElementRow[]>(() => [
@@ -280,6 +345,9 @@ const tableRows = computed<ElementRow[]>(() => [
     share: sharePercent(g.clicks, summary.value.clicks),
     sessions: g.sessions,
     frustrated: g.frustrated,
+    rage: g.rage,
+    dead: g.dead,
+    error: g.error,
   })),
   ...unusedRows.value,
 ]);
@@ -351,6 +419,14 @@ const tsField = () => store.state.zoConfig.timestamp_column || "_timestamp";
 const org = () => store.state.selectedOrganization.identifier;
 const sqlText = (v: string) => v.replace(/'/g, "''");
 
+const scope = (): AnalyticsScope => ({
+  app: appId.value,
+  env: [],
+  version: [],
+  schema: schemaFlags.value,
+  ...(exclusions.value ? { exclusions: exclusions.value } : {}),
+});
+
 function windowMicros(hours: number) {
   const end = Date.now() * 1000;
   return { start_time: end - hours * 3_600_000_000, end_time: end };
@@ -372,104 +448,170 @@ async function runSql(
   return res.data.hits ?? [];
 }
 
-async function viewportClause(): Promise<string> {
-  if (deviceClass.value === "all") return "";
-  const stream = await getStream("_rumdata", "logs", true);
-  if (!(stream?.schema ?? []).some((f: any) => f?.name === "display_viewport_width")) {
-    return " AND 1 = 0";
+// A null result means a newer request replaced this one, so the caller must drop it.
+async function searchRows<T>(
+  id: string,
+  sql: string,
+  limit: number,
+  win: { start_time: number; end_time: number },
+): Promise<T[] | null> {
+  const spec: SearchSpec = {
+    sql,
+    startUs: win.start_time,
+    endUs: win.end_time,
+    limit,
+    sampled: 1,
+  };
+  const res = await search.run<T>(id, spec, `${id}:${sql}`);
+  if (res.status === "ok") return res.rows;
+  if (res.status === "error" || res.status === "forbidden") {
+    throw new Error(res.error?.message || res.status);
   }
-  const col = "display_viewport_width";
-  if (deviceClass.value === "phone") return ` AND ${col} < ${TABLET_MIN_WIDTH}`;
-  if (deviceClass.value === "tablet")
-    return ` AND ${col} >= ${TABLET_MIN_WIDTH} AND ${col} < ${DESKTOP_MIN_WIDTH}`;
-  return ` AND ${col} >= ${DESKTOP_MIN_WIDTH}`;
+  return null;
 }
 
-async function columnsFor() {
+async function ensureSchema() {
   const stream = await getStream("_rumdata", "logs", true);
-  const pick = (f: string) => rumFieldSql(stream?.schema, f);
-  const hasType = (stream?.schema ?? []).some((f: any) => f?.name === "action_type");
-  const clickOnly = hasType ? " AND action_type = 'click'" : "";
-  const has = (name: string) => (stream?.schema ?? []).some((f: any) => f?.name === name);
-  const extras = [
-    has("action_target_name") ? ", action_target_name AS name" : "",
-    has("session_id") ? ", session_id AS sid" : "",
-    has("action_frustration_type") ? ", action_frustration_type AS frus" : "",
-  ].join("");
-  const json = { pos: pick("action_position"), tgt: pick("action_target") };
-  if (json.pos && json.tgt) {
-    return {
-      select: `${json.pos} AS pos, ${json.tgt} AS tgt${extras}`,
-      where: `${json.pos} IS NOT NULL AND ${json.tgt} IS NOT NULL${clickOnly}`,
-    };
+  schemaFlags.value = Object.fromEntries((stream?.schema ?? []).map((f: any) => [f?.name, true]));
+}
+
+function failLoad(label: string, error: unknown) {
+  console.error(`Click heatmap: ${label} failed`, error);
+  loadError.value = t("rum.heatmap.loadFailed");
+}
+
+async function loadApps() {
+  const token = ++loadToken;
+  loading.value = true;
+  loadError.value = null;
+  try {
+    await ensureSchema();
+    const rows = await searchRows<{ app: string }>(
+      "apps",
+      appProbeSql(),
+      APP_LIMIT,
+      windowMicros(RANGE_HOURS[rangeKey.value]),
+    );
+    if (token !== loadToken || !rows) return;
+    appOptions.value = rows.map((r) => ({ label: raw(r.app), value: r.app }));
+    if (!appOptions.value.some((o) => o.value === appId.value)) {
+      appId.value = appOptions.value[0]?.value ?? "";
+    }
+    await loadSettings();
+  } catch (error) {
+    if (token !== loadToken) return;
+    failLoad("app list", error);
+    appOptions.value = [];
+    loading.value = false;
+    return;
   }
-  const flat = {
-    sel: pick("action_target_selector"),
-    x: pick("action_position_x"),
-    y: pick("action_position_y"),
-    w: pick("action_target_width") ?? "0",
-    h: pick("action_target_height") ?? "0",
-  };
-  if (!flat.sel || !flat.x || !flat.y) return null;
-  return {
-    select: `${flat.sel} AS sel, ${flat.x} AS x, ${flat.y} AS y, ${flat.w} AS w, ${flat.h} AS h${extras}`,
-    where: `${flat.sel} IS NOT NULL AND ${flat.x} IS NOT NULL AND ${flat.y} IS NOT NULL${clickOnly}`,
-  };
+  if (token === loadToken) await loadPages();
+}
+
+// Bot rules come from the product analytics settings; without them the page still loads unfiltered.
+async function loadSettings() {
+  const key = `${org()}|${appId.value}`;
+  if (!appId.value || key === settingsKey) return;
+  try {
+    const res = await rumProductAnalytics.getAppSettings(org(), appId.value);
+    exclusions.value = res.data;
+    settingsKey = key;
+  } catch (error) {
+    console.error("Click heatmap: app settings failed", error);
+    exclusions.value = undefined;
+    settingsKey = "";
+  }
+}
+
+async function onAppChange() {
+  const token = ++loadToken;
+  await loadSettings();
+  if (token === loadToken) await loadPages();
 }
 
 async function loadPages() {
+  const token = ++loadToken;
   loading.value = true;
   try {
-    const hits = await runSql(
-      `SELECT view_url, count(*) AS c FROM "_rumdata" WHERE type = 'action' AND view_url IS NOT NULL GROUP BY view_url ORDER BY c DESC LIMIT 50`,
-      50,
-    );
-    pageOptions.value = hits.map((h) => ({ label: raw(h.view_url), value: h.view_url }));
+    const rows = appId.value
+      ? await searchRows<{ view_url: string }>(
+          "pages",
+          pageListSql(scope()),
+          50,
+          windowMicros(RANGE_HOURS[rangeKey.value]),
+        )
+      : [];
+    if (token !== loadToken || !rows) return;
+    pageOptions.value = rows.map((h) => ({ label: raw(h.view_url), value: h.view_url }));
     if (!pageOptions.value.some((o) => o.value === pageUrl.value)) {
       pageUrl.value = pageOptions.value[0]?.value ?? "";
     }
   } catch (error) {
-    console.error("Click heatmap: page list failed", error);
+    if (token !== loadToken) return;
+    failLoad("page list", error);
     pageOptions.value = [];
-    loadError.value = t("rum.heatmap.loadFailed");
-  } finally {
     loading.value = false;
+    return;
   }
+  loading.value = false;
   await loadPage();
 }
 
-async function loadPage() {
-  const token = ++loadToken;
+function resetPage() {
   destroyPlayer();
-  points.value = [];
+  groups.value = [];
+  totals.value = { clicks: 0, sessions: 0, frustrated: 0 };
   placedSelectors.value = new Set();
   snapshotError.value = null;
   loadError.value = null;
   selectedSelector.value = "";
-  capped.value = false;
   unusedRows.value = [];
-  if (!pageUrl.value) return;
-  const [clicks, snapshot] = await Promise.allSettled([loadClicks(token), loadSnapshot(token)]);
-  if (token !== loadToken) return;
-  if (clicks.status === "rejected") {
-    console.error("Click heatmap: clicks failed", clicks.reason);
-    loadError.value = t("rum.heatmap.loadFailed");
+}
+
+async function loadPage(refreshSplit = true) {
+  const token = ++loadToken;
+  if (refreshSplit) deviceClicks.value = {};
+  resetPage();
+  if (!pageUrl.value) {
+    for (const id of RANK_PANELS) search.hold(id, "idle");
+    return;
   }
+  const [clicks, snapshot] = await Promise.allSettled([
+    loadClicks(token, refreshSplit),
+    loadSnapshot(token),
+  ]);
+  if (token !== loadToken) return;
+  if (clicks.status === "rejected") failLoad("clicks", clicks.reason);
   if (snapshot.status === "fulfilled" && snapshotReady.value) drawHeat();
 }
 
-async function loadClicks(token: number) {
+async function loadClicks(token: number, withSplit: boolean) {
   loading.value = true;
   try {
-    const c = await columnsFor();
-    if (!c) return;
-    const hits = await runSql(
-      `SELECT ${c.select} FROM "_rumdata" WHERE type = 'action' AND view_url = '${sqlText(pageUrl.value)}' AND ${c.where}${await viewportClause()} ORDER BY ${tsField()} DESC`,
-      MAX_CLICKS,
+    const win = windowMicros(RANGE_HOURS[rangeKey.value]);
+    const sc = scope();
+    const url = pageUrl.value;
+    const rankSql = rankingSql(sc, url, deviceClass.value);
+    const [split, tot, ranked] = await Promise.all([
+      withSplit
+        ? searchRows<Record<string, unknown>>("devices", deviceSplitSql(sc, url), 8, win)
+        : [],
+      searchRows<Record<string, unknown>>("totals", totalsSql(sc, url, deviceClass.value), 1, win),
+      rankSql ? searchRows<Record<string, unknown>>("ranking", rankSql, 500, win) : [],
+    ]);
+    if (token !== loadToken || !split || !tot || !ranked) return;
+    if (withSplit) {
+      deviceClicks.value = Object.fromEntries(split.map((r) => [r.cls, Number(r.clicks) || 0]));
+    }
+    const row = tot[0] ?? {};
+    totals.value = {
+      clicks: Number(row.clicks) || 0,
+      sessions: Number(row.sessions) || 0,
+      frustrated: Number(row.frustrated) || 0,
+    };
+    groups.value = sortElements(
+      ranked.map(toElementGroup).filter((g): g is ElementGroup => g !== null),
     );
-    if (token !== loadToken) return;
-    capped.value = hits.length >= MAX_CLICKS;
-    points.value = hits.map(toClickPoint).filter((p): p is ClickPoint => p !== null);
   } finally {
     if (token === loadToken) loading.value = false;
   }
@@ -486,7 +628,7 @@ async function pickReplayView(): Promise<string | null> {
   const stream = await getStream("_rumdata", "logs", true);
   const hasActions = (stream?.schema ?? []).some((f: any) => f?.name === "view_action_count");
   const views = await runSql(
-    `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE type = 'view' AND view_url = '${sqlText(pageUrl.value)}'${await viewportClause()} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
+    `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE type = 'view' AND application_id = ${sqlLiteral(appId.value)} AND view_url = ${sqlLiteral(pageUrl.value)}${deviceClause(scope(), deviceClass.value)} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
     30,
     SNAPSHOT_LOOKBACK_HOURS,
   );
@@ -697,7 +839,7 @@ function drawHeat() {
     if (!el) continue;
     clickedEls.push(el);
     const box = el.getBoundingClientRect();
-    spots.push(...placeGroup(g, box, win?.scrollX ?? 0, win?.scrollY ?? 0));
+    spots.push(placeGroup(g, clicksMax.value, box, win?.scrollX ?? 0, win?.scrollY ?? 0));
     rects.set(g.selector, {
       x: box.left + (win?.scrollX ?? 0),
       y: box.top + (win?.scrollY ?? 0),
@@ -749,6 +891,9 @@ function findUnusedControls(
       share: 0,
       sessions: 0,
       frustrated: 0,
+      rage: 0,
+      dead: 0,
+      error: 0,
     });
   }
   return rows;
@@ -771,13 +916,29 @@ function onRowClick(row: ElementRow) {
 }
 
 onMounted(() => {
-  loadPages();
+  loadApps();
   if (scrollerRef.value) {
     resizeObserver = new ResizeObserver(fitStage);
     resizeObserver.observe(scrollerRef.value);
   }
 });
+
+function cancelLoads() {
+  loadToken++;
+  search.abortAll();
+}
+
+onDeactivated(() => {
+  deactivated = true;
+  cancelLoads();
+});
+onActivated(() => {
+  if (!deactivated) return;
+  deactivated = false;
+  loadApps();
+});
 onBeforeUnmount(() => {
+  cancelLoads();
   resizeObserver?.disconnect();
   destroyPlayer();
 });
