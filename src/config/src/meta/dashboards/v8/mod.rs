@@ -785,6 +785,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     treemap_show_breadcrumb: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    sunburst_show_labels: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -2983,7 +2985,8 @@ mod tests {
             "distribution_bucket_size": 0.25,
             "distribution_bucket_offset": -1.0,
             "state_timeline_display": "cells",
-            "treemap_show_breadcrumb": false
+            "treemap_show_breadcrumb": false,
+            "sunburst_show_labels": true
         });
         for part in [rest, rest2, rest3] {
             fields

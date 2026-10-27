@@ -23,6 +23,7 @@ import {
 } from "@/utils/dashboard/convertHostmapData";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
+import { SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 const colors = [
   "#5960b2",
@@ -67,6 +68,12 @@ export const usePanelFields = ({
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields;
     return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
   });
+  // Every x field and the breakdown add one ring, so the cap counts both wells together.
+  const sunburstLevelCount = () => {
+    const fields =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
+  };
 
   const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
@@ -89,6 +96,8 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 1
         );
+      case "sunburst":
+        return sunburstLevelCount() >= SUNBURST_MAX_LEVELS;
       case "metric":
       case "distribution":
         return (
@@ -128,6 +137,11 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1 || treemapLevels.value >= TREEMAP_MAX_LEVELS
         );
+      case "sunburst":
+        return (
+          (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length ?? 0) >= 1 || sunburstLevelCount() >= SUNBURST_MAX_LEVELS
+        );
       case "hostmap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
@@ -151,6 +165,7 @@ export const usePanelFields = ({
       case "gauge":
       case "bar-gauge":
       case "treemap":
+      case "sunburst":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1

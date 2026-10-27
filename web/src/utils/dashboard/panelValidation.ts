@@ -20,6 +20,7 @@ import {
   Y_AXIS_SCALES,
 } from "@/utils/dashboard/cartesianOptions";
 import { TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
+import { isAdditiveSizeField, SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 import { STAT_TEXT_MODES } from "@/utils/dashboard/metricOptions";
 import {
   GAUGE_STYLES,
@@ -575,6 +576,29 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "sunburst": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (!fields?.x?.length) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      if ((fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0) > SUNBURST_MAX_LEVELS) {
+        errors.push(t("dashboard.utils.sunburstMaxLevels", { count: SUNBURST_MAX_LEVELS }));
+      }
+      if (!isAdditiveSizeField(fields?.y?.[0])) {
+        errors.push(t("dashboard.utils.sizeMustBeCountOrSum"));
+      }
+      break;
+    }
     case "hostmap": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
@@ -972,6 +996,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "state-timeline",
     "distribution",
     "treemap",
+    "sunburst",
     "hostmap",
     "metric",
     "gauge",

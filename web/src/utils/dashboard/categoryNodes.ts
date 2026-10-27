@@ -24,7 +24,7 @@ export interface TreemapNode {
   path: string[];
   children?: TreemapNode[];
   itemStyle?: { color: string };
-  label?: { color?: string; show?: boolean };
+  label?: { color?: string; show?: boolean; rotate?: "radial" | "tangential" };
   upperLabel?: { color: string };
 }
 

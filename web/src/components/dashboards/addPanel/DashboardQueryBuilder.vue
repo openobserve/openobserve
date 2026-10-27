@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'state-timeline' ||
           dashboardPanelData.data.type == 'distribution' ||
           dashboardPanelData.data.type == 'treemap' ||
+          dashboardPanelData.data.type == 'sunburst' ||
           dashboardPanelData.data.type == 'hostmap'
         "
       >
@@ -221,6 +222,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <span v-else-if="dashboardPanelData.data.type == 'treemap'">{{
                   t("panel.breakdownTooltipTreemap")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'sunburst'">{{
+                  t("panel.breakdownTooltipSunburst")
                 }}</span>
                 <span v-else-if="dashboardPanelData.data.type == 'hostmap'">{{
                   t("panel.breakdownTooltipHostmap")
@@ -710,6 +714,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
+import { SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 // Minimal shape of a dashboard panel query slot as read by the PromQL builder.
 interface DashboardQuerySlot {
@@ -787,6 +792,7 @@ export default defineComponent({
     const roleLabels = computed((): { x: string; y: string; b: string | null } | null => {
       switch (dashboardPanelData.data.type) {
         case "treemap":
+        case "sunburst":
           return { x: t("panel.wellGroup"), y: t("panel.wellSize"), b: t("panel.wellSubgroup") };
         default:
           return null;
@@ -1185,6 +1191,8 @@ export default defineComponent({
           return t("dashboard.oneLabelFieldMessage");
         case "treemap":
           return t("dashboard.treemapLevelsHint", { count: TREEMAP_MAX_LEVELS });
+        case "sunburst":
+          return t("panel.sunburstLevelsHint", { count: SUNBURST_MAX_LEVELS });
         case "metric":
         case "distribution":
           return t("dashboard.xaxisFieldNAMessage");
@@ -1231,6 +1239,7 @@ export default defineComponent({
         case "gauge":
         case "bar-gauge":
         case "treemap":
+        case "sunburst":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");

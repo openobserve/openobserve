@@ -142,6 +142,7 @@
                   dashboardPanelData.data.type == 'state-timeline' ||
                   dashboardPanelData.data.type == 'distribution' ||
                   dashboardPanelData.data.type == 'treemap' ||
+                  dashboardPanelData.data.type == 'sunburst' ||
                   dashboardPanelData.data.type == 'hostmap'
                 "
                 variant="ghost-neutral"
