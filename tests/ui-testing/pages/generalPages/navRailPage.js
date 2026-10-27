@@ -111,7 +111,10 @@ export class NavRailPage {
 
   async resetPointer() {
     const vp = this.page.viewportSize();
-    await this.page.mouse.move(vp.width - 40, vp.height - 40);
+    const rail = await this.nav.boundingBox();
+    // In RTL the rail hugs the right edge, so the bottom-right corner would rest the pointer on a tile.
+    const x = rail && rail.x + rail.width / 2 > vp.width / 2 ? 40 : vp.width - 40;
+    await this.page.mouse.move(x, vp.height - 40);
     await this.page.waitForTimeout(500);
   }
 
@@ -122,6 +125,8 @@ export class NavRailPage {
 
   // Move onto a tile and let the pointer rest until the flyout is open.
   async restOn(locator) {
+    // On short viewports the tile can sit below the rail's visible area, so its centre would be off-screen.
+    await locator.scrollIntoViewIfNeeded();
     const c = await this.centre(locator);
     await this.page.mouse.move(c.x, c.y);
     await this.page.waitForTimeout(450);
