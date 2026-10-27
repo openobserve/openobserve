@@ -27,6 +27,7 @@ import {
   migrateHome,
   markedUserOrgKeys,
   pushRecall,
+  readAnnotations,
   readHints,
   readHistoryFilter,
   readHome,
@@ -36,9 +37,11 @@ import {
   recallSelection,
   rememberSelection,
   removeAllSessionKeys,
+  removeAnnotations,
   removeRecall,
   resetPrefsForTests,
   watchPrefs,
+  writeAnnotation,
   writeHistoryFilter,
   writePlacement,
   writeSidebar,
@@ -130,6 +133,78 @@ describe("prompt recall", () => {
     localStorage.setItem(`o2.assistant.recall:${KEY}`, JSON.stringify(other));
     pushRecall(KEY, { text: "mine again", chips: [], at: 3 });
     expect(readRecall(KEY).map((e) => e.text)).toEqual(["mine again", "theirs", "mine"]);
+  });
+});
+
+describe("annotations", () => {
+  afterEach(() => localStorage.clear());
+
+  it("keeps votes, Opened times and asked windows per chat, and drops run rows", () => {
+    writeAnnotation(
+      "k1",
+      "s1",
+      "turn:t1:feedback",
+      { feedback: { rating: "down", reason: "wrong_query" } },
+      1,
+    );
+    writeAnnotation("k1", "s1", "b1", { linkOutcome: { openedAt: 5 } }, 2);
+    writeAnnotation("k1", "s1", "b2", { run: { status: "done", rows: 4 } } as never, 3);
+    writeAnnotation("k1", "s2", "turn:t9:window", { window: { from: 1, to: 2 } }, 4);
+    expect(readAnnotations("k1", "s1")).toEqual({
+      "turn:t1:feedback": { feedback: { rating: "down", reason: "wrong_query" } },
+      b1: { linkOutcome: { openedAt: 5 } },
+    });
+    expect(readAnnotations("k1", "s2")).toEqual({
+      "turn:t9:window": { window: { from: 1, to: 2 } },
+    });
+    expect(readAnnotations("k2", "s1")).toEqual({});
+  });
+
+  it("validates what it reads back and forgets everything on sign-out", () => {
+    localStorage.setItem(
+      "o2.assistant.annotations:k1",
+      JSON.stringify({
+        s1: {
+          at: 1,
+          entries: {
+            a: { feedback: { rating: "maybe" } },
+            b: { linkOutcome: { openedAt: "soon" } },
+            c: { window: { from: 9, to: 1 } },
+            d: { feedback: { rating: "up", reason: "x".repeat(200) } },
+          },
+        },
+      }),
+    );
+    expect(readAnnotations("k1", "s1")).toEqual({ d: { feedback: { rating: "up" } } });
+    localStorage.setItem("o2.assistant.annotations:k1", "{not json");
+    expect(readAnnotations("k1", "s1")).toEqual({});
+    writeAnnotation("k1", "s1", "b1", { linkOutcome: { openedAt: 5 } }, 1);
+    removeAnnotations("k1");
+    expect(readAnnotations("k1", "s1")).toEqual({});
+  });
+
+  it("caps a chat at 200 keys on write, keeping the newest and the one just written", () => {
+    for (let i = 0; i < 205; i++)
+      writeAnnotation("k1", "s1", `b${i}`, { linkOutcome: { openedAt: i + 1 } }, i);
+    writeAnnotation("k1", "s1", "b10", { feedback: { rating: "up", reason: "too_slow" } }, 300);
+    const stored = JSON.parse(localStorage.getItem("o2.assistant.annotations:k1")!);
+    expect(Object.keys(stored.s1.entries)).toHaveLength(200);
+    const read = readAnnotations("k1", "s1");
+    expect(read.b204).toEqual({ linkOutcome: { openedAt: 205 } });
+    expect(read.b10).toEqual({ feedback: { rating: "up", reason: "too_slow" } });
+    expect(read.b4).toBeUndefined();
+  });
+
+  it("keeps only a known vote reason", () => {
+    writeAnnotation("k1", "s1", "v", { feedback: { rating: "down", reason: "<img src=x>" } }, 1);
+    expect(readAnnotations("k1", "s1").v).toEqual({ feedback: { rating: "down" } });
+  });
+
+  it("keeps the newest 50 chats", () => {
+    for (let i = 0; i < 55; i++)
+      writeAnnotation("k1", `s${i}`, "b", { linkOutcome: { openedAt: i + 1 } }, i);
+    expect(readAnnotations("k1", "s0")).toEqual({});
+    expect(readAnnotations("k1", "s54")).toEqual({ b: { linkOutcome: { openedAt: 55 } } });
   });
 });
 

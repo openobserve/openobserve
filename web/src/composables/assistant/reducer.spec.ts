@@ -1168,7 +1168,7 @@ describe("reduce: typed phases (live)", () => {
     });
   });
 
-  it("records the B-02, B-04, B-07 and EB-A2 frames without touching the transcript", () => {
+  it("records the step and lifecycle frames without touching the transcript", () => {
     const state = makeState();
     const frames = [
       { type: "turn_started", turn_id: "srv-1", trace_id: "tr-0" },
@@ -1176,17 +1176,7 @@ describe("reduce: typed phases (live)", () => {
       { type: "retrying", attempt: 2 },
       { type: "compacting" },
       { type: "usage", usage: { input_tokens: 9 } },
-      { type: "query", language: "sql", text: "SELECT 1" },
       { type: "resource_changed", resource_type: "alert", op: "update" },
-      {
-        type: "findings",
-        likely_cause: "x",
-        confidence: "low",
-        evidence: [],
-        ruled_out: [],
-        unknowns: [],
-        next_steps: [],
-      },
       { type: "status", message: "thinking" },
     ];
     for (const frame of frames) expect(reduce(state, frame, live())).toEqual([]);
@@ -1231,15 +1221,27 @@ describe("reduce: typed phases (live)", () => {
     });
   });
 
-  it("applies confirmation and navigation frames the legacy tail flush drops", () => {
+  it("keeps a navigation frame the legacy tail flush drops, as a link card and never a prompt", () => {
     for (const phase of ["live", "replay"] as const) {
       const state = makeState({ messages: [assistant()] });
       reduce(
         state,
-        { type: "navigation_action", resource_type: "logs", action: "load_query", target: {} },
+        {
+          type: "navigation_action",
+          resource_type: "logs",
+          action: "load_query",
+          label: "Click me",
+          target: { stream: "default", path: "/web/logout" },
+        },
         makeCtx({ phase }),
       );
-      expect(blocksOf(state)[0].pendingConfirmation).toBe(true);
+      expect(blocksOf(state)).toEqual([
+        {
+          type: "link",
+          link: { resourceType: "logs", action: "load_query", target: { stream: "default" } },
+        },
+      ]);
+      expect(state.pendingConfirmation).toBeNull();
     }
   });
 
@@ -1280,5 +1282,185 @@ describe("reduce: typed phases (live)", () => {
     reduce(state, { type: "tool_call", tool: "A", call_id: "c1" }, makeCtx());
     expect(state.messages[0].contentBlocks).toEqual([]);
     expect(state.extras).toBeUndefined();
+  });
+});
+
+describe("reduce: evidence on the typed phases", () => {
+  const live = () => makeCtx({ phase: "live", isActive: false });
+  const blocksOf = (state: StreamState) =>
+    state.messages[state.messages.length - 1]?.contentBlocks ?? [];
+
+  it("honours a step frame's top-level call_id and state, and merges its tool_call into the same row", () => {
+    const state = makeState();
+    reduce(state, { type: "step", kind: "tool", label: "SearchSQL", call_id: "c1" }, live());
+    reduce(
+      state,
+      { type: "tool_call", tool: "SearchSQL", call_id: "c1", context: { sql: "x" } },
+      live(),
+    );
+    expect(blocksOf(state)).toHaveLength(1);
+    expect(blocksOf(state)[0]).toMatchObject({ tool: "SearchSQL", stepState: "running" });
+    reduce(
+      state,
+      {
+        type: "step",
+        kind: "tool",
+        label: "SearchSQL",
+        params: { call_id: "c1" },
+        state: "interrupted",
+      },
+      live(),
+    );
+    expect(blocksOf(state)[0].stepState).toBe("interrupted");
+  });
+
+  it("never turns a step that already ended back to running", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "A", call_id: "c1" }, live());
+    reduce(state, { type: "tool_result", tool: "A", call_id: "c1", success: true }, live());
+    reduce(
+      state,
+      { type: "step", kind: "tool", label: "A", call_id: "c1", state: "running" },
+      live(),
+    );
+    expect(blocksOf(state)[0].stepState).toBe("done");
+  });
+
+  it("keeps a tool result's call args, typed query and first rows, bounded", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "SearchSQL", call_id: "c1" }, live());
+    reduce(
+      state,
+      {
+        type: "tool_result",
+        tool: "SearchSQL",
+        call_id: "c1",
+        success: true,
+        call_args: {
+          sql: "SELECT 1",
+          stream_name: "default",
+          start_time: 1,
+          end_time: 2,
+          secret: "x",
+        },
+        query: { language: "sql", text: "SELECT 1", stream: "default" },
+        response: { hits: Array.from({ length: 50 }, (_, i) => ({ i })), total: 50 },
+      },
+      live(),
+    );
+    const block = blocksOf(state)[0];
+    expect(block.callArgs).toEqual({
+      stream_name: "default",
+      sql: "SELECT 1",
+      start_time: 1,
+      end_time: 2,
+    });
+    expect(block.query).toMatchObject({ text: "SELECT 1", callId: "c1" });
+    expect(block.result?.hits).toHaveLength(10);
+    expect(block).not.toHaveProperty("response");
+  });
+
+  it("adds a query block for a query frame, a findings block for a findings frame and a footer with the trace at complete", () => {
+    const state = makeState();
+    reduce(
+      state,
+      { type: "query", language: "promql", text: "up", time_range: { from: 1, to: 2 } },
+      live(),
+    );
+    reduce(
+      state,
+      {
+        type: "findings",
+        likely_cause: "x",
+        confidence: "low",
+        evidence: [],
+        ruled_out: [],
+        unknowns: [],
+        next_steps: [],
+      },
+      live(),
+    );
+    reduce(state, { type: "usage", usage: { total_tokens: 10, llm_calls: 2 } }, live());
+    reduce(
+      state,
+      { type: "complete", trace_id: "tr-1", persisted: false, context_used: ["stream"] },
+      live(),
+    );
+    expect(blocksOf(state).map((block) => block.type)).toEqual(["query", "findings", "footer"]);
+    expect(blocksOf(state)[0].query).toMatchObject({ language: "promql", from: 1, to: 2 });
+    expect(blocksOf(state)[2].footer).toEqual({
+      traceId: "tr-1",
+      usage: { totalTokens: 10, llmCalls: 2 },
+      contextUsed: ["stream"],
+      persisted: false,
+    });
+  });
+
+  it("keeps the trace of turn_started when complete carries none", () => {
+    const state = makeState();
+    reduce(state, { type: "turn_started", turn_id: "s", trace_id: "tr-0" }, live());
+    reduce(state, { type: "message_delta", content: "x" }, live());
+    reduce(state, { type: "complete" }, live());
+    expect(blocksOf(state).at(-1)?.footer?.traceId).toBe("tr-0");
+    expect(blocksOf(state).at(-1)?.footer?.serverTurnId).toBe("s");
+  });
+
+  it("shows a policy-denied tool as one row after its step frame already failed it", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "o2_UpdateAlert", call_id: "call_9" }, live());
+    reduce(
+      state,
+      { type: "step", kind: "tool", label: "o2_UpdateAlert", call_id: "call_9", state: "failed" },
+      live(),
+    );
+    reduce(
+      state,
+      { type: "permission_denied", tool: "o2_UpdateAlert", policy: "permission_tier" },
+      live(),
+    );
+    const rows = blocksOf(state).filter((block) => block.type === "tool_call");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ call_id: "call_9", errorType: "permission_denied_tool" });
+  });
+
+  it("caps an answer at 200 steps and 50 evidence blocks, and bounds ids", () => {
+    const state = makeState();
+    for (let i = 0; i < 230; i++)
+      reduce(state, { type: "tool_call", tool: "T", call_id: `c${i}` }, live());
+    for (let i = 0; i < 70; i++)
+      reduce(state, { type: "query", language: "sql", text: `SELECT ${i}` }, live());
+    reduce(state, { type: "tool_call", tool: "T".repeat(500), call_id: "x".repeat(500) }, live());
+    const blocks = blocksOf(state);
+    expect(blocks.filter((block) => block.type === "tool_call")).toHaveLength(200);
+    expect(blocks.filter((block) => block.type === "query")).toHaveLength(50);
+    for (const block of blocks) {
+      expect((block.call_id ?? "").length).toBeLessThanOrEqual(64);
+      expect((block.tool ?? "").length).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("caps policy denials like steps and keeps one level of a link's nested query", () => {
+    const state = makeState();
+    for (let i = 0; i < 230; i++)
+      reduce(
+        state,
+        { type: "permission_denied", tool: `T${i}`.padEnd(500, "x"), policy: "permission_tier" },
+        live(),
+      );
+    const rows = blocksOf(state).filter((block) => block.type === "tool_call");
+    expect(rows).toHaveLength(200);
+    expect(rows.every((row) => (row.tool ?? "").length <= 100)).toBe(true);
+    reduce(
+      state,
+      {
+        type: "navigation_action",
+        resource_type: "alert",
+        action: "navigate_direct",
+        target: { alert_id: "a1", query: { folder: "f", query: { query: { deep: "x" } } } },
+      },
+      live(),
+    );
+    const link = blocksOf(state).find((block) => block.type === "link");
+    expect(link?.link?.target.query).toEqual({ folder: "f" });
   });
 });

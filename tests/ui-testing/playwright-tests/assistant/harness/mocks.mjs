@@ -150,6 +150,19 @@ const PLANTED_MARKDOWN = [
   "Read [the docs](https://openobserve.ai/docs/).",
 ].join("\n");
 
+const CITED_ANSWER = `The \`checkout\` errors trace back to \`payments\` resetting connections [^call_3].
+
+92% of them carry \`connection reset by peer\` [^call_3], across 3 log streams [^call_1].`;
+
+const NAV_LOGS_TARGET = {
+  stream: "default",
+  stream_type: "logs",
+  query: "SELECT * FROM \"default\" WHERE level = 'error' AND service_name = 'payments'",
+  sql_mode: true,
+  from: (NOW - 3_600_000) * US,
+  to: NOW * US,
+};
+
 export const SCENARIOS = {
   complete: { frames: completeFrames(), delayMs: 25 },
   // Same turn but slow, so a screenshot can catch it mid-stream (tool running, text half-typed).
@@ -366,6 +379,84 @@ export const SCENARIOS = {
   markdown_bomb_fences: { frames: [f.status(), ...textBlocks(["```\na\n```\n".repeat(2_000)])], delayMs: 10 },
   // Y3 / F14: a 2,000-cell table formatted as plain cells, and the 19,999-cell table of round 5 as text.
   markdown_table_cap: { frames: [f.status(), ...textBlocks([gridTable(10, 199), gridTable(8, 2_499)])], delayMs: 10 },
+  // The `complete` turn with claim markers citing the SearchSQL step.
+  cite: { frames: completeFrames(CITED_ANSWER, "Cited checkout errors"), delayMs: 20 },
+  // A navigation frame that ends the turn (no confirmation wait), so the link card is the answer's.
+  navigation_card: {
+    frames: [
+      f.status(),
+      ...chunk("I prepared a logs query for **payments errors in the last hour**.").map(f.delta),
+      { type: "navigation_action", resource_type: "logs", action: "load_query", label: "View payments errors in Logs", target: NAV_LOGS_TARGET },
+      f.complete(),
+    ],
+    delayMs: 30,
+  },
+  // The label and `target.path` point elsewhere; the card must open the dashboard of `resource_type`.
+  nav_path_override: {
+    frames: [
+      f.status(),
+      ...chunk("Here is the dashboard.").map(f.delta),
+      { type: "navigation_action", resource_type: "dashboard", action: "navigate_direct", label: "Sign out now", target: { path: "/web/logout", dashboard_id: "d_checkout", folder: "default", name: "Checkout" } },
+      f.complete(),
+    ],
+    delayMs: 30,
+  },
+  // The target names another org; the card keeps the session's.
+  nav_org_override: {
+    frames: [
+      f.status(),
+      ...chunk("Here is the alert.").map(f.delta),
+      { type: "navigation_action", resource_type: "alert", action: "navigate_direct", label: "Open", target: { alert_id: "a_latency", query: { org_identifier: "evil_org", folder: "default" } } },
+      f.complete(),
+    ],
+    delayMs: 30,
+  },
+  // An answer link to the assistant route that tries to stage a chip.
+  assistant_stage_link: {
+    frames: [f.status(), f.delta("Continue in [this chat](/web/assistant/0190f3a0-0000-7000-8000-000000000abc?assistant=1&object=log_row&ref=evil)."), f.complete()],
+    delayMs: 30,
+  },
+  // A findings frame that could not confirm a cause.
+  findings_inconclusive: {
+    frames: [
+      f.status(),
+      f.toolCall("SearchSQL", "Querying logs", { stream_name: "default", sql: SQL_CTX.sql }, "call_3"),
+      f.toolResult("SearchSQL", { call_id: "call_3", summary: { count: 0, took: 120 }, call_args: SQL_CTX }),
+      ...chunk("I could not tie the errors to one cause.").map(f.delta),
+      { type: "findings", likely_cause: "", confidence: "inconclusive", evidence: [{ text: "No errors in payments in the window", call_id: "call_3", kind: "verified" }], ruled_out: ["recent deploy"], unknowns: ["payments pool metrics"], next_steps: ["enable pool metrics"] },
+      f.complete(),
+    ],
+    delayMs: 30,
+  },
+  // A valid findings frame, and one missing likely_cause and confidence.
+  findings_valid: {
+    frames: [
+      f.status(),
+      f.toolCall("SearchSQL", "Querying logs", { stream_name: "default", sql: SQL_CTX.sql }, "call_3"),
+      f.toolResult("SearchSQL", { call_id: "call_3", summary: { count: 4, took: 380 }, call_args: SQL_CTX }),
+      ...chunk("The payments pool ran out of connections.").map(f.delta),
+      { type: "findings", likely_cause: "payments connection pool exhausted", confidence: "medium", evidence: [{ text: "92% of errors are connection resets from payments", call_id: "call_3", kind: "verified" }, { text: "the reset rate matches the pool ceiling of 50", kind: "inferred" }], ruled_out: ["recent deploy"], unknowns: ["payments pool metrics"], next_steps: ["check the payments max-connections setting"] },
+      f.complete(),
+    ],
+    delayMs: 30,
+  },
+  findings_invalid: {
+    frames: [f.status(), ...chunk("The payments pool ran out of connections.").map(f.delta), { type: "findings", evidence: [] }, f.complete()],
+    delayMs: 30,
+  },
+  // Two queries over different windows.
+  multi_window: {
+    frames: [
+      f.status(),
+      f.toolCall("SearchSQL", "Querying logs", { stream_name: "default", sql: SQL_CTX.sql }, "call_2"),
+      f.toolResult("SearchSQL", { call_id: "call_2", summary: { count: 4, took: 380 }, call_args: SQL_CTX }),
+      f.toolCall("SearchSQL", "Querying logs", { stream_name: "default", sql: SQL_CTX.sql }, "call_3"),
+      f.toolResult("SearchSQL", { call_id: "call_3", summary: { count: 9, took: 410 }, call_args: { ...SQL_CTX, start_time: SQL_CTX.start_time - 3_600_000 * US } }),
+      ...chunk("Both windows agree.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 30,
+  },
 };
 
 function queryExamples(count) {

@@ -147,6 +147,8 @@ export interface BlockAnnotation {
   feedback?: { rating: "up" | "down"; reason?: string };
   versionIndex?: number;
   run?: QueryRunState;
+  /** The page's window when the turn was asked, epoch ms. */
+  window?: { from: number; to: number };
 }
 
 /** Closed enum; the envelope test pins it (gap-2 §3.2). */

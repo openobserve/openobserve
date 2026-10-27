@@ -19,12 +19,43 @@ import { getDashboardEventType, type AiDashboardEvent } from "@/composables/useA
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 import { toAssistantError } from "./assistantErrors";
+import {
+  boundedArgs,
+  boundedFindings,
+  boundedQuery,
+  boundedResult,
+  footerUsage,
+  type FindingsData,
+  type FooterData,
+  type LinkBlockData,
+  type QueryBlockData,
+  type StepResult,
+} from "./evidence";
 import type { UsageFrame } from "./frames";
 
-// The typed phases record a step's state on its block; the legacy chat keeps reading `success`.
+const STEP_STATES: ReadonlySet<string> = new Set(["running", "done", "failed", "interrupted"]);
+
+// An answer is untrusted: its steps and evidence blocks are capped so one stream cannot fill the tab.
+const MAX_STEPS = 200;
+
+const MAX_EVIDENCE = 50;
+
+const MAX_ID_CHARS = 64;
+
+const MAX_TOOL_CHARS = 100;
+
+const EVIDENCE_TYPES: ReadonlySet<string> = new Set(["query", "link", "findings"]);
+
+// The typed phases record a step's state and its evidence on the blocks; the legacy chat keeps reading `success`.
 declare module "@/ts/interfaces/chat" {
   interface ContentBlock {
     stepState?: StepState;
+    callArgs?: Record<string, unknown>;
+    result?: StepResult;
+    query?: QueryBlockData;
+    link?: LinkBlockData;
+    findings?: FindingsData | null;
+    footer?: FooterData;
   }
 }
 
@@ -590,6 +621,17 @@ function reduceTyped(state: StreamState, data: any, ctx: ReducerCtx): StreamEffe
       return [];
     case "status":
       return [];
+    case "step":
+      reduceExtras(extras, data);
+      typedStep(state, data);
+      return [];
+    case "navigation_action":
+      return typedLink(state, data, live);
+    case "findings":
+      reduceExtras(extras, data);
+      return typedEvidence(state, { type: "findings", findings: boundedFindings(data) }, live);
+    case "query":
+      return typedQuery(state, data, live);
     default:
       return reduceExtras(extras, data) ? [] : reduce(state, data, live);
   }
@@ -624,14 +666,19 @@ function typedToolCall(
 ): StreamEffect[] {
   const effects: StreamEffect[] = [];
   finalizeTextBlock(state, ctx, effects);
-  appendBlock(state, {
+  const callId = boundedId(data.call_id);
+  const call: ContentBlock = {
     type: "tool_call",
-    tool: data.tool,
+    tool: String(data.tool ?? "").slice(0, MAX_TOOL_CHARS),
     message: data.message,
     context: data.context || {},
-    call_id: data.call_id || undefined,
+    call_id: callId,
     stepState: "running",
-  });
+  };
+  // A lifecycle `step` frame may have announced this call already; its `tool_call` fills the same row.
+  const announced = callId ? stepFor(state, callId, call.tool!) : null;
+  if (announced) Object.assign(announced, { ...call, stepState: announced.stepState ?? "running" });
+  else if (stepCount(state) < MAX_STEPS) appendBlock(state, call);
   extras.toolCalls += 1;
   effects.push({ kind: "scroll", whenActive: true });
   return effects;
@@ -654,14 +701,26 @@ function typedToolResult(
     details: data.details || undefined,
     stepState: success ? "done" : "failed",
   };
-  if (data.response) Object.assign(result, { response: data.response });
+  const callArgs = boundedArgs(data.call_args);
+  if (callArgs) result.callArgs = callArgs;
+  const bounded = boundedResult(data.response);
+  if (bounded) result.result = bounded;
+  const callId = boundedId(data.call_id);
+  const typed = boundedQuery(data.query, callId);
+  if (typed) result.query = typed;
   const navigationAction =
     success && data.call_args ? ctx.generateNavigation(data.tool, data.call_args, data) : null;
   if (navigationAction) result.navigationAction = navigationAction;
-  const step = stepFor(state, data.call_id, data.tool);
-  // HT-05 edge: a result for a call the stream never announced is still a step, never dropped.
+  const step = stepFor(state, callId, data.tool);
+  // A result for a call the stream never announced is still a step, never dropped.
   if (step) Object.assign(step, result);
-  else appendBlock(state, { ...result, tool: data.tool, context: {}, call_id: data.call_id });
+  else if (stepCount(state) < MAX_STEPS)
+    appendBlock(state, {
+      ...result,
+      tool: String(data.tool ?? "").slice(0, MAX_TOOL_CHARS),
+      context: {},
+      call_id: callId,
+    });
   if (!success) extras.toolErrors += 1;
   return [{ kind: "scroll", whenActive: true }];
 }
@@ -690,7 +749,99 @@ function typedComplete(state: StreamState, data: any, extras: StreamExtras): Str
   extras.compacted = data.compacted === true;
   state.textSegment = "";
   interruptSteps(state);
+  appendFooter(state, data, extras);
   return [];
+}
+
+// The vote and the footer need this turn's own trace and usage after the next turn and a reload.
+function appendFooter(state: StreamState, data: any, extras: StreamExtras): void {
+  const last = lastMessageOf(state);
+  if (last?.role !== "assistant" || last.contentBlocks?.some((b) => b.type === "footer")) return;
+  const traceId =
+    typeof data.trace_id === "string" && data.trace_id ? data.trace_id : extras.traceId;
+  const usage = footerUsage(data.usage ?? extras.usage);
+  const used = Array.isArray(data.context_used)
+    ? data.context_used
+        .filter((key: unknown): key is string => typeof key === "string")
+        .slice(0, 20)
+    : undefined;
+  const footer: FooterData = {
+    ...(traceId && { traceId }),
+    ...(extras.serverTurnId && { serverTurnId: String(extras.serverTurnId).slice(0, 64) }),
+    ...(usage && { usage }),
+    ...(used && { contextUsed: used }),
+    ...(typeof data.persisted === "boolean" && { persisted: data.persisted }),
+  };
+  appendBlock(state, { type: "footer", footer });
+}
+
+// A lifecycle `step` frame keys its row on the top-level `call_id` (params as the fallback) and says when it ended.
+function typedStep(state: StreamState, data: any): void {
+  const fromParams = data.params?.call_id;
+  const callId = boundedId(
+    data.call_id ?? (typeof fromParams === "string" ? fromParams : undefined) ?? data.id,
+  );
+  if (!callId) return;
+  const next: StepState = STEP_STATES.has(data.state) ? data.state : "running";
+  const block = stepFor(state, callId, "");
+  if (!block) {
+    if (stepCount(state) >= MAX_STEPS) return;
+    appendBlock(state, {
+      type: "tool_call",
+      tool: String(typeof data.label === "string" ? data.label : (data.kind ?? "")).slice(
+        0,
+        MAX_TOOL_CHARS,
+      ),
+      context: boundedArgs(data.params) ?? {},
+      call_id: callId,
+      stepState: next,
+    });
+    return;
+  }
+  // An ended step never goes back to running, and a result already written wins over the lifecycle frame.
+  if (next === "running" || block.stepState === "done" || block.stepState === "failed") return;
+  block.stepState = next;
+  if (next === "failed") block.success = false;
+}
+
+// A navigation is offered as a link card, never pushed; the model's label is never kept.
+function typedLink(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
+  const target = data.target && typeof data.target === "object" ? boundedTarget(data.target) : {};
+  const link: LinkBlockData = {
+    resourceType: String(data.resource_type ?? "").slice(0, 40),
+    action: String(data.action ?? "").slice(0, 40),
+    target,
+  };
+  return typedEvidence(state, { type: "link", link }, ctx);
+}
+
+function typedQuery(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
+  const query = boundedQuery(data);
+  return query ? typedEvidence(state, { type: "query", query }, ctx) : [];
+}
+
+function typedEvidence(state: StreamState, block: ContentBlock, ctx: ReducerCtx): StreamEffect[] {
+  const effects: StreamEffect[] = [];
+  finalizeTextBlock(state, ctx, effects);
+  const blocks = lastMessageOf(state)?.contentBlocks ?? [];
+  if (blocks.filter((b) => EVIDENCE_TYPES.has(b.type)).length < MAX_EVIDENCE)
+    appendBlock(state, block);
+  effects.push({ kind: "scroll", whenActive: true });
+  return effects;
+}
+
+function boundedTarget(target: Record<string, unknown>, depth = 0): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(target).slice(0, 30)) {
+    if (key === "path" || key === "label") continue;
+    if (typeof value === "string") out[key] = value.slice(0, key === "query" ? 20_000 : 400);
+    else if (typeof value === "number" || typeof value === "boolean") out[key] = value;
+    else if (Array.isArray(value))
+      out[key] = value.filter((v) => typeof v === "string").slice(0, 10);
+    else if (key === "query" && value && typeof value === "object" && depth < 1)
+      out[key] = boundedTarget(value as Record<string, unknown>, depth + 1);
+  }
+  return out;
 }
 
 function typedPermissionDenied(
@@ -705,9 +856,11 @@ function typedPermissionDenied(
     errorType:
       data.policy === "data_sharing_level" ? "data_level_blocked" : "permission_denied_tool",
   };
-  const step = stepFor(state, undefined, data.tool);
+  const tool = String(data.tool ?? "").slice(0, MAX_TOOL_CHARS);
+  // A lifecycle `step` frame may already have failed the row; the denial reuses it rather than adding one.
+  const step = stepFor(state, boundedId(data.call_id), tool) ?? deniedRowOf(state, tool);
   if (step) Object.assign(step, denied);
-  else appendBlock(state, { ...denied, tool: data.tool, context: {} });
+  else if (stepCount(state) < MAX_STEPS) appendBlock(state, { ...denied, tool, context: {} });
   extras.toolErrors += 1;
   return [];
 }
@@ -735,4 +888,27 @@ function stepFor(
       return block;
   }
   return null;
+}
+
+function deniedRowOf(state: StreamState, tool: string): ContentBlock | null {
+  const blocks = lastMessageOf(state)?.contentBlocks ?? [];
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i];
+    if (
+      block.type === "tool_call" &&
+      block.tool === tool &&
+      block.stepState === "failed" &&
+      !block.errorType
+    )
+      return block;
+  }
+  return null;
+}
+
+function stepCount(state: StreamState): number {
+  return (lastMessageOf(state)?.contentBlocks ?? []).filter((b) => b.type === "tool_call").length;
+}
+
+function boundedId(value: unknown): string | undefined {
+  return typeof value === "string" && value ? value.slice(0, MAX_ID_CHARS) : undefined;
 }

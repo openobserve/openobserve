@@ -1220,9 +1220,13 @@ export default defineComponent({
         }
       },
     );
+    // The assistant's nonce `t` re-applies a second link whose `type` did not change.
     watch(
-      () => router.currentRoute.value.query.type,
-      async (type) => {
+      [
+        () => router.currentRoute.value.query.type,
+        () => (isAssistantV2() ? router.currentRoute.value.query.t : undefined),
+      ],
+      async ([type]) => {
         if (type == "search_history_re_apply" || type == "ai_chat_query") {
           searchObj.meta.jobId = "";
           resetRunStateForReapply();

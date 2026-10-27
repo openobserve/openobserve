@@ -50,6 +50,7 @@ const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
   copyable: true,
   highlight: true,
+  toolbar: true,
   lineNumbers: false,
   padded: false,
   inset: false,
@@ -193,6 +194,7 @@ const onNativeCopy = () => {
     :data-test="dataTest"
   >
     <div
+      v-if="toolbar"
       class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 ps-3 pe-1.5"
     >
       <span

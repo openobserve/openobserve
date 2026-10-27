@@ -164,6 +164,19 @@ const TABLE: [
     ["track_state", "announce"],
   ],
   [
+    "a tool call with only its SQL is named by the stream it reads",
+    S.writing,
+    {
+      type: "tool_call",
+      tool: "SearchSQL",
+      call_id: "c1",
+      context: { sql: 'SELECT * FROM "default"' },
+    },
+    {},
+    { state: "running_tool", tool: "SearchSQL", target: "default", callId: "c1" },
+    ["track_state", "announce"],
+  ],
+  [
     "a B-02 step runs the tool",
     S.thinking,
     { type: "step", kind: "query", label: "query_logs", params: { stream: "default" } },

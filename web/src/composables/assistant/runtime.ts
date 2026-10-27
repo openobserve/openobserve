@@ -26,15 +26,23 @@ import { QueryObserver, type QueryKey, type QueryObserverOptions } from "@tansta
 import type { Router } from "vue-router";
 
 import config from "@/aws-exports";
+import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import { queryClient } from "@/composables/query/queryClient";
 import useBreakpoint from "@/composables/useBreakpoint";
 import assistantService, { type AssistantCapabilitiesResponse } from "@/services/assistant";
+import searchService from "@/services/search";
+import { gt } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
 import { capabilitiesQuery } from "@/services/assistant.queries";
 import { assistantKeys } from "@/services/assistant.querykeys";
 import type { TelemetryContextGetters, TelemetryRole } from "@/services/assistantAnalytics";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
+import { requestDashboardDraft } from "./actions/appliers/drafts";
+import { pruneQueryRuns } from "./actions/appliers/query";
+import { registerBuiltInAppliers } from "./actions/appliers";
+import { createActionDispatcher, type ActionEnv } from "./actions/registry";
 import {
   containerOf,
   createAssistantStore,
@@ -80,7 +88,7 @@ export interface AssistantRuntimeContext {
   isOrgAdmin(): boolean | undefined;
   /** Identifiers of every org of the user, so sign-out drops each org's recall. */
   getOrganizations?(): string[];
-  router?: Pick<Router, "currentRoute" | "push">;
+  router?: Pick<Router, "currentRoute" | "push" | "resolve">;
 }
 
 export interface AssistantRuntime {
@@ -109,6 +117,14 @@ export function getAssistantRuntime(): AssistantRuntime {
 export function resetAssistantRuntimeForTests(): void {
   runtime?.capability.dispose();
   runtime = null;
+}
+
+/** A new tab the opened page cannot script back; `noopener` would make `window.open` return null even on success. */
+export function openTabWithoutOpener(href: string): boolean {
+  const opened = window.open(href, "_blank");
+  if (!opened) return false;
+  opened.opener = null;
+  return true;
 }
 
 function lazyAssistantStore(): AssistantRuntimeStore {
@@ -151,9 +167,28 @@ function buildRuntime(): AssistantRuntime {
     );
 
     deps.engine.setRequestBuilder(serialize);
+    registerBuiltInAppliers();
+    deps.actions = createActionDispatcher(
+      actionEnv(
+        context,
+        () => store,
+        () => capability,
+        () => hosts,
+      ),
+    );
 
     const store = createAssistantStore(deps, { signOutKeys: () => orgKeysOf(context.value) });
     flushDraftsOnLeave(store);
+    // A deleted session, or one of the org the user just left, keeps no Run rows or searches.
+    watch(
+      () => {
+        const org = context.value?.getOrg()?.identifier;
+        return Object.values(store.state.sessions)
+          .filter((session) => !org || session.org === org)
+          .map((session) => session.sid);
+      },
+      (sids) => pruneQueryRuns(new Set(sids)),
+    );
     const capability = createAssistantCapability(capabilityDeps(context));
     const hosts = createHostRegistry();
     // Synchronous, so `state.ready` never lags the gate a door just read.
@@ -206,6 +241,51 @@ function engineDeps(
     pageContext: () => contextRegistry.getActiveContext(),
     uiVersion: () => uiVersion.value,
     container: () => containerOf(store().state.shell.placement, lgUp()) ?? "home",
+  };
+}
+
+// Getters again: the appliers run long after the runtime is built, against the live store and router.
+function actionEnv(
+  context: ShallowRef<AssistantRuntimeContext | null>,
+  store: () => AssistantStoreInternal,
+  capability: () => AssistantCapabilityHandle,
+  hosts: () => HostRegistry,
+): ActionEnv {
+  const client = useAssistantClient();
+  return {
+    store,
+    router: () => context.value?.router ?? null,
+    get hosts() {
+      return hosts();
+    },
+    capability: () => capability().capability.value,
+    currentOrg: () => context.value?.getOrg()?.identifier ?? null,
+    now: () => Date.now(),
+    t: gt,
+    openTab: openTabWithoutOpener,
+    copy: (text) => copyToClipboard(text, gt, { silent: true }),
+    async search(request) {
+      const response = await searchService.search({
+        org_identifier: request.org,
+        query: {
+          query: {
+            sql: request.sql,
+            start_time: request.startTime,
+            end_time: request.endTime,
+            from: 0,
+            size: request.size,
+            quick_mode: false,
+          },
+        },
+        page_type: request.streamType,
+        signal: request.signal,
+        silentForbidden: true,
+      });
+      return (response?.data ?? {}) as Record<string, unknown>;
+    },
+    feedback: (org, sid, body) => client.feedback(org, sid, body),
+    requestAlert: (prefill) => requestAlertCreation(prefill),
+    requestDashboard: (draft) => requestDashboardDraft(draft),
   };
 }
 

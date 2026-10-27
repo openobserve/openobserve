@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { HistoryFilter, Placement, Sid } from "./assistantStore.types";
+import type { BlockAnnotation, HistoryFilter, Placement, Sid } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
 
 export const RECALL_CAP = 10;
@@ -40,7 +40,25 @@ const LOCAL_KEYS = {
   hints: (k: string) => `o2.assistant.hints:${k}`,
   creditNotice: (k: string, threshold: number) => `o2.assistant.creditNotice:${k}:${threshold}`,
   importDismissed: (k: string) => `o2.assistant.importDismissed:${k}`,
+  annotations: (k: string) => `o2.assistant.annotations:${k}`,
 };
+
+// The chats whose votes, "Opened" lines and asked windows a browser keeps; the oldest go first.
+const ANNOTATION_SESSIONS = 50;
+
+const ANNOTATION_KEYS_PER_SESSION = 200;
+
+// A stored vote reason is only ever one of the bar's reasons or a findings outcome.
+const FEEDBACK_REASONS: ReadonlySet<unknown> = new Set([
+  "wrong_data",
+  "wrong_query",
+  "too_slow",
+  "wrong_action",
+  "other",
+  "cause:yes",
+  "cause:no",
+  "cause:unsure",
+]);
 
 const SESSION_KEYS = {
   selected: (k: string) => `o2.assistant.selected:${k}`,
@@ -111,6 +129,56 @@ export function pushRecall(userOrgKey: string, entry: RecallEntry): void {
 export function removeRecall(userOrgKey: string): void {
   removeKey("local", LOCAL_KEYS.recall(userOrgKey));
   removeKey("local", LEGACY_RECALL(userOrgKey));
+}
+
+/** The kept annotations of one chat; anything stored that is not a vote, an "Opened" time or a window is dropped. */
+export function readAnnotations(userOrgKey: string, sid: Sid): Record<string, BlockAnnotation> {
+  const all = readJson<Record<string, { at?: unknown; entries?: unknown }>>(
+    "local",
+    LOCAL_KEYS.annotations(userOrgKey),
+  );
+  const entries = all?.[sid]?.entries;
+  if (!entries || typeof entries !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(entries as Record<string, unknown>)
+      .slice(-ANNOTATION_KEYS_PER_SESSION)
+      .flatMap(([key, value]) => {
+        const valid = toAnnotation(value);
+        return valid ? [[key.slice(0, 200), valid]] : [];
+      }),
+  );
+}
+
+/** Re-reads, merges one block's kept fields and prunes the oldest chats, so two tabs keep each other's writes. */
+export function writeAnnotation(
+  userOrgKey: string,
+  sid: Sid,
+  key: string,
+  value: BlockAnnotation,
+  at: number,
+): void {
+  const kept = toAnnotation(value);
+  if (!kept) return;
+  const storageKey = LOCAL_KEYS.annotations(userOrgKey);
+  const all = readJson<Record<string, { at: number; entries: Record<string, unknown> }>>(
+    "local",
+    storageKey,
+  );
+  const sessions = all && typeof all === "object" ? all : {};
+  // Re-inserted last, so the per-chat cap always drops the oldest keys and never the one just written.
+  const { [key]: _previous, ...others } = sessions[sid]?.entries ?? {};
+  const entries = Object.fromEntries(
+    Object.entries({ ...others, [key]: kept }).slice(-ANNOTATION_KEYS_PER_SESSION),
+  );
+  const next = { ...sessions, [sid]: { at, entries } };
+  const newest = Object.entries(next)
+    .sort(([, a], [, b]) => (b?.at ?? 0) - (a?.at ?? 0))
+    .slice(0, ANNOTATION_SESSIONS);
+  writeJson("local", storageKey, Object.fromEntries(newest));
+}
+
+export function removeAnnotations(userOrgKey: string): void {
+  removeKey("local", LOCAL_KEYS.annotations(userOrgKey));
 }
 
 export function readSidebar(userOrgKey: string): SidebarPrefs {
@@ -288,6 +356,24 @@ function prefNameOf(userOrgKey: string, key: string): PrefName | null {
   if (key === LOCAL_KEYS.hints(userOrgKey)) return "hints";
   if (key === LOCAL_KEYS.importDismissed(userOrgKey)) return "importDismissed";
   return key.startsWith(`o2.assistant.creditNotice:${userOrgKey}:`) ? "creditNotice" : null;
+}
+
+// Only the fields worth keeping across a reload, each checked; a run's rows never leave memory.
+function toAnnotation(value: unknown): BlockAnnotation | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, any>;
+  const out: BlockAnnotation = {};
+  const rating = source.feedback?.rating;
+  if (rating === "up" || rating === "down") {
+    const reason = source.feedback.reason;
+    out.feedback = { rating, ...(FEEDBACK_REASONS.has(reason) && { reason }) };
+  }
+  const openedAt = source.linkOutcome?.openedAt;
+  if (typeof openedAt === "number" && Number.isFinite(openedAt)) out.linkOutcome = { openedAt };
+  const from = source.window?.from;
+  const to = source.window?.to;
+  if (typeof from === "number" && typeof to === "number" && to > from) out.window = { from, to };
+  return Object.keys(out).length ? out : null;
 }
 
 // Legacy prompts are bare strings; anything else without a string `text` is dropped.

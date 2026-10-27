@@ -2058,6 +2058,49 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+
+  // O2 Assistant query blocks: the language as written everywhere (spec tokens, no labelKey).
+  assistantQueryLanguage: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      sql: { variant: "default-soft", label: raw("SQL") },
+      promql: { variant: "default-soft", label: raw("PromQL") },
+      vrl: { variant: "default-soft", label: raw("VRL") },
+      regex: { variant: "default-soft", label: raw("Regex") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant claim chips: the number is the caller's `label`; muted when the step is not in view.
+  assistantClaim: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      available: { variant: "default-outline" },
+      muted: { variant: "default-soft", class: "text-text-muted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant findings confidence; inconclusive is stated, never coloured as a failure (Calm Signal).
+  assistantConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      high: { variant: "default-soft", labelKey: "assistant.findings.level.high" },
+      medium: { variant: "default-soft", labelKey: "assistant.findings.level.medium" },
+      low: { variant: "default-soft", labelKey: "assistant.findings.level.low" },
+      inconclusive: {
+        variant: "default-outline",
+        labelKey: "assistant.findings.level.inconclusive",
+      },
+    },
+    fallback: { variant: "default-soft" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;

@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :open="openId === chip.id"
             :window="context.window.value"
             :timezone="timezone"
+            :open-label="openLabelOf(chip)"
             @update:open="(open) => (openId = open ? chip.id : null)"
+            @open-source="openSource(chip)"
             @remove="remove(chip)"
             @remove-row="(index) => removeRow(chip, index)"
             @trim="(include) => trim(chip, include)"
@@ -132,6 +134,7 @@ import {
   composerUi,
   moveDraft,
 } from "@/components/ai-assistant/composer/composerUi";
+import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
   byteSize,
   timeRangeShortText,
@@ -146,6 +149,9 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+import { chipOpenQuery } from "@/composables/assistant/pure";
+import { explorerOf } from "@/utils/assistant/explorerRoutes";
 
 import AssistantChipPopover from "./AssistantChipPopover.vue";
 import AssistantContextChip from "./AssistantContextChip.vue";
@@ -392,4 +398,31 @@ function focusChip(id: string | null): void {
 }
 
 defineExpose({ focusLast: () => chipButtons().at(-1)?.focus() });
+
+function openQueryOf(chip: ContextChip) {
+  const sid = props.sid;
+  const org = sid ? store.state.sessions[sid]?.org : null;
+  return org ? chipOpenQuery(chip, org) : null;
+}
+
+function openLabelOf(chip: ContextChip): I18nText | null {
+  const query = openQueryOf(chip);
+  if (!query) return null;
+  return t("assistant.context.openSource", { page: explorerLabel(explorerOf(query), t) });
+}
+
+// Through the explorer applier, so a docked container opens a new tab and nothing runs.
+async function openSource(chip: ContextChip): Promise<void> {
+  const query = openQueryOf(chip);
+  const sid = props.sid;
+  if (!sid || !query) return;
+  openId.value = null;
+  const result = await store.dispatch(sid, {
+    kind: "open_in_explorer",
+    query,
+    explorer: explorerOf(query),
+  });
+  if (!result.ok && result.reason === "other_org")
+    announceComposer(sid, t("assistant.evidence.otherOrg", { org: raw(query.org) }));
+}
 </script>

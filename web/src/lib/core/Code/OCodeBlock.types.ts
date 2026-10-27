@@ -31,6 +31,8 @@ export interface CodeBlockProps {
   copyable?: boolean;
   /** Syntax-highlight the code (default true); off renders escaped plain text, for code that is still streaming. */
   highlight?: boolean;
+  /** Show the language and actions row (default true); off when the host already labels the code. */
+  toolbar?: boolean;
   /** Toast shown on a successful copy. */
   copyMessage?: I18nText;
   /** Tooltips for the reveal/hide toggle (when `codeMasked` is set). */

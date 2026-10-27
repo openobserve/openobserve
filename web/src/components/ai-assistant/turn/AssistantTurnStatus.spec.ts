@@ -41,6 +41,7 @@ function mountStatus(
     now?: number;
     variant?: "block" | "line" | "card";
     owned?: boolean;
+    trailShown?: boolean;
   } = {},
 ) {
   return mount(AssistantTurnStatus, {
@@ -49,6 +50,7 @@ function mountStatus(
       meta: meta(over.meta),
       variant: over.variant ?? "block",
       ownedByThisTab: over.owned ?? true,
+      trailShown: over.trailShown ?? false,
       now: () => over.now ?? 1_000,
     },
   });
@@ -113,6 +115,28 @@ describe("AssistantTurnStatus", () => {
     );
     expect(stalled.attributes("data-tone")).toBe("warning");
     expect(stalled.classes()).toContain("text-status-warning-text");
+  });
+
+  it("drops a bare Running {tool} beside the trail's row, unless the turn stalls", () => {
+    const bare: TurnState = {
+      state: "running_tool",
+      tool: "o2_Custom",
+      target: null,
+      callId: "c1",
+    };
+    const quiet = mountStatus(bare, { trailShown: true, meta: { lastFrameAt: 1_000 } });
+    expect(quiet.find('[data-test="assistant-turn-status"]').exists()).toBe(false);
+    const stalled = mountStatus(bare, { trailShown: true, now: 31_000 });
+    expect(stalled.find('[data-test="assistant-turn-status-stall"]').exists()).toBe(true);
+    const named: TurnState = {
+      state: "running_tool",
+      tool: "SearchSQL",
+      target: "default",
+      callId: "c1",
+    };
+    expect(text(mountStatus(named, { trailShown: true, meta: { lastFrameAt: 1_000 } }))).toBe(
+      "Querying default",
+    );
   });
 
   it("pauses with no motion while the turn waits on the user (HT-01 AC 4)", () => {

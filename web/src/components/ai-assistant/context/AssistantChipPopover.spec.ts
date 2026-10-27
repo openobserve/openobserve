@@ -50,6 +50,23 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+describe("AssistantChipPopover: Open in {page}", () => {
+  it("offers Open when the tray names a page, and emits it", async () => {
+    const { wrapper, popover } = await open({ openLabel: raw("Open in Logs") });
+    const button = popover()!.querySelector<HTMLElement>(
+      '[data-test="assistant-chip-open-source"]',
+    )!;
+    expect(button.textContent?.trim()).toBe("Open in Logs");
+    button.click();
+    expect(wrapper.emitted("open-source")).toHaveLength(1);
+  });
+
+  it("offers no Open without a page to open", async () => {
+    const { popover } = await open();
+    expect(popover()!.querySelector('[data-test="assistant-chip-open-source"]')).toBeNull();
+  });
+});
+
 describe("AssistantChipPopover", () => {
   it("shows provenance, the fields with internal ones greyed, and never renders HTML (CT-03 AC 1, 6)", async () => {
     const { popover } = await open();

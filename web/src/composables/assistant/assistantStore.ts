@@ -59,14 +59,17 @@ import {
   markedUserOrgKeys,
   markTabAlive,
   pushRecall,
+  readAnnotations,
   readPlacement,
   readRecall,
   readSidebar,
   recallSelection,
   rememberSelection,
   removeAllSessionKeys,
+  removeAnnotations,
   removeRecall,
   watchPrefs,
+  writeAnnotation,
   writePlacement,
   writeSidebar,
   type RecallEntry,
@@ -204,6 +207,8 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   ): Promise<TurnTerminal>;
   /** The latest turn can still be retried with its snapshot (HT-03 AC 5). */
   canRetry(sid: Sid): boolean;
+  /** Sends a prompt the user did not type in the composer (Re-run for now); the draft is untouched. */
+  resend(sid: Sid, snapshot: ComposerSnapshot, input: "rerun"): Promise<TurnTerminal>;
   /** Cancels a turn this tab does not run, for `turn_busy`'s Stop it. */
   cancelTurn(sid: Sid, turnId: string | null): Promise<boolean>;
 }
@@ -609,7 +614,10 @@ function createSessionSlice(core: StoreCore) {
     lastTurnAt: (sid) => core.endedAt.get(sid) ?? core.session(sid)?.turnMeta.startedAt ?? null,
     annotate(sid, blockId, patch) {
       const session = core.session(sid);
-      if (session) session.annotations[blockId] = { ...session.annotations[blockId], ...patch };
+      if (!session) return;
+      const next = { ...session.annotations[blockId], ...patch };
+      session.annotations[blockId] = next;
+      writeAnnotation(session.userOrgKey, sid, blockId, next, deps.now());
     },
     trackSave(sid, save) {
       core.savesPending.set(sid, (core.savesPending.get(sid) ?? 0) + 1);
@@ -924,6 +932,7 @@ function createTurnSlice(core: StoreCore) {
     | "markNotSaved"
     | "regenerate"
     | "editResend"
+    | "resend"
     | "canRetry"
     | "cancelTurn"
   > = {
@@ -962,6 +971,10 @@ function createTurnSlice(core: StoreCore) {
       return track(sid, null, () =>
         deps.engine.send(sid, { input: "edit_resend", snapshot, editedFrom: edit.editedFrom }),
       );
+    },
+    resend(sid, snapshot, input) {
+      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      return track(sid, null, () => deps.engine.send(sid, { input, snapshot }));
     },
     canRetry: (sid) => deps.engine.canRetry?.(sid) ?? false,
     cancelTurn: (sid, turnId) => deps.engine.cancelTurn?.(sid, turnId) ?? Promise.resolve(false),
@@ -1070,6 +1083,7 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
         core.drafts.clearAllForUser(userOrgKey);
         removeAllSessionKeys(userOrgKey);
         removeRecall(userOrgKey);
+        removeAnnotations(userOrgKey);
       }
       core.identities.clear();
       deps.hints.post({ v: 1, type: "signed_out", at: deps.now() });
@@ -1182,7 +1196,8 @@ function blankSession(
     },
     pendingApproval: null,
     pendingConsent: null,
-    annotations: {},
+    // Votes, "Opened" lines and asked windows survive a reload in this browser.
+    annotations: readAnnotations(userOrgKey, sid),
     share: null,
     ledger: [],
     unread: false,

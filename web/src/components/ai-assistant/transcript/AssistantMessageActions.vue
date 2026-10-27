@@ -166,27 +166,56 @@ export interface AnswerMarkdownCopy {
   /** "stream default · 13:43–13:58 IST" for the code of a query the turn ran, else `null`. */
   fenceSource(code: string): string | null;
   stamp: string | null;
+  /** The footnote of a claim chip: what the cited step did, or `null` when no step has that id. */
+  claim?(callId: string): string | null;
 }
 
 const QUERY_OPEN = /^(```|~~~)(sql|promql)/;
 
 const FENCE_CLOSE = /^(```|~~~)[ \t]*\r?$/;
 
+const FENCE_LINE = /^\s*(```|~~~)/;
+
 const COMMENT_PREFIX: Record<string, string> = { sql: "--", promql: "#" };
+
+const CLAIM_MARKER = /\[\^([A-Za-z0-9_-]{1,64})\]/g;
 
 /** An answer as Markdown: its steps as a list, its text with query fences sourced, then the stamp (EB-09 AC 6). */
 export function answerMarkdown(blocks: ContentBlock[], copy: AnswerMarkdownCopy): string {
   const steps = blocks.filter((block) => block.type === "tool_call" && block.tool).map(copy.step);
+  const numbers = new Map<string, number>();
   const text = blocks
     .filter((block) => block.type === "text" && block.text?.trim())
-    .map((block) => withFenceSources(block.text!.trim().split("\n"), copy).join("\n"));
-  return [steps.length ? steps.map((step) => `- ${step}`).join("\n") : "", ...text, copy.stamp]
+    .map((block) =>
+      withFenceSources(block.text!.trim().split("\n"), copy, (line) =>
+        withClaims(line, numbers),
+      ).join("\n"),
+    );
+  // Chips copy as "[1]" with the step each one cites listed once at the end.
+  const notes = [...numbers].map(([callId, n]) => `${n}. ${copy.claim?.(callId) ?? callId}`);
+  return [
+    steps.length ? steps.map((step) => `- ${step}`).join("\n") : "",
+    ...text,
+    notes.join("\n"),
+    copy.stamp,
+  ]
     .filter(Boolean)
     .join("\n\n");
 }
 
+function withClaims(line: string, numbers: Map<string, number>): string {
+  return line.replace(CLAIM_MARKER, (_all, id: string) => {
+    if (!numbers.has(id)) numbers.set(id, numbers.size + 1);
+    return `[${numbers.get(id)}]`;
+  });
+}
+
 // One pass over the lines: a query fence pairs with the first closer of its kind at least two lines on, as the old pattern did, so Copy stays linear (Y4).
-function withFenceSources(lines: string[], copy: AnswerMarkdownCopy): string[] {
+function withFenceSources(
+  lines: string[],
+  copy: AnswerMarkdownCopy,
+  prose: (line: string) => string = (line) => line,
+): string[] {
   const closers = { "```": [] as number[], "~~~": [] as number[] };
   lines.forEach((line, index) => {
     const close = FENCE_CLOSE.exec(line);
@@ -194,10 +223,16 @@ function withFenceSources(lines: string[], copy: AnswerMarkdownCopy): string[] {
   });
   const next = { "```": 0, "~~~": 0 };
   const out: string[] = [];
+  let inCode = false;
   for (let index = 0; index < lines.length; index++) {
     const open = QUERY_OPEN.exec(lines[index]);
+    if (!open) {
+      // Markers stay as written inside any other fence, as the renderer keeps them in code.
+      if (FENCE_LINE.test(lines[index])) inCode = !inCode;
+      out.push(inCode || FENCE_LINE.test(lines[index]) ? lines[index] : prose(lines[index]));
+      continue;
+    }
     out.push(lines[index]);
-    if (!open) continue;
     const fence = open[1] as keyof typeof closers;
     const list = closers[fence];
     while (next[fence] < list.length && list[next[fence]] < index + 2) next[fence] += 1;
@@ -221,7 +256,7 @@ function withFenceSources(lines: string[], copy: AnswerMarkdownCopy): string[] {
 export function queryRunOf(
   block: ContentBlock,
 ): { code: string; stream: string | null; from: number | null; to: number | null } | null {
-  const context = (block.context ?? {}) as Record<string, any>;
+  const context = { ...(block.context ?? {}), ...(block.callArgs ?? {}) } as Record<string, any>;
   const query = context.request_body?.query ?? {};
   const code = context.sql ?? query.sql ?? context.query;
   if (block.type !== "tool_call" || typeof code !== "string" || !code.trim()) return null;
@@ -254,7 +289,8 @@ import {
   useAssistantStore,
   type ContextChip,
 } from "@/composables/assistant";
-import { assistantTranscriptHostKey, stepLabelOf } from "@/composables/assistant/pure";
+import { stepCitation } from "@/components/ai-assistant/evidence/evidenceText";
+import { assistantTranscriptHostKey, stepLabelOf, stepsOf } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -386,7 +422,12 @@ function answerMd(): string {
   const range = (from: number, to: number) => formatOrgRange(from, to);
   const from = Math.min(...timed.map((run) => run.from!));
   const to = Math.max(...timed.map((run) => run.to!));
+  const steps = stepsOf(props.message, store.state.sessions[props.sid]?.org ?? "");
   return answerMarkdown(blocks, {
+    claim(callId) {
+      const step = steps.find((candidate) => candidate.callId === callId);
+      return step ? String(stepCitation(step, t)) : null;
+    },
     step(block) {
       const label = stepLabelOf(block.tool ?? "", block.context);
       return String(t(label.key, label.params));

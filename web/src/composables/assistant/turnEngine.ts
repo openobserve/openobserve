@@ -15,10 +15,10 @@
 
 import { toRaw } from "vue";
 
-import { generateNavigationFromToolResult } from "@/components/O2AIChat.navigation";
 import type { PageContext } from "@/composables/contextProviders/types";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { gt, raw, type TranslateFn } from "@/types/i18n";
+import { epochMs } from "@/utils/assistant/explorerRoutes";
 
 import { ERROR_LEDGER, isConsentPrompt } from "./assistantErrors";
 import type { AssistantStoreInternal } from "./assistantStore";
@@ -45,7 +45,9 @@ import {
   type EffectsRunner,
   type TurnSource,
 } from "./effects";
+import { turnAnnotationKey } from "./evidence";
 import type { AssistantFrame } from "./frames";
+import { generateNavigationFromToolResult } from "./navigationRoutes";
 import { useAssistantName } from "./useAssistantName";
 import {
   answerProgress,
@@ -257,7 +259,16 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       elapsedMs: elapsedMs(session.turnMeta, now),
     });
     if (record) appendToAnswer(session, rec, { type: "turn_outcome", outcome: record });
+    stampDuration(session, rec, elapsedMs(session.turnMeta, now));
   };
+
+  const invalidFindingsWork =
+    (rec: TurnRecord) =>
+    (session: AssistantSession): Effects => {
+      if (acceptsFrames(session.turn))
+        appendToAnswer(session, rec, { type: "findings", findings: null });
+      return { stream: [], turn: [] };
+    };
 
   const dispatch = (rec: TurnRecord, event: TurnEvent) => {
     // A late timer or callback of a turn that already ended must never touch the next turn's state.
@@ -345,7 +356,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         watchSilence(rec, false);
       },
       onUnknown(type) {
-        if (current()) runner.trackUnknown(type);
+        if (!current()) return;
+        runner.trackUnknown(type);
+        // A findings frame that fails its schema still tells the reader the card could not be shown.
+        if (type === "findings") runner.schedule(rec.sid, invalidFindingsWork(rec));
       },
       onEnd(reason) {
         if (!current()) return;
@@ -716,6 +730,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     if (fromComposer) store.drafts.remove(session.userOrgKey, sid);
     rec.rawContext = await safePageContext(deps);
     rec.pageContext = whitelist(rec.rawContext, snapshot);
+    const asked = noteSentWindow(sessionOf(rec.sid), rec);
+    if (asked) store.annotate(rec.sid, turnAnnotationKey(rec.turnId, "window"), { window: asked });
     if (sessionOf(rec.sid)?.turn.state === "queued") await attempt(rec);
     return rec.promise;
   };
@@ -969,8 +985,36 @@ function queuePrompt(session: AssistantSession, rec: TurnRecord, now: number): v
     ...(images.length > 0 && { images: [...images] }),
     ...(chips.length > 0 && { chips: chips.map((chip) => ({ ...toRaw(chip) })) }),
     ...(rec.editedFrom && { editedFrom: rec.editedFrom }),
+    ...(rec.input === "rerun" &&
+      rec.snapshot.timeOverride && {
+        rerunFor: { from: rec.snapshot.timeOverride.from, to: rec.snapshot.timeOverride.to },
+      }),
   });
   rec.userIndex = session.messages.length - 1;
+}
+
+// The window the turn asked about, so a query block or "Open in Logs instead" opens an absolute range.
+function noteSentWindow(
+  session: AssistantSession | undefined,
+  rec: TurnRecord,
+): { from: number; to: number } | null {
+  const prompt = session?.messages[rec.userIndex];
+  const range = rec.pageContext?.timeRange;
+  const from = epochMs(range?.startTime);
+  const to = epochMs(range?.endTime);
+  if (prompt?.role !== "user" || from === null || to === null || to <= from) return null;
+  prompt.sentWindow = { from, to };
+  return prompt.sentWindow;
+}
+
+// The trail header's duration is the turn's own, kept beside its footer.
+function stampDuration(session: AssistantSession, rec: TurnRecord, durationMs: number): void {
+  const answer = session.messages
+    .slice(rec.userIndex + 1)
+    .reverse()
+    .find((message) => message.role === "assistant");
+  const footer = answer?.contentBlocks?.find((block) => block.type === "footer");
+  if (footer?.footer) footer.footer = { ...footer.footer, durationMs };
 }
 
 // A regenerated attempt keeps the user message; the previous answer becomes a version of the new one (`30` §8.2).

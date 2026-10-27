@@ -48,8 +48,8 @@ export type AssistantAction =
       mode: "replace" | "append";
       provenance: { prompt: string; stream?: string; range?: { from: number; to: number } };
     }
-  | { kind: "add_to_dashboard_draft"; query: QueryRef }
-  | { kind: "create_alert_draft"; query: QueryRef; threshold?: unknown }
+  | { kind: "add_to_dashboard_draft"; query: QueryRef; turnId?: string }
+  | { kind: "create_alert_draft"; query: QueryRef; threshold?: unknown; turnId?: string }
   | { kind: "open_step"; callId: string }
   | { kind: "rerun_now"; turnId: string }
   | { kind: "navigate"; target: RouteTarget; newTab?: boolean; label: I18nText }
@@ -80,6 +80,7 @@ export type ActionResult =
   | { ok: true; detail?: unknown }
   | {
       ok: false;
-      reason: "gated" | "needs_host" | "host_too_narrow" | "guard_declined" | "failed";
+      reason:
+        "gated" | "needs_host" | "host_too_narrow" | "guard_declined" | "failed" | "other_org";
       error?: AssistantError;
     };

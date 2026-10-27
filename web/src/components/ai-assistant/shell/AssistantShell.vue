@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @action="(cta) => cta === 'close' && (learnOpen = false)"
       />
     </ODialog>
+    <AssistantDraftHost />
   </component>
 </template>
 
@@ -362,7 +363,12 @@ import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconB
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantComposer from "@/components/ai-assistant/composer/AssistantComposer.vue";
-import { composerUi, noteDraftCleared } from "@/components/ai-assistant/composer/composerUi";
+import {
+  announceComposer,
+  composerUi,
+  noteDraftCleared,
+} from "@/components/ai-assistant/composer/composerUi";
+import AssistantDraftHost from "@/components/ai-assistant/evidence/AssistantDraftHost.vue";
 import AssistantContextTray from "@/components/ai-assistant/context/AssistantContextTray.vue";
 import AssistantGateState, {
   type GateCta,
@@ -378,6 +384,7 @@ import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome
 import {
   isRunning,
   markHintSeen,
+  queryRunOf,
   readHints,
   registerAssistantFocusTarget,
   useAssistantCapability,
@@ -390,8 +397,10 @@ import {
   type Starter,
 } from "@/composables/assistant";
 import {
+  assistantEvidenceHostKey,
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
+  type AssistantEvidenceHost,
   type AssistantTranscriptHost,
 } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -571,6 +580,21 @@ const transcriptHost: AssistantTranscriptHost = {
   focusComposer: focusAfterAction,
 };
 provide(assistantTranscriptHostKey, transcriptHost);
+
+// Every evidence action goes through the store's dispatch; the shell only lends it session state.
+const evidenceHost: AssistantEvidenceHost = {
+  dispatch: (sid, action) => store.dispatch(sid, action),
+  session: (sid) => store.state.sessions[sid] ?? null,
+  capability: () => capability.value,
+  queryRun: (sid, blockId) => queryRunOf(sid, blockId),
+  prefersNewTab: () => props.placement === "docked" || props.host?.isDirty() === true,
+  currentOrg: () => org.value || null,
+  markOpened: (sid, blockId) =>
+    store.annotate(sid, blockId, { linkOutcome: { openedAt: Date.now() } }),
+  toggleStep: (sid, callId) => store.toggleStep(sid, callId),
+  announce: (sid, text) => announceComposer(sid, text),
+};
+provide(assistantEvidenceHostKey, evidenceHost);
 
 const role = computed(() => (capability.value.isAdmin ? "admin" : "member"));
 

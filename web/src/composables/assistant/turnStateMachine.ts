@@ -15,6 +15,7 @@
 
 import type { TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
+import { sqlStreamOf } from "@/utils/assistant/explorerRoutes";
 
 import {
   ERROR_LEDGER,
@@ -751,7 +752,7 @@ function mutationVerb(tool: string): "create" | "update" | "delete" | null {
 
 function targetOf(context: Record<string, unknown> | undefined): string | null {
   const value = context?.stream_name ?? context?.stream ?? context?.name;
-  return typeof value === "string" && value ? value : null;
+  return typeof value === "string" && value ? value : (sqlStreamOf(context?.sql) ?? null);
 }
 
 function matchesCall(

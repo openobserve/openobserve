@@ -77,6 +77,12 @@ export const assistantGlyph = {
   regenerate: "refresh",
   markdown: "code",
   newTab: "open-in-new",
+  run: "play-arrow",
+  helpful: "thumb-up-off-alt",
+  notHelpful: "thumb-down-off-alt",
+  verified: "task-alt",
+  inferred: "lightbulb-outline",
+  link: "call-made",
 } as const satisfies Record<string, IconName>;
 
 /** The glyph of each chip kind (`40` §2.1); the chip passes it to `OTag` as `icon`. */
