@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import { number as echartsNumber } from "echarts";
 import { applyPieDonutChart } from "@/utils/dashboard/sql/charts/convertSQLPieDonutChart";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
@@ -25,7 +26,8 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
   getSeriesColor: vi.fn(() => "#FF5733"),
 }));
 
-vi.mock("@/utils/dashboard/legendConfiguration", () => ({
+vi.mock("@/utils/dashboard/legendConfiguration", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/dashboard/legendConfiguration")>()),
   getChartDimensions: vi.fn(() => ({ chartWidth: 800, chartHeight: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
@@ -173,5 +175,57 @@ describe("applyPieDonutChart - donut type", () => {
     // Both entries should be strings ending in "%"
     expect(typeof radius[0]).toBe("string");
     expect(typeof radius[1]).toBe("string");
+  });
+});
+
+describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision", (type) => {
+  const contextWithDecimals = (decimals: unknown, values = [100, 200, 300]) =>
+    makeMockContext({
+      options: {
+        xAxis: [{ data: values.map((_, i) => `slice-${i}`) }],
+        yAxis: [{ data: [] }],
+        series: [],
+        tooltip: {},
+        grid: {},
+      },
+      getAxisDataFromKey: vi.fn(() => values),
+      panelSchema: {
+        type,
+        config: { unit: "default", unit_custom: "", decimals, color: { mode: "fixed" } },
+        queries: [{ fields: { y: [{ label: "Value" }] } }],
+      },
+    });
+
+  it.each([4, 13])("uses panel decimals %i as the label precision", (decimals) => {
+    const ctx = contextWithDecimals(decimals);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].percentPrecision).toBe(decimals);
+  });
+
+  it.each([undefined, null, ""])(
+    "defaults the label precision to 2 when decimals is %o",
+    (decimals) => {
+      const ctx = contextWithDecimals(decimals);
+      applyPieDonutChart(ctx);
+      expect(ctx.options.series[0].percentPrecision).toBe(2);
+    },
+  );
+
+  it("floors fractional decimals like the legend does", () => {
+    const ctx = contextWithDecimals(2.7);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].percentPrecision).toBe(2);
+  });
+
+  // ECharts' percent rounding never ends on these values at precision 14.
+  const loopingValues = [3, 5, 7, 11, 13, 17, 19];
+
+  it.each([14, 20, 100])("caps decimals %i at 13 so the percent rounding ends", (decimals) => {
+    const ctx = contextWithDecimals(decimals, loopingValues);
+    applyPieDonutChart(ctx);
+    const precision = ctx.options.series[0].percentPrecision;
+    expect(precision).toBe(13);
+    const values = ctx.options.series[0].data.map((item: any) => item.value);
+    expect(echartsNumber.getPercentWithPrecision(values, 0, precision)).toBeCloseTo(4, 10);
   });
 });

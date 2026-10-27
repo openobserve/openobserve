@@ -640,6 +640,20 @@ describe("KubernetesPage", () => {
     expect(wrapper.findComponent(ListStub).props("loading")).toBe(true);
   });
 
+  it("scrolls the views above the dock instead of spilling over it", async () => {
+    await mountPage();
+    expect(wrapper.find("[data-k8s2-views]").classes()).toContain("overflow-y-auto");
+  });
+
+  it("starts the next view at the top of the shared scroller", async () => {
+    await mountPage({ view: "cluster" });
+    const scroller = wrapper.find("[data-k8s2-views]").element as HTMLElement;
+    scroller.scrollTop = 120;
+    await clickRail("nodes");
+    await flushPromises();
+    expect(scroller.scrollTop).toBe(0);
+  });
+
   describe("phone chrome", () => {
     it("offers an icon-only palette button for narrow screens", async () => {
       await mountPage();

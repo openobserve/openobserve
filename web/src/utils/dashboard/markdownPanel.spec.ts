@@ -98,6 +98,36 @@ describe("renderMarkdownPanel", () => {
     expect(out.querySelector("a")?.getAttribute("href") ?? null).toBeNull();
   });
 
+  it("opens a cross-origin link in a new tab while its variable value stays escaped", () => {
+    const out = render(
+      "[docs](https://docs.example.org/?q=${x}) ${x}",
+      "<img src=x onerror=alert(1)>'",
+    );
+    const link = out.querySelector("a");
+
+    expect(out.querySelector("img")).toBeNull();
+    expect(link?.getAttribute("href")).toBe(
+      "https://docs.example.org/?q=<img src=x onerror=alert(1)>'",
+    );
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(out.textContent).toContain("<img src=x onerror=alert(1)>'");
+  });
+
+  it("opens cross-origin raw anchors and areas in a new tab and keeps same-origin ones in place", () => {
+    const out = render(
+      `<a href="/web/logs">same</a> <map name="m"><area href="https://docs.example.org/a"></map> ` +
+        `<a href="https://docs.example.org/b" target="_top">${"${x}"}</a>`,
+      "v",
+    );
+    const [same, cross] = Array.from(out.querySelectorAll("a"));
+
+    expect(same.hasAttribute("target")).toBe(false);
+    expect(cross.getAttribute("target")).toBe("_blank");
+    expect(cross.textContent).toBe("v");
+    expect(out.querySelector("area")?.getAttribute("target")).toBe("_blank");
+  });
+
   it("drops style elements wherever they appear", () => {
     for (const md of [
       "<style>body{display:none}</style>\n\n# Hi",

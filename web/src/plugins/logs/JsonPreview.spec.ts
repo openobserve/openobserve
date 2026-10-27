@@ -252,6 +252,11 @@ describe("JsonPreview Component", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("should let a field's value shrink so long values wrap inside the row", () => {
+      const valueCell = wrapper.find('[data-test="log-expand-detail-key-field1"]');
+      expect(valueCell.classes()).toContain("min-w-0");
+    });
+
     it("should have correct component name", () => {
       expect(wrapper.vm.$options.name).toBe("JsonPreview");
     });

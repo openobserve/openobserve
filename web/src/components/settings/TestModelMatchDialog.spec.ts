@@ -110,9 +110,7 @@ const OButtonStub = {
   template: `<button data-test="o-button-stub" @click="$emit('click')"><slot /></button>`,
 };
 
-// Mirrors OInput's real contract for the parts this dialog relies on: a
-// `for`-associated label with the required marker, help text, and the built-in
-// clear button whose data-test OInput derives as `${parentDataTest}-clear`.
+// Mirrors the parts of OInput's real contract this dialog relies on, including the `${parentDataTest}-clear` id.
 const OInputStub = {
   name: "OInput",
   // Attr inheritance off, like the real OInput: otherwise the parent's
@@ -129,7 +127,7 @@ const OInputStub = {
     clearable: { type: Boolean, default: false },
     autofocus: { type: Boolean, default: false },
   },
-  emits: ["update:modelValue", "clear"],
+  emits: ["update:modelValue", "clear", "keydown"],
   template: `
     <div data-test="o-input-stub">
       <label v-if="label">{{ label }}<span v-if="required">*</span></label>
@@ -138,6 +136,7 @@ const OInputStub = {
         :value="modelValue"
         :placeholder="placeholder"
         @input="$emit('update:modelValue', $event.target.value)"
+        @keydown="$emit('keydown', $event)"
       />
       <button
         v-if="clearable && modelValue !== '' && modelValue != null"
@@ -224,7 +223,7 @@ describe("TestModelMatchDialog", () => {
     it("forwards the title and subTitle to ODialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Test Model Match");
+      expect(dialog.props("title")).toBe("Test model match");
       expect(dialog.props("subTitle")).toBe(
         "Simulate how a model name from your spans would match against pricing rules.",
       );
@@ -248,7 +247,7 @@ describe("TestModelMatchDialog", () => {
     it("forwards the i18n labels to ODialog buttons", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Test Match");
+      expect(dialog.props("primaryButtonLabel")).toBe("Test match");
       expect(dialog.props("secondaryButtonLabel")).toBe("Close");
     });
 
@@ -319,7 +318,7 @@ describe("TestModelMatchDialog", () => {
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
       expect(wrapper.find('[data-test="test-match-waiting"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Click "Test Match" to see results');
+      expect(wrapper.text()).toContain('Click "Test match" to see results');
     });
 
     it("renders no-match state when testResult has no matched", async () => {
@@ -329,7 +328,7 @@ describe("TestModelMatchDialog", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="test-match-no-result"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("No Match Found");
+      expect(wrapper.text()).toContain("No match found");
       expect(wrapper.text()).toContain('No rule matched "gpt-4".');
     });
 
@@ -356,7 +355,7 @@ describe("TestModelMatchDialog", () => {
       };
       await nextTick();
       expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Match Found");
+      expect(wrapper.text()).toContain("Match found");
       expect(wrapper.find('[data-test="test-match-approximate"]').exists()).toBe(false);
     });
 
@@ -375,7 +374,7 @@ describe("TestModelMatchDialog", () => {
         tier: "Default",
       };
       await nextTick();
-      expect(wrapper.text()).toContain("Approximate Match");
+      expect(wrapper.text()).toContain("Approximate match");
       expect(wrapper.find('[data-test="test-match-approximate"]').text()).toContain(
         'This rule matches only part of "gpt-5.4-mini"',
       );
@@ -412,7 +411,7 @@ describe("TestModelMatchDialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const label = wrapper.find('[data-test="o-input-stub"] label');
       expect(label.exists()).toBe(true);
-      expect(label.text()).toContain("Model Name");
+      expect(label.text()).toContain("Model name");
       expect(label.text()).toContain("*");
     });
   });
@@ -704,6 +703,57 @@ describe("TestModelMatchDialog", () => {
     });
   });
 
+  describe("Enter in the model-name field", () => {
+    const MODEL_INPUT = '[data-test="o-input-stub"] input';
+
+    it("runs the test, like the Test match button", async () => {
+      mockTest.mockResolvedValue({ data: { matched: { name: "gpt-4" } } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      await flushPromises();
+
+      expect(mockTest).toHaveBeenCalledTimes(1);
+      expect(mockTest).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ model_name: "gpt-4" }),
+      );
+    });
+
+    it("does nothing while the field is empty, when the button is disabled", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(mockTest).not.toHaveBeenCalled();
+    });
+
+    it("does not start a second test while one is running", async () => {
+      let resolve: (v: any) => void = () => {};
+      mockTest.mockReturnValue(new Promise((r) => (resolve = r)));
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      expect(mockTest).toHaveBeenCalledTimes(1);
+
+      resolve({ data: { matched: null } });
+      await flushPromises();
+    });
+
+    it("ignores other keys", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "a" });
+      await flushPromises();
+      expect(mockTest).not.toHaveBeenCalled();
+    });
+  });
+
   describe("internalValue computed", () => {
     it("emits update:modelValue when ODialog emits update:open", async () => {
       wrapper = mountDialog({ modelValue: true });
@@ -927,15 +977,15 @@ describe("TestModelMatchDialog", () => {
   });
 
   describe("sourceLabel", () => {
-    it("returns Your Org for org source", () => {
+    it("returns Your org for org source", () => {
       wrapper = mountDialog({ modelValue: true });
       const vm: any = wrapper.vm;
-      expect(vm.sourceLabel({ source: "org" })).toBe("Your Org");
+      expect(vm.sourceLabel({ source: "org" })).toBe("Your org");
     });
 
-    it("returns Your Org when source is missing", () => {
+    it("returns Your org when source is missing", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect((wrapper.vm as any).sourceLabel({})).toBe("Your Org");
+      expect((wrapper.vm as any).sourceLabel({})).toBe("Your org");
     });
 
     it("returns Global for meta_org source", () => {
