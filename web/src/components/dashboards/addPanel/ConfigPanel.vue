@@ -604,7 +604,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max="100"
           @update:model-value="
             (val: string | number) => {
-              if (typeof val === 'number' && (val < 0 || val > 100)) {
+              // The backend reads decimals as a number, so an empty field must not be saved as an empty string.
+              if (val === '' || val == null) {
+                delete dashboardPanelDataModel.data.config.decimals;
+              } else if (typeof val === 'number' && (val < 0 || val > 100)) {
                 decimalsTouched = true;
               }
             }
@@ -3148,6 +3151,14 @@ export default defineComponent({
           },
           size_fixed: 2,
         };
+      }
+
+      // Panels saved with a null map view or base map would throw when the Map section binds their fields.
+      if (!dashboardPanelData.data.config.map_view) {
+        dashboardPanelData.data.config.map_view = { zoom: 1, lat: 0, lng: 0 };
+      }
+      if (!dashboardPanelData.data.config.base_map) {
+        dashboardPanelData.data.config.base_map = { type: "osm" };
       }
 
       // by default, use connect_nulls as false

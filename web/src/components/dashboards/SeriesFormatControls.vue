@@ -371,6 +371,7 @@ import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { matchesSeriesOverride } from "@/utils/dashboard/seriesOverrides";
 import { getUnitOptions, type UnitOption } from "@/composables/dashboard/useColumnFormatting";
 import { THRESHOLD_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import {
   parseDecimals,
   seriesPatternError,
@@ -575,8 +576,8 @@ const colorSwatches = computed(() => {
 });
 
 const showThresholds = computed(() => THRESHOLD_CHART_TYPES.includes(props.chartType));
-// A state timeline shows raw states coloured per state, so unit, decimals and a row colour do not apply.
-const isStateTimeline = computed(() => props.chartType === "state-timeline");
+// State timeline rows colour each value, so a row unit, decimals and colour do not apply.
+const isStateTimeline = computed(() => isRowTimeline(props.chartType));
 
 const addValueMapping = () =>
   patch({

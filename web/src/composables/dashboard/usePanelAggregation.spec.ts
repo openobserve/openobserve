@@ -508,5 +508,18 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.filter.conditions).toHaveLength(0);
       });
     });
+
+    describe("starter queries", () => {
+      it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {
+        const panelData = makePanelData("state-timeline");
+        Object.assign(panelData.data.queries[0], {
+          customQuery: true,
+          query: 'SELECT histogram(_timestamp) AS x, count(*) AS y FROM "test_stream" GROUP BY x',
+        });
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries[0].customQuery).toBe(true);
+        expect(panelData.data.queries[0].query).toContain("histogram(_timestamp)");
+      });
+    });
   });
 });
