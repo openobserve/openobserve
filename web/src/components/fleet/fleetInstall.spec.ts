@@ -98,6 +98,9 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set image.repository=o2cr.ai/openobserve/otel-fleet-collector");
     expect(cmd).toContain("--set image.tag='0.163.1'");
     expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
+    expect(installCommand("kubernetes", { ...target, http: true })).toContain(
+      "--set opamp.endpoint='https://o2.example.com/api/acme/v1/opamp'",
+    );
   });
 
   it("installs agents as the otel-fleet-collector release with the chart's agent default", () => {

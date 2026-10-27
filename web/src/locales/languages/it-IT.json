@@ -26953,7 +26953,7 @@
       "joinsFleet": "I collector installati con questo token si uniscono al fleet {fleet} ed eseguono {config} v{version}.",
       "joinsFleetNoConfig": "I collector installati con questo token si uniscono al fleet {fleet}, che non ha ancora una configurazione.",
       "envRefNote": "Usa riferimenti {ref} per le credenziali nelle configurazioni, così i secret restano sull'host.",
-      "httpTransport": "Il proxy o il load balancer non supporta WebSocket (usa il polling HTTP)",
+      "websocketTransport": "Usa WebSocket (invia la configurazione all'istante; il proxy deve supportarlo)",
       "kubernetesNote": "Distribuisce un DaemonSet che esegue il supervisor e il collector in un unico container. Aggiorna cambiando il tag dell'immagine.",
       "kubernetesAgent": "Agente (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",

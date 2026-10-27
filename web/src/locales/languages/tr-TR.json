@@ -26953,7 +26953,7 @@
       "joinsFleet": "Bu token ile kurulan toplayıcılar {fleet} filosuna katılır ve {config} v{version} çalıştırır.",
       "joinsFleetNoConfig": "Bu token ile kurulan toplayıcılar henüz yapılandırması olmayan {fleet} filosuna katılır.",
       "envRefNote": "Gizli bilgiler ana bilgisayarda kalsın diye yapılandırmalarda kimlik bilgileri için {ref} başvurularını kullanın.",
-      "httpTransport": "Proxy veya yük dengeleyici WebSocket taşıyamıyor (HTTP yoklama kullanın)",
+      "websocketTransport": "WebSocket kullan (yapılandırma anında iletilir; proxy desteklemelidir)",
       "kubernetesNote": "Supervisor'ı ve toplayıcıyı tek bir kapsayıcıda çalıştıran bir DaemonSet dağıtır. Yükseltmek için imaj etiketini değiştirin.",
       "kubernetesAgent": "Ajan (DaemonSet)",
       "kubernetesGateway": "Ağ geçidi (StatefulSet)",

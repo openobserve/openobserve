@@ -119,19 +119,23 @@ describe("FleetInstallCommand", () => {
     expect(code(w)).not.toContain("--version");
   });
 
-  it("switches to HTTP polling with the proxy checkbox", async () => {
+  it("uses HTTP polling by default and WebSocket with the checkbox", async () => {
     const w = mountCommand();
+    expect(code(w)).toContain("--transport http");
     w.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
     await w.vm.$nextTick();
-    expect(code(w)).toContain("--transport http");
+    expect(code(w)).not.toContain("--transport");
   });
 
-  it("shows Helm with the fleet collector image on Kubernetes, without the proxy option", async () => {
+  it("shows Helm on Kubernetes with the same transport choice, HTTP polling by default", async () => {
     const w = mountCommand();
     await flushPromises();
     await choose(w, "kubernetes");
     expect(code(w)).toContain("o2cr.ai/openobserve/otel-fleet-collector");
-    expect(w.find('[data-test="fleet-install-command-http"]').exists()).toBe(false);
+    expect(code(w)).toMatch(/opamp\.endpoint='https?:\/\//);
+    w.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
+    await w.vm.$nextTick();
+    expect(code(w)).toMatch(/opamp\.endpoint='wss?:\/\//);
   });
 
   it("offers the agent or gateway role only on Kubernetes, agents by default", async () => {
