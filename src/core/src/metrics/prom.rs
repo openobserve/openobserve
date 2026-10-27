@@ -47,6 +47,7 @@ use infra::{
     schema::SchemaCache,
 };
 use ingestion_common::IngestUser;
+use promql::utils::absent_label_rejects_all;
 use promql_parser::{label::MatchOp, parser};
 use proto::prometheus_rpc;
 use schema::stream_schema_exists;
@@ -773,6 +774,9 @@ pub async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
+    if selector_matches_nothing(&schema, selector.as_ref()) {
+        return Ok(vec![]);
+    }
     let Some(sql) = series_sql(&metric_name, &schema, selector.as_ref()) else {
         return Ok(vec![]);
     };
@@ -843,7 +847,7 @@ pub async fn get_labels(
                 .fields()
                 .iter()
                 .map(|f| f.name())
-                .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
+                .filter(|s| !is_metrics_hash_excluded_label(s))
                 .cloned();
             label_names.extend(field_names);
         }
@@ -948,7 +952,10 @@ pub async fn get_label_values(
         .await
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
-    if schema.field_with_name(&label_name).is_err() {
+    if schema.field_with_name(&label_name).is_err()
+        || is_metrics_hash_excluded_label(&label_name)
+        || selector_matches_nothing(&schema, selector.as_ref())
+    {
         return Ok(vec![]);
     }
 
@@ -1033,6 +1040,16 @@ pub fn validate_name_label_values_selector(selector: &parser::VectorSelector) ->
     Ok(())
 }
 
+fn selector_matches_nothing(schema: &Schema, selector: Option<&parser::VectorSelector>) -> bool {
+    selector.is_some_and(|selector| {
+        selector
+            .matchers
+            .matchers
+            .iter()
+            .any(|mat| absent_label_rejects_all(schema, mat))
+    })
+}
+
 fn series_sql(
     metric_name: &str,
     schema: &Schema,
@@ -1044,9 +1061,7 @@ fn series_sql(
             .fields()
             .iter()
             .map(|f| f.name().as_str())
-            .filter(|&name| {
-                name != TIMESTAMP_COL_NAME && name != VALUE_LABEL && name != HASH_LABEL
-            }),
+            .filter(|name| !is_metrics_hash_excluded_label(name)),
     );
     (columns.len() > 1).then(|| metadata_sql(metric_name, &columns, schema, selector))
 }
@@ -1592,6 +1607,8 @@ mod tests {
                 "job",
                 "label\"field",
                 "select",
+                "start_time",
+                "flag",
             ]
             .into_iter()
             .map(|name| Field::new(name, DataType::Utf8, true))
@@ -1616,6 +1633,29 @@ mod tests {
             metadata_sql(&metric, &["select"], &schema, None),
             r#"SELECT DISTINCT "select" FROM "metric""name""#
         );
+    }
+
+    #[test]
+    fn selector_on_absent_label_matches_nothing_unless_empty_passes() {
+        use datafusion::arrow::datatypes::{DataType, Field};
+
+        let schema = Schema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, nothing) in [
+            (r#"m{uuid="x"}"#, true),
+            (r#"m{uuid=~"x.+"}"#, true),
+            (r#"m{uuid!="x"}"#, false),
+            (r#"m{job="x"}"#, false),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            assert_eq!(
+                selector_matches_nothing(&schema, Some(&selector)),
+                nothing,
+                "{query}"
+            );
+        }
+        assert!(!selector_matches_nothing(&schema, None));
     }
 
     fn schema_with_metadata(blob: &str) -> Schema {

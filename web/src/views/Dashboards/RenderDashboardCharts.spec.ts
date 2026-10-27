@@ -25,6 +25,7 @@ import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesMan
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import searchService from "@/services/search";
 
 // Stub ODialog so tests are deterministic (no Portal/Teleport) and so we
 // can drive open/close + button click emits without touching the real
@@ -82,6 +83,9 @@ const mockGridStackInstance = {
   setAnimation: vi.fn(),
   setStatic: vi.fn(),
   load: vi.fn(),
+  getRow: vi.fn().mockReturnValue(60),
+  getCellHeight: vi.fn().mockReturnValue(17),
+  cellHeight: vi.fn(),
   engine: { nodes: [] as any[] },
 };
 
@@ -132,6 +136,10 @@ vi.mock("../../utils/dashboard/useCustomDebouncer", () => ({
 }));
 
 // Mock utils
+vi.mock("@/services/search", () => ({
+  default: { search: vi.fn() },
+}));
+
 vi.mock("../../utils/commons", () => ({
   checkIfVariablesAreLoaded: vi.fn().mockReturnValue(false),
   updateDashboard: vi.fn().mockResolvedValue(true),
@@ -965,6 +973,156 @@ describe("RenderDashboardCharts", () => {
     });
   });
 
+  describe("Kiosk", () => {
+    const kioskDashboard = () => ({
+      ...defaultProps.dashboardData,
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default Tab",
+          panels: [
+            {
+              id: "panel-1",
+              title: "Panel 1",
+              type: "line",
+              layout: { x: 0, y: 0, w: 96, h: 60, i: "panel-1" },
+              queries: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    let clientHeight: PropertyDescriptor | undefined;
+    beforeEach(() => {
+      clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+        configurable: true,
+        get: () => 908,
+      });
+      mockGridStackInstance.cellHeight.mockClear();
+    });
+    afterEach(() => {
+      if (clientHeight) Object.defineProperty(HTMLElement.prototype, "clientHeight", clientHeight);
+    });
+
+    const twoTabs = () => ({
+      ...kioskDashboard(),
+      tabs: [...kioskDashboard().tabs, { tabId: "beta", name: "Beta", panels: [] }],
+    });
+    const controls = () => wrapper.find('[data-test="dashboard-kiosk-controls"]');
+
+    it("puts the tab bar and the variables in one compact row on a wall screen", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        viewOnly: true,
+        dashboardData: {
+          ...twoTabs(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(controls().classes()).toEqual(
+        expect.arrayContaining(["flex", "min-h-9", "items-center", "py-1"]),
+      );
+      expect(wrapper.find(".render-dashboard-charts-container").classes()).toContain("pt-0");
+
+      const tabs = wrapper.findComponent({ name: "TabList" });
+      expect(tabs.classes()).toEqual(expect.arrayContaining(["order-first", "flex-1"]));
+      expect(tabs.classes()).not.toContain("mt-2");
+      expect(tabs.props("viewOnly")).toBe(true);
+
+      const selector = wrapper.find('[data-test="global-variables-selector"]');
+      expect(selector.element.parentElement).toBe(controls().element);
+      expect(selector.classes()).toContain("mt-0!");
+    });
+
+    it("drops a lone tab from the row but keeps the variables", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(controls().classes()).toContain("flex");
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("hidden");
+    });
+
+    it("hides the row for a single-tab dashboard with no visible variables", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: {
+            list: [{ name: "hidden", type: "constant", value: "x", hideOnDashboard: true }],
+          },
+        },
+      });
+      await flushPromises();
+      expect(controls().classes()).toEqual(["hidden"]);
+    });
+
+    it("leaves the normal layout as it was: a contents wrapper, spaced tab bar", async () => {
+      wrapper = createWrapper({ showTabs: true, dashboardData: twoTabs() });
+      await flushPromises();
+      expect(controls().classes()).toEqual(["contents"]);
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("mt-2");
+      expect(wrapper.find(".render-dashboard-charts-container").classes()).toContain("pt-2");
+    });
+
+    it("shows the one-row bar with its values in a playlist slide, but out of interaction", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        viewOnly: true,
+        readOnlySelectors: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      const row = wrapper.find('[data-test="dashboard-kiosk-controls"]');
+      expect(row.classes()).not.toContain("hidden");
+      expect(row.attributes("inert")).toBeDefined();
+      expect(row.attributes("data-read-only")).toBe("true");
+      expect(row.find('[data-test="global-variables-selector"]').exists()).toBe(true);
+    });
+
+    it("keeps the plain TV mode bar interactive", async () => {
+      wrapper = createWrapper({
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="dashboard-kiosk-controls"]').attributes("inert")).toBe(
+        undefined,
+      );
+    });
+
+    it("scales the cell height so every row fits when fit is on", async () => {
+      wrapper = createWrapper({ dashboardData: kioskDashboard(), kiosk: true, fitToScreen: true });
+      await flushPromises();
+      expect(mockGridStackInstance.cellHeight).toHaveBeenCalledWith(15);
+      expect(wrapper.classes()).toContain("overflow-hidden");
+    });
+
+    it("never resizes cells on a normal dashboard", async () => {
+      wrapper = createWrapper({ dashboardData: kioskDashboard() });
+      await flushPromises();
+      expect(mockGridStackInstance.cellHeight).not.toHaveBeenCalled();
+      expect(wrapper.classes()).toContain("overflow-y-auto");
+    });
+  });
+
   describe("Tab Management", () => {
     it("should render TabList when showTabs is true", () => {
       wrapper = createWrapper({ showTabs: true });
@@ -1400,6 +1558,52 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
       wrapper.unmount();
+    });
+  });
+
+  describe("annotation sources", () => {
+    const withSource = {
+      ...defaultProps,
+      dashboardData: {
+        ...defaultProps.dashboardData,
+        annotationSources: [
+          {
+            id: "deploys",
+            name: "Deploys",
+            enabled: true,
+            mode: "sql",
+            streamType: "logs",
+            stream: "",
+            filters: [],
+            query: "SELECT _timestamp FROM deploys",
+            title: "deploy",
+          },
+        ],
+      },
+      currentTimeObj: {
+        __global: {
+          start_time: new Date(1_700_000_000_000_000),
+          end_time: new Date(1_700_003_600_000_000),
+        },
+      },
+    };
+
+    it("holds the all-loaded flag (and so report capture) until the sources settle", async () => {
+      let release: () => void = () => undefined;
+      vi.mocked(searchService.search).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ data: { hits: [] } } as never);
+          }) as never,
+      );
+      wrapper = createWrapper(withSource);
+      await flushPromises();
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("panelsValues")?.at(-1)).not.toEqual([true]);
+
+      release();
+      await flushPromises();
+      expect(wrapper.emitted("panelsValues")?.at(-1)).toEqual([true]);
     });
   });
 });

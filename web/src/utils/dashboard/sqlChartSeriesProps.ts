@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getScatterSymbolOpacity, getScatterSymbolSize } from "./scatterPointStyle";
+
 /**
  * Retrieves the ECharts series properties for a given SQL chart type.
  *
@@ -44,12 +46,15 @@ export const getPropsByChartTypeForSeries = (panelSchema: any) => {
         areaStyle: null,
         lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
-    case "scatter":
+    case "scatter": {
+      const opacity = getScatterSymbolOpacity(panelSchema.config);
       return {
         type: "scatter",
         emphasis: { focus: "series" },
-        symbolSize: 5,
+        symbolSize: getScatterSymbolSize(panelSchema.config),
+        ...(opacity !== undefined && { itemStyle: { opacity } }),
       };
+    }
     case "pie":
       return {
         type: "pie",

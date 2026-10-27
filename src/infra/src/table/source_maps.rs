@@ -234,6 +234,14 @@ pub async fn list_files(
     Ok(res)
 }
 
+/// Deletes every source map of the org and returns the removed rows, so callers release files.
+pub async fn delete_by_org(org: &str) -> Result<Vec<SourceMap>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    let rows = super::delete_returning_models(client, delete).await?;
+    Ok(rows.into_iter().map(SourceMap::from).collect())
+}
+
 pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
 
@@ -372,5 +380,55 @@ mod tests {
             "org1",
             "files/org1/other/abc123"
         ));
+    }
+
+    fn source_map(org: &str, file: &str) -> SourceMap {
+        SourceMap {
+            id: 0,
+            org: org.to_string(),
+            service: None,
+            env: None,
+            version: None,
+            source_file_name: file.to_string(),
+            source_map_file_name: format!("{file}.map"),
+            file_store_id: format!("{org}/{file}"),
+            file_type: FileType::SourceMap,
+            created_at: 1,
+            cluster: "c".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_the_whole_rows_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_smap");
+        let other = format!("{org}_other");
+        let rows = vec![
+            source_map(&org, "a.js"),
+            source_map(&org, "b.js"),
+            source_map(&other, "a.js"),
+        ];
+        add_many(rows).await.unwrap();
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort_by(|x, y| x.source_file_name.cmp(&y.source_file_name));
+        let again = delete_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
+
+        let files: Vec<(&str, &str)> = removed
+            .iter()
+            .map(|m| (m.source_file_name.as_str(), m.file_store_id.as_str()))
+            .collect();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].0, "a.js");
+        assert_eq!(files[1].1, format!("{org}/b.js"));
+        assert!(again.is_empty());
+        assert_eq!(
+            kept.len(),
+            1,
+            "another org's source map went with this org's"
+        );
     }
 }

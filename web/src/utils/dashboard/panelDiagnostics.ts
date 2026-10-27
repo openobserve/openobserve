@@ -18,6 +18,8 @@ export interface SeriesLimitInfo {
   shown: number;
   total: number;
   cap: number;
+  /** Set when the chart capped what it draws itself; shown as written, and Top N cannot lift it. */
+  displayCapMessage?: string;
 }
 
 /** One query's server-side stats and notices, merged over its partitions. */

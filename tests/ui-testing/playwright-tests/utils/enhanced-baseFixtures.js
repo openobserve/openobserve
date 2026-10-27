@@ -181,6 +181,14 @@ async function navigateToBase(page) {
   
   let isAuthenticated = await verifyAuthentication(page);
 
+  // A blank page here is usually a JS chunk that never downloaded, not a lost session; reload before re-login.
+  if (!isAuthenticated && isCloudEnvironment()) {
+    testLogger.warn('Auth check failed — reloading once before re-authentication');
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: navTimeout }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    isAuthenticated = await verifyAuthentication(page);
+  }
+
   // Self-heal on cloud: the shared session token is minted once at the start of the run
   // and reused by every shard, so on long runs (or when shards sharing an org contend on
   // the same credential) it can expire/invalidate mid-run — surfacing as this auth check

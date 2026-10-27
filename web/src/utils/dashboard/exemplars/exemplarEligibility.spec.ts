@@ -23,30 +23,27 @@ const panel = (type: string, queryType: string, queryTypes: (string | undefined)
 });
 
 describe("isExemplarEligible", () => {
-  it.each(["line", "area", "bar", "scatter"])("accepts a PromQL range %s panel", (type) => {
-    expect(isExemplarEligible(panel(type, "promql", ["range"]))).toBe(true);
-  });
+  it.each(["line", "area", "bar", "scatter", "heatmap"])(
+    "accepts a PromQL range %s panel",
+    (type) => {
+      expect(isExemplarEligible(panel(type, "promql", ["range"]))).toBe(true);
+    },
+  );
 
   it("treats a query without query_type as a range query", () => {
     expect(isExemplarEligible(panel("line", "promql", [undefined]))).toBe(true);
   });
 
-  it.each([
-    "h-bar",
-    "stacked",
-    "area-stacked",
-    "h-stacked",
-    "table",
-    "metric",
-    "gauge",
-    "heatmap",
-    "pie",
-  ])("rejects chart type %s", (type) => {
-    expect(isExemplarEligible(panel(type, "promql", ["range"]))).toBe(false);
-  });
+  it.each(["h-bar", "stacked", "area-stacked", "h-stacked", "table", "metric", "gauge", "pie"])(
+    "rejects chart type %s",
+    (type) => {
+      expect(isExemplarEligible(panel(type, "promql", ["range"]))).toBe(false);
+    },
+  );
 
   it.each(["sql", "builder", "custom"])("rejects a %s panel", (queryType) => {
     expect(isExemplarEligible(panel("line", queryType, ["range"]))).toBe(false);
+    expect(isExemplarEligible(panel("heatmap", queryType, ["range"]))).toBe(false);
   });
 
   it("rejects a panel whose queries are all instant", () => {

@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form Body -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
-      <div class="h-[calc(100vh-10.625rem)] min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <div class="flex max-w-190 flex-col gap-6">
+      <ConstrainedPage size="md" align="left" :padded="false" class="min-h-0 flex-1">
+        <div class="flex flex-col gap-6 px-3 py-3">
           <!-- ── Model Details Card ── -->
           <div class="border-card-glass-border rounded-default border">
             <div
@@ -198,13 +198,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
             >
-              <div>
+              <div class="flex items-center gap-1">
                 <OText variant="panel-title" class="text-compact font-semibold">
                   {{ t("modelPricing.pricingTiers") }}
                 </OText>
-                <OText variant="meta" class="text-2xs mt-px block">
-                  {{ t("modelPricing.pricingTiersDesc") }}
-                </OText>
+                <OPopover
+                  v-model:open="tiersHintOpen"
+                  side="bottom"
+                  align="start"
+                  :aria-label="t('modelPricing.aboutPricingTiers')"
+                >
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="xs"
+                      icon-left="info-outline"
+                      data-test="model-pricing-tiers-hint-trigger"
+                    >
+                      <span class="max-md:sr-only">{{ t("modelPricing.aboutPricingTiers") }}</span>
+                    </OButton>
+                  </template>
+                  <p
+                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                    data-test="model-pricing-tiers-hint"
+                  >
+                    <OText variant="meta">{{ t("modelPricing.pricingTiersDesc") }}</OText>
+                  </p>
+                </OPopover>
               </div>
             </div>
 
@@ -481,14 +501,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("modelPricing.addRule") }}
                     </OButton>
-                    <div class="ms-auto w-30 shrink-0">
-                      <OFormInput
-                        :name="`tiers[${idx}].priority`"
-                        :label="t('modelPricing.tierPriority')"
-                        :help-text="t('modelPricing.tierPriorityHint')"
-                        type="number"
-                        :data-test="`model-pricing-tier-priority-input-${idx}`"
-                      />
+                    <div class="ms-auto flex shrink-0 items-end gap-1">
+                      <div class="w-30">
+                        <OFormInput
+                          :name="`tiers[${idx}].priority`"
+                          :label="t('modelPricing.tierPriority')"
+                          type="number"
+                          :data-test="`model-pricing-tier-priority-input-${idx}`"
+                        />
+                      </div>
+                      <!-- OFormInput's label only hosts a tooltip icon, so the popover trigger sits beside the input. -->
+                      <div class="flex h-8.5 items-center">
+                        <OPopover
+                          :open="priorityHintOpenIdx === idx"
+                          side="bottom"
+                          align="end"
+                          :aria-label="t('modelPricing.aboutTierPriority')"
+                          @update:open="
+                            (open: boolean) => (priorityHintOpenIdx = open ? idx : null)
+                          "
+                        >
+                          <template #trigger>
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-sq"
+                              icon-left="info-outline"
+                              :aria-label="t('modelPricing.aboutTierPriority')"
+                              :data-test="`model-pricing-tier-priority-hint-trigger-${idx}`"
+                            />
+                          </template>
+                          <p
+                            class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                            :data-test="`model-pricing-tier-priority-hint-${idx}`"
+                          >
+                            <OText variant="meta">{{ t("modelPricing.tierPriorityHint") }}</OText>
+                          </p>
+                        </OPopover>
+                      </div>
                     </div>
                   </div>
 
@@ -536,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45 max-lg:grid-cols-[1fr_6rem_auto]"
                       >
                         <span>{{ t("modelPricing.usageKeyCol") }}</span>
-                        <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
+                        <span>{{ t("modelPricing.colPrice") }}</span>
                         <span></span>
                       </div>
 
@@ -642,55 +691,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-
-                    <!-- Price Preview Table -->
-                    <div
-                      v-if="previewEntries(tier).length"
-                      class="rounded-default bg-surface-panel border-card-glass-border mt-5 border"
-                    >
-                      <div
-                        class="text-text-secondary border-card-glass-border border-b px-4 py-2 text-xs font-semibold"
-                      >
-                        {{ t("modelPricing.pricePreview") }}
-                      </div>
-                      <table class="w-full border-collapse text-xs">
-                        <thead>
-                          <tr
-                            class="text-text-secondary border-card-glass-border border-b text-left"
-                          >
-                            <th class="px-4 py-2 font-medium">
-                              {{ t("modelPricing.usageType") }}
-                            </th>
-                            <th class="px-4 py-2 font-medium">
-                              {{ t("modelPricing.perThousand") }}
-                            </th>
-                            <th class="px-4 py-2 font-medium">
-                              {{ t("modelPricing.perMillion") }}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            v-for="entry in previewEntries(tier)"
-                            :key="entry.pending ? '__pending__' : entry.key"
-                            class="border-card-glass-border border-b last:border-none"
-                            :class="{
-                              'preview-row-pending italic opacity-50': entry.pending,
-                            }"
-                          >
-                            <td class="text-text-body px-4 py-2 font-medium">
-                              {{ entry.key }}
-                            </td>
-                            <td class="text-text-body px-4 py-2">
-                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000) }}
-                            </td>
-                            <td class="text-text-body px-4 py-2">
-                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -746,7 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
+      </ConstrainedPage>
 
       <!-- Footer -->
       <div
@@ -810,6 +810,8 @@ import OCode from "@/lib/core/Code/OCode.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtcWindowsInTz } from "@/utils/formatters";
@@ -839,6 +841,9 @@ const route = useRoute();
 const existingModels = ref<any[]>([]);
 
 const showExamples = ref(false);
+const tiersHintOpen = ref(false);
+// One index, not a flag, so opening one tier's hint never opens every tier's.
+const priorityHintOpenIdx = ref<number | null>(null);
 const copiedPattern = ref<string | null>(null);
 
 function copyPattern(pattern: string) {
@@ -1401,29 +1406,6 @@ function toPerMillion(perToken: number): number {
 
 function fromPerMillion(perMillion: number): number {
   return perMillion > 0 ? perMillion / 1_000_000 : 0;
-}
-
-/** Live preview = committed price rows + the (non-empty) draft. Values are
- *  PER-MILLION; the template converts to per-token for the cost columns. */
-function previewEntries(tier: any): Array<{ key: string; value: number; pending?: boolean }> {
-  const out = (tier.prices ?? [])
-    .filter((r: any) => String(r.key ?? "").trim())
-    .map((r: any) => ({ key: String(r.key), value: Number(r.value) || 0 }));
-  const dk = String(tier.draftKey ?? "").trim();
-  if (dk && !out.find((e: any) => e.key === dk)) {
-    out.push({ key: dk, value: Number(tier.draftValue) || 0, pending: true });
-  }
-  return out;
-}
-
-function formatPreviewCost(costPerUnit: number, multiplier: number) {
-  if (!costPerUnit) return "0";
-  const c = costPerUnit * multiplier;
-  if (c === 0) return "0";
-  if (c < 0.00001) return c.toExponential(2);
-  let str = c.toFixed(8);
-  str = str.replace(/0+$/, "").replace(/\.$/, "");
-  return str;
 }
 
 function validateUsageKey(key: string): string | null {

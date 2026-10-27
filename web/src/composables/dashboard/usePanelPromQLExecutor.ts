@@ -17,6 +17,7 @@ import { markRaw } from "vue";
 import { generateTraceContext } from "@/utils/zincutils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 import { computeStepSeconds } from "@/utils/metrics/metricDefaults";
+import { promqlSeriesCap } from "@/utils/dashboard/convertStateTimelineData";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
@@ -294,7 +295,11 @@ export const usePanelPromQLExecutor = (ctx: {
                     : panelStepValue
                       ? panelStepValue
                       : (heatmapStepValue ?? "0"),
-                  query_type: it.config.query_type || "range", // Add query_type from config (default: range)
+                  // A state timeline needs samples over time, so it ignores a stored instant setting.
+                  query_type:
+                    panelSchema.value?.type === "state-timeline"
+                      ? "range"
+                      : it.config.query_type || "range",
                 },
                 type: "promql" as const,
                 traceId: traceId,
@@ -313,7 +318,7 @@ export const usePanelPromQLExecutor = (ctx: {
               };
 
               // Get series limit from config
-              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+              const maxSeries = promqlSeriesCap(panelSchema.value?.type, store.state?.zoConfig);
 
               const isShifted = queryIndex !== panelQueryIndex;
               // Create chunk processor for efficient metric merging

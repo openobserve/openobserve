@@ -21,25 +21,53 @@ import { gt } from "@/types/i18n";
 import echartsUrl from "echarts/dist/echarts.min.js?url";
 import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
-export const panelIdToBeRefreshed = ref<string | null>(null);
+// Single-panel refresh targets, each mapped to whether its load has settled; emptied once all have.
+export const panelRefreshTargets = new Map<string, boolean>();
+
+// Bumped when a single-panel refresh ends, so charts that skipped a run meanwhile can replay it.
+export const panelRefreshEpoch = ref(0);
 
 // import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
 const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
 const sandboxDompurifyUrl = new URL(dompurifyUrl, import.meta.url).href;
 
-/**
- * Converts SQL data into a format suitable for rendering a chart.
- *
- * @param {any} panelSchema - the panel schema object
- * @param {any} searchQueryData - the search query data
- * @param {any} store - the store object
- * @return {Object} - the options object for rendering the chart
- */
+// Exact first-party chart code allowed to run its callbacks in the app origin; stored dashboard code never is.
+const trustedCustomChartCode = new Set<string>();
 
-export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
+/** Read-only dashboard state handed to custom chart code as `context`. */
+export interface CustomChartContext {
+  variables: Record<string, unknown>;
+  timeRange: { start: number; end: number };
+  timezone: string;
+  theme: "light" | "dark";
+}
+
+/** Rejects a run skipped because another panel is being refreshed; the caller keeps its current chart. */
+export class CustomChartSkippedError extends Error {}
+
+/** True while a single-panel refresh is in flight that did not target this panel. */
+export const isSkippedByPanelRefresh = (panelId: string | undefined) =>
+  panelRefreshTargets.size > 0 && !(panelId && panelRefreshTargets.has(panelId));
+
+/** Marks a target's load as settled; the refresh ends once every target has settled. */
+export const settlePanelRefresh = (panelId: string | undefined) => {
+  if (!panelId || !panelRefreshTargets.has(panelId)) return;
+  panelRefreshTargets.set(panelId, true);
+  if ([...panelRefreshTargets.values()].every(Boolean)) {
+    panelRefreshTargets.clear();
+    panelRefreshEpoch.value++;
+  }
+};
+
+/** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
+export const runJavaScriptCode = (
+  panelSchema: any,
+  searchQueryData: any,
+  context?: CustomChartContext,
+) => {
   return new Promise((resolve, reject) => {
-    // Skip if this panel is not the one to be refreshed
-    if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+    if (isSkippedByPanelRefresh(panelSchema.id)) {
+      reject(new CustomChartSkippedError());
       return;
     }
 
@@ -60,6 +88,9 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
 
     // Generate a nonce
     const nonce = Math.random().toString(36).substring(2);
+    const fnTag = `__o2_fn_${randomHex()}`;
+    const readyToken = randomHex();
+    const trusted = trustedCustomChartCode.has(userCode);
 
     // The sandbox iframe has no access to the app's i18n instance, so the messages it
     // posts back are translated here and injected as a frozen JSON literal.
@@ -101,19 +132,40 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     });
 
     // Handle script execution with a timeout
+    let executed = false;
     window.addEventListener('message', (event) => {
-      if (event.data.type === 'execute') {
+      // A sibling custom-chart frame can post here too; only the parent may hand over code.
+      if (event.source !== parent || executed) return;
+      if (event.data && event.data.type === 'connect' && event.ports && event.ports[0]) {
+        executed = true;
+        const port = event.ports[0];
+        port.onmessage = (portEvent) => {
+          port.close();
+          execute(portEvent.data);
+        };
+      }
+    });
+
+    function execute(payload) {
+      if (payload && payload.type === 'execute') {
         try {
-          const data = JSON.parse(event.data.data);
-          const userCode = event.data.code.trim();
+          const data = JSON.parse(payload.data);
+          const deepFreeze = (obj) => {
+            if (typeof obj === 'object' && obj !== null) {
+              Object.values(obj).forEach(deepFreeze);
+              Object.freeze(obj);
+            }
+            return obj;
+          };
+          const context = deepFreeze(JSON.parse(payload.context || '{}'));
+          const fnTag = payload.fnTag;
 
           const convertFunctionsToString = (obj) => {
             if (typeof obj === 'function') {
               try {
-                const functionString = obj.toString();
-                return DOMPurify.sanitize(functionString); // Sanitize function string
+                return { [fnTag]: DOMPurify.sanitize(obj.toString()) };
               } catch (e) {
-                return 'Error sanitizing function';
+                return undefined;
               }
             }
             if (Array.isArray(obj)) return obj.map(convertFunctionsToString);
@@ -131,7 +183,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
             parent.postMessage({ type: 'error', message: i18nMessages.executionTimeout }, '*');
           }, 2000);
 
-          (function(data, echarts) {
+          (function(data, echarts, context) {
             try {
               ${userCode};
             } catch (err) {
@@ -151,55 +203,77 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
               }
             }, 0); // Delay to ensure CSP events have time to process
 
-          })(data, window.echarts);
+          })(data, window.echarts, context);
 
         } catch (error) {
           parent.postMessage({ type: 'error', message: error.message }, '*');
         }
       }
-    });
+    }
+
+    parent.postMessage({ type: 'ready', token: '${readyToken}' }, '*');
   </script>
     `;
 
     iframe.srcdoc = scriptContent;
 
+    const channel = new MessageChannel();
+    let connected = false;
+
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
+      const type = event.data?.type;
 
-      // Double check if this is still the panel to be refreshed
-      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
-        window.removeEventListener("message", handler);
-        document.body.removeChild(iframe);
+      if (type === "ready") {
+        // The token is known only to the srcdoc written above, which sends it before any chart code runs.
+        if (connected || event.data.token !== readyToken) return;
+        connected = true;
+        // An opaque-origin frame only accepts "*", so the payload goes over a port bound to this document.
+        iframe.contentWindow?.postMessage({ type: "connect" }, "*", [channel.port2]);
+        channel.port1.postMessage({
+          type: "execute",
+          code: userCode,
+          fnTag,
+          data: JSON.stringify(searchQueryData),
+          context: JSON.stringify(context ?? {}),
+        });
         return;
       }
+      if (type !== "error" && (type !== "success" || !connected)) return;
 
       window.removeEventListener("message", handler);
+      channel.port1.close();
       setTimeout(() => {
         document.body.removeChild(iframe);
       }, 2000);
 
-      if (event.data.type === "success") {
-        resolve(JSON.parse(event.data.result));
-        // Clear the panelIdToBeRefreshed after success
-        if (panelIdToBeRefreshed.value === panelSchema.id) {
-          panelIdToBeRefreshed.value = null;
+      if (type === "success") {
+        try {
+          const dropped = { count: 0 };
+          const options = rehydrateFunctions(
+            JSON.parse(event.data.result),
+            fnTag,
+            trusted,
+            dropped,
+          );
+          if (dropped.count) {
+            console.warn(
+              gt(
+                "dashboard.utils.customChartCallbacksDropped",
+                { count: dropped.count },
+                dropped.count,
+              ),
+            );
+          }
+          resolve(options);
+        } catch (error) {
+          reject(error);
         }
-      } else if (event.data.type === "error") {
+      } else {
         console.error("Error executing code", event.data.message);
         reject(new Error(event.data.message));
       }
     });
-
-    iframe.onload = () => {
-      iframe?.contentWindow?.postMessage(
-        {
-          type: "execute",
-          code: userCode,
-          data: JSON.stringify(searchQueryData),
-        },
-        "*",
-      );
-    };
   });
 };
 
@@ -323,3 +397,46 @@ export const validateUserCode = (code: string): string | null => {
     return gt("dashboard.utils.invalidJavaScriptSyntax");
   }
 };
+
+/** Marks first-party chart code (curated packs, bundled templates) whose function callbacks may run in the app. */
+export const trustCustomChartCode = (code: string): string => {
+  trustedCustomChartCode.add(code);
+  return code;
+};
+
+export const isTrustedCustomChartCode = (code: string): boolean => trustedCustomChartCode.has(code);
+
+/** Turns sandbox-tagged functions back into callables for trusted code; drops them otherwise, counting each in `dropped`. */
+export const rehydrateFunctions = (
+  value: unknown,
+  fnTag: string,
+  trusted: boolean,
+  dropped: { count: number } = { count: 0 },
+): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => rehydrateFunctions(item, fnTag, trusted, dropped));
+  }
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, fnTag)) {
+    const source = (value as Record<string, unknown>)[fnTag];
+    if (!trusted || typeof source !== "string") {
+      dropped.count++;
+      return undefined;
+    }
+    return new Function(`return ${source}`)();
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key,
+      rehydrateFunctions(child, fnTag, trusted, dropped),
+    ]),
+  );
+};
+
+// crypto.randomUUID needs a secure context; plain-http deployments still need an unguessable tag.
+const randomHex = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");

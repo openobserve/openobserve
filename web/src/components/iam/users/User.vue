@@ -1128,8 +1128,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          update_user: props.row.email,
           page: "Users",
         });
       } else {
@@ -1355,12 +1353,7 @@ export default defineComponent({
           await getOrgMembers(true);
           updateUserActions();
 
-          analytics.track("Button Click", {
-            button: "Revoke Invite",
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Users",
-          });
+          analytics.track("invite_revoked");
         })
         .catch((err: any) => {
           dismiss();
@@ -1504,8 +1497,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        update_user: row.email,
         page: "Users",
       });
     };

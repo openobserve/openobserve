@@ -47,6 +47,10 @@ const ConfirmDialogStub = {
     modelValue: { type: Boolean, default: false },
     title: { type: String, default: "" },
     message: { type: String, default: "" },
+    confirmText: { type: String },
+    okLabel: { type: String },
+    okVariant: { type: String },
+    focusCancel: { type: Boolean, default: false },
   },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
@@ -803,6 +807,93 @@ describe("FolderList.vue", () => {
   });
 
   describe("Template Rendering", () => {
+    it("reads Folders in the rail header and Add Folder on the add button by default", () => {
+      expect(wrapper.text()).toContain("Folders");
+      expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
+        "Add Folder",
+      );
+    });
+
+    it("reads Fleets and New fleet for the fleets type", () => {
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "fleets" },
+      });
+      expect(fleets.text()).toContain("Fleets");
+      expect(fleets.text()).not.toContain("Folders");
+      expect(fleets.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
+        "New fleet",
+      );
+      fleets.unmount();
+    });
+
+    it("asks for a fleet's name before deleting it, but not for other folder types", async () => {
+      const fleetStore = {
+        ...mockStore,
+        state: {
+          ...mockStore.state,
+          organizationData: {
+            ...mockStore.state.organizationData,
+            foldersByType: { fleets: [{ folderId: "f9", name: "test1" }] },
+          },
+        },
+      };
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: fleetStore },
+          provide: { store: fleetStore },
+        },
+        props: { type: "fleets" },
+      });
+      (fleets.vm as any).showDeleteFolderDialogFn("f9");
+      await fleets.vm.$nextTick();
+      expect(fleets.findComponent(ConfirmDialogStub).props()).toMatchObject({
+        confirmText: "test1",
+        okLabel: "Delete",
+        okVariant: "destructive",
+        focusCancel: true,
+      });
+      fleets.unmount();
+      (wrapper.vm as any).showDeleteFolderDialogFn("folder1");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
+        confirmText: undefined,
+        okLabel: undefined,
+        okVariant: undefined,
+        focusCancel: false,
+      });
+    });
+
+    it("falls back to the fleet's id when its name is not known", async () => {
+      const fleetStore = {
+        ...mockStore,
+        state: {
+          ...mockStore.state,
+          organizationData: { ...mockStore.state.organizationData, foldersByType: { fleets: [] } },
+        },
+      };
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: fleetStore },
+          provide: { store: fleetStore },
+        },
+        props: { type: "fleets" },
+      });
+      (fleets.vm as any).showDeleteFolderDialogFn("f9");
+      await fleets.vm.$nextTick();
+      expect(fleets.findComponent(ConfirmDialogStub).props("confirmText")).toBe("f9");
+      fleets.unmount();
+    });
+
     it("should render folder search input", () => {
       const searchInput = wrapper.find('[data-test="folder-search"]');
       expect(searchInput.exists()).toBe(true);

@@ -57,7 +57,15 @@ const stubs = {
   // what this spec is about.
   PanelSchemaRenderer: {
     name: "PanelSchemaRenderer",
-    props: ["panelSchema", "selectedTimeObj", "height", "width", "variablesData", "searchType"],
+    props: [
+      "panelSchema",
+      "selectedTimeObj",
+      "height",
+      "width",
+      "variablesData",
+      "searchType",
+      "shouldRefreshWithoutCache",
+    ],
     template: '<div class="panel-stub" />',
   },
 };
@@ -135,6 +143,11 @@ describe("AnomalyDetectionChart", () => {
       expect(request.query.query.end_time - request.query.query.start_time).toBe(
         60 * 60 * 1000 * 1000,
       );
+    });
+
+    it("bypasses the result cache, which would keep a tail the detector writes later empty", async () => {
+      wrapper = await mountChart();
+      expect(search.mock.calls[search.mock.calls.length - 1]?.[3]).toBe(false);
     });
 
     it("formats a traces duration percentile in time units", async () => {
@@ -423,6 +436,13 @@ describe("AnomalyDetectionChart", () => {
         1,
       );
       expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(2);
+    });
+
+    it("bypasses the result cache for both panels, like the metric query", async () => {
+      wrapper = await mountChart();
+      await openInternals(wrapper);
+      const panels = wrapper.findAllComponents({ name: "PanelSchemaRenderer" });
+      expect(panels.map((p: any) => p.props("shouldRefreshWithoutCache"))).toEqual([true, true]);
     });
 
     it("plots the threshold as a series, so a retrain steps it rather than flattening it", async () => {

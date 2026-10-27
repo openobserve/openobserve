@@ -320,6 +320,19 @@ pub async fn run() {
             }
         };
 
+        // A pending or deleting org's checks must not create runs, jobs or artifacts.
+        let unresolved;
+        (synthetics, unresolved) = retain_active_orgs(synthetics, |org_id| async move {
+            db::org_status::read_active(&org_id).await
+        })
+        .await;
+        // An unreadable org status is not a verdict: the claimed slot goes back to be run later.
+        for check in &unresolved {
+            let before = (check.next_run_at, check.last_triggered_at);
+            if let Err(e) = synthetics_checks::release_claim(db, &check.id, now_us, before).await {
+                tracing::error!(synthetics_id = %check.id, "[synthetics scheduler] release: {e}");
+            }
+        }
         if synthetics.is_empty() {
             continue;
         }
@@ -842,6 +855,52 @@ async fn enqueue_planned(
             }
         }
     }
+}
+
+/// Splits claimed checks into those of active orgs and those whose org status could not be read.
+async fn retain_active_orgs<F, Fut, E>(
+    checks: Vec<synthetics_checks::DueCheck>,
+    read_active: F,
+) -> (
+    Vec<synthetics_checks::DueCheck>,
+    Vec<synthetics_checks::DueCheck>,
+)
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<bool, E>>,
+    E: std::fmt::Display,
+{
+    let mut verdicts: HashMap<String, Option<bool>> = HashMap::new();
+    let (mut kept, mut unresolved) = (Vec::with_capacity(checks.len()), Vec::new());
+    for check in checks {
+        let verdict = match verdicts.get(&check.org_id) {
+            Some(verdict) => *verdict,
+            None => {
+                let verdict = match read_active(check.org_id.clone()).await {
+                    Ok(active) => Some(active),
+                    Err(e) => {
+                        tracing::warn!(
+                            org_id = %check.org_id,
+                            "[synthetics scheduler] cannot read org status, retrying later: {e}"
+                        );
+                        None
+                    }
+                };
+                verdicts.insert(check.org_id.clone(), verdict);
+                verdict
+            }
+        };
+        match verdict {
+            Some(true) => kept.push(check),
+            Some(false) => tracing::debug!(
+                synthetics_id = %check.id,
+                org_id = %check.org_id,
+                "[synthetics scheduler] org is not active, skipping check"
+            ),
+            None => unresolved.push(check),
+        }
+    }
+    (kept, unresolved)
 }
 
 /// Every read gate 3 needs for one whole tick, batched.
@@ -2247,7 +2306,7 @@ mod pool_gate_tests {
 
     use super::{
         ERROR_SOURCE_QUOTA, GateContext, PoolExhaustionPolicy, PoolGate, apply_expanded_counts,
-        gate_decision, quota_result_record, quota_trigger_record, slot_verdict,
+        gate_decision, quota_result_record, quota_trigger_record, retain_active_orgs, slot_verdict,
     };
     use crate::pool::StepRemaining;
 
@@ -2285,6 +2344,7 @@ mod pool_gate_tests {
             steps_configured: 14,
             subtest_refs: Vec::new(),
             tags: vec!["checkout".to_string()],
+            last_triggered_at: 0,
         }
     }
 
@@ -2293,6 +2353,64 @@ mod pool_gate_tests {
             check_type: SyntheticType::Http,
             ..due_check()
         }
+    }
+
+    #[tokio::test]
+    async fn test_scheduler_skips_checks_of_inactive_orgs() {
+        let of_org = |id: &str, org_id: &str| DueCheck {
+            id: id.to_string(),
+            org_id: org_id.to_string(),
+            ..due_check()
+        };
+        let checks = vec![
+            of_org("a1", "acme"),
+            of_org("g1", "gone"),
+            of_org("a2", "acme"),
+            of_org("g2", "gone"),
+        ];
+        let lookups = std::sync::Mutex::new(Vec::new());
+        let (kept, unresolved) = retain_active_orgs(checks, |org_id| {
+            lookups.lock().unwrap().push(org_id.clone());
+            async move { Ok::<_, String>(org_id != "gone") }
+        })
+        .await;
+        let ids: Vec<&str> = kept.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["a1", "a2"], "a check of an inactive org must not run");
+        assert!(unresolved.is_empty());
+        assert_eq!(
+            *lookups.lock().unwrap(),
+            ["acme", "gone"],
+            "one lookup per org"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_scheduler_keeps_checks_of_an_unreadable_org_for_a_retry() {
+        let of_org = |id: &str, org_id: &str| DueCheck {
+            id: id.to_string(),
+            org_id: org_id.to_string(),
+            ..due_check()
+        };
+        let checks = vec![
+            of_org("a1", "acme"),
+            of_org("u1", "unreadable"),
+            of_org("u2", "unreadable"),
+        ];
+        let (kept, unresolved) = retain_active_orgs(checks, |org_id| async move {
+            if org_id == "unreadable" {
+                Err("db down".to_string())
+            } else {
+                Ok(true)
+            }
+        })
+        .await;
+        let ids = |c: &[DueCheck]| c.iter().map(|c| c.id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&kept), ["a1"]);
+        assert_eq!(
+            ids(&unresolved),
+            ["u1", "u2"],
+            "a failed status read must hand the claimed checks back, not drop them"
+        );
     }
 
     /// The two batch-read maps, as the fan-out resolves them once a tick.

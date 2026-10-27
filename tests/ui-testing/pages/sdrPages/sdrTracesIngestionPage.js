@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { ingestBase } = require('../../playwright-tests/utils/ingest-url.js');
 
 /**
  * Traces-flavoured ingestion for SDR (Sensitive Data Redaction) tests.
@@ -102,7 +103,7 @@ export class SDRTracesIngestionPage {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await this.page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
           headers,
           data: traceData,
         });

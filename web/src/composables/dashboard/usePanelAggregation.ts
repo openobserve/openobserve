@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+
 export const usePanelAggregation = ({
   dashboardPanelData,
   getDefaultQueries,
@@ -25,6 +27,10 @@ export const usePanelAggregation = ({
   const resetAggregationFunction = () => {
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
+      // A state timeline has no comparison window; a shift left over from another type must not run.
+      if (dashboardPanelData.data.type === "state-timeline") {
+        dashboardPanelData.data.queries?.forEach((query: any) => (query.config.time_shift = []));
+      }
       return;
     }
 
@@ -72,12 +78,20 @@ export const usePanelAggregation = ({
       case "h-bar":
       case "stacked":
       case "h-stacked":
+      case "state-timeline":
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          const isStateTimeline = dashboardPanelData.data.type === "state-timeline";
+          // A count is never a state and the timeline reads one field, so only the first other y stays.
+          if (isStateTimeline) {
+            query.fields.y = query.fields.y
+              .filter((itemY: any) => itemY.functionName !== "count")
+              .slice(0, 1);
+          }
           query.fields.y.forEach((itemY: any) => {
             if (itemY.functionName === null && !itemY.isDerived) {
-              itemY.functionName = "count";
+              itemY.functionName = isStateTimeline ? STATE_TIMELINE_Y_FUNCTION : "count";
               // take first arg
               itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
             }
@@ -102,6 +116,8 @@ export const usePanelAggregation = ({
               query.fields.x = [query.fields.x[0]];
             }
           }
+          // A state timeline has no comparison window; a shift left over from another type must not run.
+          if (isStateTimeline) query.config.time_shift = [];
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";

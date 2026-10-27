@@ -230,6 +230,45 @@ describe("PromQLBuilderOptions", () => {
       expect(wrapper.vm.dashboardPanelData.data.queries[0].config.query_type).toBe("instant");
     });
 
+    describe("query type only (custom query)", () => {
+      const customQueryData = (config: Record<string, any>) => ({
+        ...mockDashboardPanelData,
+        data: { queries: [{ fields: {}, config }] },
+      });
+      const mountCustom = (config: Record<string, any>) =>
+        mount(PromQLBuilderOptions, {
+          props: { dashboardPanelData: customQueryData(config), queryTypeOnly: true },
+          global: { plugins: [i18n, store], mocks: { $t: (key: string) => key } },
+        });
+
+      it("shows only the query type, since legend and step live in the config panel", () => {
+        wrapper = mountCustom({ promql_legend: "" });
+
+        expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find('[data-test="dashboard-promql-builder-legend"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="dashboard-promql-builder-step-value"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("reads an unset type as range without writing it", () => {
+        wrapper = mountCustom({ promql_legend: "" });
+
+        expect(wrapper.vm.queryType).toBe("range");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].config.query_type).toBeUndefined();
+      });
+
+      it("writes the chosen type to the current query", () => {
+        wrapper = mountCustom({ promql_legend: "" });
+
+        wrapper.vm.queryType = "instant";
+
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].config.query_type).toBe("instant");
+      });
+    });
+
     it("should render query type select", () => {
       wrapper = createWrapper();
       const queryTypeSelect = wrapper.findComponent({ name: "OSelect" });

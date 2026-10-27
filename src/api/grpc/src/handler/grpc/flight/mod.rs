@@ -367,11 +367,13 @@ fn clear_session_data(trace_id: &str) {
     log::info!("Cleared session for trace_id: {trace_id}");
 }
 
+#[cfg(feature = "enterprise")]
 fn super_cluster_enabled() -> bool {
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        return true;
-    }
+    get_o2_config().super_cluster.enabled
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn super_cluster_enabled() -> bool {
     false
 }
 

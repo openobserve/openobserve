@@ -2092,7 +2092,7 @@ async fn incident_with_alerts(
             correlation_reason: a
                 .correlation_reason
                 .as_ref()
-                .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
+                .and_then(|r| r.parse::<CorrelationReason>().ok())
                 .unwrap_or(CorrelationReason::AlertId),
             created_at: a.created_at,
             source_url: None,

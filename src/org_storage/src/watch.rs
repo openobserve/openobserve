@@ -62,10 +62,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 crate::db::update_cached_entry(entry).await;
             }
             Event::Delete(ev) => {
-                log::error!(
-                    "watch_org_storage_providers: delete is not supported, yet received for key {}",
-                    ev.key
-                );
+                let Some(org_id) = ev.key.strip_prefix(OSP_PREFIX).filter(|id| !id.is_empty())
+                else {
+                    log::error!(
+                        "watch_org_storage_providers: delete for unknown key {}",
+                        ev.key
+                    );
+                    continue;
+                };
+                infra::storage::accounts::remove_account(org_id).await;
+                crate::db::remove_cached_entry(org_id).await;
+                log::info!("[org_storage]: removed provider of org {org_id} via event");
             }
             Event::Empty => {}
         }

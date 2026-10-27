@@ -48,6 +48,8 @@ export interface SeriesOverrideDraft {
   decimals: string;
   color: string | null;
   thresholds: SeriesOverrideThresholds | undefined;
+  /** Per-series value mappings; only the state timeline reads them. */
+  valueMappings?: any[];
 }
 
 /** The applied panel schema plus the data the editor already fetched for it. */
@@ -125,6 +127,8 @@ export const toSeriesOverrideDraft = (stored: any): SeriesOverrideDraft => {
       draft.color = typeof value === "string" && value !== "" ? value : null;
     } else if (item?.type === "thresholds") {
       draft.thresholds = cloneThresholds(value);
+    } else if (item?.type === "value_mappings" && Array.isArray(value)) {
+      draft.valueMappings = JSON.parse(JSON.stringify(value));
     }
   }
   return draft;
@@ -156,6 +160,9 @@ export const serializeSeriesOverride = (draft: SeriesOverrideDraft): SeriesOverr
   if (draft.color) config.push({ type: "series_color", value: draft.color });
   const thresholds = cloneThresholds(draft.thresholds);
   if (thresholds) config.push({ type: "thresholds", value: thresholds });
+  if (draft.valueMappings?.length) {
+    config.push({ type: "value_mappings", value: JSON.parse(JSON.stringify(draft.valueMappings)) });
+  }
   if (!config.length) return null;
   return { field: { matchBy: STORED_MATCH[draft.matchBy], value: draft.value }, config };
 };
@@ -165,14 +172,16 @@ export const serializeSeriesOverrides = (drafts: SeriesOverrideDraft[]): SeriesO
     .map((draft) => serializeSeriesOverride(draft))
     .filter((entry): entry is SeriesOverrideEntry => entry !== null);
 
-/** Legend series names of converted chart options, read per chart type like Color by series. */
-export const getLegendSeriesNames = (options: any, chartType: string): string[] => {
+/** Legend series names of converted chart options, read per chart type like Color by series; state-timeline rows come from `extras.rowEntities`. */
+export const getLegendSeriesNames = (options: any, chartType: string, extras?: any): string[] => {
   const series: any[] = Array.isArray(options?.series) ? options.series : [];
   let names: unknown[];
   if (chartType === "pie" || chartType === "donut") {
     names = (series[0]?.data ?? []).map((item: any) => item?.name);
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
+  } else if (chartType === "state-timeline") {
+    names = extras?.rowEntities ?? [];
   } else if (chartType === "metric") {
     // `_metricLabel` is drawn and may hold a display name; overrides match `_metricName`.
     names = series.map((s: any) => s?._metricName ?? s?._metricLabel);
@@ -199,13 +208,17 @@ export const getPromqlMetricSeriesNames = async (
   source: SeriesOverridePreviewSource,
   store: any,
 ): Promise<string[]> => {
-  const [{ alignShiftedPromQLResults }, { buildPromqlSeriesNames }, { legendFallbackOf }, cache] =
-    await Promise.all([
-      import("@/utils/dashboard/convertPromQLData"),
-      import("@/utils/dashboard/promql/shared/legendBuilder"),
-      import("@/utils/dashboard/promql/formula"),
-      import("@/utils/semanticGroupsCache"),
-    ]);
+  const [
+    { alignShiftedPromQLResults, METRIC_MAX_CELLS },
+    { buildPromqlSeriesNames },
+    { legendFallbackOf },
+    cache,
+  ] = await Promise.all([
+    import("@/utils/dashboard/convertPromQLData"),
+    import("@/utils/dashboard/promql/shared/legendBuilder"),
+    import("@/utils/dashboard/promql/formula"),
+    import("@/utils/semanticGroupsCache"),
+  ]);
   const { data, parentQueryIndex, nameSuffixes } = alignShiftedPromQLResults(
     source.data,
     source.metadata,
@@ -227,15 +240,16 @@ export const getPromqlMetricSeriesNames = async (
     })),
     cache.getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
-  const unique = new Set<string>();
-  limited.forEach((q: any, i: number) => {
-    const metric = q?.result?.[0];
-    if (!metric) return;
-    const name = names.get(metric.metric) ?? "";
-    const full = nameSuffixes[i] ? `${name} (${nameSuffixes[i]})` : name;
-    if (full) unique.add(full);
-  });
-  return [...unique];
+  // One value per series, in the converter's order and under its cell cap.
+  const cellNames = limited
+    .flatMap((q: any, i: number) =>
+      (q?.result ?? []).map((metric: any) => {
+        const name = names.get(metric.metric) ?? "";
+        return nameSuffixes[i] ? `${name} (${nameSuffixes[i]})` : name;
+      }),
+    )
+    .slice(0, METRIC_MAX_CELLS);
+  return [...new Set<string>(cellNames.filter(Boolean))];
 };
 
 /** The source as PanelSchemaRenderer converts it: hidden queries dropped from data, schema and metadata alike. */
@@ -319,7 +333,7 @@ const readOriginalNames = async (
   }
   const detached = { value: document.createElement("div") };
   const result = await convertWithOverrides(source, [], store, detached);
-  return getLegendSeriesNames(result?.options, chartType);
+  return getLegendSeriesNames(result?.options, chartType, result?.extras);
 };
 
 /** Converts the editor's fetched data twice: without overrides for the original legend names, and with the draft for the preview. */

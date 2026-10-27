@@ -114,7 +114,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 114: add RCA stage, context, continuation and on-call subject columns.
 // 115: create rca_steering and add the input columns to rca_runs.
 // 116: add favicon_img to status_pages.
-pub const DB_SCHEMA_VERSION: u64 = 116;
+// 117: create the fleet tables.
+pub const DB_SCHEMA_VERSION: u64 = 118;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -664,11 +665,22 @@ pub fn load_config() -> Result<(), anyhow::Error> {
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
+static CHROME_SEMAPHORE: std::sync::OnceLock<tokio::sync::Semaphore> = std::sync::OnceLock::new();
 
 pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
     CHROME_LAUNCHER_OPTIONS
         .get_or_init(init_chrome_launch_options)
         .await
+}
+
+/// Caps concurrent headless Chrome processes at the CPU limit; hold a permit while one runs.
+pub fn chrome_semaphore() -> &'static tokio::sync::Semaphore {
+    CHROME_SEMAPHORE.get_or_init(|| {
+        let cfg = get_config();
+        // cpu_num is floored at 2 and real_cpu_num ignores the memory limit, so take the smaller.
+        let permits = cfg.limit.cpu_num.min(cfg.limit.real_cpu_num);
+        tokio::sync::Semaphore::new(max(1, permits))
+    })
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
@@ -2447,6 +2459,12 @@ pub struct Common {
     )]
     pub create_org_through_ingestion: bool,
     #[env_config(
+        name = "ZO_ORG_CLEANUP_POLL_INTERVAL_SECS",
+        default = 3600,
+        help = "How often (seconds, default 3600) the compactor drains org deletion tasks and promotes orgs whose grace period ended. 0 pauses both jobs."
+    )]
+    pub org_cleanup_poll_interval_secs: u64,
+    #[env_config(
         name = "ZO_ORG_INVITE_EXPIRY",
         default = 7,
         help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
@@ -2739,7 +2757,7 @@ pub struct Limit {
         help = "Count-based alerts whose row sentinel exceeds this switch to a COUNT(*) decision query plus a 100-row payload sample (alerts_2.md 4.4c). Clamped up to the 100-row floor."
     )]
     pub alert_hybrid_count_threshold: i64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
+    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 50)]
     pub alert_schedule_concurrency: i64,
     #[env_config(
         name = "ZO_ALERT_MAX_GROUPS",
@@ -3068,6 +3086,12 @@ pub struct Limit {
         help = "maximum series to display in charts"
     )]
     pub max_dashboard_series: usize,
+    #[env_config(
+        name = "ZO_MAX_DASHBOARD_STATE_TIMELINE_SERIES",
+        default = 2000,
+        help = "maximum PromQL series a state timeline panel loads; restarts split one entity into several series"
+    )]
+    pub max_dashboard_state_timeline_series: usize,
     #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
@@ -3564,8 +3588,6 @@ pub struct RUM {
     pub service: String,
     #[env_config(name = "ZO_RUM_ENV", default = "")]
     pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
     #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
     pub organization_identifier: String,
     #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
@@ -4009,6 +4031,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+    if cfg.limit.max_dashboard_state_timeline_series < 1 {
+        cfg.limit.max_dashboard_state_timeline_series = 2000;
     }
 
     // check query timeout
@@ -6349,6 +6374,19 @@ mod tests {
     }
 
     #[test]
+    fn test_check_limit_config_dashboard_state_timeline_series() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+        cfg.limit.max_dashboard_state_timeline_series = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+
+        cfg.limit.max_dashboard_state_timeline_series = 50;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
+    }
+
+    #[test]
     fn test_check_limit_config_firehose_decompressed_limit() {
         let mut cfg = Config::init().unwrap();
         cfg.limit.req_payload_limit = 200;
@@ -6580,5 +6618,14 @@ mod tests {
         assert_eq!(select_ext_auth_salt("env", "stored"), "env");
         assert_eq!(select_ext_auth_salt("", "stored"), "stored");
         assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
+    }
+
+    #[test]
+    fn test_chrome_semaphore_never_exceeds_cpu_limit() {
+        let cfg = get_config();
+        let permits = chrome_semaphore().available_permits();
+        assert!(permits >= 1);
+        assert!(permits <= cfg.limit.real_cpu_num);
+        assert!(permits <= cfg.limit.cpu_num);
     }
 }

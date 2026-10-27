@@ -14,7 +14,73 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { runJavaScriptCode, panelIdToBeRefreshed } from "./convertCustomChartData";
+import {
+  CustomChartSkippedError,
+  runJavaScriptCode,
+  panelRefreshEpoch,
+  panelRefreshTargets,
+  rehydrateFunctions,
+  settlePanelRefresh,
+  trustCustomChartCode,
+} from "./convertCustomChartData";
+
+type PortHandler = (event: { data: unknown }) => void;
+
+// Synchronous stand-in for MessageChannel that, like the real one, queues until a handler is set.
+class FakePort {
+  other!: FakePort;
+  closed = false;
+  private queue: unknown[] = [];
+  private handler: PortHandler | null = null;
+  set onmessage(handler: PortHandler | null) {
+    this.handler = handler;
+    this.queue.splice(0).forEach((data) => handler?.({ data }));
+  }
+  get onmessage() {
+    return this.handler;
+  }
+  postMessage(data: unknown) {
+    if (this.closed || this.other.closed) return;
+    if (this.other.handler) this.other.handler({ data });
+    else this.other.queue.push(data);
+  }
+  close() {
+    this.closed = true;
+  }
+}
+
+class FakeMessageChannel {
+  port1 = new FakePort();
+  port2 = new FakePort();
+  constructor() {
+    this.port1.other = this.port2;
+    this.port2.other = this.port1;
+  }
+}
+
+vi.stubGlobal("MessageChannel", FakeMessageChannel);
+
+const parentMessageHandler = () =>
+  vi.mocked(window.addEventListener).mock.calls.find((call) => call[0] === "message")?.[1] as (
+    event: any,
+  ) => void;
+
+const readyTokenOf = (iframe: { srcdoc: string }) =>
+  /type: 'ready', token: '([0-9a-f]{32})'/.exec(iframe.srcdoc)![1];
+
+// Plays the srcdoc's ready handshake and returns what the parent then sends to the frame.
+const connectSandbox = (iframe: { srcdoc: string; contentWindow: any }) => {
+  parentMessageHandler()({
+    source: iframe.contentWindow,
+    data: { type: "ready", token: readyTokenOf(iframe) },
+  });
+  const [message, target, ports] = iframe.contentWindow.postMessage.mock.calls[0];
+  let payload: any;
+  ports[0].onmessage = (event: { data: unknown }) => {
+    payload = event.data;
+  };
+  return { message, target, port: ports[0] as FakePort, payload };
+};
 
 // Mock router
 vi.mock("src/router", () => ({
@@ -33,7 +99,7 @@ vi.mock("acorn-walk", () => ({
 describe("convertCustomChartData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    panelIdToBeRefreshed.value = null;
+    panelRefreshTargets.clear();
 
     // Mock DOM methods
     Object.defineProperty(document, "createElement", {
@@ -79,22 +145,18 @@ describe("convertCustomChartData", () => {
   });
 
   describe("Basic functionality", () => {
-    it("should skip execution when panel is not the one to be refreshed", () => {
-      panelIdToBeRefreshed.value = "panel1";
+    it("rejects with CustomChartSkippedError when another panel is being refreshed", async () => {
+      panelRefreshTargets.set("panel1", false);
 
       const panelSchema = {
         id: "panel2",
         customChartContent: "var option = {};",
       };
-      const searchQueryData = [];
 
-      const promise = runJavaScriptCode(panelSchema, searchQueryData);
-
-      // Should return a promise that never resolves/rejects (hanging promise)
-      expect(promise).toBeInstanceOf(Promise);
-
-      // Since the function returns without resolving, we can't await it
-      // This covers the early return path in the code
+      await expect(runJavaScriptCode(panelSchema, [])).rejects.toBeInstanceOf(
+        CustomChartSkippedError,
+      );
+      expect(document.body.appendChild).not.toHaveBeenCalled();
     });
 
     it("should reject with validation error for unsafe code", async () => {
@@ -182,23 +244,18 @@ describe("convertCustomChartData", () => {
       expect(mockIframe.srcdoc).toContain("echarts.min.js");
       expect(mockIframe.srcdoc).toContain("purify.min.js");
 
-      // Simulate iframe onload and message handling
-      expect(mockIframe.onload).toBeDefined();
+      const { message, target, payload } = connectSandbox(mockIframe);
 
-      // Trigger onload
-      if (mockIframe.onload) {
-        mockIframe.onload();
-      }
-
-      // Verify postMessage was called
-      expect(mockIframe.contentWindow?.postMessage).toHaveBeenCalledWith(
-        {
-          type: "execute",
-          code: panelSchema.customChartContent,
-          data: JSON.stringify(searchQueryData),
-        },
-        "*",
-      );
+      // Only an empty connect message crosses with "*"; the payload goes over the port.
+      expect(message).toEqual({ type: "connect" });
+      expect(target).toBe("*");
+      expect(payload).toEqual({
+        type: "execute",
+        code: panelSchema.customChartContent,
+        data: JSON.stringify(searchQueryData),
+        context: "{}",
+        fnTag: expect.stringMatching(/^__o2_fn_[0-9a-f]{32}$/),
+      });
 
       // Simulate successful response
       const mockEvent = {
@@ -324,6 +381,7 @@ describe("convertCustomChartData", () => {
       };
 
       const promise = runJavaScriptCode(panelSchema, []);
+      connectSandbox(mockIframe);
 
       // Simulate message from different source
       const mockEvent = {
@@ -360,7 +418,7 @@ describe("convertCustomChartData", () => {
       expect(result).toEqual({ real: "data" });
     });
 
-    it("should handle panel ID change during message handling", async () => {
+    it("still resolves when another panel's refresh starts mid-run", async () => {
       const acorn = await import("acorn");
       const walk = await import("acorn-walk");
 
@@ -382,10 +440,10 @@ describe("convertCustomChartData", () => {
         customChartContent: "var option = {};",
       };
 
-      runJavaScriptCode(panelSchema, []);
+      const promise = runJavaScriptCode(panelSchema, []);
+      connectSandbox(mockIframe);
 
-      // Change the panel ID to be refreshed before message handling
-      panelIdToBeRefreshed.value = "panel2";
+      panelRefreshTargets.set("panel2", false);
 
       // Simulate message from iframe
       const mockEvent = {
@@ -404,26 +462,13 @@ describe("convertCustomChartData", () => {
         messageHandler(mockEvent as any);
       }
 
-      // Verify event listener and iframe cleanup happened
       expect(window.removeEventListener).toHaveBeenCalledWith("message", messageHandler);
-      expect(document.body.removeChild).toHaveBeenCalledWith(mockIframe);
-
-      // The promise should remain pending as the message was ignored
-      // Reset panel ID and send valid message to complete
-      panelIdToBeRefreshed.value = null;
-
-      // Need to simulate a new message handler since the old one was removed
-      // This simulates the behavior but the original promise will remain hanging
-      // which is expected behavior in this edge case
+      await expect(promise).resolves.toEqual({ data: "test" });
     });
 
-    it("should clear panelIdToBeRefreshed on successful completion", async () => {
+    it("runs a refreshed panel's code after its load settles while a later refresh is in flight", async () => {
       const acorn = await import("acorn");
-      const walk = await import("acorn-walk");
-
       vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
-      vi.mocked(walk.simple).mockImplementation(() => {});
-
       const mockIframe = {
         style: { display: "" },
         setAttribute: vi.fn(),
@@ -431,46 +476,345 @@ describe("convertCustomChartData", () => {
         srcdoc: "",
         contentWindow: { postMessage: vi.fn() },
       };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      panelRefreshTargets.set("panel1", false);
+      panelRefreshTargets.set("panel2", false);
+      settlePanelRefresh("panel1");
 
+      const promise = runJavaScriptCode(
+        { id: "panel1", customChartContent: "var option = {};" },
+        [],
+      );
+      connectSandbox(mockIframe);
+      const messageHandler = vi
+        .mocked(window.addEventListener)
+        .mock.calls.find((call) => call[0] === "message")?.[1] as (event: any) => void;
+      messageHandler({
+        source: mockIframe.contentWindow,
+        data: { type: "success", result: JSON.stringify({ data: "test" }) },
+      });
+
+      await expect(promise).resolves.toEqual({ data: "test" });
+      await expect(
+        runJavaScriptCode({ id: "panel3", customChartContent: "var option = {};" }, []),
+      ).rejects.toBeInstanceOf(CustomChartSkippedError);
+    });
+  });
+
+  describe("settlePanelRefresh", () => {
+    it("ends the refresh only once every target has settled", () => {
+      panelRefreshTargets.set("panel1", false);
+      panelRefreshTargets.set("panel2", false);
+
+      settlePanelRefresh("panel1");
+      expect([...panelRefreshTargets]).toEqual([
+        ["panel1", true],
+        ["panel2", false],
+      ]);
+
+      settlePanelRefresh("panel2");
+      expect(panelRefreshTargets.size).toBe(0);
+    });
+
+    it("ignores a panel that is not a target", () => {
+      panelRefreshTargets.set("panel1", false);
+
+      settlePanelRefresh("panel2");
+
+      expect([...panelRefreshTargets]).toEqual([["panel1", false]]);
+    });
+  });
+
+  describe("Function callbacks returned by the sandbox", () => {
+    const advisoryPayload = "function(){globalThis.__o2AuditMarker = 'executed'}()";
+
+    const runAndRespond = async (
+      code: string,
+      buildResult: (fnTag: string) => unknown,
+    ): Promise<any> => {
+      const acorn = await import("acorn");
+      const walk = await import("acorn-walk");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
+      vi.mocked(walk.simple).mockImplementation(() => {});
+
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null as null | (() => void),
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
+      };
       vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
 
-      const panelSchema = {
-        id: "panel1",
-        customChartContent: "var option = {};",
+      const promise = runJavaScriptCode({ id: "p", customChartContent: code }, []);
+      const { fnTag } = connectSandbox(mockIframe).payload;
+
+      const messageHandler = vi
+        .mocked(window.addEventListener)
+        .mock.calls.find((call) => call[0] === "message")?.[1] as (e: any) => void;
+      messageHandler({
+        source: mockIframe.contentWindow,
+        data: { type: "success", result: JSON.stringify(buildResult(fnTag)) },
+      });
+      return promise;
+    };
+
+    afterEach(() => {
+      delete (globalThis as any).__o2AuditMarker;
+    });
+
+    it("never compiles a function-looking string from stored dashboard code", async () => {
+      const result = await runAndRespond("option = {}", () => ({ audit_probe: advisoryPayload }));
+
+      expect((globalThis as any).__o2AuditMarker).toBeUndefined();
+      expect(result.audit_probe).toBe(advisoryPayload);
+    });
+
+    it("drops real callbacks from stored dashboard code instead of rebuilding them in the app", async () => {
+      const result = await runAndRespond("option = {}", (fnTag) => ({
+        tooltip: { formatter: { [fnTag]: advisoryPayload } },
+        o2_events: { click: { [fnTag]: "function(){}" } },
+      }));
+
+      expect((globalThis as any).__o2AuditMarker).toBeUndefined();
+      expect(result.tooltip.formatter).toBeUndefined();
+      expect(result.o2_events.click).toBeUndefined();
+    });
+
+    it("rebuilds tagged callbacks for trusted first-party code only, never a plain string", async () => {
+      const code = trustCustomChartCode("option = { trusted: true }");
+      const result = await runAndRespond(code, (fnTag) => ({
+        tooltip: { formatter: { [fnTag]: "function (p) { return p.name; }" } },
+        series: [{ name: advisoryPayload }],
+        spoofed: { __o2_fn_00000000000000000000000000000000: advisoryPayload },
+      }));
+
+      expect(result.tooltip.formatter({ name: "a" })).toBe("a");
+      expect(result.series[0].name).toBe(advisoryPayload);
+      expect((globalThis as any).__o2AuditMarker).toBeUndefined();
+    });
+
+    it("only lets the parent page hand code to the sandbox", async () => {
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null,
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
       };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      const acorn = await import("acorn");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
 
-      // Set the panel ID to be refreshed
-      panelIdToBeRefreshed.value = "panel1";
+      void runJavaScriptCode({ id: "p", customChartContent: "option = {}" }, []);
 
-      const promise = runJavaScriptCode(panelSchema, []);
+      expect(mockIframe.srcdoc).toContain("if (event.source !== parent || executed) return;");
+    });
+  });
 
-      // Trigger onload
-      if (mockIframe.onload) {
-        mockIframe.onload();
+  describe("Read-only context", () => {
+    const context = {
+      variables: { service: "api", regions: ["eu", "us"] },
+      timeRange: { start: 1_000_000, end: 2_000_000 },
+      timezone: "Asia/Kolkata",
+      theme: "dark" as const,
+    };
+
+    const runSandbox = async (code: string, ctx?: typeof context) => {
+      const acorn = await import("acorn");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null as null | (() => void),
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
+      };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      void runJavaScriptCode({ id: "p", customChartContent: code }, [], ctx);
+
+      const script = mockIframe.srcdoc.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)![1];
+      const listeners: Record<string, (e: any) => void> = {};
+      const fakeWindow = {
+        addEventListener: (t: string, h: any) => (listeners[t] = h),
+        echarts: {},
+      };
+      const fakeParent = { postMessage: vi.fn() };
+      const fakeDocument = { addEventListener: vi.fn() };
+      new Function("window", "parent", "document", "DOMPurify", script)(
+        fakeWindow,
+        fakeParent,
+        fakeDocument,
+        { sanitize: (v: string) => v },
+      );
+      const [ready] = fakeParent.postMessage.mock.calls[0];
+      parentMessageHandler()({ source: mockIframe.contentWindow, data: ready });
+      const [connect, , ports] = mockIframe.contentWindow.postMessage.mock.calls[0];
+      const payload = (ports[0] as any).queue[0];
+      listeners.message({ source: fakeParent, data: connect, ports });
+      await new Promise((r) => setTimeout(r, 0));
+      return {
+        payload,
+        posted: fakeParent.postMessage.mock.calls.slice(1).map((c) => c[0]),
+      };
+    };
+
+    afterEach(() => {
+      delete (globalThis as any).option;
+    });
+
+    it("posts the context to the sandbox as JSON", async () => {
+      const { payload } = await runSandbox("option = {}", context);
+
+      expect(JSON.parse(payload.context)).toEqual(context);
+    });
+
+    it("exposes a deeply frozen context to the chart code", async () => {
+      const code = `
+        try { context.theme = "light"; context.timeRange.start = 0; context.variables.regions.push("x"); } catch (e) {}
+        option = {
+          theme: context.theme,
+          start: context.timeRange.start,
+          regions: context.variables.regions,
+          frozen: Object.isFrozen(context) && Object.isFrozen(context.variables.regions),
+        };`;
+      const { posted } = await runSandbox(code, context);
+
+      expect(posted).toHaveLength(1);
+      expect(posted[0].type).toBe("success");
+      expect(JSON.parse(posted[0].result)).toEqual({
+        theme: "dark",
+        start: 1_000_000,
+        regions: ["eu", "us"],
+        frozen: true,
+      });
+    });
+
+    it("gives chart code an empty context when none is passed", async () => {
+      const { posted } = await runSandbox("option = { keys: Object.keys(context) };");
+
+      expect(JSON.parse(posted[0].result)).toEqual({ keys: [] });
+    });
+  });
+
+  describe("Sandbox handshake", () => {
+    const startRun = async (customChartContent = "option = {}") => {
+      const acorn = await import("acorn");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null as null | (() => void),
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
+      };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      const promise = runJavaScriptCode({ id: "p", customChartContent }, [{ secret: 1 }], {
+        variables: { env: "prod" },
+        timeRange: { start: 1, end: 2 },
+        timezone: "UTC",
+        theme: "light",
+      });
+      return { mockIframe, promise };
+    };
+
+    it("hands the code over once, so a frame that navigated away never receives data or context", async () => {
+      const { mockIframe } = await startRun();
+      const first = connectSandbox(mockIframe);
+      expect(first.payload.data).toBe(JSON.stringify([{ secret: 1 }]));
+
+      // The navigated document sends the same ready message, token included, on every load.
+      for (let i = 0; i < 3; i++) {
+        parentMessageHandler()({
+          source: mockIframe.contentWindow,
+          data: { type: "ready", token: readyTokenOf(mockIframe) },
+        });
       }
 
-      // Simulate successful response
-      const mockEvent = {
+      expect(mockIframe.contentWindow.postMessage).toHaveBeenCalledTimes(1);
+      expect(mockIframe.onload).toBeNull();
+    });
+
+    it("never posts the payload with a wildcard target", async () => {
+      const { mockIframe } = await startRun();
+      connectSandbox(mockIframe);
+
+      for (const [message] of mockIframe.contentWindow.postMessage.mock.calls) {
+        expect(JSON.stringify(message)).not.toContain("secret");
+        expect(JSON.stringify(message)).not.toContain("prod");
+      }
+    });
+
+    it("ignores a ready message without the run's token", async () => {
+      const { mockIframe } = await startRun();
+      parentMessageHandler()({
+        source: mockIframe.contentWindow,
+        data: { type: "ready", token: "0".repeat(32) },
+      });
+
+      expect(mockIframe.contentWindow.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("ignores a result that arrives before the code was handed over", async () => {
+      const { mockIframe, promise } = await startRun();
+      const handler = parentMessageHandler();
+      handler({
+        source: mockIframe.contentWindow,
+        data: { type: "success", result: JSON.stringify({ spoofed: true }) },
+      });
+      connectSandbox(mockIframe);
+      handler({
+        source: mockIframe.contentWindow,
+        data: { type: "success", result: JSON.stringify({ real: true }) },
+      });
+
+      await expect(promise).resolves.toEqual({ real: true });
+    });
+
+    it("warns once per run when stored chart code returned callbacks that were dropped", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { mockIframe, promise } = await startRun();
+      const { fnTag } = connectSandbox(mockIframe).payload;
+      parentMessageHandler()({
         source: mockIframe.contentWindow,
         data: {
           type: "success",
-          result: JSON.stringify({ data: "test" }),
+          result: JSON.stringify({
+            tooltip: { formatter: { [fnTag]: "function(){}" } },
+            label: { formatter: { [fnTag]: "function(){}" } },
+          }),
         },
-      };
+      });
+      await promise;
 
-      // Get and trigger message handler
-      const addEventListenerCalls = vi.mocked(window.addEventListener).mock.calls;
-      const messageHandler = addEventListenerCalls.find((call) => call[0] === "message")?.[1];
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("2");
+    });
 
-      if (messageHandler && typeof messageHandler === "function") {
-        messageHandler(mockEvent as any);
-      }
+    it("counts every dropped callback and none for trusted code", () => {
+      const tagged = { a: { tag: "function(){ return 1; }" }, b: [{ tag: "function(){}" }] };
+      const dropped = { count: 0 };
+      rehydrateFunctions(tagged, "tag", false, dropped);
+      expect(dropped.count).toBe(2);
 
-      const result = await promise;
-      expect(result).toEqual({ data: "test" });
+      const kept = { count: 0 };
+      const result: any = rehydrateFunctions(tagged, "tag", true, kept);
+      expect(kept.count).toBe(0);
+      expect(result.a()).toBe(1);
+    });
+  });
 
-      // Verify panelIdToBeRefreshed was cleared after success
-      expect(panelIdToBeRefreshed.value).toBe(null);
+  describe("Replaying skipped runs", () => {
+    it("bumps the refresh epoch once every target has settled", () => {
+      const before = panelRefreshEpoch.value;
+      panelRefreshTargets.set("a", false);
+      panelRefreshTargets.set("b", false);
+
+      settlePanelRefresh("a");
+      expect(panelRefreshEpoch.value).toBe(before);
+
+      settlePanelRefresh("b");
+      expect(panelRefreshEpoch.value).toBe(before + 1);
     });
   });
 

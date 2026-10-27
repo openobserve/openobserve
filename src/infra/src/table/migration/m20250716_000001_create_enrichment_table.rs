@@ -72,10 +72,22 @@ fn create_enrichment_tables_statement() -> TableCreateStatement {
                 .auto_increment()
                 .primary_key(),
         )
-        .col(ColumnDef::new(EnrichmentTables::Org).string_len(256).not_null())
-        .col(ColumnDef::new(EnrichmentTables::Name).string_len(256).not_null())
+        .col(
+            ColumnDef::new(EnrichmentTables::Org)
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EnrichmentTables::Name)
+                .string_len(256)
+                .not_null(),
+        )
         .col(ColumnDef::new(EnrichmentTables::Data).binary().not_null())
-        .col(ColumnDef::new(EnrichmentTables::CreatedAt).big_unsigned().not_null())
+        .col(
+            ColumnDef::new(EnrichmentTables::CreatedAt)
+                .big_unsigned()
+                .not_null(),
+        )
         .to_owned()
 }
 

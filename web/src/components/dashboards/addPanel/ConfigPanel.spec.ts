@@ -182,6 +182,105 @@ describe("ConfigPanel", () => {
     });
   };
 
+  describe("gauge section", () => {
+    const gaugeData = (queryConfig: Record<string, any> = {}) => {
+      const data = JSON.parse(JSON.stringify(mockDashboardPanelData));
+      data.data.type = "gauge";
+      data.data.queries[0].config = {
+        ...data.data.queries[0].config,
+        min: 0,
+        max: 100,
+        ...queryConfig,
+      };
+      return reactive(data);
+    };
+    const rangeSelect = () =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.props("label") === "Gauge range");
+    const hidden = (selector: string) =>
+      (wrapper.find(selector).attributes("style") ?? "").includes("display: none");
+
+    it("defaults the range mode to fixed and writes auto to the current query", async () => {
+      const data = gaugeData();
+      wrapper = createWrapper({ dashboardPanelData: data });
+      expect(rangeSelect().props("modelValue")).toBe("fixed");
+      expect(hidden('[data-test="dashboard-config-gauge-min"]')).toBe(false);
+
+      rangeSelect().vm.$emit("update:modelValue", "auto");
+      await wrapper.vm.$nextTick();
+      expect(data.data.queries[0].config.range_mode).toBe("auto");
+      expect(hidden('[data-test="dashboard-config-gauge-min"]')).toBe(true);
+      expect(hidden('[data-test="dashboard-config-gauge-max"]')).toBe(true);
+    });
+
+    it("flags a fixed max that is not above min beside the field", async () => {
+      const maxInput = () =>
+        wrapper
+          .findAllComponents({ name: "OInput" })
+          .find((c: any) => c.attributes("data-test") === "dashboard-config-gauge-max");
+      const data = gaugeData({ min: 20, max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: data });
+      expect(maxInput()?.props("errorMessage")).toBeTruthy();
+      data.data.queries[0].config.max = 50;
+      await wrapper.vm.$nextTick();
+      expect(maxInput()?.props("errorMessage")).toBeUndefined();
+    });
+
+    it("offers the end labels switch and value mappings", () => {
+      wrapper = createWrapper({ dashboardPanelData: gaugeData() });
+      expect(wrapper.find('[data-test="dashboard-config-gauge-end-labels"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="value-mapping-stub"]').exists()).toBe(true);
+    });
+  });
+
+  describe("state timeline options", () => {
+    it("shows the defaults for a fresh panel that has none of its keys, and writes on change", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "state-timeline",
+          config: { ...mockDashboardPanelData.data.config },
+        },
+      };
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      await wrapper.vm.$nextTick();
+
+      const sort = wrapper.find('[data-test="dashboard-config-state-timeline-row-sort"]');
+      expect(sort.exists()).toBe(true);
+      expect(sort.attributes("data-test-selected-value")).toBe("name");
+      expect(wrapper.vm.showStateTextModel).toBe(true);
+      expect("show_state_text" in panelData.data.config).toBe(false);
+
+      wrapper.vm.showStateTextModel = false;
+      wrapper.vm.rowSortModel = "non_ok_time";
+      expect(panelData.data.config.show_state_text).toBe(false);
+      expect(panelData.data.config.row_sort).toBe("non_ok_time");
+    });
+
+    it("offers the tooltip mode, defaulting to this segment", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "state-timeline",
+          config: { ...mockDashboardPanelData.data.config },
+        },
+      };
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      await wrapper.vm.$nextTick();
+
+      const mode = wrapper.find('[data-test="dashboard-config-state-timeline-tooltip-mode"]');
+      expect(mode.exists()).toBe(true);
+      expect(mode.attributes("data-test-selected-value")).toBe("segment");
+      expect("tooltip_mode" in panelData.data.config).toBe(false);
+
+      wrapper.vm.tooltipModeModel = "all_rows";
+      expect(panelData.data.config.tooltip_mode).toBe("all_rows");
+    });
+  });
+
   describe("focus=top-n deep link", () => {
     it("consumes the request, opens the Data section and focuses the Top N input", async () => {
       const panelData = {
@@ -331,21 +430,24 @@ describe("ConfigPanel", () => {
       },
     });
 
-    it("appears off by default for an eligible PromQL panel and binds config.show_exemplars", async () => {
-      const panel = promqlPanel("line");
-      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
-      const toggle = wrapper.findComponent('[data-test="dashboard-config-show-exemplars"]');
-      expect(toggle.exists()).toBe(true);
-      expect(toggle.props("modelValue")).toBeFalsy();
-      await toggle.vm.$emit("update:modelValue", true);
-      expect(panel.data.config.show_exemplars).toBe(true);
-    });
+    it.each(["line", "heatmap"])(
+      "appears off by default for an eligible PromQL %s panel and binds config.show_exemplars",
+      async (type) => {
+        const panel = promqlPanel(type);
+        wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+        const toggle = wrapper.findComponent('[data-test="dashboard-config-show-exemplars"]');
+        expect(toggle.exists()).toBe(true);
+        expect(toggle.props("modelValue")).toBeFalsy();
+        await toggle.vm.$emit("update:modelValue", true);
+        expect(panel.data.config.show_exemplars).toBe(true);
+      },
+    );
 
     it.each([
       ["h-bar", "range"],
       ["stacked", "range"],
       ["table", "range"],
-      ["heatmap", "range"],
+      ["heatmap", "instant"],
       ["line", "instant"],
     ])("is absent for %s (%s)", (type, queryType) => {
       wrapper = createWrapper(
@@ -358,6 +460,157 @@ describe("ConfigPanel", () => {
     it("is absent outside PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: promqlPanel("line") }, { promqlMode: false });
       expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Map pan and zoom switch", () => {
+    const mapsPanel = (queryType: string, enableRoam?: boolean) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "maps",
+        queryType,
+        config: { ...mockDashboardPanelData.data.config, enable_roam: enableRoam },
+      },
+    });
+    const roamSwitch = () => wrapper.findComponent('[data-test="dashboard-config-map-roam"]');
+
+    it("shows each query type's default when unset: on for PromQL, off for SQL", () => {
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("promql") }, { promqlMode: true });
+      expect(roamSwitch().props("modelValue")).toBe(true);
+      wrapper.unmount();
+
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("sql") });
+      expect(roamSwitch().props("modelValue")).toBe(false);
+    });
+
+    it("writes config.enable_roam", async () => {
+      const panel = mapsPanel("sql");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await roamSwitch().vm.$emit("update:modelValue", true);
+      expect(panel.data.config.enable_roam).toBe(true);
+    });
+
+    it("reflects a saved value over the default", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: mapsPanel("promql", false) },
+        { promqlMode: true },
+      );
+      expect(roamSwitch().props("modelValue")).toBe(false);
+    });
+
+    it("follows the config search", async () => {
+      const hidden = () => (roamSwitch().attributes("style") ?? "").includes("display: none");
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("sql") });
+      wrapper.vm.searchQuery = "pan and";
+      await wrapper.vm.$nextTick();
+      expect(hidden()).toBe(false);
+      wrapper.vm.searchQuery = "map";
+      await wrapper.vm.$nextTick();
+      expect(hidden()).toBe(true);
+    });
+
+    it("is absent for geomap", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: {
+            ...mockDashboardPanelData.data,
+            type: "geomap",
+            config: {
+              ...mockDashboardPanelData.data.config,
+              map_view: { lat: 0, lng: 0, zoom: 1 },
+            },
+          },
+        },
+      });
+      expect(wrapper.find('[data-test="dashboard-config-map-roam"]').exists()).toBe(false);
+    });
+  });
+
+  describe("PromQL series limit", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        queryType: "promql",
+        queries: [{ query: "up", config: {} }],
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const limitInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-promql-series-limit"]');
+
+    it("stores a whole number between 1 and the server cap and clears an empty field", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 100 };
+      const panel = panelOf("stacked");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+
+      await limitInput().vm.$emit("update:modelValue", 20.7);
+      expect(panel.data.config.promql_series_limit).toBe(20);
+      await limitInput().vm.$emit("update:modelValue", 500);
+      expect(panel.data.config.promql_series_limit).toBe(100);
+      await limitInput().vm.$emit("update:modelValue", 0);
+      expect(panel.data.config.promql_series_limit).toBe(1);
+      await limitInput().vm.$emit("update:modelValue", -5);
+      expect(panel.data.config.promql_series_limit).toBe(1);
+      await limitInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.promql_series_limit).toBeNull();
+    });
+
+    it("shows the effective default, capped by the server, as the placeholder", () => {
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 40 };
+      wrapper = createWrapper({ dashboardPanelData: panelOf("stacked") }, { promqlMode: true });
+
+      expect(limitInput().props("placeholder")).toBe("40");
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 100 };
+    });
+
+    it("is absent for chart types on the line/area path", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(limitInput().exists()).toBe(false);
+    });
+  });
+
+  describe("Line thickness", () => {
+    const panelOf = (line_thickness: unknown) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "line",
+          config: { ...mockDashboardPanelData.data.config, line_thickness },
+        },
+      });
+    const thicknessInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-line_thickness"]');
+
+    it("stores the typed number as is and flags one outside (0, 10]", async () => {
+      const panel = panelOf(1.5);
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await thicknessInput().vm.$emit("update:modelValue", "3");
+      expect(panel.data.config.line_thickness).toBe(3);
+      expect(thicknessInput().props("errorMessage")).toBeUndefined();
+
+      await thicknessInput().vm.$emit("update:modelValue", "0");
+      expect(panel.data.config.line_thickness).toBe(0);
+      expect(thicknessInput().props("modelValue")).toBe(0);
+      expect(thicknessInput().props("errorMessage")).toBeTruthy();
+
+      await thicknessInput().vm.$emit("update:modelValue", "11");
+      expect(thicknessInput().props("errorMessage")).toBeTruthy();
+    });
+
+    it("clears an emptied field and restores the default on blur", async () => {
+      const panel = panelOf(2);
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await thicknessInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.line_thickness).toBeNull();
+      await thicknessInput().vm.$emit("blur");
+      expect(panel.data.config.line_thickness).toBe(1.5);
     });
   });
 
@@ -396,6 +649,396 @@ describe("ConfigPanel", () => {
 
     it("is absent in PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(toggleOf()).toBeUndefined();
+    });
+  });
+
+  describe("Heatmap colour scale min / max", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    const inputOf = (end: "min" | "max") =>
+      wrapper.findComponent(`[data-test="dashboard-config-heatmap_color_${end}"]`);
+
+    it("shows both inputs with an Auto placeholder for a heatmap", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") });
+      for (const end of ["min", "max"] as const) {
+        expect(inputOf(end).exists()).toBe(true);
+        expect(inputOf(end).props("placeholder")).toBe("Auto");
+      }
+      expect(wrapper.text()).toContain("Color scale min");
+      expect(wrapper.text()).toContain("Color scale max");
+    });
+
+    it.each(["line", "bar", "table"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(inputOf("min").exists()).toBe(false);
+      expect(inputOf("max").exists()).toBe(false);
+    });
+
+    it("writes the numbers to config and clears an emptied input to null", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await inputOf("min").vm.$emit("update:modelValue", 5);
+      await inputOf("max").vm.$emit("update:modelValue", 50);
+      expect(panel.data.config.heatmap_color_min).toBe(5);
+      expect(panel.data.config.heatmap_color_max).toBe(50);
+      await inputOf("max").vm.$emit("update:modelValue", "");
+      expect(panel.data.config.heatmap_color_max).toBeNull();
+    });
+
+    it("stores typed text as a number, and an emptied input as null", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      const field = inputOf("min").find("input");
+      await field.setValue("12.5");
+      expect(panel.data.config.heatmap_color_min).toBe(12.5);
+      await field.setValue("");
+      expect(panel.data.config.heatmap_color_min).toBeNull();
+    });
+
+    it("flags an inverted pair on both inputs and explains it once", async () => {
+      const panel = panelOf("heatmap", { heatmap_color_min: 50, heatmap_color_max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(inputOf("min").props("error")).toBe(true);
+      expect(inputOf("max").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("Min must be less than max");
+
+      panel.data.config.heatmap_color_max = 100;
+      await flushPromises();
+      expect(inputOf("min").props("error")).toBe(false);
+      expect(inputOf("max").props("error")).toBe(false);
+    });
+
+    it.each([
+      [null, 10],
+      [10, null],
+      [10, 10.5],
+    ])("does not flag min %s with max %s", (min, max) => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf("heatmap", { heatmap_color_min: min, heatmap_color_max: max }),
+      });
+      expect(inputOf("min").props("error")).toBe(false);
+    });
+  });
+
+  describe("Heatmap palette, reverse and colour scale", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    // By the attribute the control receives, as OToggleGroup does not render it on its root.
+    const control = (field: string) =>
+      ["OSelect", "OSwitch", "OToggleGroup", "OInput"]
+        .flatMap((name) => wrapper.findAllComponents({ name }))
+        .find((found: any) => found.vm.$attrs["data-test"] === `dashboard-config-${field}`) ?? {
+        exists: () => false,
+      };
+
+    it.each([false, true])("shows all three for a heatmap (PromQL %s)", (promqlMode) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") }, { promqlMode });
+      for (const field of ["heatmap_palette", "heatmap_palette_reverse", "heatmap_color_scale"]) {
+        expect(control(field).exists()).toBe(true);
+      }
+    });
+
+    it.each(["line", "bar", "table"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      for (const field of ["heatmap_palette", "heatmap_palette_reverse", "heatmap_color_scale"]) {
+        expect(control(field).exists()).toBe(false);
+      }
+    });
+
+    it("reads Spectral and square root for a panel that never set them", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") });
+      expect(control("heatmap_palette").props("modelValue")).toBe("spectral");
+      expect(control("heatmap_color_scale").props("modelValue")).toBe("sqrt");
+      expect(
+        control("heatmap_palette")
+          .props("options")
+          .map((o: any) => o.label),
+      ).toEqual([
+        "Spectral",
+        "Viridis",
+        "Magma",
+        "Inferno",
+        "Blues",
+        "Greens",
+        "Reds",
+        "Red-yellow-blue",
+      ]);
+      expect(control("heatmap_color_scale").text()).toContain("LinearSquare rootLog");
+    });
+
+    it("writes the palette, reverse flag and scale to config", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_palette").vm.$emit("update:modelValue", "viridis");
+      await control("heatmap_palette_reverse").vm.$emit("update:modelValue", true);
+      await control("heatmap_color_scale").vm.$emit("update:modelValue", "log");
+      expect(panel.data.config.heatmap_palette).toBe("viridis");
+      expect(panel.data.config.heatmap_palette_reverse).toBe(true);
+      expect(panel.data.config.heatmap_color_scale).toBe("log");
+    });
+  });
+
+  describe("Heatmap Prometheus histogram mode and bucket unit", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          queryType: "promql",
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    // By the attribute the control receives, as OToggleGroup does not render it on its root.
+    const control = (field: string) =>
+      ["OSelect", "OSwitch", "OToggleGroup", "OInput"]
+        .flatMap((name) => wrapper.findAllComponents({ name }))
+        .find((found: any) => found.vm.$attrs["data-test"] === `dashboard-config-${field}`) ?? {
+        exists: () => false,
+      };
+
+    it("offers the mode switch only for a PromQL heatmap", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") }, { promqlMode: true });
+      expect(control("heatmap_mode").exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") }, { promqlMode: false });
+      expect(control("heatmap_mode").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(control("heatmap_mode").exists()).toBe(false);
+    });
+
+    it("toggles heatmap_mode between prometheus_histogram and unset", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      expect(control("heatmap_mode").props("modelValue")).toBe(false);
+      await control("heatmap_mode").vm.$emit("update:modelValue", true);
+      expect(panel.data.config.heatmap_mode).toBe("prometheus_histogram");
+      await control("heatmap_mode").vm.$emit("update:modelValue", false);
+      expect(panel.data.config.heatmap_mode).toBeNull();
+    });
+
+    it("shows the bucket unit only while histogram mode is on", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      expect(control("bucket_unit").exists()).toBe(false);
+      panel.data.config.heatmap_mode = "prometheus_histogram";
+      await flushPromises();
+      expect(control("bucket_unit").exists()).toBe(true);
+      expect(control("bucket_unit").props("options")).toEqual(
+        expect.arrayContaining([expect.objectContaining({ value: "seconds" })]),
+      );
+    });
+
+    it("writes bucket_unit and asks for bucket_unit_custom only for a custom unit", async () => {
+      const panel = panelOf("heatmap", { heatmap_mode: "prometheus_histogram" });
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      await control("bucket_unit").vm.$emit("update:modelValue", "seconds");
+      expect(panel.data.config.bucket_unit).toBe("seconds");
+      expect(control("bucket_unit_custom").exists()).toBe(false);
+
+      await control("bucket_unit").vm.$emit("update:modelValue", "custom");
+      await flushPromises();
+      await control("bucket_unit_custom").vm.$emit("update:modelValue", "req");
+      expect(panel.data.config.bucket_unit_custom).toBe("req");
+    });
+  });
+
+  describe("Heatmap y-axis order, buckets and range", () => {
+    const panelOf = (config: Record<string, unknown> = {}, yType = "Int64", customQuery = false) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "heatmap",
+          queries: [
+            {
+              ...mockDashboardPanelData.data.queries[0],
+              customQuery,
+              fields: {
+                breakdown: [],
+                y: [
+                  {
+                    alias: "y_axis_1",
+                    functionName: null,
+                    args: [{ type: "field", value: { field: "age" } }],
+                  },
+                ],
+              },
+            },
+          ],
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+        meta: {
+          ...mockDashboardPanelData.meta,
+          streamFields: {
+            groupedFields: [{ stream_alias: null, schema: [{ name: "age", type: yType }] }],
+          },
+        },
+      });
+    // By the attribute the control receives, as OToggleGroup does not render it on its root.
+    const control = (field: string) =>
+      ["OSelect", "OSwitch", "OToggleGroup", "OInput"]
+        .flatMap((name) => wrapper.findAllComponents({ name }))
+        .find((found: any) => found.vm.$attrs["data-test"] === `dashboard-config-${field}`) ?? {
+        exists: () => false,
+      };
+
+    it("offers data order, ascending and descending, defaulting to data order", async () => {
+      const panel = panelOf();
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(control("heatmap_y_sort").props("modelValue")).toBe("data");
+      expect(control("heatmap_y_sort").text()).toContain("Data orderAscendingDescending");
+      await control("heatmap_y_sort").vm.$emit("update:modelValue", "asc");
+      expect(panel.data.config.heatmap_y_sort).toBe("asc");
+      await control("heatmap_y_sort").vm.$emit("update:modelValue", "data");
+      expect(panel.data.config.heatmap_y_sort).toBeNull();
+    });
+
+    it("shows the ascending order bucketed rows always take, and no data order, while bucketing is on", async () => {
+      const panel = panelOf({ heatmap_y_bucket: { mode: "size", size: 10 } });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(control("heatmap_y_sort").props("modelValue")).toBe("asc");
+      expect(control("heatmap_y_sort").text()).toContain("AscendingDescending");
+      expect(control("heatmap_y_sort").text()).not.toContain("Data order");
+      panel.data.config.heatmap_y_sort = "desc";
+      await flushPromises();
+      expect(control("heatmap_y_sort").props("modelValue")).toBe("desc");
+    });
+
+    it("offers bucketing only for a numeric builder y", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf({}, "Utf8") });
+      expect(control("heatmap_y_bucket").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf({}, "Int64", true) });
+      expect(control("heatmap_y_bucket").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf() });
+      expect(control("heatmap_y_bucket").props("modelValue")).toBe("none");
+      expect(control("heatmap_y_bucket_size").exists()).toBe(false);
+      expect(control("heatmap_y_min").exists()).toBe(false);
+    });
+
+    it("asks for a size > 0 in size mode and writes it to config", async () => {
+      const panel = panelOf();
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_y_bucket").vm.$emit("update:modelValue", "size");
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "size" });
+      expect(control("heatmap_y_bucket_size").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("Enter a bucket size greater than 0");
+
+      await control("heatmap_y_bucket_size").vm.$emit("update:modelValue", 10);
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "size", size: 10 });
+      expect(control("heatmap_y_bucket_size").props("error")).toBe(false);
+    });
+
+    it("explains a size that makes more buckets than the heatmap can draw", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf({
+          heatmap_y_bucket: { mode: "size", size: 0.001 },
+          heatmap_y_min: 0,
+          heatmap_y_max: 1000,
+        }),
+      });
+      expect(control("heatmap_y_bucket_size").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("This makes 1,000,001 buckets, more than the 416");
+    });
+
+    it("does not offer the axis border toggle, as heatmaps always draw their axis lines", () => {
+      const line = panelOf();
+      line.data.type = "line";
+      wrapper = createWrapper({ dashboardPanelData: line });
+      expect(control("axis-border").exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf() });
+      expect(control("axis-border").exists()).toBe(false);
+    });
+
+    it("defaults log to base 10, switches base, and clears everything for none", async () => {
+      const panel = panelOf({ heatmap_y_min: 1, heatmap_y_max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_y_bucket").vm.$emit("update:modelValue", "log");
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "log", base: 10 });
+      expect(control("heatmap_y_bucket_base").props("modelValue")).toBe("10");
+      await control("heatmap_y_bucket_base").vm.$emit("update:modelValue", "2");
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "log", base: 2 });
+
+      await control("heatmap_y_bucket").vm.$emit("update:modelValue", "none");
+      expect(panel.data.config.heatmap_y_bucket).toBeNull();
+      expect(panel.data.config.heatmap_y_min).toBeNull();
+      expect(panel.data.config.heatmap_y_max).toBeNull();
+    });
+
+    it("writes the y range and flags an inverted pair", async () => {
+      const panel = panelOf({ heatmap_y_bucket: { mode: "size", size: 10 } });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_y_min").vm.$emit("update:modelValue", 50);
+      await control("heatmap_y_max").vm.$emit("update:modelValue", 10);
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_min).toBe(50);
+      expect(panel.data.config.heatmap_y_max).toBe(10);
+      expect(control("heatmap_y_min").props("error")).toBe(true);
+      expect(control("heatmap_y_max").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("Min must be less than max; the full range is used instead");
+
+      await control("heatmap_y_max").vm.$emit("update:modelValue", "");
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_max).toBeNull();
+      expect(control("heatmap_y_min").props("error")).toBe(false);
+    });
+  });
+
+  describe("Legend values", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, show_legends: true, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Legend values"));
+
+    it.each(["pie", "donut"])(
+      "reads unset as none and writes value and percent for %s",
+      async (type) => {
+        const panel: any = panelOf(type);
+        wrapper = createWrapper({ dashboardPanelData: panel });
+        expect(toggleOf()?.props("modelValue")).toEqual([]);
+        expect(toggleOf()?.text()).toContain("ValuePercent");
+        await toggleOf()?.vm.$emit("update:modelValue", ["percent", "value"]);
+        expect(panel.data.config.legend_values).toEqual(["value", "percent"]);
+        await toggleOf()?.vm.$emit("update:modelValue", []);
+        expect(panel.data.config.legend_values).toEqual([]);
+      },
+    );
+
+    it("is absent when the legend is hidden or the chart is not a pie", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("pie", { show_legends: false }) });
+      expect(toggleOf()).toBeUndefined();
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
       expect(toggleOf()).toBeUndefined();
     });
   });
@@ -1936,6 +2579,19 @@ describe("ConfigPanel", () => {
       expect(colorBySeriesStub.exists()).toBe(true);
     });
 
+    it("shows the palette for sankey panels but not the per-series colours", async () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: { ...mockDashboardPanelData.data, type: "sankey" },
+        },
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showColorPalette).toBe(true);
+      expect(wrapper.find('[data-test="color-by-series-stub"]').exists()).toBe(false);
+    });
+
     it("should render stubbed components when they exist", () => {
       wrapper = createWrapper();
 
@@ -2705,6 +3361,218 @@ describe("ConfigPanel", () => {
       // The general section expansion item uses isSectionVisible('general') via v-show
       const expansionItems = wrapper.findAllComponents({ name: "OCollapsible" });
       expect(expansionItems.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Sparkline section", () => {
+    const metricPanel = (queryType: string, queryTypes: string[]) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "metric",
+        queryType,
+        queries: queryTypes.map((query_type) => ({ query: "x", config: { query_type } })),
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+
+    it("is shown for a range or mixed PromQL metric", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: metricPanel("promql", ["instant", "range"]) },
+        { promqlMode: true },
+      );
+      expect(wrapper.vm.promqlAllInstant).toBe(false);
+      expect(wrapper.text()).toContain("Sparkline");
+    });
+
+    it("is dropped when every PromQL query is instant", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: metricPanel("promql", ["instant", "instant"]) },
+        { promqlMode: true },
+      );
+      expect(wrapper.vm.promqlAllInstant).toBe(true);
+      expect(wrapper.text()).not.toContain("Sparkline");
+    });
+
+    it("stays for an SQL metric whatever its queries carry", () => {
+      wrapper = createWrapper({ dashboardPanelData: metricPanel("sql", ["instant"]) });
+      expect(wrapper.vm.promqlAllInstant).toBe(false);
+    });
+  });
+
+  describe("Area fill", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, ...config },
+      },
+    });
+    const opacityInput = () => wrapper.findComponent('[data-test="dashboard-config-fill_opacity"]');
+    const gradientSwitch = () =>
+      wrapper.findComponent('[data-test="dashboard-config-fill_gradient"]');
+
+    it("stores the opacity, clamps it to 0-100 on blur and clears an empty input to null", async () => {
+      const panel = reactive(panelOf("area"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", "35");
+      expect(panel.data.config.fill_opacity).toBe(35);
+      await opacityInput().vm.$emit("update:modelValue", "140");
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBe(100);
+      await opacityInput().vm.$emit("update:modelValue", "-3");
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBe(0);
+      await opacityInput().vm.$emit("update:modelValue", "");
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBeNull();
+    });
+
+    it("shows the clamped value after typing past 100 when 100 was already stored", async () => {
+      const panel = reactive(panelOf("area", { fill_opacity: 100 }));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", "1000");
+      expect(opacityInput().props("modelValue")).toBe(1000);
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBe(100);
+      expect(opacityInput().props("modelValue")).toBe(100);
+    });
+
+    it("shows the gradient on when unset and stores the toggle", async () => {
+      const panel = panelOf("area");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      expect(gradientSwitch().props("modelValue")).toBe(true);
+      await gradientSwitch().vm.$emit("update:modelValue", false);
+      expect(panel.data.config.fill_gradient).toBe(false);
+    });
+
+    it("shows the gradient off for a saved flat fill", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("area", { fill_gradient: false }) });
+      expect(gradientSwitch().props("modelValue")).toBe(false);
+    });
+
+    it.each(["area-stacked", "line", "bar"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(opacityInput().exists()).toBe(false);
+      expect(gradientSwitch().exists()).toBe(false);
+    });
+  });
+
+  describe("Scatter point size and opacity", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const sizeInput = () => wrapper.findComponent('[data-test="dashboard-config-symbol_size"]');
+    const opacityInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-symbol_opacity"]');
+
+    it("stores the typed size, fractions included, and an empty input as null", async () => {
+      const panel = panelOf("scatter");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await sizeInput().vm.$emit("update:modelValue", 12);
+      expect(panel.data.config.symbol_size).toBe(12);
+      await sizeInput().vm.$emit("update:modelValue", 0.5);
+      expect(panel.data.config.symbol_size).toBe(0.5);
+      await sizeInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.symbol_size).toBeNull();
+    });
+
+    it("flags a size of 0 or less, or above the max, instead of clearing it", async () => {
+      const panel = reactive(panelOf("scatter"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(sizeInput().props("error")).toBe(false);
+      for (const bad of [0, -3, 5000]) {
+        await sizeInput().vm.$emit("update:modelValue", bad);
+        expect(panel.data.config.symbol_size).toBe(bad);
+        expect(sizeInput().props("error")).toBe(true);
+      }
+      await sizeInput().vm.$emit("update:modelValue", 8);
+      expect(sizeInput().props("error")).toBe(false);
+    });
+
+    it("titles the section for points on a scatter chart", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("scatter") });
+      expect(wrapper.text()).toContain("Point style");
+    });
+
+    it("clamps the opacity to 0-100 and clears an empty input to null", async () => {
+      const panel = panelOf("scatter");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", 40);
+      expect(panel.data.config.symbol_opacity).toBe(40);
+      await opacityInput().vm.$emit("update:modelValue", 140);
+      expect(panel.data.config.symbol_opacity).toBe(100);
+      await opacityInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.symbol_opacity).toBeNull();
+    });
+
+    it("is shown for scatter in PromQL mode too, and absent for other charts", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("scatter") }, { promqlMode: true });
+      expect(sizeInput().exists()).toBe(true);
+      expect(opacityInput().exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(sizeInput().exists()).toBe(false);
+      expect(opacityInput().exists()).toBe(false);
+    });
+  });
+
+  describe("Bar width and bar track", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const widthInput = () => wrapper.findComponent('[data-test="dashboard-config-bar-width"]');
+
+    it("stores what was typed, and stores an empty input as auto", async () => {
+      const panel = panelOf("h-bar");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await widthInput().vm.$emit("update:modelValue", 24);
+      expect(panel.data.config.bar_width).toBe(24);
+      await widthInput().vm.$emit("update:modelValue", -3);
+      expect(panel.data.config.bar_width).toBe(-3);
+      await widthInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.bar_width).toBeNull();
+    });
+
+    it("flags a width below 1, above the max or with a fraction", async () => {
+      const panel = reactive(panelOf("h-bar"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(widthInput().props("error")).toBe(false);
+      for (const bad of [0, -3, 12.6, 5000]) {
+        await widthInput().vm.$emit("update:modelValue", bad);
+        expect(widthInput().props("error")).toBe(true);
+      }
+      await widthInput().vm.$emit("update:modelValue", 13);
+      expect(widthInput().props("error")).toBe(false);
+    });
+
+    it("shows the track for h-bar only and the width wherever a converter reads it", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("h-bar") });
+      expect(widthInput().exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(true);
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(widthInput().exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
+      wrapper = createWrapper({ dashboardPanelData: panelOf("stacked") }, { promqlMode: true });
+      expect(widthInput().exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
     });
   });
 });

@@ -14,8 +14,31 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ComputedRef, InjectionKey } from "vue";
+import { raw } from "@/types/i18n";
 import type { I18nText } from "@/types/i18n";
 import type { ComboboxOption } from "@/lib/forms/Combobox/OCombobox.types";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
+
+// Operator `value`s are the backend wire format (serde renames); labels stay raw English.
+export const ALL_CONDITION_OPERATORS: SelectOptionInput[] = [
+  "=",
+  "!=",
+  ">=",
+  "<=",
+  ">",
+  "<",
+  "Contains",
+  "NotContains",
+  { label: raw("Is Null"), value: "is_null" },
+  { label: raw("Is Not Null"), value: "is_not_null" },
+  { label: raw("Is Empty"), value: "is_empty" },
+  { label: raw("Is Not Empty"), value: "is_not_empty" },
+];
+
+/** The wire-format values from `ALL_CONDITION_OPERATORS`, for callers that only validate membership. */
+export const ALL_CONDITION_OPERATOR_VALUES: string[] = ALL_CONDITION_OPERATORS.map((option) =>
+  typeof option === "object" && option !== null ? String(option.value) : String(option),
+);
 
 /** ConditionBuilder hands its `operators` down to every FilterCondition, through FilterGroup. */
 export const CONDITION_OPERATORS_KEY: InjectionKey<ComputedRef<string[] | undefined>> =
