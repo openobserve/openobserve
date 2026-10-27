@@ -75,9 +75,6 @@ const VOLATILE_FUNCTIONS: [&str; 11] = [
 /// Functions that turn one bucket into several rows, which the slice reader rejects as duplicates.
 const ROW_EXPANDING_FUNCTIONS: [&str; 1] = ["unnest"];
 
-/// Caps the result keys kept for the all-NULL diagnostic.
-const MAX_KEYS_SEEN: usize = 64;
-
 /// An unchanged fallback reason is logged once per config per interval, not on every tick.
 const FALLBACK_LOG_INTERVAL: Duration = Duration::from_secs(3600);
 
@@ -399,9 +396,6 @@ impl SeriesAccumulator {
             return;
         }
         for key in row.keys() {
-            if self.keys_seen.len() >= MAX_KEYS_SEEN {
-                return;
-            }
             if !self.keys_seen.contains(key) {
                 self.keys_seen.insert(key.clone());
             }
@@ -2267,7 +2261,7 @@ mod tests {
             "{err}"
         );
 
-        let wide: serde_json::Map<_, _> = (0..2 * MAX_KEYS_SEEN)
+        let wide: serde_json::Map<_, _> = (0..128)
             .map(|i| (format!("k{i:03}"), json!(1)))
             .chain([(BUCKET_COLUMN.to_string(), json!(T0))])
             .collect();
@@ -2281,7 +2275,8 @@ mod tests {
                 &ResultColumns::generated(),
             )
             .unwrap();
-        assert_eq!(series.keys_seen.len(), MAX_KEYS_SEEN);
+        assert_eq!(series.keys_seen.len(), 129);
+        assert!(series.keys_seen.contains(BUCKET_COLUMN));
 
         let slice = [T0, T0 + 2 * FIVE_MIN_US];
         let no_bucket = response(vec![json!({ VALUE_COLUMN: 1 })]);
