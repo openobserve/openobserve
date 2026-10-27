@@ -103,7 +103,6 @@ export const slackConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: isValidSlackWebhookUrl,
   credentialFields: [
     {
       key: "webhookUrl",

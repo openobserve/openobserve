@@ -28,7 +28,7 @@
 -->
 <template>
   <OPageLayout
-    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || alertId)"
+    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || '')"
     icon="notifications"
     :subtitle="notFound ? raw('') : subtitle"
     :back="backTarget"

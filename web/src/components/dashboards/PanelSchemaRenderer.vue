@@ -37,21 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :empty-text="customNoDataText ? noDataTitle : null"
-          @row-click="
-            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
-          "
+          @row-click="onPanelClick"
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="
-            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
-          "
-          @explore-cell="
-            (params) =>
-              !store.state.kioskMode && exploreCellInLogs(params.columnId, params.value, params.row)
-          "
+          @row-click="onPanelClick"
+          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -62,10 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-key-fields="tableRowKeyFields"
           :enable-column-format="enableColumnFormat"
           :drilldown-columns="
-            store.state.printMode || store.state.kioskMode ? [] : drilldownColumnAliases
+            store.state.printMode || store.state.kioskMode || !allowDrilldown
+              ? []
+              : drilldownColumnAliases
           "
           :drilldown-all-columns="
-            !store.state.printMode && !store.state.kioskMode && drilldownAllColumns
+            !store.state.printMode &&
+            !store.state.kioskMode &&
+            allowDrilldown &&
+            drilldownAllColumns
           "
         >
           <template v-if="customNoDataText" #empty>
@@ -118,9 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="
-            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
-          "
+          @click="onPanelClick"
           @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
           @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
@@ -531,6 +527,12 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    // Off where the viewer can't follow a drilldown, such as the anonymous public page.
+    allowDrilldown: {
+      default: true,
+      required: false,
+      type: Boolean,
+    },
     allowAnnotationsAPI: {
       default: true,
       required: false,
@@ -824,6 +826,7 @@ export default defineComponent({
       allowAnnotationsAdd,
       allowAnnotationsAPI,
       allowAlertCreation,
+      allowDrilldown,
       alertSource,
       runId,
       tabId,
@@ -1426,7 +1429,8 @@ export default defineComponent({
     // ======= [END] dashboard PrintMode =======
 
     onMounted(async () => {
-      // fetch all panels
+      // The panel list only feeds annotation editing; injected-data panels have no live dashboard to fetch.
+      if (injectedPromqlData?.value) return;
       await fetchAllPanels();
     });
 
@@ -2267,13 +2271,16 @@ export default defineComponent({
       onExemplarClick: exemplarInteraction.onExemplarClick,
     });
 
+    // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
+    const onPanelClick = (...args: Parameters<typeof onChartClick>) =>
+      allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
     // The copy hover zone covers its value, so a click there stands in for a click on that cell's series.
     const onMetricZoneClick = (
       m: { idx: number; layout?: { left?: number; top?: number } },
       event: MouseEvent,
     ) => {
       if ((event.target as HTMLElement | null)?.closest("button")) return;
-      onChartClick({
+      onPanelClick({
         componentType: "series",
         seriesType: "custom",
         seriesIndex: m.idx,
@@ -2511,7 +2518,9 @@ export default defineComponent({
     }
 
     // Called directly by the search icon so it works even with a panel drilldown config.
+    // Off with drilldowns, so the anonymous public page never opens the logs drawer.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
+      if (!allowDrilldown.value || store.state.kioskMode) return;
       const queries = props.panelSchema.queries ?? [];
       const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
       const query = queries[qi];
@@ -2573,6 +2582,7 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onPanelClick,
       onFormatColumn,
       onDataZoom,
       drilldownColumnAliases,
