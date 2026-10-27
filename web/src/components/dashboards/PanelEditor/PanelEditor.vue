@@ -298,6 +298,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @result-metadata-update="onResultMetadataUpdate"
                         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                         @series-limit-update="handleSeriesLimitUpdate"
+                        @region-join-update="handleRegionJoinUpdate"
+                        @sankey-notice-update="handleSankeyNoticeUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -375,6 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
+            @openAddVariable="emit('openAddVariable')"
             :initialVariableValues="initialVariableValues"
             class="mb-2 shrink-0"
             :showAddVariableButton="true"
@@ -407,6 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
+            @openAddVariable="emit('openAddVariable')"
             :initialVariableValues="initialVariableValues"
             class="mb-2 shrink-0"
             :showAddVariableButton="true"
@@ -610,6 +614,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @result-metadata-update="onResultMetadataUpdate"
                           @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                           @series-limit-update="handleSeriesLimitUpdate"
+                          @region-join-update="handleRegionJoinUpdate"
+                          @sankey-notice-update="handleSankeyNoticeUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -723,6 +729,7 @@ import type {
   PanelEditorVariablesData,
 } from "./types/panelEditor";
 import { resolveConfig } from "./types/panelEditor";
+import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -820,8 +827,13 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value, t);
+const {
+  dashboardPanelData,
+  resetAggregationFunction,
+  makeAutoSQLQuery,
+  regenerateOtherBuilderQueries,
+  validatePanel,
+} = useDashboardPanelData(pageKey.value, t);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -890,6 +902,8 @@ const {
   handleResultMetadataUpdate,
   handlePanelDiagnosticsUpdate,
   handleSeriesLimitUpdate,
+  handleRegionJoinUpdate,
+  handleSankeyNoticeUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,
@@ -1245,9 +1259,12 @@ const resolvedVariablesData = computed(() => {
 });
 
 // Live variables data (for HTML/Markdown editors)
-const liveVariablesData = computed(() => {
-  return props.variablesData || { isVariablesLoading: false, values: [] };
-});
+const liveVariablesData = computed(() =>
+  withTimeRangeVariables(
+    props.variablesData || { isVariablesLoading: false, values: [] },
+    dashboardPanelData.meta.dateTime,
+  ),
+);
 
 // ============================================================================
 // Props forwarding
@@ -1294,7 +1311,7 @@ const handleChartTypeSelection = async (selection: any) => {
     const replaceQuery = selection.replaceQuery ?? false;
 
     try {
-      const { loadCustomChartTemplate } =
+      const { loadCustomChartTemplate, customChartTemplateContent } =
         await import("@/components/dashboards/addPanel/customChartExamples/customChartTemplates");
       const template = await loadCustomChartTemplate(chart.value);
 
@@ -1304,8 +1321,12 @@ const handleChartTypeSelection = async (selection: any) => {
 // Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple
 // Define your ECharts 'option' here.
 // 'data' variable is available for use and contains the response data from the search result and it is an array.
+// 'context' is read-only: variables (null when All), timeRange {start, end} in microseconds, timezone and theme ('light' or 'dark').
 `;
-        dashboardPanelData.data.customChartContent = defaultComments + template.code;
+        dashboardPanelData.data.customChartContent = customChartTemplateContent(
+          defaultComments,
+          template,
+        );
 
         const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
         if (dashboardPanelData.data.queries[currentQueryIndex]) {
@@ -1353,6 +1374,10 @@ watch(
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
     dashboardPanelData.data.type,
+    // The builder generates the heatmap y bucketing and range into the SQL itself.
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
   ],
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)
@@ -1369,6 +1394,16 @@ watch(
       }
     }
   },
+  { deep: true },
+);
+
+watch(
+  () => [
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
+  ],
+  () => regenerateOtherBuilderQueries(),
   { deep: true },
 );
 

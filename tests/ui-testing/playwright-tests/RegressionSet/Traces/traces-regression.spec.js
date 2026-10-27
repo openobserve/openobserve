@@ -127,12 +127,13 @@ test.describe("Traces Regression Bugs", () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // STEP 1: Get initial trace count and capture trace IDs before navigation
+    // Results arrive newest minute first, so traces older than a minute show 0 rows until the older slices land.
+    await expect.poll(() => pm.tracesPage.getTraceCount(), {
+      timeout: 30000,
+      message: 'Bug #9043: Should have initial traces to test pagination (no trace results available for this time range)',
+    }).toBeGreaterThan(0);
     const initialTraceCount = await pm.tracesPage.getTraceCount();
     testLogger.info(`Initial trace count: ${initialTraceCount}`);
-
-    // STRONG ASSERTION: We need at least some traces to test pagination
-    // If no results, test will fail with meaningful error message
-    expect(initialTraceCount, 'Bug #9043: Should have initial traces to test pagination (no trace results available for this time range)').toBeGreaterThan(0);
 
     // STEP 2: Click on first trace to open trace details
     await pm.tracesPage.clickFirstTraceResult();

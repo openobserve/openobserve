@@ -18,7 +18,11 @@ import { fillMissingTimestamps } from "./shared/dataProcessor";
 import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
-import { chartColor } from "@/utils/chartTheme";
+import { buildSeriesMarkLine } from "./shared/markLines";
+import { lineThicknessOf } from "../promqlChartSeriesProps";
+import { getScatterSymbolSize } from "../scatterPointStyle";
+import { getSeriesItemOpacity } from "../promqlChartSeriesProps";
+import { barStyleSeriesProps } from "../barTrack";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -105,23 +109,13 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           // Styling
           itemStyle: {
             color: seriesColor,
+            ...getSeriesItemOpacity(chartType, config, false),
           },
 
           // Connect null values
           connectNulls: config?.connect_nulls ?? false,
 
-          // Mark lines (annotations)
-          markLine: {
-            silent: true,
-            animation: false,
-            data: this.getMarkLineData(panelSchema),
-            zlevel: 2,
-            lineStyle: {
-              shadowColor: chartColor("--color-chart-markline-shadow"),
-              shadowBlur: 2,
-              width: 2,
-            },
-          },
+          markLine: { ...buildSeriesMarkLine(panelSchema), zlevel: 2 },
         });
 
         // Track for legend
@@ -170,7 +164,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_thickness ?? 1.5,
+            width: lineThicknessOf(config),
           },
         };
 
@@ -182,7 +176,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_thickness ?? 1.5,
+            width: lineThicknessOf(config),
           },
         };
 
@@ -191,7 +185,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           emphasis: {
             focus: "series",
           },
-          ...(config.bar_width && { barWidth: config.bar_width }),
+          ...barStyleSeriesProps(config, { withTrack: false }),
         };
 
       case "scatter":
@@ -199,7 +193,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           emphasis: {
             focus: "series",
           },
-          ...(config.symbol_size && { symbolSize: config.symbol_size }),
+          symbolSize: getScatterSymbolSize(config),
         };
 
       case "line":
@@ -209,42 +203,9 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_thickness ?? 1.5,
+            width: lineThicknessOf(config),
           },
         };
     }
-  }
-
-  /**
-   * Extract mark line data from panel schema for annotations
-   */
-  private getMarkLineData(panelSchema: any): any[] {
-    const markLines: any[] = [];
-
-    if (panelSchema.config?.mark_lines) {
-      panelSchema.config.mark_lines.forEach((markLine: any) => {
-        if (markLine.show !== false) {
-          markLines.push({
-            name: markLine.name,
-            xAxis: markLine.type === "xAxis" ? markLine.value : null,
-            yAxis: markLine.type === "yAxis" ? markLine.value : null,
-            label: {
-              // The alert preview passes show_label:false — its lines are
-              // colour-coded, and a text label clips at the chart top.
-              show: markLine.show_label !== false,
-              formatter: markLine.name ? "{b}:{c}" : "{c}",
-              position: "insideEndTop",
-            },
-            lineStyle: {
-              color: markLine.color || "#FF0000",
-              type: markLine.lineStyle || "solid",
-              width: markLine.width || 2,
-            },
-          });
-        }
-      });
-    }
-
-    return markLines;
   }
 }
