@@ -201,4 +201,21 @@ describe("ChartSelection", () => {
     expect(li.className.includes("cursor-not-allowed")).toBe(true);
     dashboardPanelData.data.queryType = previous;
   });
+  it("lists treemap with its own icon", async () => {
+    const item = wrapper.find("[data-test='selected-chart-treemap-item']");
+    expect(item.exists()).toBe(true);
+    expect(item.find("img").attributes("src")).toContain("charts/treemap.svg");
+    await item.trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["treemap"]);
+  });
+
+  it("in PromQL mode disables treemap", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const li = wrapper.find("[data-test='selected-chart-treemap-item']").element.closest("li");
+    expect(li.className.includes("cursor-not-allowed")).toBe(true);
+    dashboardPanelData.data.queryType = previous;
+  });
 });

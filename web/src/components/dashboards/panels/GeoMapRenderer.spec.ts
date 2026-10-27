@@ -81,6 +81,7 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  TreemapChart: vi.fn(),
   PictorialBarChart: vi.fn(),
 }));
 

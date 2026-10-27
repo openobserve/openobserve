@@ -184,6 +184,8 @@ export const buildDefaultBuilderFields = (
     const column = firstNumericField(groupedFields, streamName, timestampColumn);
     return { x: [], y: column ? [rawValueYField(column)] : [] };
   }
+  // One tile per label, so a time bucket is not a useful default label.
+  if (chartType === "treemap") return { x: [], y };
   // A time bucket is not an entity; the user picks the entity field.
   if (chartType === "hostmap") return { x: [], y };
   return { x, y };

@@ -545,6 +545,7 @@ mod tests {
         });
         let rest3 = serde_json::json!({
             "state_timeline_display": "cells",
+            "treemap_show_breadcrumb": true,
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

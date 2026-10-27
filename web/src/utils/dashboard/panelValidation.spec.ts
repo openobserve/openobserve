@@ -1022,3 +1022,97 @@ describe("validatePanel on bar gauge", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+describe("validatePanel on a treemap", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "treemap",
+          queryType,
+          config: {},
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one x, one y and one breakdown", () => {
+    expect(run({ x: [field("service")], y: [field("count")], breakdown: [field("r")] })).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a missing x and a second y", () => {
+    expect(run({ x: [], y: [field("c"), field("d")] })).toHaveLength(2);
+  });
+
+  it("accepts several group fields as nested levels", () => {
+    expect(
+      run({ x: [field("region"), field("service"), field("host")], y: [field("count")] }),
+    ).toEqual([]);
+  });
+
+  it("rejects more than five levels across the group fields and the sub-group", () => {
+    const x = ["a", "b", "c", "d", "e"].map(field);
+    expect(run({ x, y: [field("count")], breakdown: [field("f")] })).toEqual([
+      gt("dashboard.utils.treemapTooManyLevels", { count: 5 }),
+    ]);
+  });
+
+  it("accepts a count or sum size and rejects a size a parent tile cannot add up", () => {
+    const size = (functionName: string) => ({
+      ...field("y_axis_1"),
+      type: "build",
+      functionName,
+      args: [{ type: "field", value: { field: "latency" } }],
+    });
+    const x = [field("region"), field("service")];
+    const sizeError = gt("dashboard.utils.sizeMustBeCountOrSum");
+    expect(run({ x, y: [size("count")] })).not.toContain(sizeError);
+    expect(run({ x, y: [size("sum")] })).not.toContain(sizeError);
+    expect(run({ x, y: [size("avg")] })).toContain(sizeError);
+    expect(run({ x, y: [size("count-distinct")] })).toContain(sizeError);
+  });
+
+  it("is not supported on PromQL", () => {
+    expect(run({}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "treemap", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

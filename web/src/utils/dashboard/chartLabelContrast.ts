@@ -37,3 +37,7 @@ export const labelColorOn = (background: unknown): string => {
   const onBlack = (luminance + 0.05) / 0.05;
   return onWhite >= onBlack ? chartColor("--color-white") : chartColor("--color-black");
 };
+
+/** The colour ECharts paints a tile under a `colorSaturation` range, which in fact sets HSL lightness. */
+export const withLightness = (color: string, lightness: number): string =>
+  echartsColor.modifyHSL(color, undefined, undefined, lightness) || color;

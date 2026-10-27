@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'metric',
                           'gauge',
                           'bar-gauge',
+                          'treemap',
                           'geomap',
                           'maps',
                         ].includes(dashboardPanelData.data.type)

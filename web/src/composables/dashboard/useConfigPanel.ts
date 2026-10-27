@@ -379,6 +379,10 @@ export function useConfigPanel(
         ],
         visible: dashboardPanelData.data.type === "distribution",
       },
+      "treemap-breadcrumb": {
+        label: t("dashboard.treemapShowBreadcrumb"),
+        visible: dashboardPanelData.data.type === "treemap",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",

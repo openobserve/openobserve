@@ -1624,3 +1624,14 @@ describe("useConfigPanel – sparkline search visibility", () => {
     );
   });
 });
+
+describe("useConfigPanel – treemap options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the breadcrumb option on a treemap only, and no thresholds", () => {
+    expect(visible("treemap", "data", "treemap-breadcrumb")).toBe(true);
+    expect(visible("pie", "data", "treemap-breadcrumb")).toBe(false);
+    expect(shouldShowThresholds({ data: { type: "treemap", config: {} } })).toBe(false);
+  });
+});

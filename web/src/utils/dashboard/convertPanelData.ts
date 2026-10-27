@@ -34,6 +34,7 @@ import { applyGeoMapClusters, mapClusterRadius } from "./geoMapCluster";
 import { applyTableOptions } from "./tableOptions";
 import { barGaugeSchemaAsGauge, convertBarGaugeData } from "./convertBarGaugeData";
 import { convertDistributionData } from "./convertDistributionData";
+import { convertTreemapData } from "./convertTreemapData";
 import { convertHostmapData } from "./convertHostmapData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -177,6 +178,12 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertDistributionData(panelSchema, data, store),
+      };
+    }
+    case "treemap": {
+      return {
+        chartType: panelSchema.type,
+        ...convertTreemapData(panelSchema, data, store),
       };
     }
     case "table": {

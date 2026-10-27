@@ -299,4 +299,13 @@ describe("defaultFields", () => {
       ).toBeNull();
     });
   });
+  describe("buildDefaultBuilderFields for a treemap", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+
+    it("seeds a count with no time label", () => {
+      const { x, y } = buildDefaultBuilderFields("treemap", "logs", logsSchema, "logs");
+      expect(x).toEqual([]);
+      expect(y[0].functionName).toBe("count");
+    });
+  });
 });
