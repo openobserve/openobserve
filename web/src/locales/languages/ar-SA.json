@@ -6260,6 +6260,7 @@
       "settingTitle": "الاسم",
       "settingDescription": "الوصف",
       "settingTimeRange": "النطاق الزمني الافتراضي",
+      "settingAutoRefresh": "التحديث التلقائي الافتراضي",
       "settingDynamicFilters": "عوامل التصفية الديناميكية",
       "settingOther": "إعدادات أخرى",
       "impactSettings": "يستبدل إعدادات لوحة المعلومات التي غيّروها: {settings}",
@@ -7853,7 +7854,11 @@
       "updationFailed": "فشل تحديث لوحة المعلومات",
       "dynamicFiltersHelp": "يضيف صف فلتر مؤقتة فوق الألواح.",
       "appliesToEveryone": "هذه الإعدادات مشتركة مع كل من يمكنه الوصول إلى لوحة المعلومات هذه.",
-      "saveChanges": "حفظ التغييرات"
+      "saveChanges": "حفظ التغييرات",
+      "defaultAutoRefresh": "التحديث التلقائي الافتراضي",
+      "defaultAutoRefreshHelp": "يُطبَّق في كل مرة تُفتح فيها لوحة المعلومات، ما لم يحدد الرابط فاصلته الخاصة.",
+      "defaultAutoRefreshRaised": "تم الحفظ كـ {saved}، وهو أقل من الحد الأدنى للخادم، لذا يتم التحديث كل {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "النطاق الزمني الافتراضي مطلق، لذا يعيد كل تحديث تحميل النطاق نفسه. تحتاج التحديثات المباشرة إلى نطاق زمني نسبي."
     },
     "addDashboardPage": {
       "addedSuccessfully": "تمت إضافة لوحة المعلومات بنجاح.",
