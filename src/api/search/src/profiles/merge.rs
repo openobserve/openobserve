@@ -33,14 +33,12 @@ use tracing::Span;
 use utoipa::ToSchema;
 
 use super::{
-    ProfilesQueryBody, ProfilesSqlParams, build_where_clause, check_stream_permission, hit_i64,
-    hit_string, instance_key_expr, load_schema_field_names, parse_required_time_range,
-    require_profile_type_and_unit, resolve_query_body, resolve_timeout, run_profiles_sql,
+    ProfilesQueryBody, ProfilesSqlParams, build_where_clause, check_stream_permission,
+    default_result_size, hit_i64, hit_string, instance_key_expr, load_schema_field_names,
+    parse_required_time_range, require_profile_type_and_unit, resolve_query_body, resolve_timeout,
+    run_profiles_sql,
 };
 use crate::common::utils::http::get_or_create_trace_id;
-
-// load_stacks fetches one extra row to detect truncation, so the SQL LIMIT is 99_999.
-const MAX_UNIQUE_STACKS: i64 = 99_998;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ProfilesMergeResponse {
@@ -284,7 +282,7 @@ pub(crate) async fn load_stacks(
     snapshot_key: Option<&str>,
     http_span: Span,
 ) -> Result<StackSet, Response> {
-    let result_size = MAX_UNIQUE_STACKS;
+    let result_size = default_result_size();
     let stack_q = quote_identifier("stack");
     let value_q = quote_identifier("value");
     let sql = if where_clause.is_empty() {
