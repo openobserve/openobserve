@@ -27,9 +27,11 @@
 //!   width (~6% at schema 0, less at finer schemas, more after downscaling). This is an approximate
 //!   fallback, not a native-fidelity one.
 
-pub use config::meta::promql::CLASSIC_HISTOGRAM_SUFFIXES;
 use config::meta::promql::is_stale_marker;
 use proto::prometheus_rpc;
+
+/// The classic streams a native histogram degrades into.
+pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = ["_bucket", "_count", "_sum"];
 
 /// Exponential schemas (`base = 2^(2^-schema)`). Anything outside -- notably NHCB,
 /// schema -53 -- cannot be converted: our wire type does not decode `custom_values`.

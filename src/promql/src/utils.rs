@@ -20,8 +20,7 @@ use config::{
     meta::{
         promql::{
             BUCKET_LABEL, BUCKET_STREAM_SUFFIX, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS,
-            VALUE_LABEL, exemplars_stream_name, histogram_family, histogram_series_family,
-            value::Sample,
+            VALUE_LABEL, exemplars_stream_name, value::Sample,
         },
         stream::StreamType,
     },
@@ -112,18 +111,21 @@ pub fn apply_label_selector(
     Some(df)
 }
 
-/// The exemplar stream for `selector_name`, from cached schemas only: a histogram family's series
-/// read the family's (where its exemplars are written) unless a `_count`/`_sum` one has its own.
+/// The exemplar stream for `selector_name`, from cached schemas only: its own if that exists, else
+/// its histogram family's when the family's `_bucket` stream carries `le`.
 pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
     let own = exemplars_stream_name(selector_name);
-    let Some(family) = histogram_series_family(selector_name) else {
+    let Some(family) = [BUCKET_STREAM_SUFFIX, "_count", "_sum"]
+        .iter()
+        .find_map(|suffix| selector_name.strip_suffix(suffix))
+    else {
         return own;
     };
     let cached = |stream: String| async move {
         infra::schema::get_stream_schema_from_cache(org_id, &stream, StreamType::Metrics).await
     };
     // remote write keeps exemplars sent on a `_count`/`_sum` series in that series' own stream
-    if histogram_family(selector_name).is_none() && cached(own.clone()).await.is_some() {
+    if cached(own.clone()).await.is_some() {
         return own;
     }
     let is_family = cached(format!("{family}{BUCKET_STREAM_SUFFIX}"))
