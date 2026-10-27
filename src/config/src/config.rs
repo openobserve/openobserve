@@ -2535,7 +2535,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
-        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, no cost is computed for spans that do not report one."
     )]
     pub model_pricing_enabled: bool,
     #[env_config(
