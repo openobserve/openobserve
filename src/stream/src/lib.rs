@@ -244,6 +244,10 @@ pub async fn create_stream(
         ));
     }
 
+    if let Some(violation) = schema::stream_key_violation(org_id, stream_type, stream_name) {
+        return Ok(MetaHttpResponse::bad_request(violation));
+    }
+
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -1949,5 +1953,21 @@ mod tests {
         let index_fields = settings_test_stream(name).await.index_fields;
         assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
         assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
+    }
+
+    #[tokio::test]
+    async fn test_create_stream_rejects_too_long_stream() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
+        let name = "s".repeat(schema::STREAM_KEY_MAX_LEN);
+        let stream = StreamCreate {
+            fields: Vec::new(),
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream("org1", &name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
     }
 }

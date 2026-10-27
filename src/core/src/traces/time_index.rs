@@ -164,9 +164,8 @@ fn index_schema() -> Schema {
     ])
 }
 
-async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String> {
-    let index_stream = get_trace_time_index_stream_name(source_stream);
-    let schema_cache = infra::schema::get_cache(org_id, &index_stream, StreamType::Metadata)
+async fn ensure_index_stream(org_id: &str, source_stream: &str, index_stream: &str) -> Result<()> {
+    let schema_cache = infra::schema::get_cache(org_id, index_stream, StreamType::Metadata)
         .await
         .map_err(|e| Error::Message(format!("load trace time index schema: {e}")))?;
     let fields_map = schema_cache.fields_map();
@@ -177,7 +176,7 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         let expected = index_schema();
         crate::db::schema::merge(
             org_id,
-            &index_stream,
+            index_stream,
             StreamType::Metadata,
             &expected,
             Some(config::utils::time::now_micros()),
@@ -190,7 +189,7 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         .await
         .unwrap_or_default();
     let mut index_settings =
-        infra::schema::get_settings(org_id, &index_stream, StreamType::Metadata)
+        infra::schema::get_settings(org_id, index_stream, StreamType::Metadata)
             .await
             .map(|settings| (*settings).clone())
             .unwrap_or_else(|| StreamSettings {
@@ -224,12 +223,12 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         index_settings.data_retention = source_settings.data_retention;
         index_settings.extended_retention_days = source_settings.extended_retention_days.clone();
         index_settings.enable_distinct_fields = false;
-        schema::save_stream_settings(org_id, &index_stream, StreamType::Metadata, index_settings)
+        schema::save_stream_settings(org_id, index_stream, StreamType::Metadata, index_settings)
             .await
             .map_err(|e| Error::Message(format!("save trace time index settings: {e}")))?;
     }
 
-    Ok(index_stream)
+    Ok(())
 }
 
 pub async fn write(
@@ -240,13 +239,18 @@ pub async fn write(
     if !get_config().common.trace_time_index_enabled {
         return Ok(());
     }
+    // the index key is longer than its source's, so it can pass the limit on its own
+    let index_stream = get_trace_time_index_stream_name(source_stream);
+    if schema::is_stream_key_too_long(org_id, StreamType::Metadata, &index_stream) {
+        return Ok(());
+    }
 
     let records = generate_records(source_records);
     if records.is_empty() {
         return Ok(());
     }
 
-    let index_stream = ensure_index_stream(org_id, source_stream).await?;
+    ensure_index_stream(org_id, source_stream, &index_stream).await?;
     let schema = Arc::new(index_schema());
     let schema_key = schema.hash_key();
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
@@ -464,5 +468,29 @@ mod tests {
         records.sort_by(|a, b| a.trace_id.cmp(&b.trace_id));
         assert_eq!(records[0].session_id.as_deref(), Some("session-a"));
         assert_eq!(records[1].session_id, None);
+    }
+
+    /// A source stream that fits can still have an index key past the limit; it gets no index.
+    #[tokio::test]
+    async fn too_long_index_stream_is_skipped() {
+        if !schema::file_list_keys_bounded() || !get_config().common.trace_time_index_enabled {
+            return;
+        }
+        // "org/traces/" is 11 characters
+        let source = "s".repeat(schema::STREAM_KEY_MAX_LEN - 11);
+        assert!(!schema::is_stream_key_too_long(
+            "org",
+            StreamType::Traces,
+            &source
+        ));
+        let index = get_trace_time_index_stream_name(&source);
+        write(
+            "org",
+            &source,
+            &[span("trace", 10_000_000_000, 20_000_000_000)],
+        )
+        .await
+        .unwrap();
+        assert!(!infra::schema::exists("org", StreamType::Metadata, &index).await);
     }
 }

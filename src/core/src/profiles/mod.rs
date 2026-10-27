@@ -50,7 +50,7 @@ use opentelemetry_proto::tonic::{
     },
 };
 use prost::Message;
-use schema::check_for_schema;
+use schema::{check_for_schema, check_stream_key_len};
 
 use self::attributes::resolve_any_value_string;
 use crate::{
@@ -298,6 +298,9 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+    // the stream schema is created before check_for_schema runs, so reject up front
+    check_stream_key_len(org_id, StreamType::Profiles, &stream_name)
+        .map_err(|e| ProfilesExportError::InvalidArgument(e.to_string()))?;
 
     dictionary_compat::normalize(&mut request).map_err(ProfilesExportError::InvalidArgument)?;
     validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;

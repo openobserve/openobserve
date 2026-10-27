@@ -155,7 +155,8 @@ pub fn check_stream_key_len(
     Err(anyhow::anyhow!("{violation}. Data discarded."))
 }
 
-fn stream_key_violation(
+/// Why a stream's file_list key or org cannot be stored, if it cannot; counts no error.
+pub fn stream_key_violation(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
