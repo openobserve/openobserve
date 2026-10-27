@@ -26513,6 +26513,8 @@
       "mappedSummary": "Automatic for {domains} · from your organization's domain mapping",
       "mappedReadonly": "Mapped domains are read-only here; OpenObserve support changes the mapping. Turning linking off is still yours.",
       "manualSummary": "Automatic for {domains}",
+      "noDomains": "On, but no domains: nobody is linked automatically",
+      "skippedDomain": "{count} member skipped: their email domain is not listed | {count} members skipped: their email domain is not listed",
       "offSummary": "Off · people link with one click when they first ask",
       "domains": "Domains",
       "editDomains": "Edit domains",
