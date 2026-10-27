@@ -251,17 +251,15 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
 
     const createDestination = async (name, path, destinationType) => {
       const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
+        // The API takes url/method/type at the top level; nesting them left url empty.
         data: {
           name,
-          module: 'alert',
           template: templateName,
-          destination_type: {
-            type: 'http',
-            url: `http://127.0.0.1:${receiverPort}${path}`,
-            method: 'post',
-            destination_type: destinationType,
-            metadata: {},
-          },
+          type: 'http',
+          url: `http://127.0.0.1:${receiverPort}${path}`,
+          method: 'post',
+          destination_type_name: destinationType,
+          metadata: {},
         },
       });
       if (!resp.ok()) {
