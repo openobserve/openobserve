@@ -1769,7 +1769,7 @@ export default defineComponent({
     const loadSchemasBeforeSqlToggle = async () => {
       if (!(searchObj.data.query ?? "").trim()) return;
       await loadPendingFreeTextSchemas(searchObj, (name) =>
-        getStream(name, searchObj.data.stream.streamType || "logs", true, true),
+        getStream(name, searchObj.data.stream.streamType || "logs", true),
       );
     };
 
