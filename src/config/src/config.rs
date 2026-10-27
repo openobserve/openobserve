@@ -2746,7 +2746,7 @@ pub struct Limit {
         help = "Count-based alerts whose row sentinel exceeds this switch to a COUNT(*) decision query plus a 100-row payload sample (alerts_2.md 4.4c). Clamped up to the 100-row floor."
     )]
     pub alert_hybrid_count_threshold: i64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
+    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 50)]
     pub alert_schedule_concurrency: i64,
     #[env_config(
         name = "ZO_ALERT_MAX_GROUPS",
