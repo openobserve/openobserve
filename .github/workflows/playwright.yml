@@ -12,6 +12,8 @@ on:
     # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
     types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
   merge_group:
+  schedule:
+    - cron: '30 20 * * *'  # 2:00 AM IST
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
@@ -92,10 +94,11 @@ jobs:
         id: classify
       - id: check
         env:
+          EVENT_NAME: ${{ github.event_name }}
           HAS_CHANGES: ${{ steps.classify.outputs.run_playwright }}
           CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
@@ -503,6 +506,19 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
 
+      # Expressions have no arithmetic, so the previous attempt number is computed here.
+      - name: Resolve previous attempt
+        id: prev
+        run: echo "attempt=$(( ${{ github.run_attempt }} - 1 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Download previous attempt's failed-test list
+        if: ${{ github.run_attempt > 1 }}
+        continue-on-error: true
+        uses: actions/download-artifact@v5
+        with:
+          name: last-run-${{ matrix.testfolder }}-attempt-${{ steps.prev.outputs.attempt }}
+          path: tests/ui-testing/last-run-prev
+
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -607,6 +623,27 @@ jobs:
               echo "DEBUG: pinning workers to ${{ matrix.workers }}"
             fi
 
+            # Re-run whole files that had a failure (a serial group needs its earlier tests).
+            PREV=last-run-prev/.last-run.json
+            if [ "$GITHUB_RUN_ATTEMPT" -gt 1 ] && [ -f "$PREV" ] \
+              && node -e "const r=require('./$PREV'); process.exit(r.status === 'failed' && (r.failedTests||[]).length ? 0 : 1)"; then
+              mkdir -p test-results && cp "$PREV" test-results/.last-run.json
+              LIST_JSON=$(mktemp)
+              read -ra SHARD_FILES <<< "$FILE_PATHS"
+              FAILED_FILES=""
+              if PLAYWRIGHT_JSON_OUTPUT_NAME="$LIST_JSON" npx playwright test "${SHARD_FILES[@]}" --last-failed --list --reporter=json > /dev/null; then
+                FAILED_FILES=$(node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')); console.log([...new Set((r.suites||[]).map(s => s.file).filter(Boolean))].sort().map(f => './playwright-tests/' + f).join(' '))" "$LIST_JSON" || true)
+              fi
+              if [ -n "$FAILED_FILES" ]; then
+                echo "Re-run: files with failed tests from attempt ${{ steps.prev.outputs.attempt }}: $FAILED_FILES"
+                FILE_PATHS="$FAILED_FILES"
+              else
+                echo "::warning::Could not list the failed tests from attempt ${{ steps.prev.outputs.attempt }} — running the full shard"
+              fi
+            elif [ "$GITHUB_RUN_ATTEMPT" -gt 1 ]; then
+              echo "::warning::No complete failed-test list from attempt ${{ steps.prev.outputs.attempt }} — running the full shard"
+            fi
+
             echo "DEBUG: Final command: npx playwright test $FILE_PATHS $WORKERS_ARG"
             npx playwright test $FILE_PATHS $WORKERS_ARG
           else
@@ -619,6 +656,17 @@ jobs:
         with:
           name: blob-report-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/blob-report
+          retention-days: 1
+
+      - name: Upload failed-test list for re-runs
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-run-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
+          path: tests/ui-testing/test-results/.last-run.json
+          include-hidden-files: true
+          if-no-files-found: ignore
           retention-days: 1
 
       - name: Check OpenObserve logs
@@ -779,6 +827,79 @@ jobs:
           echo "flaky=$FLAKY" >> "$GITHUB_OUTPUT"
           # Log a count only — avoid dumping test file paths/titles into public CI logs.
           echo "flaky/failed test count: $(printf '%s' "$FLAKY" | jq 'length' 2>/dev/null || echo '?')"
+
+      # Read by playwright-auto-rerun.yml; failed_count -1 means "no advice", so a missing or broken report still writes the file.
+      - name: Write rerun advice
+        if: always()
+        env:
+          TESTED_OSS_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p rerun-advice
+          # Report file paths are relative to playwright.config.js testDir.
+          jq -c --arg sha "$TESTED_OSS_SHA" '
+            if (.suites | type) != "array" then error("not a Playwright report") else . end
+            | [.suites[] | recurse(.suites[]?) | . as $s | (.specs // [])[] | . as $sp
+               | (.tests // [])[] | select(.status == "unexpected") | ($sp.file // $s.file // "")]
+            | {tested_oss_sha: $sha, failed_count: length,
+               failed_files: (map(select(. != "") | "tests/ui-testing/playwright-tests/" + .) | unique)}
+          ' tests/ui-testing/playwright-results/report.json > rerun-advice/rerun-advice.json 2>/dev/null \
+            || jq -nc --arg sha "$TESTED_OSS_SHA" '{tested_oss_sha: $sha, failed_count: -1, failed_files: []}' > rerun-advice/rerun-advice.json
+          jq -c '{failed_count, failed_file_count: (.failed_files | length)}' rerun-advice/rerun-advice.json
+
+      - name: Download failed-test lists
+        id: download_last_runs
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: last-runs
+          pattern: last-run-*-attempt-${{ github.run_attempt }}
+
+      # A shard that died before writing results adds nothing to the report, so the advice would miss its failure.
+      - name: Check failed shards left a failed-test list
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAST_RUNS_OUTCOME: ${{ steps.download_last_runs.outcome }}
+        run: |
+          ADVICE=rerun-advice/rerun-advice.json
+          COMPUTED=$(cat "$ADVICE" 2>/dev/null || true)
+          [ "$(jq '.failed_count' <<< "$COMPUTED" 2>/dev/null)" -ge 0 ] 2>/dev/null || exit 0
+          # The file says "no advice" until every check below passes, so any early exit keeps the bot's old behaviour.
+          jq -c '.failed_count = -1 | .failed_files = []' <<< "$COMPUTED" > "$ADVICE"
+          JOBS='[]'
+          PAGE=1
+          while :; do
+            if ! RESP=$(curl -sf -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100&page=$PAGE") \
+              || ! JOBS=$(jq -c --argjson acc "$JOBS" '$acc + [.jobs[] | {name, conclusion}]' <<< "$RESP"); then
+              echo "::warning::Could not list this attempt's jobs; no rerun advice"; exit 0
+            fi
+            [ "$(jq '.jobs | length' <<< "$RESP")" -eq 100 ] || break
+            PAGE=$((PAGE + 1))
+          done
+          [ "$(jq '[.[] | select(.name | startswith("e2e / "))] | length' <<< "$JOBS")" -gt 0 ] \
+            || { echo "::warning::No shard jobs listed for this attempt; no rerun advice"; exit 0; }
+          FAILED_SHARDS=$(jq -r '.[] | select(.name | startswith("e2e / ")) | select(.conclusion != "success" and .conclusion != "skipped") | .name | ltrimstr("e2e / ")' <<< "$JOBS")
+          if [ -n "$FAILED_SHARDS" ] && [ "$LAST_RUNS_OUTCOME" != "success" ]; then
+            echo "::warning::Could not download the failed-test lists; no rerun advice"; exit 0
+          fi
+          while IFS= read -r SHARD; do
+            [ -n "$SHARD" ] || continue
+            jq -e '.status == "failed" and (.failedTests | type == "array" and length > 0)' \
+              "last-runs/last-run-$SHARD-attempt-$GITHUB_RUN_ATTEMPT/.last-run.json" > /dev/null 2>&1 \
+              || { echo "::warning::Shard $SHARD failed without a complete failed-test list; no rerun advice"; exit 0; }
+          done <<< "$FAILED_SHARDS"
+          printf '%s\n' "$COMPUTED" > "$ADVICE"
+          echo "rerun advice kept; failed shards checked: $(tr '\n' ' ' <<< "$FAILED_SHARDS")"
+
+      - name: Upload rerun advice
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rerun-advice-attempt-${{ github.run_attempt }}
+          path: rerun-advice/rerun-advice.json
+          retention-days: 7
 
       - name: Upload merged report
         if: always()
