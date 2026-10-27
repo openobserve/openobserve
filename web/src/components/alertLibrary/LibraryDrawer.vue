@@ -240,19 +240,16 @@ import { computed, nextTick, ref, watch } from "vue";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import { ANOMALY_DIRECTION_KEYS } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
-import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
 import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
-import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 
 import {
   alertTypeOf,
@@ -262,7 +259,8 @@ import {
   severityBadgeValue,
   severityLabel,
 } from "./libraryFacets";
-import { readTunables, applyTunables } from "./libraryTunables";
+import { readTunables, applyTunables, fileForInstall } from "./libraryTunables";
+import { useLibraryCustomize } from "./useLibraryCustomize";
 
 const props = defineProps<{
   open: boolean;
@@ -284,7 +282,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const { loadAlertFile } = useAlertLibrary();
-const { openAlertCreation } = useAlertCreation();
+const { customizeInEditor } = useLibraryCustomize();
 
 const file = ref<AlertLibraryFile | null>(null);
 const isLoading = ref(false);
@@ -548,27 +546,13 @@ watch(
 );
 
 // ── actions ────────────────────────────────────────────────────────────────
-const customize = () => {
+const customize = async () => {
   if (!props.entry || !file.value) return;
-
-  const opened = openAlertCreation(
-    buildPrefillFromLibrary({ entry: props.entry, file: file.value }),
-  );
-  if (!opened) {
-    toast({ variant: "error", message: t("alert_library.drawer.customizeFailed") });
-    return;
-  }
-  emit("update:open", false);
+  if (await customizeInEditor(props.entry, file.value)) emit("update:open", false);
 };
 
 const install = () => {
   if (!props.entry || !file.value) return;
-  // The threshold floors would write a trigger_condition into a body that must not have one.
-  if (isAnomaly.value) {
-    emit("install", { entry: props.entry, file: file.value });
-    return;
-  }
-  if (!tunedFile.value) return;
-  emit("install", { entry: props.entry, file: tunedFile.value });
+  emit("install", { entry: props.entry, file: fileForInstall(props.entry, file.value) });
 };
 </script>

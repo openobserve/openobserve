@@ -99,7 +99,10 @@ const manifestRef = ref<AlertLibraryManifest | null>(null);
 const isLoadingRef = ref(false);
 const errorRef = ref<{ code: string } | null>(null);
 const loadManifest = vi.fn();
+const loadAlertFile = vi.fn();
 const getStreams = vi.fn();
+const openAlertCreation = vi.fn(() => true);
+const toastMock = vi.fn();
 
 vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/composables/alerts/useAlertLibrary")>();
@@ -110,7 +113,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
       isLoading: isLoadingRef,
       error: errorRef,
       loadManifest,
-      loadAlertFile: vi.fn(),
+      loadAlertFile,
       clearLibrary: vi.fn(),
       isReady: (e: AlertLibraryEntry, byType: Record<string, Set<string>>) =>
         (e.required_streams ?? []).every((name) => byType[e.stream_type]?.has(name)),
@@ -122,20 +125,42 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams }),
 }));
 
+vi.mock("@/composables/alerts/useAlertCreation", () => ({
+  useAlertCreation: () => ({ openAlertCreation }),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: (...args: unknown[]) => toastMock(...args),
+}));
+
 import AlertLibrary from "./AlertLibrary.vue";
 
 // Tracked so afterEach can tear them down: the specs below reassign the shared
 // `manifestRef`, and every still-mounted view re-renders on every reassignment.
 const mounted: Array<ReturnType<typeof mount>> = [];
 
-const mountView = async () => {
+// Most specs here are about the whole catalog, so they leave the "Ready to use" first view for All.
+const mountView = async ({ firstOpen = false }: { firstOpen?: boolean } = {}) => {
   const wrapper = mount(AlertLibrary, {
     global: { provide: { store }, plugins: [i18n, router] },
   });
   mounted.push(wrapper);
   await flushPromises();
+  const allTile = wrapper.find('[data-test="alert-library-stat-all"]');
+  if (!firstOpen && allTile.exists()) {
+    await allTile.trigger("click");
+    await flushPromises();
+  }
   return wrapper;
 };
+
+/** The tiles the strip shows as pressed, in strip order. */
+const pressedTiles = (wrapper: ReturnType<typeof mount>) =>
+  ["ready", "missing", "all"].filter(
+    (key) =>
+      wrapper.find(`[data-test="alert-library-stat-${key}"]`).attributes("aria-pressed") === "true",
+  );
 
 /** Rail rows are checkboxes; the click target is the box, not the label. */
 const tickRail = async (wrapper: ReturnType<typeof mount>, test: string) => {
@@ -150,6 +175,9 @@ describe("AlertLibrary", () => {
     errorRef.value = null;
     loadManifest.mockReset().mockResolvedValue(manifestFixture);
     getStreams.mockReset().mockResolvedValue({ name: "all", list: STREAM_LIST });
+    loadAlertFile.mockReset();
+    openAlertCreation.mockClear();
+    toastMock.mockClear();
     await router.push({ name: "alertLibrary" });
     await router.isReady();
   });
@@ -220,15 +248,50 @@ describe("AlertLibrary", () => {
     ).toBe(true);
   });
 
-  it("offers no pack facet — the pack survives only as group context", async () => {
+  it("heads the rail's categories with their pack, without making the pack a filter", async () => {
     // A pack is a coarse bucket; the category is what people search for. The
-    // rail lists categories alone, and the heading still says which pack a
-    // group came from.
+    // rail ticks categories alone, under a pack heading that only labels them.
     const wrapper = await mountView();
-    expect(wrapper.find('[data-test="alert-library-rail-pack-k8s"]').exists()).toBe(false);
+    const rail = wrapper.findComponent({ name: "LibraryRail" });
+    const facets = rail.props("categories") as Array<{ id: string; pack: string }>;
+    expect(Object.fromEntries(facets.map((facet) => [facet.id, facet.pack]))).toEqual({
+      "cert-manager": "k8s",
+      node: "k8s",
+      pod: "k8s",
+      "self-monitoring": "openobserve",
+    });
+    expect(rail.find('[data-test="alert-library-rail-pack-heading-k8s"]').text()).toBe(
+      "Kubernetes",
+    );
     expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).toContain(
       "Kubernetes",
     );
+  });
+
+  it("lists a category two packs share once, under the pack whose label sorts first", async () => {
+    // Selection is by category id alone, so two rows for one id would tick together.
+    manifestRef.value = {
+      ...manifestFixture,
+      alerts: [
+        ...manifestFixture.alerts,
+        entry({
+          id: "openobserve/pod-ingest",
+          name: "pod-ingest",
+          pack: "openobserve",
+          category: "pod",
+          title: "Pod Ingest",
+        }),
+      ],
+    };
+    const wrapper = await mountView();
+    const facets = wrapper.findComponent({ name: "LibraryRail" }).props("categories") as Array<{
+      id: string;
+      pack: string;
+      count: number;
+    }>;
+    const pod = facets.filter((facet) => facet.id === "pod");
+    // "Kubernetes" sorts before "OpenObserve".
+    expect(pod).toEqual([expect.objectContaining({ pack: "k8s", count: 2 })]);
   });
 
   it("names the pack in group headings only while more than one is on screen", async () => {
@@ -555,17 +618,12 @@ describe("AlertLibrary", () => {
       expect(rail.props("search")).toBe("");
     });
   });
-  it("shows the All tile as the active one until a facet is chosen", async () => {
+  it("shows the All tile as the active one once no facet is chosen", async () => {
     // The strip has a state — "no availability filter" — that used to light no
     // tile at all, while the All tile it corresponds to was a button that could
     // never look pressed.
     const wrapper = await mountView();
-    const pressed = () =>
-      ["ready", "missing", "all"].filter(
-        (key) =>
-          wrapper.find(`[data-test="alert-library-stat-${key}"]`).attributes("aria-pressed") ===
-          "true",
-      );
+    const pressed = () => pressedTiles(wrapper);
 
     expect(pressed()).toEqual(["all"]);
 
@@ -577,6 +635,134 @@ describe("AlertLibrary", () => {
     await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
     await flushPromises();
     expect(pressed()).toEqual(["all"]);
+  });
+
+  describe("first open", () => {
+    it("opens on Ready to use, showing only the alerts that can run", async () => {
+      const wrapper = await mountView({ firstOpen: true });
+      expect(pressedTiles(wrapper)).toEqual(["ready"]);
+      expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("lets the user widen to All and to Not ingested from there", async () => {
+      const wrapper = await mountView({ firstOpen: true });
+      await wrapper.find('[data-test="alert-library-stat-missing"]').trigger("click");
+      await flushPromises();
+      expect(pressedTiles(wrapper)).toEqual(["missing"]);
+      await wrapper.find('[data-test="alert-library-stat-all"]').trigger("click");
+      await flushPromises();
+      expect(pressedTiles(wrapper)).toEqual(["all"]);
+      expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("falls back to All when nothing in the library is ready", async () => {
+      getStreams.mockReset().mockResolvedValue({ name: "all", list: [] });
+      const wrapper = await mountView({ firstOpen: true });
+      expect(pressedTiles(wrapper)).toEqual(["all"]);
+      expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("falls back to All when readiness could not be checked", async () => {
+      getStreams.mockReset().mockRejectedValue(new Error("streams unavailable"));
+      const wrapper = await mountView({ firstOpen: true });
+      expect(pressedTiles(wrapper)).toEqual(["all"]);
+    });
+
+    it("keeps Ready to use while the streams are still loading", async () => {
+      getStreams.mockReset().mockReturnValue(new Promise(() => {}));
+      const wrapper = await mountView({ firstOpen: true });
+      expect(pressedTiles(wrapper)).toEqual(["ready"]);
+    });
+
+    it("never overrides a tile the user picked before readiness settled", async () => {
+      let releaseStreams: () => void = () => {};
+      getStreams.mockReset().mockReturnValue(
+        new Promise((resolve) => {
+          releaseStreams = () => resolve({ name: "all", list: [] });
+        }),
+      );
+      const wrapper = await mountView({ firstOpen: true });
+      await wrapper.find('[data-test="alert-library-stat-missing"]').trigger("click");
+      releaseStreams();
+      await flushPromises();
+      expect(pressedTiles(wrapper)).toEqual(["missing"]);
+    });
+
+    it("does not fall back again when a later refresh finds nothing ready", async () => {
+      const wrapper = await mountView({ firstOpen: true });
+      getStreams.mockReset().mockResolvedValue({ name: "all", list: [] });
+      await wrapper.find('[data-test="alert-library-refresh"]').trigger("click");
+      await flushPromises();
+      expect(pressedTiles(wrapper)).toEqual(["ready"]);
+    });
+  });
+
+  // ── card actions ───────────────────────────────────────────────────────────
+  describe("card actions", () => {
+    const CARD_ADD = '[data-test="alert-library-card-add-k8s/pod-oom-killed"]';
+    const CARD_CUSTOMIZE = '[data-test="alert-library-card-customize-k8s/pod-oom-killed"]';
+
+    it("adds one alert from its card through the drawer's single-alert hand-off", async () => {
+      const file = {
+        name: "pod-oom-killed",
+        trigger_condition: { threshold: 0, period: 0, frequency: 5, silence: 10 },
+      };
+      loadAlertFile.mockResolvedValueOnce(file);
+      const wrapper = await mountView();
+      await wrapper.find(CARD_ADD).trigger("click");
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "LibraryInstallDialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("preselect")).toEqual([]);
+      const seed = dialog.props("seed") as { entry: AlertLibraryEntry; file: any };
+      expect(seed.entry.id).toBe("k8s/pod-oom-killed");
+      // Floored like the drawer's tuned file, never the raw zeroes.
+      expect(seed.file.trigger_condition.threshold).toBeGreaterThan(0);
+      expect(seed.file.trigger_condition.period).toBeGreaterThan(0);
+      expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("open")).toBe(false);
+    });
+
+    it("says so and opens nothing when the card's alert cannot be loaded", async () => {
+      loadAlertFile.mockRejectedValueOnce(new Error("gone"));
+      const wrapper = await mountView();
+      await wrapper.find(CARD_ADD).trigger("click");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "LibraryInstallDialog" }).props("open")).toBe(false);
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("opens the alert editor prefilled from the card, without opening the drawer", async () => {
+      const file = { name: "pod-oom-killed", query_condition: { type: "promql" } };
+      loadAlertFile.mockResolvedValueOnce(file);
+      const wrapper = await mountView();
+      await wrapper.find(CARD_CUSTOMIZE).trigger("click");
+      await flushPromises();
+
+      expect(loadAlertFile).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "k8s/pod-oom-killed" }),
+      );
+      expect(openAlertCreation).toHaveBeenCalledTimes(1);
+      expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("open")).toBe(false);
+    });
+
+    it("says so when the card's alert cannot be loaded for the editor", async () => {
+      loadAlertFile.mockRejectedValueOnce(new Error("gone"));
+      const wrapper = await mountView();
+      await wrapper.find(CARD_CUSTOMIZE).trigger("click");
+      await flushPromises();
+      expect(openAlertCreation).not.toHaveBeenCalled();
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
   });
 
   // ── selection ──────────────────────────────────────────────────────────────

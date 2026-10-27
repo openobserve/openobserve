@@ -147,6 +147,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <span class="truncate">{{ t("alert_library.notIngested", { stream: entry.stream }) }}</span>
       </OTag>
+
+      <!-- Locked cards open the upsell instead, so they offer nothing to act on here. -->
+      <div v-if="!locked" class="flex flex-wrap items-center gap-2 pt-1">
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="add"
+          :data-test="`alert-library-card-add-${entry.id}`"
+          @click.stop="emit('install')"
+        >
+          {{ t("alert_library.addAlert") }}
+        </OButton>
+        <!-- The editor prefill speaks the scheduled alert shape only. -->
+        <OButton
+          v-if="!isAnomaly"
+          variant="ghost"
+          size="sm"
+          icon-left="edit"
+          :title="t('alert_library.drawer.customizeHint')"
+          :data-test="`alert-library-card-customize-${entry.id}`"
+          @click.stop="emit('customize')"
+        >
+          {{ t("alert_library.drawer.customize") }}
+        </OButton>
+      </div>
     </div>
   </article>
 </template>
@@ -155,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -176,6 +202,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "open"): void;
   (e: "update:selected", value: boolean): void;
+  (e: "install"): void;
+  (e: "customize"): void;
 }>();
 
 const { t } = useI18nTyped();

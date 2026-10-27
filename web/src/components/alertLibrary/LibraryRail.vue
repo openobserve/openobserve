@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ONE list, no axis switcher. Packs used to be a second axis, but a pack is a
   coarse bucket ("databases", "observability") and the category is the thing
   people actually come looking for — Kafka, Clickhouse, Cilium. Two axes over
-  the same catalogue meant a tab to reach the useful one; the pack still names
-  itself in the gallery's group headings, which is where it earns its keep.
+  the same catalogue meant a tab to reach the useful one. The pack now heads
+  its technologies in the list, as a label rather than a second filter.
 
   Categories are MULTI-SELECT on the metrics-explorer rail pattern: a search
   box over the list, tick boxes with counts, and a "N selected / Clear" footer.
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="min-h-0 flex-1 overflow-y-auto pb-3">
       <OEmptyState
-        v-if="visibleItems.length === 0"
+        v-if="visibleGroups.length === 0"
         size="inline"
         class="px-2"
         illustration="no-results"
@@ -117,33 +117,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div
-        v-for="item in visibleItems"
-        :key="item.id"
-        class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
-        :class="selectedCategories.includes(item.id) ? 'bg-surface-subtle' : ''"
+        v-for="group in visibleGroups"
+        :key="group.pack"
+        role="group"
+        :aria-labelledby="group.label ? `alert-library-rail-pack-heading-${group.pack}` : undefined"
+        class="flex flex-col pt-2 first:pt-0"
+        :data-test="`alert-library-rail-pack-${group.pack}`"
       >
-        <OCheckbox
-          size="sm"
-          class="min-w-0 flex-1"
-          :model-value="selectedCategories.includes(item.id)"
-          :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
-          :data-active="String(selectedCategories.includes(item.id))"
-          :data-test="`alert-library-rail-category-${item.id}`"
-          @update:model-value="toggleCategory(item.id)"
+        <!-- A label only: a select-all here would tick technologies the user never looked at. -->
+        <h3
+          v-if="group.label"
+          :id="`alert-library-rail-pack-heading-${group.pack}`"
+          class="text-text-secondary text-2xs px-2 pb-0.5 font-semibold"
+          :data-test="`alert-library-rail-pack-heading-${group.pack}`"
         >
-          <template #label>
-            <OTruncatedText class="block text-xs">{{ item.label }}</OTruncatedText>
-          </template>
-        </OCheckbox>
+          {{ group.label }}
+        </h3>
+        <div
+          v-for="item in group.items"
+          :key="item.id"
+          class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+          :class="selectedCategories.includes(item.id) ? 'bg-surface-subtle' : ''"
+        >
+          <OCheckbox
+            size="sm"
+            class="min-w-0 flex-1"
+            :model-value="selectedCategories.includes(item.id)"
+            :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
+            :data-active="String(selectedCategories.includes(item.id))"
+            :data-test="`alert-library-rail-category-${item.id}`"
+            @update:model-value="toggleCategory(item.id)"
+          >
+            <template #label>
+              <OTruncatedText class="block text-xs">{{ item.label }}</OTruncatedText>
+            </template>
+          </OCheckbox>
 
-        <OTag
-          type="countChip"
-          value="neutral"
-          size="xs"
-          shape="rounded"
-          :data-test="`alert-library-rail-count-${item.id}`"
-          >{{ item.count }}</OTag
-        >
+          <OTag
+            type="countChip"
+            value="neutral"
+            size="xs"
+            shape="rounded"
+            :data-test="`alert-library-rail-count-${item.id}`"
+            >{{ item.count }}</OTag
+          >
+        </div>
       </div>
     </div>
   </nav>
@@ -163,10 +181,10 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-import type { LibraryFacet } from "./libraryFacets";
+import { packLabel, type LibraryCategoryFacet, type LibraryFacet } from "./libraryFacets";
 
 const props = defineProps<{
-  categories: LibraryFacet[];
+  categories: LibraryCategoryFacet[];
   /** Empty means every category — the rail opens unfiltered. */
   selectedCategories: string[];
   /** Includes the "all" pseudo-facet, built by the caller. */
@@ -195,19 +213,34 @@ const { t } = useI18nTyped();
  * A zero-count row is a dead end and is dropped — except when it is selected,
  * since hiding it would strand the user with a filter they cannot lift.
  */
-const visibleItems = computed(() => {
+const isVisible = (item: LibraryCategoryFacet, needle: string): boolean => {
+  // A ticked row is never hidden — not by the search, not by a zero count.
+  // Both used to remove it: typing "redis" while "kafka" was ticked took the
+  // kafka row off screen while the grid stayed filtered to kafka, leaving a
+  // filter you could see the effect of but not the control for.
+  if (props.selectedCategories.includes(item.id)) return true;
+  // A zero-count row filters to nothing, so offering it wastes a click.
+  if (item.count === 0) return false;
+  if (!needle) return true;
+  // The pack heading is on screen too, so a query naming a pack keeps all of its rows.
+  return [item.label, packLabel(item.pack)].some((text) =>
+    String(text).toLowerCase().includes(needle),
+  );
+};
+
+/** Pack headings in label order; technologies keep the order the caller gave them. */
+const visibleGroups = computed(() => {
   const needle = props.search.trim().toLowerCase();
-  return props.categories.filter((item) => {
-    // A ticked row is never hidden — not by the search, not by a zero count.
-    // Both used to remove it: typing "redis" while "kafka" was ticked took the
-    // kafka row off screen while the grid stayed filtered to kafka, leaving a
-    // filter you could see the effect of but not the control for.
-    if (props.selectedCategories.includes(item.id)) return true;
-    if (needle && !String(item.label).toLowerCase().includes(needle)) return false;
-    // A zero-count row filters to nothing, so offering it wastes a click.
-    if (item.count === 0) return false;
-    return true;
-  });
+  const groups = new Map<string, LibraryCategoryFacet[]>();
+  for (const item of props.categories) {
+    if (!isVisible(item, needle)) continue;
+    const bucket = groups.get(item.pack);
+    if (bucket) bucket.push(item);
+    else groups.set(item.pack, [item]);
+  }
+  return [...groups.entries()]
+    .map(([pack, items]) => ({ pack, label: packLabel(pack), items }))
+    .sort((a, b) => String(a.label).localeCompare(String(b.label)));
 });
 
 const toggleCategory = (id: string) => {
