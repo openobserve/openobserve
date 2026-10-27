@@ -8122,7 +8122,17 @@
     "exampleCharts": "Example Charts",
     "namePlaceholder": "Untitled panel",
     "renameHint": "Click to rename this panel",
-    "titleVariablesHint": "Use {bare} or {braced} to show a variable's value",
+    "titleSuggestion": {
+      "queryValues": "Query values",
+      "constant": "Constant",
+      "textbox": "Text box",
+      "custom": "Custom",
+      "list": "{type} · {example}",
+      "csv": "Commas: {example}",
+      "pipe": "Pipes: {example}",
+      "doublequote": "Double quotes: {example}",
+      "singlequote": "Single quotes: {example}"
+    },
     "add": "Add Panel",
     "save": "Save",
     "cancel": "Cancel",

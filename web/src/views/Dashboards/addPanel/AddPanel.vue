@@ -42,7 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="title"
               :placeholder="t('panel.namePlaceholder')"
               :aria-label="t('panel.name')"
-              :hint="titleVariablesHint"
+              :suggestions="titleSuggestions"
+              delimiter="dollar"
               :edit-hint="
                 panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('panel.renameHint')
               "
@@ -370,6 +371,7 @@ import {
 } from "@/utils/dashboard/panelValidation";
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
+import { getPanelTitleSuggestions } from "@/utils/dashboard/panelTitle";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -450,9 +452,6 @@ export default defineComponent({
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18nTyped();
-    const titleVariablesHint = computed(() =>
-      t("panel.titleVariablesHint", { bare: raw("$variable"), braced: raw("${variable}") }),
-    );
     const { isMobile } = useBreakpoint();
     const router = useRouter();
     const route = useRoute();
@@ -2080,6 +2079,14 @@ export default defineComponent({
       return dashboardPanelData.data.id || "current_panel";
     });
 
+    const titleSuggestions = computed(() =>
+      getPanelTitleSuggestions(
+        currentDashboardData.data?.variables?.list,
+        { tabId: currentTabId.value, panelId: currentPanelId.value },
+        t,
+      ),
+    );
+
     const getLiveVariables = (): any[] => {
       if (variablesManager && variablesManager.variablesData.isInitialized) {
         return variablesManager.getVariablesForPanel(
@@ -2370,7 +2377,7 @@ export default defineComponent({
 
     return {
       t,
-      titleVariablesHint,
+      titleSuggestions,
       isMobile,
       updateDateTime,
       goBack,

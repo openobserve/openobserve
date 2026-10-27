@@ -16,7 +16,11 @@
 import {
   getReferencedVariableNames,
   processVariableContent,
+  VARIABLE_FORMATS,
+  type VariableFormat,
 } from "@/utils/dashboard/variables/variablesUtils";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import type { TemplateSuggestion } from "@/lib/forms/TemplateInput/OTemplateInput.types";
 
 export interface PanelTitleContext {
   tabId?: string;
@@ -30,6 +34,18 @@ const MAX_FILE_NAME_LENGTH = 100;
 // eslint-disable-next-line no-control-regex -- control characters are invalid in file names
 const UNSAFE_FILE_NAME_CHARS = /[\\/:*?"<>|\u0000-\u001f]+/g;
 
+// Ad hoc filters hold filter objects, not a printable value.
+const TITLE_VARIABLE_TYPES = ["query_values", "custom", "constant", "textbox"] as const;
+
+const LIST_EXAMPLE = raw("a, b");
+
+const FORMAT_EXAMPLES: Record<VariableFormat, I18nText> = {
+  csv: raw("a,b"),
+  pipe: raw("a|b"),
+  doublequote: raw('"a","b"'),
+  singlequote: raw("'a','b'"),
+};
+
 const markEmpty = (value: string) => (value === "" ? EMPTY_MARK : value);
 
 const removeEmptyValues = (title: string): string => {
@@ -41,6 +57,12 @@ const removeEmptyValues = (title: string): string => {
     .replaceAll(EMPTY_MARK, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+};
+
+const isVisibleIn = (variable: any, context: PanelTitleContext): boolean => {
+  if (variable?.scope === "tabs") return (variable.tabs ?? []).includes(context.tabId);
+  if (variable?.scope === "panels") return (variable.panels ?? []).includes(context.panelId);
+  return true;
 };
 
 /** Resolves variables in a panel title as plain text: "All" for select-all, empty values dropped with their separator, unknown names kept. */
@@ -100,4 +122,45 @@ export const toPanelFileName = (title: string | null | undefined): string | unde
   const boundary = cut.lastIndexOf(" ");
   const head = boundary > MAX_FILE_NAME_LENGTH / 2 ? cut.slice(0, boundary) : cut.slice(0, -1);
   return head.replace(/[\s,;·•—–-]+$/, "");
+};
+
+/** Variables a panel title can reference, as `$` suggestions: every name, plus one per list format for multi-select variables. */
+export const getPanelTitleSuggestions = (
+  variables: any[] | null | undefined,
+  context: PanelTitleContext,
+  t: TranslateFn,
+): TemplateSuggestion[] => {
+  const typeLabels: Record<(typeof TITLE_VARIABLE_TYPES)[number], I18nText> = {
+    query_values: t("panel.titleSuggestion.queryValues"),
+    custom: t("panel.titleSuggestion.custom"),
+    constant: t("panel.titleSuggestion.constant"),
+    textbox: t("panel.titleSuggestion.textbox"),
+  };
+  const formatLabels: Record<VariableFormat, I18nText> = {
+    csv: t("panel.titleSuggestion.csv", { example: FORMAT_EXAMPLES.csv }),
+    pipe: t("panel.titleSuggestion.pipe", { example: FORMAT_EXAMPLES.pipe }),
+    doublequote: t("panel.titleSuggestion.doublequote", { example: FORMAT_EXAMPLES.doublequote }),
+    singlequote: t("panel.titleSuggestion.singlequote", { example: FORMAT_EXAMPLES.singlequote }),
+  };
+  const seen = new Set<string>();
+  return (variables ?? []).flatMap((variable: any): TemplateSuggestion[] => {
+    const name = variable?.name;
+    const type = TITLE_VARIABLE_TYPES.find((it) => it === variable?.type);
+    if (typeof name !== "string" || !name || !type || seen.has(name)) return [];
+    if (!isVisibleIn(variable, context)) return [];
+    seen.add(name);
+    const typeLabel = typeLabels[type];
+    const isList = variable.multiSelect === true && (type === "query_values" || type === "custom");
+    if (!isList) return [{ name, description: typeLabel }];
+    return [
+      {
+        name,
+        description: t("panel.titleSuggestion.list", { type: typeLabel, example: LIST_EXAMPLE }),
+      },
+      ...VARIABLE_FORMATS.map((format) => ({
+        name: `${name}:${format}`,
+        description: formatLabels[format],
+      })),
+    ];
+  });
 };
