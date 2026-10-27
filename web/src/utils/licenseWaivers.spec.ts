@@ -314,6 +314,27 @@ describe("O14 new waiver kinds", () => {
     expect(result.waivers_added[0].extra).toBe(5);
     expect(knownWaivers(result.waivers_added)).toHaveLength(2);
   });
+
+  it("key-check parsing accepts an ingestion limit of a type this release does not know", () => {
+    const future = { ...raise, limit: { typ: "Unknown", value: 0 } };
+    const result: unknown = JSON.parse(
+      JSON.stringify({
+        dry_run: true,
+        outcome: "accept",
+        message: "",
+        license_id: "synthetic",
+        same_license: true,
+        loaded_rev: 1,
+        pasted_rev: 2,
+        waivers_added: [future, unblock],
+        waivers_removed: [raise],
+      }),
+    );
+    expect(isKeyCheckResult(result)).toBe(true);
+    if (!isKeyCheckResult(result)) throw new Error("Invalid fixture");
+    expect(knownWaivers(result.waivers_added)).toEqual([unblock]);
+    expect(knownWaivers(result.waivers_removed)).toEqual([raise]);
+  });
 });
 
 it("breach retention uses every touched UTC month, leap days and year rollover", () => {

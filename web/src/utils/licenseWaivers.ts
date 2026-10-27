@@ -19,7 +19,7 @@ export interface LicenseWaiver {
   id: string;
   type: string;
   extra?: number;
-  limit?: { typ: "Unlimited" | "PerDayCount"; value: number };
+  limit?: { typ: "Unlimited" | "PerDayCount" | "Unknown"; value: number };
   starts_at: number;
   ends_at: number;
   installation_id?: string;
@@ -99,7 +99,9 @@ const KNOWN_WAIVER_TYPES = ["search_unblock", "ingestion_limit", "breach_days", 
 
 /** Drops kinds this release cannot render, so a newer server never breaks the list. */
 export function knownWaivers(ws: LicenseWaiver[] | undefined): LicenseWaiver[] {
-  return (ws ?? []).filter((w) => KNOWN_WAIVER_TYPES.includes(w.type));
+  return (ws ?? []).filter(
+    (w) => KNOWN_WAIVER_TYPES.includes(w.type) && w.limit?.typ !== "Unknown",
+  );
 }
 
 export function statusWaiverRelief(
@@ -394,7 +396,7 @@ function isWaiverList(value: unknown): value is LicenseWaiver[] {
           (w.limit !== null &&
             typeof w.limit === "object" &&
             "typ" in w.limit &&
-            ["Unlimited", "PerDayCount"].includes(String(w.limit.typ)) &&
+            ["Unlimited", "PerDayCount", "Unknown"].includes(String(w.limit.typ)) &&
             "value" in w.limit &&
             typeof w.limit.value === "number"))
       );
