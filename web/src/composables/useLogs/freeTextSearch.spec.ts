@@ -460,6 +460,17 @@ describe("loadPendingFreeTextSchemas (toggling SQL before the fields load)", () 
     expect(planStreamsFilter("timeout", ["plain"], after).kind).toBe("freeText");
   });
 
+  it("treats the list's empty schema as unloaded, so a text stream still gets match_all", async () => {
+    const obj = makeSearchObj("timeout", [{ name: "app", schema: [], settings: {} }]);
+    expect(buildFilterContext(obj, zoConfig).targets.app.mode).toBe("blocked");
+
+    await loadPendingFreeTextSchemas(obj, async () => fts("app"));
+
+    const ctx = buildFilterContext(obj, zoConfig);
+    expect(ctx.targets.app.mode).toBe("fts");
+    expect(planStreamsFilter("timeout", ["app"], ctx).kind).toBe("freeText");
+  });
+
   it("fetches only streams whose schema is missing", async () => {
     const obj = makeSearchObj("timeout", [fts("loaded")]);
     obj.data.stream.selectedStream = ["loaded", "pending"];

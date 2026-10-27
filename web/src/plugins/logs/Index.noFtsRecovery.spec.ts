@@ -122,7 +122,7 @@ describe("Index SQL toggle before the stream fields load (#15549)", { timeout: 3
     });
     const state = wrapper.vm.searchObj;
     state.data.stream.selectedStream = ["plain"];
-    state.data.streamResults = { list: [{ name: "plain" }] };
+    state.data.streamResults = { list: [{ name: "plain", schema: [], settings: {} }] };
     state.data.stream.selectedStreamFields = [];
     state.data.freeTextBlocked = null;
     resetFreeTextSchemasForTests();

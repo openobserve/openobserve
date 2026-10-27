@@ -405,12 +405,12 @@ export async function refreshFreeTextSchemas(
 export async function loadPendingFreeTextSchemas(
   searchObj: FreeTextSearchObj,
   fetchStream: (name: string) => Promise<StreamWithSchema | null | undefined>,
-  now: number = Date.now(),
 ): Promise<void> {
+  // The stream list ships schema: [] until a stream's schema is fetched, so empty counts as unloaded.
   const pending = (searchObj.data.stream.selectedStream ?? []).filter(
-    (name) => !Array.isArray(streamEntry(searchObj, name)?.schema),
+    (name) => !streamEntry(searchObj, name)?.schema?.length,
   );
-  await fetchSchemas(searchObj, pending, fetchStream, now);
+  await fetchSchemas(searchObj, pending, fetchStream, Date.now());
 }
 
 export function resetFreeTextSchemasForTests(): void {
