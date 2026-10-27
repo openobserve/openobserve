@@ -36,14 +36,23 @@ use super::{
 };
 use crate::search::error_utils::map_error_to_http_response;
 
-/// Per-trace rows of the streamed descending duration sort, each kept from the partition that
-/// reported the largest `zo_sql_candidate`.
-#[derive(Default)]
+#[derive(Clone)]
 struct CandidateMerge {
+    cap: usize,
+    // Largest candidate per trace id, kept for pruned ids too, so a smaller row cannot re-enter.
+    candidates: HashMap<String, i64>,
     rows: HashMap<String, json::Value>,
 }
 
 impl CandidateMerge {
+    fn new(cap: usize) -> Self {
+        Self {
+            cap,
+            candidates: HashMap::new(),
+            rows: HashMap::new(),
+        }
+    }
+
     fn push_hits(&mut self, hits: Vec<json::Value>) {
         for hit in hits {
             let Some(trace_id) = trace_id_of(&hit)
@@ -54,18 +63,37 @@ impl CandidateMerge {
             };
             let candidate = candidate_of(&hit);
             // A map, not the TopKHeap: a later partition can report a larger candidate for an id.
-            let keep_stored = self
-                .rows
+            if self
+                .candidates
                 .get(&trace_id)
-                .is_some_and(|stored| candidate_of(stored) >= candidate);
-            if !keep_stored {
-                self.rows.insert(trace_id, hit);
+                .is_some_and(|best| *best >= candidate)
+            {
+                continue;
             }
+            self.candidates.insert(trace_id.clone(), candidate);
+            self.rows.insert(trace_id, hit);
+        }
+        self.prune();
+    }
+
+    // Dropping past the cap is safe: candidates never shrink, so the cap-th key never falls.
+    fn prune(&mut self) {
+        if self.rows.len() <= self.cap {
+            return;
+        }
+        let mut keys: Vec<(i64, String)> = self
+            .rows
+            .iter()
+            .map(|(id, row)| (candidate_of(row), id.clone()))
+            .collect();
+        keys.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        for (_, id) in keys.drain(self.cap..) {
+            self.rows.remove(&id);
         }
     }
 
     fn len(&self) -> usize {
-        self.rows.len()
+        self.candidates.len()
     }
 
     fn into_page(self, from: i64, size: i64) -> Vec<json::Value> {
@@ -185,10 +213,7 @@ async fn run(
 
     let total_partitions = partitions.len();
     let is_non_ts_order_by = plan.sort.by_duration;
-    let mut candidate_merge = plan
-        .sort
-        .ranks_by_candidate(plan.mode)
-        .then(CandidateMerge::default);
+    let ranks_by_candidate = plan.sort.ranks_by_candidate(plan.mode);
     let partitions_desc: Vec<[i64; 2]> = if !is_non_ts_order_by && plan.sort.ascending {
         log::info!(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
@@ -203,7 +228,7 @@ async fn run(
                 format!(
                     "non-ts ({}), {}",
                     plan.sort.sql(plan.mode),
-                    if candidate_merge.is_some() {
+                    if ranks_by_candidate {
                         "candidate merge"
                     } else {
                         "TopKHeap"
@@ -223,7 +248,8 @@ async fn run(
     };
     let non_ts_col = "zo_sql_duration".to_string();
     let non_ts_is_desc = !plan.sort.ascending;
-    let mut topk_heap: Option<TopKHeap> = if is_non_ts_order_by && candidate_merge.is_none() {
+    let mut candidate_merge = ranks_by_candidate.then(|| CandidateMerge::new(heap_k));
+    let mut topk_heap: Option<TopKHeap> = if is_non_ts_order_by && !ranks_by_candidate {
         Some(TopKHeap::new(heap_k, &[(non_ts_col, non_ts_is_desc)]))
     } else {
         None
@@ -559,33 +585,42 @@ mod tests {
             vec![row("A", 5), row("C", 2)],
             vec![row("A", 12)],
         ];
-        let mut merge = CandidateMerge::default();
+        let mut merge = CandidateMerge::new(10);
         for hits in partitions {
             merge.push_hits(hits);
         }
         merge.push_hits(vec![row("A", 1), row("", 99)]);
         assert_eq!(merge.len(), 5);
         assert_eq!(merge.rows["A"], row("A", 12));
-
-        let first = CandidateMerge {
-            rows: merge.rows.clone(),
-        };
-        assert_eq!(ids(&first.into_page(0, 2)), ["A", "B"]);
-        let second = CandidateMerge {
-            rows: merge.rows.clone(),
-        };
-        assert_eq!(ids(&second.into_page(2, 2)), ["D", "E"]);
+        assert_eq!(ids(&merge.clone().into_page(0, 2)), ["A", "B"]);
+        assert_eq!(ids(&merge.clone().into_page(2, 2)), ["D", "E"]);
         assert_eq!(ids(&merge.into_page(-1, 10)), ["A", "B", "D", "E", "C"]);
     }
 
     #[test]
     fn candidate_merge_ranks_the_issue_example_by_its_root_span() {
         // Issue 15507: A = 9 s root span in the older partition plus a 1 s span in the newer one.
-        let mut merge = CandidateMerge::default();
+        let mut merge = CandidateMerge::new(1);
         merge.push_hits(vec![row("B", 2_000_000), row("A", 1_000_000)]);
         merge.push_hits(vec![row("A", 9_000_000)]);
         assert_eq!(merge.len(), 2);
         assert_eq!(ids(&merge.into_page(0, 1)), ["A"]);
+    }
+
+    #[test]
+    fn candidate_merge_keeps_at_most_cap_rows_and_readmits_a_pruned_id_that_grows() {
+        // from=1&size=1 keeps two rows: C is pruned, ignored while smaller, back once larger.
+        let mut merge = CandidateMerge::new(2);
+        merge.push_hits(vec![row("A", 5), row("B", 4), row("C", 3)]);
+        assert_eq!(merge.rows.len(), 2);
+        assert!(!merge.rows.contains_key("C"));
+        merge.push_hits(vec![row("C", 2)]);
+        assert!(!merge.rows.contains_key("C"));
+        merge.push_hits(vec![row("C", 10), row("B", 4)]);
+        assert_eq!(merge.rows.len(), 2);
+        assert_eq!(merge.len(), 3);
+        assert_eq!(ids(&merge.clone().into_page(0, 2)), ["C", "A"]);
+        assert_eq!(ids(&merge.into_page(1, 1)), ["A"]);
     }
 
     #[test]

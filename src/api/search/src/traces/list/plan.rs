@@ -22,7 +22,9 @@ use config::{
 use hashbrown::HashMap;
 
 use super::{
-    query::{build_llm_trace_query, build_trace_query, trace_id_list_sql},
+    query::{
+        DURATION_CANDIDATE_SELECT, build_llm_trace_query, build_trace_query, trace_id_list_sql,
+    },
     response::TraceResponseItem,
 };
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
@@ -73,7 +75,7 @@ impl TraceListPlan {
         let mut request = base_request.clone();
         request.query.sql = format!(
             "{} WHERE trace_id IN ({}) GROUP BY trace_id",
-            self.select_sql(stream_name),
+            self.select_sql(stream_name, false),
             trace_id_list_sql(trace_ids)
         );
         request.query.from = 0;
@@ -93,7 +95,7 @@ impl TraceListPlan {
     }
 
     fn sql(&self, stream_name: &str) -> String {
-        let sql = self.select_sql(stream_name);
+        let sql = self.select_sql(stream_name, self.sort.ranks_by_candidate(self.mode));
         let filter = self.filter();
         let order = self.sort.sql(self.mode);
         if filter.is_empty() {
@@ -103,8 +105,12 @@ impl TraceListPlan {
         }
     }
 
-    fn select_sql(&self, stream_name: &str) -> String {
-        let extra_selects = self.columns.aggregate_selects();
+    // Only the streamed descending duration Q1 reads the candidate; Q2a and other sorts skip it.
+    fn select_sql(&self, stream_name: &str, with_candidate: bool) -> String {
+        let mut extra_selects = self.columns.aggregate_selects();
+        if with_candidate {
+            extra_selects = format!("{DURATION_CANDIDATE_SELECT}, {extra_selects}");
+        }
         match &self.llm_schema {
             Some(llm_schema) => build_llm_trace_query(stream_name, llm_schema, &extra_selects),
             None => build_trace_query(stream_name, &extra_selects),
@@ -487,7 +493,18 @@ mod tests {
                     sql.ends_with(&format!("GROUP BY trace_id ORDER BY {expected}")),
                     "{sql}"
                 );
-                assert!(sql.contains("as zo_sql_candidate"), "{sql}");
+                assert_eq!(
+                    sql.contains(DURATION_CANDIDATE_SELECT),
+                    expected.starts_with("zo_sql_candidate"),
+                    "{sql}"
+                );
+                let summary =
+                    plan.summary_request("traces", &Request::default(), &["a".to_string()], (1, 2));
+                assert!(
+                    !summary.query.sql.contains("zo_sql_candidate"),
+                    "{}",
+                    summary.query.sql
+                );
             }
         }
         let mut query = query();

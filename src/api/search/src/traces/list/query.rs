@@ -39,6 +39,9 @@ use crate::traces::{
 
 // The lookup only widens summaries, so a slow index must not hold back the page.
 const RANGE_LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
+// `duration` is in microseconds while `start_time` and `end_time` are in nanoseconds.
+pub const DURATION_CANDIDATE_SELECT: &str =
+    "GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) AS zo_sql_candidate";
 
 pub struct TraceSearchContext {
     pub org_id: String,
@@ -205,7 +208,6 @@ pub fn build_llm_trace_query(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-        GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate, \
             sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
@@ -225,7 +227,6 @@ pub fn build_llm_trace_query(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-        GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate, \
             sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
             sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
@@ -243,7 +244,6 @@ pub fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
         "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
         min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
         (max(end_time) - min(start_time)) as zo_sql_duration, \
-        GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate, \
         {extra_selects} \
         FROM {}",
         quote_identifier(stream_name)
@@ -406,14 +406,14 @@ mod tests {
     }
 
     #[test]
-    fn trace_queries_select_the_partition_local_duration_candidate() {
-        let candidate =
-            "GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) as zo_sql_candidate";
-        assert!(build_trace_query("default", "count(*) AS span_count").contains(candidate));
+    fn trace_builders_leave_out_the_duration_candidate() {
+        assert!(
+            !build_trace_query("default", "count(*) AS span_count").contains("zo_sql_candidate")
+        );
         for has_gen_ai in [true, false] {
             let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
             let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
-            assert!(sql.contains(candidate), "{sql}");
+            assert!(!sql.contains("zo_sql_candidate"), "{sql}");
         }
     }
 
