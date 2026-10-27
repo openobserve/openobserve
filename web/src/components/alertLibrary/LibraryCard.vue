@@ -155,11 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           icon-left="add"
+          :title="t('alert_library.drawer.install')"
           :aria-describedby="titleId"
           :data-test="`alert-library-card-add-${entry.id}`"
           @click.stop="emit('install')"
         >
-          {{ t("alert_library.drawer.install") }}
+          {{ t("common.add") }}
         </OButton>
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
@@ -172,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`alert-library-card-customize-${entry.id}`"
           @click.stop="emit('customize')"
         >
-          {{ t("alert_library.drawer.customize") }}
+          {{ t("alert_library.card.customize") }}
         </OButton>
       </div>
     </div>

@@ -352,10 +352,18 @@ describe("LibraryCard", () => {
       alert_type: "anomaly_detection",
     };
 
-    it("offers Add to alerts and Customize in editor on a scheduled card", () => {
+    it("offers short Add and Customize labels on a scheduled card", () => {
       const wrapper = mountCard();
-      expect(wrapper.find(ADD).text()).toBe("Add to alerts");
-      expect(wrapper.find(CUSTOMIZE).text()).toBe("Customize in editor");
+      expect(wrapper.find(ADD).text()).toBe("Add");
+      expect(wrapper.find(CUSTOMIZE).text()).toBe("Customize");
+    });
+
+    it("spells out the full action of each button on hover", () => {
+      const wrapper = mountCard();
+      expect(wrapper.find(ADD).attributes("title")).toBe("Add to alerts");
+      expect(wrapper.find(CUSTOMIZE).attributes("title")).toBe(
+        "Opens the standard alert editor prefilled with this alert.",
+      );
     });
 
     it("offers Customize on a SQL card as well as a PromQL one", () => {
@@ -363,14 +371,14 @@ describe("LibraryCard", () => {
       expect(wrapper.find(CUSTOMIZE).exists()).toBe(true);
     });
 
-    it("emits install from Add to alerts without opening the card", async () => {
+    it("emits install from Add without opening the card", async () => {
       const wrapper = mountCard();
       await wrapper.find(ADD).trigger("click");
       expect(wrapper.emitted("install")).toHaveLength(1);
       expect(wrapper.emitted("open")).toBeUndefined();
     });
 
-    it("emits customize from Customize in editor without opening the card", async () => {
+    it("emits customize from Customize without opening the card", async () => {
       const wrapper = mountCard();
       await wrapper.find(CUSTOMIZE).trigger("click");
       expect(wrapper.emitted("customize")).toHaveLength(1);
