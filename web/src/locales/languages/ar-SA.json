@@ -8254,6 +8254,17 @@
     "exampleCharts": "نماذج للجداول",
     "namePlaceholder": "لوحة بدون عنوان",
     "renameHint": "انقر لإعادة تسمية هذه اللوحة",
+    "variableSuggestion": {
+      "queryValues": "قيم الاستعلام",
+      "constant": "ثابت",
+      "textbox": "مربع نص",
+      "custom": "مخصص",
+      "list": "{type} · {example}",
+      "csv": "فواصل: {example}",
+      "pipe": "شرطات عمودية: {example}",
+      "doublequote": "اقتباسات مزدوجة: {example}",
+      "singlequote": "اقتباسات فردية: {example}"
+    },
     "add": "إضافة لوحة",
     "save": "حفظ",
     "cancel": "إلغاء",

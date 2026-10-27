@@ -8254,6 +8254,17 @@
     "exampleCharts": "Örnek Grafikler",
     "namePlaceholder": "Başlıksız Panel",
     "renameHint": "Bu paneli yeniden adlandırmak için tıklayın",
+    "variableSuggestion": {
+      "queryValues": "Sorgu değerleri",
+      "constant": "Sabit",
+      "textbox": "Metin kutusu",
+      "custom": "Özel",
+      "list": "{type} · {example}",
+      "csv": "Virgüller: {example}",
+      "pipe": "Dikey çizgiler: {example}",
+      "doublequote": "Çift tırnaklar: {example}",
+      "singlequote": "Tek tırnaklar: {example}"
+    },
     "add": "Panel Ekle",
     "save": "Kaydet",
     "cancel": "İptal",

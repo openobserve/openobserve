@@ -8254,6 +8254,17 @@
     "exampleCharts": "Grafici di esempio",
     "namePlaceholder": "Pannello senza titolo",
     "renameHint": "Fai clic per rinominare questo pannello",
+    "variableSuggestion": {
+      "queryValues": "Valori query",
+      "constant": "Costante",
+      "textbox": "Casella di testo",
+      "custom": "Personalizzato",
+      "list": "{type} · {example}",
+      "csv": "Virgole: {example}",
+      "pipe": "Pipe: {example}",
+      "doublequote": "Virgolette doppie: {example}",
+      "singlequote": "Virgolette singole: {example}"
+    },
     "add": "Aggiungi pannello",
     "save": "Salva",
     "cancel": "Annulla",

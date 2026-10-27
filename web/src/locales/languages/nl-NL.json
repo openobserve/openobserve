@@ -8254,6 +8254,17 @@
     "exampleCharts": "Voorbeeldgrafieken",
     "namePlaceholder": "Naamloos paneel",
     "renameHint": "Klik om dit paneel te hernoemen",
+    "variableSuggestion": {
+      "queryValues": "Querywaarden",
+      "constant": "Constante",
+      "textbox": "Tekstvak",
+      "custom": "Aangepast",
+      "list": "{type} · {example}",
+      "csv": "Komma's: {example}",
+      "pipe": "Pipes: {example}",
+      "doublequote": "Dubbele aanhalingstekens: {example}",
+      "singlequote": "Enkele aanhalingstekens: {example}"
+    },
     "add": "Paneel toevoegen",
     "save": "Opslaan",
     "cancel": "Annuleer",

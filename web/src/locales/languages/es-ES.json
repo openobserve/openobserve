@@ -8254,6 +8254,17 @@
     "exampleCharts": "Gráficos de ejemplo",
     "namePlaceholder": "Panel sin título",
     "renameHint": "Haga clic para cambiar el nombre de este panel",
+    "variableSuggestion": {
+      "queryValues": "Valores de consulta",
+      "constant": "Constante",
+      "textbox": "Cuadro de texto",
+      "custom": "Personalizado",
+      "list": "{type} · {example}",
+      "csv": "Comas: {example}",
+      "pipe": "Barras verticales: {example}",
+      "doublequote": "Comillas dobles: {example}",
+      "singlequote": "Comillas simples: {example}"
+    },
     "add": "Añadir panel",
     "save": "Guardar",
     "cancel": "Cancelar",

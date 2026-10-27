@@ -21,7 +21,7 @@
         class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
         <OTruncatedText data-test="dashboard-viewpanel-title">
-          {{ dashboardPanelData.data.title }}
+          {{ panelTitle }}
         </OTruncatedText>
         <ExemplarToggle
           v-if="viewExemplarsEligible"
@@ -273,6 +273,7 @@ import {
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -963,6 +964,12 @@ export default defineComponent({
       return props.panelId;
     });
 
+    const panelTitle = usePanelTitle({
+      title: () => dashboardPanelData.data.title,
+      variablesData: () => currentVariablesDataRef,
+      context: () => ({ tabId: currentTabId.value, panelId: currentPanelId.value }),
+    });
+
     // Same session key as the dashboard header, so the full-screen choice carries back to the grid.
     const viewExemplarsEligible = computed(() => isExemplarEligible(chartData.value));
     const {
@@ -1019,6 +1026,7 @@ export default defineComponent({
       goBack,
       currentDashboard,
       dashboardPanelData,
+      panelTitle,
       chartData,
       selectedDate,
       errorData,
