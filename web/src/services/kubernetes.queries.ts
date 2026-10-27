@@ -15,6 +15,8 @@
 
 import { queryOptions } from "@tanstack/vue-query";
 import searchService from "./search";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { generateTraceContext } from "@/utils/auth";
 import { k8sKeys } from "./kubernetes.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { quantizeRange } from "@/composables/query/queryClient";
@@ -23,6 +25,39 @@ import { parseVector, type Series } from "@/views/Infrastructure/kubernetes2/kub
 // Two absolute END times inside one bucket must not share a key, because each request uses its exact time.
 const timeKey = (startUs: number, endUs: number, relative: boolean) =>
   relative ? quantizeRange(startUs, endUs) : { start: startUs, end: endUs };
+
+// The stream reports errors as { content }; callers read status and message off the error itself.
+const streamError = (res: any) =>
+  Object.assign(new Error(res?.content?.message ?? res?.content?.error ?? "search stream failed"), {
+    status: res?.content?.status ?? res?.content?.code ?? null,
+  });
+
+// Every k8s query is complex, so the server runs it as one partition and its hits are appended.
+function streamSqlHits(org: string, query: Record<string, unknown>) {
+  const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+  const { traceId } = generateTraceContext();
+  return new Promise<any[]>((resolve, reject) => {
+    const hits: any[] = [];
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: { query },
+        type: "search",
+        traceId,
+        org_id: org,
+        pageType: "logs",
+        searchType: "ui",
+      },
+      {
+        data: (_req: unknown, res: any) => {
+          if (res?.type === "search_response_hits")
+            hits.push(...(res.content?.results?.hits ?? []));
+        },
+        error: (_req: unknown, err: any) => reject(streamError(err)),
+        complete: () => resolve(hits),
+      },
+    );
+  });
+}
 
 export const k8sInstantQuery = (
   org: string,
@@ -56,24 +91,13 @@ export const k8sSqlQuery = (
 ) =>
   queryOptions({
     queryKey: k8sKeys.sql(org, name, sql, timeKey(startUs, endUs, relative)),
-    queryFn: async (): Promise<any[]> => {
-      const res: any = await searchService.search(
-        {
-          org_identifier: org,
-          query: {
-            query: {
-              sql,
-              start_time: startUs,
-              end_time: endUs,
-              from: 0,
-              ...(size ? { size } : {}),
-            },
-          },
-          page_type: "logs",
-        },
-        "ui",
-      );
-      return res?.data?.hits ?? [];
-    },
+    queryFn: (): Promise<any[]> =>
+      streamSqlHits(org, {
+        sql,
+        start_time: startUs,
+        end_time: endUs,
+        from: 0,
+        ...(size ? { size } : {}),
+      }),
     staleTime: LIVE_STALE_TIME,
   });

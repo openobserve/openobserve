@@ -304,6 +304,33 @@ describe("useHttpStreaming", () => {
       });
     });
 
+    it("passes the status of a non-OK, non-JSON response to the error handler", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
+      });
+      httpStreaming.traceMap.value[mockData.traceId] = {
+        data: [],
+        error: [mockHandlers.error],
+        complete: [],
+        abortController: new AbortController(),
+      };
+
+      await httpStreaming.fetchQueryDataWithHttpStream(mockData, mockHandlers);
+      await flushPromises();
+
+      expect(mockHandlers.error).toHaveBeenCalledWith(
+        mockData,
+        expect.objectContaining({
+          type: "error",
+          content: expect.objectContaining({ status: 403 }),
+        }),
+      );
+    });
+
     // TODO: Fix Worker mocking
     it.skip("should cancel the stream and clean up resources", async () => {
       const traceId = "0534c2294079426a86bd88b137752535";

@@ -20,10 +20,29 @@ import { k8sKeys } from "./kubernetes.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 
-vi.mock("./search", () => ({ default: { metrics_query: vi.fn(), search: vi.fn() } }));
+const stream = vi.hoisted(() => ({
+  fetch: vi.fn(),
+}));
+
+vi.mock("./search", () => ({ default: { metrics_query: vi.fn() } }));
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: stream.fetch,
+  }),
+}));
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
-const search = vi.mocked(searchService.search);
+
+const hitsChunk = (hits: any[]) => ({
+  type: "search_response_hits",
+  content: { results: { hits } },
+});
+
+const streamOnce = (chunks: any[]) =>
+  stream.fetch.mockImplementation(async (req: any, handlers: any) => {
+    chunks.forEach((c) => handlers.data(req, c));
+    handlers.complete(req, {});
+  });
 
 const ORG = "org1";
 const END = 1_700_000_045_000_000;
@@ -35,7 +54,7 @@ describe("kubernetes queries", () => {
     metricsQuery.mockResolvedValue({
       data: { data: { result: [{ metric: { node: "n1" }, value: [1, "2"] }] } },
     } as any);
-    search.mockResolvedValue({ data: { hits: [{ n: 1 }] } } as any);
+    streamOnce([hitsChunk([{ n: 1 }])]);
   });
 
   it("roots every key under the org's kubernetes scope", () => {
@@ -58,19 +77,64 @@ describe("kubernetes queries", () => {
     });
   });
 
-  it("returns SQL hits and sends the exact window and size", async () => {
-    const options = k8sSqlQuery(ORG, "W", "SELECT 1", START, END, true, 20001);
-    expect(await (options.queryFn as any)()).toEqual([{ n: 1 }]);
-    const [args, type] = search.mock.calls[0] as any[];
-    expect(type).toBe("ui");
-    expect(args.org_identifier).toBe(ORG);
-    expect(args.page_type).toBe("logs");
-    expect(args.query.query).toMatchObject({
-      sql: "SELECT 1",
-      start_time: START,
-      end_time: END,
-      from: 0,
-      size: 20001,
+  describe("SQL over the search stream", () => {
+    const run = (size?: number) =>
+      (k8sSqlQuery(ORG, "W", "SELECT 1", START, END, true, size).queryFn as any)();
+
+    it("returns the hits and sends the exact window and size", async () => {
+      expect(await run(20001)).toEqual([{ n: 1 }]);
+      const [req] = stream.fetch.mock.calls[0];
+      expect(req).toMatchObject({
+        type: "search",
+        pageType: "logs",
+        org_id: ORG,
+        searchType: "ui",
+      });
+      expect(req.traceId).toEqual(expect.any(String));
+      expect(req.queryReq.query).toEqual({
+        sql: "SELECT 1",
+        start_time: START,
+        end_time: END,
+        from: 0,
+        size: 20001,
+      });
+    });
+
+    it("omits size when none is given", async () => {
+      await run();
+      expect(stream.fetch.mock.calls[0][0].queryReq.query).not.toHaveProperty("size");
+    });
+
+    it("appends the hits of successive non-aggregate chunks", async () => {
+      streamOnce([hitsChunk([{ n: 1 }]), hitsChunk([{ n: 2 }, { n: 3 }])]);
+      expect(await run()).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
+    });
+
+    it("ignores chunks that carry no hits", async () => {
+      streamOnce([{ type: "search_response_metadata", content: {} }, hitsChunk([{ n: 1 }])]);
+      expect(await run()).toEqual([{ n: 1 }]);
+    });
+
+    it("rejects with the status when the handler errors", async () => {
+      stream.fetch.mockImplementation(async (req: any, handlers: any) =>
+        handlers.error(req, { content: { message: "forbidden", status: 403 } }),
+      );
+      const err: any = await run().catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toBe("forbidden");
+      expect(err.status).toBe(403);
+    });
+
+    it("reads the status from content.code when content.status is absent", async () => {
+      stream.fetch.mockImplementation(async (req: any, handlers: any) =>
+        handlers.error(req, { content: { message: "denied", code: 403 } }),
+      );
+      await expect(run()).rejects.toMatchObject({ message: "denied", status: 403 });
+    });
+
+    it("rejects with a null status when the error carries none", async () => {
+      stream.fetch.mockImplementation(async (req: any, handlers: any) => handlers.error(req, {}));
+      await expect(run()).rejects.toMatchObject({ status: null });
     });
   });
 

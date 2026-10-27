@@ -26,7 +26,11 @@ import { parseUrlState, type K8sUrlState } from "./kubernetesUrlState";
 const getStreams = vi.fn();
 const getStream = vi.fn();
 
-vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn(), search: vi.fn() } }));
+vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn() } }));
+vi.mock("@/composables/useStreamingSearch", async () => {
+  const { streamSearchApi } = await import("./__fixtures__/streamSearchMock");
+  return { default: () => streamSearchApi((args) => streamSearch(args)) };
+});
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams, getStream }) }));
 vi.mock("./kubernetesObjects", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -34,7 +38,8 @@ vi.mock("./kubernetesObjects", async (importOriginal) => {
 });
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
-const search = vi.mocked(searchService.search);
+const search = vi.hoisted(() => vi.fn());
+const streamSearch = (args: any) => search(args);
 
 const END = 1_700_000_000_000_000;
 const START = END - 3_600_000_000;
@@ -465,7 +470,7 @@ describe("useKubernetesInventory", () => {
       expect(counts).toHaveLength(1);
       expect(counts[0].sql).toContain("k8s_cluster = 'prod'");
       expect(counts[0].start_time).toBe(START);
-      expect(inv.eventCounts.value).toEqual({ total: 14, warnings: 8 });
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 14, warnings: 8 }));
     });
 
     it("stays null when the count returns no row, and is not sent for unscoped events", async () => {
@@ -619,6 +624,28 @@ describe("useKubernetesInventory", () => {
       metricsQuery.mockRejectedValue(new Error("all down"));
       search.mockRejectedValue(new Error("all down"));
       const { inv } = await setup({ view: "pods" });
+      await inv.load();
+      expect(inv.pageError.value).toBe("all down");
+    });
+
+    it("shows a page error, not partial-failure, when every list query rejects but the drawer object read succeeds", async () => {
+      metricsQuery.mockRejectedValue(new Error("all down"));
+      search.mockImplementation((async (args: any) => {
+        const q = args.query.query.sql;
+        if (q.includes("'horizontalpodautoscalers'") && q.endsWith("LIMIT 1"))
+          return { data: { hits: [] } };
+        throw new Error("all down");
+      }) as any);
+      const { inv } = await setup({ view: "hpas", cluster: "prod", details: "hpa/prod/m/h" });
+      await inv.load();
+      expect(inv.pageError.value).toBe("all down");
+      expect(inv.banners.value.map((b) => b.id)).not.toContain("partial-failure");
+    });
+
+    it("shows a page error when every query rejects and no cluster is in the URL", async () => {
+      metricsQuery.mockRejectedValue(new Error("all down"));
+      search.mockRejectedValue(new Error("all down"));
+      const { inv } = await setup({ view: "hpas", details: "hpa/prod/m/h" });
       await inv.load();
       expect(inv.pageError.value).toBe("all down");
     });
@@ -824,6 +851,191 @@ describe("useKubernetesInventory", () => {
       const { inv } = await setup({ view: "pods", details: "pod/prod/a/p" });
       await inv.load();
       expect(inv.detailObserved.value).toBe(false);
+    });
+  });
+
+  describe("SQL overlaps the cluster queries", () => {
+    const POD_ROW = (pod: string) =>
+      ksm({ namespace: "a", pod, uid: `u-${pod}`, phase: "Running" });
+    const deferred = () => {
+      let release!: () => void;
+      const promise = new Promise<void>((r) => (release = r));
+      return { promise, release };
+    };
+    const holdPromql = (gate: Promise<void>) =>
+      metricsQuery.mockImplementation((async ({ query }: { query: string }) => {
+        const rows = fixture[idOf(query)];
+        await gate;
+        return vector(rows);
+      }) as any);
+    const objectCalls = (kind: string) =>
+      sentSql().filter((q: any) => q.sql.includes(`'${kind}'`) && q.sql.endsWith("LIMIT 1"));
+    const tick = () => new Promise((r) => setTimeout(r, 20));
+
+    it("issues SQL before the cluster PromQL resolves when a cluster is in the URL", async () => {
+      const gate = deferred();
+      holdPromql(gate.promise);
+      const { inv } = await setup({ view: "pods", cluster: "prod" });
+      const done = inv.load();
+      await vi.waitFor(() => expect(search).toHaveBeenCalled());
+      expect(sentSql().some((q: any) => q.sql.includes("count(*) AS total"))).toBe(false);
+      expect(inv.loading.value).toBe(true);
+      gate.release();
+      await done;
+      expect(inv.loading.value).toBe(false);
+    });
+
+    it("waits for the cluster PromQL before any SQL when no cluster is in the URL", async () => {
+      const gate = deferred();
+      holdPromql(gate.promise);
+      const { inv } = await setup({ view: "pods" });
+      const done = inv.load();
+      await vi.waitFor(() => expect(metricsQuery).toHaveBeenCalled());
+      await tick();
+      expect(search).not.toHaveBeenCalled();
+      gate.release();
+      await done;
+      expect(search).toHaveBeenCalled();
+    });
+
+    it("clears loading before the event counts land, then fills eventCounts", async () => {
+      const ec = deferred();
+      search.mockImplementation((async (args: any) => {
+        if (!args.query.query.sql.includes("count(*) AS total")) return { data: { hits: [] } };
+        await ec.promise;
+        return { data: { hits: [{ total: 5, warnings: "2" }] } };
+      }) as any);
+      const { inv } = await setup({ view: "pods", cluster: "prod" });
+      await inv.load();
+      expect(inv.loading.value).toBe(false);
+      expect(inv.loaded.value).toBe(true);
+      expect(inv.eventCounts.value).toBeNull();
+      ec.release();
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 5, warnings: 2 }));
+    });
+
+    it("requests a non-pod drawer's object once, before the cluster PromQL resolves", async () => {
+      const gate = deferred();
+      holdPromql(gate.promise);
+      const { inv } = await setup({ view: "hpas", cluster: "prod", details: "hpa/prod/m/h" });
+      const done = inv.load();
+      await vi.waitFor(() => expect(objectCalls("horizontalpodautoscalers")).toHaveLength(1));
+      gate.release();
+      await done;
+      expect(objectCalls("horizontalpodautoscalers")).toHaveLength(1);
+    });
+
+    it("still reads a pod drawer's object after the main load, once its uid is known", async () => {
+      const gate = deferred();
+      holdPromql(gate.promise);
+      fixture = { ...CL(), P1: [POD_ROW("p")] };
+      const { inv } = await setup({ view: "pods", cluster: "prod", details: "pod/prod/a/p" });
+      const done = inv.load();
+      await vi.waitFor(() => expect(search).toHaveBeenCalled());
+      expect(objectCalls("pods")).toHaveLength(0);
+      gate.release();
+      await done;
+      expect(objectCalls("pods")).toHaveLength(1);
+      expect(objectCalls("pods")[0].sql).toContain("'u-p'");
+    });
+
+    it("drops the late results of a superseded load", async () => {
+      const gate = deferred();
+      fixture = { ...CL(), P1: [POD_ROW("old")] };
+      holdPromql(gate.promise);
+      const { inv, time } = await setup({ view: "pods", cluster: "prod" }, { relative: false });
+      const first = inv.load();
+      await vi.waitFor(() => expect(metricsQuery).toHaveBeenCalled());
+      fixture = { ...CL(), P1: [POD_ROW("new")] };
+      holdPromql(Promise.resolve());
+      time.value = { start: START, end: END + HOUR, relative: false };
+      await inv.load();
+      gate.release();
+      await first;
+      await tick();
+      expect(inv.inventory.value.pods.map((p: any) => p.name)).toEqual(["new"]);
+      expect(inv.loading.value).toBe(false);
+    });
+  });
+
+  describe("event count badge across loads", () => {
+    const isEc = (args: any) => args.query.query.sql.includes("count(*) AS total");
+    let ecGate: Promise<void> = Promise.resolve();
+    let ecTotal = 0;
+    let ecFail = false;
+    const wireEc = () =>
+      search.mockImplementation((async (args: any) => {
+        if (!isEc(args)) return { data: { hits: [] } };
+        const total = ecTotal;
+        await ecGate;
+        if (ecFail) throw Object.assign(new Error("ec down"), { response: { status: 500 } });
+        return { data: { hits: [{ total, warnings: "0" }] } };
+      }) as any);
+    const later = (t: K8sTime): K8sTime => ({ ...t, end: t.end + HOUR });
+
+    beforeEach(() => {
+      ecGate = Promise.resolve();
+      ecTotal = 0;
+      ecFail = false;
+      wireEc();
+    });
+
+    it("keeps the previous count on a same-cluster refresh until the new one lands, even if it belongs to the earlier window", async () => {
+      ecTotal = 3;
+      const { inv, time } = await setup({ view: "pods", cluster: "prod" }, { relative: false });
+      await inv.load();
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 3, warnings: 0 }));
+      let release!: () => void;
+      ecGate = new Promise<void>((r) => (release = r));
+      ecTotal = 7;
+      time.value = later(time.value);
+      await inv.load();
+      expect(inv.eventCounts.value).toEqual({ total: 3, warnings: 0 });
+      release();
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 7, warnings: 0 }));
+    });
+
+    it("clears the count when the cluster changes", async () => {
+      ecTotal = 3;
+      const { inv, state } = await setup({ view: "pods", cluster: "prod" });
+      await inv.load();
+      await vi.waitFor(() => expect(inv.eventCounts.value).not.toBeNull());
+      let release!: () => void;
+      ecGate = new Promise<void>((r) => (release = r));
+      ecTotal = 9;
+      state.value = parseUrlState({ view: "pods", cluster: "dev" });
+      await inv.load();
+      expect(inv.eventCounts.value).toBeNull();
+      release();
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 9, warnings: 0 }));
+    });
+
+    it("clears the count when a load issues no count request", async () => {
+      ecTotal = 3;
+      const { inv, time } = await setup({ view: "pods", cluster: "prod" }, { relative: false });
+      await inv.load();
+      await vi.waitFor(() => expect(inv.eventCounts.value).not.toBeNull());
+      getStream.mockResolvedValue({ schema: [] });
+      await inv.loadStreams();
+      search.mockClear();
+      time.value = later(time.value);
+      await inv.load();
+      expect(sentSql().some((q: any) => q.sql.includes("count(*) AS total"))).toBe(false);
+      expect(inv.eventCounts.value).toBeNull();
+    });
+
+    it("records an EC failure and banners it without delaying loading", async () => {
+      ecFail = true;
+      let release!: () => void;
+      ecGate = new Promise<void>((r) => (release = r));
+      const { inv } = await setup({ view: "pods", cluster: "prod" });
+      await inv.load();
+      expect(inv.loading.value).toBe(false);
+      expect(inv.failed.value.has("EC")).toBe(false);
+      release();
+      await vi.waitFor(() => expect(inv.failed.value.get("EC")).toBe(500));
+      expect(inv.eventCounts.value).toBeNull();
+      expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
     });
   });
 

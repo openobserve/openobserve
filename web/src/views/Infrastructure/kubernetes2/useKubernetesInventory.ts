@@ -138,6 +138,8 @@ export function useKubernetesInventory(
   const sql = shallowRef<Map<string, any[]>>(new Map());
   // Kept apart from sql so the drawer events landing does not rebuild the inventory.
   const detailEventHits = shallowRef<any[] | null>(null);
+  // Off the critical path: the sidebar badge fills in after the page has rendered.
+  const eventCountHits = shallowRef<any[] | undefined>(undefined);
   const failed = shallowRef<Map<string, number | null>>(new Map());
   const pageError = ref<string | null>(null);
   const loading = ref(false);
@@ -156,7 +158,7 @@ export function useKubernetesInventory(
   const pendingObjects = ref<string | null>(null);
   const loadedObjects = ref<string | null>(null);
 
-  // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
+  // Nothing cancels a superseded query, so its response is dropped by generation.
   let generation = 0;
   let streamsGeneration = 0;
 
@@ -260,6 +262,7 @@ export function useKubernetesInventory(
     results.value = new Map();
     sql.value = new Map();
     detailEventHits.value = null;
+    eventCountHits.value = undefined;
     failed.value = new Map();
     pageError.value = null;
     loading.value = false;
@@ -442,6 +445,13 @@ export function useKubernetesInventory(
       refreshNonce.value,
     ]);
     pendingObjects.value = objectsKey;
+    // SQL needs only the cluster name, so a cluster already in the URL lets it overlap the cluster queries.
+    const early = s.cluster ? settle(org, t, [], null, earlyRequests(s, t, s.cluster)) : null;
+    // Kept out of the page batch so a drawer read cannot mask every list query failing.
+    const earlyObject =
+      s.cluster && s.details && s.details.kind !== "pod"
+        ? settle(org, t, [], null, detailRequests(s, t, s.cluster, null, "object"))
+        : null;
     const cl = await settle(
       org,
       t,
@@ -467,13 +477,15 @@ export function useKubernetesInventory(
       ].sort((a, b) => a.localeCompare(b));
     }
     const cluster = s.cluster ?? clusters.value[0] ?? null;
-    const main = await settle(
-      org,
-      t,
-      neededIds(s),
-      matchersFor(cluster, cl.results),
-      sqlRequests(s, t, cluster),
-    );
+    const requests = sqlRequests(s, t, cluster);
+    const blocking = requests.filter((r) => r.name !== "EC");
+    // Same cluster as the early batch, so its SQL is already in flight and only the PromQL is left.
+    const main = early
+      ? mergeSettled(
+          await settle(org, t, neededIds(s), matchersFor(cluster, cl.results), []),
+          await early,
+        )
+      : await settle(org, t, neededIds(s), matchersFor(cluster, cl.results), blocking);
     if (gen !== generation) return;
     if (main.attempted > 0 && main.failed.size === main.attempted) {
       fail(main.firstError);
@@ -481,6 +493,15 @@ export function useKubernetesInventory(
     }
     commit(main, cluster, t, s);
     loadedObjects.value = objectsKey;
+    const counts = requests.filter((r) => r.name === "EC");
+    if (!counts.length) eventCountHits.value = undefined;
+    else {
+      void settle(org, t, [], null, counts).then((ec) => {
+        if (gen !== generation) return;
+        eventCountHits.value = ec.sql.get("EC");
+        if (ec.failed.size) failed.value = new Map([...failed.value, ...ec.failed]);
+      });
+    }
     const detail = s.details;
     if (detail) {
       const row = findRow(
@@ -488,7 +509,10 @@ export function useKubernetesInventory(
         detail.kind,
         rowKey(detail.kind, detail.cluster, detail.namespace, detail.name),
       );
-      const obj = await settle(org, t, [], null, detailRequests(s, t, cluster, row, "object"));
+      // A non-pod object needs no row, so the early batch has already read it.
+      const obj =
+        (await earlyObject) ??
+        (await settle(org, t, [], null, detailRequests(s, t, cluster, row, "object")));
       if (gen !== generation) return;
       mergeSql(obj);
       const enriched = findRow(
@@ -510,11 +534,16 @@ export function useKubernetesInventory(
     detailLoading.value = false;
   };
 
+  const earlyRequests = (s: K8sUrlState, t: K8sTime, cluster: string): SqlRequest[] => {
+    return sqlRequests(s, t, cluster).filter((r) => r.name !== "EC");
+  };
+
   const fail = (error: string | null) => {
     pageError.value = error;
     results.value = new Map();
     sql.value = new Map();
     detailEventHits.value = null;
+    eventCountHits.value = undefined;
     failed.value = new Map();
     loading.value = false;
     detailLoading.value = false;
@@ -525,6 +554,8 @@ export function useKubernetesInventory(
     results.value = main.results;
     sql.value = main.sql;
     detailEventHits.value = null;
+    // The last count stays until the new one lands; another cluster's count never shows.
+    if (loadedFor.value?.cluster !== cluster) eventCountHits.value = undefined;
     failed.value = main.failed;
     loadedFor.value = {
       cluster,
@@ -560,7 +591,7 @@ export function useKubernetesInventory(
     return { rows: [...seen.values()], truncated };
   });
 
-  const eventCounts = computed(() => parseEventCounts(sql.value.get("EC")));
+  const eventCounts = computed(() => parseEventCounts(eventCountHits.value));
 
   // Parsed once per hits array: the inventory, banners and drawer all read them, across drawer merges.
   const parsed = new WeakMap<any[], ObjectRecord[]>();
@@ -723,6 +754,17 @@ export function useKubernetesInventory(
 function viewKeyOf(s: K8sUrlState) {
   const byNode = s.view === "map" && groupsPodsByNode(s.entity, s.group);
   return JSON.stringify([s.view, s.cluster, s.namespaces, s.entity, byNode]);
+}
+
+function mergeSettled(a: Settled, b: Settled): Settled {
+  return {
+    results: new Map([...a.results, ...b.results]),
+    sql: new Map([...a.sql, ...b.sql]),
+    failed: new Map([...a.failed, ...b.failed]),
+    firstError: a.firstError ?? b.firstError,
+    attempted: a.attempted + b.attempted,
+    updatedAt: Math.max(a.updatedAt, b.updatedAt),
+  };
 }
 
 function dedupe(requests: SqlRequest[]): SqlRequest[] {
