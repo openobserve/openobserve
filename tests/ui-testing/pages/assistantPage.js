@@ -65,20 +65,45 @@ export class AssistantPage {
     await box.press("Enter");
   }
 
+  /** Stop is the composer's Send slot while a turn runs (HT-04). */
   async stop() {
-    notYet("WP-06");
+    await this.container().locator('[data-test="assistant-stop"]').click();
   }
 
+  /** The live status row under the running prompt. */
   status() {
-    return notYet("WP-06");
+    return this.transcript().locator('[data-test="assistant-turn-status"]');
   }
 
+  /** The sticky copy of the status in the strip above the composer. */
+  stickyStatus() {
+    return this.container().locator('[data-test="assistant-sticky-status"]');
+  }
+
+  /** A terminal block: refusals sit above the composer, failures in the log. */
   outcome() {
-    return notYet("WP-06");
+    return this.container().locator('[data-test="assistant-turn-outcome"]').last();
   }
 
   outcomeAction() {
-    return notYet("WP-06");
+    return this.outcome().locator('[data-test="assistant-turn-outcome-action"]');
+  }
+
+  transcript() {
+    return this.container().locator('[data-test="assistant-transcript"]');
+  }
+
+  /** The latest answer article. */
+  answer() {
+    return this.transcript().locator("[data-answer]").last();
+  }
+
+  strip() {
+    return this.container().locator('[data-test="assistant-status-strip"]');
+  }
+
+  launcher() {
+    return this.page.locator('[data-test="assistant-launcher"]');
   }
 
   consentCard() {

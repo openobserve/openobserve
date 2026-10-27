@@ -17,6 +17,7 @@ import { toRaw } from "vue";
 
 import { generateNavigationFromToolResult } from "@/components/O2AIChat.navigation";
 import type { PageContext } from "@/composables/contextProviders/types";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 import { gt, raw, type TranslateFn } from "@/types/i18n";
 
 import { ERROR_LEDGER, isConsentPrompt } from "./assistantErrors";
@@ -37,7 +38,13 @@ import type {
 } from "./assistantStore.types";
 import { contextUsedOf, transcriptOf } from "./context/serialize";
 import type { ClientContext, PageContext as AssistantPageContext } from "./context/types";
-import { createEffectsRunner, type EffectScope, type Effects, type EffectsRunner } from "./effects";
+import {
+  createEffectsRunner,
+  type EffectScope,
+  type Effects,
+  type EffectsRunner,
+  type TurnSource,
+} from "./effects";
 import type { AssistantFrame } from "./frames";
 import { useAssistantName } from "./useAssistantName";
 import {
@@ -53,6 +60,7 @@ import {
   STALL_MS,
   STOP_TIMEOUT_MS,
   elapsedMs,
+  outcomeRecordOf,
   turnReducer,
   type TurnEffect,
   type TurnReducerCtx,
@@ -136,10 +144,15 @@ interface TurnRecord {
   rawContext: PageContext | AssistantPageContext | null;
   client: ClientContext;
   input: TurnInput;
+  source: TurnSource;
   mode?: "chat" | "generate_query" | "rca";
   ephemeral?: boolean;
   userIndex: number;
   newSession: boolean;
+  /** Regenerate: the answer this attempt replaces, put back if the attempt is refused. */
+  replaced: ChatMessage[] | null;
+  /** Edit and resend: the 1-based user message the text came from. */
+  editedFrom?: number;
   stream: StreamState;
   /** Frames of an aborted request are ignored by comparing this. */
   generation: number;
@@ -152,6 +165,10 @@ interface TurnRecord {
   consentRetried: boolean;
   notSaved: boolean;
   streamEnded: boolean;
+  /** Frames applied up to the resume cursor `turnMeta.lastSeq`: what a tail from the cursor builds on (WP-18). */
+  throughSeq: AssistantFrame[];
+  /** Frames applied since the cursor last moved; a tail from the cursor sends their content again. */
+  sinceSeq: AssistantFrame[];
   cancelConfirmed?: boolean;
   cancelMs: number | null;
   silenceTimer?: ReturnType<typeof setTimeout>;
@@ -167,8 +184,17 @@ interface TurnRecord {
 interface LastTurn {
   turnId: string;
   snapshot: ComposerSnapshot;
+  source: TurnSource;
+  editedFrom?: number;
   idSends: number;
   mode?: "chat" | "generate_query" | "rca";
+}
+
+/** A Retry's own snapshot and source; `clearsComposer` when the composer held what is resent. */
+interface RetryOf {
+  snapshot: ComposerSnapshot;
+  source: TurnSource;
+  clearsComposer: boolean;
 }
 
 /** `TurnEngine` of WP-01: the one place a turn is sent, streamed, stopped and retried. */
@@ -208,13 +234,30 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   const eventWork =
     (rec: TurnRecord, event: TurnEvent) =>
     (session: AssistantSession): Effects => {
+      const before = session.turn;
       const { turn, effects } = turnReducer(session.turn, event, reducerCtx(rec));
       session.turn = askAgainIfMutated(turn, rec.stream);
+      noteOutcome(session, rec, before);
       if (session.turn.state !== "awaiting_approval") clearApproval(rec);
       // HT-05 AC 4: whatever ended the turn, a step without its result is interrupted.
       if (isTerminal(session.turn)) interruptSteps(rec.stream);
       return { stream: [], turn: effects };
     };
+
+  // The end of a turn that did not simply answer is written into its answer, so a reload renders the same block (HT-01 AC 7).
+  const noteOutcome = (session: AssistantSession, rec: TurnRecord, before: TurnState) => {
+    if (isTerminal(before) || !isTerminal(session.turn)) return;
+    const now = deps.now();
+    const record = outcomeRecordOf(session.turn, {
+      at: now,
+      turnId: rec.turnId,
+      sessionId: rec.sid,
+      traceId: session.turnMeta.traceId,
+      cancelUnconfirmed: rec.cancelConfirmed === false,
+      elapsedMs: elapsedMs(session.turnMeta, now),
+    });
+    if (record) appendToAnswer(session, rec, { type: "turn_outcome", outcome: record });
+  };
 
   const dispatch = (rec: TurnRecord, event: TurnEvent) => {
     // A late timer or callback of a turn that already ended must never touch the next turn's state.
@@ -245,8 +288,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       }
       const event =
         frame.type === "complete" && rec.notSaved ? { ...frame, persisted: false } : frame;
+      const before = session.turn;
       const next = turnReducer(session.turn, event, reducerCtx(rec));
       session.turn = askAgainIfMutated(next.turn, rec.stream);
+      noteOutcome(session, rec, before);
       out.turn.push(...next.effects);
       if (session.turn.state !== "awaiting_approval") clearApproval(rec);
       else if (frame.type === "confirmation_required") watchApproval(rec, frame.expires_at);
@@ -256,6 +301,12 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   const sinkFor = (rec: TurnRecord, tail = false): FrameSink => {
     const generation = (rec.generation += 1);
     const current = () => rec.generation === generation && !rec.settled;
+    // A tail's first message proves it delivers; only then is what came since the cursor taken back, so a failed tail keeps the text.
+    let resumed = !tail;
+    const resume = () => {
+      if (!resumed) rollBack(rec);
+      resumed = true;
+    };
     return {
       onAdmitted(result) {
         // A tail resumes an admitted turn; its own 200 is not a second admission (HT-06 caught up).
@@ -265,21 +316,31 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         if (!current()) return;
         // A frame proves admission, whatever order the transport reported them in.
         if (!tail) admit(rec, generation, { ok: true, status: 200, traceId: null });
-        const seq = id === null ? NaN : Number(id);
+        resume();
         const session = sessionOf(rec.sid);
-        // A tail replays from `from_seq`; a frame at or before the last seen seq is already applied (HT-06 AC 2).
-        if (Number.isFinite(seq) && session && (session.turnMeta.lastSeq ?? -1) >= seq) return;
-        if (Number.isFinite(seq) && session) session.turnMeta.lastSeq = seq;
         if (session?.turn.state === "reconnecting") dispatch(rec, { type: "tail_caught_up" });
-        runner.schedule(rec.sid, frameWork(rec, frame));
+        const fresh = session ? cursorFrame(rec, session.turnMeta, frame, id, tail) : frame;
         watchSilence(rec, true);
-        if (frame.type === "complete" || frame.type === "error" || frame.type === "cancelled") {
+        if (!fresh) return;
+        runner.schedule(rec.sid, frameWork(rec, fresh));
+        if (fresh.type === "complete" || fresh.type === "error" || fresh.type === "cancelled") {
           runner.flush(rec.sid);
           settleIfEnded(rec);
         }
       },
       onKeepalive() {
         if (!current()) return;
+        runner.schedule(rec.sid, eventWork(rec, { type: "keepalive" }));
+        watchSilence(rec, false);
+      },
+      onBoundary(id) {
+        if (!current()) return;
+        resume();
+        const meta = sessionOf(rec.sid)?.turnMeta;
+        const seq = Number(id);
+        // Everything through `seq` was sent: the tail resumes from here.
+        if (meta && Number.isFinite(seq) && (meta.lastSeq === null || seq > meta.lastSeq))
+          advance(rec, meta, seq);
         runner.schedule(rec.sid, eventWork(rec, { type: "keepalive" }));
         watchSilence(rec, false);
       },
@@ -300,6 +361,49 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         dispatch(rec, { type: "eof", hasTail: hasTail(rec) });
       },
     };
+  };
+
+  // The SSE id rule (WP-18): a frame tagged N comes after seq N and several frames share N, so a repeated id is never a reason to drop one.
+  const cursorFrame = (
+    rec: TurnRecord,
+    meta: TurnMeta,
+    frame: AssistantFrame,
+    id: string | null,
+    tail: boolean,
+  ): AssistantFrame | null => {
+    const seq = id === null ? NaN : Number(id);
+    // A tail starts at the cursor; content before it was applied in full.
+    if (tail && Number.isFinite(seq) && meta.lastSeq !== null && seq < meta.lastSeq) return null;
+    // A frame tagged N also proves seq N complete; the first ids of a turn (`-1`) come before any boundary.
+    if (Number.isFinite(seq) && (meta.lastSeq === null || seq > meta.lastSeq))
+      advance(rec, meta, seq);
+    rec.sinceSeq.push(frame);
+    return frame;
+  };
+
+  const advance = (rec: TurnRecord, meta: TurnMeta, seq: number) => {
+    meta.lastSeq = seq;
+    rec.throughSeq.push(...rec.sinceSeq);
+    rec.sinceSeq = [];
+  };
+
+  // The tail resends everything past the cursor, merged and without transient frames, so the answer is rebuilt from the frames through the cursor and the tail applies on top (WP-18).
+  const rollBack = (rec: TurnRecord) => {
+    if (!rec.sinceSeq.length) return;
+    rec.sinceSeq = [];
+    runner.flush(rec.sid, (session) => {
+      // The engine's own blocks (the restored marker written at admission) are no frames, so they are kept and put back first, where they were.
+      const kept = session.messages
+        .slice(rec.userIndex + 1)
+        .flatMap((message) => message.contentBlocks ?? [])
+        .filter((block) => block.type === "turn_outcome");
+      truncateAnswer(session, rec);
+      for (const block of kept) appendToAnswer(session, rec, block);
+      rec.stream = freshStream(session.messages);
+      for (const frame of rec.throughSeq) reduce(rec.stream, frame, liveCtx(t));
+      mirrorExtras(session.turnMeta, rec.stream);
+      return { stream: [], turn: [] };
+    });
   };
 
   const hasTail = (rec: TurnRecord) =>
@@ -358,6 +462,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     last.set(rec.sid, {
       turnId: rec.turnId,
       snapshot: rec.snapshot,
+      source: rec.source,
+      ...(rec.editedFrom && { editedFrom: rec.editedFrom }),
       idSends: rec.idSends,
       mode: rec.mode,
     });
@@ -438,7 +544,13 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     rec.restoring = false;
     runner.flush(rec.sid, (session) => {
       if (result.traceId) session.turnMeta.traceId = result.traceId;
-      if (restored) session.turnMeta.restored = true;
+      if (restored) {
+        session.turnMeta.restored = true;
+        appendToAnswer(session, rec, {
+          type: "turn_outcome",
+          outcome: { kind: "restored", at: deps.now(), turnId: rec.turnId },
+        });
+      }
       return { stream: [], turn: [] };
     });
     dispatch(rec, { type: "admitted", result: { ok: true, status: result.status } });
@@ -524,9 +636,11 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     // A browser-only chat cannot be restored under its old id; the replacement gets a new one (constraint 7).
     if (!deps.capability().persistence()) renameSession(rec, deps.uuid());
     runner.flush(rec.sid, (session) => {
-      session.messages.splice(rec.userIndex + 1);
+      truncateAnswer(session, rec);
       // The replacement turn numbers its frames afresh; an old seq would drop them as replays.
       session.turnMeta.lastSeq = null;
+      rec.throughSeq = [];
+      rec.sinceSeq = [];
       rec.stream = freshStream(session.messages);
       return { stream: [], turn: [] };
     });
@@ -558,7 +672,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     if (!controller) return;
     rec.streamEnded = false;
     const turnId = session.turnMeta.serverTurnId ?? rec.turnId;
-    const fromSeq = session.turnMeta.lastSeq ?? 0;
+    const fromSeq = session.turnMeta.lastSeq ?? -1;
     const tail = deps.client.tail(
       rec.org,
       rec.sid,
@@ -581,20 +695,25 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   const start = async (
     sid: Sid,
     opts: Parameters<TurnEngine["send"]>[1] = {},
-    snapshotOverride: ComposerSnapshot | null = null,
+    retryOf: RetryOf | null = null,
   ): Promise<TurnTerminal> => {
     const store = deps.store();
     const session = sessionOf(sid);
     if (!session || !store.state.ready) return refusedUnknown();
-    const snapshot = snapshotOverride ?? snapshotOf(session.composer);
-    if (!snapshot.text.trim() && !snapshot.chips.length && !snapshot.images.length)
+    const source = retryOf?.source ?? sourceOf(opts);
+    const fromComposer = retryOf ? retryOf.clearsComposer : source === "composer";
+    const snapshot =
+      retryOf?.snapshot ??
+      opts.snapshot ??
+      (source === "regenerate" ? lastPromptSnapshot(session) : snapshotOf(session.composer));
+    if (!snapshot || (!snapshot.text.trim() && !snapshot.chips.length && !snapshot.images.length))
       return refusedUnknown();
-    const rec = newRecord(session, opts, snapshot, deps);
+    const rec = newRecord(session, opts, snapshot, source, deps);
     const previous = last.get(sid);
     if (previous && previous.turnId === rec.turnId) rec.idSends = previous.idSends;
     runtime.set(sid, { controller: new AbortController(), turn: rec });
-    runner.flush(sid, (s) => queueTurn(s, rec, deps.now()));
-    store.drafts.remove(session.userOrgKey, sid);
+    runner.flush(sid, (s) => queueTurn(s, rec, deps.now(), fromComposer));
+    if (fromComposer) store.drafts.remove(session.userOrgKey, sid);
     rec.rawContext = await safePageContext(deps);
     rec.pageContext = whitelist(rec.rawContext, snapshot);
     if (sessionOf(rec.sid)?.turn.state === "queued") await attempt(rec);
@@ -654,18 +773,24 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const turn = session.turn;
       if (turn.state !== "refused" && turn.state !== "failed")
         return Promise.resolve(isTerminal(turn) ? turn : refusedUnknown());
-      // An edited composer is a new message: its text wins, the snapshot's chips and images stay.
       const typed = session.composer.text;
-      const edited = typed.trim() !== "" && typed !== previous.snapshot.text;
+      // Only a composer turn reads the composer: an edited one is a new message, the snapshot's chips and images stay.
+      const edited =
+        previous.source === "composer" && typed.trim() !== "" && typed !== previous.snapshot.text;
       const snapshot = edited ? { ...previous.snapshot, text: typed } : previous.snapshot;
+      // A refusal gave the snapshot back to the composer; resending it empties the composer again.
+      const restored =
+        previous.source !== "regenerate" && typed.trim() !== "" && typed === previous.snapshot.text;
       // Pre-admission Retry is the same turn: same id (once) and the queued snapshot (HT-03 AC 5).
       const sameTurn = turn.state === "refused" && !edited && previous.idSends < MAX_ID_SENDS;
       const opts = {
         turnId: sameTurn ? previous.turnId : undefined,
         input: "retry" as const,
         mode: previous.mode,
+        ...(previous.editedFrom && { editedFrom: previous.editedFrom }),
       };
-      return start(sid, opts, snapshot);
+      const clearsComposer = edited || restored;
+      return start(sid, opts, { snapshot, source: previous.source, clearsComposer });
     },
     continueTurn(sid) {
       const chips = last.get(sid)?.snapshot.chips ?? [];
@@ -681,6 +806,19 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const current = sessionOf(sid);
       if (saved === "server" && current?.turn.state === "done")
         current.turn = { state: "done", saved };
+    },
+    canRetry(sid) {
+      const session = sessionOf(sid);
+      return !!last.get(sid) && !record(sid) && !!session && isTerminal(session.turn);
+    },
+    async cancelTurn(sid, turnId) {
+      const session = sessionOf(sid);
+      if (!session) return false;
+      const target = { sid, origin: session.origin, record: session.record, turnId };
+      return deps.client.stop(session.org, target).then(
+        () => true,
+        () => false,
+      );
     },
     setRequestBuilder(next) {
       builder = next;
@@ -743,6 +881,7 @@ function newRecord(
   session: AssistantSession,
   opts: Parameters<TurnEngine["send"]>[1] & object,
   snapshot: ComposerSnapshot,
+  source: TurnSource,
   deps: TurnEngineDeps,
 ): TurnRecord {
   let resolve: (terminal: TurnTerminal) => void = () => undefined;
@@ -758,10 +897,13 @@ function newRecord(
     rawContext: null,
     client: clientContextOf(session, deps.uiVersion?.() ?? ""),
     input: opts.input ?? "typed",
+    source,
     mode: opts.mode,
     ephemeral: opts.ephemeral,
     userIndex: -1,
     newSession: session.messages.length === 0,
+    replaced: null,
+    ...(opts.editedFrom && { editedFrom: opts.editedFrom }),
     stream: freshStream(session.messages),
     generation: 0,
     admittedGeneration: 0,
@@ -771,6 +913,8 @@ function newRecord(
     consentRetried: false,
     notSaved: false,
     streamEnded: false,
+    throughSeq: [],
+    sinceSeq: [],
     cancelMs: null,
     settled: false,
     lingering: false,
@@ -779,8 +923,18 @@ function newRecord(
   };
 }
 
+function sourceOf(opts: Parameters<TurnEngine["send"]>[1] = {}): TurnSource {
+  if (opts.input === "regenerate") return "regenerate";
+  return opts.snapshot || opts.input === "edit_resend" ? "edit" : "composer";
+}
+
 // `queued`: snapshot taken, user message appended, composer cleared; nothing is saved before admission (constraint 13).
-function queueTurn(session: AssistantSession, rec: TurnRecord, now: number): Effects {
+function queueTurn(
+  session: AssistantSession,
+  rec: TurnRecord,
+  now: number,
+  fromComposer: boolean,
+): Effects {
   const { turn, effects } = turnReducer(
     session.turn,
     { type: "send", turnId: rec.turnId },
@@ -789,14 +943,11 @@ function queueTurn(session: AssistantSession, rec: TurnRecord, now: number): Eff
   session.turn = turn;
   session.turnMeta = freshMeta(rec.turnId, now);
   session.pendingConsent = null;
-  const images = rec.snapshot.images;
-  session.messages.push({
-    role: "user",
-    content: raw(rec.snapshot.text),
-    ...(images.length > 0 && { images: [...images] }),
-  });
-  rec.userIndex = session.messages.length - 1;
+  if (rec.source === "regenerate") queueAttempt(session, rec);
+  else queuePrompt(session, rec, now);
   rec.stream.messages = session.messages;
+  // Regenerate and Edit and resend send their own text; the composer draft stays as it is (EB-09 AC 2).
+  if (!fromComposer) return { stream: [], turn: effects };
   Object.assign(session.composer, {
     text: "",
     chips: [],
@@ -806,6 +957,101 @@ function queueTurn(session: AssistantSession, rec: TurnRecord, now: number): Eff
     recallDraft: null,
   });
   return { stream: [], turn: effects };
+}
+
+function queuePrompt(session: AssistantSession, rec: TurnRecord, now: number): void {
+  const { images, chips } = rec.snapshot;
+  session.messages.push({
+    role: "user",
+    content: raw(rec.snapshot.text),
+    sentAt: now,
+    turnId: rec.turnId,
+    ...(images.length > 0 && { images: [...images] }),
+    ...(chips.length > 0 && { chips: chips.map((chip) => ({ ...toRaw(chip) })) }),
+    ...(rec.editedFrom && { editedFrom: rec.editedFrom }),
+  });
+  rec.userIndex = session.messages.length - 1;
+}
+
+// A regenerated attempt keeps the user message; the previous answer becomes a version of the new one (`30` §8.2).
+function queueAttempt(session: AssistantSession, rec: TurnRecord): void {
+  const userIndex = lastUserIndex(session.messages);
+  rec.userIndex = userIndex;
+  // The new attempt is the one shown, even when the reader was on an older version.
+  delete session.ui.activeVersion[session.messages[userIndex]?.turnId ?? `m${userIndex}`];
+  const replaced = session.messages.splice(userIndex + 1);
+  rec.replaced = replaced;
+  const previous = replaced.filter((message) => message.role === "assistant");
+  // An attempt that failed with nothing said is a banner, not an answer, so it never becomes a version.
+  const versions = previous.flatMap((message) => [
+    ...(message.versions ?? []),
+    ...(isOutcomeOnly(message) ? [] : [{ ...toRaw(message), versions: undefined }]),
+  ]);
+  session.messages.push({
+    role: "assistant",
+    content: raw(""),
+    contentBlocks: [],
+    turnId: rec.turnId,
+    ...(versions.length > 0 && { versions }),
+  });
+}
+
+// A rebuilt answer starts from frames, which carry no earlier versions, so a regenerated answer's versions move onto the new shell.
+function truncateAnswer(session: AssistantSession, rec: TurnRecord): void {
+  const answer = session.messages
+    .slice(rec.userIndex + 1)
+    .find((message) => message.role === "assistant");
+  session.messages.splice(rec.userIndex + 1);
+  if (!answer?.versions?.length) return;
+  session.messages.push({
+    role: "assistant",
+    content: raw(""),
+    contentBlocks: [],
+    turnId: answer.turnId,
+    versions: answer.versions,
+  });
+}
+
+function isOutcomeOnly(message: ChatMessage): boolean {
+  return (
+    !String(message.content ?? "").trim() &&
+    (message.contentBlocks ?? []).every((block) => block.type === "turn_outcome")
+  );
+}
+
+function lastUserIndex(messages: ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "user") return i;
+  return -1;
+}
+
+// The prompt of the latest turn as a snapshot; Regenerate resends exactly it.
+function lastPromptSnapshot(session: AssistantSession): ComposerSnapshot | null {
+  const index = lastUserIndex(session.messages);
+  const prompt = session.messages[index];
+  if (!prompt) return null;
+  return {
+    text: String(prompt.content ?? ""),
+    chips: (prompt.chips ?? []).map((chip) => ({ ...toRaw(chip) })),
+    images: [...(prompt.images ?? [])],
+    mentions: [],
+    timeOverride: null,
+  };
+}
+
+// The turn's answer, created when the turn ended before writing one (a failure or Stop with nothing streamed).
+function appendToAnswer(
+  session: AssistantSession,
+  rec: TurnRecord,
+  block: NonNullable<ChatMessage["contentBlocks"]>[number],
+): void {
+  if (rec.userIndex < 0) return;
+  const after = session.messages.slice(rec.userIndex + 1);
+  let answer = [...after].reverse().find((message) => message.role === "assistant");
+  if (!answer) {
+    answer = { role: "assistant", content: raw(""), contentBlocks: [], turnId: rec.turnId };
+    session.messages.push(answer);
+  }
+  answer.contentBlocks = [...(answer.contentBlocks ?? []), block];
 }
 
 function freshMeta(turnId: string, now: number): TurnMeta {
@@ -858,7 +1104,8 @@ function liveCtx(t: TranslateFn): ReducerCtx {
 // HT-07 AC 8: `usage`, `compacted` and the trace id of `complete` are kept on the turn.
 function mirrorExtras(meta: TurnMeta, stream: StreamState): void {
   const extras = stream.extras;
-  if (stream.lastTraceId) meta.traceId = stream.lastTraceId;
+  const traceId = stream.lastTraceId ?? extras?.traceId;
+  if (traceId) meta.traceId = traceId;
   if (!extras) return;
   if (extras.serverTurnId) meta.serverTurnId = extras.serverTurnId;
   if (extras.compacted) meta.compacted = true;
@@ -908,6 +1155,8 @@ function scopeOf(rec: TurnRecord | undefined): EffectScope | null {
     userIndex: rec.userIndex,
     newSession: rec.newSession,
     input: rec.input,
+    source: rec.source,
+    replaced: rec.replaced,
     surface: rec.client.container === "rca" ? "rca" : "chat",
     toolCalls: extras.toolCalls,
     toolErrors: extras.toolErrors,

@@ -181,7 +181,7 @@ async function handleAi(route, request, state) {
       const nowUs = Date.now() * 1000;
       const sc = SCENARIOS[turn.scenario] || SCENARIOS.complete;
       const title = (sc.frames.find((fr) => fr.type === "title") || {}).title || turn.text.slice(0, 40);
-      state.chats.unshift({ session_id: turn.session_id, title, user: turn.text, frames: sc.frames.filter((fr) => !fr.waitForConfirm), created_at: nowUs, updated_at: nowUs, last_committed_seq: sc.frames.length });
+      state.chats.unshift({ session_id: turn.session_id, title, user: turn.text, frames: sc.frames.filter((fr) => !fr.waitForConfirm && fr.boundary === undefined).map(({ sseId, ...fr }) => fr), created_at: nowUs, updated_at: nowUs, last_committed_seq: sc.frames.length });
     }
     return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } }), true;
   }

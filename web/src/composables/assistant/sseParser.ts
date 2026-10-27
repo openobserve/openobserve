@@ -27,8 +27,10 @@ export interface ExtractedFrames {
 
 /** What the parser hands its consumer, one line at a time. */
 export interface SseHandlers {
-  /** `id` is the last `id:` line seen, the resume point of the tail (B-03). */
+  /** `id` is the last `id:` line seen: the seq the frame comes after, which several frames may share (WP-18). */
   frame(frame: AssistantFrame, id: string | null): void;
+  /** An `id: N` message without data: everything through seq N was sent. */
+  boundary?(id: string): void;
   keepalive(): void;
   /** Counted as `ai_frame_unknown{type}` and ignored; one bad line never halts the stream. */
   unknown(type: string): void;
@@ -78,13 +80,24 @@ export function createSseParser(handlers: SseHandlers): SseParser {
   let carry = "";
   let lastEventId: string | null = null;
   let oversized = false;
+  // What the message being read has so far; a blank line ends it.
+  let messageId = false;
+  let messageData = false;
   const handle = (rawLine: string): boolean => {
     const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
     if (line.length > MAX_LINE_LENGTH) return false;
     const trimmed = line.trimStart();
-    if (trimmed.startsWith(":")) handlers.keepalive();
-    else if (trimmed.startsWith("id:")) lastEventId = trimmed.slice(3).trim() || null;
-    else if (trimmed.startsWith("data:")) dispatchPayload(trimmed.slice(5), lastEventId, handlers);
+    if (!trimmed) {
+      if (messageId && !messageData && lastEventId !== null) handlers.boundary?.(lastEventId);
+      messageId = messageData = false;
+    } else if (trimmed.startsWith(":")) handlers.keepalive();
+    else if (trimmed.startsWith("id:")) {
+      lastEventId = trimmed.slice(3).trim() || null;
+      messageId = true;
+    } else if (trimmed.startsWith("data:")) {
+      messageData = true;
+      dispatchPayload(trimmed.slice(5), lastEventId, handlers);
+    }
     return true;
   };
   return {

@@ -91,6 +91,36 @@ describe("parseFrame", () => {
   });
 });
 
+describe("WP-23 frame shapes (o2-ai PR #167)", () => {
+  it("keeps a tool_result whose summary is an object (SearchSQL) or a sentence", () => {
+    const object = parseFrame(
+      '{"type":"tool_result","tool":"SearchSQL","call_id":"c1","summary":{"count":4,"took":38}}',
+    );
+    expect(isFrame(object, "tool_result") && object.summary).toEqual({ count: 4, took: 38 });
+    const text = parseFrame('{"type":"tool_result","tool":"x","summary":"4 rows"}');
+    expect(isFrame(text, "tool_result") && text.summary).toBe("4 rows");
+  });
+
+  it.each([
+    [
+      "step",
+      '{"type":"step","id":"c1","call_id":"c1","kind":"query","label":"SearchSQL","params":{"stream":"default","call_id":"c1"},"state":"running"}',
+    ],
+    ["retrying", '{"type":"retrying","attempt":2,"reason":"rate_limit","retry_after":12}'],
+    ["cancelled", '{"type":"cancelled","by":"server","turn_id":"t1"}'],
+    ["complete", '{"type":"complete","empty":true,"compacted":true}'],
+    [
+      "permission_denied",
+      '{"type":"permission_denied","tool":"o2_x","policy":"opencode","detail":"d"}',
+    ],
+    ["turn_started", '{"type":"turn_started","turn_id":"t1","agent_type":"sre","trace_id":"tr"}'],
+  ])("parses the lifecycle %s frame with its new fields", (type, json) => {
+    const frame = parseFrame(json);
+    expect(frame.type).toBe(type);
+    expect(frame).toEqual(JSON.parse(json));
+  });
+});
+
 describe("frame guards", () => {
   it("narrows by type", () => {
     const frame = parseFrame('{"type":"tool_call","tool":"SearchSQL","call_id":"c1"}');

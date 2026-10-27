@@ -752,7 +752,12 @@ export interface TurnEngine {
       turnId?: string;
       mode?: "chat" | "generate_query" | "rca";
       ephemeral?: boolean;
+      /** `regenerate` resends the latest prompt as a new attempt of the same turn; the composer is untouched. */
       input?: TurnInput;
+      /** Edit and resend: the text and chips to send instead of the composer's. */
+      snapshot?: ComposerSnapshot;
+      /** Edit and resend: the 1-based user message the edit came from (EB-09 AC 4). */
+      editedFrom?: number;
     },
   ): Promise<TurnTerminal>;
   stop(sid: Sid): Promise<void>;
@@ -760,6 +765,10 @@ export interface TurnEngine {
   retry(sid: Sid): Promise<TurnTerminal>;
   continueTurn(sid: Sid): void;
   retrySave(sid: Sid, turnId: string): Promise<void>;
+  /** The last ended turn still has the snapshot a Retry resends (HT-03 AC 5). */
+  canRetry?(sid: Sid): boolean;
+  /** `turn_busy`'s Stop it: cancels a turn this tab is not running (`80` §1.3). */
+  cancelTurn?(sid: Sid, turnId: string | null): Promise<boolean>;
   /** WP-05 installs `serialize.ts`. */
   setRequestBuilder(builder: RequestBuilder): void;
   /** WP-10 installs `consent.ts`. */

@@ -1799,6 +1799,14 @@ describe("useRoutes (router.ts)", () => {
       expect(others).toEqual([]);
     });
 
+    it("registers /close-tab outside the layout, authenticated, only with the flag on", () => {
+      expect(flagged(false).parentRoutes.find((r: any) => r.name === "closeTab")).toBeUndefined();
+      const route = flagged(true).parentRoutes.find((r: any) => r.name === "closeTab");
+      expect(route.path).toBe("/close-tab");
+      expect(route.meta.public).toBeUndefined();
+      expect(enTitle(route.meta.titleKey)).toBe("You're signed in");
+    });
+
     it("waits for the gate to settle before entering", async () => {
       const { homeChildRoutes } = flagged(true);
       const route = findRoute(homeChildRoutes, "assistant");

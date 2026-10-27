@@ -100,7 +100,31 @@ export const ERROR_LEDGER: Record<AssistantErrorCode, ErrorLedgerRow> = {
   permission_denied_tool: { phase: "post_admission", retryable: false, action: "open_settings" },
 };
 
+/** The closed `action` vocabulary of the B-01 envelope; the client words every button from the code (WP-17). */
+export const WIRE_ACTIONS = [
+  "retry",
+  "sign_in",
+  "enable_paid_usage",
+  "manage_billing",
+  "ask_admin",
+  "reload",
+  "none",
+] as const;
+
 const CODES: ReadonlySet<string> = new Set(ASSISTANT_ERROR_CODES);
+
+const WIRE_ACTION_SET: ReadonlySet<string> = new Set(WIRE_ACTIONS);
+
+// Read only when the code names no button of its own (`unknown`); every ledger code keeps its row's action.
+const WIRE_ACTION_MEANING: Record<WireAction, AssistantErrorAction> = {
+  retry: "retry",
+  sign_in: "sign_in",
+  enable_paid_usage: "manage_usage",
+  manage_billing: "manage_usage",
+  ask_admin: "ask_admin",
+  reload: "reload_chat",
+  none: "none",
+};
 
 /** B-01 and stored-turn spellings that name a ledger code differently. */
 const CODE_ALIASES: Record<string, AssistantErrorCode> = {
@@ -119,6 +143,8 @@ const PROVIDER_REASONS: [RegExp, ProviderReason][] = [
   [/model_(not_found|unavailable)/i, "model_unavailable"],
   [/too_large|context_length|too_long/i, "request_too_large"],
 ];
+
+export type WireAction = (typeof WIRE_ACTIONS)[number];
 
 export type ProviderReason = "overloaded" | "timed_out" | "model_unavailable" | "request_too_large";
 
@@ -142,6 +168,7 @@ interface WireBody {
   recoverable?: unknown;
   retryable?: unknown;
   retry_after?: unknown;
+  action?: unknown;
   trace_id?: unknown;
   turn_id?: unknown;
   session_id?: unknown;
@@ -166,6 +193,10 @@ export function toAssistantError(
   }
   const normalised = normalise(input);
   return build(codeOf(normalised), normalised, ctx);
+}
+
+export function isWireAction(value: unknown): value is WireAction {
+  return typeof value === "string" && WIRE_ACTION_SET.has(value);
 }
 
 export function isAssistantErrorCode(value: unknown): value is AssistantErrorCode {
@@ -230,7 +261,10 @@ function actionOf(
   row: ErrorLedgerRow,
   body: WireBody,
 ): AssistantErrorAction {
-  if (code === "provider_error" && body.recoverable === false) return "edit_resend";
+  // A provider failure that would fail again unchanged offers Edit and resend; the wire says `retryable:false`, today's body `recoverable:false`.
+  if (code === "provider_error" && (body.recoverable === false || body.retryable === false))
+    return "edit_resend";
+  if (code === "unknown" && isWireAction(body.action)) return WIRE_ACTION_MEANING[body.action];
   return row.action;
 }
 

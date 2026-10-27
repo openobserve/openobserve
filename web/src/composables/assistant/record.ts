@@ -134,11 +134,11 @@ function foldTurn(
       .map(toAttachment)
       .filter((img): img is ImageAttachment => img !== null);
     if (turn.user.text || images.length > 0) {
-      own.push({
-        role: "user",
-        content: raw(turn.user.text),
-        ...(images.length > 0 && { images }),
-      });
+      own.push(
+        ctx.phase === "replay"
+          ? replayedPrompt(turn, images)
+          : { role: "user", content: raw(turn.user.text), ...(images.length > 0 && { images }) },
+      );
     }
   }
   // A message that never reached the agent reads as unsent, not as the server's generic failure text.
@@ -167,11 +167,37 @@ function foldTurn(
   messages.push(...own);
 }
 
+// SEC-11: only the trailing blocks under the message's own nonce are attachments; anything else stays the user's text.
+function replayedPrompt(turn: StoredTurn, images: ImageAttachment[]): ChatMessage {
+  const { text, blocks } = parseAttachmentBlocks(turn.user?.text ?? "");
+  const created = typeof turn.created === "number" ? turn.created : null;
+  return {
+    role: "user",
+    content: raw(text),
+    ...(created !== null && { sentAt: created > 1e14 ? Math.floor(created / 1000) : created }),
+    ...(turn.turn_id && { turnId: turn.turn_id }),
+    ...(images.length > 0 && { images }),
+    ...(blocks.length > 0 && {
+      contentBlocks: blocks.map((block) => ({
+        type: "attachment" as const,
+        attachment: { name: block.name, body: block.body },
+      })),
+    }),
+  };
+}
+
 // HT-01 AC 7: a stored turn never shows a live step, and every ended turn replays one outcome marker.
 function markReplayStatus(turn: StoredTurn, messages: ChatMessage[], state: StreamState): void {
   interruptSteps(state);
   const has = (type: string) => turn.frames.some((frame) => frame?.type === type);
   if (messages.some((message) => message.contentBlocks?.some(isOutcomeMarker))) return;
+  // B-02's `by` replays as live reads it: a sign-out or the server is not the reader's own Stop.
+  const by = turn.frames.find((frame) => frame?.type === "cancelled")?.by;
+  if (by === "signed_out" || by === "server") {
+    const errorType = by === "signed_out" ? "signed_out" : "cancelled_elsewhere";
+    appendMarker(messages, 0, { type: "error", errorType });
+    return;
+  }
   if (turn.status === "cancelled" || has("cancelled")) {
     appendMarker(messages, 0, { type: "status", turnStatus: "stopped" });
     return;

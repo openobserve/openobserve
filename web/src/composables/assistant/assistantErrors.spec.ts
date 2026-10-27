@@ -25,6 +25,7 @@ import {
   ERROR_LEDGER,
   isConsentPrompt,
   toAssistantError,
+  WIRE_ACTIONS,
 } from "./assistantErrors";
 import type { AssistantErrorCode } from "./assistantStore.types";
 
@@ -134,6 +135,46 @@ describe("toAssistantError: the B-01 envelope", () => {
       expect(toAssistantError(read("envelope", envelope)).code).toBe(
         toAssistantError(read("wire", wire)).code,
       );
+  });
+
+  it.each(files)("sends the envelope %s with WP-17's fields and a closed-set action", (file) => {
+    const body = read("envelope", file).body;
+    expect(WIRE_ACTIONS).toContain(body.action);
+    expect(body).toMatchObject({ error_code: body.code, recoverable: body.retryable });
+    expect(typeof body.turn_id).toBe("string");
+  });
+
+  it("words the button from the code, never from the wire action", () => {
+    expect(toAssistantError(read("envelope", "turn_busy.json")).action).toBe("stop_it");
+    expect(toAssistantError(read("envelope", "credits_exhausted.json")).action).toBe(
+      ERROR_LEDGER.credits_exhausted.action,
+    );
+    expect(toAssistantError(read("envelope", "persistence_failed.json")).action).toBe("retry_save");
+  });
+
+  it("reads the wire action only for a code the ledger does not know", () => {
+    const body = { code: "invalid_request", message: "x", retryable: false, action: "sign_in" };
+    expect(toAssistantError({ status: 418, body })).toMatchObject({
+      code: "unknown",
+      action: "sign_in",
+    });
+    expect(toAssistantError({ status: 418, body: { ...body, action: "reload" } }).action).toBe(
+      "reload_chat",
+    );
+    expect(toAssistantError({ status: 418, body: { ...body, action: "wait" } }).action).toBe(
+      "retry",
+    );
+  });
+
+  it("reads `retryable:false` on a provider error frame as Edit and resend", () => {
+    const frame = {
+      type: "error",
+      code: "provider_error",
+      message: "x",
+      retryable: false,
+      action: "none",
+    };
+    expect(toAssistantError(frame).action).toBe("edit_resend");
   });
 
   it("takes retry_after in seconds and the envelope's retryable flag", () => {

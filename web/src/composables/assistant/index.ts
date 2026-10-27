@@ -27,9 +27,10 @@ export { useAssistantName } from "./useAssistantName";
 export { useAssistantClient } from "./useAssistantClient";
 export { parseStream, extractFrames } from "./sseParser";
 export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
-export { turnStatusText } from "./turnStateMachine";
+export { STALL_MS, turnStatusText } from "./turnStateMachine";
 export { useAssistantStarters } from "./useAssistantStarters";
 export {
+  assistantGoToAnswer,
   registerAssistantFocusTarget,
   registerContainerCloser,
   registerEscapeRung,
@@ -58,7 +59,7 @@ export {
 export { serialize } from "./context/serialize";
 export { parseAttachmentBlocks } from "./record";
 export { MAX_IMAGES, UNDO_WINDOW_MS, isRunning } from "./assistantStore";
-export { readRecall, readHints, markHintSeen } from "./prefs";
+export { readRecall, readHints, markHintSeen, migrateHome, writeHome } from "./prefs";
 export type { TurnStatusText } from "./turnStateMachine";
 export type { AssistantContextView } from "./context/useAssistantContext";
 export type { ChipState, SeesRow, TimeWindow } from "./context/contextChips";

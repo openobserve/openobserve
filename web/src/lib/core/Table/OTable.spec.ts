@@ -2844,6 +2844,18 @@ describe("OTable", () => {
       });
       const scrollContainer = wrapper.find('[data-test="o2-table-scroll-container"]');
       expect(scrollContainer.exists()).toBe(true);
+      expect(scrollContainer.attributes("tabindex")).toBeUndefined();
+    });
+
+    it("makes the scroller a named focusable region when scrollLabel is set", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns(), scrollLabel: "Table" },
+      });
+      expect(wrapper.get('[data-test="o2-table-scroll-container"]').attributes()).toMatchObject({
+        tabindex: "0",
+        role: "region",
+        "aria-label": "Table",
+      });
     });
   });
 

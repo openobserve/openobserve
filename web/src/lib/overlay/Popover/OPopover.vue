@@ -9,7 +9,7 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding | autoFocus
+  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding | autoFocus | privacy
   Slots: trigger | anchor (positions without a trigger) | default
   Emits: update:open | open-auto-focus
 -->
@@ -71,6 +71,8 @@ const props = withDefaults(
     collisionPadding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>;
     /** `false` keeps focus where it is on open and close: a listbox driven from a textbox. */
     autoFocus?: boolean;
+    /** Session replay masks the portalled content, which sits outside any masked ancestor. */
+    privacy?: "mask";
   }>(),
   {
     modal: false,
@@ -304,6 +306,7 @@ onBeforeUnmount(() => {
     <PopoverPortal>
       <PopoverContent
         data-o-popover-content
+        :data-dd-privacy="privacy"
         :side="side"
         :align="align"
         :side-offset="sideOffset"

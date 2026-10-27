@@ -1444,6 +1444,9 @@ defineExpose({
             ? 'overflow-visible'
             : ['overflow-y-auto', allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden'],
           props.fillHeight && !isDelegatedScroll ? 'flex-1' : '',
+          props.scrollLabel
+            ? 'focus-visible:ring-border-strong outline-none focus-visible:ring-2'
+            : '',
         ]"
         :style="{
           maxHeight: props.maxHeight
@@ -1452,6 +1455,9 @@ defineExpose({
               : props.maxHeight
             : undefined,
         }"
+        :tabindex="props.scrollLabel ? 0 : undefined"
+        :role="props.scrollLabel ? 'region' : undefined"
+        :aria-label="props.scrollLabel"
         data-test="o2-table-scroll-container"
         @scroll="handleScroll"
       >
