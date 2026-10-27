@@ -30,6 +30,7 @@ import type {
 const props = withDefaults(defineProps<ChipInputProps>(), {
   placeholder: undefined,
   searchPlaceholder: undefined,
+  searchInList: false,
   anchor: null,
   emptyText: undefined,
   loading: false,
@@ -45,15 +46,19 @@ const emit = defineEmits<ChipInputEmits>();
 defineSlots<ChipInputSlots>();
 
 const rootRef = ref<HTMLElement | null>(null);
-const addRef = ref<HTMLElement | null>(null);
-const inputRef = ref<HTMLInputElement | null>(null);
+const caretRef = ref<HTMLInputElement | null>(null);
+const searchRef = ref<HTMLInputElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 const highlighted = ref(-1);
 
 const listId = `o-chip-input-${Math.random().toString(36).slice(2, 9)}`;
 
 const showList = computed(() => props.open && !props.disabled);
-const anchorElement = computed(() => props.anchor ?? addRef.value ?? undefined);
+const anchorElement = computed(() => props.anchor ?? caretRef.value ?? undefined);
+const caretSearches = computed(() => !props.searchInList);
+const caretPlaceholder = computed(() =>
+  showList.value && caretSearches.value ? props.searchPlaceholder : props.placeholder,
+);
 
 const fieldClasses = computed(() => [
   "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150",
@@ -63,7 +68,11 @@ const fieldClasses = computed(() => [
   showList.value ? "border-input-border-focus ring-focus-ring-accent ring-[0.125rem]" : "",
 ]);
 
-const sizeClasses = computed(() => (props.size === "sm" ? "min-h-8 text-xs" : "min-h-9 text-sm"));
+const sizeClasses = computed(() => {
+  const text = props.size === "sm" ? "text-xs" : "text-sm";
+  if (props.appearance === "plain") return `${text} min-h-7.5`;
+  return `${text} ${props.size === "sm" ? "min-h-8" : "min-h-9"}`;
+});
 
 const testId = (suffix: string) => (props.dataTest ? `${props.dataTest}-${suffix}` : undefined);
 
@@ -84,15 +93,16 @@ watch(highlighted, async (index) => {
 });
 
 // Each newly opened step selects its search text, so typing replaces a value being edited.
-watch([showList, anchorElement], async ([shown]) => {
+watch([showList, anchorElement, caretSearches], async ([shown]) => {
   if (!shown) return;
   await nextTick();
-  inputRef.value?.focus();
-  inputRef.value?.select();
+  const target = caretSearches.value ? caretRef.value : searchRef.value;
+  target?.focus();
+  target?.select();
 });
 
 function focus() {
-  addRef.value?.focus();
+  caretRef.value?.focus();
 }
 
 defineExpose<ChipInputExpose>({ focus });
@@ -126,7 +136,7 @@ function onKeydown(event: KeyboardEvent) {
       return;
     case "Escape":
       event.preventDefault();
-      emit("escape");
+      if (showList.value) emit("escape");
       focus();
       return;
     case "Backspace":
@@ -141,22 +151,36 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-function onAddKeydown(event: KeyboardEvent) {
+// While the popover is shut the caret only opens it, runs the query, or steps back over chips.
+function onCaretKeydown(event: KeyboardEvent) {
+  if (showList.value) return onKeydown(event);
   if (event.isComposing || props.disabled) return;
-  if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+  if (event.key === "ArrowDown") {
     event.preventDefault();
-    emit("activate", "");
-  } else if (event.key === "Backspace") {
+    emit("activate");
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    emit("enter");
+  } else if (event.key === "Backspace" && !caretRef.value?.value) {
     event.preventDefault();
     emit("backspace-empty");
-  } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-    event.preventDefault();
-    emit("activate", event.key);
   }
 }
 
 function onInput(event: Event) {
+  const opening = !showList.value;
   emit("update:modelValue", (event.target as HTMLInputElement).value);
+  if (opening) emit("activate");
+}
+
+function onCaretInput(event: Event) {
+  if (caretSearches.value || !showList.value) onInput(event);
+  // The caret holds no text of its own while the popover search is in use.
+  else (event.target as HTMLInputElement).value = "";
+}
+
+function onCaretClick() {
+  if (!props.disabled && (!showList.value || !caretSearches.value)) emit("activate");
 }
 
 // A pointerdown inside the field (a chip, the add target) is not an outside interaction.
@@ -168,7 +192,8 @@ function onInteractOutside(event: Event) {
 function onFieldPointerDown(event: PointerEvent) {
   if (props.disabled || event.target !== rootRef.value) return;
   event.preventDefault();
-  emit("activate", "");
+  focus();
+  onCaretClick();
 }
 </script>
 
@@ -179,29 +204,35 @@ function onFieldPointerDown(event: PointerEvent) {
         ref="rootRef"
         :data-test="testId('field')"
         :class="[
-          'flex w-full min-w-0 cursor-text flex-wrap items-center gap-1',
+          'flex w-full min-w-0 cursor-text flex-wrap items-center gap-1.5',
           sizeClasses,
-          appearance === 'plain' ? 'px-0.5 py-0.75' : fieldClasses,
+          appearance === 'plain' ? 'px-0.5' : fieldClasses,
           disabled ? 'cursor-not-allowed' : '',
         ]"
         @pointerdown="onFieldPointerDown"
       >
         <slot />
-        <span
-          ref="addRef"
-          role="button"
-          :tabindex="disabled ? -1 : 0"
-          :aria-label="ariaLabel"
-          :aria-expanded="showList"
+        <input
+          ref="caretRef"
+          :value="caretSearches ? modelValue : ''"
+          type="text"
+          role="combobox"
+          autocomplete="off"
+          spellcheck="false"
+          :disabled="disabled"
+          :aria-expanded="showList && caretSearches"
           :aria-controls="listId"
-          :data-test="testId('add')"
-          class="text-text-secondary rounded-default focus-visible:ring-focus-ring-accent flex min-h-6 min-w-8 flex-1 items-center px-1 outline-none focus-visible:ring-2"
-          @click="!disabled && emit('activate', '')"
-          @keydown="onAddKeydown"
-        >
-          <OTruncatedText v-if="placeholder" class="min-w-0">{{ placeholder }}</OTruncatedText>
-          <OIcon v-else name="add" size="xs" />
-        </span>
+          :aria-activedescendant="
+            showList && caretSearches && highlighted >= 0 ? `${listId}-${highlighted}` : undefined
+          "
+          :aria-label="ariaLabel"
+          :placeholder="caretPlaceholder"
+          :data-test="testId('input')"
+          class="text-text-body placeholder:text-text-secondary h-6 min-w-24 flex-1 border-0 bg-transparent px-1 outline-none disabled:cursor-not-allowed"
+          @input="onCaretInput"
+          @keydown="onCaretKeydown"
+          @click="onCaretClick"
+        />
         <div v-if="$slots.trailing" class="ms-auto flex shrink-0 items-center gap-1">
           <slot name="trailing" />
         </div>
@@ -223,10 +254,13 @@ function onFieldPointerDown(event: PointerEvent) {
         @interact-outside="onInteractOutside"
         @escape-key-down.prevent
       >
-        <div class="border-select-content-border flex items-center gap-2 border-b px-2.5">
+        <div
+          v-if="searchInList"
+          class="border-select-content-border flex items-center gap-2 border-b px-2.5"
+        >
           <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
           <input
-            ref="inputRef"
+            ref="searchRef"
             :value="modelValue"
             type="text"
             role="combobox"
@@ -237,12 +271,15 @@ function onFieldPointerDown(event: PointerEvent) {
             :aria-activedescendant="highlighted >= 0 ? `${listId}-${highlighted}` : undefined"
             :aria-label="searchPlaceholder ?? ariaLabel"
             :placeholder="searchPlaceholder"
-            :data-test="testId('input')"
+            :data-test="testId('search')"
             class="text-text-body placeholder:text-text-secondary min-w-0 flex-1 border-0 bg-transparent py-1.5 text-xs outline-none"
             @input="onInput"
             @keydown="onKeydown"
           />
           <OSpinner v-if="loading" size="xs" />
+        </div>
+        <div v-else-if="loading" class="flex justify-end px-2.5 pt-1.5">
+          <OSpinner size="xs" />
         </div>
         <div
           :id="listId"

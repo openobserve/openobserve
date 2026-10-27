@@ -28,16 +28,18 @@ export interface ChipInputSuggestion {
 }
 
 export interface ChipInputProps {
-  /** The text typed into the popover's search box. */
+  /** The text typed at the caret after the chips, or into the popover search while `searchInList`. */
   modelValue: string;
   /** Whether the suggestion popover is shown; the parent decides. */
   open: boolean;
   suggestions: ChipInputSuggestion[];
-  /** Text on the add target while the field holds no chips. */
+  /** Shown at the caret while the field is closed and empty. */
   placeholder?: I18nText;
-  /** Placeholder of the popover's search box, naming what is being picked. */
+  /** Names what is being picked; shown at the caret while the popover is open. */
   searchPlaceholder?: I18nText;
-  /** Element the popover opens under; the add target at the end of the chips when unset. */
+  /** Moves typing into a search box inside the popover, for a picker opened away from the caret. */
+  searchInList?: boolean;
+  /** Element the popover opens under; the caret after the chips when unset. */
   anchor?: HTMLElement | null;
   /** Shown instead of rows when there are no suggestions. */
   emptyText?: I18nText;
@@ -51,7 +53,7 @@ export interface ChipInputProps {
   /** `plain` drops the input frame, for a field that sits inside an editor surface. */
   appearance?: "field" | "plain";
   ariaLabel?: I18nText;
-  /** Prefix for `data-test`: `-add` target, `-input` search box, `-suggest` popover, `-suggest-item-{key}` rows. */
+  /** Prefix for `data-test`: `-input` caret input, `-search` popover search box, `-suggest` popover, `-suggest-item-{key}` rows. */
   dataTest?: string;
 }
 
@@ -62,18 +64,18 @@ export interface ChipInputEmits {
   (_e: "enter"): void;
   /** Backspace while the text is empty. */
   (_e: "backspace-empty"): void;
-  /** Escape in the search box. */
+  /** Escape while the popover is open. */
   (_e: "escape"): void;
   /** A pointer or focus move outside the field and its popover. */
   (_e: "close"): void;
-  /** The add target was clicked, focused or typed into; `text` is a first typed character. */
-  (_e: "activate", _text: string): void;
+  /** The caret was clicked or typed into while the popover was shut. */
+  (_e: "activate"): void;
   /** A typed character the parent may treat as a separator (`,`). */
   (_e: "separator", _char: string): void;
 }
 
 export interface ChipInputSlots {
-  /** Chips drawn before the add target. */
+  /** Chips drawn before the caret. */
   default?(): unknown;
   /** Controls on the end edge of the field. */
   trailing?(): unknown;
@@ -84,6 +86,6 @@ export interface ChipInputSlots {
 }
 
 export interface ChipInputExpose {
-  /** Moves focus to the add target. */
+  /** Moves focus to the caret after the chips. */
   focus: () => void;
 }

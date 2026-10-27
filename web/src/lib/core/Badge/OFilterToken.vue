@@ -38,10 +38,10 @@ const { t } = useI18nTyped();
 const testId = (suffix: string) => (props.dataTest ? `${props.dataTest}-${suffix}` : undefined);
 
 const SEGMENT =
-  "inline-flex min-w-0 items-center px-2 py-1 whitespace-nowrap outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring-accent";
+  "inline-flex min-w-0 items-center px-2 py-0.75 whitespace-nowrap outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring-accent";
 
 const TONES: Record<FilterTokenPart, string> = {
-  field: "bg-badge-default-soft-bg text-badge-default-soft-text font-medium",
+  field: "bg-badge-default-soft-bg text-text-heading font-medium",
   operator: "bg-input-bg text-text-secondary",
   value: "bg-badge-primary-soft-bg text-badge-primary-soft-text font-medium",
 };
@@ -78,8 +78,11 @@ function onSelect(part: FilterTokenPart, event: MouseEvent) {
 
 <template>
   <span
-    class="rounded-default border-badge-default-ol-border divide-badge-default-ol-border inline-flex max-w-full min-w-0 items-stretch divide-x overflow-hidden border text-xs leading-4"
-    :class="armed ? 'ring-focus-ring-accent ring-2' : ''"
+    class="rounded-default border-border-default divide-border-subtle inline-flex max-w-full min-w-0 items-stretch divide-x overflow-hidden border text-xs leading-4 shadow-xs transition-colors"
+    :class="[
+      armed ? 'ring-focus-ring-accent ring-2' : '',
+      editable ? 'hover:border-border-strong' : 'border-dashed',
+    ]"
     :data-test="dataTest"
   >
     <template v-for="part in parts" :key="part">
@@ -100,7 +103,7 @@ function onSelect(part: FilterTokenPart, event: MouseEvent) {
         <button
           type="button"
           :aria-label="removeLabel ?? t('common.remove')"
-          class="focus-visible:ring-focus-ring-accent inline-flex cursor-pointer items-center ps-0.5 pe-1.5 outline-none hover:opacity-70 focus-visible:ring-2 focus-visible:ring-inset"
+          class="focus-visible:ring-focus-ring-accent inline-flex cursor-pointer items-center ps-0.5 pe-1.5 opacity-60 outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-inset"
           :data-test="testId('remove')"
           @click.stop="emit('remove')"
         >
