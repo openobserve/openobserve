@@ -50,6 +50,9 @@
               {{ t("about.online_plaintext_hint") }}
             </div>
           </template>
+          <span v-else-if="!refresh.key_created" class="text-text-secondary">{{
+            t("about.online_no_key")
+          }}</span>
           <span v-else class="text-text-secondary">{{ t("about.online_key_root_only") }}</span>
         </ODescriptionItem>
       </ODescriptionList>
