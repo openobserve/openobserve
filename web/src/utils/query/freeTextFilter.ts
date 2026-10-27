@@ -413,6 +413,8 @@ export function appendConjunct(
   if (isBlankFilter(filter)) return predicate;
   const materialized = materializeFreeText(filter, streams, ctx);
   if (materialized === null) return `${filter} and ${predicate}`;
+  if (materialized === filter && isGroupedConjunction(filter))
+    return `${filter.trimEnd()} AND ${predicate}`;
   return `(\n${materialized}\n) AND ${predicate}`;
 }
 
@@ -1424,6 +1426,31 @@ function maskLiteralsAndComments(raw: string): string {
     }
   }
   return out;
+}
+
+// True for `(...)` optionally followed only by ANDs, so appending another AND needs no new wrapper.
+function isGroupedConjunction(filter: string): boolean {
+  const text = filter.trim();
+  if (!text.startsWith("(")) return false;
+  let depth = 0;
+  let tail = "";
+  let i = 0;
+  while (i < text.length) {
+    const end = maskedSpanEnd(text, i);
+    if (end !== null) {
+      const isComment = text.startsWith("--", i) || text.startsWith("/*", i);
+      if (isComment ? depth === 0 : end - i < 2 || text[end - 1] !== text[i]) return false;
+      if (depth === 0) tail += " ";
+      i = end;
+      continue;
+    }
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")") depth--;
+    else if (depth === 0) tail += text[i];
+    i++;
+  }
+  const rest = tail.trim();
+  return depth === 0 && (rest === "" || (/^AND\b/i.test(rest) && !/\bOR\b/i.test(rest)));
 }
 
 function isBlankFilter(filter: string): boolean {

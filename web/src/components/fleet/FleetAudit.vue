@@ -82,6 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           preset="no-data"
           :filtered="!!search || !!kindFilter"
           :title="audit.disabled.value ? t('fleet.settings.auditDisabled') : undefined"
+          :description="
+            audit.disabled.value || search || kindFilter
+              ? undefined
+              : t('fleet.settings.auditDelayHint')
+          "
           @action="clearFilters"
         />
       </template>

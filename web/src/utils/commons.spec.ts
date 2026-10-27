@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AxiosResponse } from "axios";
 import {
   modifySQLQuery,
   getConsumableDateTime,
@@ -47,7 +48,13 @@ import {
   moveModuleToAnotherFolder,
   checkIfVariablesAreLoaded,
   getDashboard,
+  fetchLatestDashboard,
+  fetchServerDashboard,
+  getLoadedDashboardVersion,
+  hasUnsavedDashboardEdits,
+  isDashboardStoredAtOldVersion,
 } from "./commons";
+import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { gt } from "@/types/i18n";
 
 // Mock dependencies
@@ -82,6 +89,7 @@ vi.mock("../services/common", async (importOriginal) => {
 });
 
 vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
+  CURRENT_DASHBOARD_SCHEMA_VERSION: 8,
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
@@ -1229,6 +1237,42 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[0].panels[0].id).toBe("panel-2");
     });
 
+    it("drops the deleted panel from annotation sources limited to it", async () => {
+      const dashboardId = "dashboard-2";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", title: "Panel 1" },
+              { id: "panel-2", title: "Panel 2" },
+            ],
+          },
+        ],
+        annotationSources: [
+          { id: "a", panels: ["panel-1"] },
+          { id: "b", panels: ["panel-1", "panel-2"] },
+          { id: "c" },
+        ],
+      };
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      vi.mocked(dashboardService.save).mockResolvedValue({
+        data: { success: true },
+      } as unknown as AxiosResponse);
+      vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      } as unknown as AxiosResponse);
+
+      await deletePanel(mockStore, dashboardId, "panel-1", "f", "tab-1");
+
+      const saved = vi.mocked(dashboardService.save).mock.calls.at(-1)![2];
+      expect(saved.annotationSources.map((it: { panels?: string[] }) => it.panels)).toEqual([
+        [],
+        ["panel-2"],
+        undefined,
+      ]);
+    });
+
     it("removes the deleted panel's browser draft and keeps the others", async () => {
       localStorage.clear();
       const mockDashboard = {
@@ -1803,6 +1847,91 @@ describe("Commons Utility Functions", () => {
         expect(dashboardService.list_Folders).not.toHaveBeenCalled();
         expect(mockStore.dispatch).not.toHaveBeenCalledWith("setFolders", expect.anything());
       });
+    });
+  });
+
+  describe("stored schema version", () => {
+    const respond = (version: number, doc: any) =>
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version, [`v${version}`]: doc, hash: 5 },
+      });
+
+    it("remembers the version the server stores, not the one the browser upgraded it to", async () => {
+      vi.mocked(convertDashboardSchemaVersion).mockImplementationOnce((d: any) => ({
+        ...d,
+        version: 8,
+      }));
+      respond(3, { version: 3, tabs: [] });
+      await fetchLatestDashboard(mockStore, "d3", "default");
+      expect(getLoadedDashboardVersion("d3")?.storedVersion).toBe(3);
+      expect(getLoadedDashboardVersion("d3")?.snapshot.version).toBe(8);
+      expect(isDashboardStoredAtOldVersion("d3")).toBe(true);
+      expect(isDashboardStoredAtOldVersion("never-loaded")).toBe(false);
+    });
+
+    it("is not old at the current version", async () => {
+      respond(8, { version: 8, tabs: [] });
+      await fetchLatestDashboard(mockStore, "d8", "default");
+      expect(getLoadedDashboardVersion("d8")?.storedVersion).toBe(8);
+      expect(isDashboardStoredAtOldVersion("d8")).toBe(false);
+    });
+
+    it("reports the stored version of the server's copy too", async () => {
+      respond(3, { version: 3, tabs: [] });
+      expect((await fetchServerDashboard(mockStore, "d3", "default")).storedVersion).toBe(3);
+    });
+  });
+
+  describe("hasUnsavedDashboardEdits", () => {
+    const stored = () => ({
+      version: 8,
+      title: "T",
+      tabs: [
+        {
+          tabId: "a",
+          name: "A",
+          panels: [{ id: "p1", layout: { x: 0, y: 0, w: 4, h: 4, i: 1 }, queries: [] }],
+        },
+        { tabId: "b", name: "B", panels: [] },
+      ],
+    });
+    const reversedKeys = (v: any): any =>
+      Array.isArray(v)
+        ? v.map(reversedKeys)
+        : v && typeof v === "object"
+          ? Object.fromEntries(
+              Object.entries(v)
+                .reverse()
+                .map(([k, x]) => [k, reversedKeys(x)]),
+            )
+          : v;
+    const load = async () => {
+      mockStore.dispatch.mockImplementation((type: string, payload: any) => {
+        if (type === "setDashboardData")
+          mockStore.state.organizationData.allDashboardData = payload;
+      });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 8, v8: stored(), hash: 5 },
+      });
+      return getDashboard(mockStore, "dash", "default");
+    };
+
+    it("sees no edit right after load, though the viewer filled in variables", async () => {
+      const dashboard = await load();
+      expect(dashboard.variables).toEqual({ showDynamicFilters: false, list: [] });
+      expect(hasUnsavedDashboardEdits("dash", dashboard)).toBe(false);
+      expect(hasUnsavedDashboardEdits("dash", reversedKeys(dashboard))).toBe(false);
+    });
+
+    it.each([
+      ["a moved panel", (d: any) => (d.tabs[0].panels[0].layout.y = 8)],
+      ["reordered tabs", (d: any) => d.tabs.reverse()],
+      ["a renamed dashboard", (d: any) => (d.title = "U")],
+      ["a new variable", (d: any) => d.variables.list.push({ name: "env" })],
+    ])("sees %s", async (_, edit) => {
+      const dashboard = await load();
+      edit(dashboard);
+      expect(hasUnsavedDashboardEdits("dash", dashboard)).toBe(true);
     });
   });
 

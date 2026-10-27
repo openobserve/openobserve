@@ -17,7 +17,7 @@ use axum::{
     Router,
     body::Body,
     extract::{Path, State},
-    http::{StatusCode, header},
+    http::{HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
@@ -28,7 +28,24 @@ use crate::WebAssets;
 
 /// Serve static files from embedded web assets
 pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
-    let mut file_path = path.as_str();
+    let mut resp = serve_file(&path);
+    // The viewer page's URL holds the link's slug, a bearer secret, as the data routes' URLs do.
+    if path.starts_with("public/dashboards/") {
+        let headers = resp.headers_mut();
+        headers.insert(
+            "x-robots-tag",
+            HeaderValue::from_static("noindex, nofollow"),
+        );
+        headers.insert(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("no-referrer"),
+        );
+    }
+    resp
+}
+
+fn serve_file(path: &str) -> Response {
+    let mut file_path = path;
 
     // For SPA routing, serve index.html for non-asset paths
     if !file_path.starts_with("src/")
@@ -201,6 +218,32 @@ mod tests {
                 html.contains(&format!(r#"<base href="{mount}" />"#)),
                 "mount={mount} produced {html}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_public_dashboard_page_is_not_indexed_and_sends_no_referrer() {
+        let app = ui_routes("/web/");
+        for (uri, public) in [
+            ("/public/dashboards/k8Zt2mR7aB3cD4eF5gH6Qx", true),
+            (
+                "/public/dashboards/k8Zt2mR7aB3cD4eF5gH6Qx?range=r3600",
+                true,
+            ),
+            ("/dashboards", false),
+            ("/public/ai_chats/x", false),
+        ] {
+            let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            let h = resp.headers();
+            let robots = h.get("x-robots-tag").map(|v| v.as_bytes());
+            let referrer = h.get(header::REFERRER_POLICY).map(|v| v.as_bytes());
+            if public {
+                assert_eq!(robots, Some(&b"noindex, nofollow"[..]), "{uri}");
+                assert_eq!(referrer, Some(&b"no-referrer"[..]), "{uri}");
+            } else {
+                assert_eq!((robots, referrer), (None, None), "{uri}");
+            }
         }
     }
 

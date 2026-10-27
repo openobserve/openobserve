@@ -36,10 +36,15 @@ const CodeStub = {
     '<div><pre data-test="fleet-install-command-code">{{ code }}</pre><pre data-test="fleet-install-command-masked">{{ codeMasked }}</pre></div>',
 };
 
+const OpenCollapsible = { name: "OCollapsible", props: ["label"], template: "<div><slot /></div>" };
+
 function mountCommand(props: Record<string, unknown> = {}) {
   return mount(FleetInstallCommand, {
     props: { token: "o2ft_abc123", ...props },
-    global: { plugins: [i18n, store], stubs: { OCodeBlock: CodeStub } },
+    global: {
+      plugins: [i18n, store],
+      stubs: { OCodeBlock: CodeStub, OCollapsible: OpenCollapsible },
+    },
   });
 }
 
@@ -65,6 +70,16 @@ describe("FleetInstallCommand", () => {
       .findAll('[data-test^="fleet-install-command-os-"]')
       .map((b) => b.text());
     expect(offered).toEqual(["Linux", "macOS", "Windows", "Docker", "Kubernetes"]);
+  });
+
+  it("shows how to uninstall for the chosen platform, without a second platform picker", async () => {
+    const w = mountCommand();
+    const uninstall = () => w.findComponent({ name: "FleetUninstallCommand" });
+    expect(uninstall().props("platform")).toBe("linux");
+    expect(uninstall().find('[data-test="fleet-uninstall-command-os"]').exists()).toBe(false);
+    await choose(w, "docker");
+    expect(uninstall().props("platform")).toBe("docker");
+    expect(uninstall().text()).toContain("docker volume rm otel-fleet-state");
   });
 
   it("masks a real token in the shown command and leaves a placeholder readable", () => {
@@ -104,19 +119,23 @@ describe("FleetInstallCommand", () => {
     expect(code(w)).not.toContain("--version");
   });
 
-  it("switches to HTTP polling with the proxy checkbox", async () => {
+  it("uses HTTP polling by default and WebSocket with the checkbox", async () => {
     const w = mountCommand();
+    expect(code(w)).toContain("--transport http");
     w.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
     await w.vm.$nextTick();
-    expect(code(w)).toContain("--transport http");
+    expect(code(w)).toContain("--transport ws");
   });
 
-  it("shows Helm with the fleet collector image on Kubernetes, without the proxy option", async () => {
+  it("shows Helm on Kubernetes with the same transport choice, HTTP polling by default", async () => {
     const w = mountCommand();
     await flushPromises();
     await choose(w, "kubernetes");
     expect(code(w)).toContain("o2cr.ai/openobserve/otel-fleet-collector");
-    expect(w.find('[data-test="fleet-install-command-http"]').exists()).toBe(false);
+    expect(code(w)).toMatch(/opamp\.endpoint='https?:\/\//);
+    w.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
+    await w.vm.$nextTick();
+    expect(code(w)).toMatch(/opamp\.endpoint='wss?:\/\//);
   });
 
   it("offers the agent or gateway role only on Kubernetes, agents by default", async () => {

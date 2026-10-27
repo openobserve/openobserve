@@ -178,7 +178,7 @@ describe("FleetRollouts", () => {
 
   it("lists only this fleet's rollouts, the active one first and then the newest", async () => {
     wrapper = await mountDrawer();
-    expect(fleet.listRollouts).toHaveBeenCalledWith(org());
+    expect(fleet.listRollouts).toHaveBeenCalledWith(org(), expect.objectContaining({ offset: 0 }));
     const text = wrapper.find('[data-test="o2-table-body"]').text();
     expect(text).not.toContain("gateway");
     expect(text.indexOf("Proven bad")).toBeLessThan(text.indexOf("edge-newer"));

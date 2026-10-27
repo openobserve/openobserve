@@ -317,6 +317,10 @@ impl ExecutablePipeline {
     }
 
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
+        // No publish_error here: its stream params would name the other org.
+        if let Some(refusal) = pipeline.cross_org_refusal() {
+            return Err(anyhow!("Init error: {refusal}"));
+        }
         let node_map = pipeline
             .nodes
             .iter()

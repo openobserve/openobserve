@@ -24,7 +24,11 @@ import { fetchInto } from "@/composables/query/fetchInto";
 import { dropDashboardPanelCache, dropPanelCache } from "@/composables/dashboard/usePanelCache";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
-import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
+import {
+  CURRENT_DASHBOARD_SCHEMA_VERSION,
+  convertDashboardSchemaVersion,
+} from "./dashboard/convertDashboardSchemaVersion";
+import { same } from "./dashboard/saveConflict";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
 import { gt, type TranslateFn } from "@/types/i18n";
@@ -32,6 +36,7 @@ import { findPanelById } from "./dashboard/findPanel";
 import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { toRaw, type Ref } from "vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { pruneAnnotationSourcePanels } from "@/utils/dashboard/pruneAnnotationSourcePanels";
 
 let moment: any;
 let momentInitialized = false;
@@ -39,6 +44,8 @@ let momentInitialized = false;
 export interface LoadedDashboardVersion {
   hash: string;
   updatedAt: number | null;
+  /** The schema version the server stores, before the browser upgrades it on load. */
+  storedVersion: number;
   snapshot: any;
 }
 
@@ -575,6 +582,7 @@ const retrieveAndStoreDashboardData = async (
   loadedDashboardVersions.set(String(dashboardId), {
     hash,
     updatedAt: updatedAtOf(apiResponse.data),
+    storedVersion: version,
     snapshot: structuredClone(toRaw(convertedData ?? null)),
   });
 
@@ -598,6 +606,8 @@ export const updateDashboard = async (
   folderId: any,
   hash?: string,
 ) => {
+  // Every panel deletion path ends here, so a deleted panel never lingers in an annotation source.
+  pruneAnnotationSourcePanels(currentDashboardData);
   const isObject = !!currentDashboardData && typeof currentDashboardData === "object";
   // The server only stamps updatedAt on create and stores the client's value on update, so the save carries its own time.
   const body = isObject
@@ -632,6 +642,20 @@ export const updateDashboard = async (
 export const getLoadedDashboardVersion = (dashboardId: any): LoadedDashboardVersion | null =>
   loadedDashboardVersions.get(String(dashboardId)) ?? null;
 
+/** True when the server still stores the loaded dashboard at an older schema than the one it is shown in. */
+export const isDashboardStoredAtOldVersion = (dashboardId: any): boolean =>
+  (getLoadedDashboardVersion(dashboardId)?.storedVersion ?? CURRENT_DASHBOARD_SCHEMA_VERSION) <
+  CURRENT_DASHBOARD_SCHEMA_VERSION;
+
+/** Whether the working copy differs from the loaded version, beyond key order and the defaults getDashboard fills in. */
+export const hasUnsavedDashboardEdits = (dashboardId: any, workingCopy: any): boolean => {
+  const loaded = getLoadedDashboardVersion(dashboardId)?.snapshot;
+  if (!loaded) return false;
+  const base = structuredClone(loaded);
+  ensureVariablesStructure(base);
+  return !same(base, toRaw(workingCopy));
+};
+
 /** This object keeps saving with its old hash, so it conflicts again instead of overwriting. */
 export const markDashboardStale = (dashboardData: any, hash: string | undefined) => {
   if (!dashboardData || typeof dashboardData !== "object" || !hash) return;
@@ -662,6 +686,7 @@ export const fetchServerDashboard = async (store: any, dashboardId: any, folderI
     data: convertDashboardSchemaVersion(apiResponse.data[`v${version}`]),
     hash: apiResponse.data.hash.toString() as string,
     updatedAt: updatedAtOf(apiResponse.data),
+    storedVersion: version as number,
   };
 };
 

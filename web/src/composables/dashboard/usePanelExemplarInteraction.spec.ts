@@ -19,6 +19,7 @@ import {
   EXEMPLAR_CARD_CLOSE_MS,
   EXEMPLAR_LOOKUP_DWELL_MS,
   usePanelExemplarInteraction,
+  type ExemplarGridPlacer,
 } from "./usePanelExemplarInteraction";
 import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import type { ExemplarMarker, TraceVerdict } from "@/ts/interfaces/exemplars";
@@ -46,6 +47,7 @@ const setup = (
   markers: ExemplarMarker[],
   verdict: TraceVerdict = found,
   placeY?: (m: ExemplarMarker) => number | null,
+  gridPlacer?: ExemplarGridPlacer | null,
 ) => {
   const cache = new Map<string, TraceVerdict>();
   let release: () => void = () => {};
@@ -87,6 +89,7 @@ const setup = (
       toChartX: (ts) => ts,
       navigate,
       placeY,
+      gridPlacer: ref(gridPlacer ?? null),
     }),
   )!;
   return { api, lookupFn, navigate, chart, release, scope };
@@ -283,5 +286,65 @@ describe("usePanelExemplarInteraction", () => {
     const { api } = setup([m]);
     api.onMouseOver({ seriesId: "cpu", data: { exemplar: { id: "a" } } } as any);
     expect(api.activeMarker.value).toBeNull();
+  });
+
+  describe("on heatmap cells", () => {
+    const placer: ExemplarGridPlacer = (m) =>
+      m.id === "off" ? null : { seriesId: `${EXEMPLAR_SERIES_ID}:1`, value: [3, 2] };
+
+    it("reads pixels at the marker's cell on its grid's series and leaves the extents alone", () => {
+      const { api, chart } = setup([marker("a")], found, undefined, placer);
+      chart.convertToPixel.mockImplementation(((_finder: unknown, [x, y]: number[]) => [
+        10 + 8 * x,
+        200 - 15 * y,
+      ]) as any);
+      api.onFinished();
+      expect(chart.convertToPixel).toHaveBeenCalledWith(
+        { seriesId: `${EXEMPLAR_SERIES_ID}:1` },
+        [0, 0],
+      );
+      expect(api.points.value).toEqual([
+        {
+          marker: expect.objectContaining({ id: "a" }),
+          xPx: 34,
+          yPx: 170,
+          clamped: false,
+          placement: "value",
+        },
+      ]);
+      expect(api.yExtent.value).toEqual([0, 10]);
+    });
+
+    it("probes each grid twice per paint however many markers it holds", () => {
+      const many = Array.from({ length: 50 }, (_unused, i) => marker(`m${i}`));
+      const { api, chart } = setup(many, found, undefined, placer);
+      api.onFinished();
+      expect(chart.convertToPixel).toHaveBeenCalledTimes(2);
+      expect(api.points.value).toHaveLength(50);
+    });
+
+    it("lists only the markers drawn on a cell", () => {
+      const { api } = setup([marker("a"), marker("off")], found, undefined, placer);
+      api.onFinished();
+      expect(api.points.value.map((p) => p.marker.id)).toEqual(["a"]);
+    });
+
+    it("opens the card from a stacked grid's marker series", () => {
+      const m = marker("a");
+      const { api } = setup([m], found, undefined, placer);
+      api.onMouseOver({ ...event(m), seriesId: `${EXEMPLAR_SERIES_ID}:1` });
+      expect(api.activeMarker.value?.id).toBe("a");
+    });
+
+    it("opens and closes the card without a setOption, which would repaint every cell", async () => {
+      const m = marker("a");
+      const { api, chart } = setup([m], found, undefined, placer);
+      api.onMouseOver({ ...event(m), seriesId: `${EXEMPLAR_SERIES_ID}:1` });
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+      api.onMouseOut({ ...event(m), seriesId: `${EXEMPLAR_SERIES_ID}:1` });
+      await vi.advanceTimersByTimeAsync(EXEMPLAR_CARD_CLOSE_MS * 2);
+      expect(api.activeMarker.value).toBeNull();
+      expect(chart.setOption).not.toHaveBeenCalled();
+    });
   });
 });

@@ -15,6 +15,7 @@
 
 import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
+import { color as echartsColor } from "echarts/core";
 import { chartColor, chartNumber } from "../chartTheme";
 
 export enum ColorModeWithoutMinMax {
@@ -245,6 +246,12 @@ const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: SeriesBy): number 
   }
 };
 
+/** The panel config keys an area fill reads. */
+export interface AreaFillConfig {
+  fill_opacity?: unknown;
+  fill_gradient?: boolean | null;
+}
+
 interface ColorConfig {
   mode:
     | "fixed"
@@ -356,35 +363,15 @@ export const getColorForTable = (_theme?: string): string[] => [
 ];
 
 /**
- * Converts a color string (hex, rgb, or rgba) into an rgba string with the
- * given alpha. Returns the input unchanged if it can't be parsed.
+ * Converts any CSS color ECharts can parse (hex with or without alpha, rgb, hsl, named) into an
+ * rgba string with the given alpha. Returns the input unchanged if it can't be parsed.
  */
 export const colorToRgba = (color: string, alpha: number): string => {
   if (!color) return color;
-  // hex: #rgb or #rrggbb
-  if (color[0] === "#") {
-    let hex = color.slice(1);
-    if (hex.length === 3) {
-      hex = hex
-        .split("")
-        .map((c) => c + c)
-        .join("");
-    }
-    const num = parseInt(hex, 16);
-    if (Number.isNaN(num)) return color;
-    const r = (num >> 16) & 255;
-    const g = (num >> 8) & 255;
-    const b = num & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  // rgb()/rgba()
-  const match = color.match(/rgba?\(([^)]+)\)/);
-  if (match) {
-    const parts = match[1].split(",").map((p) => p.trim());
-    const [r, g, b] = parts;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  return color;
+  const parsed = echartsColor.parse(color);
+  if (!parsed) return color;
+  const [r, g, b] = parsed;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 /**
@@ -399,52 +386,74 @@ export const getGridLineStyle = (_theme?: string) => ({
   color: chartColor("--color-chart-gridline"),
 });
 
-/**
- * Builds a top-to-bottom vertical gradient for area chart fills that fades
- * from a translucent series color at the top to fully transparent at the
- * bottom. `color` should be the resolved concrete series color.
- */
-export const getAreaGradientColor = (color: string, _theme?: string) => {
-  // The fade opacities' light/dark swap lives in the --chart-area-fill-*-opacity
-  // tokens (base/dark css); `_theme` kept for call-site compatibility, ignored.
-  const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
-  const bottomAlpha = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
-  return {
-    type: "linear",
-    x: 0,
-    y: 0,
-    x2: 0,
-    y2: 1,
-    colorStops: [
-      { offset: 0, color: colorToRgba(color, topAlpha) },
-      { offset: 1, color: colorToRgba(color, bottomAlpha) },
-    ],
-    global: false,
-  };
+const verticalGradient = (topColor: string, bottomColor: string) => ({
+  type: "linear",
+  x: 0,
+  y: 0,
+  x2: 0,
+  y2: 1,
+  colorStops: [
+    { offset: 0, color: topColor },
+    { offset: 1, color: bottomColor },
+  ],
+  global: false,
+});
+
+/** The theme's top-to-bottom area fill fade; `stacked` reads the area-stacked tokens, which stay opaque in dark. */
+export const getAreaGradientColor = (color: string, stacked = false) => {
+  // Dark keeps a stack's layers opaque since they tile; unstacked areas overlap, so they stay translucent.
+  const topAlpha = stacked
+    ? chartNumber("--chart-area-stacked-fill-top-opacity", 0.9)
+    : chartNumber("--chart-area-fill-top-opacity", 0.9);
+  const bottomAlpha = stacked
+    ? chartNumber("--chart-area-stacked-fill-bottom-opacity", 0.4)
+    : chartNumber("--chart-area-fill-bottom-opacity", 0.4);
+  return verticalGradient(colorToRgba(color, topAlpha), colorToRgba(color, bottomAlpha));
 };
 
-/**
- * Builds the `{ areaStyle: {...} }` override for area charts — fades the fill
- * into a bottom-to-top transparent gradient. Returns `{}` for non-area charts
- * or when there's no base areaStyle. Resolves a concrete color from the palette
- * when the series color is null (auto-palette mode). Shared by the PromQL and
- * SQL chart builders so the area fill stays consistent.
- */
+/** The `area` panel's `fill_opacity` as a 0-1 alpha, or null when unset so the theme tokens apply. */
+export const getAreaFillOpacity = (
+  panelType: string,
+  config?: AreaFillConfig | null,
+): number | null => {
+  const value = config?.fill_opacity;
+  if (panelType !== "area" || value === null || value === undefined || value === "") return null;
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) return null;
+  return Math.min(Math.max(percent, 0), 100) / 100;
+};
+
+/** The `{ areaStyle }` override for area charts: the theme gradient, or the `area` panel's own fill opacity and gradient; `{}` for other charts. */
 export const getAreaStyleOverride = (
   panelType: string,
   baseAreaStyle: any,
   resolvedColor: any,
   seriesName: any,
   theme: string,
+  config?: AreaFillConfig | null,
 ) => {
   const isAreaChart = panelType === "area" || panelType === "area-stacked";
   if (!isAreaChart || !baseAreaStyle) return {};
   const palette = getColorPalette(theme);
   const color = resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  const gradient = panelType !== "area" || config?.fill_gradient !== false;
+  const opacity = getAreaFillOpacity(panelType, config);
+  if (opacity === null) {
+    return {
+      areaStyle: {
+        ...baseAreaStyle,
+        color: gradient
+          ? getAreaGradientColor(color, panelType === "area-stacked")
+          : colorToRgba(color, chartNumber("--chart-area-fill-top-opacity", 0.9)),
+      },
+    };
+  }
+  // The alpha rides on areaStyle.opacity, which also replaces ECharts' 0.7 default, so the percent is exact.
   return {
     areaStyle: {
       ...baseAreaStyle,
-      color: getAreaGradientColor(color, theme),
+      opacity,
+      color: gradient ? verticalGradient(colorToRgba(color, 1), colorToRgba(color, 0)) : color,
     },
   };
 };

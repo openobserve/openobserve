@@ -20,7 +20,7 @@ mod real_ip;
 mod slow_log;
 
 pub use access_log::{
-    AccessLogLayer, AccessLogService, get_http_access_log_format, mask_share_tokens,
+    AccessLogLayer, AccessLogService, get_http_access_log_format, mask_log_url, mask_share_tokens,
 };
 pub use real_ip::{ClientIpSources, RealIp, extract_real_ip, resolve_client_ip_sources};
 pub use slow_log::{SlowLogLayer, SlowLogService};

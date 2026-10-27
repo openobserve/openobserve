@@ -25,6 +25,7 @@ import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesMan
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import searchService from "@/services/search";
 
 // Stub ODialog so tests are deterministic (no Portal/Teleport) and so we
 // can drive open/close + button click emits without touching the real
@@ -135,6 +136,10 @@ vi.mock("../../utils/dashboard/useCustomDebouncer", () => ({
 }));
 
 // Mock utils
+vi.mock("@/services/search", () => ({
+  default: { search: vi.fn() },
+}));
+
 vi.mock("../../utils/commons", () => ({
   checkIfVariablesAreLoaded: vi.fn().mockReturnValue(false),
   updateDashboard: vi.fn().mockResolvedValue(true),
@@ -1553,6 +1558,52 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
       wrapper.unmount();
+    });
+  });
+
+  describe("annotation sources", () => {
+    const withSource = {
+      ...defaultProps,
+      dashboardData: {
+        ...defaultProps.dashboardData,
+        annotationSources: [
+          {
+            id: "deploys",
+            name: "Deploys",
+            enabled: true,
+            mode: "sql",
+            streamType: "logs",
+            stream: "",
+            filters: [],
+            query: "SELECT _timestamp FROM deploys",
+            title: "deploy",
+          },
+        ],
+      },
+      currentTimeObj: {
+        __global: {
+          start_time: new Date(1_700_000_000_000_000),
+          end_time: new Date(1_700_003_600_000_000),
+        },
+      },
+    };
+
+    it("holds the all-loaded flag (and so report capture) until the sources settle", async () => {
+      let release: () => void = () => undefined;
+      vi.mocked(searchService.search).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ data: { hits: [] } } as never);
+          }) as never,
+      );
+      wrapper = createWrapper(withSource);
+      await flushPromises();
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("panelsValues")?.at(-1)).not.toEqual([true]);
+
+      release();
+      await flushPromises();
+      expect(wrapper.emitted("panelsValues")?.at(-1)).toEqual([true]);
     });
   });
 });
