@@ -8249,6 +8249,17 @@
     "exampleCharts": "範例圖表",
     "namePlaceholder": "未命名面板",
     "renameHint": "按一下以重新命名此面板",
+    "variableSuggestion": {
+      "queryValues": "查詢值",
+      "constant": "常數",
+      "textbox": "文字方塊",
+      "custom": "自訂",
+      "list": "{type} · {example}",
+      "csv": "逗號：{example}",
+      "pipe": "豎線：{example}",
+      "doublequote": "雙引號：{example}",
+      "singlequote": "單引號：{example}"
+    },
     "add": "新增面板",
     "save": "儲存",
     "cancel": "取消",
