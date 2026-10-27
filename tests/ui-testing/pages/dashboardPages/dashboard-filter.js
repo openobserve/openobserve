@@ -223,15 +223,11 @@ export default class DashboardFilter {
       const optionByValue = operatorPopover.locator(
         `[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`,
       ).first();
-      if (await optionByValue.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await optionByValue.click();
-      } else {
-        // Fallback to first visible option in the popover (post-filter only one should remain).
-        await operatorPopover
-          .locator('[data-test="dashboard-add-condition-operator-option"]')
-          .first()
-          .click();
-      }
+      // No fallback to the first option: a near-match (e.g. "!=" for "=") would silently set the wrong operator.
+      await optionByValue.waitFor({ state: "visible", timeout: 5000 }).catch(() => {
+        throw new Error(`Operator option "${operator}" not found in the operator dropdown`);
+      });
+      await optionByValue.click();
       // Wait for the operator dropdown portal to fully close before step 5.
       await operatorPopover
         .waitFor({ state: "hidden", timeout: 5000 })
