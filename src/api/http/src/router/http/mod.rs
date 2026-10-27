@@ -23,7 +23,9 @@ use axum::{
 };
 use common::utils::http::get_search_type_from_request;
 use config::{
-    RouteDispatchStrategy, get_config,
+    RouteDispatchStrategy,
+    axum::middlewares::mask_log_url,
+    get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         search::{
@@ -32,8 +34,8 @@ use config::{
         },
     },
     router::{
-        extract_path_without_query, is_fixed_querier_route, is_querier_route,
-        is_querier_route_by_body,
+        extract_path_without_query, is_fixed_querier_route, is_public_dashboard_slug,
+        is_querier_route, is_querier_route_by_body, public_dashboard_slug,
     },
     utils::{json, rand::get_rand_element},
 };
@@ -41,11 +43,15 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use http_body_util::{BodyExt, Limited};
 use infra::cluster;
+use openobserve_api_management::request::public_dashboards;
 
 mod hec;
 
 pub use hec::is_splunk_collector_route;
 use hec::{splunk_payload_too_large, splunk_server_busy};
+
+/// Seconds a viewer waits after the router found no querier for a public dashboard read.
+const PUBLIC_RETRY_AFTER_SECS: &str = "5";
 
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
@@ -99,14 +105,29 @@ enum QuerierPayload {
 
 /// Main dispatch handler for all routes
 pub async fn dispatch(req: Request) -> Response {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
     let path = req
         .uri()
         .path_and_query()
         .map(|x| x.as_str())
         .unwrap_or("")
         .to_string();
+    let public_slug = public_dashboard_slug(&path).map(str::to_string);
+    if public_slug.is_none() {
+        return route(req, path, None).await;
+    }
+    // The router's own 404, 502 and 503 answer the anonymous viewer too.
+    public_dashboards::public::with_headers(route(req, path, public_slug).await)
+}
+
+async fn route(req: Request, path: String, public_slug: Option<String>) -> Response {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+    if public_slug
+        .as_deref()
+        .is_some_and(|slug| !is_public_dashboard_slug(slug))
+    {
+        return (StatusCode::NOT_FOUND, "not found").into_response();
+    }
 
     // Resolve the candidate nodes (preferred node first, the rest are fail-over
     // targets used when the preferred node can't be reached).
@@ -115,16 +136,21 @@ pub async fn dispatch(req: Request) -> Response {
         Err(error) => {
             log::error!(
                 "dispatch: {}, resolve target error: {}, took: {} ms",
-                path,
-                error,
+                mask_log_url(&path),
+                mask_log_url(&error),
                 start.elapsed().as_millis()
             );
-            return (StatusCode::SERVICE_UNAVAILABLE, error).into_response();
+            return no_nodes(&path, error);
         }
     };
 
     // Route based on request type
-    if cfg.common.result_cache_enabled && is_querier_route_by_body(&path) {
+    if let Some(slug) = public_slug.filter(|_| req.method() == Method::GET) {
+        let headers = req.headers().clone();
+        let group = Some(RoleGroup::Interactive);
+        let payload = QuerierPayload::Empty;
+        proxy_by_key(full_path, nodes, &slug, group, &headers, &payload, start).await
+    } else if cfg.common.result_cache_enabled && is_querier_route_by_body(&path) {
         proxy_with_body_routing(req, full_path, nodes, start).await
     } else {
         proxy_request(req, full_path, nodes, start).await
@@ -290,11 +316,7 @@ async fn proxy_request(
             Err(e) => {
                 let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
-                    log::warn!(
-                        "proxy request failed: {} -> {}, error: {e}, retrying on another node",
-                        target.path,
-                        target.node_addr,
-                    );
+                    warn_retry(&target, &e);
                     last_error = Some((target.node_addr, e));
                     continue;
                 }
@@ -307,6 +329,16 @@ async fn proxy_request(
     proxy_error_response(&path, last_error, start)
 }
 
+/// Logs a connect failure the proxy retries on the next candidate node.
+fn warn_retry(target: &ProxyTarget, e: &reqwest::Error) {
+    log::warn!(
+        "proxy request failed: {} -> {}, error: {}, retrying on another node",
+        mask_log_url(&target.path),
+        target.node_addr,
+        mask_log_url(&e.to_string()),
+    );
+}
+
 /// Builds the 502 response after all proxy attempts have failed.
 fn proxy_error_response(
     path: &str,
@@ -316,9 +348,10 @@ fn proxy_error_response(
     match last_error {
         Some((node_addr, e)) => {
             log::error!(
-                "proxy request failed: {} -> {}, error: {e:?}, took: {} ms",
-                path,
+                "proxy request failed: {} -> {}, error: {}, took: {} ms",
+                mask_log_url(path),
                 node_addr,
+                mask_log_url(&format!("{e:?}")),
                 start.elapsed().as_millis()
             );
             if is_splunk_collector_route(path) {
@@ -333,8 +366,18 @@ fn proxy_error_response(
         None if is_splunk_collector_route(path) => {
             splunk_server_busy(StatusCode::SERVICE_UNAVAILABLE)
         }
-        None => (StatusCode::SERVICE_UNAVAILABLE, "No online nodes").into_response(),
+        None => no_nodes(path, "No online nodes"),
     }
+}
+
+/// The router's own 503, with a retry hint on public paths; a querier's 503 passes through as is.
+fn no_nodes(path: &str, body: impl Into<String>) -> Response {
+    let mut resp = (StatusCode::SERVICE_UNAVAILABLE, body.into()).into_response();
+    if public_dashboard_slug(path).is_some() {
+        let hint = header::HeaderValue::from_static(PUBLIC_RETRY_AFTER_SECS);
+        resp.headers_mut().insert(header::RETRY_AFTER, hint);
+    }
+    resp
 }
 
 /// Proxies a querier request with body-based routing for consistent hashing.
@@ -365,29 +408,50 @@ async fn proxy_with_body_routing(
         }
         Err(e) => return e,
     };
+    proxy_by_key(
+        path,
+        nodes,
+        &routing_key,
+        None,
+        &headers,
+        &querier_payload,
+        start,
+    )
+    .await
+}
 
-    // Use routing_key for consistent hash node selection
+/// Proxies to the querier the key hashes to, failing over to the other online queriers.
+async fn proxy_by_key(
+    path: String,
+    nodes: Vec<Node>,
+    routing_key: &str,
+    group: Option<RoleGroup>,
+    headers: &HeaderMap,
+    querier_payload: &QuerierPayload,
+    start: std::time::Instant,
+) -> Response {
+    let query_path = extract_path_without_query(&path);
     let Some(node_name) =
-        cluster::get_node_from_consistent_hash(&routing_key, &Role::Querier, None).await
+        cluster::get_node_from_consistent_hash(routing_key, &Role::Querier, group).await
     else {
         log::error!(
             "dispatch: {} consistent hash error: {:?}, took: {} ms",
-            path,
+            mask_log_url(&path),
             "No online querier nodes",
             start.elapsed().as_millis()
         );
-        return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
+        return no_nodes(&path, "No online querier nodes");
     };
     // get node by name
     let Some(primary) = cluster::get_cached_node_by_name(&node_name).await else {
         log::error!(
             "dispatch: {} get node {} from cache error: {:?}, took: {} ms",
-            path,
+            mask_log_url(&path),
             node_name,
             "No online querier nodes",
             start.elapsed().as_millis()
         );
-        return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
+        return no_nodes(&path, "No online querier nodes");
     };
 
     // Preferred (consistent-hash) node first, then the other online queriers as
@@ -397,7 +461,7 @@ async fn proxy_with_body_routing(
     candidates.extend(nodes.into_iter().filter(|n| n.uuid != primary.uuid));
 
     let is_streaming = is_streaming_endpoint(query_path);
-    let req_headers = build_request_headers(&headers, is_streaming);
+    let req_headers = build_request_headers(headers, is_streaming);
     let client = get_http_client();
     let attempts = max_attempts(candidates.len());
     let mut last_error: Option<(String, reqwest::Error)> = None;
@@ -408,7 +472,7 @@ async fn proxy_with_body_routing(
             client,
             &target.full_url,
             req_headers.clone(),
-            &querier_payload,
+            querier_payload,
         );
 
         match upstream_req.send().await {
@@ -416,11 +480,7 @@ async fn proxy_with_body_routing(
             Err(e) => {
                 let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
-                    log::warn!(
-                        "proxy request failed: {} -> {}, error: {e}, retrying on another node",
-                        target.path,
-                        target.node_addr,
-                    );
+                    warn_retry(&target, &e);
                     last_error = Some((target.node_addr, e));
                     continue;
                 }
@@ -626,7 +686,7 @@ async fn build_response(
     }
 
     if is_streaming {
-        let path_for_log = target.path.clone();
+        let path_for_log = mask_log_url(&target.path);
         let node_for_log = target.node_addr.clone();
         let stream = resp
             .bytes_stream()
@@ -635,9 +695,10 @@ async fn build_response(
                     Ok(bytes) => Ok(bytes),
                     Err(e) => {
                         log::error!(
-                            "proxy streaming error: {} -> {}, error: {e:?}",
+                            "proxy streaming error: {} -> {}, error: {}",
                             path_for_log,
                             node_for_log,
+                            mask_log_url(&format!("{e:?}")),
                         );
                         let error_event = serde_json::json!({
                             "type": "error",
@@ -660,9 +721,10 @@ async fn build_response(
             Ok(b) => b,
             Err(e) => {
                 log::error!(
-                    "proxy response failed: {} -> {}, error: {e:?}, took: {} ms",
-                    target.path,
+                    "proxy response failed: {} -> {}, error: {}, took: {} ms",
+                    mask_log_url(&target.path),
                     target.node_addr,
+                    mask_log_url(&format!("{e:?}")),
                     start.elapsed().as_millis()
                 );
                 return (
@@ -989,6 +1051,170 @@ mod tests {
         assert_eq!(max_attempts(100), 1 + max_retries);
         // capped by the number of available nodes
         assert!(max_attempts(2) <= 2);
+    }
+
+    fn assert_public_headers(resp: &Response) {
+        let h = resp.headers();
+        assert_eq!(h[header::CACHE_CONTROL], "no-store");
+        assert_eq!(h[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+        assert_eq!(h["x-robots-tag"], "noindex, nofollow");
+        assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
+    }
+
+    #[tokio::test]
+    async fn a_malformed_public_dashboard_slug_is_404_without_proxying() {
+        for path in [
+            "/api/public_dashboards/short",
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Q-/data?range=r3600",
+            "/api/public_dashboards/..%2F..%2Fetc%2Fpasswd/data",
+        ] {
+            let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+            let resp = dispatch(req).await;
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{path}");
+            assert_public_headers(&resp);
+        }
+    }
+
+    /// Both public-route proxy tests read the global querier ring, so they take turns.
+    static RING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    // No querier is online in a unit test, so a well-formed slug reaching the proxy answers 503.
+    #[tokio::test]
+    async fn a_well_formed_public_dashboard_slug_is_proxied_to_a_querier() {
+        let _ring = RING.lock().await;
+        for path in [
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx",
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600",
+        ] {
+            let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+            let resp = dispatch(req).await;
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE, "{path}");
+            assert_public_headers(&resp);
+            assert_eq!(resp.headers()[header::RETRY_AFTER], PUBLIC_RETRY_AFTER_SECS);
+        }
+    }
+
+    /// A querier's 503 for a paused link has no Retry-After by contract; the router adds none.
+    #[tokio::test]
+    async fn a_queriers_public_503_passes_through_without_a_retry_hint() {
+        let _ring = RING.lock().await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let upstream =
+            axum::Router::new().fallback(|| async { (StatusCode::SERVICE_UNAVAILABLE, "paused") });
+        tokio::spawn(async move { axum::serve(listener, upstream).await.unwrap() });
+
+        let mut node = test_node(9100);
+        node.name = format!("public-dashboard-upstream-{port}");
+        node.uuid = format!("public-dashboard-upstream-{port}");
+        node.http_addr = format!("http://127.0.0.1:{port}");
+        cluster::add_node_to_cache(node.clone()).await;
+        cluster::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+            .await;
+
+        let path = "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600";
+        let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+        let resp = dispatch(req).await;
+
+        cluster::remove_node_from_consistent_hash(
+            &node,
+            &Role::Querier,
+            Some(RoleGroup::Interactive),
+        )
+        .await;
+        node.status = config::meta::cluster::NodeStatus::Offline;
+        cluster::add_node_to_cache(node).await;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(resp.headers().get(header::RETRY_AFTER).is_none());
+        assert_public_headers(&resp);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"paused");
+    }
+
+    static LOG_LINES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+    struct CaptureLogger;
+
+    impl log::Log for CaptureLogger {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record) {
+            LOG_LINES.lock().unwrap().push(record.args().to_string());
+        }
+
+        fn flush(&self) {}
+    }
+
+    static CAPTURE_LOGGER: CaptureLogger = CaptureLogger;
+
+    async fn refused_node(id: i32) -> Node {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let mut node = test_node(id);
+        node.name = format!("refused-{port}");
+        node.uuid = format!("refused-{port}");
+        node.http_addr = format!("http://127.0.0.1:{port}");
+        node
+    }
+
+    #[tokio::test]
+    async fn router_logs_never_carry_a_public_dashboard_slug() {
+        let _ring = RING.lock().await;
+        let _ = log::set_logger(&CAPTURE_LOGGER);
+        log::set_max_level(log::LevelFilter::Trace);
+        let slug = "Zq9LmN3pR5sT7uV1wX2yA4";
+        let path = format!("/api/public_dashboards/{slug}/data?range=r3600");
+        let start = std::time::Instant::now();
+
+        let req = Request::builder().uri(&path).body(Body::empty()).unwrap();
+        assert_eq!(
+            dispatch(req).await.status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+
+        let headers = HeaderMap::new();
+        let group = Some(RoleGroup::Interactive);
+        let empty = QuerierPayload::Empty;
+        let resp = proxy_by_key(path.clone(), vec![], slug, group, &headers, &empty, start).await;
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let mut primary = refused_node(9200).await;
+        let fallback = refused_node(9201).await;
+        cluster::add_node_to_cache(primary.clone()).await;
+        cluster::add_node_to_consistent_hash(&primary, &Role::Querier, group).await;
+        let resp = proxy_by_key(
+            path.clone(),
+            vec![fallback],
+            slug,
+            group,
+            &headers,
+            &empty,
+            start,
+        )
+        .await;
+        cluster::remove_node_from_consistent_hash(&primary, &Role::Querier, group).await;
+        primary.status = config::meta::cluster::NodeStatus::Offline;
+        cluster::add_node_to_cache(primary).await;
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+
+        let lines = LOG_LINES.lock().unwrap().clone();
+        let masked = |a: &str, b: &str| {
+            lines
+                .iter()
+                .any(|l| l.contains(a) && l.contains(b) && l.contains("public_dashboards/Zq9LmN…"))
+        };
+        assert!(masked("resolve target error", "took:"), "{lines:?}");
+        assert!(masked("consistent hash error", "took:"), "{lines:?}");
+        assert!(masked("proxy request failed", "retrying"), "{lines:?}");
+        assert!(masked("proxy request failed", "took:"), "{lines:?}");
+        let leaked: Vec<_> = lines.iter().filter(|l| l.contains(slug)).collect();
+        assert!(leaked.is_empty(), "slug in router logs: {leaked:?}");
     }
 
     #[tokio::test]

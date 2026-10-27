@@ -260,6 +260,8 @@ export class ModelPricingPage {
             .locator(`tr:has-text("${name}")`);
         // OCheckbox renders as button[role="checkbox"] — data-test="o2-table-select-{id}"
         const checkbox = row.locator('button[role="checkbox"]').first();
+        // Clicking a ticked box unticks it, so a re-select must leave checked rows alone.
+        if ((await checkbox.getAttribute('aria-checked')) === 'true') return;
         await checkbox.click();
     }
 
