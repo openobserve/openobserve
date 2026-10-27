@@ -492,21 +492,24 @@ function setTimeRange() {
 }
 
 // The page loads the config once, so a run since then has moved the cursor past the prop's copy.
-async function refreshCursor() {
+async function fetchCursor(): Promise<number | null> {
   const org = store.state.selectedOrganization?.identifier;
-  if (!org || !props.anomalyId) return;
+  if (!org || !props.anomalyId) return cursorUs.value;
   try {
     const res = await alertsService.get_by_alert_id(org, props.anomalyId);
-    cursorUs.value = res?.data?.last_processed_timestamp ?? null;
+    return res?.data?.last_processed_timestamp ?? null;
   } catch {
     // A failed refresh keeps the older cursor, which only under-queries.
+    return cursorUs.value;
   }
 }
 
 const onRangeChange = async (value: unknown) => {
   if (!value) return;
   range.value = String(value);
-  await refreshCursor();
+  const cursor = await fetchCursor();
+  // Both writes in one tick, or the watcher first queries the old window with the new cursor.
+  cursorUs.value = cursor;
   // The renderer watches `selectedTimeObj` and refetches itself.
   setTimeRange();
 };

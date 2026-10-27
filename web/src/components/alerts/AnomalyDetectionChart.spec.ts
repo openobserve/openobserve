@@ -323,6 +323,17 @@ describe("AnomalyDetectionChart", () => {
       expect(lastSearch().query.query.end_time).toBe(advanced);
     });
 
+    it("queries once per range change, not once per cursor and window write", async () => {
+      wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: minutesAgoUs(50) });
+      getAlert.mockResolvedValue({
+        data: { ...ANOMALY, last_processed_timestamp: minutesAgoUs(5) },
+      } as any);
+      const before = search.mock.calls.length;
+      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
+      await settle();
+      expect(search.mock.calls.length - before).toBe(1);
+    });
+
     it("keeps the older cursor when the re-read fails", async () => {
       const cursor = minutesAgoUs(50);
       wrapper = await mountChart({ ...ANOMALY, last_processed_timestamp: cursor });
