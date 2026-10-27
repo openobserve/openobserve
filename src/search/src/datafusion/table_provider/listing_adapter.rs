@@ -686,8 +686,7 @@ mod tests {
             Field::new("ratio", DataType::Float64, true),
             Field::new("ok", DataType::Boolean, true),
         ]));
-        // 9 and 100 order differently as numbers and as strings, so stats cast to strings would
-        // mis-prune
+        // "9" > "100" as strings, so string-cast stats would mis-prune
         let batch = RecordBatch::try_new(
             file_schema.clone(),
             vec![
