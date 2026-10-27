@@ -35,7 +35,7 @@ import { formulaRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql
 import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlacement";
 
 /** Panel types whose shape has no meaningful row count to alert on. */
-const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
+const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey", "node-graph"];
 
 /** The parts of a dashboard panel query the alert adapters read. */
 export interface PanelQueryShape {

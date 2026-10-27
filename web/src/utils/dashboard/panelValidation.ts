@@ -32,6 +32,7 @@ import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
 import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
 import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
 import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
+import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { STATE_TIMELINE_DISPLAYS } from "@/utils/dashboard/convertStateTimelineData";
 import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
@@ -689,7 +690,8 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
-    case "sankey": {
+    case "sankey":
+    case "node-graph": {
       if (fields?.source == null) {
         const errorMsg =
           pageKey === "logs"
@@ -1024,6 +1026,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "maps",
     "table",
     "sankey",
+    "node-graph",
     "custom_chart",
     "html",
     "markdown",
@@ -1208,6 +1211,7 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["sort_order", ["pie", "donut"], SORT_ORDERS],
   ["funnel_sort", ["funnel"], FUNNEL_SORTS],
   ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
+  ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],
 ];
 
 const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [

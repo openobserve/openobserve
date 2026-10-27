@@ -7458,6 +7458,10 @@
     "funnelSortNone": "쿼리 순서",
     "funnelShowPercent": "첫 단계 대비 비율 표시",
     "funnelShowPercentTooltip": "각 단계를 가장 큰 단계에 대한 백분율로 표시합니다. 정렬된 퍼널은 그 단계로 시작하거나 끝나며, 쿼리 순서에서는 어느 단계든 될 수 있습니다.",
+    "nodeGraphLayout": "레이아웃",
+    "nodeGraphLayoutForce": "포스",
+    "nodeGraphLayoutCircular": "원형",
+    "nodeGraphShowEdgeLabels": "엣지 값 표시",
     "stateValueAlign": "상태 텍스트 정렬",
     "mapCluster": "포인트 클러스터링",
     "mapClusterRadius": "클러스터 크기 (px)",
@@ -7734,6 +7738,7 @@
       "treemap": "트리맵",
       "sunburst": "선버스트",
       "funnel": "퍼널",
+      "nodeGraph": "노드 그래프",
       "sankey": "생키",
       "customChart": "사용자 정의 차트"
     },

@@ -7458,6 +7458,10 @@
     "funnelSortNone": "Sorgu sırası",
     "funnelShowPercent": "İlk aşamaya göre yüzdeyi göster",
     "funnelShowPercentTooltip": "Her aşama, en büyük aşamanın yüzdesi olarak. Sıralı bir huni onunla başlar veya biter; sorgu sırasında herhangi bir aşama olabilir.",
+    "nodeGraphLayout": "Düzen",
+    "nodeGraphLayoutForce": "Kuvvet",
+    "nodeGraphLayoutCircular": "Dairesel",
+    "nodeGraphShowEdgeLabels": "Kenar değerlerini göster",
     "stateValueAlign": "Durum metni hizalaması",
     "mapCluster": "Noktaları kümele",
     "mapClusterRadius": "Küme boyutu (px)",
@@ -7734,6 +7738,7 @@
       "treemap": "Ağaç haritası",
       "sunburst": "Güneş patlaması",
       "funnel": "Huni",
+      "nodeGraph": "Düğüm grafiği",
       "sankey": "Sankey",
       "customChart": "Özel Grafik"
     },

@@ -7456,6 +7456,10 @@
     "funnelSortNone": "Query order",
     "funnelShowPercent": "Show percent of first stage",
     "funnelShowPercentTooltip": "Each stage as a percent of the largest stage. A sorted funnel starts or ends with it; in query order it can be any stage.",
+    "nodeGraphLayout": "Layout",
+    "nodeGraphLayoutForce": "Force",
+    "nodeGraphLayoutCircular": "Circular",
+    "nodeGraphShowEdgeLabels": "Show edge values",
     "stateValueAlign": "State text alignment",
     "mapCluster": "Cluster points",
     "mapClusterRadius": "Cluster size (px)",
@@ -7732,6 +7736,7 @@
       "treemap": "Treemap",
       "sunburst": "Sunburst",
       "funnel": "Funnel",
+      "nodeGraph": "Node graph",
       "sankey": "Sankey",
       "customChart": "Custom Chart"
     },

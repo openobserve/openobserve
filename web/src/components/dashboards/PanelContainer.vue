@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'treemap',
               'sunburst',
               'funnel',
+              'node-graph',
             ].includes(props.data.type)
           "
           variant="ghost"

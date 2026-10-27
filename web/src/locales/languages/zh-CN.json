@@ -7458,6 +7458,10 @@
     "funnelSortNone": "查询顺序",
     "funnelShowPercent": "显示相对第一阶段的百分比",
     "funnelShowPercentTooltip": "每个阶段占最大阶段的百分比。排序后的漏斗以它开始或结束；按查询顺序时它可以是任意阶段。",
+    "nodeGraphLayout": "布局",
+    "nodeGraphLayoutForce": "力导向",
+    "nodeGraphLayoutCircular": "环形",
+    "nodeGraphShowEdgeLabels": "显示边的值",
     "stateValueAlign": "状态文本对齐",
     "mapCluster": "聚合点",
     "mapClusterRadius": "聚合大小 (px)",
@@ -7734,6 +7738,7 @@
       "treemap": "矩形树图",
       "sunburst": "旭日图",
       "funnel": "漏斗图",
+      "nodeGraph": "节点图",
       "sankey": "桑基图",
       "customChart": "自定义图表"
     },
