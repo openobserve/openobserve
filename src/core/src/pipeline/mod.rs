@@ -145,13 +145,13 @@ pub async fn save_pipeline_checked(
             "Missing pipeline ID".to_string(),
         ));
     }
-    refuse_cross_org_node(&pipeline)?;
     default_node_orgs(&mut pipeline);
 
     // validate pipeline
     if let Err(e) = pipeline.validate() {
         return Err(PipelineError::InvalidPipeline(e.to_string()));
     }
+    refuse_cross_org_node(&pipeline)?;
 
     // Runs after validate(), which rebuilds source from the first node: checking
     // pipeline.source before that compares a value which is never persisted.
@@ -225,7 +225,6 @@ pub async fn update_pipeline_checked(
     mut pipeline: Pipeline,
     check: Option<&dyn WriteCheck<Pipeline>>,
 ) -> Result<(), PipelineError> {
-    refuse_cross_org_node(&pipeline)?;
     default_node_orgs(&mut pipeline);
 
     let Ok(mut existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
@@ -247,6 +246,7 @@ pub async fn update_pipeline_checked(
     pipeline
         .validate()
         .map_err(|e| PipelineError::InvalidPipeline(e.to_string()))?;
+    refuse_cross_org_node(&pipeline)?;
 
     // validate no JavaScript functions in pipeline
     validate_no_javascript_functions(&pipeline).await?;
@@ -615,6 +615,21 @@ mod tests {
         );
     }
 
+    /// The meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+        })
+        .await;
+        true
+    }
+
     fn scheduled_pipeline(id: &str, org: &str, source_org: &str, dest_org: &str) -> Pipeline {
         let mut pipeline: Pipeline = serde_json::from_value(serde_json::json!({
             "pipeline_id": id,
@@ -651,34 +666,74 @@ mod tests {
         pipeline
     }
 
+    struct Reached;
+
+    #[async_trait::async_trait]
+    impl crate::authz::WriteCheck<Pipeline> for Reached {
+        async fn check(&self, _: &Pipeline) -> Result<(), axum::response::Response> {
+            Err(axum::response::Response::default())
+        }
+    }
+
     #[tokio::test]
-    async fn save_and_update_refuse_a_node_in_another_org() {
-        use super::{PipelineError, save_pipeline_checked, update_pipeline_checked};
+    async fn save_refuses_a_node_in_another_org() {
+        use super::{PipelineError, save_pipeline_checked};
 
         for (source_org, dest_org, node) in [("b", "a", "src"), ("a", "b", "dst")] {
             let pipeline = scheduled_pipeline("cross_org_pl", "a", source_org, dest_org);
-            for result in [
-                save_pipeline_checked(pipeline.clone(), Some(&Unreached)).await,
-                update_pipeline_checked(pipeline, Some(&Unreached)).await,
-            ] {
-                assert!(
-                    matches!(&result, Err(PipelineError::InvalidPipeline(msg)) if msg.contains(node)),
-                    "{source_org}->{dest_org}: {result:?}"
-                );
-            }
+            let result = save_pipeline_checked(pipeline, Some(&Unreached)).await;
+            assert!(
+                matches!(&result, Err(PipelineError::InvalidPipeline(msg)) if msg.contains(node)),
+                "{source_org}->{dest_org}: {result:?}"
+            );
         }
+    }
+
+    #[tokio::test]
+    async fn save_replaces_a_stale_source_org_instead_of_refusing_it() {
+        use super::{PipelineError, save_pipeline_checked};
+
+        let mut pipeline = scheduled_pipeline("stale_source_pl", "a", "a", "a");
+        pipeline.source = PipelineSource::Scheduled(DerivedStream {
+            org_id: "b".to_string(),
+            ..Default::default()
+        });
+        let saved = save_pipeline_checked(pipeline, Some(&Reached)).await;
+        assert!(matches!(saved, Err(PipelineError::Refused(_))), "{saved:?}");
+    }
+
+    #[tokio::test]
+    async fn update_refuses_a_foreign_node_only_on_an_existing_pipeline() {
+        use super::{PipelineError, update_pipeline_checked};
+
+        if !meta_store().await {
+            return;
+        }
+        let missing = scheduled_pipeline("update_missing_pl", "update_org_a", "update_org_b", "");
+        let updated = update_pipeline_checked(missing, Some(&Unreached)).await;
+        assert!(
+            matches!(updated, Err(PipelineError::NotFound(_))),
+            "{updated:?}"
+        );
+
+        let stored = scheduled_pipeline("update_cross_org_pl", "update_org_a", "", "");
+        super::db::set(&stored).await.unwrap();
+        let foreign = scheduled_pipeline("update_cross_org_pl", "update_org_a", "update_org_b", "");
+        let updated = update_pipeline_checked(foreign, Some(&Unreached)).await;
+        super::delete_pipeline(&stored.id).await.unwrap();
+        assert!(
+            matches!(&updated, Err(PipelineError::InvalidPipeline(msg)) if msg.contains("src")),
+            "{updated:?}"
+        );
     }
 
     #[tokio::test]
     async fn enabling_a_stored_cross_org_pipeline_is_refused() {
         use super::PipelineError;
 
-        if std::env::var("ZO_META_STORE").is_err() {
-            eprintln!("skipped: needs ZO_META_STORE");
+        if !meta_store().await {
             return;
         }
-        infra::db_init().await.unwrap();
-        infra::table::migrate().await.unwrap();
         let mut stored = scheduled_pipeline("enable_cross_org_pl", "enable_org_a", "", "");
         stored.enabled = false;
         stored.source = PipelineSource::Scheduled(DerivedStream {

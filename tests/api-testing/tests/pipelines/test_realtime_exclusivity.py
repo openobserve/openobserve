@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 DUPLICATE_MSG = "A realtime pipeline with same source stream already exists"
-CROSS_ORG_SOURCE_MSG = "Node source belongs to another organization"
 
 
 def _ingest(session, base_url, stream):
@@ -209,7 +208,7 @@ class TestRealtimePipelineExclusivity:
     def test_source_org_disagreeing_with_the_node_still_rejects(
         self, create_session, base_url, random_string
     ):
-        """A source org other than the pipeline's is refused outright, so it cannot dodge the guard."""
+        """validate() rebuilds source from the node, so a bogus source org must not decide."""
         session = create_session
         suffix = random_string(6).lower()
         stream = f"pytest_6443_mismatch_{suffix}"
@@ -226,11 +225,11 @@ class TestRealtimePipelineExclusivity:
                 second, stream, source_org="anotherorg"))
             logger.info("second (source org disagrees) -> %s %s", resp.status_code, resp.text[:200])
             assert resp.status_code == 400, (
-                "a source in another org must be refused, not saved alongside the first "
-                f"pipeline. Got {resp.status_code} {resp.text}"
+                "#6443: the guard must compare the node-derived source that is actually "
+                f"persisted, not a source org the client supplied. Got {resp.status_code} {resp.text}"
             )
-            assert CROSS_ORG_SOURCE_MSG in resp.text, \
-                f"the rejection must name the foreign source org, got {resp.text}"
+            assert DUPLICATE_MSG in resp.text, \
+                f"#6443: the rejection must name the duplicate source stream, got {resp.text}"
         finally:
             _delete_by_name(session, base_url, first)
             _delete_by_name(session, base_url, second)
