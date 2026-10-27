@@ -97,6 +97,9 @@ export function createMockState(overrides = {}) {
     // Stop: delay and status of POST /ai/chats/{sid}/cancel.
     cancelDelayMs: 0,
     cancelStatus: 200,
+    // The access probe (00 §9): status (default 403 for viewer, 404 otherwise) and a delay past its 5 s timeout.
+    probeStatus: null,
+    probeDelayMs: 0,
     ...overrides,
   };
 }
@@ -138,7 +141,7 @@ async function patchedConfig(route, request, state) {
     ...(state.publicLinks !== undefined && { public_ai_chat_enabled: state.publicLinks }),
     ...(state.aiEnabled !== undefined && { ai_enabled: state.aiEnabled }),
     // A non-admin role only means something with RBAC on; the OSS test backend reports it off.
-    ...(state.role !== "admin" && { rbac_enabled: true }),
+    ...(state.role !== "admin" && state.configPatch.rbac_enabled === undefined && { rbac_enabled: true }),
   };
   return route.fulfill({ status: response.status(), headers: { ...cleanHeaders(response, request), "content-type": "application/json" }, body: JSON.stringify({ ...body, ...state.configPatch, ...knobs }) });
 }
@@ -200,7 +203,9 @@ async function handleAi(route, request, state) {
   }
   // The access probe (00 §9) arrives by XHR (the shim answers fetch cancels); a viewer is refused, any other role reaches the handler.
   if (m === "POST" && /^\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel$/.test(p)) {
-    if (state.role === "viewer") return json(route, { code: 403, message: "Forbidden" }, 403), true;
+    if (state.probeDelayMs) await new Promise((r) => setTimeout(r, state.probeDelayMs));
+    const status = state.probeStatus ?? (state.role === "viewer" ? 403 : 404);
+    if (status === 403) return json(route, { code: 403, message: "Forbidden" }, 403), true;
     return json(route, { code: 404, message: "conversation not found" }, 404), true;
   }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats$/))) {

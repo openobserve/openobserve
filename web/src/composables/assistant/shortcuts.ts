@@ -52,6 +52,9 @@ const focusTargets = new Map<FocusTarget, Set<() => boolean>>();
 // Mounted instances in mount order; the first binds, and the binding passes on when it unmounts.
 const instances: symbol[] = [];
 
+// The sidebar and sheet hosts register how they close; rung f asks them for the focused root.
+const closers = new Set<() => void>();
+
 let ownerRef: ShallowRef<symbol | undefined> | null = null;
 
 export type EscapeRung = (typeof ESCAPE_RUNGS)[number];
@@ -87,12 +90,15 @@ export function useAssistantShortcuts(options: AssistantShortcutsOptions = {}): 
     active: computed(() => registered.value && focusInside.value),
   });
 
+  let unregisterRungs: (() => void) | null = null;
   onMounted(() => {
     document.addEventListener("focusin", syncFocus);
     document.addEventListener("focusout", syncFocus);
     syncFocus();
+    unregisterRungs = registerContainerRungs();
   });
   onUnmounted(() => {
+    unregisterRungs?.();
     instances.splice(instances.indexOf(token), 1);
     if (owner().value === token) owner().value = instances[0];
     document.removeEventListener("focusin", syncFocus);
@@ -109,6 +115,12 @@ export function registerEscapeRung(
   set.add(handler);
   rungs.set(rung, set);
   return () => set.delete(handler);
+}
+
+/** The sidebar host registers how it closes, so rung f closes whatever the focused root shows. */
+export function registerContainerCloser(close: () => void): () => void {
+  closers.add(close);
+  return () => closers.delete(close);
 }
 
 /** A card's default button or the composer registers how to take focus for `assistantOpen`. */
@@ -154,9 +166,28 @@ export function onAssistantOpen(): void {
 /** Lets a spec start from an empty ladder; never called by app code. */
 export function resetAssistantShortcutsForTests(): void {
   rungs.clear();
+  closers.clear();
   focusTargets.clear();
   instances.length = 0;
   owner().value = undefined;
+}
+
+// Rung f closes the sidebar or sheet (the turn keeps running); rung h keeps the full view and swallows the key.
+function registerContainerRungs(): () => void {
+  const off = [
+    registerEscapeRung("f", (event) => {
+      if (focusedPlacement(event) !== "sidebar" || closers.size === 0) return false;
+      for (const close of closers) close();
+      return true;
+    }),
+    registerEscapeRung("h", (event) => focusedPlacement(event) === "full"),
+  ];
+  return () => off.forEach((unregister) => unregister());
+}
+
+function focusedPlacement(event: KeyboardEvent): string | null {
+  const from = event.target instanceof Element ? event.target : document.activeElement;
+  return from?.closest<HTMLElement>(ASSISTANT_ROOT_SELECTOR)?.dataset.placement ?? null;
 }
 
 function owner(): ShallowRef<symbol | undefined> {

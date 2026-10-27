@@ -5,8 +5,13 @@ import { test } from "@playwright/test";
 
 const GAPS = [
   ["SMOKE-02 v2 happy path from the header to done", "WP-06"],
-  ["SH-01 sidebar shell renders the active session (assistant-shell-sidebar)", "WP-04"],
-  ["GATE-01 OSS build shows the locked header and no doors @edition", "WP-04"],
+  ["SHELL-01 the chord lands on assistant-composer", "WP-05"],
+  ["SHELL-08 the composer and last message stay above an emulated keyboard", "WP-05"],
+  ["SHELL-12 Escape closes and never stops a running turn; IME-safe", "WP-05"],
+  ["GATE-06 a 403 mid-session swaps the container to G2", "WP-05"],
+  ["GATE-11 and GATE-13 the first send settles an unknown role", "WP-05"],
+  ["GATE-10 off_for_org copy per role (B-14 settingsEnabled)", "WP-14"],
+  ["PERF-06 open and close x50 and 30 chat_300 records from history", "WP-11"],
   ["TURN drop_mid_stream ends as failed{stream_dropped} with Retry", "WP-06"],
   ["TURN keepalive_stall shows 'No response for {n} s'", "WP-06"],
   ["ERR refusals restore the composer (HT-03) for every HTTP scenario", "WP-06"],

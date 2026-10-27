@@ -3653,7 +3653,12 @@
     },
     "summaryOtherRoles": "+{count} more roles",
     "indices": "Indices",
-    "roleAdmin": "Admin"
+    "roleAdmin": "Admin",
+    "modules": {
+      "groups": {
+        "assistant": "Assistant"
+      }
+    }
   },
   "announcements": {
     "dismiss": "Dismiss",
@@ -8873,6 +8878,40 @@
     }
   },
   "assistant": {
+    "announce": {
+      "closed": "{product} closed.",
+      "closedRunning": "{product} closed. Still answering in the background.",
+      "opened": "{product} opened.",
+      "sheetCollapsed": "Collapsed.",
+      "sheetExpanded": "Expanded."
+    },
+    "askAdmin": {
+      "adminsOf": "Admins of {org}",
+      "anAdminOf": "An admin of {org}",
+      "copied": "Message copied. Paste it to your admin.",
+      "copy": "Copy message",
+      "email": "Email admins",
+      "includePrompt": "Include the first line of my question",
+      "message": {
+        "access": "Hi, could you grant me {product} access in OpenObserve ({whereToGrant}, Chat) for the {org} organization?",
+        "consent": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
+        "credits": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › Assistant?",
+        "share_read": "Could you grant me chat sharing access ({whereToGrant}, Chat sharing) in {org}?",
+        "tool_policy": "The assistant wasn't allowed to run {tool} in {org}. Could you review the assistant's permissions in Settings › Assistant › Permissions?"
+      },
+      "messageLabel": "Message",
+      "subject": {
+        "access": "{product} access for {org}",
+        "consent": "Paid AI usage for {org}",
+        "credits": "Paid AI usage for {org}",
+        "settings": "{product} settings for {org}",
+        "share_read": "Chat sharing access for {org}",
+        "tool_policy": "{product} permissions for {org}"
+      },
+      "title": "Ask an admin",
+      "withPrompt": "{message} My question starts with: \"{prompt}\""
+    },
     "beta": "Beta",
     "client": {
       "copyManually": "Couldn't copy. Select the text and copy it.",
@@ -9052,9 +9091,106 @@
         "title": "Couldn't reach OpenObserve. Your message wasn't sent."
       }
     },
+    "gate": {
+      "announce": {
+        "locked": "{product} isn't available to your role."
+      },
+      "close": "Close",
+      "learnMore": "Learn what it does",
+      "learnTitle": "What {product} does",
+      "noPermission": {
+        "askAdmin": "Ask an admin",
+        "body": "An admin can grant access in {whereToGrant}.",
+        "title": "{product} isn't available to your role",
+        "tooltip": "Ask an admin for AI access",
+        "unknownNotice": "Your role may not include {product}. If sending fails, ask an admin."
+      },
+      "noShare": {
+        "tooltip": "Only admins can share chats"
+      },
+      "noShareRead": {
+        "body": "Ask an admin for chat sharing access.",
+        "title": "You don't have access to shared chats in this organization"
+      },
+      "notConfigured": {
+        "body": "No agent target is configured for this deployment, so the assistant is off for everyone.",
+        "setup": "Set up the assistant",
+        "title": "{product} isn't set up yet"
+      },
+      "notEntitled": {
+        "capability1": "Explain any log row, span or panel",
+        "capability2": "Write SQL, PromQL and VRL from plain language",
+        "capability3": "Propose fixes you approve",
+        "pitch": "{product} investigates logs, traces and metrics with you, writes queries and proposes changes you approve. It's part of OpenObserve Enterprise and Cloud.",
+        "seePlans": "See plans",
+        "title": "Meet {product}",
+        "tooltip": "{product} is part of OpenObserve Enterprise and Cloud"
+      },
+      "offForOrg": {
+        "body": "Past chats stay readable. An admin can turn it on in Settings › Assistant.",
+        "title": "{product} is turned off for this organization"
+      },
+      "reload": "Reload",
+      "reloadHint": "If an admin just granted access, reload to check.",
+      "tryAgain": "Try again",
+      "unhealthy": {
+        "body": "The assistant service isn't responding. Try again in a few minutes.",
+        "notice": "{product} isn't responding. Your last message wasn't answered.",
+        "title": "{product} is unavailable right now",
+        "tooltip": "{product} is unavailable right now"
+      },
+      "whereToGrant": "{iam} › {roles} › {group}"
+    },
+    "header": {
+      "announceFailed": "Answer failed: {title}.",
+      "announceNeedsYou": "{product} needs you: {title}.",
+      "announceReady": "Answer ready: {title}.",
+      "announceWorkingElsewhere": "Answering in another tab: {title}.",
+      "answeringName": "{product}, answering",
+      "answeringNameOpen": "{product}, answering, open",
+      "enterpriseName": "{product}, Enterprise and Cloud feature",
+      "failedName": "{product}, last answer failed",
+      "lockedName": "{product}, locked",
+      "nameOpen": "{product}, open",
+      "needsYouName": "{product}, needs you",
+      "needsYouNameOpen": "{product}, needs you, open",
+      "offName": "{product}, not set up",
+      "open": "Open",
+      "readyName": "{product}, answer ready",
+      "stateDone": "Answer ready: {title}",
+      "stateFailed": "Answer failed: {title}",
+      "stateNeedsApproval": "Waiting for your approval",
+      "stateOpen": "{product} · Open",
+      "stateRunningCount": "{count} answer running | {count} answers running",
+      "stateWorking": "Answering: {title}",
+      "toastNeedsYou": "Waiting for your approval · {title}",
+      "toastReady": "Answer ready · {title}",
+      "tooltip": "{product}",
+      "unavailableName": "{product}, unavailable"
+    },
     "name": "O2 Assistant",
     "outcome": {
       "readonlyFailed": "Failed: {title}"
+    },
+    "shell": {
+      "close": "Close {product}",
+      "deletedElsewhere": "This chat was deleted elsewhere",
+      "layout": "Layout",
+      "loadingChat": "Loading your chat…",
+      "modeForcedPinnedHint": "Pinned so the page stays reachable",
+      "modePinnedHint": "Pushes the page aside",
+      "moreActions": "More actions",
+      "newChat": "New chat",
+      "notFound": "This chat isn't available",
+      "openInFullView": "Open in full view",
+      "openInSidebar": "Open in sidebar",
+      "sheetExpand": "Show more",
+      "sheetPeek": "Show less",
+      "skipLink": "Skip to {product}",
+      "width": "Width",
+      "widthDefault": "Default",
+      "widthNarrow": "Narrow",
+      "widthWide": "Wide"
     },
     "step": {
       "create": "Creating {resource}",
@@ -9070,6 +9206,9 @@
       "StreamSchema": "Reading schema for `{stream}`",
       "TraceSearch": "Searching traces",
       "update": "Updating {resource}"
+    },
+    "thread": {
+      "newChatTitle": "New chat"
     },
     "turn": {
       "cancelUnconfirmed": "The server may still be finishing this answer.",
@@ -9099,6 +9238,78 @@
       "waitingConsent": "Waiting for your decision on paid usage",
       "withElapsed": "{status} · {elapsed}",
       "writing": "Writing the answer"
+    },
+    "welcome": {
+      "capability": {
+        "readOnly": "Ask about your logs, traces, metrics, alerts and dashboards. It runs read-only queries, links to what it finds and can't change anything in this organization.",
+        "readWrite": "Ask about your logs, traces, metrics, alerts and dashboards. It runs read-only queries, links to what it finds and asks before changing anything."
+      },
+      "lastRange": "last {period}",
+      "scope": "Sees:",
+      "scopeObject": {
+        "dashboard": "dashboard {name}"
+      },
+      "scopeOrg": "org {org}",
+      "sentWithFirst": "Sent with your first message",
+      "starter": {
+        "alerts": {
+          "1": "Which alerts fired most in the last 24 h?",
+          "2": "Draft an alert for errors in `{stream}`",
+          "2Generic": "Draft an alert for errors"
+        },
+        "dashboard": {
+          "1": "What changed on \"{dashboard}\" in the last {range}?",
+          "1Generic": "What changed on this dashboard recently?",
+          "2": "Explain the panel with the biggest change"
+        },
+        "function": {
+          "1": "Write VRL to parse JSON from the `message` field",
+          "2": "Explain what this function does"
+        },
+        "home": {
+          "1": "What needs attention in `{org}` right now?",
+          "2": "Which alerts fired since yesterday?"
+        },
+        "ingest": {
+          "1": "Show me how to send logs from my app",
+          "2": "Set up ingestion for Kubernetes",
+          "3": "What can you do once data arrives?"
+        },
+        "jsonEditor": {
+          "2": "Check this JSON for mistakes",
+          "alert": "Explain this alert's conditions",
+          "pipeline": "Explain what this pipeline does"
+        },
+        "learn": "What can you do here?",
+        "logs": {
+          "1": "Why did errors spike in `{stream}` in the last {range}?",
+          "1Generic": "Why did errors spike in my logs recently?",
+          "2": "Summarise what's in `{stream}` right now",
+          "2Generic": "Summarise what's in my logs right now"
+        },
+        "metrics": {
+          "1": "Write PromQL for p95 latency of `{metric}`",
+          "1Generic": "Write PromQL for p95 latency",
+          "2": "Which metrics stopped reporting?"
+        },
+        "recent": "Continue \"{title}\"",
+        "regex": {
+          "1": "Write a pattern that redacts email addresses",
+          "2": "Test this pattern against recent `{stream}` rows",
+          "2Generic": "Test this pattern against recent rows"
+        },
+        "sqlEditor": {
+          "1": "Write SQL for errors per service over 5 % in the last hour",
+          "2": "Check this query against `{stream}`",
+          "2Generic": "Check this query"
+        },
+        "traces": {
+          "1": "Which services had the slowest spans in the last {range}?",
+          "1Generic": "Which services had the slowest spans recently?"
+        }
+      },
+      "streams": "no streams yet | {count} stream | {count} streams",
+      "suggestions": "Suggestions"
     }
   },
   "llmObservability": {

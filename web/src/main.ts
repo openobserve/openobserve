@@ -50,6 +50,15 @@ bootstrapTheme();
 const activeLocale = getLocale();
 applyDocumentLocale(activeLocale);
 
+// Only the assistant's sheet needs the keyboard to resize the layout; with the flag off every page keeps the default viewport.
+if (isAssistantV2())
+  document
+    .querySelector('meta[name="viewport"]')
+    ?.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1.0, interactive-widget=resizes-content",
+    );
+
 const app = createApp(App);
 const router = createRouter(store);
 
