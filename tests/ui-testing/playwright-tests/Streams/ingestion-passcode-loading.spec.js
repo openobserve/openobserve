@@ -24,7 +24,8 @@ test.describe("Ingestion snippet credential loading", () => {
         const passcodeGate = new Promise((resolve) => { releasePasscode = resolve; });
         await page.route(PASSCODE_ROUTE, async (route) => {
             await passcodeGate;
-            await route.continue();
+            // a request the guide's own navigation cancelled is already handled by the time the gate opens
+            await route.continue().catch(() => {});
         });
 
         try {
@@ -34,7 +35,6 @@ test.describe("Ingestion snippet credential loading", () => {
         } finally {
             releasePasscode();
         }
-        await page.unroute(PASSCODE_ROUTE);
 
         await pm.ingestionConfigPage.expectCodeBlockVisible(SLUG);
         await pm.ingestionConfigPage.expectCodeBlockNotLoading(SLUG);
