@@ -135,6 +135,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     dashboardPanelData,
     getDefaultQueries,
     getDefaultCustomChartText,
+    getTimestampColumn: () => store?.state?.zoConfig?.timestamp_column || "_timestamp",
   });
 
   const addQuery = () => {
@@ -1004,7 +1005,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
 
       let query = "";
-      if (dashboardPanelData.data.type == "geomap") {
+      if (dashboardPanelData.data.type == "alert-list") {
+        query = "";
+      } else if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
       } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);

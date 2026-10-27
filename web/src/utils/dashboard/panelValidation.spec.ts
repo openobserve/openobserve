@@ -884,3 +884,99 @@ describe("validatePanel on sunburst, funnel, box plot and node graph", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+
+describe("validatePanel on logs, alert list and flame graph", () => {
+  const run = (
+    type: string,
+    query: Partial<{ query: string; customQuery: boolean }>,
+    config: any = {},
+    queryType = "sql",
+  ) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+              ...query,
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const sql = { customQuery: true, query: 'SELECT * FROM "demo_app"' };
+
+  it("needs a query for logs and flame graph but asks for no builder fields", () => {
+    expect(run("logs", sql)).toEqual([]);
+    expect(run("flame-graph", sql)).toEqual([]);
+    const empty = gt("dashboard.utils.queryIsEmpty", { index: 1 });
+    expect(run("logs", { customQuery: true, query: "" })).toEqual([empty]);
+    expect(run("flame-graph", { customQuery: true, query: "" })).toEqual([empty]);
+  });
+
+  it("asks nothing of an alert list, which has no query", () => {
+    expect(run("alert-list", {}, {}, "")).toEqual([]);
+  });
+
+  it("checks the allowed values and types of the new keys", () => {
+    expect(run("logs", sql, { logs_order: "oldest" })).toEqual([]);
+    expect(run("logs", sql, { logs_order: "random" })).toHaveLength(1);
+    const ok = {
+      alert_list_sort: "time",
+      alert_list_state: ["firing", "paused"],
+      alert_list_max: 5,
+    };
+    expect(run("alert-list", {}, ok, "")).toEqual([]);
+    expect(run("alert-list", {}, { alert_list_sort: "owner" }, "")).toHaveLength(1);
+    expect(run("alert-list", {}, { alert_list_state: ["firing", "muted"] }, "")).toHaveLength(1);
+    expect(run("alert-list", {}, { alert_list_max: 0 }, "")).toHaveLength(1);
+    expect(run("alert-list", {}, { alert_list_max: 5000 }, "")).toHaveLength(1);
+  });
+
+  it("does not allow logs, alert list or flame graph on PromQL", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    for (const type of ["logs", "alert-list", "flame-graph"]) {
+      expect(run(type, { customQuery: true, query: "up" }, {}, "promql"), type).toContain(
+        unsupported,
+      );
+    }
+  });
+
+  it("lists the new types as importable panel types", () => {
+    const panel = (type: string) => ({
+      type,
+      id: `p-${type}`,
+      title: "t",
+      layout: { x: 0, y: 0, w: 1, h: 1, i: type },
+      queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+    });
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: ["logs", "alert-list", "flame-graph"].map(panel),
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

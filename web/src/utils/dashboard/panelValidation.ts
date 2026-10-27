@@ -37,6 +37,12 @@ import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionD
 import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
 import { BOXPLOT_WHISKERS } from "@/utils/dashboard/convertBoxplotData";
 import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
+import { LOGS_ORDERS } from "@/utils/dashboard/convertLogsPanelData";
+import {
+  ALERT_LIST_MAX_LIMIT,
+  ALERT_LIST_SORTS,
+  ALERT_LIST_STATES,
+} from "@/utils/dashboard/alertListPanel";
 
 /**
  * Validates a single condition item
@@ -807,6 +813,10 @@ const validatePanelContentByType = (t: TranslateFn, panel: any, errors: string[]
         t("dashboard.utils.enterCustomChartQuery"),
       );
       break;
+    case "logs":
+    case "flame-graph":
+      validateQueriesNotEmpty(t, [panel?.queries?.[0]], errors);
+      break;
   }
 };
 
@@ -958,6 +968,9 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "custom_chart",
     "html",
     "markdown",
+    "logs",
+    "alert-list",
+    "flame-graph",
   ];
 
   if (!allowedTypes.includes(panel?.type)) {
@@ -1142,11 +1155,14 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
   ["boxplot_whisker", ["boxplot"], BOXPLOT_WHISKERS],
   ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],
+  ["logs_order", ["logs"], LOGS_ORDERS],
+  ["alert_list_sort", ["alert-list"], ALERT_LIST_SORTS],
 ];
 
 const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
   ["pie_label_content", ["pie", "donut"], PIE_LABEL_CONTENTS],
   ["table_footer_calcs", ["table"], TABLE_FOOTER_CALCS],
+  ["alert_list_state", ["alert-list"], ALERT_LIST_STATES],
 ];
 
 // [key, chart types, lowest allowed, highest allowed, lowest is exclusive]
@@ -1159,6 +1175,7 @@ const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, bo
   ["map_cluster_radius", ["geomap"], 0, Infinity, true],
   ["distribution_bucket_count", ["distribution"], 1, DISTRIBUTION_MAX_BUCKETS, false],
   ["distribution_bucket_size", ["distribution"], 0, Infinity, true],
+  ["alert_list_max", ["alert-list"], 1, ALERT_LIST_MAX_LIMIT, false],
 ];
 
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {

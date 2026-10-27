@@ -98,6 +98,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <LogsPanelRenderer
+          v-else-if="panelSchema.type == 'logs'"
+          :data="panelData.chartType == 'logs' ? panelData : null"
+          :config="panelSchema.config"
+        />
+        <AlertListPanelRenderer
+          v-else-if="panelSchema.type == 'alert-list'"
+          :config="panelSchema.config"
+        />
+        <FlameGraphPanelRenderer
+          v-else-if="panelSchema.type == 'flame-graph'"
+          :data="panelData.chartType == 'flame-graph' ? panelData : null"
+          :config="panelSchema.config"
+        />
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
@@ -408,6 +422,14 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const LogsPanelRenderer = defineAsyncComponent(() => import("./panels/LogsPanelRenderer.vue"));
+const AlertListPanelRenderer = defineAsyncComponent(
+  () => import("./panels/AlertListPanelRenderer.vue"),
+);
+const FlameGraphPanelRenderer = defineAsyncComponent(
+  () => import("./panels/FlameGraphPanelRenderer.vue"),
+);
+
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
@@ -445,6 +467,9 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    LogsPanelRenderer,
+    AlertListPanelRenderer,
+    FlameGraphPanelRenderer,
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
@@ -846,11 +871,11 @@ export default defineComponent({
       injectedPromqlData,
     );
 
-    // Html and markdown render without a query, so they never wait on one.
+    // Html, markdown and the alert list render without a query, so they never wait on one.
     const isAwaitingFirstLoad = computed(
       () =>
         isFirstLoadSettled?.value === false &&
-        !["html", "markdown"].includes(panelSchema.value?.type),
+        !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
     );
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
@@ -1955,7 +1980,7 @@ export default defineComponent({
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
-      if (type === "html" || type === "markdown") {
+      if (type === "html" || type === "markdown" || type === "alert-list") {
         return "";
       }
 
@@ -1988,6 +2013,14 @@ export default defineComponent({
       // Raw data exists but conversion hasn't produced output yet — wait.
       if (!panelData.value?.chartType) {
         return "";
+      }
+
+      if (type === "logs") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+      }
+
+      if (type === "flame-graph") {
+        return panelData.value?.root ? "" : "No Data";
       }
 
       // Table renders raw rows; the conversion returns { rows, columns }.

@@ -136,6 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'funnel',
               'boxplot',
               'node-graph',
+              'logs',
+              'alert-list',
+              'flame-graph',
             ].includes(props.data.type)
           "
           variant="ghost"

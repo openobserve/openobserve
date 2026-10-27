@@ -47,6 +47,34 @@ export const alertsListQuery = (
     staleTime: LIVE_STALE_TIME,
   });
 
+/** A dashboard panel's alert list; a 403 is an answer the panel renders, not an error or a toast. */
+export const panelAlertsQuery = (org: string, folderId: string) =>
+  queryOptions({
+    queryKey: alertKeys.panel(org, folderId),
+    queryFn: async (): Promise<{ alerts: any[]; forbidden: boolean }> => {
+      try {
+        const res = await alerts.listByFolderId(
+          1,
+          1000,
+          "name",
+          false,
+          "",
+          org,
+          folderId,
+          "",
+          "",
+          false,
+          { skipAccessToast: true },
+        );
+        return { alerts: res.data?.list ?? [], forbidden: false };
+      } catch (err: any) {
+        if (err?.response?.status === 403) return { alerts: [], forbidden: true };
+        throw err;
+      }
+    },
+    staleTime: LIVE_STALE_TIME,
+  });
+
 /**
  * The dependency graph's alert read: every folder, with the destination and
  * template refs the default path omits. Cached so the graph shares one entry

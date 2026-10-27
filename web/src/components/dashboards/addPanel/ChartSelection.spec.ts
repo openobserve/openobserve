@@ -215,4 +215,23 @@ describe("ChartSelection", () => {
     }
     dashboardPanelData.data.queryType = previous;
   });
+
+  it("lists logs, alert list and flame graph with their own icons, and disables them on PromQL", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    for (const id of ["logs", "alert-list", "flame-graph"]) {
+      const item = wrapper.find(`[data-test='selected-chart-${id}-item']`);
+      expect(item.exists(), id).toBe(true);
+      expect(item.find("img").attributes("src"), id).toContain(`charts/${id}.svg`);
+    }
+    await wrapper.find("[data-test='selected-chart-logs-item']").trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["logs"]);
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    for (const id of ["logs", "alert-list", "flame-graph"]) {
+      const li = wrapper.find(`[data-test='selected-chart-${id}-item']`).element.closest("li");
+      expect(li.className.includes("cursor-not-allowed"), id).toBe(true);
+    }
+    dashboardPanelData.data.queryType = previous;
+  });
 });

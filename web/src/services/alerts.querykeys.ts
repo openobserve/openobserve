@@ -33,6 +33,8 @@ export const alertKeys = {
           type: alertType || "all",
         })
       : orgKey(org, "alerts", "list", folderId, alertType || "all"),
+  /** A dashboard alert-list panel's read; under `all`, so every alert write refreshes it. */
+  panel: (org: string, folderId: string) => orgKey(org, "alerts", "panel", folderId || "__all__"),
   detail: (org: string, id: string) => orgKey(org, "alerts", "detail", id),
   /** Every folder's alerts with their destination/template refs — the dep graph. */
   dependencies: (org: string) => orgKey(org, "alerts", "dependencies"),

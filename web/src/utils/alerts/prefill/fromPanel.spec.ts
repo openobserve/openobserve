@@ -75,6 +75,18 @@ describe("buildPrefillFromPanel", () => {
     expect(p.warnings.map((w) => w.key)).toContain("unsupportedPanelType");
   });
 
+  it("warns on an alert list or flame graph, but alerts on a logs panel's rows", () => {
+    for (const panelType of ["alert-list", "flame-graph"]) {
+      const p = buildPrefillFromPanel(sqlPanel({ panelType }), makeId);
+      expect(
+        p.warnings.map((w) => w.key),
+        panelType,
+      ).toContain("unsupportedPanelType");
+    }
+    const logs = buildPrefillFromPanel(sqlPanel({ panelType: "logs" }), makeId);
+    expect(logs.warnings.map((w) => w.key)).not.toContain("unsupportedPanelType");
+  });
+
   it("blocks a panel with no queries", () => {
     const p = normalizePrefill(buildPrefillFromPanel(sqlPanel({ queries: [] }), makeId));
     expect(p.warnings.map((w) => w.key)).toContain("noQueries");

@@ -324,10 +324,13 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("funnel");
         expect(ALL_CHART_TYPES).toContain("boxplot");
         expect(ALL_CHART_TYPES).toContain("node-graph");
+        expect(ALL_CHART_TYPES).toContain("logs");
+        expect(ALL_CHART_TYPES).toContain("alert-list");
+        expect(ALL_CHART_TYPES).toContain("flame-graph");
       });
 
       it("should have 24 chart types", () => {
-        expect(ALL_CHART_TYPES.length).toBe(28);
+        expect(ALL_CHART_TYPES.length).toBe(31);
       });
     });
 
@@ -384,9 +387,19 @@ describe("panelEditor types and utilities", () => {
       });
 
       it("all chart types should be accounted for", () => {
-        // Distribution and box plot summarise raw values, so they neither aggregate nor read SELECT *.
+        // Distribution and box plot summarise raw values, and the HTML panels read raw rows or no query at all.
         const regularChartTypes = ALL_CHART_TYPES.filter(
-          (type) => !["html", "markdown", "custom_chart", "distribution", "boxplot"].includes(type),
+          (type) =>
+            ![
+              "html",
+              "markdown",
+              "custom_chart",
+              "distribution",
+              "boxplot",
+              "logs",
+              "alert-list",
+              "flame-graph",
+            ].includes(type),
         );
 
         regularChartTypes.forEach((type) => {

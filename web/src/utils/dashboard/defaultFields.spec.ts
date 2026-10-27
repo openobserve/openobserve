@@ -201,5 +201,11 @@ describe("defaultFields", () => {
       expect(seed("boxplot")).toEqual({ x: [], y: [] });
       expect(seed("node-graph")).toEqual({ x: [], y: [] });
     });
+
+    it("logs, alert list and flame graph seed nothing", () => {
+      for (const type of ["logs", "alert-list", "flame-graph"]) {
+        expect(seed(type), type).toEqual({ x: [], y: [] });
+      }
+    });
   });
 });

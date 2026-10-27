@@ -34,7 +34,7 @@ import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibil
 import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 import { isStatChangeOn } from "@/utils/dashboard/metricOptions";
-import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { isHtmlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,6 +118,16 @@ export const shouldShowHeatmapYBucket = (dashboardPanelData: any, promqlMode: bo
   );
 };
 
+/** The only sections an HTML panel shows; every other section configures an ECharts option it never builds. */
+export const HTML_PANEL_SECTIONS: Record<string, readonly SectionId[]> = {
+  logs: ["general", "logs"],
+  "alert-list": ["general", "alertList"],
+  "flame-graph": ["general", "data", "flameGraph"],
+};
+
+export const isSectionAllowedForType = (sectionId: SectionId, type: unknown): boolean =>
+  !isHtmlPanel(type) || (HTML_PANEL_SECTIONS[type as string] ?? []).includes(sectionId);
+
 // ---------------------------------------------------------------------------
 // Pure filter helpers (exported so they can be unit-tested independently)
 // ---------------------------------------------------------------------------
@@ -196,7 +206,10 @@ export function useConfigPanel(
         label: t("dashboard.showExemplarsLabel"),
         visible: !!promqlMode.value && isExemplarEligible(dashboardPanelData.data),
       },
-      "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
+      "panel-default-time": {
+        label: t("dashboard.panelTimeEnabled"),
+        visible: dashboardPanelData.data.type !== "alert-list",
+      },
       "promql-chart-config": {
         label: t("dashboard.promqlChartConfig"),
         visible:
@@ -814,6 +827,56 @@ export function useConfigPanel(
         visible: dashboardPanelData.data.type === "metric",
       },
     },
+    logs: {
+      "logs-fields": {
+        label: [
+          t("dashboard.logsMessageField"),
+          t("dashboard.logsLevelField"),
+          t("dashboard.logsTimeField"),
+        ],
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-order": {
+        label: t("dashboard.logsOrder"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-show-time": {
+        label: t("dashboard.logsShowTime"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-wrap": {
+        label: t("dashboard.logsWrap"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-prettify-json": {
+        label: t("dashboard.logsPrettifyJson"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+    },
+    alertList: {
+      "alert-list-folder": {
+        label: t("dashboard.alertListFolder"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-state": {
+        label: t("dashboard.alertListState"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-sort": {
+        label: t("dashboard.alertListSort"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-max": {
+        label: t("dashboard.alertListMax"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+    },
+    flameGraph: {
+      "flame-graph-fields": {
+        label: [t("dashboard.flameGraphStackField"), t("dashboard.flameGraphValueField")],
+        visible: dashboardPanelData.data.type === "flame-graph",
+      },
+    },
   }));
 
   // ── Search state ──────────────────────────────────────────────────────────
@@ -851,6 +914,7 @@ export function useConfigPanel(
     filterOption(configOptions.value[sectionId]?.[optionId], normalizedSearchQuery.value);
 
   const isSectionVisible = (sectionId: SectionId): boolean =>
+    isSectionAllowedForType(sectionId, dashboardPanelData.data.type) &&
     filterSection(configOptions.value[sectionId], normalizedSearchQuery.value);
 
   // ── Expand / collapse ─────────────────────────────────────────────────────

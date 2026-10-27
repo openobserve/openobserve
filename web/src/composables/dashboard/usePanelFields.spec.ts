@@ -617,6 +617,9 @@ describe("usePanelFields", () => {
       ["funnel", 1, 1, 0],
       ["boxplot", 1, 1, 0],
       ["node-graph", 0, 0, 0],
+      ["logs", 0, 0, 0],
+      ["alert-list", 0, 0, 0],
+      ["flame-graph", 0, 0, 0],
     ])("%s takes %i x, %i y and %i breakdown fields", (type, maxX, maxY, maxB) => {
       panelData.data.type = type;
       expect(addMany("x", 3)).toBe(maxX);

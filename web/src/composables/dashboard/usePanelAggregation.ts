@@ -16,15 +16,38 @@
 import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
 import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 
+/** The SQL a new logs panel starts from: the stream's latest rows, newest first. */
+export const defaultLogsPanelQuery = (stream: string, timestampColumn: string): string =>
+  stream ? `SELECT * FROM "${stream}" ORDER BY ${timestampColumn} DESC LIMIT 100` : "";
+
 export const usePanelAggregation = ({
   dashboardPanelData,
   getDefaultQueries,
   getDefaultCustomChartText,
+  getTimestampColumn = () => "_timestamp",
 }: {
   dashboardPanelData: any;
   getDefaultQueries: () => any;
   getDefaultCustomChartText: () => string;
+  getTimestampColumn?: () => string;
 }) => {
+  // Keeps the chosen stream across the reset, as the html and markdown switches do.
+  const resetToSingleQuery = () => {
+    const current = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+    const stream = current?.fields?.stream;
+    const streamType = current?.fields?.stream_type;
+    dashboardPanelData.data.queries = getDefaultQueries();
+    dashboardPanelData.layout.currentQueryIndex = 0;
+    const query = dashboardPanelData.data.queries[0];
+    query.fields.stream = stream;
+    query.fields.stream_type = streamType;
+    query.config.time_shift = [];
+    dashboardPanelData.data.htmlContent = "";
+    dashboardPanelData.data.markdownContent = "";
+    dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+    return query;
+  };
+
   const resetAggregationFunction = () => {
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
@@ -409,6 +432,26 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
+        break;
+      }
+      case "logs":
+      case "flame-graph": {
+        // Both read raw rows of a hand-written query; the builder cannot ask for folded stacks or every column.
+        const query = resetToSingleQuery();
+        query.customQuery = true;
+        query.query =
+          dashboardPanelData.data.type === "logs"
+            ? defaultLogsPanelQuery(query.fields.stream ?? "", getTimestampColumn())
+            : "";
+        dashboardPanelData.data.queryType = "sql";
+        // The builder is hidden for these types, so the SQL editor is where the panel is built.
+        dashboardPanelData.layout.showQueryBar = true;
+        break;
+      }
+      case "alert-list": {
+        // The alert list reads the alerts API, so the panel keeps one empty query.
+        resetToSingleQuery();
+        dashboardPanelData.data.queryType = "";
         break;
       }
       case "custom_chart": {

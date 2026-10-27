@@ -43,11 +43,14 @@ describe("searchLabelsConfig", () => {
     "metric",
     "background",
     "sparkline",
+    "logs",
+    "alertList",
+    "flameGraph",
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {
-    it("contains all 26 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(26);
+    it("contains all 29 section IDs", () => {
+      expect(ORDERED_SECTION_IDS).toHaveLength(29);
     });
 
     it("contains every expected section ID", () => {
@@ -79,8 +82,8 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("has exactly 26 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(26);
+    it("has exactly 29 keys", () => {
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(29);
     });
 
     it("has no section set to true", () => {

@@ -335,6 +335,34 @@ describe("FlameGraphView search action", () => {
   });
 });
 
+describe("FlameGraphView profile actions", () => {
+  it("hides the callers/callees and details actions when the page cannot open them", async () => {
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        root: { name: "main", self: 1, total: 4, children: [] },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "4",
+        hideProfileActions: true,
+      },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+    await flushPromises();
+    await rightClick(wrapper);
+    expect(wrapper.find('[data-test="flame-graph-search-function"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="flame-graph-sandwich"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="flame-graph-details"]').exists()).toBe(false);
+  });
+});
+
 describe("FlameGraphView grouped frames", () => {
   const mountGraph = (root: object) =>
     mount(FlameGraphView, {

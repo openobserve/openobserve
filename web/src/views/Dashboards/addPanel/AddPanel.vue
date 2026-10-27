@@ -60,7 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
               >
               <OButton
-                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                v-if="
+                  !['html', 'markdown', 'custom_chart', 'alert-list'].includes(
+                    dashboardPanelData.data.type,
+                  )
+                "
                 variant="outline"
                 size="icon-sm"
                 @click="showViewPanel = true"
@@ -213,7 +217,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
               >
               <OButton
-                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                v-if="
+                  !['html', 'markdown', 'custom_chart', 'alert-list'].includes(
+                    dashboardPanelData.data.type,
+                  )
+                "
                 variant="outline"
                 size="sm"
                 icon-left="info-outline"

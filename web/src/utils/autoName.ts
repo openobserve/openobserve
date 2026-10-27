@@ -82,7 +82,14 @@ interface PanelAutoNameInput {
 }
 
 /** Chart types that carry no field config at all — nothing to derive a name from. */
-const FIELDLESS_CHART_TYPES = ["markdown", "html", "custom_chart"];
+const FIELDLESS_CHART_TYPES = [
+  "markdown",
+  "html",
+  "custom_chart",
+  "logs",
+  "alert-list",
+  "flame-graph",
+];
 
 /** Time bucketing is HOW a chart is drawn, not WHAT it measures. */
 const TIME_AGGREGATIONS = ["histogram", "date_bin"];

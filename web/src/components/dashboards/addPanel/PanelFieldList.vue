@@ -427,7 +427,7 @@ import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
-import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
+import { isFlowChart, isHtmlPanel } from "@/utils/dashboard/chartTypeGroups";
 
 const props = defineProps<{
   editMode?: boolean;
@@ -1026,7 +1026,8 @@ function showStandardActions(row: FieldItem): boolean {
     chartType === "geomap" ||
     chartType === "maps" ||
     chartType === "custom_chart" ||
-    isFlowChart(chartType)
+    isFlowChart(chartType) ||
+    isHtmlPanel(chartType)
   ) {
     return false;
   }

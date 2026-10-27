@@ -191,6 +191,21 @@ export default defineComponent({
         id: "funnel",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/logs.svg"),
+        title: t("dashboard.chartSelection.logs"),
+        id: "logs",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/alert-list.svg"),
+        title: t("dashboard.chartSelection.alertList"),
+        id: "alert-list",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/flame-graph.svg"),
+        title: t("dashboard.chartSelection.flameGraph"),
+        id: "flame-graph",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
         title: t("dashboard.chartSelection.html"),
         id: "html",

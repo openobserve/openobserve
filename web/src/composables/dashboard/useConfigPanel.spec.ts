@@ -215,10 +215,13 @@ describe("ORDERED_SECTION_IDS", () => {
     "metric",
     "background",
     "sparkline",
+    "logs",
+    "alertList",
+    "flameGraph",
   ];
 
-  it("contains all 26 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(26);
+  it("contains all 29 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(29);
   });
 
   it("contains every expected section id", () => {
@@ -916,6 +919,38 @@ describe("useConfigPanel – gauge section", () => {
     const c = makeComposable(makePanelData("bar"));
     expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+  });
+});
+
+describe("useConfigPanel – logs, alert list and flame graph sections", () => {
+  it("shows an HTML panel only its own section and general, plus data for the flame graph", () => {
+    const visible = (type: string) => {
+      const c = makeComposable(makePanelData(type));
+      return ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id));
+    };
+    expect(visible("logs")).toEqual(["general", "logs"]);
+    expect(visible("alert-list")).toEqual(["general", "alertList"]);
+    expect(visible("flame-graph")).toEqual(["general", "data", "flameGraph"]);
+  });
+
+  it("hides the panel time option for the alert list, which reads no time range", () => {
+    expect(
+      makeComposable(makePanelData("alert-list")).isConfigOptionVisible(
+        "general",
+        "panel-default-time",
+      ),
+    ).toBe(false);
+    expect(
+      makeComposable(makePanelData("logs")).isConfigOptionVisible("general", "panel-default-time"),
+    ).toBe(true);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("logs")).toBe(false);
+    expect(c.isSectionVisible("alertList")).toBe(false);
   });
 });
 

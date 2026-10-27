@@ -83,6 +83,9 @@ export const usePanelFields = ({
       case "metric":
       case "distribution":
       case "node-graph":
+      case "logs":
+      case "alert-list":
+      case "flame-graph":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -119,6 +122,9 @@ export const usePanelFields = ({
       case "funnel":
       case "boxplot":
       case "node-graph":
+      case "logs":
+      case "alert-list":
+      case "flame-graph":
         return true;
       case "table":
         // Allow up to 3 breakdown fields for table charts
@@ -146,6 +152,9 @@ export const usePanelFields = ({
             .length >= 1
         );
       case "node-graph":
+      case "logs":
+      case "alert-list":
+      case "flame-graph":
         return true;
       case "metric":
         return (

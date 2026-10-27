@@ -205,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("profiles.highlight") }}
       </OButton>
       <OButton
+        v-if="!hideProfileActions"
         variant="ghost"
         size="sm"
         class="w-full justify-start"
@@ -215,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("profiles.showCallersAndCallees") }}
       </OButton>
       <OButton
+        v-if="!hideProfileActions"
         variant="ghost"
         size="sm"
         class="w-full justify-start"
@@ -333,6 +335,8 @@ const props = withDefaults(
     diffComparisonTotal?: number | null;
     /** What each side of a diff is called, as in "v1.4.0", for the tooltip's rows. */
     diffLabels?: { baseline: string; comparison: string };
+    /** Hide the callers/callees and function details actions, which only the profiles page can open. */
+    hideProfileActions?: boolean;
   }>(),
   {
     root: null,

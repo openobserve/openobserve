@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 import analytics from "./product_analytics";
 import type {
@@ -46,6 +47,7 @@ const alerts = {
     query?: string,
     alert_type?: string,
     include_dependencies?: boolean,
+    requestConfig?: AxiosRequestConfig,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -62,7 +64,7 @@ const alerts = {
     if (include_dependencies) {
       url += `&include_dependencies=true`;
     }
-    return http().get(url);
+    return requestConfig ? http().get(url, requestConfig) : http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()

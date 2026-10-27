@@ -581,5 +581,53 @@ describe("usePanelAggregation", () => {
         expect(fields.y).toEqual([]);
       });
     });
+
+    describe("logs, flame graph and alert list", () => {
+      const twoQueries = (type: string) => {
+        const panelData = makePanelData(type);
+        panelData.data.queries.push(makeDefaultQuery({ query: "SELECT 2" }));
+        panelData.layout.currentQueryIndex = 1;
+        panelData.data.queries[1].fields.stream = "demo_app";
+        panelData.data.queries[1].config.time_shift = [{ offSet: "1h" }] as any;
+        return panelData;
+      };
+
+      it("logs resets to one custom SQL query on the chosen stream, newest rows first", () => {
+        const panelData = twoQueries("logs");
+        usePanelAggregation({
+          dashboardPanelData: panelData,
+          getDefaultQueries: () => [makeDefaultQuery()],
+          getDefaultCustomChartText,
+          getTimestampColumn: () => "ts",
+        }).resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(1);
+        expect(panelData.layout.currentQueryIndex).toBe(0);
+        const [query] = panelData.data.queries;
+        expect(query.customQuery).toBe(true);
+        expect(query.fields.stream).toBe("demo_app");
+        expect(query.query).toBe('SELECT * FROM "demo_app" ORDER BY ts DESC LIMIT 100');
+        expect(query.config.time_shift).toEqual([]);
+        expect(panelData.data.queryType).toBe("sql");
+        expect((panelData.layout as any).showQueryBar).toBe(true);
+        expect(panelData.data.htmlContent).toBe("");
+        expect(panelData.data.markdownContent).toBe("");
+      });
+
+      it("flame graph resets to an empty custom SQL query", () => {
+        const panelData = twoQueries("flame-graph");
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(1);
+        expect(panelData.data.queries[0]).toMatchObject({ customQuery: true, query: "" });
+      });
+
+      it("alert list keeps one empty builder query and no query type", () => {
+        const panelData = twoQueries("alert-list");
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(1);
+        expect(panelData.data.queries[0]).toMatchObject({ customQuery: false, query: "" });
+        expect(panelData.data.queries[0].fields.stream).toBe("demo_app");
+        expect(panelData.data.queryType).toBe("");
+      });
+    });
   });
 });

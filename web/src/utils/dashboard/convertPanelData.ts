@@ -35,6 +35,8 @@ import { convertSunburstData } from "./convertSunburstData";
 import { convertFunnelData } from "./convertFunnelData";
 import { convertBoxplotData } from "./convertBoxplotData";
 import { convertNodeGraphData } from "./convertNodeGraphData";
+import { convertLogsPanelData } from "./convertLogsPanelData";
+import { convertFlameGraphPanelData } from "./convertFlameGraphPanelData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -238,6 +240,18 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertNodeGraphData(panelSchema, data, store),
+      };
+    }
+    case "logs": {
+      return {
+        chartType: panelSchema.type,
+        ...convertLogsPanelData(panelSchema, data, store),
+      };
+    }
+    case "flame-graph": {
+      return {
+        chartType: panelSchema.type,
+        ...convertFlameGraphPanelData(panelSchema, data),
       };
     }
     case "table": {

@@ -33,3 +33,15 @@ export const isRawValueChart = (type: unknown): boolean =>
 
 /** Rows a builder raw-value chart asks for when the query sets no limit; the search API otherwise caps raw rows far lower. */
 export const DISTRIBUTION_ROW_LIMIT = 10000;
+
+/** Panel types drawn as HTML by their own renderer instead of an ECharts option. */
+export const HTML_PANEL_TYPES: readonly string[] = ["logs", "alert-list", "flame-graph"];
+
+export const isHtmlPanel = (type: unknown): boolean =>
+  typeof type === "string" && HTML_PANEL_TYPES.includes(type);
+
+/** HTML panel types that read the rows of a hand-written SQL query; the builder cannot express them. */
+export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = ["logs", "flame-graph"];
+
+export const isCustomSqlPanel = (type: unknown): boolean =>
+  typeof type === "string" && CUSTOM_SQL_PANEL_TYPES.includes(type);
