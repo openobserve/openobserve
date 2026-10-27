@@ -350,6 +350,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
+import { showsMissingValue } from "@/utils/dashboard/tableConfigUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
@@ -1977,12 +1978,26 @@ export default defineComponent({
     // Multi-SQL note: panelData is built from filteredData (visible queries only)
     // by convertSQLData and friends, so the type-specific checks below
     // already reflect the multi-query aggregate.
+    // A metric or SQL gauge that names its missing value draws that text instead of the No Data state.
+    const drawsMissingValue = computed(() => {
+      const { type, queryType, config } = panelSchema.value ?? {};
+      if (!panelData.value?.chartType) return false;
+      if (type === "metric") return showsMissingValue(config);
+      return (
+        type === "gauge" &&
+        queryType !== "promql" &&
+        String(config?.no_value_replacement ?? "") !== ""
+      );
+    });
+
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
       if (type === "html" || type === "markdown" || type === "alert-list") {
         return "";
       }
+
+      if (drawsMissingValue.value) return "";
 
       if (panelSchema.value?.queryType === "promql") {
         const hasResults =
@@ -2166,6 +2181,7 @@ export default defineComponent({
       showErrorNotification,
       t,
       onExemplarClick: exemplarInteraction.onExemplarClick,
+      hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
     });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({

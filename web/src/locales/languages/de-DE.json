@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Kleinste zuerst",
     "funnelSortNone": "Abfragereihenfolge",
     "funnelShowPercent": "Prozent der ersten Stufe anzeigen",
+    "funnelShowPercentTooltip": "Jede Stufe als Prozentsatz der größten Stufe. Ein sortierter Trichter beginnt oder endet mit ihr; in Abfragereihenfolge kann es jede Stufe sein.",
     "boxplotWhisker": "Whisker",
     "boxplotWhiskerMinMax": "Minimum bis Maximum",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Wert",
     "source": "Quelle",
     "target": "Ziel",
+    "wellGroup": "Gruppe",
+    "wellSubgroup": "Untergruppe",
+    "wellSize": "Größe",
+    "wellCategory": "Kategorie",
+    "wellTime": "Zeit",
+    "wellRow": "Zeile",
     "value": "Wert"
   },
   "home": {

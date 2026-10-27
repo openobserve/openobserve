@@ -53,6 +53,15 @@ describe("FlameGraphPanelRenderer", () => {
     expect(view.props("hideProfileActions")).toBe(true);
   });
 
+  it("hides the align and root-at-bottom controls, which the panel cannot save", async () => {
+    const wrapper = mountPanel({ data, config: {} });
+    await flushPromises();
+    expect(wrapper.findComponent(FlameGraphView).props("hideViewOptions")).toBe(true);
+    expect(wrapper.find('[data-test="flame-graph-align-left"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="flame-graph-root-at-bottom"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="flame-graph-plot"]').exists()).toBe(true);
+  });
+
   it("highlights the searched frame and clears it on a second search", async () => {
     const wrapper = mountPanel({ data, config: {} });
     await flushPromises();

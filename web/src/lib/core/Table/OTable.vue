@@ -753,8 +753,13 @@ function getPivotMerge(
   return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
-function pivotTotalCell(col: OTableColumnDef<TData>): any {
-  const row = props.stickyTotalRow;
+const stickyTotalRows = computed<Record<string, any>[]>(() => {
+  const rows = props.stickyTotalRow;
+  if (!rows) return [];
+  return Array.isArray(rows) ? rows : [rows];
+});
+
+function pivotTotalCell(col: OTableColumnDef<TData>, row: Record<string, any>): any {
   if (!row) return "";
   const key = (col.accessorKey ?? col.id) as string;
   const val = row[key];
@@ -1746,11 +1751,15 @@ defineExpose({
 
           <!-- ── Pivot grand-total row (sticky <tfoot>) ── -->
           <tfoot
-            v-if="props.stickyTotalRow"
+            v-if="stickyTotalRows.length"
             data-test="o2-table-pivot-total-foot"
             :class="props.stickyRowTotals ? 'o2-pivot-total-sticky sticky bottom-0 z-10' : ''"
           >
-            <tr class="bg-table-header-bg">
+            <tr
+              v-for="(totalRow, totalIndex) in stickyTotalRows"
+              :key="`pivot-total-row-${totalIndex}`"
+              class="bg-table-header-bg"
+            >
               <td
                 v-for="col in props.columns"
                 :key="`pivot-total-${col.id}`"
@@ -1766,7 +1775,7 @@ defineExpose({
                 ]"
                 :style="pivotTotalCellStyle(col)"
               >
-                {{ pivotTotalCell(col) }}
+                {{ pivotTotalCell(col, totalRow) }}
               </td>
             </tr>
           </tfoot>

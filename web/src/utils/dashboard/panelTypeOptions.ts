@@ -68,14 +68,36 @@ const applyGaugeNeutral = (gauge: any, neutral: number, index: number) => {
   };
 };
 
-const applyGaugeSegments = (gauge: any, segments: number) => {
+// The gaps sit on a silent overlay gauge, because a gauge draws its progress bar over its own split lines.
+const gaugeSegmentOverlay = (gauge: any, segments: number) => {
   const width = parseFloat(gauge?.axisLine?.lineStyle?.width) || 10;
-  gauge.splitNumber = segments;
-  gauge.splitLine = {
-    show: true,
-    distance: -width,
-    length: width,
-    lineStyle: { width: SEGMENT_GAP_WIDTH, color: chartColor("--color-surface-base") },
+  return {
+    type: "gauge",
+    silent: true,
+    tooltip: { show: false },
+    z: (toNumber(gauge.z) ?? 2) + 1,
+    center: gauge.center,
+    radius: gauge.radius,
+    startAngle: gauge.startAngle,
+    endAngle: gauge.endAngle,
+    min: gauge.min,
+    max: gauge.max,
+    splitNumber: segments,
+    progress: { show: false },
+    pointer: { show: false },
+    anchor: { show: false },
+    axisTick: { show: false },
+    axisLabel: { show: false },
+    title: { show: false },
+    detail: { show: false },
+    axisLine: { show: true, lineStyle: { width, color: [[1, "transparent"]] } },
+    splitLine: {
+      show: true,
+      distance: -width,
+      length: width,
+      lineStyle: { width: SEGMENT_GAP_WIDTH, color: chartColor("--color-surface-base") },
+    },
+    data: [],
   };
 };
 
@@ -96,19 +118,19 @@ export const applyGaugeOptions = (options: any, panelSchema: any): void => {
   const segments = toNumber(config.gauge_segments);
   const neutral = toNumber(config.gauge_neutral);
   const noValue = String(config.no_value_replacement ?? "");
+  const overlays: any[] = [];
   seriesOfType(options, ["gauge"]).forEach((gauge: any, index: number) => {
     if (!Array.isArray(gauge.data) || gauge.data.length === 0) return;
     if (noValue !== "") applyGaugeNoValue(gauge, noValue);
     if (angles) Object.assign(gauge, angles);
-    if (config.gauge_round_cap === true) {
-      gauge.progress = { ...gauge.progress, roundCap: true };
-      gauge.axisLine = { ...gauge.axisLine, roundCap: true };
-    }
-    if (segments !== null && segments >= 2) {
-      applyGaugeSegments(gauge, Math.min(MAX_GAUGE_SEGMENTS, Math.round(segments)));
-    }
+    // Rounding the track would round every threshold band end, so only the bar gets caps.
+    if (config.gauge_round_cap === true) gauge.progress = { ...gauge.progress, roundCap: true };
     if (neutral !== null) applyGaugeNeutral(gauge, neutral, index);
+    if (segments !== null && segments >= 2) {
+      overlays.push(gaugeSegmentOverlay(gauge, Math.min(MAX_GAUGE_SEGMENTS, Math.round(segments))));
+    }
   });
+  if (overlays.length) options.series.push(...overlays);
 };
 
 const pieLabelFormatter = (contents: string[], panelSchema: any) => {
@@ -168,9 +190,7 @@ export const applyPieOptions = (options: any, panelSchema: any): void => {
   if (panelSchema?.type !== "pie" && panelSchema?.type !== "donut") return;
   const config = panelSchema?.config ?? {};
   const contents = Array.isArray(config.pie_label_content)
-    ? config.pie_label_content.filter((content: string) =>
-        (PIE_LABEL_CONTENTS as readonly string[]).includes(content),
-      )
+    ? PIE_LABEL_CONTENTS.filter((content) => config.pie_label_content.includes(content))
     : null;
   const threshold = toNumber(config.pie_other_threshold);
   const innerRadius = toNumber(config.donut_inner_radius);

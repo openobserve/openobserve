@@ -7276,6 +7276,7 @@
     "funnelSortAscending": "由小到大",
     "funnelSortNone": "查詢順序",
     "funnelShowPercent": "顯示相對第一階段的百分比",
+    "funnelShowPercentTooltip": "每個階段佔最大階段的百分比。排序後的漏斗以它開始或結束；依查詢順序時它可以是任意階段。",
     "boxplotWhisker": "鬚線",
     "boxplotWhiskerMinMax": "最小值到最大值",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8421,6 +8422,12 @@
     "mapvalue": "值",
     "source": "來源",
     "target": "目標",
+    "wellGroup": "分組",
+    "wellSubgroup": "子分組",
+    "wellSize": "大小",
+    "wellCategory": "類別",
+    "wellTime": "時間",
+    "wellRow": "列",
     "value": "值"
   },
   "home": {

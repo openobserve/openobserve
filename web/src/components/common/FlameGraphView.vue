@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else>
-      <div class="mb-1.5 flex min-w-0 flex-nowrap items-center gap-2">
+      <div v-if="!hideViewOptions" class="mb-1.5 flex min-w-0 flex-nowrap items-center gap-2">
         <div class="ms-auto flex shrink-0 items-center gap-2">
           <div
             class="border-border-default rounded-default inline-flex overflow-hidden border"
@@ -337,6 +337,8 @@ const props = withDefaults(
     diffLabels?: { baseline: string; comparison: string };
     /** Hide the callers/callees and function details actions, which only the profiles page can open. */
     hideProfileActions?: boolean;
+    /** Hide the label-align and root-at-bottom controls, for hosts that cannot keep their state. */
+    hideViewOptions?: boolean;
   }>(),
   {
     root: null,

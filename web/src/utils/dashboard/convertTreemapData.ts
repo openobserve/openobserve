@@ -20,8 +20,10 @@ import { getSeriesColor } from "./colorPalette";
 import { getFieldLabel } from "./fieldLabel";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { echartsPaletteColor } from "./thresholds";
+import { labelColorOn, withLightness } from "./chartLabelContrast";
 
 const UPPER_LABEL_HEIGHT = 18;
+const CHILD_LIGHTNESS: [number, number] = [0.35, 0.6];
 
 /** A treemap node; leaves carry the summed value, parents add up their children. */
 export interface TreemapNode {
@@ -30,6 +32,8 @@ export interface TreemapNode {
   path: string[];
   children?: TreemapNode[];
   itemStyle?: { color: string };
+  label?: { color: string };
+  upperLabel?: { color: string };
 }
 
 const toNumber = (value: unknown): number | null => {
@@ -107,6 +111,26 @@ export const paintByPalette = (
   });
 };
 
+/** Gives every tile the label colour that reads on it, following the lightness ECharts maps child tiles to. */
+export const contrastLabels = (nodes: TreemapNode[]) => {
+  nodes.forEach((node) => {
+    const color = node.itemStyle?.color;
+    if (!color) return;
+    const text = labelColorOn(color);
+    node.label = { color: text };
+    node.upperLabel = { color: text };
+    const children = node.children ?? [];
+    if (!children.length) return;
+    const values = children.map((child) => child.value);
+    const [min, max] = [Math.min(...values), Math.max(...values)];
+    const [low, high] = CHILD_LIGHTNESS;
+    children.forEach((child) => {
+      const share = max > min ? (child.value - min) / (max - min) : 0.5;
+      child.label = { color: labelColorOn(withLightness(color, low + (high - low) * share)) };
+    });
+  });
+};
+
 /** Converts SQL rows into a treemap: the x field names the outer tiles, the breakdown splits them. */
 export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
   const config = panelSchema?.config ?? {};
@@ -114,6 +138,7 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
   if (!nodes.length) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
 
   paintByPalette(nodes, config, store?.state?.theme);
+  contrastLabels(nodes);
   const format = (value: unknown) =>
     formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, config.decimals));
   const nested = nodes.some((node) => node.children?.length);
@@ -161,6 +186,7 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
         label: {
           show: true,
           color: chartColor("--color-text-inverse"),
+          textBorderWidth: 0,
           formatter: (params: any) => `${params.name}\n${format(params.value)}`,
           overflow: "truncate",
         },
@@ -169,13 +195,21 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
               show: true,
               height: UPPER_LABEL_HEIGHT,
               color: chartColor("--color-text-inverse"),
+              textBorderWidth: 0,
               formatter: (params: any) => `${params.name}  ${format(params.value)}`,
             }
           : { show: false },
         itemStyle: { borderColor: surface, borderWidth: 1, gapWidth: 1 },
         levels: [
-          { itemStyle: { borderColor: surface, borderWidth: nested ? 2 : 1, gapWidth: 2 } },
-          { colorSaturation: [0.35, 0.6], itemStyle: { borderColorSaturation: 0.7, gapWidth: 1 } },
+          {
+            itemStyle: { borderColor: surface, borderWidth: nested ? 2 : 1, gapWidth: 2 },
+            // The root tile is unfilled, so its label sits on the panel background.
+            upperLabel: { color: chartColor("--color-text-body") },
+          },
+          {
+            colorSaturation: CHILD_LIGHTNESS,
+            itemStyle: { borderColorSaturation: 0.7, gapWidth: 1 },
+          },
         ],
       },
     ],

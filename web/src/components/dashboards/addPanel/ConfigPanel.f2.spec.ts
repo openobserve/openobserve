@@ -248,6 +248,28 @@ describe(
       expect(donut.data.config.donut_inner_radius).toBe(60);
     });
 
+    it("pie: slice labels start from the shown default and keep several parts, through the real OSelect", async () => {
+      const panel = mountPanel("pie");
+      await flushPromises();
+      const select = wrapper!.find('[data-test="dashboard-config-pie_label_content"]');
+      expect(select.text()).toBe("Slice labelsPercent");
+      for (const value of ["name", "value"]) {
+        if (!document.body.querySelector(`[data-test-value="${value}"]`)) {
+          await select.find("button").trigger("click");
+          await flushPromises();
+        }
+        (document.body.querySelector(`[data-test-value="${value}"]`) as HTMLElement).click();
+        await flushPromises();
+      }
+      expect([...panel.data.config.pie_label_content].sort()).toEqual(["name", "percent", "value"]);
+      wrapper!.unmount();
+      mountPanel("pie", {}, true);
+      await flushPromises();
+      expect(wrapper!.find('[data-test="dashboard-config-pie_label_content"]').text()).toBe(
+        "Slice labelsNameValuePercent",
+      );
+    });
+
     it("table: density and footer on SQL, density only on PromQL", async () => {
       const panel = mountPanel("table");
       await flushPromises();

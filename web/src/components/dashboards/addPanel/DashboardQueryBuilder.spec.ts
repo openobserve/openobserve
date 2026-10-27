@@ -213,6 +213,13 @@ const i18n = createI18n({
         rowFields: "Row Fields",
         valueFields: "Value Fields",
         breakdown: "Breakdown",
+        value: "Value",
+        wellGroup: "Group",
+        wellSubgroup: "Sub-group",
+        wellSize: "Size",
+        wellCategory: "Category",
+        wellTime: "Time",
+        wellRow: "Row",
         joins: "Joins",
         addJoin: "Add Join",
       },
@@ -508,6 +515,31 @@ describe("DashboardQueryBuilder", () => {
       wrapper.unmount();
       wrapper = createWrapper({ "data.type": "bar" });
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
+    });
+
+    it("names the wells by their job for hierarchy, row and category charts", () => {
+      const wells = (type: string) => {
+        wrapper?.unmount();
+        wrapper = createWrapper({ "data.type": type });
+        return [
+          wrapper.vm.currentXLabel,
+          wrapper.vm.currentYLabel,
+          wrapper.vm.currentBreakdownLabel,
+        ];
+      };
+      expect(wells("treemap")).toEqual(["Group", "Size", "Sub-group"]);
+      expect(wells("sunburst")).toEqual(["Group", "Size", "Sub-group"]);
+      expect(wells("status-history")).toEqual(["Time", "Value", "Row"]);
+      expect(wells("boxplot").slice(0, 2)).toEqual(["Category", "Value"]);
+      expect(wells("bar")).toEqual(["X-Axis", "Y-Axis", "Breakdown"]);
+      expect(wells("h-bar")).toEqual(["Y-Axis", "X-Axis", "Breakdown"]);
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "treemap" });
+      const text = wrapper.text();
+      expect(text).toContain("Group");
+      expect(text).toContain("Sub-group");
+      expect(text).toContain("Size");
+      expect(text).not.toContain("X-Axis");
     });
 
     it("should handle x-axis field removal", async () => {

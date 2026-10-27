@@ -19,6 +19,7 @@ import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
 import { applyGaugeOptions, applyHeatmapOptions, applyPieOptions } from "./panelTypeOptions";
 import { chartColor } from "@/utils/chartTheme";
+import * as echarts from "echarts";
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -207,15 +208,54 @@ describe("gauge", () => {
     expect([semi.startAngle, semi.endAngle]).toEqual([205, -25]);
   });
 
-  it("rounds the ends and cuts the band into segments", async () => {
-    const [gauge] = gauges(
-      await viaPanel(sqlPanel("gauge", { gauge_round_cap: true, gauge_segments: 5 }), [rows()]),
-    );
+  it("rounds only the bar, never the threshold track", async () => {
+    const [gauge] = gauges(await viaPanel(sqlPanel("gauge", { gauge_round_cap: true }), [rows()]));
     expect(gauge.progress.roundCap).toBe(true);
-    expect(gauge.axisLine.roundCap).toBe(true);
-    expect(gauge.splitNumber).toBe(5);
-    expect(gauge.splitLine.show).toBe(true);
-    expect(gauge.splitLine.length).toBe(-gauge.splitLine.distance);
+    expect(gauge.axisLine.roundCap).toBeUndefined();
+  });
+
+  it.each(["semi", "arc", "circle"])(
+    "%s: segments draw as gaps on top of the bar, inside the chart",
+    async (style) => {
+      const options = await viaPanel(
+        sqlPanel("gauge", { gauge_style: style, gauge_segments: 12, gauge_round_cap: true }),
+        [rows()],
+      );
+      const dials = gauges(options).filter((s: any) => s.data.length);
+      const overlays = gauges(options).filter((s: any) => !s.data.length);
+      expect(overlays).toHaveLength(dials.length);
+      overlays.forEach((overlay: any, i: number) => {
+        expect(overlay.silent).toBe(true);
+        expect(overlay.splitNumber).toBe(12);
+        expect(overlay.z).toBeGreaterThan(dials[i].z ?? 2);
+        expect([overlay.startAngle, overlay.endAngle]).toEqual([
+          dials[i].startAngle,
+          dials[i].endAngle,
+        ]);
+        expect(overlay.center).toEqual(dials[i].center);
+      });
+      const chart = echarts.init(null as any, null, {
+        renderer: "svg",
+        ssr: true,
+        width: 800,
+        height: 400,
+      });
+      chart.setOption(options);
+      const svg = chart.renderToSVGString();
+      chart.dispose();
+      const gaps = [
+        ...svg.matchAll(/<path d="M([-\d.]+) ([-\d.]+)L([-\d.]+) ([-\d.]+)"[^>]*stroke-width="3"/g),
+      ];
+      expect(gaps.length).toBeGreaterThanOrEqual(12);
+      for (const [, ...coords] of gaps) {
+        coords.map(Number).forEach((c) => expect(Math.abs(c)).toBeLessThan(800));
+      }
+    },
+  );
+
+  it("adds no overlay without segments", async () => {
+    const options = await viaPanel(sqlPanel("gauge", { gauge_round_cap: true }), [rows()]);
+    expect(gauges(options).every((s: any) => s.data.length)).toBe(true);
   });
 
   it("fills from the neutral value to the current value", async () => {
@@ -241,6 +281,51 @@ describe("pie and donut", () => {
       await viaPanel(promPanel("donut", { pie_label_content: ["value"] }), promData()),
     );
     expect(valueOnly.label.formatter({ name: "api", value: 70, percent: 70 })).toBe("70");
+  });
+
+  it.each(["pie", "donut"])(
+    "%s inside labels carry no slice-colour halo, in dark or light mode",
+    async (type) => {
+      const labelStrokes = async (theme: string) => {
+        store.state.theme = theme;
+        try {
+          const options = await viaPanel(sqlPanel(type), [rows()]);
+          const chart = echarts.init(null as any, null, {
+            renderer: "svg",
+            ssr: true,
+            width: 800,
+            height: 400,
+          });
+          chart.setOption({
+            ...options,
+            backgroundColor: theme === "dark" ? "#16181d" : "#ffffff",
+            animation: false,
+          });
+          const svg = chart.renderToSVGString();
+          chart.dispose();
+          return [...svg.matchAll(/<text[^>]*>[\d.]+%<\/text>/g)].map(([tag]) =>
+            /stroke="(?!none)[^"]+"/.test(tag),
+          );
+        } finally {
+          store.state.theme = "light";
+        }
+      };
+      const dark = await labelStrokes("dark");
+      expect(dark.length).toBeGreaterThan(0);
+      expect(dark.every((stroked) => !stroked)).toBe(true);
+      const light = await labelStrokes("light");
+      expect(light.length).toBeGreaterThan(0);
+      expect(light.every((stroked) => !stroked)).toBe(true);
+    },
+  );
+
+  it("orders the parts name, value, percent whatever order they were picked in", async () => {
+    const series = pieSeries(
+      await viaPanel(sqlPanel("pie", { pie_label_content: ["percent", "name", "value"] }), [
+        rows(),
+      ]),
+    );
+    expect(series.label.formatter({ name: "/a", value: 70, percent: 70 })).toBe("/a · 70 · 70%");
   });
 
   it("hides labels when no part is chosen", async () => {

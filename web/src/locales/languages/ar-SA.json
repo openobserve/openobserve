@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "الأصغر أولاً",
     "funnelSortNone": "ترتيب الاستعلام",
     "funnelShowPercent": "إظهار النسبة من المرحلة الأولى",
+    "funnelShowPercentTooltip": "كل مرحلة كنسبة مئوية من أكبر مرحلة. يبدأ القمع المرتب بها أو ينتهي بها؛ وبترتيب الاستعلام قد تكون أي مرحلة.",
     "boxplotWhisker": "الشعيرات",
     "boxplotWhiskerMinMax": "من الأدنى إلى الأعلى",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "القيمة",
     "source": "المصدر",
     "target": "الهدف",
+    "wellGroup": "المجموعة",
+    "wellSubgroup": "المجموعة الفرعية",
+    "wellSize": "الحجم",
+    "wellCategory": "الفئة",
+    "wellTime": "الوقت",
+    "wellRow": "الصف",
     "value": "القيمة"
   },
   "home": {

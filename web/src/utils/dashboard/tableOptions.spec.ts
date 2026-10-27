@@ -110,20 +110,22 @@ describe("footer calculations", () => {
     expect(computeFooterCalc("count", [])).toBe(0);
   });
 
-  it("adds a sticky footer row with labels and formatted values", async () => {
+  it("adds one labelled sticky footer row per calculation", async () => {
     const result = await viaPanel(tablePanel({ table_footer_calcs: ["sum", "max"] }), [rows()]);
     expect(result.stickyRowTotals).toBe(true);
-    expect(result.stickyTotalRow.service).toBe("Sum · Max");
-    expect(result.stickyTotalRow.requests).toBe("60 · 30");
-    expect(result.stickyTotalRow.trend).toBeUndefined();
+    expect(result.stickyTotalRow).toHaveLength(2);
+    const [sum, max] = result.stickyTotalRow;
+    expect([sum.service, sum.requests]).toEqual(["Sum", "60"]);
+    expect([max.service, max.requests]).toEqual(["Max", "30"]);
+    expect(sum.trend).toBeUndefined();
     const requests = result.columns.find((column: any) => column.field === "requests");
-    expect(requests.format("Sum · Max", result.stickyTotalRow)).toBe("Sum · Max");
+    expect(requests.format("60", sum)).toBe("60");
     expect(requests.format(1234, rows()[0])).toBe("1234");
   });
 
   it("works on a multi-query table", async () => {
     const result = await viaPanel(tablePanel({ table_footer_calcs: ["count"] }), [rows(), rows()]);
-    expect(result.stickyTotalRow.requests).toBe("6");
+    expect(result.stickyTotalRow[0].requests).toBe("6");
   });
 
   it("skips transposed tables", () => {

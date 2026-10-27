@@ -261,7 +261,8 @@ const normalisePercentStacks = (options: any) => {
   const raw = new Map<any, any[]>();
   const groups = new Map<string, any[]>();
   for (const series of dataSeriesOf(options)) {
-    if (!series.stack) continue;
+    // Without a breakdown the bar converters leave series unstacked; a 100% stack still needs one.
+    if (!series.stack) series.stack = "percent";
     const key = String(series.stack);
     groups.set(key, [...(groups.get(key) ?? []), series]);
   }

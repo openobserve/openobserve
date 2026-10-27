@@ -30,8 +30,10 @@ const props = withDefaults(
     /** Bar tone. Default teal; "warning"/"danger" for threshold columns. */
     variant?: "default" | "warning" | "danger";
     emptyLabel?: I18nText;
+    /** Draw a filled bar on a track with the value beside it, instead of a thin bar under the value. */
+    gauge?: boolean;
   }>(),
-  { variant: "default", emptyLabel: raw("—"), min: 0, color: null },
+  { variant: "default", emptyLabel: raw("—"), min: 0, color: null, gauge: false },
 );
 
 const num = computed<number | null>(() => {
@@ -65,10 +67,30 @@ const barClass = computed(
 </script>
 
 <template>
+  <div v-if="gauge" class="flex w-full min-w-0 items-center gap-2">
+    <div
+      class="rounded-default bg-progress-bar-track relative h-3 min-w-0 flex-1 overflow-hidden"
+      aria-hidden="true"
+      data-test="o2-data-bar-cell-track"
+    >
+      <div
+        v-if="widthPct > 0"
+        class="rounded-default h-full transition-[width] duration-300"
+        :class="barClass"
+        :style="{ width: widthPct + '%', ...(color ? { backgroundColor: color } : {}) }"
+        data-test="o2-data-bar-cell-fill"
+      />
+    </div>
+    <span
+      class="shrink-0 leading-none whitespace-nowrap tabular-nums"
+      :class="num === null ? 'text-text-body text-xs' : ''"
+      >{{ text }}</span
+    >
+  </div>
   <!-- Value on top, a thin magnitude bar UNDERNEATH (no overlap with the
        number). Both right-aligned so the bars share a common right edge and
        lengths stay comparable across rows. -->
-  <div class="flex w-full min-w-0 flex-col items-end justify-center gap-0.75">
+  <div v-else class="flex w-full min-w-0 flex-col items-end justify-center gap-0.75">
     <span
       class="leading-none whitespace-nowrap tabular-nums"
       :class="num === null ? 'text-text-body text-xs' : ''"

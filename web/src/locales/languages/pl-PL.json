@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Najmniejsze najpierw",
     "funnelSortNone": "Kolejność zapytania",
     "funnelShowPercent": "Pokaż procent pierwszego etapu",
+    "funnelShowPercentTooltip": "Każdy etap jako procent największego etapu. Posortowany lejek zaczyna się lub kończy na nim; w kolejności zapytania może to być dowolny etap.",
     "boxplotWhisker": "Wąsy",
     "boxplotWhiskerMinMax": "Od minimum do maksimum",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Wartość",
     "source": "Źródło",
     "target": "Cel",
+    "wellGroup": "Grupa",
+    "wellSubgroup": "Podgrupa",
+    "wellSize": "Rozmiar",
+    "wellCategory": "Kategoria",
+    "wellTime": "Czas",
+    "wellRow": "Wiersz",
     "value": "Wartość"
   },
   "home": {

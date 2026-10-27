@@ -165,18 +165,16 @@ describe("ChartRenderer", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Mock hoveredSeriesState - needs to be a reactive ref-like object
-    mockHoveredSeriesState = {
-      value: {
-        panelId: null,
-        seriesIndex: -1,
-        dataIndex: -1,
-        hoveredTime: null,
-        hoveredSeriesName: "",
-      },
+    // The providers inject a ref whose value carries the setters.
+    mockHoveredSeriesState = ref({
+      panelId: null,
+      seriesIndex: -1,
+      dataIndex: -1,
+      hoveredTime: null,
+      hoveredSeriesName: "",
       setIndex: vi.fn(),
       setHoveredSeriesName: vi.fn(),
-    };
+    });
 
     // Mock intersection observer
     global.IntersectionObserver = vi.fn(function () {
@@ -345,7 +343,7 @@ describe("ChartRenderer", () => {
       await container.trigger("mouseover");
       await container.trigger("mouseleave");
 
-      expect(mockHoveredSeriesState.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+      expect(mockHoveredSeriesState.value.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
     });
 
     it("keeps the hover when the pointer moves into a tooltip or exemplar card", async () => {
@@ -356,11 +354,11 @@ describe("ChartRenderer", () => {
         const child = document.createElement("span");
         overlay.appendChild(child);
         document.body.appendChild(overlay);
-        mockHoveredSeriesState.setIndex.mockClear();
+        mockHoveredSeriesState.value.setIndex.mockClear();
 
         await container.trigger("mouseleave", { relatedTarget: child });
 
-        expect(mockHoveredSeriesState.setIndex).not.toHaveBeenCalled();
+        expect(mockHoveredSeriesState.value.setIndex).not.toHaveBeenCalled();
         overlay.remove();
       }
     });
@@ -376,15 +374,15 @@ describe("ChartRenderer", () => {
         document.body.appendChild(outside);
         const leaveOverlay = (relatedTarget: Node) =>
           overlay.dispatchEvent(new MouseEvent("mouseleave", { relatedTarget }));
-        mockHoveredSeriesState.setIndex.mockClear();
+        mockHoveredSeriesState.value.setIndex.mockClear();
 
         await container.trigger("mouseleave", { relatedTarget: overlay });
         leaveOverlay(container.element);
-        expect(mockHoveredSeriesState.setIndex).not.toHaveBeenCalled();
+        expect(mockHoveredSeriesState.value.setIndex).not.toHaveBeenCalled();
 
         await container.trigger("mouseleave", { relatedTarget: overlay });
         leaveOverlay(outside);
-        expect(mockHoveredSeriesState.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+        expect(mockHoveredSeriesState.value.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
 
         overlay.remove();
         outside.remove();
@@ -398,13 +396,13 @@ describe("ChartRenderer", () => {
       const card = document.createElement("div");
       card.className = "o2-exemplar-card";
       document.body.append(tooltip, card);
-      mockHoveredSeriesState.setIndex.mockClear();
+      mockHoveredSeriesState.value.setIndex.mockClear();
 
       await container.trigger("mouseleave", { relatedTarget: tooltip });
       tooltip.dispatchEvent(new MouseEvent("mouseleave", { relatedTarget: card }));
-      expect(mockHoveredSeriesState.setIndex).not.toHaveBeenCalled();
+      expect(mockHoveredSeriesState.value.setIndex).not.toHaveBeenCalled();
       card.dispatchEvent(new MouseEvent("mouseleave", { relatedTarget: document.body }));
-      expect(mockHoveredSeriesState.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+      expect(mockHoveredSeriesState.value.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
 
       tooltip.remove();
       card.remove();
@@ -415,7 +413,7 @@ describe("ChartRenderer", () => {
 
       await container.trigger("mouseover");
 
-      expect(mockHoveredSeriesState.panelId).toBe("panel-1");
+      expect(mockHoveredSeriesState.value.panelId).toBe("panel-1");
     });
 
     it("should emit error events when needed", async () => {

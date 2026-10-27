@@ -69,6 +69,7 @@ export function usePanelDrilldown({
   showErrorNotification,
   t,
   onExemplarClick,
+  hideChartTooltip,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -94,6 +95,7 @@ export function usePanelDrilldown({
   showErrorNotification: any;
   t: TranslateFn;
   onExemplarClick?: (params: any) => void | Promise<void>;
+  hideChartTooltip?: () => void;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
@@ -641,6 +643,8 @@ export function usePanelDrilldown({
 
     // Handle popup displays with priority
     if (shouldShowDrilldown) {
+      // An item tooltip sits at the cursor, right where the menu opens, and would cover it.
+      hideChartTooltip?.();
       // Show drilldown popup first
       drilldownPopUpRef.value.style.display = "block";
       await nextTick();

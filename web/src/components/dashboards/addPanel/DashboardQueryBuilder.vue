@@ -200,9 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
-            {{
-              dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
-            }}
+            {{ currentBreakdownLabel }}
             <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip side="top" align="center">
               <template #content>
@@ -782,7 +780,28 @@ export default defineComponent({
     // Translated axis labels. The composable's currentXLabel/currentYLabel return
     // hardcoded English; recompute them here through t() so they respect the
     // active locale (mirrors the composable's type/pivot branching).
+    // Hierarchy, row and category charts name each well by its job, as the sankey builder does.
+    const roleLabels = computed(() => {
+      switch (dashboardPanelData.data.type) {
+        case "treemap":
+        case "sunburst":
+          return { x: t("panel.wellGroup"), y: t("panel.wellSize"), b: t("panel.wellSubgroup") };
+        case "status-history":
+          return { x: t("panel.wellTime"), y: t("panel.value"), b: t("panel.wellRow") };
+        case "boxplot":
+          return { x: t("panel.wellCategory"), y: t("panel.value"), b: null };
+        default:
+          return null;
+      }
+    });
+
+    const currentBreakdownLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") return t("panel.pivotField");
+      return roleLabels.value?.b ?? t("panel.breakdown");
+    });
+
     const currentXLabel = computed(() => {
+      if (roleLabels.value) return roleLabels.value.x;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
       }
@@ -792,6 +811,7 @@ export default defineComponent({
     });
 
     const currentYLabel = computed(() => {
+      if (roleLabels.value) return roleLabels.value.y;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
       }
@@ -1605,6 +1625,7 @@ export default defineComponent({
       isDragArmed,
       currentXLabel,
       currentYLabel,
+      currentBreakdownLabel,
       labelWidthClass,
       isPivotMode,
       reorderItems,

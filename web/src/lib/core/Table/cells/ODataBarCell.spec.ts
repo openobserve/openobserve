@@ -38,4 +38,19 @@ describe("ODataBarCell", () => {
       "background-color: rgb(255, 0, 0)",
     );
   });
+
+  it("draws a filled bar on a track beside the value in gauge mode", () => {
+    const cell = mount(ODataBarCell, {
+      props: { value: 25, max: 100, gauge: true, display: "25" },
+    });
+    expect(cell.find('[data-test="o2-data-bar-cell-track"]').classes()).toContain(
+      "bg-progress-bar-track",
+    );
+    expect(cell.find('[data-test="o2-data-bar-cell-fill"]').attributes("style")).toBe(
+      "width: 25%;",
+    );
+    expect(cell.text()).toBe("25");
+    const plain = mount(ODataBarCell, { props: { value: 25, max: 100 } });
+    expect(plain.find('[data-test="o2-data-bar-cell-track"]').exists()).toBe(false);
+  });
 });

@@ -1058,4 +1058,43 @@ describe("convertGeoMapData", () => {
       expect(result).toBeDefined();
     });
   });
+  describe("Saved panels with odd data", () => {
+    const schema = (config: any) => ({
+      queries: [
+        {
+          customQuery: true,
+          fields: {
+            latitude: { alias: "lat" },
+            longitude: { alias: "lng" },
+            weight: { alias: "w" },
+          },
+          config: { layer_type: "scatter", weight_fixed: 1 },
+        },
+      ],
+      config,
+    });
+
+    it("opens on the default view when the panel saved map_view as null", () => {
+      const result: any = convertGeoMapData(schema({ map_view: null }), [
+        [{ lat: 10, lng: 20, w: 1 }],
+      ]);
+      expect(result.options.lmap.center).toEqual([0, 0]);
+      expect(result.options.lmap.zoom).toBe(1);
+      const zero: any = convertGeoMapData(schema({ map_view: { lat: 5, lng: 6, zoom: 0 } }), [
+        [{ lat: 10, lng: 20, w: 1 }],
+      ]);
+      expect(zero.options.lmap).toMatchObject({ center: [6, 5], zoom: 0 });
+    });
+
+    it("drops points off the globe instead of failing the panel", () => {
+      const result: any = convertGeoMapData(schema({ map_view: null }), [
+        [
+          { lat: 51.5, lng: -0.1, w: 3 },
+          { lat: 120, lng: 30, w: 4 },
+          { lat: 10, lng: -500, w: 5 },
+        ],
+      ]);
+      expect(result.options.series[0].data).toEqual([[-0.1, 51.5, 3]]);
+    });
+  });
 });

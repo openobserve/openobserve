@@ -862,7 +862,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-funnel_show_percent"
             size="lg"
             @update:model-value="(value: any) => setFlagConfig('funnel_show_percent', value)"
-          />
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.funnelShowPercentTooltip')" max-width="15.625rem" />
+            </template>
+          </OSwitch>
         </template>
 
         <template v-if="dashboardPanelData.data.type === 'boxplot'">
@@ -3293,6 +3297,7 @@ import {
   onMounted,
   ref,
   markRaw,
+  unref,
   watchEffect,
   watch,
 } from "vue";
@@ -3617,7 +3622,12 @@ export default defineComponent({
       { label: t("dashboard.nodeGraphLayoutForce"), value: "force" },
       { label: t("dashboard.nodeGraphLayoutCircular"), value: "circular" },
     ];
-    const pieLabelContentModel = listModel("pie_label_content");
+    // Absent, the converters label SQL slices by percent and PromQL slices by all three, so the picker starts there.
+    const pieLabelContentModel = computed(() => {
+      const saved = config().pie_label_content;
+      if (Array.isArray(saved)) return saved;
+      return unref(promqlMode) ? ["name", "value", "percent"] : ["percent"];
+    });
     const pieLabelContentOptions: { label: I18nText; value: string }[] = [
       { label: t("dashboard.pieLabelName"), value: "name" },
       { label: t("dashboard.pieLabelValue"), value: "value" },

@@ -119,8 +119,13 @@ describe("ConfigPanel logs, alert list and flame graph settings", { timeout: 30_
     document.body.innerHTML = "";
   });
 
-  const mountPanel = async (type: string, config: Record<string, unknown> = {}) => {
+  const mountPanel = async (
+    type: string,
+    config: Record<string, unknown> = {},
+    adjust: (panel: any) => void = () => {},
+  ) => {
     const panel = makePanel(type, config);
+    adjust(panel);
     vi.mocked(useDashboardPanelData).mockReturnValue({
       dashboardPanelData: panel,
       promqlMode: false,
@@ -209,6 +214,50 @@ describe("ConfigPanel logs, alert list and flame graph settings", { timeout: 30_
     for (const key of ["logs_message_field", "logs_wrap", "logs_show_time", "logs_prettify_json"]) {
       expect(key in panel.data.config, key).toBe(false);
     }
+  });
+
+  it("logs: offers the stream's columns when the query selects every column", async () => {
+    await mountPanel("logs", {}, (panel) => {
+      panel.data.queries[0].fields.stream = "demo_app";
+      panel.meta.stream.customQueryFields = [];
+      panel.meta.streamFields = {
+        groupedFields: [
+          {
+            name: "demo_app",
+            schema: [{ name: "_timestamp" }, { name: "level" }, { name: "message" }],
+          },
+          { name: "other_stream", schema: [{ name: "unrelated" }] },
+        ],
+      };
+    });
+    const combobox = wrapper!
+      .findAllComponents({ name: "OCombobox" })
+      .find(
+        (component: any) =>
+          component.attributes("data-test") === "dashboard-config-logs_message_field",
+      );
+    expect(combobox!.props("items").map((item: any) => item.value)).toEqual([
+      "_timestamp",
+      "level",
+      "message",
+    ]);
+  });
+
+  it("logs: offers only the query's named columns when it names them", async () => {
+    await mountPanel("logs", {}, (panel) => {
+      panel.meta.streamFields = { groupedFields: [{ name: "demo_app", schema: [{ name: "x" }] }] };
+    });
+    const combobox = wrapper!
+      .findAllComponents({ name: "OCombobox" })
+      .find(
+        (component: any) =>
+          component.attributes("data-test") === "dashboard-config-logs_level_field",
+      );
+    expect(combobox!.props("items").map((item: any) => item.value)).toEqual([
+      "message",
+      "level",
+      "stack",
+    ]);
   });
 
   it("alert list: writes folder, states, sort and max with the right JSON types", async () => {

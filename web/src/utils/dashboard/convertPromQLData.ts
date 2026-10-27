@@ -17,6 +17,7 @@ import { gt } from "@/types/i18n";
 import echartsTokens from "echarts/lib/visual/tokens.js";
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { formatAxisTickValue } from "./axisTickFormat";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import { formatDate } from "./dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
@@ -41,7 +42,7 @@ import {
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
-import { resolveMetricValueStyle } from "./tableConfigUtils";
+import { resolveMetricValueStyle, showsMissingValue } from "./tableConfigUtils";
 import {
   applyGaugeThresholds,
   applyLineAreaThresholds,
@@ -712,13 +713,11 @@ export const convertPromQLData = async (
         // other (short panels fit fewer labels than ECharts offers)
         hideOverlap: true,
         formatter: function (name: any) {
-          return formatUnitValue(
-            getUnitValue(
-              name,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
+          return formatAxisTickValue(
+            name,
+            panelSchema.config?.unit,
+            panelSchema.config?.unit_custom,
+            panelSchema.config?.decimals,
           );
         },
       },
@@ -1214,7 +1213,8 @@ export const convertPromQLData = async (
             const values = (metric?.values ?? (metric?.value ? [metric.value] : [])).sort(
               (a: any, b: any) => a[0] - b[0],
             );
-            const latestValue = values[values.length - 1]?.[1] ?? 0;
+            const emptyValue = showsMissingValue(panelSchema.config) ? null : 0;
+            const latestValue = values[values.length - 1]?.[1] ?? emptyValue;
             const metricName = metric ? nameOf(seriesNames, metric.metric, index) : "";
             const metricUnit = seriesOverrides.unitArgs(metricName);
 
@@ -1255,7 +1255,8 @@ export const convertPromQLData = async (
               coordinateSystem: "polar",
               _metricText: metricText,
               _metricRawValue: values.length > 0 ? latestValue : null,
-              _metricStatName: metricName,
+              // A label-less result is named by its label dump "{}", which names nothing.
+              _metricStatName: metricName === "{}" ? "" : metricName,
               z: 2,
               renderItem: function (params: any) {
                 return {

@@ -26,7 +26,6 @@ export type TableFooterCalc = (typeof TABLE_FOOTER_CALCS)[number];
 // Absent density keeps today's row height, which is the compact one.
 const ROW_HEIGHTS: Record<string, number> = { compact: 22, standard: 28, comfortable: 36 };
 const DEFAULT_ROW_HEIGHT = 22;
-const FOOTER_SEPARATOR = " · ";
 
 const CALC_LABEL_KEYS: Record<TableFooterCalc, I18nKey> = {
   sum: "dashboard.tableFooterCalcSum",
@@ -114,43 +113,45 @@ const applyCellTypes = (columns: any[], rows: any[], config: any) => {
   }
 };
 
-const footerCell = (calcs: TableFooterCalc[], column: any, rows: any[]): string => {
-  const values = columnValues(rows, column);
-  return calcs
-    .map((calc) => {
-      const result = computeFooterCalc(calc, values);
-      if (result === null) return "—";
-      if (calc === "count") return String(result);
-      return String(typeof column.format === "function" ? column.format(result) : result);
-    })
-    .join(FOOTER_SEPARATOR);
+const footerCell = (calc: TableFooterCalc, column: any, rows: any[]): string => {
+  const result = computeFooterCalc(calc, columnValues(rows, column));
+  if (result === null) return "—";
+  if (calc === "count") return String(result);
+  return String(typeof column.format === "function" ? column.format(result) : result);
 };
 
-const isNumericColumn = (column: any, rows: any[]): boolean =>
-  column.isNumeric ??
+const valuesAreNumeric = (column: any, rows: any[]): boolean =>
   columnValues(rows, column).every(
     (value) => value === null || value === undefined || value === "" || typeof value === "number",
   );
 
+// A sparkline column is typed as text, yet its scalar cells still total like numbers.
+const isNumericColumn = (column: any, rows: any[]): boolean =>
+  column.cellType === "sparkline"
+    ? valuesAreNumeric(column, rows)
+    : (column.isNumeric ?? valuesAreNumeric(column, rows));
+
 const applyFooterCalcs = (result: any, calcs: TableFooterCalc[]) => {
   const columns: any[] = result.columns;
   const rows: any[] = result.rows;
-  const footer: Record<string, any> = { __isFooterRow: true };
   const numeric = new Set(columns.filter((column) => isNumericColumn(column, rows)));
   const labelColumn = columns.find((column) => !numeric.has(column));
-  for (const column of columns) {
-    const key = columnKey(column);
-    if (column === labelColumn) {
-      footer[key] = calcs.map((calc) => gt(CALC_LABEL_KEYS[calc])).join(FOOTER_SEPARATOR);
-    } else if (numeric.has(column)) {
-      footer[key] = footerCell(calcs, column, rows);
+  const footers = calcs.map((calc) => {
+    const footer: Record<string, any> = { __isFooterRow: true };
+    for (const column of columns) {
+      const key = columnKey(column);
+      if (column === labelColumn) footer[key] = gt(CALC_LABEL_KEYS[calc]);
+      else if (numeric.has(column)) footer[key] = footerCell(calc, column, rows);
     }
+    return footer;
+  });
+  for (const column of columns) {
     const format = column.format;
     if (typeof format === "function") {
       column.format = (value: any, row?: any) => (row?.__isFooterRow ? value : format(value, row));
     }
   }
-  result.stickyTotalRow = footer;
+  result.stickyTotalRow = footers;
   result.stickyRowTotals = true;
 };
 

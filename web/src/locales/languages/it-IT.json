@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Prima la più piccola",
     "funnelSortNone": "Ordine della query",
     "funnelShowPercent": "Mostra percentuale della prima fase",
+    "funnelShowPercentTooltip": "Ogni fase come percentuale della fase più grande. Un imbuto ordinato inizia o finisce con essa; nell'ordine della query può essere qualsiasi fase.",
     "boxplotWhisker": "Baffi",
     "boxplotWhiskerMinMax": "Dal minimo al massimo",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Valore",
     "source": "Fonte",
     "target": "Obiettivo",
+    "wellGroup": "Gruppo",
+    "wellSubgroup": "Sottogruppo",
+    "wellSize": "Dimensione",
+    "wellCategory": "Categoria",
+    "wellTime": "Tempo",
+    "wellRow": "Riga",
     "value": "Valore"
   },
   "home": {

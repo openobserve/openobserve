@@ -278,6 +278,32 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
   });
 
+  it("hides the chart tooltip when the drilldown menu opens, and only then", async () => {
+    const hideChartTooltip = vi.fn();
+    const deps: any = { ...makeDeps(), hideChartTooltip };
+    const api = usePanelDrilldown(deps);
+    await api.onChartClick({
+      componentType: "series",
+      seriesType: "funnel",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      name: "visit",
+      value: 200,
+    });
+    expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
+    expect(hideChartTooltip).toHaveBeenCalledTimes(1);
+
+    const plain: any = { ...makeDeps(), hideChartTooltip: vi.fn() };
+    plain.panelSchema.value.config.drilldown = [];
+    plain.store.state.zoConfig.enable_cross_linking = false;
+    await usePanelDrilldown(plain).onChartClick({
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      name: "visit",
+    });
+    expect(plain.hideChartTooltip).not.toHaveBeenCalled();
+  });
+
   it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
     const deps = makeDeps();
     deps.panelSchema.value.config.drilldown = [

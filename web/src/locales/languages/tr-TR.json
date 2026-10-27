@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Önce en küçük",
     "funnelSortNone": "Sorgu sırası",
     "funnelShowPercent": "İlk aşamaya göre yüzdeyi göster",
+    "funnelShowPercentTooltip": "Her aşama, en büyük aşamanın yüzdesi olarak. Sıralı bir huni onunla başlar veya biter; sorgu sırasında herhangi bir aşama olabilir.",
     "boxplotWhisker": "Bıyıklar",
     "boxplotWhiskerMinMax": "Minimumdan maksimuma",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Değer",
     "source": "Kaynak",
     "target": "Hedef",
+    "wellGroup": "Grup",
+    "wellSubgroup": "Alt grup",
+    "wellSize": "Boyut",
+    "wellCategory": "Kategori",
+    "wellTime": "Zaman",
+    "wellRow": "Satır",
     "value": "Değer"
   },
   "home": {

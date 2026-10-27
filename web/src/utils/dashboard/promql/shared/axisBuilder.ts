@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { formatAxisTickValue } from "../../axisTickFormat";
 import { getGridLineStyle } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
@@ -172,9 +173,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
       show: config.axis_label !== false,
       // Add unit formatting to Y-axis labels
       formatter: (value: any) => {
-        return formatUnitValue(
-          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
-        );
+        return formatAxisTickValue(value, config?.unit, config?.unit_custom, config?.decimals);
       },
     },
     splitLine: {
@@ -193,9 +192,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
         width: config.axis_width,
         // Preserve unit formatter when axis_width is set
         formatter: (value: any) => {
-          return formatUnitValue(
-            getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
-          );
+          return formatAxisTickValue(value, config?.unit, config?.unit_custom, config?.decimals);
         },
       },
     }),
@@ -306,9 +303,7 @@ export function buildValueAxis(panelSchema: any, store?: any): any {
       hideOverlap: true,
       // Add unit formatting to value axis labels
       formatter: (value: any) => {
-        return formatUnitValue(
-          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
-        );
+        return formatAxisTickValue(value, config?.unit, config?.unit_custom, config?.decimals);
       },
     },
     splitLine: {

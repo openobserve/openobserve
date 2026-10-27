@@ -21,6 +21,7 @@ import {
   hasValueColumn,
   buildDefaultSqlFields,
   buildDefaultBuilderFields,
+  firstNumericField,
   SKIP_SEED_TYPES,
 } from "./defaultFields";
 
@@ -187,7 +188,7 @@ describe("defaultFields", () => {
       }
     });
 
-    it("distribution seeds nothing; status history seeds the time x and a count", () => {
+    it("distribution seeds nothing without a numeric column; status history seeds the time x and a count", () => {
       expect(seed("distribution")).toEqual({ x: [], y: [] });
       expect(seed("status-history").x[0].functionName).toBe("histogram");
       expect(seed("status-history").y[0].functionName).toBe("count");
@@ -200,6 +201,38 @@ describe("defaultFields", () => {
       }
       expect(seed("boxplot")).toEqual({ x: [], y: [] });
       expect(seed("node-graph")).toEqual({ x: [], y: [] });
+    });
+
+    it("distribution and box plot start from the first numeric column that is not a timestamp", () => {
+      const schema = [
+        {
+          name: "demo_app",
+          schema: [
+            { name: "_timestamp", type: "Int64" },
+            { name: "ts", type: "Int64" },
+            { name: "host", type: "Utf8" },
+            { name: "enabled", type: "Boolean" },
+            { name: "latency_ms", type: "Float64" },
+            { name: "bytes", type: "Int64" },
+          ],
+        },
+        { name: "other", schema: [{ name: "first", type: "Int64" }] },
+      ];
+      for (const type of ["distribution", "boxplot"]) {
+        const { x, y } = buildDefaultBuilderFields(type, "logs", schema, "demo_app", "ts");
+        expect(x, type).toEqual([]);
+        expect(y, type).toHaveLength(1);
+        expect(y[0], type).toMatchObject({
+          alias: "y_axis_1",
+          column: "latency_ms",
+          functionName: null,
+          args: [{ type: "field", value: { field: "latency_ms" } }],
+        });
+      }
+      expect(firstNumericField(schema, "other")).toBe("first");
+      expect(
+        firstNumericField([{ name: "s", schema: [{ name: "_timestamp", type: "Int64" }] }]),
+      ).toBeNull();
     });
 
     it("logs, alert list and flame graph seed nothing", () => {

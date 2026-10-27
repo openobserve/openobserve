@@ -227,19 +227,19 @@ export const convertPanelData = async (
     case "funnel": {
       return {
         chartType: panelSchema.type,
-        ...convertFunnelData(panelSchema, data, store),
+        ...convertFunnelData(panelSchema, data, store, chartPanelRef),
       };
     }
     case "boxplot": {
       return {
         chartType: panelSchema.type,
-        ...convertBoxplotData(panelSchema, data, store),
+        ...convertBoxplotData(panelSchema, data, store, chartPanelRef),
       };
     }
     case "node-graph": {
       return {
         chartType: panelSchema.type,
-        ...convertNodeGraphData(panelSchema, data, store),
+        ...convertNodeGraphData(panelSchema, data, store, chartPanelRef),
       };
     }
     case "logs": {

@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "작은 순서",
     "funnelSortNone": "쿼리 순서",
     "funnelShowPercent": "첫 단계 대비 비율 표시",
+    "funnelShowPercentTooltip": "각 단계를 가장 큰 단계에 대한 백분율로 표시합니다. 정렬된 퍼널은 그 단계로 시작하거나 끝나며, 쿼리 순서에서는 어느 단계든 될 수 있습니다.",
     "boxplotWhisker": "수염",
     "boxplotWhiskerMinMax": "최솟값부터 최댓값까지",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "값",
     "source": "소스",
     "target": "타깃",
+    "wellGroup": "그룹",
+    "wellSubgroup": "하위 그룹",
+    "wellSize": "크기",
+    "wellCategory": "범주",
+    "wellTime": "시간",
+    "wellRow": "행",
     "value": "값"
   },
   "home": {

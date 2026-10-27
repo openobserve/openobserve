@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Menor primero",
     "funnelSortNone": "Orden de la consulta",
     "funnelShowPercent": "Mostrar porcentaje de la primera etapa",
+    "funnelShowPercentTooltip": "Cada etapa como porcentaje de la etapa más grande. Un embudo ordenado empieza o termina con ella; en el orden de la consulta puede ser cualquier etapa.",
     "boxplotWhisker": "Bigotes",
     "boxplotWhiskerMinMax": "Mínimo a máximo",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Valor",
     "source": "Fuente",
     "target": "Objetivo",
+    "wellGroup": "Grupo",
+    "wellSubgroup": "Subgrupo",
+    "wellSize": "Tamaño",
+    "wellCategory": "Categoría",
+    "wellTime": "Tiempo",
+    "wellRow": "Fila",
     "value": "Valor"
   },
   "home": {

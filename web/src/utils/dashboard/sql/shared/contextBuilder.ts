@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { formatAxisTickValue } from "../../axisTickFormat";
 import {
   calculateWidthText,
   calculateDynamicNameGap,
@@ -712,13 +713,11 @@ export function buildSQLContext(
         hideOverlap: true,
         formatter: function (value: any) {
           try {
-            return formatUnitValue(
-              getUnitValue(
-                value,
-                panelSchema?.config?.unit,
-                panelSchema?.config?.unit_custom,
-                yAxisTickDecimals,
-              ),
+            return formatAxisTickValue(
+              value,
+              panelSchema?.config?.unit,
+              panelSchema?.config?.unit_custom,
+              yAxisTickDecimals,
             );
           } catch (error) {
             return "";

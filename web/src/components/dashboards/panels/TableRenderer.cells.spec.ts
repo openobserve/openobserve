@@ -111,7 +111,12 @@ describe("TableRenderer cell types and footer (real converter, OTable and cells)
     const bars = wrapper!.findAll('[data-test="dashboard-table-bar-gauge-requests"]');
     expect(bars).toHaveLength(2);
     expect(bars[0].text()).toBe("30");
-    const fills = bars.map((bar) => bar.find('[aria-hidden="true"]').attributes("style"));
+    expect(bars.every((bar) => bar.find('[data-test="o2-data-bar-cell-track"]').exists())).toBe(
+      true,
+    );
+    const fills = bars.map((bar) =>
+      bar.find('[data-test="o2-data-bar-cell-fill"]').attributes("style"),
+    );
     expect(fills[0]).toContain("width: 100%");
     expect(fills[0]).toContain("background-color: rgb(204, 0, 0)");
     expect(fills[1]).toContain("width: 33.3");
@@ -125,12 +130,30 @@ describe("TableRenderer cell types and footer (real converter, OTable and cells)
     ).toHaveLength(2);
   });
 
+  it("falls back to the formatted value for a sparkline on a scalar column, footer included", async () => {
+    await mountTable({
+      override_config: [fieldType("requests", "sparkline")],
+      table_footer_calcs: ["sum"],
+    });
+    const cells = wrapper!
+      .findAll("td")
+      .map((td) => td.text())
+      .filter(Boolean);
+    expect(cells).toContain("30");
+    expect(cells).toContain("10");
+    const foot = wrapper!.find('[data-test="o2-table-pivot-total-foot"]');
+    expect(foot.find('[data-test="o2-table-pivot-total-cell-requests"]').text()).toBe("40");
+  });
+
   it("renders the footer row from the footer calculations", async () => {
     await mountTable({ table_footer_calcs: ["sum", "mean"] });
     const foot = wrapper!.find('[data-test="o2-table-pivot-total-foot"]');
     expect(foot.exists()).toBe(true);
-    expect(foot.find('[data-test="o2-table-pivot-total-cell-service"]').text()).toBe("Sum · Mean");
-    expect(foot.find('[data-test="o2-table-pivot-total-cell-requests"]').text()).toBe("40 · 20");
+    const cells = (id: string) =>
+      foot.findAll(`[data-test="o2-table-pivot-total-cell-${id}"]`).map((cell) => cell.text());
+    expect(foot.findAll("tr")).toHaveLength(2);
+    expect(cells("service")).toEqual(["Sum", "Mean"]);
+    expect(cells("requests")).toEqual(["40", "20"]);
   });
 
   it("has no footer and today's row height without the keys", async () => {

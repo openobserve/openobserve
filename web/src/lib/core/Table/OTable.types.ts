@@ -554,9 +554,9 @@ export interface OTableProps<TData = any> {
   pivotHeaderLevels?: any[];
   /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
+  /** Grand-total row (or rows, one `<tr>` each) rendered as a sticky `<tfoot>`, keyed by each column's
    *  `accessorKey`/`id`; values run through the column's `meta.format`. */
-  stickyTotalRow?: Record<string, any> | null;
+  stickyTotalRow?: Record<string, any> | Record<string, any>[] | null;
   /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */

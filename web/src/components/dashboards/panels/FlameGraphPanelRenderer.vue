@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :value-formatter="formatValue"
       :search-query="highlight"
       hide-profile-actions
+      hide-view-options
       @search="(name: string) => (highlight = highlight === name ? '' : name)"
     />
   </div>

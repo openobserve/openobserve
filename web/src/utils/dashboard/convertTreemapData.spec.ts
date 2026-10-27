@@ -15,7 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { convertPanelData } from "./convertPanelData";
-import { buildTreemapNodes } from "./convertTreemapData";
+import { buildTreemapNodes, contrastLabels } from "./convertTreemapData";
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -142,6 +142,46 @@ describe("treemap through convertPanelData", () => {
     expect(options.series[0].breadcrumb.show).toBe(false);
     expect(options.series[0].nodeClick).toBe(false);
     expect(options.series[0].upperLabel.show).toBe(false);
+  });
+
+  it("gives each tile the label colour that reads on it, with no halo, and the root the body colour", async () => {
+    const { options } = await viaPanel(
+      panel("treemap", { x: [serviceX], y: [count], breakdown: [regionB] }),
+      [rows],
+    );
+    const [series] = options.series;
+    series.data.forEach((node: any) => {
+      expect(["#ffffff", "#000000"]).toContain(node.label.color);
+      expect(node.upperLabel.color).toBe(node.label.color);
+      (node.children ?? []).forEach((child: any) =>
+        expect(["#ffffff", "#000000"]).toContain(child.label.color),
+      );
+    });
+    expect(series.label.textBorderWidth).toBe(0);
+    expect(series.upperLabel.textBorderWidth).toBe(0);
+    expect(series.levels[0].upperLabel.color).toBe("#404040");
+  });
+
+  it("puts white on dark tiles and black on light ones, following the children's lightness", () => {
+    const nodes: any[] = [
+      {
+        name: "dark",
+        value: 30,
+        path: ["dark"],
+        itemStyle: { color: "#7f1d1d" },
+        children: [
+          { name: "a", value: 20, path: ["dark", "a"] },
+          { name: "b", value: 10, path: ["dark", "b"] },
+        ],
+      },
+      { name: "light", value: 10, path: ["light"], itemStyle: { color: "#fde68a" } },
+    ];
+    contrastLabels(nodes);
+    expect(nodes[0].label.color).toBe("#ffffff");
+    expect(nodes[1].label.color).toBe("#000000");
+    // The smallest child is drawn at lightness 0.35 (dark), the largest at 0.6 (light).
+    expect(nodes[0].children[1].label.color).toBe("#ffffff");
+    expect(nodes[0].children[0].label.color).toBe("#000000");
   });
 
   it("returns an empty series list without rows", async () => {

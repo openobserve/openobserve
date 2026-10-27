@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :max="col.barRange?.max ?? 0"
           :color="col.barColor?.(value) ?? null"
           :display="formatCellValue(value, column, row)"
+          gauge
           :data-test="`dashboard-table-bar-gauge-${col.id}`"
         />
       </template>

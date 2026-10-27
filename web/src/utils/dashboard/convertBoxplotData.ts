@@ -18,6 +18,7 @@ import { gt, raw } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
+import { formatAxisTickValue } from "./axisTickFormat";
 import { getDataValue } from "./aliasUtils";
 import { getGridLineStyle, getSeriesColor } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
@@ -27,6 +28,12 @@ import { echartsPaletteColor } from "./thresholds";
 export const BOXPLOT_WHISKERS = ["minmax", "iqr"] as const;
 // Tukey fences: a value further than this many interquartile ranges past a quartile is an outlier.
 const IQR_FENCE = 1.5;
+const LABEL_CHAR_WIDTH = 7;
+// Room the y-axis labels and grid padding take from the plot width.
+const Y_AXIS_ALLOWANCE = 80;
+const CROWDED_ROTATION = 45;
+const CROWDED_WIDTH = 120;
+const FALLBACK_PANEL_WIDTH = 800;
 
 /** Five-number summary of one category; outliers are only split off in iqr mode. */
 export interface BoxStats {
@@ -122,8 +129,23 @@ const seriesName = (panelSchema: any): string => {
   return getFieldLabel(field, panelSchema?.config, query?.customQuery) || field?.alias || "";
 };
 
+/** Shows every category; crowded labels tilt and truncate, unless the panel sets its own rotation or width. */
+export const categoryLabelLayout = (names: string[], panelWidth: number, config: any) => {
+  const slot = Math.max(panelWidth - Y_AXIS_ALLOWANCE, 40) / Math.max(names.length, 1);
+  const longest = Math.max(0, ...names.map((name) => String(name).length)) * LABEL_CHAR_WIDTH;
+  const crowded = longest + 8 > slot;
+  const rotate = Number(config?.axis_label_rotate) || (crowded ? CROWDED_ROTATION : 0);
+  const width = Number(config?.axis_label_truncate_width) || (crowded ? CROWDED_WIDTH : undefined);
+  return { interval: 0, rotate, width, overflow: "truncate" as const };
+};
+
 /** Converts raw SQL rows into a box plot: one box per x value, quartiles computed here. */
-export const convertBoxplotData = (panelSchema: any, data: any, store: any) => {
+export const convertBoxplotData = (
+  panelSchema: any,
+  data: any,
+  store: any,
+  chartPanelRef?: any,
+) => {
   const config = panelSchema?.config ?? {};
   const whisker = config.boxplot_whisker === "iqr" ? "iqr" : "minmax";
   const groups = boxplotGroups(panelSchema, Array.isArray(data) ? data : []);
@@ -214,7 +236,14 @@ export const convertBoxplotData = (panelSchema: any, data: any, store: any) => {
       type: "category",
       data: groups.map((group) => group.name),
       boundaryGap: true,
-      axisLabel: { hideOverlap: true, color: chartColor("--color-text-secondary") },
+      axisLabel: {
+        ...categoryLabelLayout(
+          groups.map((group) => group.name),
+          chartPanelRef?.value?.offsetWidth || FALLBACK_PANEL_WIDTH,
+          config,
+        ),
+        color: chartColor("--color-text-secondary"),
+      },
       splitLine: { show: false },
     },
     yAxis: {
@@ -222,7 +251,8 @@ export const convertBoxplotData = (panelSchema: any, data: any, store: any) => {
       scale: true,
       axisLabel: {
         color: chartColor("--color-text-secondary"),
-        formatter: (value: number) => format(value),
+        formatter: (value: number) =>
+          formatAxisTickValue(value, config.unit, config.unit_custom, config.decimals),
       },
       splitLine: {
         show: config.show_gridlines !== false,

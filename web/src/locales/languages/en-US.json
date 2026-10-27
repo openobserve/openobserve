@@ -7279,6 +7279,7 @@
     "funnelSortAscending": "Smallest first",
     "funnelSortNone": "Query order",
     "funnelShowPercent": "Show percent of first stage",
+    "funnelShowPercentTooltip": "Each stage as a percent of the largest stage. A sorted funnel starts or ends with it; in query order it can be any stage.",
     "boxplotWhisker": "Whiskers",
     "boxplotWhiskerMinMax": "Min to max",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8424,6 +8425,12 @@
     "mapvalue": "Value",
     "source": "Source",
     "target": "Target",
+    "wellGroup": "Group",
+    "wellSubgroup": "Sub-group",
+    "wellSize": "Size",
+    "wellCategory": "Category",
+    "wellTime": "Time",
+    "wellRow": "Row",
     "value": "Value"
   },
   "home": {

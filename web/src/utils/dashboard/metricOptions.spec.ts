@@ -285,6 +285,57 @@ describe("stat change", () => {
     expect(texts(rendered(options)).map((line: any) => line.style.text)).toEqual(["150", "▲ 50%"]);
   });
 
+  it.each(["sql", "promql"])(
+    "%s: keeps the value and change inside a very small panel",
+    async (kind) => {
+      const small = { value: { offsetWidth: 240, offsetHeight: 90 } };
+      const metadata = { queries: [meta(0), meta(3_600_000)] };
+      const panel =
+        kind === "sql"
+          ? sqlMetric({ stat_change: "percent", stat_text_mode: "value_and_name" })
+          : promMetric({ stat_change: "percent", stat_text_mode: "value_and_name" });
+      const data =
+        kind === "sql"
+          ? [[{ y_axis_1: 1234567 }], [{ y_axis_1: 1000 }]]
+          : [promValue(1234567), promValue(1000)];
+      const options = (
+        (await convertPanelData(
+          panel,
+          data,
+          store,
+          small,
+          { value: null },
+          { value: [] },
+          metadata,
+          { height: "90px" },
+          { value: [] },
+          false,
+        )) as any
+      ).options;
+      const lines = texts(textSeries(options).renderItem({ coordSys: { cx: 120, cy: 45 } }, {}));
+      expect(lines).toHaveLength(3);
+      for (const line of lines) {
+        const half = line.style.fontSize / 2;
+        expect(line.style.y - half).toBeGreaterThanOrEqual(-0.5);
+        expect(line.style.y + half).toBeLessThanOrEqual(90.5);
+      }
+      for (const line of lines.slice(1)) {
+        expect(line.style.overflow).toBe("truncate");
+        expect(line.style.width).toBeLessThanOrEqual(240);
+      }
+    },
+  );
+
+  it("leaves a roomy panel's change line where it was", async () => {
+    const metadata = { queries: [meta(0), meta(3_600_000)] };
+    const data = [[{ y_axis_1: 120 }], [{ y_axis_1: 100 }]];
+    const options = await viaPanel(sqlMetric({ stat_change: "percent" }), data, metadata);
+    const [value, change] = texts(rendered(options));
+    expect(change.style.fontSize).toBe(
+      Math.max(11, Math.min(16, Math.round(value.style.fontSize / 3))),
+    );
+  });
+
   it("shows no change line while the comparison has no data", async () => {
     const metadata = { queries: [meta(0)] };
     const options = await viaPanel(
@@ -311,6 +362,29 @@ describe("text mode and value size", () => {
   it("shows only the name", async () => {
     const options = await viaPanel(sqlMetric({ stat_text_mode: "name" }), data, metadata);
     expect(texts(rendered(options)).map((line: any) => line.style.text)).toEqual(["Latency"]);
+  });
+
+  it("names a label-less PromQL result by nothing rather than {}", async () => {
+    const bare = { resultType: "matrix", result: [{ metric: {}, values: [[1704067200, "7"]] }] };
+    const both = await viaPanel(promMetric({ stat_text_mode: "value_and_name" }), [bare], metadata);
+    expect(texts(rendered(both)).map((line: any) => line.style.text)).toEqual(["7"]);
+    const name = await viaPanel(promMetric({ stat_text_mode: "name" }), [bare], metadata);
+    expect(texts(rendered(name)).map((line: any) => line.style.text)).toEqual(["7"]);
+    const labelled = await viaPanel(
+      promMetric({ stat_text_mode: "value_and_name" }),
+      [promValue(7)],
+      metadata,
+    );
+    expect(texts(rendered(labelled))).toHaveLength(2);
+  });
+
+  it("shows a special null mapping for a PromQL metric with no samples", async () => {
+    const mappings = [{ type: "special", match: "null", text: "N/A", color: null }];
+    const empty = { resultType: "matrix", result: [] };
+    const mapped = await viaPanel(promMetric({ mappings }), [empty], metadata);
+    expect(textSeries(mapped)._metricText).toBe("N/A");
+    const plain = await viaPanel(promMetric(), [empty], metadata);
+    expect(textSeries(plain)._metricText).toBe("0");
   });
 
   it("drops the grid label in value mode", async () => {

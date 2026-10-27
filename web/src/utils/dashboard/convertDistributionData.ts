@@ -18,6 +18,7 @@ import { gt } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
+import { formatAxisTickValue } from "./axisTickFormat";
 import { getDataValue } from "./aliasUtils";
 import { getGridLineStyle, getSeriesColor } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
@@ -195,7 +196,8 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
       axisLabel: {
         hideOverlap: true,
         color: chartColor("--color-text-secondary"),
-        formatter: (value: number) => format(value),
+        formatter: (value: number) =>
+          formatAxisTickValue(value, config.unit, config.unit_custom, config.decimals),
       },
       splitLine: { show: false },
     },

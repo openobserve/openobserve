@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "小さい順",
     "funnelSortNone": "クエリの順序",
     "funnelShowPercent": "最初のステージに対する割合を表示",
+    "funnelShowPercentTooltip": "各ステージを最大ステージに対する割合で表示します。並べ替えたファネルは最大ステージで始まるか終わります。クエリ順では任意のステージになります。",
     "boxplotWhisker": "ひげ",
     "boxplotWhiskerMinMax": "最小から最大",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "値",
     "source": "ソース",
     "target": "ターゲット",
+    "wellGroup": "グループ",
+    "wellSubgroup": "サブグループ",
+    "wellSize": "サイズ",
+    "wellCategory": "カテゴリ",
+    "wellTime": "時間",
+    "wellRow": "行",
     "value": "値"
   },
   "home": {

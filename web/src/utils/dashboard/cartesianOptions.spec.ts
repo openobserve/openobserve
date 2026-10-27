@@ -503,6 +503,48 @@ describe("stack_mode percent", () => {
     expect(yOf(named(prom, "api").data[0]) + yOf(named(prom, "web").data[0])).toBeCloseTo(100);
   });
 
+  it.each(["stacked", "h-stacked"])(
+    "SQL %s without a breakdown: one series fills to 100 and two y fields share the bucket",
+    async (type) => {
+      const valueAxis = (options: any) => (type === "h-stacked" ? options.xAxis : options.yAxis);
+      const single = await viaPanel(
+        sqlPanel(type, { stack_mode: "percent" }, { x: [endpointX], y: [yField()] }),
+        [plainCategoryRows()],
+      );
+      expect(dataSeries(single)[0].data.map(yOf)).toEqual([100, 100, 100]);
+      expect(valueAxis(single).max).toBe(100);
+      const rows = plainCategoryRows().map((row) => ({ ...row, y_axis_2: row.y_axis_1 * 3 }));
+      const two = await viaPanel(
+        sqlPanel(
+          type,
+          { stack_mode: "percent" },
+          { x: [endpointX], y: [yField(), yField("y_axis_2", "Errors")] },
+        ),
+        [rows],
+      );
+      const [first, second] = dataSeries(two);
+      expect(first.stack).toBe(second.stack);
+      expect(first.data.map(yOf)).toEqual([25, 25, 25]);
+      expect(second.data.map(yOf)).toEqual([75, 75, 75]);
+    },
+  );
+
+  it("SQL stacked over time without a breakdown", async () => {
+    const options = await viaPanel(
+      sqlPanel("stacked", { stack_mode: "percent" }, { x: [timeX], y: [yField()] }),
+      [TIMES.map((t, i) => ({ x_axis_1: t, y_axis_1: [100, 600, 1200][i] }))],
+    );
+    expect(named(options, "Latency").data.map(yOf)).toEqual([100, 100, 100]);
+  });
+
+  it("SQL area-stacked without a breakdown names the series by its y label, not (empty)", async () => {
+    const options = await viaPanel(
+      sqlPanel("area-stacked", {}, { x: [endpointX], y: [yField()] }),
+      [plainCategoryRows()],
+    );
+    expect(dataSeries(options).map((s: any) => s.name)).toEqual(["Latency"]);
+  });
+
   it("normal stacking is untouched", async () => {
     const panel = (config: any) =>
       sqlPanel("stacked", config, { x: [endpointX], y: [yField()], breakdown: [breakdown] });
@@ -729,6 +771,33 @@ describe("series override styles", () => {
     expect(html).toContain("60");
     expect(html).not.toContain("-60");
     expect(options.yAxis.axisLabel.formatter(-50)).toBe(options.yAxis.axisLabel.formatter(50));
+  });
+
+  it("negative_y on a right axis: ticks and tooltip both show the original positive value", async () => {
+    const config = {
+      ...overrides({ value: "web", transform: "negative_y", axisPlacement: "right" }),
+      unit: "bytes",
+    };
+    const sql = await viaPanel(
+      sqlPanel("line", config, { x: [timeX], y: [yField()], breakdown: [breakdown] }),
+      [timeRows({ api: [1, 2, 3], web: [199680, 200000, 300000] })],
+    );
+    const right = sql.yAxis[named(sql, "web").yAxisIndex];
+    expect(right.axisLabel.formatter(-199680)).toBe("195KB");
+    const html = sql.tooltip.formatter([timePoint("web", -199680)]);
+    expect(html).toContain("195KB");
+    expect(html).not.toContain("-195");
+
+    const prom = await viaPanel(
+      promPanel("line", {
+        ...overrides({ value: "web", transform: "negative_y", axisPlacement: "right" }),
+        unit: "bytes",
+      }),
+      [promMatrix({ api: [1, 2, 3], web: [199680, 200000, 300000] })],
+    );
+    const promRight = prom.yAxis[named(prom, "web").yAxisIndex];
+    expect(promRight.axisLabel.formatter(-199680)).toBe("195KB");
+    expect(yOf(named(prom, "web").data[0])).toBe(-199680);
   });
 
   it("draw_style switches the series type", async () => {

@@ -13,12 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+import {
+  STATE_TIMELINE_Y_FUNCTION,
+  firstNumericField,
+  rawValueYField,
+} from "@/utils/dashboard/defaultFields";
 import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 
 /** The SQL a new logs panel starts from: the stream's latest rows, newest first. */
 export const defaultLogsPanelQuery = (stream: string, timestampColumn: string): string =>
   stream ? `SELECT * FROM "${stream}" ORDER BY ${timestampColumn} DESC LIMIT 100` : "";
+
+/** The SQL a new flame graph panel starts from: folded stacks and their summed samples. */
+export const defaultFlameGraphPanelQuery = (stream: string): string =>
+  stream ? `SELECT stack, sum(samples) AS value FROM "${stream}" GROUP BY stack` : "";
 
 export const usePanelAggregation = ({
   dashboardPanelData,
@@ -48,6 +56,22 @@ export const usePanelAggregation = ({
     return query;
   };
 
+  // A timestamp or a count's column has nothing to bucket; fall back to the stream's first numeric column.
+  const keepRawValueFields = (query: any) => {
+    const timestamps = new Set(["_timestamp", getTimestampColumn()]);
+    query.fields.y = query.fields.y.filter(
+      (itemY: any) =>
+        itemY.isDerived || !timestamps.has(itemY?.args?.[0]?.value?.field ?? itemY?.column),
+    );
+    if (query.fields.y.length || query.customQuery) return;
+    const column = firstNumericField(
+      dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+      query.fields.stream,
+      getTimestampColumn(),
+    );
+    if (column) query.fields.y = [rawValueYField(column)];
+  };
+
   const resetAggregationFunction = () => {
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
@@ -67,6 +91,7 @@ export const usePanelAggregation = ({
             itemY.functionName = null;
             itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
           });
+          keepRawValueFields(query);
           query.fields.x = [];
           query.fields.z = [];
           query.fields.breakdown = query.fields.breakdown.slice(0, 1);
@@ -93,6 +118,7 @@ export const usePanelAggregation = ({
             itemY.functionName = null;
             itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
           });
+          keepRawValueFields(query);
           query.fields.x = query.fields.x.slice(0, 1);
           query.fields.y = query.fields.y.slice(0, 1);
           query.fields.z = [];
@@ -288,6 +314,7 @@ export const usePanelAggregation = ({
               itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
             }
           });
+          keepRawValueFields(query);
           query.fields.x = query.fields.x.slice(0, 1);
           query.fields.y = query.fields.y.slice(0, 1);
           query.fields.z = [];
@@ -442,7 +469,7 @@ export const usePanelAggregation = ({
         query.query =
           dashboardPanelData.data.type === "logs"
             ? defaultLogsPanelQuery(query.fields.stream ?? "", getTimestampColumn())
-            : "";
+            : defaultFlameGraphPanelQuery(query.fields.stream ?? "");
         dashboardPanelData.data.queryType = "sql";
         // The builder is hidden for these types, so the SQL editor is where the panel is built.
         dashboardPanelData.layout.showQueryBar = true;

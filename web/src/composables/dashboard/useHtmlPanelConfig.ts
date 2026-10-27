@@ -54,13 +54,23 @@ export const useHtmlPanelConfig = (dashboardPanelData: any) => {
         if (allowed.includes(value)) config.value[key] = value;
       },
     });
-  // Custom SQL panels name their columns in the query, so these are the columns to offer.
-  const queryFieldOptions = computed(() =>
-    (dashboardPanelData.meta?.stream?.customQueryFields ?? [])
-      .map((field: any) => field?.name)
-      .filter((name: unknown): name is string => typeof name === "string" && !!name)
-      .map((name: string) => ({ label: raw(name), value: name })),
-  );
+  // A query that names its columns offers those; `SELECT *` names none, so the stream's schema stands in.
+  const queryFieldOptions = computed(() => {
+    const queryColumns = (dashboardPanelData.meta?.stream?.customQueryFields ?? []).map(
+      (field: any) => field?.name,
+    );
+    const query =
+      dashboardPanelData.data?.queries?.[dashboardPanelData.layout?.currentQueryIndex ?? 0];
+    const schemaColumns = queryColumns.length
+      ? []
+      : (dashboardPanelData.meta?.streamFields?.groupedFields ?? [])
+          .filter((stream: any) => !query?.fields?.stream || stream?.name === query.fields.stream)
+          .flatMap((stream: any) => (stream?.schema ?? []).map((field: any) => field?.name));
+    const names = [...queryColumns, ...schemaColumns].filter(
+      (name: unknown): name is string => typeof name === "string" && !!name && name !== "*",
+    );
+    return [...new Set(names)].map((name) => ({ label: raw(name), value: name }));
+  });
 
   return {
     config,

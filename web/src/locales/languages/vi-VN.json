@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Nhỏ nhất trước",
     "funnelSortNone": "Thứ tự truy vấn",
     "funnelShowPercent": "Hiển thị phần trăm so với giai đoạn đầu",
+    "funnelShowPercentTooltip": "Mỗi giai đoạn theo phần trăm của giai đoạn lớn nhất. Phễu đã sắp xếp bắt đầu hoặc kết thúc bằng giai đoạn đó; theo thứ tự truy vấn, nó có thể là bất kỳ giai đoạn nào.",
     "boxplotWhisker": "Râu",
     "boxplotWhiskerMinMax": "Từ nhỏ nhất đến lớn nhất",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Giá trị",
     "source": "Nguồn",
     "target": "Đích",
+    "wellGroup": "Nhóm",
+    "wellSubgroup": "Nhóm con",
+    "wellSize": "Kích thước",
+    "wellCategory": "Danh mục",
+    "wellTime": "Thời gian",
+    "wellRow": "Hàng",
     "value": "Giá trị"
   },
   "home": {

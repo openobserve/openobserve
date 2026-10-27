@@ -200,6 +200,12 @@ describe(
       expect("funnel_show_percent" in panel.data.config).toBe(false);
     });
 
+    it("funnel: explains what the percent is measured against", async () => {
+      mountPanel("funnel");
+      await flushPromises();
+      expect(has("dashboard-config-funnel_show_percent-info")).toBe(true);
+    });
+
     it("box plot: writes the whisker mode", async () => {
       const panel = mountPanel("boxplot");
       await flushPromises();

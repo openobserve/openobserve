@@ -16,7 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { convertPanelData } from "./convertPanelData";
 import { sankeyChartQuery } from "./dashboardAutoQueryBuilder";
-import { buildGraph } from "./convertNodeGraphData";
+import { buildGraph, circularPositions, forcePositions } from "./convertNodeGraphData";
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -69,12 +69,12 @@ const panel = (config: Record<string, any> = {}) => ({
   config: { show_legends: true, unit: "default", decimals: 0, ...config },
 });
 
-const convert = async (schema: any, data: any[]) =>
+const convert = async (schema: any, data: any[], size = { width: 800, height: 400 }) =>
   (await convertPanelData(
     schema,
     data,
     store,
-    { value: { offsetWidth: 800, offsetHeight: 400 } },
+    { value: { offsetWidth: size.width, offsetHeight: size.height } },
     { value: null },
     { value: [] },
     { queries: [] },
@@ -116,7 +116,7 @@ describe("node graph", () => {
     const out = await convert(panel(), [rows]);
     const series = out.options.series[0];
     expect(out.chartType).toBe("node-graph");
-    expect(series).toMatchObject({ type: "graph", layout: "force", draggable: true });
+    expect(series).toMatchObject({ type: "graph", layout: "none", draggable: true });
     expect(series.edgeSymbol).toEqual(["none", "arrow"]);
     expect(series.edgeLabel.show).toBe(false);
     const [web, , db] = series.data;
@@ -131,7 +131,14 @@ describe("node graph", () => {
       [rows],
     );
     const series = out.options.series[0];
-    expect(series).toMatchObject({ layout: "circular", draggable: false });
+    expect(series.layout).toBe("none");
+    // Pixel positions whose bounding box is exactly the inset plot of the 800 × 400 panel.
+    const xs = series.data.map((node: any) => node.x);
+    const ys = series.data.map((node: any) => node.y);
+    expect(Math.min(...xs)).toBeCloseTo(series.left);
+    expect(Math.max(...xs)).toBeCloseTo(800 - series.right);
+    expect(Math.min(...ys)).toBeCloseTo(series.top);
+    expect(Math.max(...ys)).toBeCloseTo(400 - series.bottom);
     expect(series.edgeLabel.show).toBe(true);
     expect(series.edgeLabel.formatter({ value: 2048 })).toBe("2KB");
   });
@@ -142,6 +149,72 @@ describe("node graph", () => {
       "web → api: <strong>40</strong>",
     );
     expect(formatter({ dataType: "node", name: "db", value: 25 })).toBe("db: <strong>25</strong>");
+  });
+
+  it("places every node at a finite position inside an inset plot, at small and large sizes", async () => {
+    const mesh = ["web", "api", "db", "cache", "queue", "auth"].flatMap((source, i, all) =>
+      all.filter((target) => target !== source).map((target) => ({ source, target, value: i + 1 })),
+    );
+    for (const size of [
+      { width: 400, height: 250 },
+      { width: 1200, height: 500 },
+    ]) {
+      const series = (await convert(panel(), [mesh], size)).options.series[0];
+      expect(series.layout).toBe("none");
+      series.data.forEach((node: any) => {
+        expect(node.x).toBeGreaterThanOrEqual(series.left);
+        expect(node.x).toBeLessThanOrEqual(size.width - series.right);
+        expect(node.y).toBeGreaterThanOrEqual(series.top);
+        expect(node.y).toBeLessThanOrEqual(size.height - series.bottom);
+      });
+      // The inset leaves room for the largest node and the label under it.
+      expect(series.top).toBeGreaterThanOrEqual(20);
+      expect(series.bottom).toBeGreaterThanOrEqual(series.top);
+      expect(series.left).toBeGreaterThanOrEqual(48);
+      expect(series.label.position).toBe("bottom");
+    }
+  });
+
+  it("lays out the same graph the same way every time, with no two nodes on top of each other", () => {
+    const { nodes, edges } = buildGraph(panel(), [rows]);
+    const first = forcePositions(nodes, edges);
+    expect(forcePositions(nodes, edges)).toEqual(first);
+    expect(circularPositions(4)[0]).toEqual([expect.closeTo(0), -1]);
+    const many = Array.from({ length: 8 }, (_, i) => ({ name: `n${i}`, value: 1 }));
+    const ring = many.map((node, i) => ({
+      source: node.name,
+      target: `n${(i + 1) % 8}`,
+      value: 1,
+    }));
+    const points = forcePositions(many, ring);
+    points.forEach((a, i) =>
+      points
+        .slice(i + 1)
+        .forEach((b) => expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeGreaterThan(0.05)),
+    );
+  });
+
+  it("keeps edge values only where they fit and shows the rest on hover", async () => {
+    const mesh = ["web", "api", "db", "cache", "queue", "auth"].flatMap((source, i, all) =>
+      all
+        .filter((target) => target !== source)
+        .map((target) => ({ source, target, value: 1000 + i })),
+    );
+    const schema = panel({ node_graph_layout: "circular", node_graph_show_edge_labels: true });
+    const small = (await convert(schema, [mesh], { width: 400, height: 250 })).options.series[0];
+    const large = (await convert(schema, [mesh], { width: 1200, height: 500 })).options.series[0];
+    const shown = (series: any) => series.links.filter((link: any) => link.label.show).length;
+    expect(shown(small)).toBeGreaterThan(0);
+    expect(shown(small)).toBeLessThan(small.links.length);
+    expect(shown(large)).toBeGreaterThanOrEqual(shown(small));
+    small.links.forEach((link: any) => expect(link.emphasis.label.show).toBe(true));
+    expect(small.emphasis.edgeLabel.show).toBe(true);
+  });
+
+  it("leaves edges unlabelled when edge values are off", async () => {
+    const series = (await convert(panel(), [rows])).options.series[0];
+    series.links.forEach((link: any) => expect(link.label).toBeUndefined());
+    expect(series.emphasis.edgeLabel.show).toBe(false);
   });
 
   it("draws nothing without complete edges", async () => {

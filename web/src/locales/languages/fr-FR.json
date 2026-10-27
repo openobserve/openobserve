@@ -7281,6 +7281,7 @@
     "funnelSortAscending": "Plus petite d'abord",
     "funnelSortNone": "Ordre de la requête",
     "funnelShowPercent": "Afficher le pourcentage de la première étape",
+    "funnelShowPercentTooltip": "Chaque étape en pourcentage de la plus grande étape. Un entonnoir trié commence ou finit par elle ; dans l'ordre de la requête, ce peut être n'importe quelle étape.",
     "boxplotWhisker": "Moustaches",
     "boxplotWhiskerMinMax": "Du minimum au maximum",
     "boxplotWhiskerIqr": "1.5 × IQR",
@@ -8426,6 +8427,12 @@
     "mapvalue": "Valeur",
     "source": "Source",
     "target": "Cible",
+    "wellGroup": "Groupe",
+    "wellSubgroup": "Sous-groupe",
+    "wellSize": "Taille",
+    "wellCategory": "Catégorie",
+    "wellTime": "Temps",
+    "wellRow": "Ligne",
     "value": "Valeur"
   },
   "home": {

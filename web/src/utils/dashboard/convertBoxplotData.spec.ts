@@ -66,12 +66,12 @@ const panel = (config: Record<string, any> = {}, x = [field("x_axis_1", "service
   config: { show_legends: true, unit: "default", decimals: 0, ...config },
 });
 
-const convert = async (schema: any, data: any[]) =>
+const convert = async (schema: any, data: any[], width = 800) =>
   (await convertPanelData(
     schema,
     data,
     store,
-    { value: { offsetWidth: 800, offsetHeight: 400 } },
+    { value: { offsetWidth: width, offsetHeight: 400 } },
     { value: null },
     { value: [] },
     { queries: [] },
@@ -141,6 +141,31 @@ describe("box plot", () => {
       [10, 12.5, 15, 17.5, 20],
       [1, 3, 5, 7, 100],
     ]);
+  });
+
+  it("labels every category, tilting and truncating only when they crowd the axis", async () => {
+    const services = ["auth", "cart", "checkout", "inventory", "payments", "search"];
+    const many = services.flatMap((name) => [
+      { x_axis_1: name, y_axis_1: 1 },
+      { x_axis_1: name, y_axis_1: 3 },
+    ]);
+    const roomy = (await convert(panel(), [many], 1200)).options.xAxis.axisLabel;
+    expect(roomy).toMatchObject({ interval: 0, rotate: 0 });
+    expect(roomy.hideOverlap).toBeUndefined();
+    const crowded = (await convert(panel(), [many], 400)).options.xAxis.axisLabel;
+    expect(crowded).toMatchObject({ interval: 0, rotate: 45, width: 120, overflow: "truncate" });
+    const chosen = (
+      await convert(panel({ axis_label_rotate: 30, axis_label_truncate_width: 60 }), [many], 400)
+    ).options.xAxis.axisLabel;
+    expect(chosen).toMatchObject({ interval: 0, rotate: 30, width: 60 });
+  });
+
+  it("keeps adjacent y-axis ticks distinct after unit rounding, and exact ticks unchanged", async () => {
+    const tick = (await convert(panel({ unit: "milliseconds", decimals: 0 }), [rows])).options.yAxis
+      .axisLabel.formatter;
+    expect(tick(1000)).toBe("1s");
+    expect(tick(1200)).toBe("1.2s");
+    expect(tick(800)).toBe("800ms");
   });
 
   it("adds an outlier scatter series in iqr mode", async () => {

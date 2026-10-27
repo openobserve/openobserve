@@ -185,6 +185,18 @@ describe("distribution through convertPanelData", () => {
     ]);
   });
 
+  it("keeps adjacent x-axis ticks distinct after unit rounding, and exact ticks unchanged", async () => {
+    const { options } = await viaPanel(
+      panel("distribution", { y: [latency] }, { unit: "milliseconds", decimals: 0 }),
+      [rows],
+    );
+    const tick = options.xAxis.axisLabel.formatter;
+    expect(tick(1000)).toBe("1s");
+    expect(tick(1500)).toBe("1.5s");
+    expect(tick(1500)).not.toBe(tick(1000));
+    expect(tick(200)).toBe("200ms");
+  });
+
   it("returns an empty series list when no value is numeric", async () => {
     const { options } = await viaPanel(panel("distribution", { y: [latency] }), [
       [{ y_axis_1: "x" }],

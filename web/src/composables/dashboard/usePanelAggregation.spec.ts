@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
-import { usePanelAggregation } from "./usePanelAggregation";
+import { defaultFlameGraphPanelQuery, usePanelAggregation } from "./usePanelAggregation";
 
 const DEFAULT_CUSTOM_CHART_TEXT = "option = {};";
 const getDefaultCustomChartText = vi.fn(() => DEFAULT_CUSTOM_CHART_TEXT);
@@ -500,6 +500,56 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].config.time_shift).toEqual([]);
       });
 
+      it("distribution and box plot never keep a timestamp y, and fall back to a numeric column", () => {
+        for (const type of ["distribution", "boxplot"]) {
+          const panelData: any = makePanelData(type);
+          panelData.meta = {
+            streamFields: {
+              groupedFields: [
+                {
+                  name: "demo_app",
+                  schema: [
+                    { name: "_timestamp", type: "Int64" },
+                    { name: "host", type: "Utf8" },
+                    { name: "cpu_pct", type: "Float64" },
+                  ],
+                },
+              ],
+            },
+          };
+          const fields = panelData.data.queries[0].fields;
+          fields.stream = "demo_app";
+          fields.x = [{ alias: "x_axis_1", column: "_timestamp", functionName: "histogram" }];
+          fields.y = [
+            {
+              alias: "y_axis_1",
+              column: "_timestamp",
+              functionName: "count",
+              args: [{ type: "field", value: { field: "_timestamp" } }],
+            },
+          ];
+          makeAggregation(panelData).resetAggregationFunction();
+          expect(fields.y, type).toHaveLength(1);
+          expect(fields.y[0], type).toMatchObject({ column: "cpu_pct", functionName: null });
+        }
+      });
+
+      it("distribution keeps a numeric y and leaves y empty when the stream has no numeric column", () => {
+        const kept = makePanelData("distribution");
+        kept.data.queries[0].fields.y = [
+          { functionName: "avg", args: [{ type: "field", value: { field: "latency_ms" } }] },
+        ];
+        makeAggregation(kept).resetAggregationFunction();
+        expect(kept.data.queries[0].fields.y[0].args[0].value.field).toBe("latency_ms");
+
+        const empty = makePanelData("distribution");
+        empty.data.queries[0].fields.y = [
+          { functionName: "count", args: [{ type: "field", value: { field: "_timestamp" } }] },
+        ];
+        makeAggregation(empty).resetAggregationFunction();
+        expect(empty.data.queries[0].fields.y).toEqual([]);
+      });
+
       it("treemap keeps one x, one y counted and one breakdown", () => {
         const panelData = makePanelData("treemap");
         const fields = panelData.data.queries[0].fields;
@@ -613,11 +663,15 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.markdownContent).toBe("");
       });
 
-      it("flame graph resets to an empty custom SQL query", () => {
+      it("flame graph resets to a starter custom SQL query on the chosen stream", () => {
         const panelData = twoQueries("flame-graph");
         makeAggregation(panelData).resetAggregationFunction();
         expect(panelData.data.queries).toHaveLength(1);
-        expect(panelData.data.queries[0]).toMatchObject({ customQuery: true, query: "" });
+        expect(panelData.data.queries[0]).toMatchObject({
+          customQuery: true,
+          query: 'SELECT stack, sum(samples) AS value FROM "demo_app" GROUP BY stack',
+        });
+        expect(defaultFlameGraphPanelQuery("")).toBe("");
       });
 
       it("alert list keeps one empty builder query and no query type", () => {

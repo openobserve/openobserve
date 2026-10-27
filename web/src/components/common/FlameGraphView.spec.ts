@@ -393,6 +393,7 @@ describe("FlameGraphView grouped frames", () => {
     await flushPromises();
     await nextTick();
     expect(wrapper.text()).toContain("Root at Bottom");
+    expect(wrapper.find('[data-test="flame-graph-align-left"]').exists()).toBe(true);
 
     (wrapper.vm as unknown as { rootAtBottom: boolean }).rootAtBottom = true;
     await nextTick();
