@@ -221,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @replace="onReplaceLabelFilter"
         @clear-all="onClearLabelFilters"
       />
     </div>
@@ -1280,6 +1281,12 @@ export default defineComponent({
       await requestOnScreen({ skipCache: true });
     };
 
+    const onReplaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+      await grid.replaceLabelFilter(previous, next);
+      trackFilter("label");
+      await requestOnScreen({ skipCache: true });
+    };
+
     const onRemoveLabelFilter = async (filter: LabelFilter) => {
       grid.removeLabelFilter(filter);
       await requestOnScreen({ skipCache: true });
@@ -2277,6 +2284,7 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onReplaceLabelFilter,
       onClearLabelFilters,
       sortOptions,
       PAGE_SIZE_INCREMENT,

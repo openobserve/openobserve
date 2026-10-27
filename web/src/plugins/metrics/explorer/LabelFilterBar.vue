@@ -54,6 +54,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "add", filter: LabelFilter): void;
   (e: "remove", filter: LabelFilter): void;
+  /** An edited chip, swapped in place. */
+  (e: "replace", previous: LabelFilter, next: LabelFilter): void;
   (e: "clear-all"): void;
   /** Each open — lets the parent lazily fetch label names. */
   (e: "focus-picker"): void;
@@ -121,12 +123,14 @@ function onChange(next: FilterGroup) {
   }
   const nextKeys = new Set(nextFilters.map(labelFilterKey));
   const currentKeys = new Set(props.filters.map(labelFilterKey));
-  for (const filter of props.filters) {
-    if (!nextKeys.has(labelFilterKey(filter))) emit("remove", filter);
+  const removed = props.filters.filter((filter) => !nextKeys.has(labelFilterKey(filter)));
+  const added = nextFilters.filter((filter) => !currentKeys.has(labelFilterKey(filter)));
+  if (removed.length === 1 && added.length === 1 && nextFilters.length === props.filters.length) {
+    emit("replace", removed[0], added[0]);
+    return;
   }
-  for (const filter of nextFilters) {
-    if (!currentKeys.has(labelFilterKey(filter))) emit("add", filter);
-  }
+  removed.forEach((filter) => emit("remove", filter));
+  added.forEach((filter) => emit("add", filter));
 }
 
 // Every open, not just the first, so a list that was cleared or failed can reload.

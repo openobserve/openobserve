@@ -175,15 +175,18 @@ describe("LabelFilterBar", () => {
     expect(wrapper!.emitted("remove")).toEqual([[target]]);
   });
 
-  it("emits remove then add when a chip is edited", async () => {
+  it("emits replace when a chip is edited, so it keeps its place", async () => {
     const original = filter("job", "api");
-    createWrapper({ filters: [original] });
+    createWrapper({ filters: [original, filter("code", "200")] });
     await wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').trigger("click");
     await flushPromises();
     await type("web");
     await press("Enter");
-    expect(wrapper!.emitted("remove")).toEqual([[original]]);
-    expect(wrapper!.emitted("add")).toEqual([[{ label: "job", operator: "=", value: "web" }]]);
+    expect(wrapper!.emitted("replace")).toEqual([
+      [original, { label: "job", operator: "=", value: "web" }],
+    ]);
+    expect(wrapper!.emitted("remove")).toBeUndefined();
+    expect(wrapper!.emitted("add")).toBeUndefined();
   });
 
   it("emits clear-all from the clear button when several filters are set", async () => {

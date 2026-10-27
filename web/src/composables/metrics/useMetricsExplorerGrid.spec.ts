@@ -485,6 +485,20 @@ describe("useMetricsExplorerGrid", () => {
 
       expect(grid.labelFilters.value).toEqual([keep]);
     });
+
+    it("replaces a matcher in place, dropping a duplicate of the new one", async () => {
+      const grid = await setup();
+      const job = { label: "job", value: "web", operator: "=" };
+      const code = { label: "code", value: "500", operator: "!=" };
+      const api = { label: "job", value: "api", operator: "=" };
+      await grid.addLabelFilter(job);
+      await grid.addLabelFilter(code);
+      await grid.addLabelFilter(api);
+
+      await grid.replaceLabelFilter(job, api);
+
+      expect(grid.labelFilters.value).toEqual([api, code]);
+    });
   });
   it("does not blank the grid when the schema load comes back empty", async () => {
     // An empty list is a failure that did not throw, so the catch cannot help:
