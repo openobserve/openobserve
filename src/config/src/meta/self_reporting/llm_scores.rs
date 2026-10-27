@@ -358,6 +358,12 @@ pub struct LlmScoreRecord {
     /// Bounded excerpt of the target output the scorer evaluated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_preview: Option<String>,
+    /// Span the scorer read the target input from, when it came from one span.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_span_id: Option<String>,
+    /// Span the scorer read the target output from, when it came from one span.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_span_id: Option<String>,
     /// Attempts this scorer dimension has consumed, 1-based. Resuming the
     /// bounded sequence after a restart reads this and nothing else.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -444,6 +450,8 @@ impl Default for LlmScoreRecord {
             reasoning: None,
             input_preview: None,
             output_preview: None,
+            input_span_id: None,
+            output_span_id: None,
             attempt_count: None,
             error_reason: None,
             annotation_id: None,
@@ -494,6 +502,8 @@ impl LlmScoreRecord {
             reasoning: Some(String::new()),
             input_preview: Some(String::new()),
             output_preview: Some(String::new()),
+            input_span_id: Some(String::new()),
+            output_span_id: Some(String::new()),
             skip_reason: Some(ExperimentSkipReason::NoReference),
             attempt_count: Some(0),
             error_reason: Some(LlmScoreErrorReason::AttemptFailed),
@@ -641,6 +651,8 @@ mod tests {
             reasoning: None,
             input_preview: None,
             output_preview: None,
+            input_span_id: None,
+            output_span_id: None,
             attempt_count: None,
             error_reason: None,
             annotation_id: None,
@@ -783,6 +795,8 @@ mod tests {
         assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("job_id"));
         assert!(obj.contains_key("reasoning"));
+        assert!(obj.contains_key("input_span_id"));
+        assert!(obj.contains_key("output_span_id"));
         assert!(obj.contains_key("review_submission_comments"));
         assert!(obj.contains_key("scorer_metadata"));
         assert!(obj.contains_key("author"));
