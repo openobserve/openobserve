@@ -22,7 +22,12 @@ import {
   watch,
   type ShallowRef,
 } from "vue";
-import { QueryObserver, type QueryKey, type QueryObserverOptions } from "@tanstack/vue-query";
+import {
+  QueryObserver,
+  type QueryKey,
+  type QueryObserverOptions,
+  type QueryObserverResult,
+} from "@tanstack/vue-query";
 import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 
 import config from "@/aws-exports";
@@ -32,13 +37,16 @@ import { queryClient } from "@/composables/query/queryClient";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { registerSessionConsentSurface } from "@/composables/usePaidOverageConsent";
-import assistantService, { type AssistantCapabilitiesResponse } from "@/services/assistant";
+import assistantService, {
+  type AssistantCapabilitiesResponse,
+  type AssistantUsage,
+} from "@/services/assistant";
 import type { PaidOverageFeature } from "@/services/paidOverage";
 import { paidOverageQuery, setPaidOverageMutation } from "@/services/paidOverage.queries";
 import searchService from "@/services/search";
 import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import { capabilitiesQuery } from "@/services/assistant.queries";
+import { assistantUsageQuery, capabilitiesQuery } from "@/services/assistant.queries";
 import { assistantKeys } from "@/services/assistant.querykeys";
 import type { TelemetryContextGetters, TelemetryRole } from "@/services/assistantAnalytics";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
@@ -83,6 +91,8 @@ const TELEMETRY_ROLES: Record<string, TelemetryRole> = {
   editor: "editor",
   viewer: "viewer",
 };
+
+const MAX_ENDED_TURNS = 64;
 
 // Built on first property access, so importing the barrel constructs nothing and the chunk can be dropped.
 export const assistantStore: AssistantRuntimeStore = /* @__PURE__ */ lazyAssistantStore();
@@ -254,7 +264,17 @@ function buildRuntime(): AssistantRuntime {
         context.value?.getOrg()?.name ?? context.value?.getOrg()?.identifier ?? "",
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
       currentEmail: () => context.value?.getUser()?.email ?? null,
+      onTurnEnded: refreshUsage,
     });
+    // The hint arrives on both the org and the user channel; one refresh per turn.
+    const endedTurns = new Set<string>();
+    hints.on("turn_ended", (hint) => {
+      if (endedTurns.has(hint.turnId)) return;
+      if (endedTurns.size >= MAX_ENDED_TURNS) endedTurns.clear();
+      endedTurns.add(hint.turnId);
+      refreshUsage(hint.org);
+    });
+    hints.on("consent_granted", (hint) => refreshUsage(hint.org));
     const openAssistant = createOpenAssistant({
       store,
       capability: () => capability.capability.value,
@@ -379,7 +399,8 @@ function consentDeps(
       queryClient
         .getMutationCache()
         .build(queryClient, setPaidOverageMutation(org, feature))
-        .execute(true),
+        .execute(true)
+        .finally(() => refreshUsage(org)),
     read: (org: string, feature: PaidOverageFeature) =>
       queryClient.fetchQuery({ ...paidOverageQuery(org, feature), staleTime: 0 }),
     hints,
@@ -407,30 +428,45 @@ function capabilityDeps(context: ShallowRef<AssistantRuntimeContext | null>): Ca
     getRole: () => context.value?.getUser()?.role ?? null,
     isOrgAdmin: () => context.value?.isOrgAdmin(),
     probe: (org) => assistantService.probeChatAccess(org),
-    watchCapabilities(org, onResult) {
-      // vue-query's options type admits refs; these are plain values, which the core observer takes as is.
-      const options = capabilitiesQuery(org) as unknown as QueryObserverOptions<
-        AssistantCapabilitiesResponse | null,
-        Error,
-        AssistantCapabilitiesResponse | null,
-        AssistantCapabilitiesResponse | null,
-        QueryKey
-      >;
-      const observer = new QueryObserver(queryClient, options);
-      const report = () => {
-        const result = observer.getCurrentResult();
-        if (result.isFetched || result.isError) onResult(result.data ?? null, result.dataUpdatedAt);
-      };
-      const stop = observer.subscribe(report);
-      report();
-      return stop;
-    },
+    watchCapabilities: (org, onResult) =>
+      observe<AssistantCapabilitiesResponse | null>(capabilitiesQuery(org), (result) =>
+        onResult(result.data ?? null, result.dataUpdatedAt),
+      ),
     invalidateCapabilities: (org) =>
       void queryClient.invalidateQueries({
         queryKey: assistantKeys.capabilities(org),
         refetchType: "none",
       }),
+    // Focus refetch stays with the meter, so a closed panel sends nothing on focus.
+    watchUsage: (org, onResult) =>
+      observe<AssistantUsage | null>(
+        { ...assistantUsageQuery(org), refetchOnWindowFocus: false },
+        (result) => onResult(result.data?.mode ?? null),
+      ),
   };
+}
+
+// vue-query's options type admits refs; these are plain values, which the core observer takes as is.
+function observe<T>(
+  options: unknown,
+  onResult: (result: QueryObserverResult<T, Error>) => void,
+): () => void {
+  const observer = new QueryObserver(
+    queryClient,
+    options as QueryObserverOptions<T, Error, T, T, QueryKey>,
+  );
+  const report = () => {
+    const result = observer.getCurrentResult();
+    if (result.isFetched || result.isError) onResult(result);
+  };
+  const stop = observer.subscribe(report);
+  report();
+  return stop;
+}
+
+// The meter moves within one turn, and a grant elsewhere changes the mode.
+function refreshUsage(org: string): void {
+  if (org) void queryClient.invalidateQueries({ queryKey: assistantKeys.usage(org) });
 }
 
 // The open Alerts and Dashboards lists hear about an approved change on their own refresh bus.

@@ -111,7 +111,11 @@ export class AssistantPage {
   }
 
   meter() {
-    return notYet("WP-10b");
+    return this.container().locator('[data-test="assistant-credit-meter"]');
+  }
+
+  creditNotice() {
+    return this.container().locator('[data-test="assistant-credit-notice"]');
   }
 
   notice() {

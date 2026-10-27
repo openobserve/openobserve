@@ -18,7 +18,7 @@ import { computed, effectScope, ref, shallowRef, watch, type ComputedRef, type R
 import type { AssistantCapabilitiesResponse } from "@/services/assistant";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
-import type { AssistantCapability, GateCode, Tri } from "./assistantStore.types";
+import type { AssistantCapability, CreditMode, GateCode, Tri } from "./assistantStore.types";
 import { getAssistantRuntime } from "./runtime";
 
 const DENIED_PREFIX = "o2.assistant.denied:";
@@ -55,6 +55,8 @@ export interface CapabilityDeps {
     onResult: (data: AssistantCapabilitiesResponse | null, at?: number) => void,
   ): () => void;
   invalidateCapabilities(org: string): void;
+  /** `GET /ai/usage` on Cloud; `onResult(null)` when it failed or is not served. */
+  watchUsage?(org: string, onResult: (mode: CreditMode | null) => void): () => void;
   storage?(): Storage | null;
 }
 
@@ -110,6 +112,7 @@ interface CapabilityInput {
   b06At: number;
   access: AccessState | null;
   health: AssistantCapability["health"];
+  creditMode: CreditMode | null;
 }
 
 /** The capability of this tab's runtime; reactive, shared by every caller. */
@@ -136,6 +139,7 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
   const b06At = ref(0);
   const access = shallowRef<AccessState | null>(null);
   const health = ref<AssistantCapability["health"]>("unknown");
+  const creditMode = ref<CreditMode | null>(null);
   let probed = false;
   let generation = 0;
 
@@ -191,6 +195,7 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       b06At: b06At.value,
       access: access.value,
       health: health.value,
+      creditMode: creditMode.value,
     }));
     const capability = computed(() => resolveCapability(input.value));
     const gate = computed(() => capability.value.gate);
@@ -215,6 +220,25 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
           if (data.can_chat === true && (access.value?.at ?? 0) < b06At.value) clearAccess();
         });
         onCleanup(stop);
+      },
+      { immediate: true },
+    );
+
+    // Off Cloud nothing is metered, so no request is sent.
+    const metered = computed(() => deps.getEdition().isCloud && entitledAndConfigured.value);
+    watch(
+      [identity, metered],
+      ([id, on], _old, onCleanup) => {
+        if (!id || !on || !deps.watchUsage) return;
+        const asked = generation;
+        const stop = deps.watchUsage(id.org, (mode) => {
+          if (asked === generation) creditMode.value = mode;
+        });
+        // A gate that stops metering takes the last mode with it.
+        onCleanup(() => {
+          stop();
+          creditMode.value = null;
+        });
       },
       { immediate: true },
     );
@@ -271,6 +295,7 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       b06At.value = 0;
       b06Settled.value = false;
       health.value = "unknown";
+      creditMode.value = null;
       access.value = next ? readAccess(next.userOrgKey) : null;
       identity.value = next;
     },
@@ -321,6 +346,7 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
     capability.retentionDays = input.b06.retention_days;
   if (input.b06?.attachments === true) capability.attachments = true;
   if (input.b06?.approval_extend === true) capability.approvalExtend = true;
+  if (input.creditMode && input.edition.isCloud) capability.creditMode = input.creditMode;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";

@@ -121,6 +121,8 @@ export interface LifecycleDeps {
   currentEmail(): string | null;
   /** Purges chat data at rest on every sign-out. */
   purge?(): Promise<void>;
+  /** A turn this tab ran ended; other tabs hear the `turn_ended` hint instead. */
+  onTurnEnded?(org: string): void;
 }
 
 export {
@@ -607,6 +609,7 @@ function endTurn(
     status,
     at,
   });
+  deps.onTurnEnded?.(known.org);
   writeLiveTurn(deps.hints.userHash(), { remove: { sid, turnId: known.turnId } }, at);
 }
 

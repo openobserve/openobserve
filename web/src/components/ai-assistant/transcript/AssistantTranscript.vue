@@ -510,6 +510,8 @@ async function onManualRoute(query: QueryRef, turnId: string): Promise<void> {
 }
 
 function onOutcome(action: OutcomeAction, record: TurnOutcomeRecord): void {
+  // Copy request comes only from the shell's 402 block, which holds the usage it copies.
+  if (action === "copy_request") return;
   if (props.sid && live) live.outcomeAction(props.sid, action, record);
 }
 

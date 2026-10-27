@@ -9230,7 +9230,37 @@
       "valueOn": "On"
     },
     "credits": {
-      "exhaustedTag": "Credits used up"
+      "copyRequest": "Please add AI credits for {org}: {used} of {limit} included credits used as of {date}.",
+      "copyRequestNoUsage": "Please add AI credits for {org}: included credits used up as of {date}.",
+      "exhaustedTag": "Credits used up",
+      "manage": "Manage paid usage",
+      "manageName": "Manage paid usage (opens in a new tab)",
+      "meter": {
+        "barName": "Included AI credits",
+        "compact": "{used} of {limit}",
+        "consent": "Included credits used · paid usage needs consent",
+        "exhausted": "AI credits are used up for {org}",
+        "exhaustedCompact": "Used up",
+        "free": "{used} of {limit} included credits · {renewal}",
+        "noIncluded": "No included credits",
+        "noRenew": "they don't renew",
+        "payg": "{limit} included credits used · {billed} billed · paid usage on",
+        "resets": "resets {date}",
+        "retry": "Retry",
+        "unavailable": "Credit usage unavailable",
+        "unavailableCompact": "Credits unavailable",
+        "value": "{used} of {limit} credits"
+      },
+      "modeTag": {
+        "consent": "Consent required",
+        "exhausted": "Exhausted",
+        "payg": "Paid usage on"
+      },
+      "notice": "{percent}% of included AI credits used · they don't renew",
+      "noticeDismiss": "Dismiss credit notice",
+      "more": "More credit actions",
+      "noticeResets": "{percent}% of included AI credits used · they reset {date}",
+      "predictedExhausted": "AI credits are used up for {org}."
     },
     "diff": {
       "accept": "Accept",
@@ -9429,9 +9459,15 @@
       "credits_exhausted": {
         "action": "Manage paid usage",
         "actionAdmin": "Manage paid usage",
+        "actionCopy": "Copy request",
         "actionMember": "Ask an admin",
         "body": "Included credits don't renew.",
-        "title": "AI credits are used up for {org}."
+        "bodyContract": "Contact your account manager to add credits.",
+        "bodyMember": "An admin of {org} can allow paid usage in Billing › Paid usage.",
+        "bodyPayerMember": "An admin of {payer} can allow paid usage.",
+        "bodyResets": "They reset {date}.",
+        "title": "AI credits are used up for {org}.",
+        "titlePayer": "AI credits are used up for {org}, billed to {payer}."
       },
       "data_level_blocked": {
         "action": "Change level",
@@ -9655,6 +9691,7 @@
       "notSaved": "not saved",
       "notSavedHint": "This answer was given but could not be saved to history",
       "queries": "{count} query | {count} queries",
+      "refunded": "0 credits · refunded",
       "rerun": "Re-run for now",
       "rerunFor": "Re-run for {range}",
       "stopped": "stopped",

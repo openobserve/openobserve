@@ -638,7 +638,8 @@
       "editors.spec.js",
       "lifecycle.spec.js",
       "approvals.spec.js",
-      "consent.spec.js"
+      "consent.spec.js",
+      "credits.spec.js"
     ],
     "disabled": []
   }

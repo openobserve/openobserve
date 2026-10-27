@@ -19,8 +19,13 @@ export {
   useAssistantSession,
   useAssistantStore,
 } from "./assistantStore";
-export { assistantStore } from "./runtime";
+export { assistantStore, openTabWithoutOpener } from "./runtime";
 export { useAssistantCapability } from "./useAssistantCapability";
+export {
+  useAssistantCredits,
+  useCreditNotice,
+  type CreditRefusalContext,
+} from "./useAssistantCredits";
 export { openAssistant, type OpenAssistantCall } from "./openAssistant";
 export { useDeepLinkDoor } from "./useDeepLinkDoor";
 export { isAssistantV2 } from "./flags";

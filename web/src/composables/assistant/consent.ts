@@ -145,10 +145,15 @@ export function createConsentRuntime(deps: ConsentDeps): ConsentRuntime {
   };
 
   // The note goes where the grant happened: before the resent turn's answer, or after a turn stopped meanwhile.
-  const noteGrant = (session: AssistantSession, pending: PendingConsent, org = pending.org) => {
+  const noteGrant = (
+    session: AssistantSession,
+    pending: PendingConsent,
+    org = pending.org,
+    by?: string,
+  ) => {
     const block = {
       type: "consent_note" as const,
-      consentNote: { org, by: deps.currentUser(), at: deps.now() },
+      consentNote: { org, by: by ?? deps.currentUser(), at: deps.now() },
     };
     session.messages.push({
       role: "assistant",
@@ -158,7 +163,12 @@ export function createConsentRuntime(deps: ConsentDeps): ConsentRuntime {
     });
   };
 
-  const granted = (sid: Sid, pending: PendingConsent, via: "here" | "tab" | "focus") => {
+  const granted = (
+    sid: Sid,
+    pending: PendingConsent,
+    via: "here" | "tab" | "focus",
+    status?: PaidOverageStatus,
+  ) => {
     const session = sessionOf(sid);
     if (!session || !live(sid, pending)) return;
     views[sid] = via === "here" ? { state: "resolved_here" } : { state: "resolved_elsewhere", via };
@@ -177,7 +187,7 @@ export function createConsentRuntime(deps: ConsentDeps): ConsentRuntime {
       if (!live(sid, pending)) return void delete views[sid];
       // Stopped while the line showed: paid usage is on, so the note says so and the prompt comes back unsent.
       if (cancelAfter.delete(sid)) return stopAfterEnable(session, pending, [pending.org]);
-      noteGrant(session, pending);
+      noteGrant(session, pending, pending.org, enabledBy(status));
       void deps.send(sid, pending.turnId).finally(() => {
         if (!sessionOf(sid)?.pendingConsent) delete views[sid];
       });
@@ -215,7 +225,7 @@ export function createConsentRuntime(deps: ConsentDeps): ConsentRuntime {
         .then((status) => {
           if (!status.effective || !live(session.sid, pending)) return;
           track("resolved_elsewhere", pending);
-          granted(session.sid, pending, via);
+          granted(session.sid, pending, via, status);
         })
         .catch(() => undefined);
     }
@@ -268,7 +278,7 @@ export function createConsentRuntime(deps: ConsentDeps): ConsentRuntime {
       });
       track("enabled", pending);
       // A Stop asked while this ran keeps the grant but sends nothing.
-      if (!cancelAfter.has(sid)) granted(sid, pending, "here");
+      if (!cancelAfter.has(sid)) granted(sid, pending, "here", status);
       grantSiblings(sid, pending);
       return { on, granted: true };
     } catch {
@@ -364,4 +374,13 @@ export function cancelConsentOnClose(
       if (state().sessions[sid]?.pendingConsent) consent.cancel(sid, "container_closed");
     },
   );
+}
+
+// The server's record of who allowed it wins over this tab's user once it is sent.
+function enabledBy(status: PaidOverageStatus | undefined): string | undefined {
+  for (const side of [status?.organization, status?.payer]) {
+    const email = side?.enabled_by?.email;
+    if (typeof email === "string" && email && email.length <= 200) return email;
+  }
+  return undefined;
 }
