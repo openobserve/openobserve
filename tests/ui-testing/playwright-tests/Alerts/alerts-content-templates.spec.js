@@ -249,17 +249,17 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     // =====================================================================
     testLogger.info('Step 2: Creating two destinations via API bound to the content template');
 
-    const createDestination = async (name, path, destinationType) => {
+    const createDestination = async (name, path, renderFormat) => {
       const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
-        // The API takes url/method/type at the top level; nesting them left url empty.
+        // Only 'custom' keeps our template; other types swap in a prebuilt one.
         data: {
           name,
           template: templateName,
           type: 'http',
           url: `http://127.0.0.1:${receiverPort}${path}`,
           method: 'post',
-          destination_type_name: destinationType,
-          metadata: {},
+          destination_type_name: 'custom',
+          metadata: renderFormat ? { render_format: renderFormat } : {},
         },
       });
       if (!resp.ok()) {
@@ -270,7 +270,7 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     };
 
     await createDestination(slackDestName, '/slack', 'slack');
-    await createDestination(hookDestName, '/hook', 'custom');
+    await createDestination(hookDestName, '/hook', null);
     testLogger.info('Created both destinations', { slackDestName, hookDestName });
 
     // =====================================================================
@@ -337,11 +337,14 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const slackPayload = JSON.parse(received.slack[0].body);
-    expect(Array.isArray(slackPayload.blocks)).toBe(true);
-    const slackHeaderText = JSON.stringify(slackPayload.blocks);
+    // Block Kit rides inside attachments so the colour bar applies (render/slack.rs:212).
+    const slackBlocks = (slackPayload.attachments ?? []).flatMap((a) => a.blocks ?? []);
+    expect(Array.isArray(slackPayload.attachments)).toBe(true);
+    expect(slackBlocks.length).toBeGreaterThan(0);
+    const slackHeaderText = JSON.stringify(slackBlocks);
     expect(slackHeaderText).toContain(alertName);
     testLogger.info('Verified Slack destination received Block Kit payload with alert name in header', {
-      blocksCount: slackPayload.blocks.length,
+      blocksCount: slackBlocks.length,
     });
 
     const hookPayload = JSON.parse(received.hook[0].body);
@@ -382,9 +385,11 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const hookOverridePayload = JSON.parse(received.hook[0].body);
-    expect(Array.isArray(hookOverridePayload.blocks)).toBe(true);
+    const hookOverrideBlocks = (hookOverridePayload.attachments ?? []).flatMap((a) => a.blocks ?? []);
+    expect(Array.isArray(hookOverridePayload.attachments)).toBe(true);
+    expect(hookOverrideBlocks.length).toBeGreaterThan(0);
     testLogger.info('Verified render_format override: hook destination now received Block Kit, not the Webhook envelope', {
-      blocksCount: hookOverridePayload.blocks.length,
+      blocksCount: hookOverrideBlocks.length,
     });
 
     // ===== CLEANUP =====
