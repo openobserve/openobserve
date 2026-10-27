@@ -8150,6 +8150,7 @@
     "movePanelMessage": "Выберите вкладку назначения",
     "noQueriesToCreateAlert": "Эта панель не содержит запросов для создания оповещения",
     "panelQueryMustHaveStream": "Запрос панели должен иметь настроенный поток",
+    "enrichmentTableAlertUnsupported": "Оповещения нельзя запускать для таблиц обогащения",
     "unsupportedPanelTypeAlert": "Создание оповещений из панелей типа {type} может работать не так, как ожидалось",
     "panelDuplicatedSuccessfully": "Панель успешно дублирована",
     "panelDuplicationFailed": "Не удалось дублировать панель",

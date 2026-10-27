@@ -223,23 +223,6 @@ describe("fillMissingValues", () => {
     expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 100 });
   });
 
-  it("keeps enrichment-table rows outside the dashboard window", () => {
-    const processedData = [{ ts: "2024-01-15T09:00:00", value: 50 }];
-    const result = fillMissingValues(
-      processedData,
-      { type: "line", queries: [{ fields: { stream_type: "enrichment_tables" } }] },
-      makeResultMetaData(60),
-      makeMetadata(),
-      ["ts"],
-      ["value"],
-      [],
-      [],
-      null,
-    );
-
-    expect(result).toEqual(processedData);
-  });
-
   it("inserts null/noValue entry for a missing time slot (no breakdown)", () => {
     // processedData has ts = "2024-01-15T09:00:00" (different from "2024-01-15T10:00:00")
     // The map key for that entry is "2024-01-15T09:00:00" but format mock returns

@@ -8150,6 +8150,7 @@
     "movePanelMessage": "Wybierz kartę docelową",
     "noQueriesToCreateAlert": "Ten panel nie ma zapytań do utworzenia alertu",
     "panelQueryMustHaveStream": "Zapytanie panelu musi mieć skonfigurowany strumień",
+    "enrichmentTableAlertUnsupported": "Alertów nie można uruchamiać na tabelach wzbogacających",
     "unsupportedPanelTypeAlert": "Tworzenie alertów z paneli {type} może nie działać zgodnie z oczekiwaniami",
     "panelDuplicatedSuccessfully": "Panel zduplikowany pomyślnie",
     "panelDuplicationFailed": "Duplikowanie panelu nie powiodło się",

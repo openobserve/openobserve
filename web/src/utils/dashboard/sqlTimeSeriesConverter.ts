@@ -16,7 +16,6 @@
 import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "./chartDimensionUtils";
-import { spansStreamLifetime } from "./streamLifetime";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { chartColor } from "../chartTheme";
 import { escapeHtml } from "@/utils/html";
@@ -157,7 +156,7 @@ export const applyAutoSQLTimeSeries = (
       const queryStartMs = parseInt(metadata?.queries[0]?.startTime?.toString() ?? "0") / 1000;
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
-      if (queryStartMs > 0 && queryEndMs > 0 && !spansStreamLifetime(panelSchema)) {
+      if (queryStartMs > 0 && queryEndMs > 0) {
         options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
         options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
@@ -390,7 +389,7 @@ export const applyCustomSQLTimeSeries = (
       const queryStartMs = parseInt(metadata?.queries[0]?.startTime?.toString() ?? "0") / 1000;
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
-      if (queryStartMs > 0 && queryEndMs > 0 && !spansStreamLifetime(panelSchema)) {
+      if (queryStartMs > 0 && queryEndMs > 0) {
         options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
         options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }

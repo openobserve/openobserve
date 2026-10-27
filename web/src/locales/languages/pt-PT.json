@@ -8150,6 +8150,7 @@
     "movePanelMessage": "Selecione o separador de destino",
     "noQueriesToCreateAlert": "Este painel não tem consultas para criar um alerta",
     "panelQueryMustHaveStream": "A consulta do painel deve ter um stream configurado",
+    "enrichmentTableAlertUnsupported": "Os alertas não podem ser executados em tabelas de enriquecimento",
     "unsupportedPanelTypeAlert": "A criação de alertas a partir de painéis {type} pode não funcionar conforme o esperado",
     "panelDuplicatedSuccessfully": "Painel duplicado com sucesso",
     "panelDuplicationFailed": "Falha na duplicação do painel",

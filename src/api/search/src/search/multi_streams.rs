@@ -68,10 +68,7 @@ use crate::{
             get_stream_type_from_request, get_use_cache_from_request,
         },
     },
-    search::{
-        error_utils::map_error_to_http_response,
-        utils::{SearchStreamGuard, enrichment_table_time_range},
-    },
+    search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
 };
 
 /// SearchStreamData
@@ -1353,14 +1350,6 @@ pub async fn search_multi_stream(
                 .await;
             }
             return http_response;
-        }
-
-        // Multi-query and comparison panels land here; enrichment rows carry their upload time.
-        if let Some((start_time, end_time)) =
-            enrichment_table_time_range(&org_id, stream_type, search_type, &req.query.sql).await
-        {
-            req.query.start_time = start_time;
-            req.query.end_time = end_time;
         }
 
         #[cfg(feature = "enterprise")]

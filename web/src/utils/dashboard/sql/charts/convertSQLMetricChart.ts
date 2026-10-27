@@ -21,7 +21,6 @@ import { getSeriesThresholds } from "../../thresholds";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { type SQLContext } from "../shared/types";
 import { chartColor, chartNumber } from "../../../chartTheme";
-import { spansStreamLifetime } from "../../streamLifetime";
 
 // Copy-button size (icon-xs-sq) and the slot it needs beside the value
 // (button + gaps). The value stays perfectly centered, so free width splits
@@ -307,11 +306,10 @@ export function applyMetricChart(ctx: SQLContext): void {
   // streaming chunks); empty buckets fill with no_value_replacement (numeric), else 0.
   const rawNoValue = Number(panelSchema?.config?.no_value_replacement);
   const sparkNoValue = Number.isFinite(rawNoValue) ? rawNoValue : 0;
-  const lifetime = spansStreamLifetime(panelSchema);
   const histogramSeries = fillSparklineRange(
     sparklineData,
-    lifetime ? NaN : Number(metadata?.queries?.[0]?.startTime),
-    lifetime ? NaN : Number(metadata?.queries?.[0]?.endTime),
+    Number(metadata?.queries?.[0]?.startTime),
+    Number(metadata?.queries?.[0]?.endTime),
     sparkNoValue,
   );
   const sparklineInput = histogramSeries.length >= 2 ? histogramSeries : yAxisValue;

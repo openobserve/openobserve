@@ -31,12 +31,6 @@ import {
   writePanelDraft,
 } from "@/composables/dashboard/usePanelDraft";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
-import shortURL from "@/services/short_url";
-
-const { mockGetStream } = vi.hoisted(() => ({ mockGetStream: vi.fn() }));
-vi.mock("@/composables/useStreams", () => ({
-  default: () => ({ getStream: mockGetStream }),
-}));
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -1177,6 +1171,13 @@ describe("PanelContainer", () => {
         expect(wrapper.vm.alertDisabledReason).toBeNull();
       });
 
+      it("disables the action on an enrichment-table panel", () => {
+        const panel = formulaPanel(true);
+        panel.queries[0].fields.stream_type = "enrichment_tables";
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBe("Alerts can't run on enrichment tables");
+      });
+
       it("disables the action when every query is hidden", () => {
         const panel = formulaPanel(true);
         panel.queries[2].config.hide = true;
@@ -1297,37 +1298,6 @@ describe("PanelContainer", () => {
       await flushPromises();
 
       expect(windowOpenSpy).toHaveBeenCalled();
-    });
-
-    it("opens an enrichment-table panel on the table's own time span", async () => {
-      mockGetStream.mockResolvedValueOnce({
-        stats: { doc_time_min: 1_000_000_000, doc_time_max: 2_000_000_000 },
-      });
-      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
-      wrapper = createWrapper({
-        data: {
-          ...mockPanelData,
-          queries: [
-            {
-              query: 'SELECT * FROM "geo"',
-              fields: { stream: "geo", stream_type: "enrichment_tables" },
-              vrlFunctionQuery: "",
-            },
-          ],
-        },
-      });
-      await wrapper.vm.metaDataValue({
-        queries: [{ query: 'SELECT * FROM "geo"', startTime: 5, endTime: 6 }],
-      });
-
-      await wrapper.vm.onLogPanel();
-      await flushPromises();
-
-      expect(mockGetStream).toHaveBeenCalledWith("geo", "enrichment_tables", false);
-      expect(windowOpenSpy).toHaveBeenCalled();
-      const opened = new URL(String(vi.mocked(shortURL.create).mock.calls.at(-1)?.[1]));
-      expect(opened.searchParams.get("from")).toBe("999000000");
-      expect(opened.searchParams.get("to")).toBe("2060000000");
     });
 
     it("should handle missing query data gracefully", async () => {

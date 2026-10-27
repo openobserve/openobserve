@@ -8150,6 +8150,7 @@
     "movePanelMessage": "Hedef sekmeyi seçin",
     "noQueriesToCreateAlert": "Bu panelde bir uyarı oluşturmak için herhangi bir sorgu yok",
     "panelQueryMustHaveStream": "Panel sorgusunun yapılandırılmış bir akışı olmalıdır",
+    "enrichmentTableAlertUnsupported": "Uyarılar zenginleştirme tablolarında çalıştırılamaz",
     "unsupportedPanelTypeAlert": "{type} panellerinden uyarılar oluşturmak beklendiği gibi çalışmayabilir",
     "panelDuplicatedSuccessfully": "Panel Başarıyla Çoğaltıldı",
     "panelDuplicationFailed": "Panel çoğaltma başarısız oldu",

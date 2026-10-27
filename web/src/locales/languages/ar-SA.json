@@ -8150,6 +8150,7 @@
     "movePanelMessage": "اختر علامة التبويب الوجهة",
     "noQueriesToCreateAlert": "هذه اللوحة لا تحتوي على استعلامات لإنشاء تنبيه من خلالها",
     "panelQueryMustHaveStream": "يجب أن يكون للاستعلام في اللوحة تدفق مهيأ",
+    "enrichmentTableAlertUnsupported": "لا يمكن تشغيل التنبيهات على جداول الإثراء",
     "unsupportedPanelTypeAlert": "قد لا يعمل إنشاء تنبيهات من {type} اللوحات كما هو متوقع",
     "panelDuplicatedSuccessfully": "تم تكرار اللوحة بنجاح",
     "panelDuplicationFailed": "فشل تكرار اللوحة",

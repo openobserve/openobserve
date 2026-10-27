@@ -19,7 +19,6 @@ import { format } from "date-fns";
 import { isTimeSeries } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import { detectChunkingDirection } from "./chunkingDirection";
-import { spansStreamLifetime } from "./streamLifetime";
 
 const formatUtc = (date: Date) => format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
 
@@ -58,8 +57,7 @@ export const fillMissingValues = (
   if (
     !interval ||
     !metadata.queries ||
-    !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(panelSchema.type) ||
-    spansStreamLifetime(panelSchema)
+    !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(panelSchema.type)
   ) {
     return JSON.parse(JSON.stringify(processedData));
   }
