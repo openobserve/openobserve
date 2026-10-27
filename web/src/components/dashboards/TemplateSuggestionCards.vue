@@ -66,6 +66,7 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 const hostsDetected = computed(() => detection.states.value.hosts === "detected");
 
 const GALLERY_CARD_LIMIT = 6;
+const HOST_METRICS_TITLE = dashboardJson.title;
 const galleryOpened = ref(false);
 
 const cardBadged = (dashboard: GalleryDashboard) =>
@@ -188,7 +189,7 @@ onMounted(() => {
       >
         <OTag variant="success-soft" icon="monitor-heart" size="sm" />
         <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">
-          {{ raw("Host Metrics") }}
+          {{ raw(HOST_METRICS_TITLE) }}
         </OTruncatedText>
         <OTag
           v-if="hostsDetected"
@@ -246,7 +247,7 @@ onMounted(() => {
             ><span
               data-test="template-replace-confirm-name"
               class="text-text-heading font-semibold break-all"
-              >{{ raw("Host Metrics") }}</span
+              >{{ raw(HOST_METRICS_TITLE) }}</span
             ></template
           >
         </i18n-t>
