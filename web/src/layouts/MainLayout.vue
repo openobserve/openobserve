@@ -333,6 +333,7 @@ import config from "../aws-exports";
 import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
 
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
@@ -438,13 +439,18 @@ export default defineComponent({
     navigateToOpenAPI(zoBackendUrl: string) {
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
-    signout() {
+    async signout() {
+      const invoker = document.querySelector<HTMLElement>(
+        '[data-test="header-my-account-profile-icon"]',
+      );
+      if ((await assistantSignOut({ invoker })) === "cancel") return;
+
       this.closeSocket();
 
       // AI chat streams outlive their component by design, so navigating away
       // doesn't kill an answer. Logout has to stop them explicitly — otherwise
       // they keep streaming and writing chat history after sign-out.
-      window.dispatchEvent(new Event("o2:abort-ai-streams"));
+      if (!this.assistantV2) window.dispatchEvent(new Event("o2:abort-ai-streams"));
 
       // Clear any open notifications so they don't carry over past logout.
       dismissAll();
@@ -1144,6 +1150,11 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      // The revamped assistant settles running answers first; Cancel keeps the current org.
+      if (assistantV2 && (await assistantOrgSwitch()) === "cancel") {
+        selectedOrg.value = store.state.selectedOrganization;
+        return;
+      }
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
@@ -1188,6 +1199,27 @@ export default defineComponent({
         store.state.organizationData.isDataIngested == false
       ) {
         await verifyStreamExist(selectedOrg.value);
+      }
+    };
+
+    const assistantOrgSwitch = async (): Promise<"proceed" | "cancel"> => {
+      const next = selectedOrg.value?.identifier;
+      const email = store.state.userInfo?.email;
+      if (!next || next === store.state.selectedOrganization?.identifier || !email)
+        return "proceed";
+      // A chunk that fails to load after a deploy must not strand the selector on an org the store never took.
+      try {
+        const [{ assistantLifecycle }, { computeUserOrgKey }] = await Promise.all([
+          import("@/composables/assistant"),
+          import("@/utils/userOrgKey"),
+        ]);
+        const userOrgKey = await computeUserOrgKey(email, next);
+        const invoker = document.querySelector<HTMLElement>(
+          '[data-test="navbar-organizations-select-trigger"]',
+        );
+        return await assistantLifecycle.onOrgSwitch({ org: next, userOrgKey }, { invoker });
+      } catch {
+        return "proceed";
       }
     };
 

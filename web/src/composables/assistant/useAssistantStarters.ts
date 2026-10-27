@@ -64,6 +64,8 @@ export interface AssistantScope {
   streamCount: number | null;
   timeRange: I18nText | null;
   pageObject?: { kind: ObjectKind; name: string };
+  /** Docked: the editor's buffer leads the line ("this SQL"), then its stream. */
+  editor?: { language: AssistantHostAdapter["language"]; stream: string | null };
   canWrite: Tri;
 }
 
@@ -169,6 +171,9 @@ export function useAssistantStarters(input: AssistantStartersInput): {
       streamCount: streamCount.value,
       timeRange: facts.value.range ? raw(facts.value.range.label) : null,
       ...(dashboard && { pageObject: { kind: "dashboard" as const, name: dashboard } }),
+      ...(input.host && {
+        editor: { language: input.host.language, stream: pageStream(pageContext.value) ?? null },
+      }),
       canWrite: runtime.capability.capability.value.canWrite,
     };
   });

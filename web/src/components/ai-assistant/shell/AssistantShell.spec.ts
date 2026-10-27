@@ -29,6 +29,7 @@ import AssistantShell, {
   type ShellRouteState,
 } from "./AssistantShell.vue";
 import { closeLockedPanel, lockedPanelMoved, openLockedPanel, useLockedPanel } from "./lockedPanel";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 const STARTER: Starter = {
   id: "s1",
@@ -249,6 +250,29 @@ describe("AssistantShell states", () => {
     expect(retry).toHaveBeenCalledWith(sid);
   });
 
+  it("holds Try again under another tab's approval lock and says why when pressed", async () => {
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => false),
+        otherAccountSignedIn: computed(() => false),
+        turnLock: () => "approval_elsewhere",
+      },
+    } as never);
+    const { wrapper, store } = setup({}, "unhealthy");
+    store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    const retry = vi.spyOn(store, "retry");
+    await flushPromises();
+    const button = wrapper.get('[data-test="assistant-shell-unhealthy-notice-retry"]');
+    expect(button.attributes("aria-disabled")).toBe("true");
+    await button.trigger("click");
+    await flushPromises();
+    expect(retry).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain("Another tab is waiting for your approval on this chat.");
+    setRuntimeHandle(null);
+  });
+
   it("swaps the composer for the gate only when B-06 reports the agent down", () => {
     const { wrapper } = setup({}, "unhealthy", { source: "capabilities" });
     expect(wrapper.find('[data-test="assistant-shell-unhealthy-notice"]').exists()).toBe(false);
@@ -258,7 +282,7 @@ describe("AssistantShell states", () => {
 });
 
 describe("AssistantShell chrome and focus", () => {
-  it("offers full view and the layout menu in the sidebar, close everywhere but docked", () => {
+  it("offers full view and the layout menu in the sidebar, and close in every container", () => {
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-shell-open-in-full-view"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(true);
@@ -269,9 +293,9 @@ describe("AssistantShell chrome and focus", () => {
     const sheet = setup({ sheet: true }).wrapper;
     expect(sheet.find('[data-test="assistant-shell-open-in-full-view"]').exists()).toBe(false);
     document.body.innerHTML = "";
-    expect(
-      setup({ placement: "docked" }).wrapper.find('[data-test="assistant-shell-close"]').exists(),
-    ).toBe(false);
+    const docked = setup({ placement: "docked" }).wrapper;
+    expect(docked.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
+    expect(docked.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-15");
   });
 
   it("closes through the store from ×, keeping the session", async () => {
@@ -721,5 +745,66 @@ describe("WP-06 conversation wiring", () => {
     await wrapper.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
     expect(wrapper.find('[data-test="assistant-turn-outcome-open-here"]').exists()).toBe(true);
     open.mockRestore();
+  });
+});
+
+describe("AssistantShell after a sign-out in another tab", () => {
+  afterEach(() => setRuntimeHandle(null));
+
+  it("shows the signed-out notice with Sign in, unannounced, and keeps Send off", async () => {
+    const signedOut = ref(true);
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => signedOut.value),
+        otherAccountSignedIn: computed(() => false),
+        turnLock: () => (signedOut.value ? "signed_out" : null),
+      },
+    } as never);
+    const { wrapper } = setup();
+    await flushPromises();
+    const block = wrapper.get('[data-test="assistant-shell-signed-out-block"]');
+    expect(block.text()).toContain("You signed out in another tab.");
+    expect(block.attributes("role")).toBe("presentation");
+    expect(wrapper.find('[data-test="assistant-shell-signed-out-sign-in"]').text()).toBe("Sign in");
+    signedOut.value = false;
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-shell-signed-out-block"]').exists()).toBe(false);
+  });
+
+  it("asks for a reload when another account signed in, keeping this tab's chats locked", async () => {
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => true),
+        otherAccountSignedIn: computed(() => true),
+        turnLock: () => "account_changed",
+      },
+    } as never);
+    const { wrapper } = setup();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-shell-signed-out-block"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-shell-other-account-block"]').text()).toContain(
+      "Another account signed in.",
+    );
+    expect(wrapper.get('[data-test="assistant-shell-other-account-reload"]').text()).toBe("Reload");
+  });
+
+  it("leaves the stopped turn's own outcome to say it, without a second notice", async () => {
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => true),
+        otherAccountSignedIn: computed(() => false),
+        turnLock: () => "signed_out",
+      },
+    } as never);
+    const { wrapper, store } = setup();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.state.sessions[sid].turn = {
+      state: "failed",
+      error: { code: "signed_out", phase: "post_admission", retryable: false, action: "sign_in" },
+    };
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-shell-signed-out-block"]').exists()).toBe(false);
   });
 });

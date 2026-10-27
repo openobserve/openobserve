@@ -61,6 +61,8 @@ export const ASSISTANT_ERROR_CODES = [
   "off_for_org",
   "data_level_blocked",
   "permission_denied_tool",
+  "approval_elsewhere",
+  "account_changed",
 ] as const satisfies readonly AssistantErrorCode[];
 
 /** `80` §1.3; role-split codes carry the admin action, the member one is `.actionMember`. */
@@ -98,6 +100,8 @@ export const ERROR_LEDGER: Record<AssistantErrorCode, ErrorLedgerRow> = {
   off_for_org: { phase: "pre_admission", retryable: false, action: "open_settings" },
   data_level_blocked: { phase: "post_admission", retryable: false, action: "change_level" },
   permission_denied_tool: { phase: "post_admission", retryable: false, action: "open_settings" },
+  approval_elsewhere: { phase: "pre_admission", retryable: false, action: "none" },
+  account_changed: { phase: "pre_admission", retryable: false, action: "none" },
 };
 
 /** The closed `action` vocabulary of the B-01 envelope; the client words every button from the code (WP-17). */
@@ -110,6 +114,9 @@ export const WIRE_ACTIONS = [
   "reload",
   "none",
 ] as const;
+
+// Refusals this tab makes itself under a cross-tab lock; the server never sends them, so the wire never yields them.
+const CLIENT_ONLY_CODES: ReadonlySet<string> = new Set(["approval_elsewhere", "account_changed"]);
 
 const CODES: ReadonlySet<string> = new Set(ASSISTANT_ERROR_CODES);
 
@@ -200,7 +207,7 @@ export function isWireAction(value: unknown): value is WireAction {
 }
 
 export function isAssistantErrorCode(value: unknown): value is AssistantErrorCode {
-  return typeof value === "string" && CODES.has(value);
+  return typeof value === "string" && CODES.has(value) && !CLIENT_ONLY_CODES.has(value);
 }
 
 /** A 412 with `error_type` and a `consent` payload is the consent prompt, never a refusal (constraint 30). */

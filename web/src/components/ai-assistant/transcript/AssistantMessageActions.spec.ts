@@ -15,7 +15,9 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { computed, ref } from "vue";
+
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
@@ -140,6 +142,18 @@ describe("AssistantMessageActions", () => {
     ).toBeUndefined();
   });
 
+  it("disables Regenerate while another tab signed out, saying why", () => {
+    setRuntimeHandle({
+      lifecycle: { signedOutElsewhere: computed(() => true), turnLock: () => "signed_out" },
+    } as never);
+    const bar = mountActions({ message: answer, prompt });
+    expect(bar.get('[data-test="assistant-msg-regenerate"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    expect(bar.text()).toContain("You signed out in another tab.");
+    setRuntimeHandle(null);
+  });
+
   it("hides the bar of an older message until hover or focus, never on a coarse pointer (`30` §8)", () => {
     const older = mountActions({ message: answer, prompt, isLast: false });
     expect(older.get('[data-test="assistant-msg-actions"]').classes()).toEqual(
@@ -186,6 +200,29 @@ describe("AssistantMessageActions", () => {
       editedFrom: 3,
     });
     expect(track).toHaveBeenCalledWith("ai_thread_action", { action: "edit_resend" });
+  });
+
+  it("holds the open editor's Send and Enter once another tab's lock arrives", async () => {
+    const edit = vi.spyOn(fake.current.store, "editResend");
+    const lock = ref<string | null>(null);
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => false),
+        turnLock: () => lock.value,
+      },
+    } as never);
+    const editor = mountActions({ message: prompt, mode: "editor" });
+    await flushPromises();
+    await editor.get("textarea").setValue("why 5xx now?");
+    lock.value = "approval_elsewhere";
+    await flushPromises();
+    const send = editor.get('[data-test="assistant-msg-edit-send"]');
+    expect(send.attributes("aria-disabled")).toBe("true");
+    expect(editor.text()).toContain("Another tab is waiting for your approval on this chat.");
+    await editor.get("textarea").trigger("keydown", { key: "Enter" });
+    await send.trigger("click");
+    expect(edit).not.toHaveBeenCalled();
+    setRuntimeHandle(null);
   });
 
   it("holds the editor's Send while a turn runs, so the edit is never dropped (S8)", async () => {

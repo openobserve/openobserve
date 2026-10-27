@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')
     "
-    :width="isFullScreen ? 100 : store.state.isAiChatEnabled ? 70 : 40"
+    :width="isFullScreen ? 100 : store.state.isAiChatEnabled || dockOpen ? 70 : 40"
     :primary-button-label="
       isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')
     "
@@ -32,8 +32,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center gap-2">
+        <AiEntryButton
+          v-if="docked"
+          appearance="toggle"
+          verb="ask"
+          entry-kind="editor_toggle"
+          object-kind="regex"
+          thread="current"
+          dock-host="regex"
+          :label="t('assistant.entry.assistant')"
+          :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+          :pressed="docked.dock.isOpen.value"
+          :build="docked.dock.build"
+          data-test="ai-entry-regex-ask"
+          @closed="docked.dock.close"
+        />
         <OButton
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           variant="ghost"
           size="icon-toolbar"
           @click="toggleAIChat"
@@ -62,11 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div class="flex h-full w-full">
+    <div :ref="docked ? docked.dockSlot : undefined" class="flex h-full w-full">
       <div
-        :class="
-          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] ps-2' : 'w-[65%] ps-2') : 'w-full'
-        "
+        :class="[
+          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] ps-2' : 'w-[65%] ps-2') : 'w-full',
+          dockOpen ? 'min-h-0 min-w-0 overflow-y-auto pe-2' : '',
+        ]"
       >
         <OForm
           id="add-regex-pattern-form"
@@ -113,8 +129,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-sm leading-5.25 font-bold">{{
                   t("settings.addRegexPattern.regexPatternLabel")
                 }}</span>
+                <AiLabel
+                  v-if="docked?.proposal.label.value"
+                  :state="docked.proposal.label.value"
+                  @revert="docked.proposal.revert"
+                  @ask-again="docked.dock.askAgain"
+                />
                 <OButton
-                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                  v-else-if="
+                    !docked && config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+                  "
                   variant="ghost"
                   size="sm"
                   @click="toggleAIChat"
@@ -126,7 +150,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ms-1 h-5 w-5" />
                 </OButton>
               </div>
-              <div class="regex-pattern-input">
+              <div ref="editorArea" :class="['regex-pattern-input', docked ? 'relative' : '']">
+                <AssistantDiffBlock
+                  v-if="docked?.proposal.pending.value"
+                  :key="docked.proposal.pending.value.id"
+                  :proposal="docked.proposal.pending.value"
+                  class="absolute inset-0 z-1000 min-h-40"
+                />
                 <div class="bg-surface-subtle h-6 py-0.5">
                   <div class="text-text-secondary px-2 text-xs font-[500]">
                     {{ t("settings.addRegexPattern.writePattern") }}
@@ -223,10 +253,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
+      <AssistantDock v-if="docked" :host="docked.adapter" />
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ms-2 max-w-full"
-        v-if="store.state.isAiChatEnabled"
+        v-else-if="store.state.isAiChatEnabled"
         style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
       >
         <O2AIChat
@@ -242,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed } from "vue";
+import { defineAsyncComponent, defineComponent, ref, watch, computed } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -263,6 +294,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { makeAddRegexPatternSchema, type AddRegexPatternForm } from "./AddRegexPattern.schema";
+import {
+  isAssistantV2,
+  useAssistantLeaveGuard,
+  useDockedEditor,
+  type DockedEditor,
+} from "@/composables/assistant/pure";
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -283,6 +320,17 @@ export default defineComponent({
   },
   emit: ["close", "update:list", "update:open"],
   components: {
+    // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
+    AiLabel: defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue")),
+    AssistantDiffBlock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+    ),
+    AssistantDock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+    ),
     OSeparator,
     OBanner,
     FullViewContainer,
@@ -507,6 +555,56 @@ export default defineComponent({
       }
     };
 
+    const editorArea = ref<HTMLElement | null>(null);
+    const patternName = () =>
+      String(addRegexPatternForm.value?.form?.state.values.name ?? props.data?.name ?? "");
+    const regexDirty = () =>
+      props.open &&
+      (patternValue.value !== addRegexPatternDefaults.value.pattern ||
+        testStringValue.value !== (addRegexPatternDefaults.value.testString ?? ""));
+    const docked: DockedEditor | null = isAssistantV2()
+      ? useDockedEditor(
+          {
+            id: "regex",
+            objectKind: "regex",
+            objectTitle: () =>
+              patternName()
+                ? t("assistant.editor.title.regex", { name: raw(patternName()) })
+                : t("assistant.editor.title.regexNew"),
+            language: () => "regex",
+            getBuffer: () => patternValue.value ?? "",
+            getContext: () => ({
+              currentQuery: patternValue.value ?? "",
+              ...(testStringValue.value && {
+                regexTestInput: testStringValue.value.slice(0, 2000),
+              }),
+            }),
+            isDirty: regexDirty,
+            run: () => void testStringOutput(),
+            focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+            write(text) {
+              addRegexPatternForm.value?.form?.setFieldValue("pattern", text);
+              patternValue.value = text;
+            },
+            area: () => editorArea.value,
+            dockRowRem: () => (window.innerWidth * (isFullScreen.value ? 1 : 0.7)) / 16,
+          },
+          { active: () => props.open },
+        )
+      : null;
+    const dockOpen = computed(() => !!docked?.dock.isOpen.value);
+    watch(
+      () => props.open,
+      (open) => !open && docked?.proposal.clear(),
+    );
+    if (docked)
+      useAssistantLeaveGuard({
+        host: "regex",
+        isDirty: regexDirty,
+        name: () =>
+          patternName() ? raw(patternName()) : t("assistant.shell.leaveGuardThisPattern"),
+      });
+
     const closeAddRegexPatternDialog = () => {
       emit("close");
     };
@@ -545,6 +643,9 @@ export default defineComponent({
       addRegexPatternSchema,
       addRegexPatternDefaults,
       patternValue,
+      docked,
+      dockOpen,
+      editorArea,
     };
   },
 });

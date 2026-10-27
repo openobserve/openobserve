@@ -37,6 +37,7 @@ export {
   type LogRowsInput,
 } from "./logRows";
 export { buildLogFieldPrompt, fieldValueOf, logFieldChip, type LogFieldInput } from "./logField";
+export { buildRegexFieldPrompt, regexFieldChip, type RegexFieldInput } from "./regexField";
 export { buildQueryErrorPrompt, errorPlainText, type QueryErrorInput } from "./queryError";
 export { buildEmptyResultPrompt, type EmptyResultInput } from "./emptyResult";
 export { buildNoStreamPrompt, type NoStreamInput } from "./noStream";

@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
     :data-panel-type="props.data.type"
+    :data-assistant-source-scope="assistantV2 ? '' : undefined"
   >
     <div
       :class="{

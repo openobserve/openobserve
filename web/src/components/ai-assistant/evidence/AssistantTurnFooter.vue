@@ -127,17 +127,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="canRerun"
         :variant="isMobile ? 'secondary' : 'ghost'"
         size="sm"
-        :disabled="exhausted"
-        :focusable-unavailable="exhausted"
+        :disabled="!!rerunBlocked"
+        :focusable-unavailable="!!rerunBlocked"
         :class="['max-md:w-full', TOUCH_TARGET_CLASS]"
         data-test="assistant-rerun"
         @click="rerun"
       >
         {{ t("assistant.footer.rerun") }}
-        <template v-if="exhausted" #unavailable-reason>{{
-          t("assistant.message.creditsUsedUp")
-        }}</template>
-        <OTooltip v-if="exhausted" :content="t('assistant.message.creditsUsedUp')" />
+        <template v-if="rerunBlocked" #unavailable-reason>{{ rerunBlocked }}</template>
+        <OTooltip v-if="rerunBlocked" :content="rerunBlocked" />
       </OButton>
     </div>
     <div
@@ -176,6 +174,8 @@ import {
   isTerminal,
   queryCount,
   stepsOf,
+  turnLockKey,
+  useTurnLock,
   windowsOf,
   type AssistantTurnView,
 } from "@/composables/assistant/pure";
@@ -224,6 +224,12 @@ const notSaved = computed(
 const hasLine = computed(() => !stopped.value || windows.value.length > 0);
 const capability = computed(() => evidence?.capability() ?? null);
 const exhausted = computed(() => capability.value?.creditMode === "exhausted");
+// A re-run starts a turn, so the cross-tab lock holds it like every other turn start.
+const turnLock = useTurnLock(() => props.turn?.sid ?? null);
+const rerunBlocked = computed<I18nText | null>(() => {
+  if (turnLock.value) return t(turnLockKey(turnLock.value));
+  return exhausted.value ? t("assistant.message.creditsUsedUp") : null;
+});
 const live = computed(() => !props.readonly && !!evidence && !!props.turn?.sid);
 // A send while another turn runs would join that turn, so Re-run waits for it.
 const sessionIdle = computed(() => {
@@ -290,7 +296,7 @@ const context = computed<{ kind: "used" | "sent"; labels: I18nText[] } | null>((
 
 function rerun(): void {
   const sid = props.turn?.sid;
-  if (!sid || !evidence || exhausted.value || !props.turn) return;
+  if (!sid || !evidence || rerunBlocked.value || !props.turn) return;
   void evidence.dispatch(sid, { kind: "rerun_now", turnId: props.turn.turnId });
 }
 

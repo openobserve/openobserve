@@ -418,3 +418,35 @@ export async function login(page) {
   await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 30000 });
   await page.waitForLoadState("networkidle").catch(() => {});
 }
+
+/** A real (unmocked) API call as the root user, for fixtures the mocks do not cover. */
+async function rootApi(method, path, body) {
+  const auth = Buffer.from(`${ENV.user}:${ENV.pass}`).toString("base64");
+  const response = await fetch(`${ENV.backend || ENV.apiOrigin}${path}`, {
+    method,
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`${method} ${path} answered ${response.status}`);
+  return response.json();
+}
+
+/** The identifier of the organization named `name`, created once per backend (organizations cannot be deleted here). */
+export async function ensureOrg(name) {
+  const { data = [] } = await rootApi("GET", "/api/organizations");
+  const found = data.find((o) => o.name === name);
+  return found ? found.identifier : (await rootApi("POST", "/api/organizations", { name })).identifier;
+}
+
+/** Creates a two-panel dashboard (one left, one right column) and returns its id. */
+export async function createTwoColumnDashboard(title) {
+  const fixture = JSON.parse(readFileSync(join(here, "..", "dashboards", "d1-turn-health.json"), "utf8"));
+  const [left, right] = fixture.tabs[0].panels;
+  const panels = [
+    { ...left, id: "e2e_left", title: "Left panel", layout: { ...left.layout, x: 0, y: 0, w: 24, i: 1 } },
+    { ...right, id: "e2e_right", title: "Right panel", layout: { ...right.layout, x: 24, y: 0, w: 24, i: 2 } },
+  ];
+  const dashboard = { ...fixture, title, tabs: [{ ...fixture.tabs[0], panels }] };
+  const created = await rootApi("POST", `/api/${ENV.org}/dashboards?folder=default`, dashboard);
+  return created.v5.dashboardId;
+}

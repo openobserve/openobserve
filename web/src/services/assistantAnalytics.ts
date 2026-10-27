@@ -190,7 +190,12 @@ export type TurnScopedEventName = (typeof TURN_SCOPED_EVENTS)[number];
 /** The `ai_turn_ended.error_code` enum: the codes of `99` §3.5 plus `stopped_before_send`, a Stop while still queued. */
 export type AiErrorCode = Exclude<
   AssistantErrorCode,
-  "history_unavailable" | "off_for_org" | "data_level_blocked" | "permission_denied_tool"
+  | "history_unavailable"
+  | "off_for_org"
+  | "data_level_blocked"
+  | "permission_denied_tool"
+  | "approval_elsewhere"
+  | "account_changed"
 >;
 
 export type Viewport = "mobile" | "tablet" | "desktop";
@@ -263,7 +268,7 @@ export interface AiEventProps {
   ai_sheet_snap: { snap: "peek" | "half" | "full" };
   ai_toast: { kind: "ready" | "needs_you"; action: "open" | "dismiss" };
   ai_turn_busy: Record<string, never>;
-  ai_leave_guard: { host: DockHostId; choice: "keep" | "discard" };
+  ai_leave_guard: { host: DockHostId | "alert"; choice: "keep" | "discard" };
   ai_status_light: { state: "needs_you" | "working" | "unread" | "failed" | "open" | "idle" };
   ai_context_changed: {
     action: "add" | "remove" | "swap_time" | "trim" | "mention" | "add_back";

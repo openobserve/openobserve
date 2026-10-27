@@ -436,7 +436,9 @@ export type AssistantErrorCode =
   | "history_unavailable"
   | "off_for_org"
   | "data_level_blocked"
-  | "permission_denied_tool";
+  | "permission_denied_tool"
+  | "approval_elsewhere"
+  | "account_changed";
 
 /** The one action a terminal block offers (`80` §1.3); `none` renders Details only. */
 export type AssistantErrorAction =
@@ -543,7 +545,16 @@ export type AssistantHint =
       status: "completed" | "cancelled" | "failed" | "interrupted";
       at: number;
     }
-  | { v: 1; type: "approval_pending"; sid: string; turnId: string; callId?: string; at: number }
+  | {
+      v: 1;
+      type: "approval_pending";
+      sid: string;
+      turnId: string;
+      callId?: string;
+      /** The card's own expiry, when the server gave one; the other tabs drop it then at the latest. */
+      expiresAt?: number;
+      at: number;
+    }
   | { v: 1; type: "approval_resolved"; sid: string; callId?: string; approved: boolean; at: number }
   | { v: 1; type: "consent_granted"; org: string; feature: "ai_credits"; at: number }
   | { v: 1; type: "signed_out"; at: number }
@@ -653,7 +664,7 @@ export interface AssistantHostAdapter {
   objectKind: ObjectKind;
   /** Thread title "Alert · {name}" (`04` §14 docked thread rule). */
   objectTitle: () => I18nText;
-  language: "sql" | "promql" | "vrl" | "json" | "regex";
+  language: "sql" | "promql" | "vrl" | "json" | "regex" | "js";
   /** Current editor text (the `query` chip). */
   getBuffer(): string;
   /** Merged over the page provider (pushed on the stack). */
@@ -673,6 +684,8 @@ export interface AssistantHostAdapter {
   focusEditor(cursor?: { line: number; column: number }): void;
   /** Default 20; a host that cannot give it refuses to dock (SH-05 edge). */
   minWidthRem?: number;
+  /** The row width the host gives the editor and the dock together once docked; the slot's own width by default. */
+  dockRowRem?(): number;
   /** The flex column the dock fills. */
   dockSlot: Ref<HTMLElement | null>;
 }
@@ -764,6 +777,8 @@ export interface TurnEngine {
   ): Promise<TurnTerminal>;
   stop(sid: Sid): Promise<void>;
   stopAll(reason: "sign_out" | "org_switch" | "new_turn_elsewhere"): Promise<void>;
+  /** Another tab signed out: every running turn here cancels and ends `failed{signed_out}`, never a reload. */
+  signedOutElsewhere?(): Promise<void>;
   retry(sid: Sid): Promise<TurnTerminal>;
   continueTurn(sid: Sid): void;
   retrySave(sid: Sid, turnId: string): Promise<void>;

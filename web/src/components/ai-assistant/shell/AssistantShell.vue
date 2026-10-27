@@ -31,7 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- ① chrome row; WP-11's thread header takes the title slot -->
     <div
-      class="border-border-default flex h-12 shrink-0 items-center gap-2 border-b px-3"
+      :class="[
+        'border-border-default flex shrink-0 items-center gap-2 border-b px-3',
+        placement === 'docked' ? 'h-15' : 'h-12',
+      ]"
       data-test="assistant-shell-chrome"
     >
       <OSkeleton v-if="state === 'loading'" type="text" class="w-40" />
@@ -55,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <AssistantContainerMenu v-if="state !== 'gate'" :placement="placement" :sheet="sheet" />
         <AssistantIconButton
-          v-if="placement !== 'docked'"
           :label="t('assistant.shell.close', { product })"
           :icon="assistantGlyph.close"
           data-test="assistant-shell-close"
@@ -64,14 +66,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- ①b notice row: one line at most; WP-09 signed out, WP-10 credit notice, WP-11 history unavailable -->
     <div
       v-if="notice || $slots.notice"
       class="shrink-0 px-3 pt-2"
       data-test="assistant-shell-notice-row"
     >
       <OBanner
-        v-if="notice === 'unhealthy'"
+        v-if="notice === 'signed_out'"
+        variant="info"
+        dense
+        role="presentation"
+        :content="t('assistant.shell.signedOutElsewhere')"
+        data-test="assistant-shell-signed-out-block"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="max-md:min-h-11"
+            data-test="assistant-shell-signed-out-sign-in"
+            @click="signIn"
+          >
+            {{ t("assistant.error.signed_out.action") }}
+          </OButton>
+        </template>
+      </OBanner>
+      <OBanner
+        v-else-if="notice === 'other_account'"
+        variant="info"
+        dense
+        role="presentation"
+        :content="t('assistant.shell.otherAccount')"
+        data-test="assistant-shell-other-account-block"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="max-md:min-h-11"
+            data-test="assistant-shell-other-account-reload"
+            @click="reloadPage"
+          >
+            {{ t("assistant.shell.reload") }}
+          </OButton>
+        </template>
+      </OBanner>
+      <OBanner
+        v-else-if="notice === 'unhealthy'"
         variant="info"
         dense
         :content="t('assistant.gate.unhealthy.notice', { product })"
@@ -82,10 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             class="max-md:min-h-11"
+            :disabled="!!turnLock"
+            :focusable-unavailable="!!turnLock"
             data-test="assistant-shell-unhealthy-notice-retry"
             @click="retry"
           >
             {{ t("assistant.gate.tryAgain") }}
+            <template v-if="turnLock" #unavailable-reason>{{ t(turnLockKey(turnLock)) }}</template>
+            <OTooltip v-if="turnLock" :content="t(turnLockKey(turnLock))" />
           </OButton>
         </template>
       </OBanner>
@@ -221,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :retry-snapshot-available="!!activeSid && store.canRetry(activeSid)"
           :at="refusalAt"
           :org="org"
+          :sid="activeSid ?? undefined"
           :online="online"
           :persistence="capability.persistence"
           :signed-in="signedIn"
@@ -253,7 +299,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ghost="ghost"
           :host="host"
           :visible="visible"
-          :cooldown-reason="coolingDown ? t('assistant.composer.rateLimited') : undefined"
+          :cooldown-reason="
+            turnLock
+              ? t(turnLockKey(turnLock))
+              : coolingDown
+                ? t('assistant.composer.rateLimited')
+                : undefined
+          "
         />
       </slot>
       <slot name="disclosure">
@@ -384,13 +436,18 @@ import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome
 import {
   isRunning,
   markHintSeen,
+  markSignedIn,
   queryRunOf,
   readHints,
   registerAssistantFocusTarget,
+  turnLockKey,
   useAssistantCapability,
   useAssistantName,
   useAssistantStarters,
   useAssistantStore,
+  useOtherAccountSignedIn,
+  useSignedOutElsewhere,
+  useTurnLock,
   type AssistantError,
   type Container,
   type GateReason,
@@ -411,6 +468,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { refreshSession } from "@/services/http";
 import type { ChatMessage, TurnOutcomeRecord } from "@/ts/interfaces/chat";
@@ -485,9 +543,18 @@ const isTerminalBody = computed(
 const showTitle = computed(() => state.value !== "gate" && !isTerminalBody.value);
 const title = computed(() => session.value?.title ?? t("assistant.thread.newChatTitle"));
 const b06 = computed(() => capability.value.source === "capabilities");
-const notice = computed(() =>
-  capability.gate.value === "unhealthy" && !b06.value ? ("unhealthy" as const) : null,
-);
+const signedOutElsewhere = useSignedOutElsewhere();
+const otherAccount = useOtherAccountSignedIn();
+const turnLock = useTurnLock(() => activeSid.value);
+// The turn the hint stopped already says so in its own outcome; the row speaks only for the rest.
+const notice = computed(() => {
+  if (otherAccount.value) return "other_account" as const;
+  if (signedOutElsewhere.value)
+    return session.value?.turn.state === "failed" && session.value.turn.error.code === "signed_out"
+      ? null
+      : ("signed_out" as const);
+  return capability.gate.value === "unhealthy" && !b06.value ? ("unhealthy" as const) : null;
+});
 const composerLocked = computed(() => capability.gate.value === "unhealthy" && b06.value);
 const unknownNotice = computed(() => capability.unknownNotice.value);
 
@@ -593,6 +660,7 @@ const evidenceHost: AssistantEvidenceHost = {
     store.annotate(sid, blockId, { linkOutcome: { openedAt: Date.now() } }),
   toggleStep: (sid, callId) => store.toggleStep(sid, callId),
   announce: (sid, text) => announceComposer(sid, text),
+  host: () => (props.placement === "docked" ? (props.host ?? null) : null),
 };
 provide(assistantEvidenceHostKey, evidenceHost);
 
@@ -813,6 +881,11 @@ function signIn(): void {
   popupBlocked.value = !tab;
 }
 
+// This tab's chats belong to the signed-out account; only a fresh page load takes the new one.
+function reloadPage(): void {
+  window.location.reload();
+}
+
 // Signing in here reloads this page, so the sign-in returns to it and the saved draft comes back.
 function openSignInHere(): void {
   store.drafts.flush();
@@ -824,6 +897,7 @@ async function onVisibility(): Promise<void> {
   awaitingSignIn = false;
   if ((await refreshSession()) !== "refreshed") return;
   signedIn.value = true;
+  markSignedIn();
   region.value?.announce(t("assistant.outcome.signedIn"));
 }
 
@@ -953,9 +1027,12 @@ function newChat(): void {
   trackAssistant("ai_composer_cleared", { reason: "new_chat", undone: false });
 }
 
+// Under a cross-tab lock the retry is refused; the reader hears why instead of nothing happening.
 function retry(): void {
   const sid = store.state.shell.activeSid;
-  if (sid) void store.retry(sid);
+  if (!sid) return;
+  if (turnLock.value) return region.value?.announce(t(turnLockKey(turnLock.value)));
+  void store.retry(sid);
 }
 
 // The locked sidebar has no placement to move, so its full view is the route's hero gate.

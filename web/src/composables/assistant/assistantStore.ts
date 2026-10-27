@@ -36,6 +36,7 @@ import {
 import type { I18nKey } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/uuid";
 
+import { ERROR_LEDGER } from "./assistantErrors";
 import type {
   AssistantCapability,
   AssistantSession,
@@ -74,8 +75,12 @@ import {
   writeSidebar,
   type RecallEntry,
 } from "./prefs";
+import type { TurnLockReason } from "./lifecycle";
 import { getAssistantRuntime } from "./runtime";
+import { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
 import { isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
+
+export { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
 
 export const MAX_CHIP_ROWS = 20;
 
@@ -91,15 +96,7 @@ export const UNDO_WINDOW_MS = 10_000;
 /** Sign-out waits at most this long for this tab's turns to be stopped before it resets (`00` §12.3). */
 export const SIGN_OUT_STOP_WAIT_MS = 300;
 
-export const SIDEBAR_MIN_REM = 20;
-
 export const SIDEBAR_MAX_REM = 32;
-
-/** `<main>` never drops below this beside a pinned sidebar (`20` §2.1). */
-export const MAIN_MIN_REM = 32;
-
-/** Must match `ONavbar`'s rail (`w-[5.5rem]`), which `<main>` also gives up at `md` and up. */
-export const NAV_RAIL_REM = 5.5;
 
 const SIDEBAR_DEFAULT_MIN_REM = 22;
 
@@ -179,6 +176,8 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   readonly sidebarForcedFloating: ComputedRef<boolean>;
   /** The open that pinned a floating sidebar so it would not cover its source (`20` §2.1). */
   readonly sidebarForcedPinned: Readonly<Ref<boolean>>;
+  /** The cross-tab lock on starting a turn in `sid` (`null` for a chat not yet created). */
+  turnLockOf(sid: Sid | null): TurnLockReason | null;
   readonly focusRequest: Readonly<Ref<FocusRequest | null>>;
   readonly announcement: Readonly<Ref<AssistantAnnouncement | null>>;
   createSession(init: SessionInit): Sid;
@@ -219,6 +218,10 @@ export interface AssistantStoreOptions {
   viewportRem?: () => number;
   /** The `userOrgKey` of every org of the signed-in user, so sign-out drops each org's recall. */
   signOutKeys?: () => Promise<string[]>;
+  /** A session another tab of this browser runs or waits on; the light shows it when nothing here outranks it. */
+  remoteLight?: () => { state: "needs_you" | "working"; sid: Sid } | null;
+  /** The cross-tab lock on starting a turn in `sid`; every turn-starting entry point refuses while it holds. */
+  turnLock?: (sid: Sid | null) => TurnLockReason | null;
 }
 
 export interface AssistantSessionView {
@@ -272,6 +275,7 @@ interface StoreCore {
   state: AssistantState;
   drafts: DraftStore;
   viewportRem(): number;
+  turnLock(sid: Sid | null): TurnLockReason | null;
   invokers: Map<Sid, WeakRef<HTMLElement>>;
   released: Set<Sid>;
   endedAt: Map<Sid, number>;
@@ -304,13 +308,17 @@ export function createAssistantStore(
   const store: AssistantStoreInternal = {
     state,
     drafts: core.drafts,
-    headerLight: computed(() => headerLightOf(state)),
+    headerLight: computed(() =>
+      withRemoteLight(headerLightOf(state), options.remoteLight?.() ?? null),
+    ),
+    // Pinned holds the width down to 20 rem first; only a window without room for even that floats.
     sidebarForcedFloating: computed(
-      () => core.viewportRem() - NAV_RAIL_REM - state.shell.sidebarWidthRem < MAIN_MIN_REM,
+      () => core.viewportRem() - NAV_RAIL_REM - SIDEBAR_MIN_REM < MAIN_MIN_REM,
     ),
     sidebarForcedPinned: core.forcedPinned,
     focusRequest: core.focusRequest,
     announcement: lifecycle.announcement,
+    turnLockOf: (sid) => core.turnLock(sid),
     ...sessions,
     ...createPlacementSlice(core),
     ...createComposerSlice(core),
@@ -459,6 +467,17 @@ export function headerLightOf(state: AssistantState): HeaderLight {
   return { state: "idle", sid: null, failed: false };
 }
 
+/** Another tab's `needs_you` outranks this tab's `working`; its `working` outranks only `unread`, `open` and `idle`. */
+export function withRemoteLight(
+  local: HeaderLight,
+  remote: { state: "needs_you" | "working"; sid: Sid } | null,
+): HeaderLight {
+  if (!remote || local.state === "needs_you") return local;
+  if (remote.state === "needs_you" || local.state !== "working")
+    return { state: remote.state, sid: remote.sid, failed: false };
+  return local;
+}
+
 /** The telemetry and `context.client` container of a placement; below `lg` the sidebar and dock render as the sheet. */
 export function containerOf(placement: Placement, lgUp: boolean): Container | null {
   if (placement.kind === "hidden") return null;
@@ -481,6 +500,7 @@ function createCore(
     state,
     drafts: options.drafts ?? createDraftStore(),
     viewportRem: options.viewportRem ?? windowRem,
+    turnLock: (sid) => options.turnLock?.(sid) ?? null,
     invokers: new Map(),
     released: new Set(),
     endedAt: new Map(),
@@ -939,6 +959,8 @@ function createTurnSlice(core: StoreCore) {
     send(sid, opts) {
       const session = core.session(sid);
       if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
+      const locked = refusedByLock(core.turnLock(sid));
+      if (locked) return Promise.resolve(locked);
       const running = inFlight.get(sid);
       if (running) return running;
       delete core.notices[sid];
@@ -951,16 +973,22 @@ function createTurnSlice(core: StoreCore) {
     retry(sid) {
       const session = core.session(sid);
       if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
+      const locked = refusedByLock(core.turnLock(sid));
+      if (locked) return Promise.resolve(locked);
       return track(sid, null, () => deps.engine.retry(sid));
     },
     continueTurn: (sid) => deps.engine.continueTurn(sid),
     retrySave: (sid, turnId) => deps.engine.retrySave(sid, turnId),
     regenerate(sid) {
       if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const locked = refusedByLock(core.turnLock(sid));
+      if (locked) return Promise.resolve(locked);
       return track(sid, null, () => deps.engine.send(sid, { input: "regenerate" }));
     },
     editResend(sid, edit) {
       if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const locked = refusedByLock(core.turnLock(sid));
+      if (locked) return Promise.resolve(locked);
       const snapshot: ComposerSnapshot = {
         text: edit.text,
         chips: edit.chips,
@@ -974,6 +1002,8 @@ function createTurnSlice(core: StoreCore) {
     },
     resend(sid, snapshot, input) {
       if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const locked = refusedByLock(core.turnLock(sid));
+      if (locked) return Promise.resolve(locked);
       return track(sid, null, () => deps.engine.send(sid, { input, snapshot }));
     },
     canRetry: (sid) => deps.engine.canRetry?.(sid) ?? false,
@@ -1072,6 +1102,8 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
       return "proceed";
     },
     async onSignOut() {
+      // Other tabs hear it first, so their own cancels race this tab's instead of following it.
+      deps.hints.post({ v: 1, type: "signed_out", at: deps.now() });
       // The streams abort at once and the keepalive cancels are already posted; only the stopped states are awaited.
       const waited = new Promise((resolve) => setTimeout(resolve, SIGN_OUT_STOP_WAIT_MS));
       await Promise.race([deps.engine.stopAll("sign_out"), waited]);
@@ -1086,7 +1118,6 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
         removeAnnotations(userOrgKey);
       }
       core.identities.clear();
-      deps.hints.post({ v: 1, type: "signed_out", at: deps.now() });
       api.reset();
       return "proceed";
     },
@@ -1418,6 +1449,17 @@ function windowRem(): number {
     window.addEventListener("resize", read, { passive: true });
   }
   return windowWidthRem.value;
+}
+
+function refusedByLock(reason: TurnLockReason | null): TurnTerminal | null {
+  if (!reason) return null;
+  const code =
+    reason === "signed_out"
+      ? "session_expired"
+      : reason === "account_changed"
+        ? "account_changed"
+        : "approval_elsewhere";
+  return { state: "refused", error: { code, ...ERROR_LEDGER[code] } };
 }
 
 function refusedUnknown(): TurnTerminal {

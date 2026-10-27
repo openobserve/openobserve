@@ -782,6 +782,16 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const sids = runtime.abortAll(reason);
       await Promise.all(sids.map((sid) => engine.stop(sid)));
     },
+    async signedOutElsewhere() {
+      // The session is gone: each stream stops reading, its cancel goes out, and the turn ends with Sign in.
+      for (const sid of runtime.abortAll("signed_out")) {
+        const rec = record(sid);
+        const session = sessionOf(sid);
+        if (!rec || !session) continue;
+        deps.client.stop(rec.org, stopTarget(session, rec)).catch(() => undefined);
+        dispatch(rec, { type: "signed_out" });
+      }
+    },
     retry(sid) {
       const session = sessionOf(sid);
       const previous = last.get(sid);

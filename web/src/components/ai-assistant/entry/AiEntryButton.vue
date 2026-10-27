@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <span class="flex min-w-0 flex-col items-start text-start">
-          <span>{{ visibleLabel }}</span>
+          <span :class="appearance === 'toggle' ? 'max-md:sr-only' : ''">{{ visibleLabel }}</span>
           <span
             v-if="appearance === 'chip'"
             class="text-text-secondary hidden text-xs font-normal max-md:block"
@@ -172,10 +172,14 @@ export interface AiEntryButtonProps {
   objectKey?: string;
   /** The org the host loaded this object under; a door left on screen after an org switch is then refused. */
   boundOrg?: string;
+  /** A door that navigates first: activation runs this instead, and the destination opens the assistant. */
+  handoff?: () => void | Promise<void>;
 }
 
 export interface AiEntryButtonEmits {
   (e: "opened", result: OpenAssistantResult): void;
+  /** A pressed toggle was activated again: the host closes its dock. */
+  (e: "closed"): void;
 }
 
 /** One door of the app: its test id and the telemetry envelope it reports. */
@@ -380,6 +384,42 @@ export const AI_ENTRY_DOORS: readonly DoorRegistration[] = [
     entryVerb: "fix",
     objectKind: "dbm_finding",
   },
+  {
+    dataTest: "ai-entry-alert-query-ask",
+    entryKind: "editor_toggle",
+    entryVerb: "ask",
+    objectKind: "alert",
+  },
+  {
+    dataTest: "ai-entry-json-editor-ask",
+    entryKind: "editor_toggle",
+    entryVerb: "ask",
+    objectKind: "pipeline_node",
+  },
+  {
+    dataTest: "ai-entry-function-ask",
+    entryKind: "editor_toggle",
+    entryVerb: "ask",
+    objectKind: "function",
+  },
+  {
+    dataTest: "ai-entry-scheduled-query-ask",
+    entryKind: "editor_toggle",
+    entryVerb: "ask",
+    objectKind: "pipeline_node",
+  },
+  {
+    dataTest: "ai-entry-regex-ask",
+    entryKind: "editor_toggle",
+    entryVerb: "ask",
+    objectKind: "regex",
+  },
+  {
+    dataTest: "ai-entry-regex-field-ask",
+    entryKind: "object_verb",
+    entryVerb: "ask",
+    objectKind: "log_field",
+  },
 ];
 
 /** An empty-state door appends to the chat it opened from this route within this window. */
@@ -458,6 +498,7 @@ const props = withDefaults(defineProps<AiEntryButtonProps>(), {
   size: "sm",
   disabledReason: undefined,
   objectKey: undefined,
+  handoff: undefined,
 });
 
 const emit = defineEmits<AiEntryButtonEmits>();
@@ -613,6 +654,7 @@ function onSelect(event: Event): void {
 
 function onClick(event: MouseEvent): void {
   event.stopPropagation();
+  if (props.appearance === "toggle" && props.pressed && !locked.value) return emit("closed");
   void activate();
 }
 
@@ -624,10 +666,20 @@ async function activate(): Promise<void> {
   if (props.verb === "add_to_chat" && added.value) return;
   busy = true;
   try {
-    await run();
+    await (props.handoff ? runHandoff(props.handoff) : run());
   } finally {
     busy = false;
   }
+}
+
+// A stale door is refused like any other before it navigates; openAssistant says why.
+async function runHandoff(handoff: () => void | Promise<void>): Promise<void> {
+  const key = callerKey();
+  if (key && key !== store.state.userOrgKey) {
+    emit("opened", await openAssistant(callFor(undefined, controlEl())));
+    return;
+  }
+  await handoff();
 }
 
 async function run(): Promise<void> {

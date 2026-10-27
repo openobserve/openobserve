@@ -15,6 +15,7 @@
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 
 import { raw } from "@/types/i18n";
 
@@ -72,6 +73,56 @@ describe("OSheet", () => {
     expect(el.getAttribute("aria-label")).toBe("Assistant");
     expect(el.textContent).toContain("body");
     wrapper.unmount();
+  });
+
+  it("renders in place when inline, so a modal drawer's focus scope keeps it", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const wrapper = mount(OSheet, { props: { ...base, inline: true }, attachTo: host });
+    mounted.push(wrapper);
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
+  it("spans only the columns of the element it is aligned to, and follows it when it resizes", async () => {
+    const observers: ResizeObserverCallback[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          observers.push(callback);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const drawer = document.createElement("div");
+    let rect = { left: 460, right: 768, width: 308 };
+    drawer.getBoundingClientRect = () => rect as DOMRect;
+    vi.stubGlobal("innerWidth", 800);
+    mountSheet({ alignTo: drawer });
+    await nextTick();
+    expect(sheet()!.style.getPropertyValue("--o-sheet-start")).toBe("460");
+    expect(sheet()!.style.getPropertyValue("--o-sheet-end")).toBe("32");
+    rect = { left: 230, right: 768, width: 538 };
+    observers.forEach((callback) => callback([], {} as ResizeObserver));
+    expect(sheet()!.style.getPropertyValue("--o-sheet-start")).toBe("230");
+    vi.unstubAllGlobals();
+  });
+
+  it("spans the whole window on a phone or for a target as wide as the window, as every other sheet does", async () => {
+    const drawer = document.createElement("div");
+    drawer.getBoundingClientRect = () => ({ left: 10, right: 365, width: 355 }) as DOMRect;
+    vi.stubGlobal("innerWidth", 375);
+    mountSheet({ alignTo: drawer });
+    await nextTick();
+    expect(sheet()!.style.getPropertyValue("--o-sheet-start")).toBe("0");
+    expect(sheet()!.style.getPropertyValue("--o-sheet-end")).toBe("0");
+    vi.unstubAllGlobals();
+    mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+    mountSheet({});
+    await nextTick();
+    expect(sheet()!.style.getPropertyValue("--o-sheet-start")).toBe("0");
   });
 
   it("renders nothing while closed", () => {
@@ -251,6 +302,8 @@ describe("OSheet", () => {
     );
     const row = document.body.querySelector<HTMLElement>('[data-test="sheet-peek-row"]')!;
     expect(row.textContent).toContain("Checkout spike");
+    expect(row.getAttribute("aria-label")).toBeNull();
+    expect(row.querySelector(".sr-only")?.textContent).toBe("Show more");
     expect(handle().closest<HTMLElement>("div[style]")?.style.display).toBe("none");
     row.click();
     expect(wrapper.emitted("update:snap")).toEqual([["half"]]);

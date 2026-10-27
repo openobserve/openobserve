@@ -174,6 +174,16 @@ const tags = computed<ContextChip[]>(() => {
     sent: "whitelist",
   });
   const list: ContextChip[] = [];
+  const editor = props.scope.editor;
+  if (editor) {
+    list.push(tag("object", "query", t(`assistant.welcome.scopeObject.${editor.language}`)));
+    if (editor.stream)
+      list.push(
+        tag("stream", "stream", t("assistant.welcome.scopeStream", { stream: raw(editor.stream) })),
+      );
+    if (timeRange) list.push(tag("time", "time", timeRange));
+    return list;
+  }
   if (pageObject?.kind === "dashboard")
     list.push(
       tag(

@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :partial="turn.partial"
               :cancel-unconfirmed="outcome.record.cancelUnconfirmed"
               :org="session?.org ?? ''"
+              :sid="sid ?? undefined"
               :elapsed-ms="outcome.record.elapsedMs"
               :online="online"
               :persistence="persistence"

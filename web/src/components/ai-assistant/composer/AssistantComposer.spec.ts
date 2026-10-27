@@ -185,6 +185,32 @@ describe("states (`40` §1.3)", () => {
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
   });
 
+  it("says why when a lock lands between render and click, keeps the draft, and sends once it lifts", async () => {
+    const { wrapper, store, sid, textarea, send, status } = setup();
+    let lock: "approval_elsewhere" | null = "approval_elsewhere";
+    vi.spyOn(store, "turnLockOf").mockImplementation(() => lock);
+    send.mockResolvedValueOnce({
+      state: "refused",
+      error: {
+        code: "approval_elsewhere",
+        phase: "pre_admission",
+        retryable: false,
+        action: "none",
+      },
+    });
+    await type(textarea(), "why 5xx?");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    const line = "Another tab is waiting for your approval on this chat. Decide there first.";
+    expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toBe(line);
+    expect(status()).toContain(line);
+    expect(store.state.sessions[sid].composer.text).toBe("why 5xx?");
+    lock = null;
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it("is inert under an approval card: readonly, aria-disabled, the reason as helper (CT-07)", async () => {
     const { wrapper, store, sid, textarea } = setup();
     store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;

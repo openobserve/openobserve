@@ -109,6 +109,23 @@ describe("action registry", () => {
     expect(applier).not.toHaveBeenCalled();
   });
 
+  it("refuses a turn-starting action while another tab locks the chat, before its applier runs", async () => {
+    const { env } = makeEnv();
+    const store = env.store();
+    vi.spyOn(store, "turnLockOf").mockImplementation((sid) =>
+      sid === "s" ? "approval_elsewhere" : null,
+    );
+    const applier = vi.fn(() => ({ ok: true as const }));
+    registerApplier("rerun_now", applier);
+    createActionDispatcher(env);
+    await expect(applyAction("s", { kind: "rerun_now", turnId: "t" })).resolves.toEqual({
+      ok: false,
+      reason: "gated",
+    });
+    expect(applier).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalledWith("ai_evidence_action", expect.anything());
+  });
+
   it("turns a throwing applier into failed", async () => {
     registerApplier("copy", () => {
       throw new Error("boom");

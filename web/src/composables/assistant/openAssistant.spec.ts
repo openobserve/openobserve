@@ -20,6 +20,7 @@ import { raw } from "@/types/i18n";
 import { createAssistantStore, inertAssistantDeps } from "./assistantStore";
 import type {
   AssistantCapability,
+  AssistantHostAdapter,
   DockHostId,
   GateCode,
   HostRegistry,
@@ -114,7 +115,19 @@ interface Setup {
   route?: string;
   prefersFloating?: boolean;
   mounted?: DockHostId[];
+  adapters?: Partial<Record<DockHostId, AssistantHostAdapter>>;
   lgUp?: boolean;
+  turnLock?: () => "signed_out" | "account_changed" | "approval_elsewhere" | null;
+}
+
+// The fields `openAssistant` reads of a host: its row width, its minimum and its object's title.
+function hostAt(rowRem: number, title = "Alert · checkout", minWidthRem?: number) {
+  return {
+    dockRowRem: () => rowRem,
+    objectTitle: () => raw(title),
+    dockSlot: { value: null },
+    ...(minWidthRem !== undefined && { minWidthRem }),
+  } as unknown as AssistantHostAdapter;
 }
 
 function setup(options: Setup = {}) {
@@ -130,12 +143,16 @@ function setup(options: Setup = {}) {
   const store = createAssistantStore(deps, {
     drafts: createDraftStore({ delayMs: 0 }),
     viewportRem: () => 80,
+    ...(options.turnLock && { turnLock: options.turnLock }),
   });
   const gate = options.gate ?? "available";
   store.setIdentity({ userOrgKey: "k1", org: "org1" });
   store.syncCapability({ ...capability, gate });
   const mounted = new Set(options.mounted ?? []);
-  const hosts = { has: (id: DockHostId) => mounted.has(id) } as unknown as HostRegistry;
+  const hosts = {
+    has: (id: DockHostId) => mounted.has(id),
+    get: (id: DockHostId) => (mounted.has(id) ? options.adapters?.[id] : undefined),
+  } as unknown as HostRegistry;
   const notify = vi.fn();
   const pushRoute = vi.fn();
   const env: OpenAssistantEnv = {
@@ -434,6 +451,64 @@ describe("container resolution (10 §3.3)", () => {
     );
   });
 
+  it("opens the sidebar with a notice when the host cannot give the dock 20 rem beside 32", async () => {
+    const { open, store, notify } = setup({
+      mounted: ["regex"],
+      adapters: { regex: hostAt(48) },
+    });
+    const result = ok(await open({ ...headerOpen, entryKind: "editor_toggle", dockHost: "regex" }));
+    expect(result.container).toBe("sidebar");
+    expect(store.state.shell.placement.kind).toBe("sidebar");
+    expect(notify).toHaveBeenCalledWith("assistant.editor.tooNarrow", undefined);
+  });
+
+  it("docks when the row gives both, and a phone never refuses because the dock is a sheet", async () => {
+    const wide = setup({ mounted: ["regex"], adapters: { regex: hostAt(52) } });
+    expect(
+      ok(await wide.open({ ...headerOpen, entryKind: "editor_toggle", dockHost: "regex" }))
+        .container,
+    ).toBe("docked.regex");
+    const phone = setup({ mounted: ["regex"], adapters: { regex: hostAt(23) }, lgUp: false });
+    ok(await phone.open({ ...headerOpen, entryKind: "editor_toggle", dockHost: "regex" }));
+    expect(phone.store.state.shell.placement).toEqual({ kind: "docked", hostId: "regex" });
+    expect(phone.notify).not.toHaveBeenCalled();
+  });
+
+  it("keeps a dock's thread to its object: another alert in the same editor starts its own chat", async () => {
+    const adapter = hostAt(80, "Alert · checkout");
+    const { open, store } = setup({ mounted: ["alert_query"], adapters: { alert_query: adapter } });
+    const dockDoor = {
+      ...headerOpen,
+      entryKind: "editor_toggle" as const,
+      dockHost: "alert_query" as const,
+      thread: "current" as const,
+      payload: { chips: [], title: raw("Alert · checkout") },
+    };
+    const first = ok(await open(dockDoor));
+    store.setDraft(first.sid, { text: "keep me" });
+    store.close("close");
+    expect(ok(await open(dockDoor)).sid).toBe(first.sid);
+    store.close("close");
+    (adapter as { objectTitle: () => unknown }).objectTitle = () => raw("Alert · payments");
+    const other = ok(
+      await open({ ...dockDoor, payload: { chips: [], title: raw("Alert · payments") } }),
+    );
+    expect(other.sid).not.toBe(first.sid);
+  });
+
+  it("stages a send door's prompt instead of sending while this tab may not start a turn", async () => {
+    const { open, store, send, notify } = setup({ turnLock: () => "approval_elsewhere" });
+    const result = ok(await open(explain()));
+    expect(result.sent).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(store.state.sessions[result.sid].composer.text).toBe("Explain this log row");
+    expect(notify).toHaveBeenCalledWith("assistant.shell.approvalElsewhere", undefined);
+    const clicked = events()
+      .filter((e) => e.name === "ai_entry_clicked")
+      .at(-1);
+    expect(clicked?.properties.sends).toBe(false);
+  });
+
   it("names the sheet below lg while the placement stays the sidebar", async () => {
     const { open, store } = setup({ lgUp: false });
     expect(ok(await open(headerOpen)).container).toBe("sheet");
@@ -442,13 +517,21 @@ describe("container resolution (10 §3.3)", () => {
 
   it("opens floating on a prefers-floating route but pinned when floating would cover the source", async () => {
     const { open, store } = setup({ prefersFloating: true });
-    const left = document.createElement("div");
-    left.getBoundingClientRect = () => ({ right: 400 }) as DOMRect;
-    ok(await open({ ...headerOpen, invoker: left }));
+    const rect = (left: number, right: number, top: number, bottom: number) =>
+      ({ left, right, top, bottom }) as DOMRect;
+    const leftPanel = document.createElement("div");
+    leftPanel.getBoundingClientRect = () => rect(100, 400, 200, 400);
+    ok(await open({ ...headerOpen, invoker: leftPanel }));
     expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
     store.close("close");
+    // The header's own button sits above the card's top, so it is not covered either.
+    const headerButton = document.createElement("button");
+    headerButton.getBoundingClientRect = () => rect(1180, 1210, 4, 32);
+    ok(await open({ ...headerOpen, invoker: headerButton }));
+    expect(store.sidebarForcedPinned.value).toBe(false);
+    store.close("close");
     const right = document.createElement("div");
-    right.getBoundingClientRect = () => ({ right: 1200 }) as DOMRect;
+    right.getBoundingClientRect = () => rect(900, 1200, 200, 400);
     ok(await open({ ...headerOpen, invoker: right }));
     expect(store.sidebarForcedPinned.value).toBe(true);
     expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });

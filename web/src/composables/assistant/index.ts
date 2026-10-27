@@ -35,6 +35,8 @@ export {
   registerAssistantFocusTarget,
   registerContainerCloser,
   registerEscapeRung,
+  runEscapeLadder,
+  stopLadderEscape,
   useAssistantShortcuts,
 } from "./shortcuts";
 export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";
@@ -59,15 +61,79 @@ export {
 } from "./context/legacyPayloadToChips";
 export { serialize } from "./context/serialize";
 export { parseAttachmentBlocks } from "./record";
-export { MAX_IMAGES, UNDO_WINDOW_MS, isRunning } from "./assistantStore";
-export { readRecall, readHints, markHintSeen, migrateHome, writeHome } from "./prefs";
+export {
+  MAIN_MIN_REM,
+  MAX_IMAGES,
+  NAV_RAIL_REM,
+  SIDEBAR_MIN_REM,
+  UNDO_WINDOW_MS,
+  isRunning,
+} from "./assistantStore";
+export { sidebarWidthFor } from "./sidebarWidth";
+export { readRecall, readHints, readSidebar, markHintSeen, migrateHome, writeHome } from "./prefs";
 export { assistantDashboardDraft, clearDashboardDraft } from "./actions/appliers/drafts";
+export {
+  assistantObjectNameKey,
+  focusDockComposer,
+  hostRegistry,
+  isDockOpen,
+  queueDockStage,
+  reportDockWidth,
+  useAssistantDockHost,
+  useAssistantDockToggle,
+  useDockedEditor,
+} from "./hostAdapter";
+export {
+  scheduleResizeSignal,
+  useAssistantPanelWidth,
+  useSidebarFloating,
+} from "./useAssistantPanelWidth";
+export {
+  PROPOSAL_LANGUAGE_NAMES,
+  proposalFor,
+  useEditorProposal,
+  withProvenance,
+  withoutProvenance,
+} from "./useEditorProposal";
+export { createHintChannel } from "./hints";
+export {
+  assistantLifecycle,
+  registerLifecycleDialogs,
+  runLeaveGuards,
+  useAssistantLeaveGuard,
+  useLifecycleQuestion,
+} from "./lifecycle";
+export {
+  markSignedIn,
+  useOtherAccountSignedIn,
+  useSignedOutElsewhere,
+  turnLockKey,
+  useTurnLock,
+} from "./runtimeHandle";
 export { queryRunOf } from "./actions/appliers/query";
 export type { TurnStatusText } from "./turnStateMachine";
 export type { AssistantContextView } from "./context/useAssistantContext";
 export type { ChipState, SeesRow, TimeWindow } from "./context/contextChips";
 export type { RecallEntry } from "./prefs";
 export type { DashboardDraft } from "./actions/registry";
+export type {
+  AssistantDockHost,
+  AssistantDockHostOptions,
+  DockedEditor,
+  DockedEditorConfig,
+} from "./hostAdapter";
+export type { AssistantPanelWidth } from "./useAssistantPanelWidth";
+export type {
+  AiLabelState,
+  EditorBinding,
+  EditorProposal,
+  PendingProposal,
+  ProposalLanguage,
+  ProposalProvenance,
+} from "./useEditorProposal";
+export type { AssistantHintChannel } from "./hints";
+export type { AssistantLifecycle, LeaveGuard, LifecycleQuestion, OpenQuestion } from "./lifecycle";
+export type { InsertOutcome } from "./actions/appliers/editor";
 export type { AssistantScope, AssistantStartersInput, Starter } from "./useAssistantStarters";
 export type { AssistantClient, FrameSink, SendResult, TailResult } from "./useAssistantClient";
 export type * from "./assistantStore.types";

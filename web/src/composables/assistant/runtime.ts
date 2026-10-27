@@ -23,7 +23,7 @@ import {
   type ShallowRef,
 } from "vue";
 import { QueryObserver, type QueryKey, type QueryObserverOptions } from "@tanstack/vue-query";
-import type { Router } from "vue-router";
+import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 
 import config from "@/aws-exports";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -57,7 +57,10 @@ import type {
   OpenAssistantResult,
 } from "./assistantStore.types";
 import { serialize } from "./context/serialize";
+import { createHintChannel, type AssistantHintChannel } from "./hints";
+import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
+import { setRuntimeHandle } from "./runtimeHandle";
 import { createTurnEngine, type TurnEngineDeps } from "./turnEngine";
 import {
   createAssistantCapability,
@@ -95,6 +98,8 @@ export interface AssistantRuntime {
   store: AssistantStoreInternal;
   capability: AssistantCapabilityHandle;
   hosts: HostRegistry;
+  hints: AssistantHintChannel;
+  lifecycle: AssistantLifecycleRuntime;
   context: ShallowRef<AssistantRuntimeContext | null>;
   /** Set by `telemetryContext`; the `context.client.ui_version` of every turn (B-13). */
   uiVersion: ShallowRef<string>;
@@ -109,14 +114,20 @@ export type AssistantRuntimeStore = AssistantStoreInternal & {
 };
 
 export function getAssistantRuntime(): AssistantRuntime {
-  runtime ??= buildRuntime();
+  if (!runtime) {
+    runtime = buildRuntime();
+    setRuntimeHandle(runtime);
+  }
   return runtime;
 }
 
 /** Drops the singleton so a spec builds a fresh runtime; never called by app code. */
 export function resetAssistantRuntimeForTests(): void {
   runtime?.capability.dispose();
+  runtime?.lifecycle.dispose();
+  runtime?.hints.close();
   runtime = null;
+  setRuntimeHandle(null);
 }
 
 /** A new tab the opened page cannot script back; `noopener` would make `window.open` return null even on success. */
@@ -177,7 +188,13 @@ function buildRuntime(): AssistantRuntime {
       ),
     );
 
-    const store = createAssistantStore(deps, { signOutKeys: () => orgKeysOf(context.value) });
+    const hints = createHintChannel("");
+    deps.hints = hints;
+    const store = createAssistantStore(deps, {
+      signOutKeys: () => orgKeysOf(context.value),
+      remoteLight: () => lifecycle.remoteLight(),
+      turnLock: (sid) => lifecycle.turnLock(sid),
+    });
     flushDraftsOnLeave(store);
     // A deleted session, or one of the org the user just left, keeps no Run rows or searches.
     watch(
@@ -196,21 +213,32 @@ function buildRuntime(): AssistantRuntime {
       immediate: true,
       flush: "sync",
     });
-    watchIdentity(context, store, capability);
+    watchIdentity(context, store, capability, hints);
+    const lifecycle = createLifecycle({
+      store,
+      hints,
+      engine: deps.engine,
+      client: useAssistantClient(),
+      now: deps.now,
+      currentOrgName: () =>
+        context.value?.getOrg()?.name ?? context.value?.getOrg()?.identifier ?? "",
+      currentOrg: () => context.value?.getOrg()?.identifier ?? null,
+      currentEmail: () => context.value?.getUser()?.email ?? null,
+    });
     const openAssistant = createOpenAssistant({
       store,
       capability: () => capability.capability.value,
       hosts,
       routeName: () => String(context.value?.router?.currentRoute.value.name ?? ""),
-      routePrefersFloating: () =>
-        context.value?.router?.currentRoute.value.meta?.assistantPrefersFloating === true,
+      routePrefersFloating: () => prefersFloating(context.value?.router?.currentRoute.value),
       pushRoute: (to) => void context.value?.router?.push(to).catch(() => undefined),
       lgUp: () => lgUp.value,
       viewportPx: () => window.innerWidth,
+      viewportHeightPx: () => window.innerHeight,
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
       now: deps.now,
     });
-    return { store, capability, hosts, context, uiVersion, openAssistant };
+    return { store, capability, hosts, hints, lifecycle, context, uiVersion, openAssistant };
   })!;
 }
 
@@ -345,6 +373,7 @@ function watchIdentity(
   context: ShallowRef<AssistantRuntimeContext | null>,
   store: AssistantStoreInternal,
   capability: AssistantCapabilityHandle,
+  hints: AssistantHintChannel,
 ): void {
   let generation = 0;
   watch(
@@ -362,9 +391,24 @@ function watchIdentity(
       if (asked !== generation) return;
       capability.setIdentity(identity);
       store.setIdentity(identity);
+      hints.rebind(identity?.userOrgKey ?? "");
     },
     { immediate: true, deep: true },
   );
+  // The user channel follows the user, never the org (`signed_out` reaches every org's tabs).
+  watch(
+    () => context.value?.getUser()?.email ?? null,
+    (email) => void hints.bindUser(email),
+    { immediate: true },
+  );
+}
+
+// A route asks for the floating panel by meta, or by a predicate when only some of its tabs need the width.
+function prefersFloating(route: RouteLocationNormalizedLoaded | undefined): boolean {
+  const wanted = route?.meta?.assistantPrefersFloating;
+  return typeof wanted === "function"
+    ? wanted(route as RouteLocationNormalizedLoaded)
+    : wanted === true;
 }
 
 function createHostRegistry(): HostRegistry {

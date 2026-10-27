@@ -389,8 +389,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                         {{ t("logs.detailTable.sendToAiChat") }}
                       </ODropdownItem>
+                      <AiEntryButton
+                        v-if="assistantV2"
+                        v-bind="regexDoor(row.field, row.value)"
+                        appearance="menu-item"
+                      />
                       <ODropdownItem
-                        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                        v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                         data-test="log-details-table-redirect-to-regex-pattern-btn"
                         @select="createRegexPatternFromLogs(row.field, row.value)"
                       >
@@ -710,6 +715,8 @@ import {
   logFieldBuild,
   logRowBuild,
   logsDoorBase,
+  regexFieldHandoff,
+  regexPatternsOpener,
   rowKeyOf,
   type LogsDoorBase,
 } from "@/plugins/logs/logsDoors";
@@ -1421,6 +1428,20 @@ export default defineComponent({
       objectKey: `${rowKeyOf(rowData.value)}:${String(field)}`,
     });
 
+    // The regex drawer receives the prompt in its own dock; the sidebar never also gets it.
+    const regexDoor = (field: string, value: unknown) => ({
+      verb: "ask" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.createRegex"),
+      tooltip: t("assistant.entry.tooltip.createRegex"),
+      dataTest: "ai-entry-regex-field-ask" as const,
+      build: () => undefined,
+      handoff: () => regexFieldHandoff(recordDoorBase(), String(field), value, openRegexPatterns),
+    });
+    const openRegexPatterns = regexPatternsOpener(store, router, () => emit("closeTable"));
+
     const addSearchTerm = (
       field: string | number,
       fieldValue: string | number | boolean,
@@ -1568,6 +1589,7 @@ export default defineComponent({
       getBtnLogo,
       regexIcon,
       createRegexPatternFromLogs,
+      regexDoor,
     };
   },
   async created() {

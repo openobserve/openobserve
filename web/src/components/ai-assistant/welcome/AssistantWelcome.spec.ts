@@ -199,3 +199,19 @@ describe("AssistantWelcome", () => {
     wrapper.unmount();
   });
 });
+
+describe("AssistantWelcome docked", () => {
+  it("leads the scope line with the editor's object, then its stream and range", () => {
+    const wrapper = mountWelcome({
+      scope: {
+        ...SCOPE,
+        timeRange: raw("last 1 h"),
+        editor: { language: "sql", stream: "default" },
+      },
+    });
+    const tags = wrapper
+      .findAll('[data-test^="assistant-welcome-scope-"]')
+      .map((tag) => tag.text());
+    expect(tags).toEqual(["this SQL", "stream default", "last 1 h"]);
+  });
+});

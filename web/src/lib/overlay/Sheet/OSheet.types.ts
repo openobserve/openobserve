@@ -43,6 +43,10 @@ export interface OSheetProps {
   keepMounted?: boolean;
   /** Escape closes a non-persistent sheet; off when the consumer owns Escape. */
   closeOnEscape?: boolean;
+  /** Renders in place instead of in `body`, so a sheet inside a modal drawer stays inside its focus scope. */
+  inline?: boolean;
+  /** Spans only this element's columns (a drawer narrower than the window) instead of the whole width. */
+  alignTo?: HTMLElement | null;
 }
 
 export interface OSheetEmits {

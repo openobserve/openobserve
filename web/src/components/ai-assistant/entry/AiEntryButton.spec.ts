@@ -720,3 +720,87 @@ describe("door registry (DG-12 AC 1)", () => {
     ]);
   });
 });
+
+describe("AiEntryButton editor toggle and hand-off", () => {
+  const toggle: Partial<AiEntryButtonProps> = {
+    verb: "ask",
+    entryKind: "editor_toggle",
+    objectKind: "alert",
+    appearance: "toggle",
+    dockHost: "alert_query",
+    thread: "current",
+    build: () => ({ chips: [], title: raw("Alert · checkout") }),
+    tooltip: raw("Opens the assistant beside this editor"),
+    dataTest: "ai-entry-alert-query-ask",
+  };
+
+  it("docks through openAssistant while released and closes through its host while pressed", async () => {
+    openAssistant.mockResolvedValue({ ok: false, reason: "loading" });
+    const released = setup(toggle);
+    const button = released.wrapper.get('[data-test="ai-entry-alert-query-ask"]');
+    expect(button.attributes("aria-pressed")).toBe("false");
+    await button.trigger("click");
+    await flushPromises();
+    expect(openAssistant).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        entryKind: "editor_toggle",
+        dockHost: "alert_query",
+        intent: "open",
+      }),
+    );
+    released.wrapper.unmount();
+    openAssistant.mockClear();
+    const pressed = setup({ ...toggle, pressed: true });
+    await pressed.wrapper.get('[data-test="ai-entry-alert-query-ask"]').trigger("click");
+    expect(pressed.wrapper.emitted("closed")).toHaveLength(1);
+    expect(openAssistant).not.toHaveBeenCalled();
+    pressed.wrapper.unmount();
+  });
+
+  it("runs a hand-off door's navigation instead of opening the assistant here", async () => {
+    openAssistant.mockClear();
+    const handoff = vi.fn();
+    const { wrapper } = setup({
+      verb: "ask",
+      objectKind: "log_field",
+      appearance: "button",
+      handoff,
+      dataTest: "ai-entry-regex-field-ask",
+    });
+    await wrapper.get('[data-test="ai-entry-regex-field-ask"]').trigger("click");
+    await flushPromises();
+    expect(handoff).toHaveBeenCalledTimes(1);
+    expect(openAssistant).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("refuses a hand-off door that outlived an org switch before it navigates", async () => {
+    openAssistant.mockClear();
+    const handoff = vi.fn();
+    const { wrapper, store } = setup({
+      verb: "ask",
+      objectKind: "log_field",
+      appearance: "button",
+      handoff,
+      dataTest: "ai-entry-regex-field-ask",
+    });
+    store.setIdentity({ userOrgKey: "k2", org: "other" });
+    await wrapper.get('[data-test="ai-entry-regex-field-ask"]').trigger("click");
+    await flushPromises();
+    expect(handoff).not.toHaveBeenCalled();
+    expect(lastCall().userOrgKey).toBe("k1");
+    wrapper.unmount();
+  });
+
+  it("keeps a locked hand-off door's reason instead of navigating", async () => {
+    const handoff = vi.fn();
+    const { wrapper } = setup(
+      { verb: "ask", appearance: "button", handoff, dataTest: "ai-entry-regex-field-ask" },
+      "no_permission",
+    );
+    await wrapper.get('[data-test="ai-entry-regex-field-ask"]').trigger("click");
+    await flushPromises();
+    expect(handoff).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+});

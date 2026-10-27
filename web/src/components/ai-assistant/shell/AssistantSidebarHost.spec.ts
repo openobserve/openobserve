@@ -103,6 +103,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  window.innerWidth = 1024;
   document.body.innerHTML = "";
   closeLockedPanel();
   track.mockClear();
@@ -129,6 +130,122 @@ describe("AssistantSidebarHost", () => {
     expect(column()!.dataset.mode).toBe("pinned");
     expect(column()!.style.getPropertyValue("--o-assistant-sidebar-width")).toBe("26");
     expect(column()!.style.width).toBe("");
+  });
+
+  it("puts the resize handle on the panel's inner edge; a key step stores the width", async () => {
+    window.innerWidth = 1280;
+    const { open, store } = await setup();
+    open();
+    store.setSidebarWidth(24);
+    await flushPromises();
+    const handle = column()!.querySelector<HTMLElement>(
+      '[data-test="assistant-shell-resize-handle"]',
+    )!;
+    expect(handle.getAttribute("aria-valuenow")).toBe("24");
+    handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    await flushPromises();
+    expect(store.state.shell.sidebarWidthRem).toBe(25);
+    expect(handle.getAttribute("aria-valuenow")).toBe("25");
+    handle.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await flushPromises();
+    expect(store.state.shell.sidebarWidthRem).toBe(24);
+  });
+
+  it("holds a stored width too wide for the window instead of floating, and reports what it draws", async () => {
+    window.innerWidth = 1100;
+    const { open, store } = await setup();
+    open();
+    store.setSidebarWidth(34);
+    await flushPromises();
+    const handle = column()!.querySelector<HTMLElement>(
+      '[data-test="assistant-shell-resize-handle"]',
+    )!;
+    expect(column()!.dataset.mode).toBe("pinned");
+    expect(column()!.style.getPropertyValue("--o-assistant-sidebar-width")).toBe("31.25");
+    expect(handle.getAttribute("aria-valuenow")).toBe("31.3");
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(
+      Number(handle.getAttribute("aria-valuemax")),
+    );
+  });
+
+  it("follows a drag live without storing, then stores once on release", async () => {
+    window.innerWidth = 1280;
+    const { open, store } = await setup();
+    open();
+    store.setSidebarWidth(24);
+    await flushPromises();
+    const handle = column()!.querySelector<HTMLElement>(
+      '[data-test="assistant-shell-resize-handle"]',
+    )!;
+    handle.setPointerCapture = () => undefined;
+    handle.releasePointerCapture = () => undefined;
+    handle.dispatchEvent(
+      new PointerEvent("pointerdown", { button: 0, clientX: 900, pointerId: 7 }),
+    );
+    handle.dispatchEvent(new PointerEvent("pointermove", { clientX: 836, pointerId: 7 }));
+    await flushPromises();
+    expect(column()!.style.getPropertyValue("--o-assistant-sidebar-width")).toBe("28");
+    expect(column()!.hasAttribute("data-dragging")).toBe(true);
+    expect(store.state.shell.sidebarWidthRem).toBe(24);
+    handle.dispatchEvent(new PointerEvent("pointerup", { clientX: 836, pointerId: 7 }));
+    await flushPromises();
+    expect(store.state.shell.sidebarWidthRem).toBe(28);
+    expect(column()!.hasAttribute("data-dragging")).toBe(false);
+  });
+
+  it("rings the source a door opened from while its chat sits pinned beside it", async () => {
+    const { store, invoker } = await setup();
+    const sid = store.createSession({
+      origin: { entryKind: "object_verb", objectKind: "panel", container: "sidebar" },
+    });
+    store.open(
+      { kind: "sidebar", mode: "floating" },
+      { sid, focus: "none", invoker: invoker.value, forcePinned: true },
+    );
+    await flushPromises();
+    expect(invoker.value!.hasAttribute("data-assistant-source")).toBe(true);
+    expect(invoker.value!.classList.contains("ring-2")).toBe(true);
+    expect(invoker.value!.classList.contains("ring-inset")).toBe(true);
+    store.close("close");
+    await flushPromises();
+    expect(invoker.value!.hasAttribute("data-assistant-source")).toBe(false);
+    expect(invoker.value!.classList.contains("ring-focus-ring-accent")).toBe(false);
+  });
+
+  it("rings the panel a toolbar door sits in, not the door itself", async () => {
+    const { store, invoker } = await setup();
+    const panel = document.createElement("div");
+    panel.setAttribute("data-assistant-source-scope", "");
+    document.body.appendChild(panel);
+    panel.appendChild(invoker.value!);
+    const sid = store.createSession({
+      origin: { entryKind: "object_verb", objectKind: "panel", container: "sidebar" },
+    });
+    store.open(
+      { kind: "sidebar", mode: "floating" },
+      { sid, focus: "none", invoker: invoker.value, forcePinned: true },
+    );
+    await flushPromises();
+    expect(panel.hasAttribute("data-assistant-source")).toBe(true);
+    expect(panel.classList.contains("ring-2")).toBe(true);
+    expect(invoker.value!.hasAttribute("data-assistant-source")).toBe(false);
+  });
+
+  it("keeps the legacy expanded width once on the first revamped open", async () => {
+    window.innerWidth = 1280;
+    const vuexWithLegacy = fakeVuex();
+    (vuexWithLegacy.state as Record<string, unknown>).isAiChatExpanded = true;
+    fake.current = fakeAssistant();
+    fake.current.store.setIdentity(null);
+    const router = fakeRouter();
+    await router.push("/logs");
+    mount(AssistantSidebarHost, {
+      global: { plugins: [router, vuexWithLegacy] },
+      attachTo: document.body,
+    });
+    fake.current.store.setIdentity({ userOrgKey: "k1", org: "default" });
+    await flushPromises();
+    expect(fake.current.store.state.shell.sidebarWidthRem).toBe(40);
   });
 
   it("renders the same session as the sheet at half below lg", async () => {
