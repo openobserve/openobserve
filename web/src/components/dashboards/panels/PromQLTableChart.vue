@@ -74,13 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="panelConfig.table_pagination && !store.state.printMode"
-              :pagination="scope.pagination"
-              :pagination-options="scope.paginationOptions"
+              :pagination="{ page: scope.currentPage, rowsPerPage: scope.pageSize }"
               :total-rows="scope.totalRows"
-              :pages-number="scope.pagesNumber"
+              :pages-number="scope.totalPages"
               :is-first-page="scope.isFirstPage"
               :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setRowsPerPage"
+              @update:rows-per-page="scope.setPageSize"
               @first-page="scope.firstPage"
               @prev-page="scope.prevPage"
               @next-page="scope.nextPage"
@@ -232,10 +231,6 @@ export default defineComponent({
       );
       return filtered;
     });
-
-    // Note: paginationOptions is now provided by TableRenderer's slot
-    // and accessible via scope.paginationOptions in the template
-    // This avoids code duplication
 
     const pagination = ref({
       rowsPerPage: 0, // 0 = show all rows (like SQL table)
