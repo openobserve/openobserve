@@ -27195,7 +27195,7 @@
       "joinsFleet": "使用此令牌安装的 Collector 将加入机群 {fleet} 并运行 {config} v{version}。",
       "joinsFleetNoConfig": "使用此令牌安装的 Collector 将加入机群 {fleet}，该机群尚无配置。",
       "envRefNote": "在配置中使用 {ref} 引用凭据，使密钥保留在主机上。",
-      "httpTransport": "代理或负载均衡器无法承载 WebSocket（使用 HTTP 轮询）",
+      "websocketTransport": "使用 WebSocket（配置即时下发，需代理支持）",
       "kubernetesNote": "部署一个 DaemonSet，在同一容器中运行 supervisor 和 Collector。通过更改镜像标签进行升级。",
       "kubernetesAgent": "Agent（DaemonSet）",
       "kubernetesGateway": "Gateway（StatefulSet）",
