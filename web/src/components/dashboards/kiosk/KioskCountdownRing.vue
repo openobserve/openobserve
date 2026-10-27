@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span
-    class="relative inline-flex size-7.5 shrink-0 items-center justify-center rounded-full"
+    class="relative inline-flex shrink-0 items-center justify-center rounded-full"
+    :class="size === 'sm' ? 'size-5' : 'size-7.5'"
     tabindex="0"
     :aria-label="tooltip"
     :data-state="state"
@@ -69,8 +70,10 @@ const props = withDefaults(
     progress?: number;
     state?: "running" | "spinning" | "paused" | "off";
     tooltip: I18nText;
+    /** `sm` for a ring with no icon inside, such as beside a compact status text. */
+    size?: "sm" | "md";
   }>(),
-  { progress: 0, state: "running" },
+  { progress: 0, state: "running", size: "md" },
 );
 
 const clamped = computed(() => Math.min(1, Math.max(0, props.progress)));
