@@ -414,6 +414,18 @@ describe("DomainManagement Component", () => {
       expect(ok?.className).toContain("bg-button-destructive");
     });
 
+    it("keeps the removed domain's name for the closing fade", async () => {
+      const vm = wrapper.vm;
+      vm.domains.push({ name: "fading.com", policy: "allow_all", allowedEmails: [] });
+      await nextTick();
+      await vm.removeDomain(vm.domains.length - 1);
+      await vm.doRemoveDomain();
+
+      expect(vm.confirmRemoveDomainOpen).toBe(false);
+      expect(vm.domains.some((d: { name: string }) => d.name === "fading.com")).toBe(false);
+      expect(vm.pendingRemoveDomainName).toBe("fading.com");
+    });
+
     it("keeps unblocking an email non-destructive and names the email in bold", async () => {
       const vm = wrapper.vm;
       const domain = {

@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showBulkDeleteConfirm = false"
     >
       <p class="py-2">
-        {{ t("synthetics.dialog.bulkDeleteBody", { count: selectedMonitorIds.length }) }}
+        {{ t("synthetics.dialog.bulkDeleteBody", { count: bulkDeleteCount }) }}
       </p>
     </ODialog>
 
@@ -905,6 +905,8 @@ watch(searchAcrossFolders, async (newVal) => {
 const selectedMonitorIds = ref<string[]>([]);
 const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
+// Set on open and never cleared: the selection empties before the dialog finishes closing.
+const bulkDeleteCount = ref(0);
 const monitorsToMove = ref<string[]>([]);
 
 // Both delete handlers' 409s render here, with distinct titles for a named parent vs outside ones.
@@ -937,6 +939,7 @@ const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
 
 const openBulkDeleteConfirm = () => {
+  bulkDeleteCount.value = selectedMonitorIds.value.length;
   showBulkDeleteConfirm.value = true;
 };
 

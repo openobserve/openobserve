@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
     message-keypath="iam.appRoles.deleteConfirm"
-    :message-name="deleteConformDialog.name"
+    :message-name="deleteConformDialog.data?.role_name"
     :warning-message="deleteImpactMessage"
     ok-variant="destructive"
     @update:ok="_deleteRole"
@@ -239,8 +239,6 @@ const assignMemberToRole = async (role: any) => {
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
-  // Not cleared with `data`, so the name stays visible while the dialog fades out.
-  name: "",
 });
 
 const selectedRoleNames = ref<string[]>([]);
@@ -451,7 +449,6 @@ const deleteImpactMessage = ref(raw(""));
 const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
   deleteConformDialog.value.data = row;
-  deleteConformDialog.value.name = row?.role_name ?? "";
   deleteImpactMessage.value = t("iam.rolesPage.delete.impact", { count: 0 });
 
   try {

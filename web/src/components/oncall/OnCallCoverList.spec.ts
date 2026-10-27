@@ -261,6 +261,30 @@ describe("OnCallCoverList", () => {
         .find((c) => c.attributes("data-test") === "oncall-cover-remove-dialog");
       expect(dialog!.props("primaryButtonVariant")).toBe("destructive");
     });
+
+    it("keeps the sentence while the dialog fades out after the remove", async () => {
+      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      // Renders its body while closed, as the real dialog does during its fade.
+      const FadingDialog = {
+        name: "ODialog",
+        props: ["open"],
+        emits: ["click:primary", "click:secondary", "update:open"],
+        template: `<div :data-open="String(open)"><slot />
+          <button data-test="confirm" @click="$emit('click:primary')">ok</button></div>`,
+      };
+      const wrapper = mount(OnCallCoverList, {
+        props: { teamId: "team_1", timezone: "UTC" },
+        global: { plugins: [i18n, store], stubs: { ...stubs, ODialog: FadingDialog } },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-cover-remove-ovr_1"]').trigger("click");
+      await wrapper.find('[data-test="confirm"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find("[data-open]").attributes("data-open")).toBe("false");
+      expect(wrapper.find('[data-test="oncall-cover-remove-name"]').text()).toBe("sam@o2.ai");
+    });
   });
 
   /// A cover replaces the holder of ONE position and leaves the others alone,

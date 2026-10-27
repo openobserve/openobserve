@@ -372,4 +372,63 @@ describe("ConfirmDialog", () => {
       expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
     });
   });
+
+  describe("closing fade", () => {
+    const keypath = "confirmDialogSpec.deleteNamed";
+    const body = () => wrapper.find('[data-test="dialog-box"]');
+
+    it("keeps the name, title and labels while the caller clears its props on close", async () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({
+        title: "Delete alert",
+        message: undefined,
+        messageKeypath: keypath,
+        messageName: "cpu-high",
+        warningMessage: "Cannot be undone",
+        okLabel: "Delete",
+        okVariant: "destructive",
+      });
+      await wrapper.setProps({
+        modelValue: false,
+        title: undefined,
+        messageName: "",
+        messageKeypath: undefined,
+        message: "",
+        warningMessage: "",
+        okLabel: undefined,
+        okVariant: "primary",
+      });
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
+      expect(dialog.props("title")).toBe("Delete alert");
+      expect(dialog.props("primaryButtonLabel")).toBe("Delete");
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("size")).toBe("md");
+      expect(wrapper.find('[data-test="confirm-dialog-name"]').text()).toBe("cpu-high");
+      expect(body().text()).toContain("Cannot be undone");
+    });
+
+    it("keeps a bulk count in the message after close", async () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ message: "Delete 2 alerts?" });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+      await wrapper.setProps({ modelValue: false, message: "Delete 0 alerts?" });
+      expect(body().text()).toContain("Delete 2 alerts?");
+      expect(body().text()).not.toContain("0 alerts");
+    });
+
+    it("follows live prop updates while open", async () => {
+      await wrapper.setProps({ message: "Updated message", title: "Updated title" });
+      expect(body().text()).toContain("Updated message");
+      expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Updated title");
+    });
+
+    it("shows fresh values when reopened", async () => {
+      await wrapper.setProps({ modelValue: false, message: "" });
+      expect(body().text()).toContain("Dialog Message");
+      await wrapper.setProps({ modelValue: true, message: "Second message", title: "Second" });
+      expect(body().text()).toContain("Second message");
+      expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Second");
+    });
+  });
 });

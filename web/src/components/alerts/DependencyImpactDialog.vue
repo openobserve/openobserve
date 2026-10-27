@@ -548,13 +548,12 @@ const openInNewTab = (n: DepNode) => {
 const requestDelete = (node: DepNode) => {
   confirm.value = { visible: true, node };
 };
-// The node is kept on close so title, name and message stay put while the dialog fades out.
 const cancelDelete = () => {
-  confirm.value.visible = false;
+  confirm.value = { visible: false, node: null };
 };
 const performDelete = async () => {
   const n = confirm.value.node;
-  confirm.value.visible = false;
+  confirm.value = { visible: false, node: null };
   if (!n) return;
   const org_identifier = org();
   // Read before the prune below: focusNode re-derives from the graph, so once the

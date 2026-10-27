@@ -52,14 +52,28 @@ describe("DomainOrgMappings — remove confirm", () => {
     expect(dialog.props("okVariant")).toBe("destructive");
   });
 
-  it("keeps the removed domain in the message while the dialog fades out", async () => {
-    const wrapper = mountList();
+  it("keeps the removed domain in the real ConfirmDialog while it fades out", async () => {
+    // Renders its body while closed, as the real dialog does during its fade.
+    const FadingDialog = {
+      name: "ODialog",
+      props: ["open"],
+      emits: ["click:primary", "click:secondary", "update:open"],
+      template: `<div :data-open="String(open)"><slot />
+        <button data-test="confirm" @click="$emit('click:primary')">ok</button></div>`,
+    };
+    const wrapper = mount(DomainOrgMappings, {
+      props: { modelValue: MAPPINGS },
+      global: {
+        plugins: [i18n],
+        stubs: { DomainOrgMappingDialog: true, ODialog: FadingDialog },
+      },
+    });
     await wrapper.find('[data-test="settings-domain-org-mappings-delete-0"]').trigger("click");
-    const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
-    dialog.vm.$emit("update:ok");
+    await wrapper.find('[data-test="confirm"]').trigger("click");
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([[MAPPINGS[1]]]);
-    expect(dialog.props("messageName")).toBe("acme.com");
+    expect(wrapper.find("[data-open]").attributes("data-open")).toBe("false");
+    expect(wrapper.find('[data-test="confirm-dialog-name"]').text()).toBe("acme.com");
   });
 });

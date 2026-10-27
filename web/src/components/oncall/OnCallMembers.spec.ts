@@ -370,7 +370,9 @@ describe("OnCallMembers", () => {
     confirm.vm.$emit("update:cancel");
     await flushPromises();
     expect(confirm.props("modelValue")).toBe(false);
-    expect(confirm.props("messageName")).toBe("ana@o2.ai");
+    expect(confirm.props("messageName")).toBeUndefined();
+    // The real ConfirmDialog keeps what it showed while open, so the fade-out still reads right.
+    expect((confirm.vm as any).shown.messageName).toBe("ana@o2.ai");
   });
 
   describe("absences", () => {

@@ -329,11 +329,19 @@ describe("DependencyImpactDialog", () => {
     mountDialog({ kind: "template", name: "tpl-http" });
     await flushPromises();
     const confirm = await openDeleteConfirm("slack");
-    confirm.vm.$emit("update:cancel");
+    (
+      document.querySelector(
+        '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]',
+      ) as HTMLElement
+    ).click();
     await flushPromises();
     expect(confirm.props("modelValue")).toBe(false);
-    expect(confirm.props("messageKeypath")).toBe("alert_dependencies.deleteDestinationMessage");
-    expect(confirm.props("messageName")).toBe("slack");
+    expect(confirm.props("messageName")).toBeUndefined();
+    // The real ConfirmDialog keeps what it showed while open, so the fade-out still reads right.
+    const shown = (confirm.vm as any).shown;
+    expect(shown.messageKeypath).toBe("alert_dependencies.deleteDestinationMessage");
+    expect(shown.messageName).toBe("slack");
+    expect(confirm.findComponent({ name: "ODialog" }).props("title")).toContain("slack");
   });
 
   it("closes when the row deleted IS the entity the dialog is focused on", async () => {

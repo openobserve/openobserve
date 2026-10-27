@@ -457,14 +457,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="doRemoveDomain"
   >
     <i18n-t
-      v-if="pendingRemoveDomainIndex !== null"
       keypath="settings.confirmRemoveDomain"
       tag="p"
       data-test="domain-management-remove-domain-message"
     >
       <template #domain
         ><span class="text-text-heading font-semibold break-all">{{
-          domains[pendingRemoveDomainIndex]?.name
+          pendingRemoveDomainName
         }}</span></template
       >
     </i18n-t>
@@ -548,6 +547,8 @@ const { t } = useI18nTyped();
 // Dialog state for domain/email removal confirmations
 const confirmRemoveDomainOpen = ref(false);
 const pendingRemoveDomainIndex = ref<number | null>(null);
+// Set on open and never cleared, so the closing fade keeps the name.
+const pendingRemoveDomainName = ref("");
 const confirmRemoveEmailOpen = ref(false);
 const pendingRemoveEmail = ref<{
   domain: any;
@@ -759,6 +760,7 @@ const addDomain = (value?: AddDomainForm) => {
 
 const removeDomain = (index: number) => {
   pendingRemoveDomainIndex.value = index;
+  pendingRemoveDomainName.value = domains[index]?.name ?? "";
   confirmRemoveDomainOpen.value = true;
 };
 

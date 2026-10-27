@@ -1188,6 +1188,21 @@ describe("SyntheticMonitoring", () => {
 
       expect(analytics.track).not.toHaveBeenCalledWith("synthetic_test_deleted", expect.anything());
     });
+
+    it("keeps the bulk count after the selection clears on delete", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["a", "b"]);
+      table().vm.$emit("delete-selected");
+      const vm = wrapper.vm as any;
+      expect(vm.showBulkDeleteConfirm).toBe(true);
+
+      await vm.bulkDeleteMonitors();
+
+      expect(vm.selectedMonitorIds).toEqual([]);
+      expect(vm.showBulkDeleteConfirm).toBe(false);
+      expect(vm.bulkDeleteCount).toBe(2);
+    });
   });
 
   describe("delete dialogs name the item", () => {

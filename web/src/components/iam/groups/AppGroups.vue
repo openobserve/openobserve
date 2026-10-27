@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('iam.appGroups.deleteGroupTitle')"
       message-keypath="iam.appGroups.deleteGroupConfirm"
-      :message-name="deleteConformDialog.name"
+      :message-name="deleteConformDialog.data?.group_name"
       :warning-message="deleteImpactMessage"
       ok-variant="destructive"
       @update:ok="_deleteGroup"
@@ -369,8 +369,6 @@ watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
-  // Not cleared with `data`, so the name stays visible while the dialog fades out.
-  name: "",
 });
 
 const selectedGroups: any = ref([]);
@@ -566,7 +564,6 @@ const fetchGroupMemberCount = async (groupName: string): Promise<number> => {
 const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
   deleteConformDialog.value.data = row;
-  deleteConformDialog.value.name = row?.group_name ?? "";
   deleteImpactMessage.value = t("iam.groupsPage.delete.impact", { count: 0 });
 
   try {

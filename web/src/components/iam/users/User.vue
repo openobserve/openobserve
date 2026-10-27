@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
+      <p>{{ t("user.deleteUsersMsg", { count: bulkDeleteCount }) }}</p>
     </ODialog>
   </OPageLayout>
 </template>
@@ -440,6 +440,8 @@ export default defineComponent({
     };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
+    // Set on open and never cleared, so the closing fade does not show "0 users".
+    const bulkDeleteCount = ref(0);
     const bulkDeleteLoading = ref(false);
     const rows = ref<any[]>([]);
     const tableKey = ref(0);
@@ -1419,6 +1421,7 @@ export default defineComponent({
     });
 
     const openBulkDeleteDialog = () => {
+      bulkDeleteCount.value = selectedUsers.value.length;
       confirmBulkDelete.value = true;
     };
 
@@ -1622,6 +1625,7 @@ export default defineComponent({
       selectedUserIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteCount,
       bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteUsers,

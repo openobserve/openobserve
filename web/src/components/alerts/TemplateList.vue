@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_templates.deleteTemplateTitle')"
       message-keypath="alert_templates.deleteTemplateMessage"
-      :message-name="deleteName"
+      :message-name="confirmDelete.data?.name"
       ok-variant="destructive"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
@@ -431,8 +431,6 @@ const confirmDelete: Ref<{
   visible: boolean;
   data: any;
 }> = ref({ visible: false, data: null });
-// Not cleared on close, so the name stays visible while the dialog fades out.
-const deleteName = ref("");
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);
@@ -705,7 +703,6 @@ const importTemplate = () => {
 const conformDeleteDestination = (destination: any) => {
   confirmDelete.value.visible = true;
   confirmDelete.value.data = destination;
-  deleteName.value = destination?.name ?? "";
 };
 const cancelDeleteTemplate = () => {
   confirmDelete.value.visible = false;

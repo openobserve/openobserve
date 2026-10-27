@@ -496,6 +496,26 @@ describe("User Component", () => {
       );
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
     });
+
+    it("keeps the opened count while the dialog closes after the delete", async () => {
+      wrapper.vm.selectedUsers = [
+        { email: "a@example.com", enableDelete: true },
+        { email: "b@example.com", enableDelete: true },
+      ];
+      mockUsersService.bulkDelete.mockResolvedValue({
+        data: { successful: ["a@example.com", "b@example.com"], unsuccessful: [] },
+      } as any);
+      wrapper.vm.openBulkDeleteDialog();
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === "Delete Users")!;
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+      expect(wrapper.vm.selectedUsers).toEqual([]);
+      expect(dialog.props("open")).toBe(false);
+      expect(dialog.text()).toContain("delete 2 users?");
+    });
   });
 
   // ---------------------------------------------------------------------
