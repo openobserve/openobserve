@@ -28,10 +28,10 @@ import {
   hostmapLabelNames,
   hostmapMappingFill,
   layoutHostmap,
+  hostmapLabelSuggestions,
   markHostmapDuplicates,
   middleTruncate,
   naturalCompare,
-  preferredColumns,
   promqlHostmapEntities,
   reduceHostmapValues,
   sqlHostmapEntities,
@@ -133,13 +133,6 @@ describe("hostmap value helpers", () => {
     expect(reduceHostmapValues([null, null], "last")).toBeNull();
     expect(reduceHostmapValues([], "avg")).toBeNull();
   });
-
-  it("picks grid columns with the fewest empty slots", () => {
-    expect(preferredColumns(1)).toBe(1);
-    expect(preferredColumns(4)).toBe(2);
-    expect(preferredColumns(8)).toBe(4);
-    expect(preferredColumns(16)).toBe(4);
-  });
 });
 
 describe("hostmap grouping and sorting", () => {
@@ -225,10 +218,53 @@ describe("hostmap layout", () => {
       "name",
       "name",
     );
-    const layout = layoutHostmap(tree, 600, 300, "hexagon");
+    const layout = layoutHostmap(tree, 300, 300, "hexagon");
     expect(layout.frames.map((frame) => frame.title)).toEqual(["host-a", "host-b"]);
-    const [first, , , , fifth] = layout.cells;
-    expect(fifth.x - first.x).toBeCloseTo(first.size / 2);
+    const [first] = layout.cells;
+    const nextRow = layout.cells.find((cell) => cell.y > first.y + 1e-6)!;
+    expect(nextRow.x - first.x).toBeCloseTo(first.size / 2);
+  });
+
+  const rackFleet = Array.from({ length: 512 }, (_, i) =>
+    entity(`gpu${i % 8}`, i, [`rack-${Math.floor(i / 64)}`, `host-${Math.floor(i / 8)}`]),
+  );
+
+  it("puts group blocks side by side when the box has room, instead of one per row", () => {
+    const tree = buildHostmapTree(rackFleet, 2, "name", "name");
+    const layout = layoutHostmap(tree, 1400, 560, "square");
+    const racks = layout.frames.filter((frame) => frame.depth === 1);
+    expect(layout.overflows).toBe(false);
+    expect(new Set(racks.map((frame) => frame.y)).size).toBe(1);
+    expect(layout.cellSize).toBeGreaterThan(20);
+  });
+
+  it("lines sibling blocks up in columns", () => {
+    const tree = buildHostmapTree(rackFleet, 2, "name", "name");
+    const layout = layoutHostmap(tree, 900, 700, "square");
+    const racks = layout.frames.filter((frame) => frame.depth === 1);
+    const rows = [...new Set(racks.map((frame) => frame.y))];
+    expect(rows.length).toBeGreaterThan(1);
+    const columnsOf = (y: number) => racks.filter((frame) => frame.y === y).map((frame) => frame.x);
+    expect(columnsOf(rows[1])).toEqual(columnsOf(rows[0]).slice(0, columnsOf(rows[1]).length));
+  });
+
+  it("keeps every frame and cell off the panel edges", () => {
+    const tree = buildHostmapTree(rackFleet, 2, "name", "name");
+    for (const [width, height] of [
+      [1400, 560],
+      [645, 500],
+      [645, 230],
+    ]) {
+      const layout = layoutHostmap(tree, width, height, "hexagon");
+      [
+        ...layout.frames,
+        ...layout.cells.map((c) => ({ ...c, width: c.size, height: c.size })),
+      ].forEach((box) => {
+        expect(box.x).toBeGreaterThanOrEqual(4);
+        expect(box.y).toBeGreaterThanOrEqual(4);
+        expect(box.x + box.width).toBeLessThanOrEqual(width - 4 + 1e-6);
+      });
+    }
   });
 
   it("lays out 5,000 cells quickly", () => {
@@ -240,6 +276,22 @@ describe("hostmap layout", () => {
     expect(layout.cells).toHaveLength(5000);
     expect(layout.cellSize).toBeGreaterThanOrEqual(HOSTMAP_MIN_CELL);
     expect(performance.now() - started).toBeLessThan(1500);
+  });
+});
+
+describe("hostmapLabelSuggestions", () => {
+  it("lists labels a by clause keeps first, then the other stream labels, without internal columns", () => {
+    expect(
+      hostmapLabelSuggestions("sum(rate(x[5m])) by (rack) + max by (rack, host) (y)", [
+        "__name__",
+        "_timestamp",
+        "value",
+        "gpu_uuid",
+        "host",
+        "rack",
+      ]),
+    ).toEqual(["rack", "host", "gpu_uuid"]);
+    expect(hostmapLabelSuggestions("gpu_power_watts", ["host", "rack"])).toEqual(["host", "rack"]);
   });
 });
 

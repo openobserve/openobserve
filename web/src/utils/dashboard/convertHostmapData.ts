@@ -53,6 +53,9 @@ const GAP_RATIO = 0.12;
 const FRAME_PAD = 4;
 const TITLE_HEIGHT = 16;
 const BLOCK_GAP = 6;
+// Keeps group frames off the panel edges.
+const EDGE_PAD = 4;
+const SIZE_TIE = 0.5;
 const LEGEND_ROOM = 32;
 const TOP_PAD = 2;
 const MIN_LABEL_CELL = 26;
@@ -69,10 +72,14 @@ const CELL_FONT_SIZES = [11, 10, 9, 8];
 const SWATCH = 8;
 const SCROLLBAR_ROOM = 16;
 const SWATCH_GAP = 4;
+// Room for a group's swatch and the first few characters of its name.
+const MIN_FRAME_WIDTH = FRAME_PAD * 2 + 2 + SWATCH + SWATCH_GAP + 40;
 // These units print the raw number, so the colour is picked from the number as shown.
 const RAW_DISPLAY_UNITS = new Set(["", "default", "custom", "percent"]);
 // No whitespace, so a group path can sit in a drilldown URL.
 const DRILLDOWN_GROUP_SEPARATOR = "/";
+// Metric stream columns that are not series labels.
+const HOSTMAP_NON_LABEL_FIELDS = new Set(["_timestamp", "value"]);
 
 export type HostmapReduction = (typeof HOSTMAP_REDUCTIONS)[number];
 export type HostmapSort = "name" | "value";
@@ -434,47 +441,28 @@ export const capHostmapTree = (root: HostmapGroup, cap: number): HostmapGroup =>
   return walk(root) ?? { ...root, children: [], cells: [] };
 };
 
-/** Columns for a group's grid: the fewest empty slots near a square, so 8 cells read as 4 by 2. */
-export const preferredColumns = (count: number): number => {
-  if (count <= 1) return 1;
-  const root = Math.ceil(Math.sqrt(count));
-  let best = root;
-  let bestWaste = Infinity;
-  for (let cols = root; cols <= Math.min(count, root * 2); cols++) {
-    const waste = cols * Math.ceil(count / cols) - count;
-    if (waste < bestWaste) {
-      best = cols;
-      bestWaste = waste;
-    }
-  }
-  return best;
-};
-
 const gridHeight = (rows: number, size: number, hex: boolean) =>
   hex ? (rows - 1) * size * HEX_ROW_PITCH + size * HEX_HEIGHT : rows * size;
 
+/** Lays a node out for one plan: plan[depth] is how many child blocks a group puts per row, the last entry is the cell columns of a leaf group. */
 const measure = (
   node: HostmapGroup,
-  available: number,
   size: number,
   hex: boolean,
-  isRoot: boolean,
-): Measured | null => {
-  const pad = isRoot ? 0 : FRAME_PAD;
-  const title = isRoot ? 0 : TITLE_HEIGHT;
-  const inner = available - pad * 2;
+  depth: number,
+  plan: number[],
+): Measured => {
+  const pad = depth === 0 ? 0 : FRAME_PAD;
+  const title = depth === 0 ? 0 : TITLE_HEIGHT;
   if (!node.children.length) {
     const count = node.cells.length;
-    let maxCols = Math.floor(inner / size);
-    // Offset hexagon rows stick out by half a cell.
-    if (hex && count > maxCols) maxCols = Math.floor((inner - size / 2) / size);
-    if (maxCols < 1) return null;
-    const cols = Math.max(1, Math.min(isRoot ? count : preferredColumns(count), maxCols));
+    const cols = Math.max(1, Math.min(count, plan[plan.length - 1]));
     const rows = Math.max(1, Math.ceil(count / cols));
+    // Offset hexagon rows stick out by half a cell.
     const width = cols * size + (hex && rows > 1 ? size / 2 : 0);
     return {
       node,
-      width: width + pad * 2,
+      width: Math.max(width + pad * 2, depth === 0 ? 0 : MIN_FRAME_WIDTH),
       height: gridHeight(rows, size, hex) + pad * 2 + title,
       pad,
       title,
@@ -483,28 +471,36 @@ const measure = (
       children: [],
     };
   }
-  const children: Measured["children"] = [];
-  let x = 0;
-  let y = 0;
-  let rowHeight = 0;
-  let widest = 0;
-  for (const child of node.children) {
-    const measured = measure(child, inner, size, hex, false);
-    if (!measured) return null;
-    if (x > 0 && x + measured.width > inner) {
-      y += rowHeight + BLOCK_GAP;
-      x = 0;
-      rowHeight = 0;
-    }
-    children.push({ measured, dx: x, dy: y });
-    widest = Math.max(widest, x + measured.width);
-    rowHeight = Math.max(rowHeight, measured.height);
-    x += measured.width + BLOCK_GAP;
-  }
+  const measuredChildren = node.children.map((child) => measure(child, size, hex, depth + 1, plan));
+  const perRow = Math.max(1, Math.min(measuredChildren.length, plan[depth]));
+  // Siblings share column widths and row heights, so blocks line up in a grid instead of a ragged flow.
+  const colWidths = Array.from({ length: perRow }, () => 0);
+  const rowHeights: number[] = [];
+  measuredChildren.forEach((child, index) => {
+    const col = index % perRow;
+    const row = Math.floor(index / perRow);
+    colWidths[col] = Math.max(colWidths[col], child.width);
+    rowHeights[row] = Math.max(rowHeights[row] ?? 0, child.height);
+  });
+  const colX = colWidths.map((_, col) =>
+    colWidths.slice(0, col).reduce((sum, width) => sum + width + BLOCK_GAP, 0),
+  );
+  const rowY = rowHeights.map((_, row) =>
+    rowHeights.slice(0, row).reduce((sum, height) => sum + height + BLOCK_GAP, 0),
+  );
+  const children = measuredChildren.map((measured, index) => ({
+    measured,
+    dx: colX[index % perRow],
+    dy: rowY[Math.floor(index / perRow)],
+  }));
+  const gaps = (n: number) => Math.max(0, n - 1) * BLOCK_GAP;
   return {
     node,
-    width: widest + pad * 2,
-    height: y + rowHeight + pad * 2 + title,
+    width: Math.max(
+      colWidths.reduce((a, b) => a + b, 0) + gaps(perRow) + pad * 2,
+      depth === 0 ? 0 : MIN_FRAME_WIDTH,
+    ),
+    height: rowHeights.reduce((a, b) => a + b, 0) + gaps(rowHeights.length) + pad * 2 + title,
     pad,
     title,
     cols: 0,
@@ -553,17 +549,46 @@ const place = (
   );
 };
 
-/** The largest cell size from the readable minimum up that fits the box, or null when even that overflows. */
-const largestFit = (root: HostmapGroup, width: number, height: number, hex: boolean) => {
+/** Per-row counts worth trying for n items: one per distinct row count, so 64 items try 64, 32, 22, 16… */
+const perRowCandidates = (n: number): number[] => {
+  const counts = new Set<number>();
+  for (let rows = 1; rows <= n; rows++) counts.add(Math.ceil(n / rows));
+  return [...counts];
+};
+
+/** Every plan for the tree: one per-row candidate per group level plus the leaf cell columns. */
+const layoutPlans = (root: HostmapGroup): number[][] => {
+  const widest: number[] = [];
+  const walk = (node: HostmapGroup, depth: number) => {
+    const n = node.children.length || node.cells.length;
+    widest[depth] = Math.max(widest[depth] ?? 1, n);
+    node.children.forEach((child) => walk(child, depth + 1));
+  };
+  walk(root, 0);
+  return widest.reduce<number[][]>(
+    (plans, n) => plans.flatMap((plan) => perRowCandidates(n).map((k) => [...plan, k])),
+    [[]],
+  );
+};
+
+/** The largest cell size from the readable minimum up at which a plan fits the box, or null when even that overflows. */
+const largestSizeFor = (
+  root: HostmapGroup,
+  plan: number[],
+  width: number,
+  height: number,
+  hex: boolean,
+  floor = HOSTMAP_MIN_CELL,
+) => {
   const fits = (size: number) => {
-    const measured = measure(root, width, size, hex, true);
-    return measured && measured.height <= height ? measured : null;
+    const measured = measure(root, size, hex, 0, plan);
+    return measured.width <= width && measured.height <= height ? measured : null;
   };
   const biggest = fits(HOSTMAP_MAX_CELL);
   if (biggest) return { measured: biggest, size: HOSTMAP_MAX_CELL };
-  let best = fits(HOSTMAP_MIN_CELL);
+  let best = fits(floor);
   if (!best) return null;
-  let low = HOSTMAP_MIN_CELL;
+  let low = floor;
   let high = HOSTMAP_MAX_CELL;
   for (let step = 0; step < SEARCH_STEPS; step++) {
     const mid = (low + high) / 2;
@@ -578,6 +603,38 @@ const largestFit = (root: HostmapGroup, width: number, height: number, hex: bool
   return { measured: best, size: low };
 };
 
+/** The plan with the biggest cells; near-equal sizes prefer the one that leaves the least empty box. */
+const bestFit = (root: HostmapGroup, width: number, height: number, hex: boolean) => {
+  let best: { measured: Measured; size: number } | null = null;
+  for (const plan of layoutPlans(root)) {
+    // A plan that cannot reach the current best size is skipped after one measure.
+    const floor = best ? Math.max(HOSTMAP_MIN_CELL, best.size - SIZE_TIE) : HOSTMAP_MIN_CELL;
+    const fit = largestSizeFor(root, plan, width, height, hex, floor);
+    if (!fit) continue;
+    const area = (m: Measured) => m.width * m.height;
+    if (
+      !best ||
+      fit.size > best.size + SIZE_TIE ||
+      (fit.size > best.size - SIZE_TIE && area(fit.measured) < area(best.measured))
+    ) {
+      best = fit;
+    }
+  }
+  return best;
+};
+
+/** When nothing fits at the readable minimum: the plan that fits the width and scrolls the least. */
+const scrollingFit = (root: HostmapGroup, width: number, hex: boolean) => {
+  let best: Measured | null = null;
+  let fallback: Measured | null = null;
+  for (const plan of layoutPlans(root)) {
+    const measured = measure(root, HOSTMAP_MIN_CELL, hex, 0, plan);
+    if (!fallback || measured.width < fallback.width) fallback = measured;
+    if (measured.width <= width && (!best || measured.height < best.height)) best = measured;
+  }
+  return (best ?? fallback)!;
+};
+
 /** Positions every cell and group frame in a width by height box at the largest readable cell size that fits; every group level keeps its frame, so a crowded map grows taller instead. */
 export const layoutHostmap = (
   root: HostmapGroup,
@@ -586,17 +643,21 @@ export const layoutHostmap = (
   shape: HostmapShape,
 ): HostmapLayout => {
   const hex = shape === "hexagon";
-  const fit = largestFit(root, width, height, hex);
+  const inset = EDGE_PAD;
+  const innerWidth = Math.max(0, width - inset * 2);
+  const innerHeight = Math.max(0, height - inset * 2);
+  const fit = bestFit(root, innerWidth, innerHeight, hex);
+  const measured = fit?.measured ?? scrollingFit(root, innerWidth, hex);
   const size = fit?.size ?? HOSTMAP_MIN_CELL;
-  const measured = fit?.measured ?? measure(root, width, size, hex, true);
   const layout: HostmapLayout = {
     cellSize: size,
     cells: [],
     frames: [],
-    contentHeight: measured?.height ?? 0,
+    contentHeight: measured.height + inset * 2,
     overflows: !fit,
   };
-  if (measured) place(measured, 0, 0, size, hex, 0, layout);
+  const left = inset + Math.max(0, (innerWidth - measured.width) / 2);
+  place(measured, left, inset, size, hex, 0, layout);
   return layout;
 };
 
@@ -746,6 +807,17 @@ export const hostmapLabelNames = (panel: any): string[] => {
         .filter(Boolean),
     ),
   ];
+};
+
+/** Label names to suggest for a PromQL host map: labels a `by (...)` clause keeps come first, then the stream's other labels. */
+export const hostmapLabelSuggestions = (query: string, streamFields: string[]): string[] => {
+  const kept = [...(query ?? "").matchAll(/\bby\s*\(([^)]*)\)/g)].flatMap((match) =>
+    match[1].split(",").map((label) => label.trim()),
+  );
+  const labels = streamFields.filter(
+    (name) => name && !name.startsWith("__") && !HOSTMAP_NON_LABEL_FIELDS.has(name),
+  );
+  return [...new Set([...kept.filter(Boolean), ...labels])];
 };
 
 /** The column a logs drilldown filters on: the entity field of the first query. */
