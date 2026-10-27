@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ONE list, no axis switcher. Packs used to be a second axis, but a pack is a
   coarse bucket ("databases", "observability") and the category is the thing
   people actually come looking for — Kafka, Clickhouse, Cilium. Two axes over
-  the same catalogue meant a tab to reach the useful one. The pack now heads
-  its technologies in the list, as a label rather than a second filter.
+  the same catalogue meant a tab to reach the useful one.
 
   Categories are MULTI-SELECT on the metrics-explorer rail pattern: a search
   box over the list, tick boxes with counts, and a "N selected / Clear" footer.
@@ -214,10 +213,7 @@ const { t } = useI18nTyped();
  * since hiding it would strand the user with a filter they cannot lift.
  */
 const isVisible = (item: LibraryCategoryFacet, needle: string): boolean => {
-  // A ticked row is never hidden — not by the search, not by a zero count.
-  // Both used to remove it: typing "redis" while "kafka" was ticked took the
-  // kafka row off screen while the grid stayed filtered to kafka, leaving a
-  // filter you could see the effect of but not the control for.
+  // A ticked row is never hidden, or its filter would stay on with no control to lift it.
   if (props.selectedCategories.includes(item.id)) return true;
   // A zero-count row filters to nothing, so offering it wastes a click.
   if (item.count === 0) return false;
