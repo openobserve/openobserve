@@ -71,6 +71,7 @@ Object.assign(navigator, {
 
 const mockFetchCorrelation = vi.fn();
 let mockIsLoading = ref(false);
+const mockError = ref<Error | null>(null);
 let mockCorrelationDataRef = ref<any>(createMockCorrelationData());
 let mockHasBackendTrace = ref(true);
 let mockBackendSpanCount = ref(2);
@@ -80,6 +81,7 @@ vi.mock("@/composables/rum/useTraceCorrelation", () => ({
   default: () => ({
     correlationData: mockCorrelationDataRef,
     isLoading: mockIsLoading,
+    error: mockError,
     hasBackendTrace: mockHasBackendTrace,
     backendSpanCount: mockBackendSpanCount,
     performanceData: mockPerformanceData,
@@ -164,6 +166,7 @@ describe("TraceCorrelationCard", () => {
     mockFetchCorrelation.mockResolvedValue(undefined);
 
     mockIsLoading.value = false;
+    mockError.value = null;
     mockCorrelationDataRef.value = createMockCorrelationData();
     mockHasBackendTrace.value = true;
     mockBackendSpanCount.value = 2;
@@ -184,6 +187,19 @@ describe("TraceCorrelationCard", () => {
   // =========================================================================
 
   describe("component rendering", () => {
+    it("shows a query error without claiming spans are still being ingested", async () => {
+      mockError.value = new Error("Request failed with status code 400");
+      mockHasBackendTrace.value = false;
+      await nextTick();
+      expect(wrapper.find('[data-test="trace-correlation-error"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Unable to Load Correlation Data");
+      expect(wrapper.text()).not.toContain("Trace data may take up to 30 seconds");
+      expect(wrapper.text()).not.toContain("Performance breakdown");
+      const refresh = findButtonByText(wrapper, "Refresh");
+      await refresh!.trigger("click");
+      expect(mockFetchCorrelation).toHaveBeenCalledTimes(2);
+    });
+
     it("mounts TraceCorrelationCard without errors", () => {
       // Assert
       expect(wrapper.exists()).toBe(true);
