@@ -9130,6 +9130,10 @@
     "generalSettings": "c910d474dcd724bf",
     "generalSettingsPage": {
       "appliesToEveryone": "124fcbb7dbdc79e5",
+      "defaultAutoRefresh": "b371ea46b3ba1a9a",
+      "defaultAutoRefreshAbsoluteHint": "3ae4241a687a7ee2",
+      "defaultAutoRefreshHelp": "9c28837909733008",
+      "defaultAutoRefreshRaised": "4bfecda5497364f0",
       "dynamicFiltersHelp": "91c37cc4fdff5b4b",
       "saveChanges": "dd0ae7a5cbcf2339",
       "updatedSuccessfully": "042a0687fa1547fb",
@@ -9953,6 +9957,7 @@
       "savedAgain": "46ea08fa62731e0b",
       "savedBy": "819451b3c7070d7b",
       "savedByUnknown": "2c7c2326901bfe39",
+      "settingAutoRefresh": "c8fe77a4cb8137c0",
       "settingDescription": "c9046f7a37ad0ea7",
       "settingDynamicFilters": "245d0fe3e84c969f",
       "settingOther": "252d9e8941fc5d7a",

@@ -6260,6 +6260,7 @@
       "settingTitle": "tên",
       "settingDescription": "mô tả",
       "settingTimeRange": "khoảng thời gian mặc định",
+      "settingAutoRefresh": "tự động làm mới mặc định",
       "settingDynamicFilters": "bộ lọc động",
       "settingOther": "cài đặt khác",
       "impactSettings": "Thay thế các cài đặt bảng điều khiển họ đã đổi: {settings}",
@@ -7853,7 +7854,11 @@
       "updationFailed": "Cập nhật bảng điều khiển thất bại",
       "dynamicFiltersHelp": "Thêm một hàng bộ lọc tạm thời phía trên các panel.",
       "appliesToEveryone": "Các cài đặt này được chia sẻ với mọi người có quyền truy cập bảng điều khiển này.",
-      "saveChanges": "Lưu thay đổi"
+      "saveChanges": "Lưu thay đổi",
+      "defaultAutoRefresh": "Tự động làm mới mặc định",
+      "defaultAutoRefreshHelp": "Được áp dụng mỗi khi bảng điều khiển mở, trừ khi liên kết đặt khoảng thời gian riêng.",
+      "defaultAutoRefreshRaised": "Đã lưu là {saved}, thấp hơn mức tối thiểu của máy chủ, nên mỗi {effective} sẽ làm mới.",
+      "defaultAutoRefreshAbsoluteHint": "Khoảng thời gian mặc định là tuyệt đối, nên mỗi lần làm mới tải lại cùng một khoảng. Cập nhật trực tiếp cần khoảng thời gian tương đối."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Bảng điều khiển đã được thêm thành công.",

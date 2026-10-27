@@ -6260,6 +6260,7 @@
       "settingTitle": "名称",
       "settingDescription": "描述",
       "settingTimeRange": "默认时间范围",
+      "settingAutoRefresh": "默认自动刷新",
       "settingDynamicFilters": "动态筛选",
       "settingOther": "其他设置",
       "impactSettings": "替换他人更改的仪表板设置：{settings}",
@@ -7853,7 +7854,11 @@
       "updationFailed": "仪表盘更新失败。",
       "dynamicFiltersHelp": "在面板上方添加一个临时筛选行。",
       "appliesToEveryone": "这些设置与所有可访问此仪表盘的人共享。",
-      "saveChanges": "保存更改"
+      "saveChanges": "保存更改",
+      "defaultAutoRefresh": "默认自动刷新",
+      "defaultAutoRefreshHelp": "每次打开仪表盘时应用，除非链接设置了自己的间隔。",
+      "defaultAutoRefreshRaised": "已保存为 {saved}，低于服务器最小值，因此每 {effective} 刷新一次。",
+      "defaultAutoRefreshAbsoluteHint": "默认时间范围是绝对时间，因此每次刷新都会重新加载同一范围。实时更新需要相对时间范围。"
     },
     "addDashboardPage": {
       "addedSuccessfully": "仪表盘添加成功。",

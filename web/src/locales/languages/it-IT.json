@@ -6260,6 +6260,7 @@
       "settingTitle": "nome",
       "settingDescription": "descrizione",
       "settingTimeRange": "intervallo di tempo predefinito",
+      "settingAutoRefresh": "aggiornamento automatico predefinito",
       "settingDynamicFilters": "filtri dinamici",
       "settingOther": "altre impostazioni",
       "impactSettings": "Sostituisce le impostazioni della dashboard che hanno modificato: {settings}",
@@ -7853,7 +7854,11 @@
       "updationFailed": "Aggiornamento dashboard fallito",
       "dynamicFiltersHelp": "Aggiunge una riga di filtro ad hoc sopra i pannelli.",
       "appliesToEveryone": "Queste impostazioni sono condivise con chiunque possa accedere a questa dashboard.",
-      "saveChanges": "Salva modifiche"
+      "saveChanges": "Salva modifiche",
+      "defaultAutoRefresh": "Aggiornamento automatico predefinito",
+      "defaultAutoRefreshHelp": "Applicato ogni volta che la dashboard viene aperta, a meno che il link non imposti un proprio intervallo.",
+      "defaultAutoRefreshRaised": "Salvato come {saved}, inferiore al minimo del server, quindi si aggiorna ogni {effective}.",
+      "defaultAutoRefreshAbsoluteHint": "L'intervallo temporale predefinito è assoluto, quindi ogni aggiornamento ricarica lo stesso intervallo. Gli aggiornamenti live richiedono un intervallo temporale relativo."
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard aggiunta con successo.",
