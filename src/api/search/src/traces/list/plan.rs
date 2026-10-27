@@ -256,9 +256,12 @@ impl TraceSort {
     }
 
     pub fn sql(self, mode: TraceListMode) -> String {
-        let field = if self.ranks_by_candidate(mode) {
-            "zo_sql_candidate"
-        } else if self.by_duration {
+        if self.ranks_by_candidate(mode) {
+            // Same tiebreaker as the merge, so a per-partition LIMIT cuts ties the same way on
+            // every page.
+            return "zo_sql_candidate DESC, trace_id ASC".to_string();
+        }
+        let field = if self.by_duration {
             "zo_sql_duration"
         } else {
             "zo_sql_timestamp"
@@ -471,7 +474,13 @@ mod tests {
     #[test]
     fn only_the_streamed_descending_duration_sort_ranks_by_the_candidate() {
         for (sort_order, expected) in [
-            ("desc", ["zo_sql_duration DESC", "zo_sql_candidate DESC"]),
+            (
+                "desc",
+                [
+                    "zo_sql_duration DESC",
+                    "zo_sql_candidate DESC, trace_id ASC",
+                ],
+            ),
             ("asc", ["zo_sql_duration ASC", "zo_sql_duration ASC"]),
         ] {
             let mut query = query();

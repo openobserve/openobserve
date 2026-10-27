@@ -576,6 +576,39 @@ mod tests {
         rows.iter().filter_map(trace_id_of).collect()
     }
 
+    // The Q1 order `zo_sql_candidate DESC, trace_id ASC` (or ties cut the other way) then LIMIT.
+    fn sql_cut(mut hits: Vec<json::Value>, limit: usize, ids_ascending: bool) -> Vec<json::Value> {
+        hits.sort_by(|a, b| {
+            let by_id = trace_id_of(a).cmp(&trace_id_of(b));
+            candidate_of(b).cmp(&candidate_of(a)).then_with(|| {
+                if ids_ascending {
+                    by_id
+                } else {
+                    by_id.reverse()
+                }
+            })
+        });
+        hits.truncate(limit);
+        hits
+    }
+
+    fn page(
+        partitions: &[Vec<json::Value>],
+        from: i64,
+        size: i64,
+        ids_ascending: bool,
+    ) -> Vec<String> {
+        let heap_k = (from + size) as usize;
+        let mut merge = CandidateMerge::new(heap_k);
+        for hits in partitions {
+            merge.push_hits(sql_cut(hits.clone(), heap_k, ids_ascending));
+        }
+        ids(&merge.into_page(from, size))
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+    }
+
     #[test]
     fn candidate_merge_keeps_the_largest_row_per_trace_and_pages_by_candidate() {
         // Example 3 of the spec: four partitions newest first, page size 2, trace A crosses all.
@@ -621,6 +654,22 @@ mod tests {
         assert_eq!(merge.len(), 3);
         assert_eq!(ids(&merge.clone().into_page(0, 2)), ["C", "A"]);
         assert_eq!(ids(&merge.into_page(1, 1)), ["A"]);
+    }
+
+    #[test]
+    fn the_trace_id_tiebreaker_keeps_tied_candidates_stable_across_pages() {
+        // Six traces tie at the cutoff; every page fetches `LIMIT from + size` per partition.
+        let partitions = vec![
+            vec![row("D", 5), row("C", 5), row("B", 5), row("A", 5)],
+            vec![row("F", 5), row("E", 5), row("G", 3)],
+        ];
+        assert_eq!(page(&partitions, 0, 2, true), ["A", "B"]);
+        assert_eq!(page(&partitions, 2, 2, true), ["C", "D"]);
+        assert_eq!(page(&partitions, 4, 2, true), ["E", "F"]);
+        assert_eq!(page(&partitions, 6, 2, true), ["G"]);
+        // Without the tiebreaker a partition can cut the ties the other way: page 2 repeats page 1.
+        assert_eq!(page(&partitions, 0, 2, false), ["C", "D"]);
+        assert_eq!(page(&partitions, 2, 2, false), ["C", "D"]);
     }
 
     #[test]

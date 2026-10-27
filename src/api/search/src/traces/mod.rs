@@ -305,7 +305,7 @@ pub async fn get_latest_traces(
     tag = "Traces",
     operation_id = "GetLatestTracesStream",
     summary = "Stream recent trace data",
-    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges.",
+    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges. With sort_by=duration and sort_order=desc, each partition ranks a trace by the larger of its longest span and its span range inside that partition, and the stream keeps the largest value per trace across partitions. Three limits apply. A trace whose spans spread across partitions with no single span that covers them is ranked by its range inside one partition. Page boundaries follow that ranking while each page is sorted by the full duration. sort_order=asc ranks each partition by its local range only.",
     security(
         ("Authorization"= [])
     ),
@@ -318,7 +318,7 @@ pub async fn get_latest_traces(
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
-        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time)"),
+        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time); see the endpoint description for the limits of the streamed duration sort"),
         ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
