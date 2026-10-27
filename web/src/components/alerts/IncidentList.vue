@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-alert_count="{ row }">
           <div
-            v-if="row.alert_groups"
+            v-if="row.alert_groups?.length"
             class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
           >
             <OTag
@@ -219,8 +219,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-w-0"
               data-test="incident-alert-group-chip"
             >
-              <span class="truncate">{{ group.alert_name }}</span>
-              <span class="shrink-0">&nbsp;×{{ group.count }}</span>
+              <!-- One element, so the tooltip anchors on the whole label, truncated name included. -->
+              <span class="flex min-w-0">
+                <span class="truncate">{{ group.alert_name }}</span>
+                <span class="shrink-0">&nbsp;×{{ group.count }}</span>
+              </span>
               <OTooltip
                 :delay="300"
                 :content="

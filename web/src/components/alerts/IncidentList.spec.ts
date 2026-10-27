@@ -1023,5 +1023,11 @@ describe("IncidentList.vue", () => {
       expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
       expect(cell.text()).toBe("7");
     });
+
+    it("shows the count chip for an incident with no linked alerts", async () => {
+      const cell = await mountWith(createIncident({ alert_groups: [], alert_count: 0 }));
+      expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
+      expect(cell.text()).toBe("0");
+    });
   });
 });
