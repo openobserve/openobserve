@@ -532,6 +532,37 @@ describe("License.vue", () => {
       expect(field().element.value).toBe("half-typed-key");
     });
 
+    it("an older node's response without refresh status still offers a limits refresh", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, can_update_license: true }),
+      );
+      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(createAxiosResponse(""));
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-online-card"]').exists()).toBe(false);
+      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
+      await wrapper.get('[data-test="refresh-license-limits-btn"]').trigger("click");
+      await flushPromises();
+      expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBeGreaterThan(before);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Limits refreshed; online refresh needs all nodes upgraded",
+        }),
+      );
+    });
+
+    it("an older node's response hides the limits refresh without update permission", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...mockLicenseData, can_update_license: false }),
+      );
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="refresh-license-limits-btn"]').exists()).toBe(false);
+    });
+
     it("refresh button lives in the online card", async () => {
       wrapper.vm.licenseData = {
         ...mockLicenseData,
