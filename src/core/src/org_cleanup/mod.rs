@@ -1169,6 +1169,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     timed_annotations::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/timed_annotations: {e}"))?;
+    crate::public_dashboards::revoke_all_for_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/public_dashboards: {e}"))?;
     // dashboards must be deleted before folders (FK constraint)
     crate::dashboards::delete_by_org(org_id)
         .await
@@ -1746,6 +1749,11 @@ pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
             match sweep_tombstones().await {
                 Ok(n) if n > 0 => log::info!("[org_cleanup] removed {n} expired tombstones"),
                 Err(e) => log::error!("[org_cleanup] tombstone sweep error: {e}"),
+                _ => {}
+            }
+            match crate::public_dashboards::purge_deleted().await {
+                Ok(n) if n > 0 => log::info!("[org_cleanup] purged {n} revoked public links"),
+                Err(e) => log::error!("[org_cleanup] public link purge error: {e}"),
                 _ => {}
             }
             match reconcile().await {

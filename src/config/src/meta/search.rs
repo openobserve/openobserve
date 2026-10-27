@@ -1044,6 +1044,8 @@ pub enum SearchEventType {
     SearchJob,
     Download,
     Insights,
+    #[serde(rename = "public_dashboard")]
+    PublicDashboard,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -1088,6 +1090,7 @@ impl std::fmt::Display for SearchEventType {
             Self::SearchJob => write!(f, "search_job"),
             Self::Download => write!(f, "download"),
             Self::Insights => write!(f, "insights"),
+            Self::PublicDashboard => write!(f, "public_dashboard"),
         }
     }
 }
@@ -1107,8 +1110,9 @@ impl std::str::FromStr for SearchEventType {
             "search_job" | "searchjob" => Ok(Self::SearchJob),
             "download" => Ok(Self::Download),
             "insights" => Ok(Self::Insights),
+            "public_dashboard" | "publicdashboard" => Ok(Self::PublicDashboard),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`, `public_dashboard`"
             )),
         }
     }
@@ -1155,6 +1159,12 @@ pub struct SearchEventContext {
         default
     )]
     pub dashboard_folder_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub public_dashboard_link_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub range_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub panel_id: Option<String>,
 }
 
 impl SearchEventContext {
@@ -1224,6 +1234,9 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
             dashboard_name: proto_sec.dashboard_name,
             dashboard_folder_id: proto_sec.dashboard_folder_id,
             dashboard_folder_name: proto_sec.dashboard_folder_name,
+            public_dashboard_link_id: proto_sec.public_dashboard_link_id,
+            range_key: proto_sec.range_key,
+            panel_id: proto_sec.panel_id,
         }
     }
 }
@@ -1239,6 +1252,9 @@ impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
             dashboard_name: sec.dashboard_name,
             dashboard_folder_id: sec.dashboard_folder_id,
             dashboard_folder_name: sec.dashboard_folder_name,
+            public_dashboard_link_id: sec.public_dashboard_link_id,
+            range_key: sec.range_key,
+            panel_id: sec.panel_id,
         }
     }
 }
@@ -2580,6 +2596,19 @@ mod tests {
     }
 
     #[test]
+    fn test_search_event_context_round_trips_through_cluster_rpc() {
+        let ctx = SearchEventContext {
+            dashboard_id: Some("d1".into()),
+            public_dashboard_link_id: Some("l1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let rpc: cluster_rpc::SearchEventContext = ctx.clone().into();
+        assert_eq!(SearchEventContext::from(rpc), ctx);
+    }
+
+    #[test]
     fn test_query_to_cluster_rpc() {
         let query = Query {
             sql: "SELECT * FROM test".to_string(),
@@ -3451,6 +3480,39 @@ mod tests {
         assert_eq!(
             "insights".parse::<SearchEventType>().unwrap(),
             SearchEventType::Insights
+        );
+    }
+
+    #[test]
+    fn public_dashboard_search_type_is_interactive_and_named_on_the_wire() {
+        let t = SearchEventType::PublicDashboard;
+        assert!(!t.is_background());
+        assert_eq!(t.to_string(), "public_dashboard");
+        assert_eq!(serde_json::to_string(&t).unwrap(), r#""public_dashboard""#);
+        assert_eq!(
+            serde_json::from_str::<SearchEventType>(r#""public_dashboard""#).unwrap(),
+            t
+        );
+        assert_eq!(
+            crate::meta::cluster::RoleGroup::from(t),
+            crate::meta::cluster::RoleGroup::Interactive
+        );
+        let ctx = SearchEventContext {
+            public_dashboard_link_id: Some("l1".into()),
+            dashboard_id: Some("d1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "public_dashboard_link_id": "l1",
+                "dashboard_id": "d1",
+                "range_key": "r3600",
+                "panel_id": "p1"
+            })
         );
     }
 
