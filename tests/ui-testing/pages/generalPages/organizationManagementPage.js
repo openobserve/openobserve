@@ -11,6 +11,7 @@ export class OrganizationManagementPage {
         this.statusStepsUsedHeader = page.locator('[data-test="o2-table-th-status_steps_used"]');
         this.statusStepsTotalHeader = page.locator('[data-test="o2-table-th-status_steps_total"]');
         this.orgRows = page.locator('tr[data-test^="o2-table-row-"]');
+        this.searchInput = page.locator('[data-test="org-management-search-input"]');
 
         this.usageLimitsDialog = page.locator('[data-test="organization-management-usage-limits-dialog"]');
         this.aiCreditsTab = page.locator('[data-test="org-management-set-ai-credits-btn"]');
@@ -116,6 +117,10 @@ export class OrganizationManagementPage {
             const isJson = (resp.headers.get('content-type') || '').includes('application/json');
             return { status: resp.status, data: isJson ? await resp.json() : await resp.text() };
         }, META_ORG);
+    }
+
+    async searchForOrg(identifier) {
+        await this.searchInput.fill(identifier);
     }
 
     async expectStatusStepsColumnsVisible() {

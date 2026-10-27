@@ -72,8 +72,8 @@ test.describe('Get started dialog', () => {
         expect(await gs.storedPick(orgId)).toBe('http');
         expect(await gs.firstLoginFlag()).toBeNull();
 
-        await expect(page.locator('[data-test="ingestion-curl-code-block-pre"]')).toContainText('\u2022');
-        await page.locator('[data-test="ingestion-curl-code-block-copy-btn"]').click(); interactions += 1;
+        await gs.expectCurlCredentialLoaded();
+        await gs.copyCurlCommand(); interactions += 1;
         expect(interactions).toBeLessThanOrEqual(3);
         const copied = await gs.readClipboard();
         expect(copied).toContain(`/api/${orgId}/`);

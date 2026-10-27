@@ -182,9 +182,7 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     const severityFilterExists = await severityFilterTrigger.isVisible({ timeout: 3000 }).catch(() => false);
     if (severityFilterExists) {
       await severityFilterTrigger.click();
-      // Options carry data-test-value; a /critical/i text match picks up any element on the
-      // page, so the filter silently stayed unset and the assertions below then failed for
-      // a reason unrelated to severity gating.
+      // Options carry data-test-value; a /critical/i match hits any element and left the filter unset.
       await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().first().click();
       await page.keyboard.press('Escape');
       // The filter has to be applied before its effect can be asserted.

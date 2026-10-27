@@ -283,12 +283,15 @@
     "actual_folder": "Onboarding",
     "browser": "chrome",
     "run_files": [
-      "get-started.spec.js",
       "diagnosis.spec.js",
       "first-data-notice.spec.js",
       "empty-pages-flag-off.spec.js"
     ],
     "disabled": [
+      {
+        "file": "get-started.spec.js",
+        "reason": "unstable on a persistent env: three runs gave 7/7, then a failure at :128, then one at :34. It drives a first-login flag against an org that keeps state, so it needs a pristine backend"
+      },
       {
         "file": "web-server.spec.js",
         "reason": "the nginx case fails on a live env: the first-event bar never leaves deciding for the nginx stream"

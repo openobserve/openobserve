@@ -23,6 +23,8 @@ class GetStartedPage {
         this.continueBtn = page.locator('[data-test="onboarding-get-started-submit-btn"]');
         this.connectPopup = page.locator('[data-test="connect-data-source-popup-dialog"]');
         this.pickGroup = page.locator('[data-test="ingestion-recommended-pick-group"]');
+        this.curlCodePre = page.locator('[data-test="ingestion-curl-code-block-pre"]');
+        this.curlCopyBtn = page.locator('[data-test="ingestion-curl-code-block-copy-btn"]');
         this.attributionBodies = [];
     }
 
@@ -71,6 +73,15 @@ class GetStartedPage {
 
     async firstLoginFlag() {
         return this.page.evaluate(() => localStorage.getItem('isFirstTimeLogin'));
+    }
+
+    // The org token is substituted asynchronously; the mask proves it arrived before a copy.
+    async expectCurlCredentialLoaded() {
+        await expect(this.curlCodePre).toContainText('\u2022');
+    }
+
+    async copyCurlCommand() {
+        await this.curlCopyBtn.click();
     }
 
     async readClipboard() {
