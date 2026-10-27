@@ -1065,10 +1065,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border border-t border-solid"
     >
       <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
-        <OInput
+        <OCombobox
           v-if="promqlMode"
           v-show="isConfigOptionVisible('hostmap', 'entity-label')"
           v-model="hostmapEntityLabelModel"
+          :items="hostmapLabelOptions"
           :label="t('dashboard.hostmapEntityLabel')"
           :placeholder="t('dashboard.hostmapEntityLabelPlaceholder')"
           data-test="dashboard-config-hostmap-entity-label"
@@ -1076,27 +1077,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip :content="t('dashboard.hostmapEntityLabelTooltip')" max-width="15.625rem" />
           </template>
-        </OInput>
+        </OCombobox>
 
         <div
           v-if="promqlMode"
           v-show="isConfigOptionVisible('hostmap', 'group-by')"
           class="flex gap-2"
         >
-          <OInput
-            class="min-w-0 flex-1"
-            v-model="hostmapGroupByFirstModel"
-            :label="t('dashboard.hostmapGroupBy')"
-            :placeholder="t('dashboard.hostmapLabelPlaceholder')"
-            data-test="dashboard-config-hostmap-group-by-1"
-          />
-          <OInput
-            class="min-w-0 flex-1"
-            v-model="hostmapGroupBySecondModel"
-            :label="t('dashboard.hostmapThenBy')"
-            :placeholder="t('dashboard.hostmapLabelPlaceholder')"
-            data-test="dashboard-config-hostmap-group-by-2"
-          />
+          <div class="min-w-0 flex-1">
+            <OCombobox
+              v-model="hostmapGroupByFirstModel"
+              :items="hostmapLabelOptions"
+              :label="t('dashboard.hostmapGroupBy')"
+              :placeholder="t('dashboard.hostmapLabelPlaceholder')"
+              data-test="dashboard-config-hostmap-group-by-1"
+            />
+          </div>
+          <div class="min-w-0 flex-1">
+            <OCombobox
+              v-model="hostmapGroupBySecondModel"
+              :items="hostmapLabelOptions"
+              :label="t('dashboard.hostmapThenBy')"
+              :placeholder="t('dashboard.hostmapLabelPlaceholder')"
+              data-test="dashboard-config-hostmap-group-by-2"
+            />
+          </div>
         </div>
 
         <OToggleGroup
@@ -2736,6 +2741,7 @@ import {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
 import { isGaugeFixedRangeValid } from "@/utils/dashboard/gaugeDial";
+import { hostmapLabelSuggestions } from "@/utils/dashboard/convertHostmapData";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -2909,6 +2915,12 @@ export default defineComponent({
       });
     const hostmapGroupByFirstModel = hostmapGroupByLevel(0);
     const hostmapGroupBySecondModel = hostmapGroupByLevel(1);
+    const hostmapLabelOptions = computed(() =>
+      hostmapLabelSuggestions(
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query ?? "",
+        dashboardSelectfieldPromQlList.value.map((option: { value: string }) => option.value),
+      ).map((label) => ({ label: raw(label), value: label })),
+    );
     const hostmapReductionOptions: { label: I18nText; value: string }[] = [
       { label: t("dashboard.hostmapReductionLast"), value: "last" },
       { label: t("dashboard.hostmapReductionAvg"), value: "avg" },
@@ -3981,6 +3993,7 @@ export default defineComponent({
       hostmapEntityLabelModel,
       hostmapGroupByFirstModel,
       hostmapGroupBySecondModel,
+      hostmapLabelOptions,
       hostmapReductionOptions,
       hostmapGroupSortOptions,
       hostmapCellSortOptions,

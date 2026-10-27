@@ -255,4 +255,50 @@ describe("ConfigPanel host map options", () => {
     expect(panelData.data.config.hostmap_group_by).toBeNull();
     expect(panelData.data.config.hostmap_entity_label).toBeNull();
   });
+
+  it("suggests the stream's labels for the PromQL entity and group-by fields, kept labels first", async () => {
+    const panelData: any = hostmapPanel();
+    panelData.data.queries = [
+      {
+        ...panelData.data.queries[0],
+        queryType: "promql",
+        query: "max by (rack, host) (gpu_power_watts)",
+        fields: { ...panelData.data.queries[0].fields, stream: "gpu_power_watts" },
+      },
+    ];
+    panelData.meta = {
+      ...panelData.meta,
+      streamFields: {
+        groupedFields: [
+          {
+            name: "gpu_power_watts",
+            schema: [
+              "__hash__",
+              "__name__",
+              "_timestamp",
+              "cdu",
+              "gpu_uuid",
+              "host",
+              "rack",
+              "value",
+            ].map((name) => ({ name })),
+          },
+        ],
+      },
+    };
+    wrapper = createWrapper({ dashboardPanelData: panelData }, { promqlMode: true });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.hostmapLabelOptions.map((option: any) => option.value)).toEqual([
+      "rack",
+      "host",
+      "cdu",
+      "gpu_uuid",
+    ]);
+    for (const field of ["entity-label", "group-by-1", "group-by-2"]) {
+      expect(wrapper.find(`[data-test="dashboard-config-hostmap-${field}-input"]`).exists()).toBe(
+        true,
+      );
+    }
+  });
 });
