@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -16,10 +16,19 @@ import {
   sha256,
 } from "./telemetry.mjs";
 import { selectOwnReviewComment } from "./src/comments.mjs";
+import {
+  buildReviewPayload,
+  existingFingerprints,
+  extractInlineBlock,
+  rightSideLines,
+  selectInlineComments,
+} from "./src/inline.mjs";
 import { OpencodeServer, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { fetchDiff, prefixDiffPaths } from "./src/pr-diff.mjs";
+import { failedReviewersNote, insertAfterCallout, mapStrings } from "./src/report.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
-import { scrubReviewBody } from "./src/scrub.mjs";
+import { scrubReviewBody, scrubSecrets } from "./src/scrub.mjs";
+import { isReleaseFile, resolveRulesFiles } from "./src/selection.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +95,10 @@ const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
 const NOTICE_TAG = "<!-- o2-review-notice -->";
 // Login of the token that posts the review; anyone else's comment carrying the marker must never become <previous_review>.
 const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
+// Kill switch for the inline review comments; the summary comment is posted either way.
+const REVIEW_INLINE = (process.env.REVIEW_INLINE || "true").toLowerCase() !== "false";
+// Where the raw findings JSON is written for the workflow to upload; unset skips it.
+const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
 
 // ─── Branding (presentation only) ───────────────────────────────────────────
 // The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
@@ -161,7 +174,7 @@ const AGENTS = {
     name: "Release Reviewer",
     promptFile: "agents/release.md",
     opencodeAgent: "ai-review-release",
-    fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
+    fileFocus: isReleaseFile,
   },
   // Reviews only the half of the ui-architect skill that no lint rule or script can see
   // (structure, cross-file consistency, i18n semantics). `requiresFocus` is what makes that
@@ -203,7 +216,7 @@ const RISK_TIERS = {
     coordinatorAgent: COORDINATOR_AGENT,
   },
   full: {
-    agents: ["security", "code-quality", "performance", "documentation", "release"],
+    agents: ["security", "code-quality", "performance", "documentation"],
     coordinatorAgent: COORDINATOR_AGENT,
   },
 };
@@ -214,6 +227,8 @@ const RISK_TIERS = {
 const CONDITIONAL_AGENTS = [
   { agent: "frontend", matches: isFrontendFile },
   { agent: "qa", matches: isTestFile },
+  // Release reviews only what can affect a release (migrations, manifests, config, CI, deploy); most PRs touch none of it.
+  { agent: "release", matches: isReleaseFile },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -260,7 +275,7 @@ function fetchPrDiff(prNumber) {
     head: process.env.HEAD_SHA,
     log,
   });
-  if (!PAIRED.repo || !PAIRED.prNumber) return own;
+  if (!PAIRED.repo || !PAIRED.prNumber) return { diff: own, own };
   const paired = fetchDiff({
     repo: PAIRED.repo,
     prNumber: PAIRED.prNumber,
@@ -270,7 +285,7 @@ function fetchPrDiff(prNumber) {
     log,
   });
   log(`Reviewing together with paired PR ${PAIRED.repo}#${PAIRED.prNumber} (paths prefixed with ${PAIRED.dir}/)`);
-  return `${own.replace(/\n?$/, "\n")}${prefixDiffPaths(paired, PAIRED.dir)}`;
+  return { diff: `${own.replace(/\n?$/, "\n")}${prefixDiffPaths(paired, PAIRED.dir)}`, own };
 }
 
 function pairedPrContext() {
@@ -288,10 +303,10 @@ function pairedPrContext() {
   }
 }
 
-// Trusted repo rules (base-branch AGENTS.md files) that sanitize removed from the PR tree; opencode used to attach them itself.
+// Trusted repo rules (base-branch AGENTS.md files, or CLAUDE.md where there is no AGENTS.md) that sanitize removed from the PR tree; opencode used to attach them itself.
 function readRepoRules() {
   const files = (process.env.REVIEW_RULES_FILES ?? resolve(ENGINE_DIR, "AGENTS.md")).split("\n").map(f => f.trim()).filter(Boolean);
-  const sections = files.filter(f => existsSync(f)).map(f => readFileSync(f, "utf-8").trim()).filter(Boolean);
+  const sections = resolveRulesFiles(files).map(f => readFileSync(f, "utf-8").trim()).filter(Boolean);
   if (sections.length === 0) return "";
   return `## Repository rules (from the base branch)\n\nThese are the repository's contributor rules. Flag changed code that breaks them.\n\n${sections.join("\n\n---\n\n")}`;
 }
@@ -929,7 +944,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.error(`[${isoNow()}] ${agentDef.name} FAILED after ${elapsed}s: ${err.message}`);
     TRACE.endSpan(reviewerSpan, { "review.elapsed_seconds": Number(elapsed) }, err);
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: err.message, genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: err.message, timedOut: err?.name === "TimeoutError", genAIResponseId: "" };
   }
 }
 
@@ -1083,12 +1098,17 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
       agentName: "Coordinator",
       operationName: "code_review.coordination",
     });
+    // The machine-readable list of kept findings never reaches the summary comment.
+    const inline = extractInlineBlock(completion.text);
+    if (inline.error) console.warn(`[${isoNow()}] Coordinator inline block: ${inline.error}; no inline comments from it`);
     TRACE.endSpan(coordinatorSpan, {
       "review.output_length": completion.text.length,
       "gen_ai.response.id": completion.responseId,
+      "review.kept_findings": inline.findings.length,
     });
     return {
-      text: completion.text,
+      text: inline.text,
+      kept: inline.findings,
       genAIResponseId: completion.responseId,
       fallback: false,
       error: null,
@@ -1102,6 +1122,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     }, err);
     return {
       text: fallback,
+      kept: dedupeFindings(agentResults).map(toKeptFinding),
       genAIResponseId: "",
       fallback: true,
       error: err.message,
@@ -1109,7 +1130,19 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   }
 }
 
-function buildFallbackReview(agentResults, tier, failedAgents) {
+// Same shape as an entry of the coordinator's inline block.
+function toKeptFinding(f) {
+  return {
+    file: (f.file || "").replace(/^\.?\//, ""),
+    line: Number.parseInt(f.line, 10) || 0,
+    severity: (f.severity || "").toLowerCase(),
+    category: f.category || "",
+    title: f.summary,
+    body: [f.description, f.suggestion ? `**Fix:** ${f.suggestion}` : ""].filter(Boolean).join("\n\n"),
+  };
+}
+
+function dedupeFindings(agentResults) {
   const allFindings = agentResults.flatMap(r => r.findings);
 
   const seen = new Map();
@@ -1127,10 +1160,16 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
         existing.line = f.line || existing.line;
       }
     } else {
-      seen.set(key, f);
-      deduped.push(f);
+      seen.set(key, { ...f });
+      deduped.push(seen.get(key));
     }
   }
+  return deduped;
+}
+
+function buildFallbackReview(agentResults, tier, failedAgents) {
+  const allFindings = agentResults.flatMap(r => r.findings);
+  const deduped = dedupeFindings(agentResults);
 
   const MAX_FALLBACK_FINDINGS = 15;
   const sorted = deduped
@@ -1184,10 +1223,6 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
     sections.push(`#### 🔵 Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
   }
 
-  const failureNote = failedAgents.length > 0
-    ? `\n> Note: ${failedAgents.map(r => r.agentName).join(", ")} failed to complete. Findings are from available reviewers only.`
-    : "";
-
   const dedupNote = allFindings.length > sorted.length
     ? `\n> Deduplicated: ${allFindings.length} raw findings → ${sorted.length} unique (${allFindings.length - sorted.length} duplicates removed).`
     : "";
@@ -1197,7 +1232,7 @@ ${REVIEW_HEADING}
 
 > [!NOTE]
 > ### 💬 Approved with comments
-> Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
+> Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${dedupNote}
 
 **🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion**
 
@@ -1261,6 +1296,65 @@ function updateReviewComment(prNumber, commentId, body) {
     throw err;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
+  }
+}
+
+// Inline threads for the kept blockers and warnings. Advisory like the rest of the review: any failure is logged, never fatal.
+function postInlineReview(prNumber, kept, ownDiff) {
+  if (!REVIEW_INLINE) {
+    console.log(`[${isoNow()}] REVIEW_INLINE=false; not posting inline comments`);
+    return { posted: 0, skipped: "disabled" };
+  }
+  let posted = new Set();
+  if (REVIEW_BOT_LOGIN) {
+    const pages = JSON.parse(gh(`api --paginate --slurp "repos/${process.env.GITHUB_REPOSITORY}/pulls/${prNumber}/comments"`));
+    posted = existingFingerprints(pages.flat(), REVIEW_BOT_LOGIN);
+  }
+  const { selected, dropped } = selectInlineComments(kept, rightSideLines(ownDiff), posted);
+  console.log(`[${isoNow()}] Inline: ${selected.length} to post; dropped ${JSON.stringify(dropped)}`);
+  if (selected.length === 0) return { posted: 0, dropped };
+  const scrub = text => {
+    const scrubbed = scrubReviewBody(redactProviderIdentity(text), process.env);
+    if (scrubbed.secretHits > 0) console.warn(`[${isoNow()}] Redacted ${scrubbed.secretHits} secret-shaped value(s) from an inline comment`);
+    return scrubbed.text;
+  };
+  const summary = `${REVIEW_TITLE}: ${selected.length} finding(s) from the review comment, anchored to the diff.`;
+  const payload = buildReviewPayload(selected, process.env.HEAD_SHA || "", summary, scrub);
+  const tmpFile = `/tmp/review_inline_${randomUUID()}.json`;
+  writeFileSync(tmpFile, JSON.stringify(payload));
+  try {
+    gh(`api "repos/${process.env.GITHUB_REPOSITORY}/pulls/${prNumber}/reviews" --method POST --input "${tmpFile}"`);
+  } finally {
+    try { unlinkSync(tmpFile); } catch {}
+  }
+  return { posted: selected.length, dropped };
+}
+
+// Model output only (parsed findings, no raw text, no prompts), scrubbed like the comment, for grading what the coordinator kept.
+function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlineResult) {
+  if (!REVIEW_ARTIFACT_DIR) return;
+  try {
+    const clean = text => scrubSecrets(redactProviderIdentity(text), process.env).text;
+    const data = mapStrings({
+      pr: String(prNumber),
+      head_sha: process.env.HEAD_SHA || "",
+      tier,
+      reviewers: results.map(r => ({
+        agent: r.agentKey,
+        name: r.agentName,
+        skipped: Boolean(r.skipped),
+        error: r.error || null,
+        findings: r.findings,
+      })),
+      coordinator: coordinatorResult
+        ? { fallback: coordinatorResult.fallback, error: coordinatorResult.error, kept: coordinatorResult.kept || [] }
+        : null,
+      inline: inlineResult,
+    }, clean);
+    mkdirSync(REVIEW_ARTIFACT_DIR, { recursive: true });
+    writeFileSync(resolve(REVIEW_ARTIFACT_DIR, "review-findings.json"), `${JSON.stringify(data, null, 2)}\n`);
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not write the findings artifact: ${err.message}`);
   }
 }
 
@@ -1334,9 +1428,11 @@ async function main() {
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
     let diff;
+    // This repo's diff alone: inline comments can only anchor to files of this PR, not the paired one.
+    let ownDiff;
     const diffSpan = TRACE.startSpan("github.pr.diff", { "github.pr.number": prNumber }, rootSpan);
     try {
-      diff = fetchPrDiff(prNumber);
+      ({ diff, own: ownDiff } = fetchPrDiff(prNumber));
       const diffStats = diff.split("\n").length;
       TRACE.endSpan(diffSpan, { "diff.raw_lines": diffStats });
       console.log(`[${isoNow()}] Raw diff: ${diffStats} lines`);
@@ -1491,6 +1587,7 @@ async function main() {
     // and exit non-zero so the check surfaces as red.
     const allAgentsFailed = ranResults.length > 0 && failedAgents.length === ranResults.length;
     let finalReview;
+    let coordinatorResult = null;
     let responseIds = reviewerResponseIds;
 
     if (allAgentsFailed) {
@@ -1519,8 +1616,8 @@ async function main() {
         `</details>`,
       ].join("\n");
     } else {
-      const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
-      finalReview = coordinatorResult.text;
+      coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
+      finalReview = insertAfterCallout(coordinatorResult.text, failedReviewersNote(failedAgents, ranResults.length));
       responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
       if (coordinatorResult.fallback) {
         outcome = "partial_success";
@@ -1536,6 +1633,9 @@ async function main() {
       "gen_ai.response.ids": responseIds,
       "gen_ai.response.count": responseIds.length,
     });
+
+    // Written now so a failed post still leaves the findings behind; rewritten with the inline outcome below.
+    writeFindingsArtifact(prNumber, tier, results, coordinatorResult, null);
 
     // Sanitize and validate before posting
     const sanitizeSpan = TRACE.startSpan("ai_review.sanitize", {}, rootSpan);
@@ -1566,6 +1666,20 @@ async function main() {
       TRACE.endSpan(commentSpan, {}, err);
       throw err;
     }
+
+    let inlineResult = null;
+    if (coordinatorResult) {
+      const inlineSpan = TRACE.startSpan("github.pr.inline_review", { "github.pr.number": prNumber }, rootSpan);
+      try {
+        inlineResult = postInlineReview(prNumber, coordinatorResult.kept, ownDiff);
+        TRACE.endSpan(inlineSpan, { "review.inline.posted": inlineResult.posted });
+      } catch (err) {
+        console.warn(`[${isoNow()}] Could not post inline comments: ${execErrorText(err).slice(0, 300)}`);
+        inlineResult = { posted: 0, error: "post failed" };
+        TRACE.endSpan(inlineSpan, {}, err);
+      }
+    }
+    writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlineResult);
 
     // The failure notice is posted above so it is visible on the PR; now fail the check too,
     // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands

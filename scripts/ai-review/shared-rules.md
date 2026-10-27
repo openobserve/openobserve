@@ -4,7 +4,7 @@ These rules apply to ALL reviewers. Violating any of these will cause your findi
 
 ### Rules
 
-1. **Only review changed code.** Do not flag issues in pre-existing code that was not modified in this PR.
+1. **Only report problems this PR introduces or leaves incomplete.** Unchanged code is in scope when the change relies on it or leaves it wrong: a caller or consumer that still uses the old semantics, a sibling code path that should enforce the same rule, a match arm or key the new code depends on that never fires, the other half of a parity pair. Name the changed line that creates the dependency. Unrelated pre-existing bugs stay out.
 2. **Be certain.** If you are unsure whether something is an actual bug, skip it. Do not invent hypothetical problems.
 3. **No style nitpicks.** Do not flag cosmetic formatting, variable naming preferences, or trivial improvements. Only flag style if it violates established project conventions (e.g., clippy lints in Rust, ESLint rules in TypeScript).
 4. **No flattery.** Do not include "Great job", "Thanks for", "Nice work", or any non-actionable commentary.

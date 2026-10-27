@@ -209,7 +209,8 @@ jobs:
           git -C pr -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$MERGE_BASE" \
             || echo "::warning::Could not fetch merge base $MERGE_BASE; diffs over the API limit will fail."
 
-      # Sanitize deletes the PR's AGENTS.md files, so the engine gets the rules of the engine's commit from outside ./pr.
+      # Sanitize deletes the PR's AGENTS.md/CLAUDE.md files, so the engine gets the rules of the engine's commit from outside ./pr.
+      # CLAUDE.md stands in wherever there is no AGENTS.md.
       - name: Fetch repo rules (base branch)
         if: env.REVIEW_RUN == 'true'
         env:
@@ -219,10 +220,19 @@ jobs:
           rules="$RUNNER_TEMP/review-rules"
           mkdir -p "$rules"
           files="$GITHUB_WORKSPACE/engine/AGENTS.md"
-          if gh api "repos/$REPO/contents/web/AGENTS.md?ref=$GITHUB_SHA" -H "Accept: application/vnd.github.raw" > "$rules/web.AGENTS.txt"; then
-            files="$files"$'\n'"$rules/web.AGENTS.txt"
-          else
-            echo "::warning::Could not fetch web/AGENTS.md at $GITHUB_SHA; reviewing without the frontend rules."
+          if [ ! -f "$files" ] && [ -f "$GITHUB_WORKSPACE/engine/CLAUDE.md" ]; then
+            files="$GITHUB_WORKSPACE/engine/CLAUDE.md"
+          fi
+          fetched=""
+          for name in AGENTS.md CLAUDE.md; do
+            if gh api "repos/$REPO/contents/web/$name?ref=$GITHUB_SHA" -H "Accept: application/vnd.github.raw" > "$rules/web.$name.txt" 2>/dev/null; then
+              files="$files"$'\n'"$rules/web.$name.txt"
+              fetched=1
+              break
+            fi
+          done
+          if [ -z "$fetched" ]; then
+            echo "::warning::Could not fetch web/AGENTS.md or web/CLAUDE.md at $GITHUB_SHA; reviewing without the frontend rules."
           fi
           {
             echo "REVIEW_RULES_FILES<<EOF_REVIEW_RULES"
@@ -281,4 +291,17 @@ jobs:
           O2_TRACE_STREAM: ${{ secrets.O2_TRACE_STREAM }}
           O2_TRACE_EXPORT_TIMEOUT_MS: ${{ vars.O2_TRACE_EXPORT_TIMEOUT_MS }}
           O2_TRACE_EXPORT_BATCH_SIZE: ${{ vars.O2_TRACE_EXPORT_BATCH_SIZE }}
+          # Set the variable to 'false' to stop the inline threads; the summary comment still posts.
+          REVIEW_INLINE: ${{ vars.AI_REVIEW_INLINE || 'true' }}
+          REVIEW_ARTIFACT_DIR: ${{ runner.temp }}/ai-review-findings
         run: node engine/scripts/ai-review/run-review.mjs
+
+      # Parsed reviewer findings and the coordinator's kept list (model output only, scrubbed), for grading coordinator drops.
+      - name: Upload review findings
+        if: always() && env.REVIEW_RUN == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ai-review-findings-${{ matrix.provider.name }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-review-findings/
+          retention-days: 7
+          if-no-files-found: ignore

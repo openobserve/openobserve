@@ -16,9 +16,21 @@ Actions logs is fine; naming it in the comment is not.
 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /
 `full`), runs the tier's read-only specialist agents (security, code-quality, performance,
-documentation, release) in parallel — plus any *conditional* agent whose domain the diff touches —
-and a coordinator consolidates their findings into one comment with an approve/needs-work
-decision. The comment PATCHes itself in place on re-review. Full engine details live in the code;
+documentation) in parallel — plus any *conditional* agent whose domain the diff touches (frontend,
+qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config.rs`, `.github/`,
+`deploy/` and Docker files) — and a coordinator consolidates their findings into one comment with
+an approve/needs-work decision. The comment PATCHes itself in place on re-review. If a reviewer
+fails or times out, the runner (not the model) adds a line to the comment saying which area went
+unreviewed.
+
+The coordinator also lists the findings it kept in a hidden JSON block, which the runner strips
+from the comment. Kept blockers and warnings whose `file:line` is an added or context line of the
+diff are posted as one `COMMENT` review with inline threads (at most 10, never approve or request
+changes). Each thread carries a hidden fingerprint of file and title, so a re-run skips findings
+already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. Set the variable
+`AI_REVIEW_INLINE` to `false` to turn the threads off. Every reviewer's parsed findings and the
+coordinator's kept list are also uploaded as the `ai-review-findings-*` artifact (7 days,
+scrubbed like the comment). Full engine details live in the code;
 the rest of this README covers **trusted execution, setup, activation, and rollback**.
 
 The v2 redesign (inline findings, a verifier, a human gate) is specified in
@@ -33,7 +45,7 @@ A PR must never be able to run code next to the review secrets or weaken its own
 |-------|--------------|
 | `pull_request_target` | The workflow file and the engine always come from `main`. A PR's edits to `scripts/ai-review/**`, `opencode.jsonc` or the workflow take effect only after merge. |
 | Two checkouts | `./engine` = `main` (sparse: this directory, `opencode.jsonc`, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
-| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
+| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md`, or `CLAUDE.md` where a directory has no `AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
 | `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` from `./engine`), the `OPENCODE_DISABLE_*` flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
 | `opencode.jsonc` permissions | Each `ai-review-*` agent: `"*": "deny"`, then allow `read`, `glob`, `grep`; `external_directory` denied. LSP, formatters, snapshots and sharing are off. |
 | Startup self-check | Refuses to review if `GET /experimental/tool/ids` lists any non-built-in tool, or any agent resolves to allow for a tool other than `read`/`glob`/`grep`. Permission prompts during a run are rejected. |
