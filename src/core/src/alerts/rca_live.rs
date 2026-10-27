@@ -371,9 +371,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         thread.run_id = run_id.clone();
         thread.state_version = session_version(session, self.run, show_tool_io);
         if !active {
-            thread.reusable_steps = fork::plan_resume(&prefix.events)
-                .ok()
-                .map(|plan| plan.reused_steps);
+            thread.reusable_steps = fork::reusable_steps(&prefix.events);
         }
         if let Some(lost_from) = prefix.lost_from {
             thread.truncated = true;

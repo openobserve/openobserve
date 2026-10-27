@@ -143,6 +143,7 @@ pub struct RunUpdate {
 pub struct RunSummaryPatch {
     pub steps: Option<u32>,
     pub tool_calls: Option<u32>,
+    pub reusable_steps: Option<u32>,
     pub detail: Option<Option<String>>,
     pub cancelled_by: Option<String>,
     pub unblocked_by: Option<String>,
@@ -584,6 +585,9 @@ fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFi
         if let Some(tool_calls) = p.tool_calls {
             summary.tool_calls = tool_calls;
         }
+        if p.reusable_steps.is_some() {
+            summary.reusable_steps = p.reusable_steps;
+        }
         if let Some(detail) = p.detail.as_ref() {
             summary.detail = detail.clone();
         }
@@ -869,6 +873,9 @@ async fn final_stats_with<C: TransactionTrait>(
             }
             if let Some(tool_calls) = p.tool_calls {
                 summary.tool_calls = tool_calls;
+            }
+            if p.reusable_steps.is_some() {
+                summary.reusable_steps = p.reusable_steps;
             }
             if p.unblocked_by.is_some() {
                 summary.unblocked_by = p.unblocked_by.clone();

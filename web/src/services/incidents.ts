@@ -104,6 +104,8 @@ export interface RcaSummaryFields {
   stage_count: number;
   steps: number;
   tool_calls: number;
+  /** Ended run: the finished steps a Resume keeps, the drawer's count too. */
+  reusable_steps?: number | null;
   steered_by: string[];
   unblocked_by: string | null;
   /** The error reason of a failed run, or the blocked detail. */

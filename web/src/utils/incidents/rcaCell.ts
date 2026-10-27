@@ -239,8 +239,8 @@ export function rcaCellModel(
           rerunNote,
         });
       }
-      // The server's cancellation reason wins; the step open at the cancel did not finish.
-      const finished = Math.max(rca.summary.steps - 1, 0);
+      // The server's reason wins; the count is the drawer's Resume count when stored.
+      const finished = rca.summary.reusable_steps ?? Math.max(rca.summary.steps - 1, 0);
       const detail =
         rca.state === "failed" || rca.summary.detail
           ? raw(rca.summary.detail)

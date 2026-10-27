@@ -431,6 +431,16 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     },
   );
 
+  it("a stored Resume count wins over the steps before the open one", () => {
+    const row = {
+      rca: rca({ state: "cancelled", summary: { steps: 4, reusable_steps: 1 } }),
+      severity: "P2",
+    } as Row;
+    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toBe(
+      gt("alerts.incidents.aiAnalysis.cancelledAfterChecks", { count: 1 }, 1),
+    );
+  });
+
   it("SG26: the until time is in the viewer's zone and names it", () => {
     const row = {
       rca: rca({
