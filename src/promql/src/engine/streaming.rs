@@ -26,7 +26,7 @@ use promql_parser::{
 
 use super::{
     Engine,
-    selector::{SelectorContexts, SelectorOutput, named_selector, plain_selector},
+    selector::{SelectorContexts, SelectorOutput, plain_selector},
 };
 use crate::{
     ScanContext,
@@ -349,7 +349,9 @@ impl Engine {
         {
             return Ok(None);
         }
-        let selector = named_selector(plain_selector(vs, kind)?, kind)?;
+        let selector = self
+            .stream_selector(plain_selector(vs, kind)?, kind)
+            .await?;
         let (start, end, offset) = self.selector_time_range(&selector, Some(range));
         // a window the block scan cannot represent must not reach a streaming source
         if blocks::query_window(&self.eval_ctx, offset, micros(range)).is_none() {

@@ -24,6 +24,7 @@ use config::{
         },
         stream::StreamType,
     },
+    utils::schema::format_stream_name,
 };
 use datafusion::{
     arrow::{
@@ -123,6 +124,19 @@ pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
         return exemplars_stream_name(family);
     }
     exemplars_stream_name(selector_name)
+}
+
+/// The stream `name` reads: itself when its schema is cached, else its ingest-formatted form.
+pub async fn resolve_metric_name(org_id: &str, name: String) -> String {
+    let formatted = format_stream_name(name.clone());
+    if formatted == name
+        || infra::schema::get_stream_schema_from_cache(org_id, &name, StreamType::Metrics)
+            .await
+            .is_some()
+    {
+        return name;
+    }
+    formatted
 }
 
 /// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
@@ -691,6 +705,30 @@ mod tests {
                 rejects,
                 "{query}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_resolve_metric_name_prefers_the_stream_as_written() {
+        let org_id = "test_org_resolve_metric_name";
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            infra::schema::insert_latest(
+                &mut w,
+                format!("{org_id}/{}/ErrorRate", StreamType::Metrics),
+                infra::schema::SchemaCache::new(ArrowSchema::new(vec![Field::new(
+                    "job",
+                    DataType::Utf8,
+                    true,
+                )])),
+            );
+        }
+        for (name, stream) in [
+            ("ErrorRate", "ErrorRate"),
+            ("DCGM_FI_DEV_GPU_TEMP", "dcgm_fi_dev_gpu_temp"),
+            ("up", "up"),
+        ] {
+            assert_eq!(resolve_metric_name(org_id, name.to_string()).await, stream);
         }
     }
 }
