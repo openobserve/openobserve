@@ -64,7 +64,6 @@ export const pagerdutyConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => url === "https://events.pagerduty.com/v2/enqueue",
   credentialFields: [
     {
       key: "integrationKey",

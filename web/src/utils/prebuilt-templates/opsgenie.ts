@@ -58,8 +58,6 @@ export const opsgenieConfig: PrebuiltConfig = {
     Authorization: "GenieKey {api_key}",
   },
   method: "post",
-  urlValidator: (url: string) =>
-    url === "https://api.opsgenie.com/v2/alerts" || url === "https://api.eu.opsgenie.com/v2/alerts",
   credentialFields: [
     {
       key: "apiKey",

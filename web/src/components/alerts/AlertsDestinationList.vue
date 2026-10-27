@@ -872,11 +872,7 @@ export default defineComponent({
       return t("alert_destinations.custom");
     };
 
-    // Top-right tab filter — mirrors the alerts list and templates list.
-    // "prebuilt" matches any destination detectable as a prebuilt type
-    // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
-    // `prebuilt_type` metadata or URL/template pattern); "custom" is the
-    // negation, capturing user-defined HTTP/Email destinations.
+    // "prebuilt" is what the server treats as prebuilt (`detectPrebuiltType`); "custom" is everything else.
     const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
     watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {
