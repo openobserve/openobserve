@@ -538,6 +538,7 @@
       "ingestion-config.spec.js",
       "ingestionTokens.spec.js",
       "ingestion-passcode-forbidden.spec.js",
+      "ingestion-passcode-loading.spec.js",
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",

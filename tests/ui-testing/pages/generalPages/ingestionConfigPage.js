@@ -143,7 +143,30 @@ export class IngestionConfigPage {
             tokenLink: this.page.locator(`[data-test="${prefix}-token-link"]`),
             revealBtn: this.page.locator(`[data-test="${prefix}-reveal-btn"]`),
             copyBtn: this.page.locator(`[data-test="${prefix}-copy-btn"]`),
+            // the skeleton the block holds until GET /{org}/passcode lands
+            loading: this.page.locator(`[data-test="${prefix}-loading"]`),
         };
+    }
+
+    async expectCodeBlockLoading(slug, timeout = 15000) {
+        await expect(this.codeBlock(slug).loading).toBeVisible({ timeout });
+    }
+
+    async expectCodeBlockNotLoading(slug) {
+        await expect(this.codeBlock(slug).loading).toHaveCount(0);
+    }
+
+    async expectCodeBlockNotCopyable(slug) {
+        await expect(this.codeBlock(slug).copyBtn).toHaveCount(0);
+        await expect(this.codeBlock(slug).pre).toHaveCount(0);
+    }
+
+    async clickCodeBlockCopyBtn(slug) {
+        await this.codeBlock(slug).copyBtn.click();
+    }
+
+    async clickCodeBlockRevealBtn(slug) {
+        await this.codeBlock(slug).revealBtn.click();
     }
 
     async expectCodeBlockVisible(slug, timeout = 15000) {
