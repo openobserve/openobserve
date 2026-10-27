@@ -110,6 +110,8 @@ pub struct Capabilities {
     pub context_used: bool,
     /// Answers follow `context.locale`, so doors need no English-only note.
     pub answer_locale: bool,
+    /// `mode: "chat"` with an `incident_id` reaches the interactive incident agent, not RCA.
+    pub rca_chat_mode: bool,
     /// Set only when the org turned the assistant off; `can_chat` is then false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gate: Option<Gate>,
@@ -148,6 +150,7 @@ impl Capabilities {
             attachments: facts.attachments,
             context_used: facts.context_used,
             answer_locale: facts.answer_locale,
+            rca_chat_mode: settings.rca && facts.rca_chat_mode,
             gate: None,
         }
     }
@@ -225,6 +228,7 @@ struct AgentFacts {
     attachments: bool,
     context_used: bool,
     answer_locale: bool,
+    rca_chat_mode: bool,
 }
 
 impl AgentFacts {
@@ -246,6 +250,7 @@ impl AgentFacts {
             attachments: discover.attachments,
             context_used: discover.context_used,
             answer_locale: discover.answer_locale,
+            rca_chat_mode: discover.rca_chat_mode,
         }
     }
 }
@@ -425,6 +430,8 @@ struct Settings {
     persistence: bool,
     public_links: bool,
     retention_days: Option<i64>,
+    /// Incident analysis is on for this deployment, the first bar `POST …/rca` checks.
+    rca: bool,
 }
 
 impl Settings {
@@ -436,6 +443,7 @@ impl Settings {
             public_links: persistence && config::get_config().public_ai_chat.enabled,
             // 0 means the org's stream default, which this server does not resolve here.
             retention_days: (ai.chat_retention_days > 0).then_some(ai.chat_retention_days),
+            rca: get_o2_config().incidents.enabled && get_o2_config().incidents.rca_enabled,
         }
     }
 }
@@ -944,6 +952,7 @@ mod tests {
             attachments: true,
             context_used: true,
             answer_locale: true,
+            rca_chat_mode: true,
         };
         (health, facts)
     }
@@ -953,6 +962,7 @@ mod tests {
             persistence: true,
             public_links: false,
             retention_days: Some(90),
+            rca: true,
         }
     }
 
@@ -1176,6 +1186,34 @@ mod tests {
         let older: DiscoverResponse = serde_json::from_value(json!({"agents": agents})).unwrap();
         let facts = AgentFacts::new(&health, &older);
         assert!(!facts.attachments && !facts.context_used && !facts.answer_locale);
+        assert!(!facts.rca_chat_mode);
+    }
+
+    #[tokio::test]
+    async fn rca_chat_mode_needs_both_the_deployment_and_the_agent() {
+        for (rca, agent, expected) in [
+            (true, true, true),
+            (true, false, false),
+            (false, true, false),
+        ] {
+            let (health, mut facts) = sample_health();
+            facts.rca_chat_mode = agent;
+            let settings = Settings {
+                rca,
+                ..sample_settings()
+            };
+            let caps = Capabilities::new(
+                (health, facts),
+                permissions(Role::User).await,
+                settings,
+                vec![],
+            );
+            assert_eq!(caps.rca_chat_mode, expected, "rca={rca} agent={agent}");
+        }
+        let health: HealthResponse = serde_json::from_value(json!({"status": "healthy"})).unwrap();
+        let discover: DiscoverResponse =
+            serde_json::from_value(json!({"agents": [], "rca_chat_mode": true})).unwrap();
+        assert!(AgentFacts::new(&health, &discover).rca_chat_mode);
     }
 
     #[test]
