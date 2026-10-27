@@ -626,8 +626,9 @@ describe("GeneralSettings", () => {
   });
 
   describe("Default auto refresh", () => {
-    const refreshSelect = () =>
-      wrapper.findComponent('[data-test="dashboard-general-setting-default-refresh"]');
+    const refreshSelect = () => wrapper.findComponent({ name: "AutoRefreshInterval" });
+    const helpText = () =>
+      wrapper.find('[data-test="dashboard-general-setting-default-refresh-help"]').text();
     const formValues = () => wrapper.findComponent({ name: "OForm" }).vm.form.state.values;
     const savedPayload = () => vi.mocked(updateDashboard).mock.calls[0][3] as any;
 
@@ -635,13 +636,21 @@ describe("GeneralSettings", () => {
       store.state.zoConfig.min_auto_refresh_interval = undefined;
     });
 
-    it("offers Off and the toolbar intervals, with those below the minimum disabled", async () => {
+    it("uses the toolbar refresh control, with intervals below the minimum disabled", async () => {
       store.state.zoConfig.min_auto_refresh_interval = 30;
       wrapper = await createWrapper();
 
-      const options = refreshSelect().props("options");
-      expect(options[0]).toMatchObject({ value: 0, label: "Off" });
-      expect(options.filter((o: any) => o.disabled).map((o: any) => o.value)).toEqual([5, 10, 15]);
+      expect(refreshSelect().props("minRefreshInterval")).toBe(30);
+      expect(refreshSelect().props("modelValue")).toBe(0);
+    });
+
+    it("writes the interval picked in the control into the form", async () => {
+      wrapper = await createWrapper();
+      refreshSelect().vm.$emit("update:modelValue", 900);
+      await flushPromises();
+
+      expect(formValues().defaultRefreshInterval).toBe(900);
+      expect(refreshSelect().props("modelValue")).toBe(900);
     });
 
     it("loads the saved default into the form", async () => {
@@ -664,8 +673,8 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       expect(formValues().defaultRefreshInterval).toBe(30);
-      expect(refreshSelect().props("helpText")).toContain("10 sec");
-      expect(refreshSelect().props("helpText")).toContain("30 sec");
+      expect(helpText()).toContain("10 sec");
+      expect(helpText()).toContain("30 sec");
     });
 
     it("saves the picked interval in seconds", async () => {

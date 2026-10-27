@@ -17,9 +17,7 @@ import { describe, expect, it } from "vitest";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import {
-  AUTO_REFRESH_INTERVALS,
   autoRefreshLabel,
-  defaultRefreshOptions,
   effectiveDefaultRefresh,
   minAutoRefreshSeconds,
   resolveOpenRefreshInterval,
@@ -86,18 +84,5 @@ describe("autoRefreshLabel", () => {
     expect(autoRefreshLabel(7200, t)).toBe("2 hr");
     expect(autoRefreshLabel(86400, t)).toBe("1 day");
     expect(autoRefreshLabel(45, t)).toBe("45 sec");
-  });
-});
-
-describe("defaultRefreshOptions", () => {
-  it("offers Off plus the toolbar intervals, disabling those below the minimum", () => {
-    const options = defaultRefreshOptions(30, t);
-    expect(options.map((o) => o.value)).toEqual([0, ...AUTO_REFRESH_INTERVALS]);
-    expect(options.filter((o: any) => o.disabled).map((o) => o.value)).toEqual([5, 10, 15]);
-  });
-
-  it("adds a saved value the toolbar does not list, in order", () => {
-    const values = defaultRefreshOptions(5, t, 45).map((o) => o.value);
-    expect(values.indexOf(45)).toBe(values.indexOf(30) + 1);
   });
 });

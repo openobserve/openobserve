@@ -62,20 +62,3 @@ export const resolveOpenRefreshInterval = (options: {
   }
   return effectiveDefaultRefresh(savedDefault, minSeconds);
 };
-
-/** Select options for the saved default: Off plus the toolbar's intervals, the ones under the minimum disabled. */
-export const defaultRefreshOptions = (minSeconds: number, t: TranslateFn, extra?: number) => {
-  const values: number[] = [...AUTO_REFRESH_INTERVALS];
-  if (extra && extra > 0 && !values.includes(extra)) {
-    values.push(extra);
-    values.sort((a, b) => a - b);
-  }
-  return [
-    { label: t("common.off"), value: 0 },
-    ...values.map((value) => ({
-      label: autoRefreshLabel(value, t),
-      value,
-      disabled: value < minSeconds,
-    })),
-  ];
-};

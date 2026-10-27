@@ -57,15 +57,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="flex flex-col gap-1">
-          <OFormSelect
-            name="defaultRefreshInterval"
-            :label="t('dashboard.generalSettingsPage.defaultAutoRefresh')"
-            :options="refreshOptions"
-            :searchable="false"
-            :help-text="refreshHelpText"
+        <div class="flex flex-col items-start gap-1">
+          <label class="text-compact text-input-label-text leading-tight font-medium">{{
+            t("dashboard.generalSettingsPage.defaultAutoRefresh")
+          }}</label>
+          <AutoRefreshInterval
+            :model-value="selectedRefresh"
+            :min-refresh-interval="minRefreshSeconds"
+            class="h-7.5"
             data-test="dashboard-general-setting-default-refresh"
+            @update:model-value="
+              (value: number) => form.setFieldValue('defaultRefreshInterval', value)
+            "
           />
+          <span
+            class="text-input-help-text text-xs leading-none"
+            data-test="dashboard-general-setting-default-refresh-help"
+          >
+            {{ refreshHelpText }}
+          </span>
           <p
             v-if="showAbsoluteRangeHint"
             class="text-text-secondary text-xs"
@@ -134,11 +144,10 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   autoRefreshLabel,
-  defaultRefreshOptions,
   effectiveDefaultRefresh,
   minAutoRefreshSeconds,
 } from "@/utils/dashboard/autoRefresh";
@@ -158,7 +167,7 @@ export default defineComponent({
     OFormInput,
     OFormTextarea,
     OFormSwitch,
-    OFormSelect,
+    AutoRefreshInterval,
   },
   emits: ["save", "close"],
   setup(props, { emit }) {
@@ -186,9 +195,6 @@ export default defineComponent({
       effectiveDefaultRefresh(savedRefresh.value, minRefreshSeconds.value),
     );
     const selectedRefresh = form.useStore((s: any) => s.values.defaultRefreshInterval as number);
-    const refreshOptions = computed(() =>
-      defaultRefreshOptions(minRefreshSeconds.value, t, effectiveRefresh.value),
-    );
     const refreshHelpText = computed(() =>
       savedRefresh.value > 0 && savedRefresh.value < minRefreshSeconds.value
         ? t("dashboard.generalSettingsPage.defaultAutoRefreshRaised", {
@@ -316,7 +322,8 @@ export default defineComponent({
     return {
       t,
       form,
-      refreshOptions,
+      selectedRefresh,
+      minRefreshSeconds,
       refreshHelpText,
       showAbsoluteRangeHint,
       store,
