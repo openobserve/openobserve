@@ -27051,7 +27051,7 @@
       "joinsFleet": "使用此權杖安裝的收集器會加入機群 {fleet}，並執行 {config} v{version}。",
       "joinsFleetNoConfig": "使用此權杖安裝的收集器會加入機群 {fleet}，該機群尚無組態。",
       "envRefNote": "組態中的憑證請使用 {ref} 參照，讓機密保留在主機上。",
-      "httpTransport": "代理伺服器或負載平衡器無法承載 WebSocket（改用 HTTP 輪詢）",
+      "websocketTransport": "使用 WebSocket（設定即時下發，需代理伺服器支援）",
       "kubernetesNote": "部署一個 DaemonSet，在單一容器中執行 supervisor 與收集器。變更映像檔標籤即可升級。",
       "kubernetesAgent": "Agent（DaemonSet）",
       "kubernetesGateway": "Gateway（StatefulSet）",
