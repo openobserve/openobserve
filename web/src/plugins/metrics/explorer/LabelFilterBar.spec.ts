@@ -47,10 +47,11 @@ const filter = (label: string, value: string, operator?: string): LabelFilter =>
 });
 
 const input = () =>
-  document.body.querySelector<HTMLInputElement>('[data-test="metrics-explorer-label-input"]')!;
+  (document.body.querySelector<HTMLInputElement>('[data-test="metrics-explorer-label-search"]') ??
+    document.body.querySelector<HTMLInputElement>('[data-test="metrics-explorer-label-input"]'))!;
 
 async function focus() {
-  await wrapper!.find('[data-test="metrics-explorer-label-add"]').trigger("click");
+  await wrapper!.find('[data-test="metrics-explorer-label-input"]').trigger("click");
   await flushPromises();
 }
 
