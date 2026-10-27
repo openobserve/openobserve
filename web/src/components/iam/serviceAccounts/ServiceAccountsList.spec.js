@@ -1151,11 +1151,19 @@ describe("ServiceAccountsList Component", () => {
       expect(curl).not.toContain("_search");
     });
 
-    it("cURL snippet targets the host the UI is served from", () => {
-      wrapper.vm.revealToken("the-token", "svc@example.com");
-      expect(wrapper.vm.tokenCurlSnippet).toContain(
-        `"${window.location.origin}/api/test-org/streams"`,
-      );
+    it.each([
+      ["http://localhost:5080", "http://localhost:5080"],
+      ["/", window.location.origin],
+      ["https://o2.example.com/base", "https://o2.example.com/base"],
+    ])("cURL snippet targets the API endpoint the UI calls (%s)", (apiEndpoint, expectedHost) => {
+      const original = store.state.API_ENDPOINT;
+      store.state.API_ENDPOINT = apiEndpoint;
+      try {
+        wrapper.vm.revealToken("the-token", "svc@example.com");
+        expect(wrapper.vm.tokenCurlSnippet).toContain(`"${expectedHost}/api/test-org/streams"`);
+      } finally {
+        store.state.API_ENDPOINT = original;
+      }
     });
 
     it("Header snippet is Authorization: Basic base64(identifier:token)", () => {
@@ -1242,10 +1250,10 @@ describe("ServiceAccountsList Component", () => {
       config.isCloud = false;
     });
 
-    it("targets the host the UI is served from, not a fixed global API host", () => {
+    it("targets the API endpoint the UI calls, not a fixed global API host", () => {
       wrapper.vm.revealToken("the-token", "svc@example.com");
       const curl = wrapper.vm.tokenCurlSnippet;
-      expect(curl).toContain(`"${window.location.origin}/api/test-org/streams"`);
+      expect(curl).toContain(`"${store.state.API_ENDPOINT}/api/test-org/streams"`);
       expect(curl).not.toContain("api.openobserve.ai");
     });
   });

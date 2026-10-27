@@ -677,8 +677,10 @@ export default defineComponent({
     // OpenObserve authenticates API requests with HTTP Basic auth —
     // base64("<identifier>:<token>"), NOT a Bearer token. The service account's
     // email is the username and the token is the password.
-    // Cloud regions accept the account only on their own host, e.g. us2.openobserve.ai.
-    const tokenEndpoint = computed(() => window.location.origin);
+    // The host the UI's own API calls use; Cloud regions accept the account only there (e.g. us2.openobserve.ai).
+    const tokenEndpoint = computed(() =>
+      new URL(store.state.API_ENDPOINT || "/", window.location.origin).href.replace(/\/$/, ""),
+    );
 
     const tokenBasicCredential = computed(() =>
       b64EncodeStandard(
