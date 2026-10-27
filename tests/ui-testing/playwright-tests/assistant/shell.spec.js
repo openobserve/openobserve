@@ -86,8 +86,10 @@ test.describe("assistant shell", () => {
       "aria-label",
       "O2 Assistant, open",
     );
+    // The header button's tooltip stays open under a resting pointer and covers the thread header.
+    await page.mouse.move(0, 0);
     await assistant.sidebar
-      .locator('[data-test="assistant-shell-menu"]')
+      .locator('[data-test="assistant-thread-menu"]')
       .click();
     const menu = page.locator('[role="menu"]');
     await expect(menu).toBeVisible();
@@ -148,7 +150,7 @@ test.describe("assistant shell", () => {
     );
     await expect(landmarks.filter({ visible: true })).toHaveCount(1);
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
-    await assistant.full.locator('[data-test="assistant-shell-menu"]').click();
+    await assistant.full.locator('[data-test="assistant-thread-menu"]').click();
     await page.locator('[data-test="assistant-shell-open-in-sidebar"]').click();
     await expect(page).toHaveURL(/\/logs/);
     await expect(assistant.sidebar).toBeVisible();

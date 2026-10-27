@@ -1169,6 +1169,22 @@ describe("draft restore after a reload (WP-05)", () => {
     },
   );
 
+  it("brings a draft back on a blank chat when history never saw the chat saved", async () => {
+    const sid = "0190f3a0-0000-7000-8000-000000000096";
+    sessionStorage.setItem("o2.assistant.selected:k1", sid);
+    sessionStorage.setItem(`o2.assistant.draft:k1:${sid}`, JSON.stringify({ text: "draft" }));
+    const { store } = makeStore({
+      history: {
+        ...inertAssistantDeps().history,
+        canReload: computed(() => true),
+        open: () => Promise.reject(Object.assign(new Error("not_found"), { code: "not_found" })),
+      },
+    });
+    await flushPromises();
+    expect(store.state.shell.activeSid).toBe(sid);
+    expect(store.state.sessions[sid].composer.text).toBe("draft");
+  });
+
   it("starts empty when the selected chat left no draft", async () => {
     sessionStorage.setItem("o2.assistant.selected:k1", "0190f3a0-0000-7000-8000-000000000098");
     const { store } = makeStore();

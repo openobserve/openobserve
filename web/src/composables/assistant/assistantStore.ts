@@ -33,7 +33,7 @@ import {
   type ChatMessage,
   type ImageAttachment,
 } from "@/ts/interfaces/chat";
-import type { I18nKey } from "@/types/i18n";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import { MAX_LEDGER } from "./actions/appliers/approval";
@@ -51,6 +51,8 @@ import type {
   HistoryRow,
   HistoryService,
   Placement,
+  RecordMeta,
+  SessionOrigin,
   ShellState,
   Sid,
   TurnInput,
@@ -167,6 +169,16 @@ export type SessionInit = Parameters<AssistantStoreApi["createSession"]>[0] & {
   messages?: ChatMessage[];
 };
 
+/** A chat read from history: its transcript, title and record fields as the server or this browser keeps them. */
+export interface AdoptInit {
+  chatId: number | null;
+  title: I18nText | null;
+  titleSource: AssistantSession["titleSource"];
+  origin: SessionOrigin;
+  messages: ChatMessage[];
+  record: Partial<RecordMeta>;
+}
+
 /** `open`'s options; `forcePinned` pins this open only, without touching `placement.mode`. */
 export type OpenOptions = Parameters<AssistantStoreApi["open"]>[1] & { forcePinned?: boolean };
 
@@ -217,6 +229,8 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   ): Promise<TurnTerminal>;
   /** Cancels a turn this tab does not run, for `turn_busy`'s Stop it. */
   cancelTurn(sid: Sid, turnId: string | null): Promise<boolean>;
+  /** Puts a chat read from history into the store, or refreshes its transcript when this tab is not running it. */
+  adoptSession(sid: Sid, init: AdoptInit): void;
 }
 
 export interface AssistantStoreOptions {
@@ -581,6 +595,7 @@ function createSessionSlice(core: StoreCore) {
     | "lastTurnAt"
     | "annotate"
     | "trackSave"
+    | "adoptSession"
   > = {
     createSession(init) {
       if (!state.ready || !state.userOrgKey) throw new Error("The assistant store is inert here");
@@ -629,6 +644,24 @@ function createSessionSlice(core: StoreCore) {
       core.released.delete(sid);
       if (state.shell.activeSid === sid) core.setActive(null);
       if (state.shell.invoker?.sid === sid) state.shell.invoker = null;
+    },
+    adoptSession(sid, init) {
+      const userOrgKey = state.userOrgKey;
+      if (!userOrgKey) return;
+      const known = core.session(sid);
+      const session =
+        known ?? blankSession(sid, userOrgKey, deps, { origin: init.origin, messages: [] });
+      // A turn this tab streams owns the transcript; the history copy waits for its save.
+      if (!known || !(isRunning(known.turn) && known.turnMeta.ownedByThisTab))
+        session.messages = [...init.messages];
+      Object.assign(session.record, init.record);
+      if (init.chatId !== null) session.chatId = init.chatId;
+      if (!known) session.origin = { ...init.origin };
+      if (init.title !== null && TITLE_RANK[init.titleSource] >= TITLE_RANK[session.titleSource]) {
+        session.title = init.title;
+        session.titleSource = init.titleSource;
+      } else if (session.title === null) session.title = init.title;
+      if (!known) state.sessions[sid] = session;
     },
     setTitle(sid, title, source) {
       const session = core.session(sid);
@@ -1399,7 +1432,9 @@ function restoreStoredDraft(core: StoreCore, sid: Sid): void {
 
 // Only an unavailable history revives the chat; only a chat history calls gone (404) or forbidden (403) loses its draft (S9).
 function afterOpenFailed(core: StoreCore, sid: Sid, err: unknown): void {
-  if (!core.deps.history.canReload.value) return reviveDraft(core, sid);
+  // A chat that was never saved is not found, not deleted: its draft comes back on a blank chat.
+  const notFound = (err as { code?: unknown } | null)?.code === "not_found";
+  if (!core.deps.history.canReload.value || notFound) return reviveDraft(core, sid);
   const status = httpStatusOf(err);
   if ((status === 404 || status === 403) && core.state.userOrgKey)
     core.drafts.remove(core.state.userOrgKey, sid);

@@ -513,6 +513,11 @@ export function formatOrgIsoDay(ts: number): string {
   });
 }
 
+/** Calendar days between `ts` and `now` in the org zone (0 = same day), never a 24 h span. */
+export function orgDayDistance(ts: number, now: number, timeZone: string = orgTimeZone()): number {
+  return dayDistance(ts, now, timeZone);
+}
+
 /** "13:42–13:58 GMT+5:30": one zone, always named, en dash between the ends. */
 export function formatOrgRange(from: number, to: number, opts: { timeZone?: string } = {}): string {
   const locale = uiIntlLocale();
@@ -594,7 +599,8 @@ function orgParts(
   return orgFormatter(locale, tz, options)?.format(new Date(ts)) ?? "";
 }
 
-function orgTimeZone(): string {
+/** The org's IANA zone, else the browser's. */
+export function orgTimeZone(): string {
   return orgTimeZoneSource() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 

@@ -88,25 +88,50 @@
     return out;
   };
 
-  const sseStream = (scenario, signal, firstSeq = 1) => {
+  // Streams running in this page by session, so a Stop sent from another tab can end them (`cancelSid`).
+  mock.active = mock.active || {};
+  mock.cancelSid = (sid) => mock.active[sid]?.();
+  // One channel object per page: a page never hears its own post, so only other tabs' streams end.
+  const cancelChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("o2mock-cancel") : null;
+  if (cancelChannel) cancelChannel.onmessage = (event) => mock.cancelSid(event.data?.sid);
+
+  const sseStream = (scenario, signal, firstSeq = 1, hooks = {}) => {
     const enc = new TextEncoder();
+    let ended = false;
+    const end = () => {
+      if (ended) return;
+      ended = true;
+      if (hooks.sid && mock.active[hooks.sid] === cancelHere) delete mock.active[hooks.sid];
+      hooks.onEnd?.();
+    };
+    let cancelHere = () => {};
     return new ReadableStream({
       async start(controller) {
         const onAbort = () => {
+          end();
           try {
             controller.error(new DOMException("The user aborted a request.", "AbortError"));
           } catch (_) {}
         };
         signal?.addEventListener("abort", onAbort, { once: true });
         let seq = firstSeq;
+        cancelHere = () => {
+          if (ended) return;
+          try {
+            controller.enqueue(enc.encode(encodeFrame({ type: "cancelled" }, seq)));
+            controller.close();
+          } catch (_) {}
+          end();
+        };
+        if (hooks.sid) mock.active[hooks.sid] = cancelHere;
         for (const frame of scenario.frames) {
-          if (signal?.aborted) return;
+          if (signal?.aborted || ended) return;
           if (frame.waitForConfirm) {
             await new Promise((r) => confirmWaiters.push(r));
             continue;
           }
           await sleep((scenario.delayMs ?? 30) / (mock.speed || 1));
-          if (signal?.aborted) return;
+          if (signal?.aborted || ended) return;
           controller.enqueue(enc.encode(encodeFrame(frame, seq)));
           seq += 1;
         }
@@ -115,6 +140,8 @@
           await new Promise((r) => (mock.release = r));
         }
         signal?.removeEventListener("abort", onAbort);
+        if (ended) return;
+        end();
         controller.close();
       },
     });
@@ -125,12 +152,12 @@
     if (/\/api\/[^/]+\/ai\/chat_stream(\?|$)/.test(url)) {
       const bodyText = typeof init.body === "string" ? init.body : "";
       const name = pickScenario(bodyText, new Error().stack);
-      mock.requests.push({ url, scenario: name, body: bodyText, headers: init.headers, stack: new Error().stack });
+      mock.requests.push({ url, scenario: name, body: bodyText, headers: init.headers, stack: new Error().stack, at: Date.now() });
       // Tell the Node-side mock which scenario this session ran, so GET /ai/chats/{id} can replay it.
       try {
         const sid = (init.headers || {})["x-o2-assistant-session-id"];
         const last = (JSON.parse(bodyText || "{}").messages || []).slice(-1)[0];
-        if (sid) origFetch(new URL("/__o2mock/turn", url).href, { method: "POST", body: JSON.stringify({ session_id: sid, scenario: name, text: String(last?.content || "") }) }).catch(() => {});
+        if (sid) origFetch(new URL("/__o2mock/turn", url).href, { method: "POST", body: JSON.stringify({ session_id: sid, turn_id: (init.headers || {})["x-o2-assistant-turn-id"], scenario: name, text: String(last?.content || "") }) }).catch(() => {});
       } catch (_) {}
       const httpErr = HTTP_SCENARIOS[name];
       if (httpErr) {
@@ -150,7 +177,9 @@
       const scenario = SCENARIOS[name] || SCENARIOS.complete;
       const turnId = (init.headers || {})["x-o2-assistant-turn-id"];
       mock.lastTurn = { name, turnId, seq: 0 };
-      return new Response(sseStream({ ...scenario, frames: withLifecycle(scenario.frames, turnId) }, init.signal), {
+      const sid = (init.headers || {})["x-o2-assistant-session-id"];
+      const onEnd = () => sid && origFetch(new URL("/__o2mock/turn_end", url).href, { method: "POST", body: JSON.stringify({ session_id: sid }) }).catch(() => {});
+      return new Response(sseStream({ ...scenario, frames: withLifecycle(scenario.frames, turnId) }, init.signal, 1, { sid, onEnd }), {
         status: 200,
         headers: { "Content-Type": "text/event-stream" },
       });
@@ -201,6 +230,8 @@
       if (mock.knobs.cancelDelayMs) await sleep(mock.knobs.cancelDelayMs);
       mock.release?.();
       const status = mock.knobs.cancelStatus || 200;
+      const cancelled = url.match(/\/ai\/chats\/([^/]+)\/cancel/);
+      if (status === 200 && cancelled) cancelChannel?.postMessage({ sid: decodeURIComponent(cancelled[1]) });
       return new Response(JSON.stringify(status === 200 ? { cancelled: true } : { code: status, message: "cancel failed" }), { status, headers: { "Content-Type": "application/json" } });
     }
     return origFetch(input, init);

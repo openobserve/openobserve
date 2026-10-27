@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-base data-[dragging]:ring-border-strong flex h-full min-h-0 flex-col outline-none data-[dragging]:ring-2 data-[dragging]:ring-inset"
     @keydown="recordKeydown"
   >
-    <!-- ① chrome row; WP-11's thread header takes the title slot -->
     <div
       :class="[
         'border-border-default flex shrink-0 items-center gap-2 border-b px-3',
@@ -37,37 +36,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       data-test="assistant-shell-chrome"
     >
-      <OSkeleton v-if="state === 'loading'" type="text" class="w-40" />
-      <template v-else-if="showTitle">
-        <AssistantMark size="sm" />
-        <OTruncatedText
-          class="text-text-heading min-w-12 flex-1 text-sm font-medium"
-          data-test="assistant-shell-title"
-          >{{ title }}</OTruncatedText
-        >
+      <AssistantThreadHeader
+        v-if="showTitle && state !== 'loading'"
+        ref="threadHeader"
+        :sid="activeSid"
+        :placement="sheet ? 'sheet' : placement"
+        :density="headerDensity"
+        :container="container"
+      >
+        <template #container-actions>
+          <slot name="container-actions" />
+          <AssistantIconButton
+            v-if="placement === 'sidebar' && !sheet"
+            :label="t('assistant.shell.openInFullView')"
+            :icon="assistantGlyph.openFull"
+            data-test="assistant-shell-open-in-full-view"
+            @click="openInFullView"
+          />
+          <AssistantIconButton
+            :label="t('assistant.shell.close', { product })"
+            :icon="assistantGlyph.close"
+            data-test="assistant-shell-close"
+            @click="closeContainer"
+          />
+        </template>
+        <template #menu-layout>
+          <AssistantContainerMenu bare :placement="placement" :sheet="sheet" />
+        </template>
+      </AssistantThreadHeader>
+      <template v-else>
+        <OSkeleton v-if="state === 'loading'" type="text" class="w-40" />
+        <span class="flex-1" />
+        <div class="flex shrink-0 items-center gap-1">
+          <slot name="container-actions" />
+          <AssistantIconButton
+            v-if="placement === 'sidebar' && (!sheet || state === 'gate')"
+            :label="t('assistant.shell.openInFullView')"
+            :icon="assistantGlyph.openFull"
+            data-test="assistant-shell-open-in-full-view"
+            @click="openInFullView"
+          />
+          <AssistantContainerMenu v-if="state !== 'gate'" :placement="placement" :sheet="sheet" />
+          <AssistantIconButton
+            :label="t('assistant.shell.close', { product })"
+            :icon="assistantGlyph.close"
+            data-test="assistant-shell-close"
+            @click="closeContainer"
+          />
+        </div>
       </template>
-      <span v-if="state === 'loading' || !showTitle" class="flex-1" />
-      <div class="flex shrink-0 items-center gap-1">
-        <slot name="container-actions" />
-        <AssistantIconButton
-          v-if="placement === 'sidebar' && (!sheet || state === 'gate')"
-          :label="t('assistant.shell.openInFullView')"
-          :icon="assistantGlyph.openFull"
-          data-test="assistant-shell-open-in-full-view"
-          @click="openInFullView"
-        />
-        <AssistantContainerMenu v-if="state !== 'gate'" :placement="placement" :sheet="sheet" />
-        <AssistantIconButton
-          :label="t('assistant.shell.close', { product })"
-          :icon="assistantGlyph.close"
-          data-test="assistant-shell-close"
-          @click="closeContainer"
-        />
-      </div>
     </div>
 
     <div
-      v-if="notice || creditThreshold || $slots.notice"
+      v-if="notice || creditThreshold || historyUnavailable || $slots.notice"
       ref="noticeRow"
       class="shrink-0 px-3 pt-2"
       data-test="assistant-shell-notice-row"
@@ -145,6 +166,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @manage="creditNotice.noteAction('manage')"
         @ask-admin="creditNotice.noteAction('ask_admin')"
       />
+      <OBanner
+        v-else-if="historyUnavailable"
+        variant="warning"
+        dense
+        role="presentation"
+        :content="t('assistant.thread.historyUnavailable')"
+        data-test="assistant-shell-history-unavailable"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-shell-history-retry"
+            @click="retryHistory"
+          >
+            {{ t("common.retry") }}
+          </OButton>
+        </template>
+      </OBanner>
       <slot v-else name="notice" />
     </div>
 
@@ -184,11 +225,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="
           state === 'not_found'
             ? t('assistant.shell.notFound')
-            : t('assistant.shell.deletedElsewhere')
+            : deletedHere === 'tab'
+              ? t('assistant.shell.deletedInAnotherTab')
+              : t('assistant.shell.deletedElsewhere')
         "
         :action-label="t('assistant.shell.newChat')"
         :data-test="state === 'not_found' ? 'assistant-shell-not-found' : 'assistant-shell-deleted'"
         @action="newChat"
+      >
+        <template #illustration>
+          <AssistantMark size="lg" muted />
+        </template>
+      </OEmptyState>
+      <OEmptyState
+        v-else-if="state === 'unavailable'"
+        size="block"
+        :backdrop="false"
+        :title="t('assistant.shell.loadFailed')"
+        :action-label="t('common.retry')"
+        data-test="assistant-shell-unavailable"
+        @action="retryHistory"
       >
         <template #illustration>
           <AssistantMark size="lg" muted />
@@ -270,6 +326,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto"
       data-test="assistant-shell-lower"
     >
+      <div
+        v-if="elsewhere"
+        class="border-border-default flex min-w-0 shrink-0 flex-col gap-1 border-t px-3 py-1"
+        data-test="assistant-shell-elsewhere"
+      >
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <OText
+            variant="meta"
+            as="p"
+            class="min-w-0 flex-1"
+            data-test="assistant-shell-elsewhere-status"
+          >
+            {{ elsewhere.line }}
+          </OText>
+          <OButton
+            v-if="elsewhere.stalled"
+            variant="ghost"
+            size="sm"
+            class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-shell-elsewhere-refresh"
+            @click="refreshElsewhere"
+          >
+            {{ t("assistant.shell.refresh") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm"
+            :icon-left="assistantGlyph.stop"
+            class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-shell-elsewhere-stop"
+            @click="stopElsewhere"
+          >
+            {{ t("assistant.shell.stop") }}
+          </OButton>
+        </div>
+        <OText
+          v-if="elsewhere.approval"
+          variant="meta"
+          as="p"
+          data-test="assistant-shell-elsewhere-approval"
+        >
+          {{ t("assistant.shell.approvalNotAnswerableHere") }}
+        </OText>
+      </div>
       <slot name="status-strip">
         <div
           v-if="strip || metered"
@@ -380,9 +480,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :cooldown-reason="
             turnLock
               ? t(turnLockKey(turnLock))
-              : coolingDown
-                ? t('assistant.composer.rateLimited')
-                : undefined
+              : session?.record.historyUnavailable
+                ? t('assistant.thread.loadToContinue')
+                : coolingDown
+                  ? t('assistant.composer.rateLimited')
+                  : undefined
           "
         />
       </slot>
@@ -447,7 +549,7 @@ export interface AssistantShellProps {
 }
 
 export type ShellState =
-  "gate" | "loading" | "not_found" | "deleted_elsewhere" | "empty" | "conversation";
+  "gate" | "loading" | "not_found" | "deleted_elsewhere" | "unavailable" | "empty" | "conversation";
 
 export type ShellRouteState = "idle" | "loading" | "not_found" | "deleted";
 
@@ -461,6 +563,9 @@ export const SHELL_ROUTE_CONTEXT: InjectionKey<ShellRouteContext> = Symbol("assi
 
 /** Tool-step announcements are spaced at least this far apart (`95` §2.2). */
 export const STEP_ANNOUNCE_MS = 3_000;
+
+// Every mounted shell sees one history outcome; only the first visible one speaks it.
+const historySpoken = new WeakMap<object, number>();
 </script>
 
 <script setup lang="ts">
@@ -508,6 +613,9 @@ import AssistantContextTray from "@/components/ai-assistant/context/AssistantCon
 import AssistantGateState, {
   type GateCta,
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
+import AssistantThreadHeader, {
+  assistantThreadHostKey,
+} from "@/components/ai-assistant/thread/AssistantThreadHeader.vue";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
 import AssistantTurnOutcome, {
   outcomeActionLabel,
@@ -532,6 +640,7 @@ import {
   useAssistantCapability,
   useAssistantCredits,
   useAssistantName,
+  useAssistantHistory,
   useAssistantStarters,
   useAssistantStore,
   useCreditNotice,
@@ -541,6 +650,7 @@ import {
   useTurnLock,
   type AssistantError,
   type Container,
+  type Sid,
   type GateReason,
   type Starter,
 } from "@/composables/assistant";
@@ -555,8 +665,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -591,17 +701,19 @@ defineSlots<{
 const { t, te } = useI18nTyped();
 const { product } = useAssistantName();
 const store = useAssistantStore();
+const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const lockedPanel = useLockedPanel();
 const routeContext = inject(SHELL_ROUTE_CONTEXT, null);
 const route = useRoute();
 const router = useRouter();
 const vuex = useStore();
-const { lgUp } = useBreakpoint();
+const { lgUp, mdUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
 const lower = ref<HTMLElement | null>(null);
 const noticeRow = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
+const threadHeader = ref<InstanceType<typeof AssistantThreadHeader> | null>(null);
 const composer = ref<InstanceType<typeof AssistantComposer> | null>(null);
 const transcript = ref<InstanceType<typeof AssistantTranscript> | null>(null);
 const decisionsEl = ref<HTMLElement | null>(null);
@@ -630,15 +742,16 @@ const state = computed<ShellState>(() => {
   if (routed === "loading") return "loading";
   if (routed === "not_found") return "not_found";
   if (routed === "deleted") return "deleted_elsewhere";
+  if (deletedHere.value && !session.value?.messages.length) return "deleted_elsewhere";
   if (!session.value) return store.state.ready ? "empty" : "loading";
-  return session.value.messages.length ? "conversation" : "empty";
+  if (session.value.messages.length) return "conversation";
+  return session.value.record.historyUnavailable ? "unavailable" : "empty";
 });
 
 const isTerminalBody = computed(
   () => state.value === "not_found" || state.value === "deleted_elsewhere",
 );
 const showTitle = computed(() => state.value !== "gate" && !isTerminalBody.value);
-const title = computed(() => session.value?.title ?? t("assistant.thread.newChatTitle"));
 const b06 = computed(() => capability.value.source === "capabilities");
 const signedOutElsewhere = useSignedOutElsewhere();
 const otherAccount = useOtherAccountSignedIn();
@@ -660,6 +773,88 @@ const container = computed<Container>(() => {
   if (props.sheet || !lgUp.value) return "sheet";
   return props.placement === "docked" && props.host ? `docked.${props.host.id}` : "sidebar";
 });
+
+const headerDensity = computed(() =>
+  props.placement === "docked" || props.sheet || !mdUp.value ? "dense" : "default",
+);
+provide(assistantThreadHostKey, { newChat });
+
+const historyUnavailable = computed(
+  () => state.value === "conversation" && !!session.value?.record.historyUnavailable,
+);
+
+// Another tab or device runs this turn: server truth by tail or poll, and Stop still reaches it.
+const elsewhere = computed(() => {
+  const current = session.value;
+  if (!current || !isRunning(current.turn) || current.turnMeta.ownedByThisTab) return null;
+  const view = history.elsewhere(current.sid);
+  const mode = view?.mode ?? "hint";
+  const line =
+    mode === "polling"
+      ? t("assistant.shell.answeringElsewherePolling")
+      : mode === "stalled"
+        ? t("assistant.shell.stillRunningRefresh")
+        : t("assistant.shell.answeringElsewhere");
+  return {
+    line,
+    stalled: mode === "stalled",
+    approval: !!view?.approval && !approvalElsewhere.value,
+  };
+});
+
+// The chat this container last showed; a deletion of it elsewhere replaces the body, never another chat.
+const lastShownSid = ref<Sid | null>(null);
+const deletedHere = ref<"tab" | "server" | null>(null);
+watch(
+  activeSid,
+  (sid) => {
+    if (!sid) return;
+    lastShownSid.value = sid;
+    deletedHere.value = null;
+  },
+  { immediate: true },
+);
+watch(
+  () => history.deletedNotice.value,
+  (notice) => {
+    if (!notice) return;
+    // A chat opened from a list replaces an empty body; a chat with a transcript is never replaced.
+    if (
+      notice.opening
+        ? !session.value?.messages.length
+        : notice.sid === lastShownSid.value && !activeSid.value
+    )
+      deletedHere.value = notice.via;
+  },
+);
+
+watch(
+  () => history.announcement.value?.seq,
+  (seq) => {
+    const text = history.announcement.value?.text;
+    if (!seq || !text || !visible.value || seq <= (historySpoken.get(history) ?? 0)) return;
+    historySpoken.set(history, seq);
+    region.value?.announce(text);
+  },
+);
+
+// The elsewhere line speaks when it appears and when polling gives up, never on every poll.
+watch(
+  () => (elsewhere.value ? (elsewhere.value.stalled ? "stalled" : "running") : null),
+  (mode, before) => {
+    if (!mode || mode === before || !visible.value || !elsewhere.value) return;
+    region.value?.announce(elsewhere.value.line);
+  },
+);
+
+async function retryHistory(): Promise<void> {
+  const sid = activeSid.value;
+  if (sid) await history.open({ sid }).catch(() => undefined);
+}
+
+function refreshElsewhere(): void {
+  if (activeSid.value) history.refreshElsewhere(activeSid.value);
+}
 
 const visible = computed(() => {
   if (state.value === "gate") return props.placement === "sidebar" && !!lockedPanel.value;
@@ -1329,12 +1524,24 @@ function onStarter(starter: Starter): void {
   focusEntry();
 }
 
-function onOpenChat(chatId: number): void {
-  void store.openSession({ chatId }, { focus: true }).catch(() => undefined);
+// A deleted chat shows its own state; any other failure says so instead of doing nothing.
+function onOpenChat(target: { sid: Sid } | { chatId: number }): void {
+  void store.openSession(target, { focus: true }).catch((err: { code?: string } | null) => {
+    if (err?.code === "deleted_elsewhere") return;
+    void toast({ variant: "error", message: t("assistant.history.openFailed") });
+  });
+}
+
+/** New from outside the header (the full view's rail): the header's guard and the shell's drafts still apply. */
+function askNew(): void {
+  if (threadHeader.value) threadHeader.value.askNew();
+  else newChat();
 }
 
 // The previous chat keeps its draft; "Bring it here" moves it into the new chat (SH-03 AC 6, CT-06 AC 5, V6).
 function newChat(): void {
+  deletedHere.value = null;
+  history.clearDeletedNotice();
   if (routeContext) return routeContext.newChat();
   const previous = session.value;
   const { text = "", chips = [], images = [] } = previous?.composer ?? {};
@@ -1474,4 +1681,6 @@ watch(lower, (el, _was, onCleanup) => {
     children.disconnect();
   });
 });
+
+defineExpose({ askNew });
 </script>

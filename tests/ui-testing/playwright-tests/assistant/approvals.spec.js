@@ -170,8 +170,7 @@ test.describe("assistant approval cards", () => {
     expect((await confirmations(page))[0].url).toContain(`/ai/confirm/${sid}`);
   });
 
-  // A reloaded or second tab reopens a chat only through the history service, which is not built yet.
-  test.fixme("APPR-07 a reload shows the decision as a record, never a live card", async ({ page }) => {
+  test("APPR-07 a reload shows the decision as a record, never a live card", async ({ page }) => {
     await ask(page, "confirmation");
     const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
     await approve().click();
@@ -182,6 +181,21 @@ test.describe("assistant approval cards", () => {
     });
     await expect(assistant.approvalResult()).toContainText("Deleted 1 alert", { timeout: 30_000 });
     await expect(assistant.approval()).toHaveCount(0);
+  });
+
+  test("APPR-07 a reload keeps the decision as a record when the server history has no card", async ({ page }) => {
+    state.historyDropsCards = true;
+    await ask(page, "confirmation");
+    const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
+    await approve().click();
+    await expect(assistant.approvalResult()).toContainText("Deleted 1 alert");
+    await expect(assistant.answer()).toContainText("was deleted", { timeout: 15_000 });
+    await page.goto(`${harness.ENV.appUrl}/assistant/${sid}?org_identifier=${harness.ENV.org}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(assistant.approvalResult()).toContainText("Deleted 1 alert", { timeout: 30_000 });
+    await expect(assistant.approval()).toHaveCount(0);
+    await expect(assistant.approvalResult().getByRole("button", { name: "Ask again" })).toHaveCount(0);
   });
 
   test("APPR-08 a change made without a review step is surfaced with the object", async ({ page }) => {
@@ -254,6 +268,8 @@ test.describe("assistant approval cards", () => {
       await expect(target).toBeFocused();
     };
 
+    // The logs query editor can take focus late and swallow the chord, as SHELL-01 guards against.
+    await page.locator("body").click({ position: { x: 5, y: 300 } });
     await page.keyboard.press("ControlOrMeta+i");
     await expect(assistant.composer()).toBeFocused();
     await page.evaluate(() => (window.__o2mock.next = "confirmation"));

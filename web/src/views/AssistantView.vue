@@ -22,7 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :icon="assistantGlyph.assistant"
     bleed
     title-data-test="assistant-view-title"
+    :sidebar-width="railPx(RAIL_REM)"
+    :splitter-limits="[railPx(RAIL_MIN_REM), railPx(RAIL_MAX_REM)]"
+    :resizable="view === 'shell'"
   >
+    <template v-if="view === 'shell'" #sidebar>
+      <AssistantHistoryList
+        mode="rail"
+        :current-sid="store.state.shell.activeSid"
+        container="full_view"
+        @new="shell?.askNew()"
+      />
+    </template>
     <div class="flex h-full min-h-0 flex-col" data-test="assistant-view" :data-view="view">
       <div
         v-if="view === 'loading'"
@@ -44,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @action="onGateAction"
       />
       <div v-else class="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
-        <AssistantShell placement="full" density="roomy" />
+        <AssistantShell ref="shell" placement="full" density="roomy" />
       </div>
     </div>
     <ODialog
@@ -82,7 +93,20 @@ export function viewFor(gate: GateCode, isAdmin: boolean): AssistantViewState {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** `chatId` is the server session id, else the local IndexedDB id (`10` §2). */
+/** The rail's default and limits; the layout's splitter works in pixels of the root font size. */
+export const RAIL_REM = 18;
+export const RAIL_MIN_REM = 14;
+export const RAIL_MAX_REM = 24;
+
+export function railPx(rem: number): number {
+  const root =
+    typeof document === "undefined"
+      ? 16
+      : parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Math.round(rem * (Number.isFinite(root) && root > 0 ? root : 16));
+}
+
+/** `chatId` is the server session id, else the local IndexedDB id. */
 export function chatRef(chatId: string): { sid: string } | { chatId: number } | null {
   if (UUID.test(chatId)) return { sid: chatId };
   return /^\d+$/.test(chatId) ? { chatId: Number(chatId) } : null;
@@ -102,6 +126,7 @@ import AssistantShell, {
   SHELL_ROUTE_CONTEXT,
   type ShellRouteState,
 } from "@/components/ai-assistant/shell/AssistantShell.vue";
+import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import { takeLockedMove } from "@/components/ai-assistant/shell/lockedPanel";
 import { useAssistantCapability, useAssistantStore } from "@/composables/assistant";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -119,6 +144,7 @@ const router = useRouter();
 const vuex = useStore();
 const routeState = ref<ShellRouteState>("idle");
 const learnOpen = ref(false);
+const shell = ref<InstanceType<typeof AssistantShell> | null>(null);
 // The locked sidebar's move lands here, so the hero's primary action takes the focus it left.
 const arrivedFromLockedPanel = takeLockedMove();
 let entered = false;
@@ -168,17 +194,18 @@ async function enter(): Promise<void> {
   const target = id ? chatRef(id) : null;
   if (id) {
     routeState.value = "loading";
-    let found = false;
+    let result: ShellRouteState = "not_found";
     try {
       if (target) {
         await store.openSession(target);
-        found = true;
+        result = "idle";
       }
-    } catch {
-      found = false;
+    } catch (err) {
+      result =
+        (err as { code?: string } | null)?.code === "deleted_elsewhere" ? "deleted" : "not_found";
     }
     if (asked !== generation) return;
-    routeState.value = found ? "idle" : "not_found";
+    routeState.value = result;
   } else if (!store.state.shell.activeSid) {
     createSession();
   }

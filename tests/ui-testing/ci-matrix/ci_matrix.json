@@ -639,7 +639,9 @@
       "lifecycle.spec.js",
       "approvals.spec.js",
       "consent.spec.js",
-      "credits.spec.js"
+      "credits.spec.js",
+      "history.spec.js",
+      "xtab.spec.js"
     ],
     "disabled": []
   }

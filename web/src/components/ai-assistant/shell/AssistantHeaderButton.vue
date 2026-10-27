@@ -169,6 +169,7 @@ import AssistantGateState, {
 import {
   openAssistant,
   useAssistantCapability,
+  useAssistantHistory,
   useAssistantName,
   useAssistantPlacement,
   useAssistantStore,
@@ -191,6 +192,7 @@ import { openLockedPanel, useLockedPanel } from "./lockedPanel";
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const store = useAssistantStore();
+const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const placement = useAssistantPlacement(store);
 const lockedPanel = useLockedPanel();
@@ -214,9 +216,16 @@ const mine = computed(() =>
 
 const view = computed<HeaderView>(() => gateView() ?? lightView());
 
+// A chat another tab or device lights may be known only by its history row; else no title is claimed.
+function knownTitle(sid: string | null): I18nText | null {
+  if (!sid) return null;
+  const session = store.state.sessions[sid];
+  if (session) return session.title ?? t("assistant.thread.newChatTitle");
+  return history.rows.value.find((row) => row.sid === sid)?.title ?? null;
+}
+
 function titleOf(sid: string | null): I18nText {
-  const session = sid ? store.state.sessions[sid] : undefined;
-  return session?.title ?? t("assistant.thread.newChatTitle");
+  return knownTitle(sid) ?? t("assistant.thread.newChatTitle");
 }
 
 function plain(state: HeaderButtonState, name: I18nText, tooltip: I18nText): HeaderView {
@@ -272,6 +281,7 @@ function lightView(): HeaderView {
   const p = { product };
   const open = visible.value;
   if (light.state === "needs_you") {
+    const waiting = mine.value.filter(needsYou).length;
     const session = light.sid ? store.state.sessions[light.sid] : undefined;
     const consent = session?.turn.state === "awaiting_consent" || !!session?.pendingConsent;
     return {
@@ -281,18 +291,25 @@ function lightView(): HeaderView {
         consent ? t("assistant.turn.waitingConsent") : t("assistant.header.stateNeedsApproval"),
       ),
       signal: "attention",
-      count: mine.value.filter(needsYou).length,
+      ...(waiting > 0 && { count: waiting }),
     };
   }
   if (light.state === "working") {
     const running = mine.value.filter(isRunning).length;
+    const name = t(
+      open ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName",
+      p,
+    );
+    const title = knownTitle(light.sid);
     return {
       ...plain(
         "working",
-        t(open ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName", p),
+        name,
         running > 1
           ? t("assistant.header.stateRunningCount", { count: running }, running)
-          : t("assistant.header.stateWorking", { title: titleOf(light.sid) }),
+          : title
+            ? t("assistant.header.stateWorking", { title })
+            : name,
       ),
       signal: "working",
     };

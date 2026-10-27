@@ -20,6 +20,7 @@ import {
   type AiEventProps,
 } from "@/services/assistantAnalytics";
 import type { ChatMessage } from "@/ts/interfaces/chat";
+import { raw } from "@/types/i18n";
 
 import { sessionView, type AssistantStoreInternal } from "./assistantStore";
 import type {
@@ -39,6 +40,8 @@ export const SAVE_INTERVAL_MS = 3_000;
 
 // Ended turn ids kept for the once-per-turn rule; only a late duplicate of a recent turn needs one.
 const ENDED_MEMORY = 200;
+// A server-generated title is untrusted text; the history and the header both cap a title here.
+const GENERATED_TITLE_MAX = 200;
 
 /** The reducer and state-machine output of one commit; animate, segment, dashboard, navigate and confirm effects are dropped (`00` §5.6). */
 export interface Effects {
@@ -203,6 +206,14 @@ export function createEffectsRunner(deps: EffectsDeps): EffectsRunner {
 
   const applyStreamEffect = (sid: Sid, effect: StreamEffect) => {
     if (effect.kind === "save" || effect.kind === "throttledSave") save(sid, false);
+    else if (
+      effect.kind === "animateTitle" &&
+      typeof effect.title === "string" &&
+      effect.title.trim()
+    )
+      deps
+        .store()
+        .setTitle(sid, raw(effect.title.trim().slice(0, GENERATED_TITLE_MAX)), "generated");
   };
 
   const runner: EffectsRunner = {

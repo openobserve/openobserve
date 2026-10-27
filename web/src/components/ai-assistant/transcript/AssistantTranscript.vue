@@ -59,6 +59,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="turnName(turn)"
       class="flex min-w-0 flex-col gap-2"
     >
+      <div
+        v-if="compactionOf(turn.user)"
+        class="flex min-w-0 items-center gap-2"
+        data-test="assistant-compaction-divider"
+      >
+        <OSeparator class="min-w-4 flex-1" />
+        <OText variant="meta" as="p" class="min-w-0 text-center break-words">
+          {{ compactionOf(turn.user) }}
+        </OText>
+        <OSeparator class="min-w-4 flex-1" />
+      </div>
       <AssistantMessage
         v-if="turn.user"
         :message="turn.user"
@@ -304,6 +315,7 @@ import {
 } from "@/composables/assistant/pure";
 import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -424,6 +436,12 @@ const scroll = useTranscriptScroll({
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)")?.matches === true,
 });
+
+// A reloaded turn that followed a compaction carries the line on its prompt; it reads as a divider above it.
+function compactionOf(message: ChatMessage | null | undefined): string | null {
+  const block = message?.contentBlocks?.find((candidate) => candidate.compactedAt !== undefined);
+  return block?.message ? String(block.message) : null;
+}
 
 function turnName(turn: TranscriptTurn): I18nText {
   return t("assistant.transcript.turnLabel", { n: turn.number, prompt: turn.firstLine });

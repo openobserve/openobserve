@@ -43,6 +43,8 @@ export const assistantGlyph = {
   share: "share",
   more: "more-vert",
   pin: "push-pin",
+  remove: "delete-outline",
+  download: "file-download",
   info: "info-outline",
   attachImage: "image",
   send: "send",

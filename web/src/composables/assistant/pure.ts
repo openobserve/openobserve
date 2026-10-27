@@ -30,7 +30,17 @@ import type {
 
 export { isAssistantV2 } from "./flags";
 export { useAssistantName } from "./useAssistantName";
-export { foldTurns, mergeIncremental, messagesFromTurns, parseAttachmentBlocks } from "./record";
+export {
+  foldTurns,
+  hidesAttachments,
+  mergeIncremental,
+  messagesFromTurns,
+  minuteLabel,
+  parseAttachmentBlocks,
+  prepareTurns,
+  projectRecord,
+} from "./record";
+export type { ProjectRecordOptions, RecordAudience, StoredTurn } from "./record";
 export { ERROR_LEDGER } from "./assistantErrors";
 export {
   elapsedMs,

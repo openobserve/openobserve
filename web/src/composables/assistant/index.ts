@@ -35,13 +35,28 @@ export { parseStream, extractFrames } from "./sseParser";
 export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
 export { STALL_MS, turnStatusText } from "./turnStateMachine";
 export { useAssistantStarters } from "./useAssistantStarters";
+export { groupOf, originOf, useAssistantHistory } from "./useAssistantHistory";
+export type {
+  AssistantHistory,
+  DeletedNotice,
+  HistoryAnnouncement,
+  HistoryListState,
+  HistoryPending,
+  ImportView,
+} from "./useAssistantHistory";
+export type { ElsewhereView } from "./historyElsewhere";
+export { LOCAL_CAP } from "./historyDb";
+export { useChatExport } from "./useChatExport";
 export {
   assistantFocusCard,
   assistantGoToAnswer,
+  historyTargetAbove,
   registerAssistantFocusTarget,
   registerContainerCloser,
   registerEscapeRung,
+  registerHistoryTarget,
   runEscapeLadder,
+  runHistoryTarget,
   stopLadderEscape,
   useAssistantShortcuts,
 } from "./shortcuts";
@@ -66,7 +81,14 @@ export {
   legacyRelayArgs,
 } from "./context/legacyPayloadToChips";
 export { serialize } from "./context/serialize";
-export { parseAttachmentBlocks } from "./record";
+export {
+  hidesAttachments,
+  minuteLabel,
+  parseAttachmentBlocks,
+  prepareTurns,
+  projectRecord,
+} from "./record";
+export type { ProjectRecordOptions, RecordAudience, StoredTurn } from "./record";
 export {
   MAIN_MIN_REM,
   MAX_IMAGES,

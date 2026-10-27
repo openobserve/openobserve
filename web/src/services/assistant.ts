@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { AxiosRequestConfig } from "axios";
+import { z } from "zod";
 
-import type { CreditMode, Tri } from "@/composables/assistant";
+import type { CreditMode, StoredTurn, Tri } from "@/composables/assistant";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import http from "./http";
@@ -108,6 +109,62 @@ export interface FeedbackBody {
   value?: number;
 }
 
+/** One row of `GET /api/{org}/ai/chats`; the marker, pin and agent fields are absent on today's server. */
+export interface ChatSummaryWire {
+  session_id: string;
+  title: string;
+  /** Microseconds. */
+  created_at: number;
+  updated_at: number;
+  last_committed_seq: number;
+  forked_from_share?: string;
+  active_turn?: boolean;
+  active_turn_id?: string;
+  pending_approval?: boolean;
+  pinned?: boolean;
+  agent_type?: string | null;
+  origin?: string;
+}
+
+export interface ChatsPage {
+  chats: ChatSummaryWire[];
+  next_cursor?: string | null;
+  retention_days?: number;
+  /** Every chat of this user in the org, when the server counts them. */
+  total?: number;
+}
+
+/** `GET /api/{org}/ai/chats/{sid}`; `not_modified` keeps the caller's copy. */
+export interface ChatDetail extends ChatSummaryWire {
+  not_modified?: boolean;
+  state_version?: string;
+  turns?: StoredTurn[];
+  partial_from_seq?: number;
+  has_more?: boolean;
+}
+
+export interface ChatImportItem {
+  client_id: string;
+  title: string;
+  created: number;
+  origin: string;
+  pinned?: boolean;
+  turns: StoredTurn[];
+}
+
+export interface ChatImportResult {
+  imported: { client_id: string; session_id: string }[];
+  skipped: string[];
+  failed: { client_id: string; code: string }[];
+}
+
+export interface ListChatsParams {
+  cursor?: string | null;
+  limit?: number;
+  /** Sent only when the server advertises `history_search`; today's server ignores it. */
+  q?: string;
+}
+
 export const PROBE_TIMEOUT_MS = 5_000;
 
 /** A deny or an undo with no answer by then reads as unconfirmed; an approve adds time per item it acts on. */
@@ -124,6 +181,9 @@ const KEEPALIVE_REQUEST: AxiosRequestConfig = {
 };
 
 const enc = encodeURIComponent;
+
+// The server's own page size (`chats.rs` default), so Load older and the client search see the same pages.
+const CHATS_PAGE = 50;
 
 const statusOf = (err: unknown): number | undefined =>
   (err as { response?: { status?: number } })?.response?.status;
@@ -160,6 +220,96 @@ export function parseAiUsage(body: unknown): AssistantUsage | null {
       : NaN;
   if (!Number.isNaN(resets)) usage.resetsAt = resets;
   return usage;
+}
+
+// Server output is untrusted: unknown keys are dropped, sizes bounded, and a bad row skipped, never the page.
+const MAX_CHATS_PER_PAGE = 200;
+const MAX_TURNS = 2_000;
+const MAX_FRAMES_PER_TURN = 5_000;
+
+const chatSummarySchema = z.object({
+  session_id: z.string().min(1).max(128),
+  title: z
+    .string()
+    .catch("")
+    .transform((title) => title.slice(0, 200)),
+  created_at: z.number().catch(0),
+  updated_at: z.number().catch(0),
+  last_committed_seq: z.number().catch(0),
+  forked_from_share: z.string().max(128).optional().catch(undefined),
+  active_turn: z.boolean().optional().catch(undefined),
+  active_turn_id: z.string().max(128).optional().catch(undefined),
+  pending_approval: z.boolean().optional().catch(undefined),
+  pinned: z.boolean().optional().catch(undefined),
+  agent_type: z.string().max(64).nullable().optional().catch(undefined),
+  origin: z.string().max(32).optional().catch(undefined),
+});
+
+const storedTurnSchema = z.object({
+  user_message_id: z.string().max(128).optional().catch(undefined),
+  turn_id: z.string().max(128).optional().catch(undefined),
+  created: z.number().nullable().optional().catch(undefined),
+  user: z
+    .object({
+      text: z.string().catch(""),
+      images: z
+        .array(z.object({ filename: z.string(), mime: z.string(), url: z.string() }))
+        .max(16)
+        .optional()
+        .catch(undefined),
+    })
+    .nullable()
+    .catch(null),
+  frames: z.array(z.unknown()).max(MAX_FRAMES_PER_TURN).catch([]),
+  error: z.string().nullable().optional().catch(undefined),
+  status: z
+    .enum(["running", "completed", "failed", "cancelled", "interrupted"])
+    .optional()
+    .catch(undefined),
+  error_code: z.string().max(64).nullable().optional().catch(undefined),
+});
+
+/** One page of the list, keeping only rows that parse. */
+export function parseChatsPage(data: unknown): ChatsPage {
+  const body = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const rows = Array.isArray(body.chats) ? body.chats.slice(0, MAX_CHATS_PER_PAGE) : [];
+  const chats = rows.flatMap((row) => {
+    const parsed = chatSummarySchema.safeParse(row);
+    return parsed.success ? [parsed.data as ChatSummaryWire] : [];
+  });
+  const next = typeof body.next_cursor === "string" ? body.next_cursor.slice(0, 512) : null;
+  const retention = typeof body.retention_days === "number" ? body.retention_days : undefined;
+  const total =
+    typeof body.total === "number" && Number.isInteger(body.total) && body.total >= 0
+      ? body.total
+      : undefined;
+  return {
+    chats,
+    next_cursor: next,
+    ...(retention !== undefined && { retention_days: retention }),
+    ...(total !== undefined && { total }),
+  };
+}
+
+/** A chat read; turns beyond the bound are dropped and malformed ones skipped. */
+export function parseChatDetail(data: unknown): ChatDetail {
+  const summary = chatSummarySchema.parse(data);
+  const body = data as Record<string, unknown>;
+  const raw = Array.isArray(body.turns) ? body.turns.slice(-MAX_TURNS) : undefined;
+  const turns = raw?.flatMap((turn) => {
+    const parsed = storedTurnSchema.safeParse(turn);
+    return parsed.success ? [parsed.data as StoredTurn] : [];
+  });
+  return {
+    ...(summary as ChatSummaryWire),
+    ...(body.not_modified === true && { not_modified: true }),
+    ...(typeof body.state_version === "string" && {
+      state_version: body.state_version.slice(0, 128),
+    }),
+    ...(turns && { turns }),
+    ...(typeof body.partial_from_seq === "number" && { partial_from_seq: body.partial_from_seq }),
+    ...(typeof body.has_more === "boolean" && { has_more: body.has_more }),
+  };
 }
 
 const assistant = {
@@ -257,6 +407,72 @@ const assistant = {
       { ...ASSISTANT_REQUEST, timeout: CONFIRM_TIMEOUT_MS },
     );
     return res.data ?? {};
+  },
+
+  listChats: async (org: string, params: ListChatsParams = {}): Promise<ChatsPage> => {
+    const query: Record<string, string> = { limit: String(params.limit ?? CHATS_PAGE) };
+    if (params.cursor) query.cursor = params.cursor;
+    if (params.q) query.q = params.q;
+    const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
+      ...ASSISTANT_REQUEST,
+      params: query,
+    });
+    return parseChatsPage(res.data);
+  },
+
+  /** With `known`, an unchanged chat answers `not_modified` and a stale one only its newer turns. */
+  getChat: async (
+    org: string,
+    sid: string,
+    known?: { seq?: number; version?: string },
+  ): Promise<ChatDetail> => {
+    const query: Record<string, string> = {};
+    if (typeof known?.seq === "number") query.known_seq = String(known.seq);
+    if (typeof known?.seq === "number" && known.version) query.known_version = known.version;
+    const res = await http().get<unknown>(`/api/${enc(org)}/ai/chats/${enc(sid)}`, {
+      ...ASSISTANT_REQUEST,
+      params: query,
+    });
+    return parseChatDetail(res.data);
+  },
+
+  renameChat: async (org: string, sid: string, title: string): Promise<void> => {
+    await http().patch(`/api/${enc(org)}/ai/chats/${enc(sid)}`, { title }, ASSISTANT_REQUEST);
+  },
+
+  /** Only when the server advertises pins; today's server rejects a `PATCH` without `title`. */
+  pinChat: async (org: string, sid: string, pinned: boolean): Promise<void> => {
+    await http().patch(`/api/${enc(org)}/ai/chats/${enc(sid)}`, { pinned }, ASSISTANT_REQUEST);
+  },
+
+  deleteChat: async (org: string, sid: string): Promise<void> => {
+    await http().delete(`/api/${enc(org)}/ai/chats/${enc(sid)}`, ASSISTANT_REQUEST);
+  },
+
+  /** Also cancels every running turn of the caller (`DELETE /ai/chats`). */
+  deleteAllChats: async (org: string): Promise<void> => {
+    await http().delete(`/api/${enc(org)}/ai/chats`, ASSISTANT_REQUEST);
+  },
+
+  /** Idempotent on `client_id`, so a resumed import re-posts safely. */
+  importBrowserChats: async (org: string, chats: ChatImportItem[]): Promise<ChatImportResult> => {
+    const res = await http().post<ChatImportResult>(
+      `/api/${enc(org)}/ai/chats/import`,
+      { chats },
+      ASSISTANT_REQUEST,
+    );
+    const list = (value: unknown) => (Array.isArray(value) ? value.slice(0, chats.length) : []);
+    const str = (value: unknown) => typeof value === "string";
+    return {
+      imported: list(res.data?.imported).filter(
+        (row): row is ChatImportResult["imported"][number] =>
+          str(row?.client_id) && str(row?.session_id),
+      ),
+      skipped: list(res.data?.skipped).filter(str),
+      failed: list(res.data?.failed).filter(
+        (row): row is ChatImportResult["failed"][number] => str(row?.client_id) && str(row?.code),
+      ),
+    };
   },
 
   feedback: async (org: string, sid: string, body: FeedbackBody): Promise<void> => {
