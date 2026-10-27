@@ -345,13 +345,7 @@ const tuneFrequency = ref(DEFAULT_TUNABLES.frequency);
 const tuneSilence = ref(DEFAULT_TUNABLES.silence);
 
 // ── run ────────────────────────────────────────────────────────────────────
-/**
- * The alert set this run reports on, frozen when it starts.
- *
- * `candidates` derives from props the gallery can rewrite mid-run (its catalog
- * refresh prunes `preselect`). Rebuilding the result rows from it would drop
- * rows the user has not read yet.
- */
+// Frozen at run start: the gallery can prune `preselect` mid-run, which would drop unread result rows.
 const roster = ref<AlertLibraryEntry[]>([]);
 const results = ref<InstallResult[]>([]);
 const isInstalling = ref(false);
@@ -367,8 +361,7 @@ const minutesSuffix = computed(() => t("alert_library.install.minutes"));
 /** Every alert this open adds, and the only list install ever walks. */
 const candidates = computed<AlertLibraryEntry[]>(() => {
   const offered = props.seed ? [props.seed.entry] : props.preselect;
-  // Deduped by id: the install walks this list, so a batch that repeats an
-  // entry would create that alert twice.
+  // Deduped by id: a repeated entry would otherwise be created twice.
   const seen = new Set<string>();
   return offered.filter((entry) => {
     if (!canInstallKind(entry)) return false;
@@ -435,11 +428,7 @@ const reset = () => {
   tuneSilence.value = tunables.silence;
 };
 
-/**
- * Bumped by every `reset()`. Anything that awaits must re-check it afterwards:
- * a folder fetch started before a close-and-reopen would otherwise clear the
- * NEW session's loading state.
- */
+// Bumped by reset(), so a folder fetch from a previous open cannot clear this open's loading state.
 let sessionToken = 0;
 
 // The folder picker refreshes itself only on `onActivated`, which a dialog never fires.

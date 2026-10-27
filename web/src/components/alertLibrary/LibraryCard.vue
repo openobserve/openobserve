@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <h3 class="min-w-0 flex-1 text-sm leading-snug font-medium">
         <button
+          :id="titleId"
           type="button"
           class="text-text-heading focus-visible:ring-accent/40 rounded-default cursor-pointer text-left outline-none focus-visible:ring-2"
           :data-test="`alert-library-card-title-${entry.id}`"
@@ -154,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           icon-left="add"
+          :aria-describedby="titleId"
           :data-test="`alert-library-card-add-${entry.id}`"
           @click.stop="emit('install')"
         >
@@ -166,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon-left="edit"
           :title="t('alert_library.drawer.customizeHint')"
+          :aria-describedby="titleId"
           :data-test="`alert-library-card-customize-${entry.id}`"
           @click.stop="emit('customize')"
         >
@@ -213,4 +216,6 @@ const severityText = computed(() => severityLabel(t, props.entry.severity));
 // A query language, not prose — one correct form worldwide.
 const queryTypeLabelText = computed(() => queryTypeLabel(props.entry.query_type));
 const isAnomaly = computed(() => alertTypeOf(props.entry) === "anomaly");
+// Every card repeats the same two button labels, so each is described by its own card's title.
+const titleId = computed(() => `alert-library-card-title-id-${props.entry.id}`);
 </script>

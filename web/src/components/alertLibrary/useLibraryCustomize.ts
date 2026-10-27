@@ -31,15 +31,12 @@ export const useLibraryCustomize = () => {
     entry: AlertLibraryEntry,
     file?: AlertLibraryFile | null,
   ): Promise<boolean> => {
-    let source = file ?? null;
-    if (!source) {
-      try {
-        source = await loadAlertFile(entry);
-      } catch {
-        source = null;
-      }
+    const source = file ?? (await loadAlertFile(entry).catch(() => null));
+    // The prefill speaks the scheduled shape only; an anomaly body would open a broken form.
+    const prefillable = source !== null && source.alert_type !== "anomaly_detection";
+    if (prefillable && openAlertCreation(buildPrefillFromLibrary({ entry, file: source }))) {
+      return true;
     }
-    if (source && openAlertCreation(buildPrefillFromLibrary({ entry, file: source }))) return true;
     toast({ variant: "error", message: t("alert_library.drawer.customizeFailed") });
     return false;
   };

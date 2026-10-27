@@ -249,8 +249,7 @@ describe("AlertLibrary", () => {
   });
 
   it("heads the rail's categories with their pack, without making the pack a filter", async () => {
-    // A pack is a coarse bucket; the category is what people search for. The
-    // rail ticks categories alone, under a pack heading that only labels them.
+    // Selection stays by category; the pack heading only labels the rows.
     const wrapper = await mountView();
     const rail = wrapper.findComponent({ name: "LibraryRail" });
     const facets = rail.props("categories") as Array<{ id: string; pack: string }>;
@@ -753,6 +752,19 @@ describe("AlertLibrary", () => {
       );
       expect(openAlertCreation).toHaveBeenCalledTimes(1);
       expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("open")).toBe(false);
+    });
+
+    it("refuses to prefill the editor when the card's file turns out to be an anomaly body", async () => {
+      // The manifest says scheduled, but the file is what the prefill would read.
+      loadAlertFile.mockResolvedValueOnce({
+        name: "pod-oom-killed",
+        alert_type: "anomaly_detection",
+      });
+      const wrapper = await mountView();
+      await wrapper.find(CARD_CUSTOMIZE).trigger("click");
+      await flushPromises();
+      expect(openAlertCreation).not.toHaveBeenCalled();
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("says so when the card's alert cannot be loaded for the editor", async () => {

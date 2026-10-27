@@ -365,9 +365,7 @@ describe("LibraryInstallDialog", () => {
       await click(wrapper, "alert-library-install-run");
 
       const payload = mocks.createAlert.mock.calls[0][1] as Record<string, any>;
-      // Wizard-supplied: the folder and the store identity/timezone. `owner:
-      // undefined` serialises away silently, so nothing else in either spec
-      // would notice these were never read. Destinations are always cleared.
+      // `owner: undefined` serialises away silently, so only this read-back proves the wizard fed it.
       expect(payload.destinations).toEqual([]);
       expect(payload.folder_id).toBe("default");
       expect(mocks.createAlert.mock.calls[0][2]).toBe("default");
