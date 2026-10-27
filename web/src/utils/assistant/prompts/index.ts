@@ -59,6 +59,9 @@ export {
 export { buildAlertFiringPrompt, type AlertFiringInput } from "./alertFiring";
 export { buildMetricSeriesPrompt, labelSet, type MetricSeriesInput } from "./metricSeries";
 export { buildServiceEdgePrompt, type ServiceEdgeInput } from "./serviceEdge";
+export { buildIncidentReportPrompt, MAX_REPORT_CHARS, type IncidentReportInput } from "./incident";
+export { buildOnCallVerdictPrompt, MAX_VERDICT_CHARS, type OnCallVerdictInput } from "./oncall";
+export { buildAutoObserveAskPrompt, MAX_ASK_CHARS, type AutoObserveAskInput } from "./autoobserve";
 export { askAiQuery, buildIngestionPrompt, englishT, type AskAiContext } from "./ingestion";
 export {
   buildBlockingFixPrompt,

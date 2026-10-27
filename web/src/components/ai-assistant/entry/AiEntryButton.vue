@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ tooltipLines.join(" ") }}</span
           >
         </span>
-        <OTooltip v-if="!touch">
+        <OTooltip v-if="!touch" :shortcut-id="shortcutId">
           <template #content
             ><span v-for="line in tooltipLines" :key="line" class="block">{{
               line
@@ -174,6 +174,8 @@ export interface AiEntryButtonProps {
   boundOrg?: string;
   /** A door that navigates first: activation runs this instead, and the destination opens the assistant. */
   handoff?: () => void | Promise<void>;
+  /** Registry id whose keycaps the tooltip shows beside its text. */
+  shortcutId?: string;
 }
 
 export interface AiEntryButtonEmits {
@@ -420,6 +422,30 @@ export const AI_ENTRY_DOORS: readonly DoorRegistration[] = [
     entryVerb: "ask",
     objectKind: "log_field",
   },
+  {
+    dataTest: "ai-entry-query-generate",
+    entryKind: "editor_button",
+    entryVerb: "generate_query",
+    objectKind: "query",
+  },
+  {
+    dataTest: "ai-entry-incident-report-ask",
+    entryKind: "object_verb",
+    entryVerb: "ask",
+    objectKind: "incident",
+  },
+  {
+    dataTest: "ai-entry-oncall-verdict-ask",
+    entryKind: "oncall_card",
+    entryVerb: "ask",
+    objectKind: "alert_firing",
+  },
+  {
+    dataTest: "ai-entry-autoobserve-ask-ask",
+    entryKind: "autoobserve_card",
+    entryVerb: "ask",
+    objectKind: "none",
+  },
 ];
 
 /** An empty-state door appends to the chat it opened from this route within this window. */
@@ -499,6 +525,7 @@ const props = withDefaults(defineProps<AiEntryButtonProps>(), {
   disabledReason: undefined,
   objectKey: undefined,
   handoff: undefined,
+  shortcutId: undefined,
 });
 
 const emit = defineEmits<AiEntryButtonEmits>();

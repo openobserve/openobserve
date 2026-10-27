@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TurnMeta, TurnState } from "@/composables/assistant/pure";
+import { raw } from "@/types/i18n";
 
 import AssistantTurnStatus from "./AssistantTurnStatus.vue";
 
@@ -198,5 +199,70 @@ describe("AssistantTurnStatus", () => {
       await wrapper.setProps({ turn: { state: "done", saved: "server" } });
       expect(vi.getTimerCount()).toBe(0);
     });
+  });
+
+  describe("host copy", () => {
+    const mountCopy = (turn: TurnState, copy: "helper" | "rca", now: number, line?: string) =>
+      mount(AssistantTurnStatus, {
+        props: {
+          turn,
+          meta: meta({ startedAt: 0, lastFrameAt: now }),
+          variant: "line",
+          ownedByThisTab: true,
+          copy,
+          ...(line && { line: raw(line) }),
+          now: () => now,
+        },
+      });
+    const line = (wrapper: ReturnType<typeof mountCopy>) =>
+      wrapper.get('[data-test="assistant-turn-status-text"]').text();
+
+    it("words the helper's run in its own copy with whole seconds", () => {
+      expect(line(mountCopy({ state: "connecting" } as TurnState, "helper", 500))).toBe("Sending…");
+      expect(line(mountCopy({ state: "responding.writing" } as TurnState, "helper", 3_400))).toBe(
+        "Generating… 3 s",
+      );
+    });
+
+    it("words an analysis as starting, then analysing with its elapsed time", () => {
+      expect(line(mountCopy({ state: "connecting" } as TurnState, "rca", 200))).toBe(
+        "Starting analysis… 0 s",
+      );
+      expect(line(mountCopy({ state: "responding.writing" } as TurnState, "rca", 12_000))).toBe(
+        "Analysing · 12 s",
+      );
+    });
+
+    it("lets the host's own line win", () => {
+      expect(
+        line(
+          mountCopy({ state: "responding.writing" } as TurnState, "rca", 1_000, "Reconnecting…"),
+        ),
+      ).toBe("Reconnecting…");
+    });
+  });
+
+  it.each([
+    { state: "connecting" },
+    { state: "responding.thinking" },
+    { state: "responding.writing" },
+    { state: "running_tool", tool: "search_logs", target: "default" },
+    { state: "reconnecting", attempt: 1 },
+    { state: "stopping" },
+    { state: "awaiting_consent" },
+  ] as TurnState[])("words $state the same in the block, line and card variants", (turn) => {
+    const looks = (["block", "line", "card"] as const).map((variant) => {
+      const wrapper = mountStatus(turn, { variant, now: 40_000, meta: { lastFrameAt: 1_000 } });
+      const root = wrapper.find('[data-test="assistant-turn-status"]');
+      return {
+        line: root.exists() ? root.get('[data-test="assistant-turn-status-text"]').text() : null,
+        tone: root.attributes("data-tone") ?? null,
+        glyph: root.find('[data-test="assistant-turn-status-glyph"]').exists()
+          ? root.get('[data-test="assistant-turn-status-glyph"]').attributes("name")
+          : null,
+      };
+    });
+    expect(looks[1]).toEqual(looks[0]);
+    expect(looks[2]).toEqual(looks[0]);
   });
 });

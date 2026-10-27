@@ -79,6 +79,11 @@ Present today (`mocks.mjs`):
 | `confirmation` | SSE | `confirmation_required` (`o2_delete`) → waits for `/ai/confirm` → result → complete |
 | `navigation` | SSE | `navigation_action` (logs, `load_query`) → waits → complete |
 | `nl_sql` | SSE | a fenced SQL block for the NL bar |
+| `nl_needs_chat` | SSE | prose with no query and no question: the inline helper's "needs the assistant" line |
+| `rca_stream` | SSE | the incident analysis route's `start`, ten `chunk` frames at 350 ms, `complete`; answered for `/alerts/incidents/{id}/rca?stream=true` (`window.__o2mock.rcaScenario` overrides it) |
+| `rca_dropped` | SSE | two `chunk` frames and no terminal frame: the stream drops while the run finishes on the server |
+| `nl_sql_e2e` | SSE | the `nl_sql` proposal over `e2e_automate`, so Accept keeps the Logs stream selection |
+| `rca_in_progress`, `rca_priority_off`, `rca_not_enabled` | HTTP 400 | the incident route's own refusals, set through `window.__o2mock.rcaScenario` |
 | `promql`, `vrl` | SSE | short answers with a PromQL / VRL block |
 | `consent` | HTTP 412 | `paid_overage_consent_required` with a `consent` status |
 | `credits_exhausted`, `subscription_required` | HTTP 402 | credit refusals |
@@ -114,7 +119,7 @@ Named by the specs and added by the WP that first needs them (`99` §5, honest-t
 `data_level_frame`,
 `confirm_500`, `update_card`, `cli_card`,
 `permission_card`, `resource_changed_unreviewed`,
-`nl_needs_chat`, `nl_parse_error`, `rca_stream`, `delimiter_breakout`,
+`nl_parse_error`, `delimiter_breakout`,
 `cloud_401_mid_stream`, `payloads/*`; fixture `chat_300`. The wire shapes they replay are
 the golden fixtures in `web/src/composables/assistant/__fixtures__/`.
 
@@ -182,3 +187,5 @@ query node, functions toolbar and JSON editor); regex drawer
 
 Known limits: the NL-bar stack check depends on unminified module names (Vite dev server
 only); `GET /ai/chats/{sid}` replays the scenario frames regardless of what was typed.
+
+A re-analysis (`reanalysis=true`) is answered `202 {"message":"Analysis started"}` as the server does today; knob `rcaReanalysisStreams` streams it instead, as a server that streams re-analysis would. `configPatch.rca_enabled` puts the `rca_enabled` flag in `/config`.

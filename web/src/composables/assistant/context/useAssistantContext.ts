@@ -112,8 +112,10 @@ export function useAssistantContext(
     return timeWindowOf(page.value, composer.value?.timeOverride ?? null);
   });
   const timeChip = computed(() => timeChipOf(window.value, org.value, t));
-  const pageChips = computed(() => pageChipsOf(page.value, removedKeys.value, t));
   const stagedChips = computed(() => staged(composer.value?.chips ?? []));
+  const pageChips = computed(() =>
+    supersededDropped(pageChipsOf(page.value, removedKeys.value, t), stagedChips.value, page.value),
+  );
   // Images live only in the composer's strip, never also in the tray (`40` §8).
   const chips = computed(() => [timeChip.value, ...pageChips.value, ...stagedChips.value]);
   const removed = computed(() => ghostChipsOf(page.value, removedKeys.value, t));
@@ -256,6 +258,21 @@ async function readPage(): Promise<void> {
   if (asked !== generation) return;
   // Same content, same object, so the tray does not re-render once a second.
   if (JSON.stringify(next) !== JSON.stringify(page.value)) page.value = next;
+}
+
+// A door's chip for the page's own object (the incident a tab is about) replaces the page's copy of it.
+function supersededDropped(
+  pageChips: ContextChip[],
+  stagedChips: readonly ContextChip[],
+  page: PageContext | null,
+): ContextChip[] {
+  if (!page || !stagedChips.length) return pageChips;
+  return pageChips.filter((chip) => {
+    const value = page[chip.id.replace(/^page:/, "")];
+    return !stagedChips.some(
+      (door) => door.kind === chip.kind && value != null && door.ref?.id === String(value),
+    );
+  });
 }
 
 // Page fields come from the provider only: a staged copy (a starter's stream or time) is never shown, so it can never outlive a removal (S4).

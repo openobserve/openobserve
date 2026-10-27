@@ -762,10 +762,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
+                      :assistant="scheduledAssistant"
+                      :placeholder="scheduledAssistant ? editorPlaceholder : undefined"
                     />
                     <!-- eslint-enable local/no-hardcoded-px -->
                     <div
-                      v-if="!query && queryEditorPlaceholderFlag && expandState.query"
+                      v-if="
+                        !scheduledAssistant &&
+                        !query &&
+                        queryEditorPlaceholderFlag &&
+                        expandState.query
+                      "
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                     >
                       <span
@@ -999,7 +1006,11 @@ import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
-import { useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
+import {
+  useDockedEditor,
+  type DockedEditor,
+  type QueryEditorAssistant,
+} from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -2642,6 +2653,25 @@ const sendToAiChat = (value: any, append: boolean = true) => {
 const editorArea = ref<HTMLElement | null>(null);
 const openedWithQuery = query.value ?? "";
 const docked: DockedEditor | null = assistantV2 ? scheduledQueryHost() : null;
+const scheduledAssistant: QueryEditorAssistant | null = docked
+  ? {
+      id: "scheduled_query",
+      proposal: docked.proposal,
+      get stream() {
+        return String(selectedStreamName.value ?? "");
+      },
+      get streamType() {
+        return String(selectedStreamType.value ?? "");
+      },
+      get timeRange() {
+        const minutes = Number(triggerData.value.period);
+        if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+        const to = Date.now();
+        return { from: to - minutes * 60_000, to, period: `${minutes}m` };
+      },
+      run: () => void runQuery(),
+    }
+  : null;
 
 function scheduledQueryHost(): DockedEditor {
   const nodeEdited = form.useStore((s: { isDirty: boolean }) => s.isDirty);

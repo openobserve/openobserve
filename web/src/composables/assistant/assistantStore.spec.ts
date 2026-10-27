@@ -926,6 +926,49 @@ describe("derived views", () => {
     expect(store.headerLight.value).toMatchObject({ state: "needs_you", sid: second });
   });
 
+  it("leaves ephemeral helper and analysis sessions out of the light", () => {
+    const { store } = makeStore();
+    const sid = store.createSession({
+      origin: { entryKind: "shortcut", objectKind: "query", container: "inline_helper" },
+      ephemeral: true,
+    });
+    store.state.sessions[sid].unread = true;
+    expect(store.headerLight.value.state).toBe("idle");
+    store.state.sessions[sid].turn = { state: "connecting" };
+    expect(store.headerLight.value.state).toBe("idle");
+  });
+
+  it("stages a door's Time chip as the composer's range instead of a hidden chip", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.stage(sid, {
+      chips: [
+        {
+          id: "door:time:1",
+          kind: "time",
+          label: raw("02:00 – 03:00"),
+          ref: { type: "time", org: "org1", from: 1_000, to: 2_000 },
+          sizeBytes: 0,
+          provenance: "door",
+          sent: "whitelist",
+        },
+      ],
+    });
+    expect(store.state.sessions[sid].composer.timeOverride).toEqual({ from: 1_000, to: 2_000 });
+    expect(store.state.sessions[sid].composer.chips).toHaveLength(0);
+  });
+
+  it("never writes a helper or analysis prompt as a draft", () => {
+    const { store, drafts } = makeStore();
+    const sid = store.createSession({
+      origin: { entryKind: "shortcut", objectKind: "query", container: "inline_helper" },
+      ephemeral: true,
+    });
+    store.setDraft(sid, { text: "errors per service" });
+    drafts.flush();
+    expect(drafts.read("k1", sid)).toBeNull();
+  });
+
   it("leaves other user+org sessions out of the light", () => {
     const { store } = makeStore();
     const sid = newSession(store);

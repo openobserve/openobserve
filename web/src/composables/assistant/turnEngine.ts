@@ -890,7 +890,13 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     async cancelTurn(sid, turnId) {
       const session = sessionOf(sid);
       if (!session) return false;
-      const target = { sid, origin: session.origin, record: session.record, turnId };
+      const target = {
+        sid,
+        origin: session.origin,
+        record: session.record,
+        turnId,
+        ...(session.incidentId && { incidentId: session.incidentId }),
+      };
       return deps.client.stop(session.org, target).then(
         () => true,
         () => false,
@@ -1264,15 +1270,20 @@ function scopeOf(rec: TurnRecord | undefined): EffectScope | null {
     input: rec.input,
     source: rec.source,
     replaced: rec.replaced,
-    surface: rec.client.container === "rca" ? "rca" : "chat",
+    surface: surfaceOf(rec.client.container),
     toolCalls: extras.toolCalls,
     toolErrors: extras.toolErrors,
     cancelMs: rec.cancelMs,
   };
 }
 
+function surfaceOf(container: ClientContext["container"]): EffectScope["surface"] {
+  if (container === "rca") return "rca";
+  return container === "nl_bar" ? "inline_helper" : "chat";
+}
+
 function stopTarget(session: AssistantSession, rec: TurnRecord) {
-  const incidentId = rec.pageContext.incident_id;
+  const incidentId = session.incidentId ?? rec.pageContext.incident_id;
   return {
     sid: rec.sid,
     origin: session.origin,
@@ -1286,7 +1297,7 @@ function clientContextOf(session: AssistantSession, uiVersion: string): ClientCo
   return {
     container: session.origin.container,
     entry_kind: session.origin.entryKind,
-    entry_verb: "ask",
+    entry_verb: session.origin.container === "nl_bar" ? "generate_query" : "ask",
     object_kind: session.origin.objectKind,
     ui_version: uiVersion,
   };

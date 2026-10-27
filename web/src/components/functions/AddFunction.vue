@@ -124,10 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @blur="functionEditorPlaceholderFlag = true"
                     @update:query="handleFunctionUpdate"
                     @language-change="handleLanguageChange"
-                    @toggle-nlp-mode="handleToggleNlpMode"
-                    @generation-start="handleGenerationStart"
-                    @generation-end="handleGenerationEnd"
-                    @generation-success="handleGenerationSuccess"
+                    :assistant="functionAssistant"
+                    :placeholder="
+                      docked && !formData.function
+                        ? transType === '1'
+                          ? jsPlaceholder
+                          : vrlPlaceholder
+                        : undefined
+                    "
                   />
                   <!-- Typewriter placeholder for an empty editor.
                          Deliberately NOT gated on `!forcedLanguage`: a forced
@@ -139,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          pipeline Function node with a blank editor — it forces
                          vrl but passes no defaultCode. -->
                   <div
-                    v-if="!formData.function && functionEditorPlaceholderFlag"
+                    v-if="!docked && !formData.function && functionEditorPlaceholderFlag"
                     class="pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
@@ -701,33 +705,13 @@ export default defineComponent({
       addFunctionForm.setFieldValue("transType", tt);
     };
 
-    /**
-     * Handle NLP mode toggle from AI icon in editor
-     */
-    const handleToggleNlpMode = () => {
-      // UnifiedQueryEditor manages its own NLP mode state internally
-    };
-
-    /**
-     * Handle generation start event from UnifiedQueryEditor
-     */
-    const handleGenerationStart = () => {
-      // Can add loading indicators here if needed
-    };
-
-    /**
-     * Handle generation end event from UnifiedQueryEditor
-     */
-    const handleGenerationEnd = () => {
-      // Can remove loading indicators here if needed
-    };
-
-    /**
-     * Handle successful generation from UnifiedQueryEditor
-     */
-    const handleGenerationSuccess = (_payload: { type: string; message: string }) => {
-      // Function code is already updated via @update:query handler
-    };
+    const functionAssistant = docked
+      ? {
+          id: "function" as const,
+          proposal: docked.proposal,
+          ...(docked.adapter.run && { run: docked.adapter.run }),
+        }
+      : null;
 
     return {
       raw,
@@ -740,6 +724,7 @@ export default defineComponent({
       compilationErr,
       indexOptions,
       editorRef,
+      functionAssistant,
       functionEditorPlaceholderFlag,
       functionEditorNlpMode,
       vrlPlaceholder,
@@ -771,10 +756,6 @@ export default defineComponent({
       aiChatInputContext,
       handleFunctionUpdate,
       handleLanguageChange,
-      handleToggleNlpMode,
-      handleGenerationStart,
-      handleGenerationEnd,
-      handleGenerationSuccess,
       docked,
       editorArea,
     };

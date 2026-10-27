@@ -642,8 +642,14 @@
       "credits.spec.js",
       "history.spec.js",
       "xtab.spec.js",
-      "sharing.spec.js"
+      "sharing.spec.js",
+      "helper.spec.js"
     ],
-    "disabled": []
+    "disabled": [
+      {
+        "file": "rca.spec.js",
+        "reason": "Waits for the rca-panel, which nothing mounts until the Incident Analysis hand-off lands"
+      }
+    ]
   }
 ]

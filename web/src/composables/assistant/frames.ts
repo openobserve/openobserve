@@ -306,7 +306,7 @@ export function parseFrame(json: string): ParsedFrame {
   } catch {
     return { type: "unknown", raw: json };
   }
-  const parsed = assistantFrameSchema.safeParse(value);
+  const parsed = assistantFrameSchema.safeParse(fromAnalysisRoute(value));
   return parsed.success ? parsed.data : { type: "unknown", raw: json };
 }
 
@@ -324,4 +324,14 @@ export function isUnknownFrame(frame: ParsedFrame): frame is UnknownFrame {
 /** `sync`/`sync_state` are OpenObserve's persistence feed; o2-ai owns their schema and the UI drops them. */
 export function isDroppableFrame(frame: ParsedFrame): frame is FrameOf<"sync" | "sync_state"> {
   return DROPPED_FRAME_TYPES.has(frame.type);
+}
+
+// The incident analysis route streams `start` and `chunk`; they are the shared `status` and `message_delta`.
+function fromAnalysisRoute(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const frame = value as { type?: unknown; content?: unknown };
+  if (frame.type === "chunk" && typeof frame.content === "string")
+    return { type: "message_delta", content: frame.content };
+  if (frame.type === "start") return { type: "status" };
+  return value;
 }

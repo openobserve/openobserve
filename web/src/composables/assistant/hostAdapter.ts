@@ -34,8 +34,10 @@ import type {
   AssistantHostAdapter,
   DockHostId,
   HostRegistry,
+  InlineHostAdapter,
   OpenAssistantArgs,
   OpenAssistantResult,
+  ProposalHostId,
 } from "./assistantStore.types";
 import type { PageContext } from "./context/types";
 import type { OpenAssistantCall } from "./openAssistant";
@@ -107,6 +109,16 @@ export interface DockedEditor {
   /** The host's body row; the dock is its last child. */
   dockSlot: Ref<HTMLElement | null>;
 }
+
+/** What a host hands its query editor for the inline helper; the editor supplies the buffer, language and focus. */
+export type QueryEditorAssistant = Omit<
+  InlineHostAdapter,
+  "language" | "getBuffer" | "previewInsert" | "focusEditor" | "id"
+> & {
+  id: ProposalHostId;
+  /** A docked host's own controller: the host already renders its diff and label. */
+  proposal?: EditorProposal;
+};
 
 interface QueuedStage {
   payload: NonNullable<OpenAssistantArgs["payload"]>;
@@ -261,13 +273,13 @@ export function queueDockStage(
 }
 
 /** True while `hostId`'s dock is the visible container. */
-export function isDockOpen(hostId: DockHostId): boolean {
+export function isDockOpen(hostId: ProposalHostId): boolean {
   const placement = runtimeHandle().value?.store.state.shell.placement;
   return placement?.kind === "docked" && placement.hostId === hostId;
 }
 
 /** Focuses the open dock's composer, for the editor's own chord; false when that dock is not open. */
-export function focusDockComposer(hostId: DockHostId): boolean {
+export function focusDockComposer(hostId: ProposalHostId): boolean {
   if (!isDockOpen(hostId)) return false;
   const composer = document.querySelector<HTMLElement>(
     `[data-assistant-root][data-placement="docked"][data-host="${hostId}"] [data-assistant-composer]`,

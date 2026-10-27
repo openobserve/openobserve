@@ -29,6 +29,12 @@ export type Sid = string;
 
 export type DockHostId = "alert_query" | "json_editor" | "function" | "scheduled_query" | "regex";
 
+/** Editors that take the inline helper but never dock a chat. */
+export type InlineHostId = "logs" | "dashboard" | "anomaly" | "alert";
+
+/** Every editor a proposal can land in. */
+export type ProposalHostId = DockHostId | InlineHostId;
+
 export type Placement =
   | { kind: "hidden" }
   | { kind: "sidebar"; mode: "pinned" | "floating" }
@@ -553,6 +559,10 @@ export interface AssistantSession {
   ledger: ActionLedgerEntry[];
   /** Set when a turn ends while no container shows the session. */
   unread: boolean;
+  /** An incident analysis session's incident; its turns go to the incident route. */
+  incidentId?: string;
+  /** The flags of the analysis the next send starts (`reanalysis`, `build_on_previous`). */
+  rcaRun?: { reanalysis: boolean; buildOnPrevious: boolean };
 }
 
 export interface AssistantState {
@@ -749,9 +759,20 @@ export type InlineHostAdapter = Pick<
   AssistantHostAdapter,
   "language" | "getBuffer" | "previewInsert" | "run" | "schemaFields" | "focusEditor"
 > & {
+  /** The editor's proposal controller key and the door's `data-host`. */
+  id?: ProposalHostId;
+  /** `""` when the host needs a stream and none is selected; absent where streams do not apply. */
   stream?: string;
+  /** Every selected stream where the host takes several; one chip and one request entry each. */
+  streams?: string[];
   streamType?: string;
   timeRange?: { from: number; to: number; period?: string };
+  /** The chips point at the host's own pickers; they never change the range or stream themselves. */
+  focusPicker?(kind: "time" | "stream"): void;
+  /** "Use proposed range": the host's picker takes the range a proposal names. */
+  setTimeRange?(range: { from: number; to: number }): void;
+  /** What the request carries beyond the chips ("SQL mode", "interesting fields"). */
+  alsoSends?(): I18nText[];
 };
 
 /** Where the turn came from (`ai_turn_sent.input`, `99` §3.3). */
@@ -786,6 +807,8 @@ export interface SendRequest {
   attachments?: WireAttachment[];
   /** The approval card a Reply or Ask again answers. */
   replyToApproval?: string;
+  /** `mode: "rca"` posts to this incident's analysis route instead of the chat stream. */
+  incident?: { id: string; reanalysis: boolean; buildOnPrevious: boolean };
 }
 
 /** One B-09 attachment (`00` §6.3). */

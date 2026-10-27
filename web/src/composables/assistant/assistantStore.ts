@@ -167,6 +167,10 @@ export interface AssistantAnnouncement {
 /** `createSession`'s init; `messages` seeds a hand-off transcript on a new or reused blank session. */
 export type SessionInit = Parameters<AssistantStoreApi["createSession"]>[0] & {
   messages?: ChatMessage[];
+  /** A helper or analysis session: never saved, never listed, never the shell's active chat. */
+  ephemeral?: boolean;
+  /** The incident an analysis session runs for; its sends and its Stop use the incident route. */
+  incidentId?: string;
 };
 
 /** A chat read from history: its transcript, title and record fields as the server or this browser keeps them. */
@@ -473,7 +477,10 @@ export function sessionView(session: AssistantSession, shell: ShellState): Sessi
 
 /** `needs_you > working > unread > open > idle` over this tab's sessions of the current user+org. */
 export function headerLightOf(state: AssistantState): HeaderLight {
-  const sessions = Object.values(state.sessions).filter((s) => s.userOrgKey === state.userOrgKey);
+  // An ephemeral turn answers in its own surface (helper row, analysis tab), never through the header.
+  const sessions = Object.values(state.sessions).filter(
+    (s) => s.userOrgKey === state.userOrgKey && !s.record.ephemeral,
+  );
   const waiting = sessions.find(needsYou);
   if (waiting) return { state: "needs_you", sid: waiting.sid, failed: false };
   const working = sessions.find((s) => isRunning(s.turn));
@@ -537,7 +544,8 @@ function createCore(
     // Rule 7: a write under another user+org than the session's captured key is refused.
     writable: (session) => state.ready && session.userOrgKey === state.userOrgKey,
     persistDraft(session) {
-      if (!core.writable(session)) return;
+      // A helper or analysis request is never written anywhere, not even as a draft.
+      if (!core.writable(session) || session.record.ephemeral) return;
       const { chips, timeOverride, removedPageKeys, images, mode, replyStash } = toRaw(
         session.composer,
       );
@@ -599,6 +607,11 @@ function createSessionSlice(core: StoreCore) {
   > = {
     createSession(init) {
       if (!state.ready || !state.userOrgKey) throw new Error("The assistant store is inert here");
+      if (init.ephemeral) {
+        const own = deps.uuid();
+        state.sessions[own] = blankSession(own, state.userOrgKey, deps, init);
+        return own;
+      }
       const active = core.session(state.shell.activeSid);
       if (active && active.userOrgKey === state.userOrgKey && isEmptySession(active)) {
         applyInit(active, init);
@@ -816,7 +829,12 @@ function createComposerSlice(core: StoreCore) {
   > = {
     stage(sid, payload) {
       edit(sid, (composer) => {
-        for (const chip of payload.chips ?? []) addChipTo(composer, chip);
+        for (const chip of payload.chips ?? []) {
+          // The tray reads time from the override, so a door's Time chip becomes the composer's range.
+          const range = doorRangeOf(chip);
+          if (range) composer.timeOverride = range;
+          else addChipTo(composer, chip);
+        }
         if (!payload.text) return;
         const keep = payload.mode === "append" && composer.text.trim() !== "";
         // A repeated door never doubles its prompt (`40` §4).
@@ -1278,7 +1296,7 @@ function blankSession(
       liveSavedAt: null,
       forkedFromShare: null,
       historyUnavailable: false,
-      ephemeral: false,
+      ephemeral: init.ephemeral === true,
       pinned: false,
     },
     composer: emptyComposer(deps.uuid()),
@@ -1306,6 +1324,7 @@ function blankSession(
       .sort((a, b) => a.at - b.at)
       .slice(-MAX_LEDGER),
     unread: false,
+    ...(init.incidentId && { incidentId: init.incidentId }),
   };
 }
 
@@ -1340,6 +1359,12 @@ function snapshotOf(composer: ComposerState): ComposerSnapshot {
     timeOverride: composer.timeOverride ? { ...composer.timeOverride } : null,
     removedPageKeys: [...composer.removedPageKeys],
   };
+}
+
+function doorRangeOf(chip: ContextChip): { from: number; to: number } | null {
+  if (chip.kind !== "time" || chip.provenance !== "door") return null;
+  const { from, to } = chip.ref ?? {};
+  return typeof from === "number" && typeof to === "number" && to > from ? { from, to } : null;
 }
 
 function addChipTo(
