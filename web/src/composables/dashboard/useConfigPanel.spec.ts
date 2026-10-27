@@ -14,7 +14,12 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref, computed, nextTick } from "vue";
-import { useConfigPanel, filterOption, filterSection } from "./useConfigPanel";
+import {
+  useConfigPanel,
+  filterOption,
+  filterSection,
+  shouldShowThresholds,
+} from "./useConfigPanel";
 import type { ConfigOption } from "./useConfigPanel";
 import {
   DEFAULT_EXPANDED_SECTIONS,
@@ -44,6 +49,12 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowAxisConfig: vi.fn(() => false),
   shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),
+  shouldShowCartesianSeriesConfig: vi.fn(() => false),
+  shouldShowStackMode: vi.fn(() => false),
+  shouldShowSortOrder: vi.fn(() => false),
+  shouldShowBarRadius: vi.fn(() => false),
+  shouldShowScatterEncoding: vi.fn(() => false),
+  shouldShowConnectNullsThreshold: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
   shouldShowAreaFillConfig: vi.fn(() => false),
@@ -200,18 +211,20 @@ describe("ORDERED_SECTION_IDS", () => {
     "seriesOverrides",
     "map",
     "gauge",
+    "pie",
     "layout",
     "colors",
     "drilldown",
     "comparison",
     "markLines",
     "thresholds",
+    "metric",
     "background",
     "sparkline",
   ];
 
-  it("contains all 25 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(25);
+  it("lists each section once", () => {
+    expect(new Set(ORDERED_SECTION_IDS).size).toBe(ORDERED_SECTION_IDS.length);
   });
 
   it("contains every expected section id", () => {
@@ -1473,6 +1486,66 @@ describe("useConfigPanel – heatmap y axis", () => {
         "heatmap-y-range",
       ),
     ).toBe(true);
+  });
+});
+
+describe("cartesian series options", () => {
+  it.each([
+    ["shouldShowCartesianSeriesConfig", "legend", "chart-tooltip-mode"],
+    ["shouldShowCartesianSeriesConfig", "legend", "tooltip-sort"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-scale"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-label"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-hard-range"],
+    ["shouldShowCartesianSeriesConfig", "markLines", "mark-areas"],
+    ["shouldShowStackMode", "axis", "stack-mode"],
+    ["shouldShowSortOrder", "axis", "sort-order"],
+    ["shouldShowBarRadius", "lineStyle", "bar-radius"],
+    ["shouldShowAreaLineStyleConfig", "lineStyle", "line-style"],
+    ["shouldShowScatterEncoding", "data", "scatter-encoding"],
+    ["shouldShowConnectNullsThreshold", "data", "connect-nulls-threshold"],
+  ] as const)("%s drives %s/%s", async (helper, section, option) => {
+    const utils: any = await import("@/utils/dashboard/configUtils");
+    expect(makeComposable().isConfigOptionVisible(section, option)).toBe(false);
+    vi.mocked(utils[helper]).mockReturnValue(true);
+    expect(makeComposable().isConfigOptionVisible(section, option)).toBe(true);
+    vi.mocked(utils[helper]).mockReturnValue(false);
+  });
+});
+
+describe("useConfigPanel – metric, gauge, pie, table, heatmap, state timeline and geomap options", () => {
+  const visible = (type: string, section: any, option: string, config = {}, promql = false) =>
+    makeComposable(makePanelData(type, config), ref(promql)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    expect(visible("metric", "metric", "stat-text-mode")).toBe(true);
+    expect(visible("bar", "metric", "stat-text-mode")).toBe(false);
+    expect(visible("gauge", "gauge", "gauge-style")).toBe(true);
+    expect(visible("pie", "pie", "pie-other-threshold")).toBe(true);
+    expect(visible("pie", "pie", "donut-inner-radius")).toBe(false);
+    expect(visible("donut", "pie", "donut-inner-radius")).toBe(true);
+    expect(visible("heatmap", "data", "heatmap-cells")).toBe(true);
+    expect(visible("state-timeline", "stateTimeline", "state-value-align")).toBe(true);
+    expect(visible("geomap", "map", "map-cluster")).toBe(true);
+    expect(visible("maps", "map", "map-cluster")).toBe(false);
+  });
+
+  it("keeps footer calculations to SQL tables", () => {
+    expect(visible("table", "table", "table-footer-calcs")).toBe(true);
+    expect(visible("table", "table", "table-footer-calcs", {}, true)).toBe(false);
+    expect(visible("table", "table", "table-density", {}, true)).toBe(true);
+  });
+
+  it("shows thresholds on a SQL table once a column is a bar gauge", () => {
+    const table = (overrides: any[], queryType = "sql") => ({
+      data: { type: "table", queryType, config: { override_config: overrides } },
+    });
+    const barGauge = {
+      field: { matchBy: "name", value: "latency" },
+      config: [{ type: "field_type", value: "bar_gauge" }],
+    };
+    expect(shouldShowThresholds(table([]))).toBe(false);
+    expect(shouldShowThresholds(table([barGauge]))).toBe(true);
+    expect(shouldShowThresholds(table([barGauge], "promql"))).toBe(false);
   });
 });
 

@@ -687,6 +687,85 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     tooltip_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    tooltip_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y_axis_scale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    y_axis_log_base: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y_axis_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    y_axis_hard_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    y_axis_hard_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line_style: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stack_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    connect_nulls_threshold: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    bar_radius: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sort_order: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mark_area: Option<Vec<MarkArea>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scatter_size_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scatter_color_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    scatter_size_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    scatter_size_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stat_text_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    value_font_size: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gauge_style: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    gauge_segments: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gauge_round_cap: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    gauge_neutral: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pie_label_content: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    pie_other_threshold: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    donut_inner_radius: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_footer_calcs: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_density: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_cell_gap: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_hide_below: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_value_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    map_cluster: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    map_cluster_radius: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -799,6 +878,22 @@ pub struct MarkLine {
     value: Option<String>,
 }
 
+/// Shaded band on a cartesian chart; `axis` is "x" or "y", `from`/`to` are axis values as strings.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct MarkArea {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    axis: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
@@ -887,6 +982,10 @@ pub enum Config {
     ShowPoints {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<bool>,
+    },
+    Transform {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
     },
     DrawStyle {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -2813,6 +2912,191 @@ mod tests {
         });
         let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
         assert_eq!(serde_json::to_value(&entry).unwrap(), input);
+    }
+
+    fn parity_panel_config_fields() -> serde_json::Value {
+        let mut fields = serde_json::json!({
+            "tooltip_sort": "desc",
+            "y_axis_scale": "log",
+            "y_axis_log_base": 2.0,
+            "y_axis_label": "Latency",
+            "y_axis_hard_min": 0.0,
+            "y_axis_hard_max": 100.0,
+            "line_style": "dashed",
+            "stack_mode": "percent",
+            "connect_nulls_threshold": 300.0,
+            "bar_radius": 4.0,
+            "sort_order": "asc",
+            "mark_area": [
+                {"name": "Deploy", "axis": "x", "from": "1700000000000", "to": "1700000600000", "color": "#F59E0B"},
+                {"axis": "y", "from": "80", "to": "100"}
+            ],
+            "scatter_size_field": "count",
+            "scatter_color_field": "status",
+            "scatter_size_min": 4.0,
+            "scatter_size_max": 40.0
+        });
+        let rest = serde_json::json!({
+            "stat_text_mode": "value_and_name",
+            "value_font_size": 48.0,
+            "gauge_style": "arc",
+            "gauge_segments": 10.0,
+            "gauge_round_cap": true,
+            "gauge_neutral": 0.0,
+            "pie_label_content": ["name", "percent"],
+            "pie_other_threshold": 2.5,
+            "donut_inner_radius": 60.0,
+            "table_footer_calcs": ["sum", "mean", "last"],
+            "table_density": "compact"
+        });
+        let rest2 = serde_json::json!({
+            "heatmap_cell_gap": 1.0,
+            "heatmap_hide_below": 0.5,
+            "state_value_align": "center",
+            "map_cluster": true,
+            "map_cluster_radius": 40.0
+        });
+        let rest3 = serde_json::json!({});
+        for part in [rest, rest2, rest3] {
+            fields
+                .as_object_mut()
+                .unwrap()
+                .extend(part.as_object().unwrap().clone());
+        }
+        fields
+    }
+
+    fn panel_config_with(fields: &serde_json::Value) -> serde_json::Value {
+        let mut json = serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        });
+        json.as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
+        json
+    }
+
+    #[test]
+    fn test_panel_config_parity_fields_round_trip() {
+        let fields = parity_panel_config_fields();
+        let cfg: PanelConfig = serde_json::from_value(panel_config_with(&fields)).unwrap();
+        assert_eq!(cfg.y_axis_log_base, Some(OrdF64::from(2.0)));
+        assert_eq!(cfg.stack_mode.as_deref(), Some("percent"));
+        assert_eq!(cfg.gauge_round_cap, Some(true));
+        assert_eq!(
+            cfg.table_footer_calcs,
+            Some(vec!["sum".into(), "mean".into(), "last".into()])
+        );
+        assert_eq!(cfg.mark_area.as_ref().map(Vec::len), Some(2));
+        let json = serde_json::to_value(&cfg).unwrap();
+        for (key, expected) in fields.as_object().unwrap() {
+            assert_eq!(&json[key], expected, "{key} changed on serialise");
+        }
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_parity_fields_absent_when_none() {
+        let cfg: PanelConfig =
+            serde_json::from_value(panel_config_with(&serde_json::json!({}))).unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in parity_panel_config_fields().as_object().unwrap().keys() {
+            assert!(json.get(key).is_none(), "{key} should be omitted");
+        }
+    }
+
+    #[test]
+    fn test_panel_config_parity_fields_accept_explicit_null() {
+        let nulls: serde_json::Map<String, serde_json::Value> = parity_panel_config_fields()
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(|k| (k.clone(), serde_json::Value::Null))
+            .collect();
+        let cfg: PanelConfig =
+            serde_json::from_value(panel_config_with(&serde_json::Value::Object(nulls))).unwrap();
+        assert_eq!(cfg.tooltip_sort, None);
+        assert_eq!(cfg.mark_area, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in parity_panel_config_fields().as_object().unwrap().keys() {
+            assert!(json.get(key).is_none(), "{key} should be omitted");
+        }
+    }
+
+    #[test]
+    fn test_mark_area_partial_entry_round_trip() {
+        let area: MarkArea = serde_json::from_value(serde_json::json!({"axis": "y"})).unwrap();
+        assert_eq!(area.axis.as_deref(), Some("y"));
+        assert_eq!(area.name, None);
+        assert_eq!(area.from, None);
+        assert_eq!(
+            serde_json::to_value(&area).unwrap(),
+            serde_json::json!({"axis": "y"})
+        );
+        assert_eq!(
+            serde_json::to_value(MarkArea::default()).unwrap(),
+            serde_json::json!({})
+        );
+    }
+
+    #[test]
+    fn test_override_config_parity_types_round_trip() {
+        let input = serde_json::json!({
+            "field": {"matchBy": "series", "value": "errors"},
+            "config": [
+                {"type": "y_axis", "value": "hidden"},
+                {"type": "transform", "value": "negative_y"},
+                {"type": "draw_style", "value": "bars"},
+                {"type": "line_style", "value": "dotted"}
+            ]
+        });
+        let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
+        let config = entry.config.as_ref().unwrap();
+        assert!(matches!(&config[0], Config::YAxis { value: Some(v) } if v == "hidden"));
+        assert!(matches!(&config[1], Config::Transform { value: Some(v) } if v == "negative_y"));
+        assert!(matches!(&config[2], Config::DrawStyle { value: Some(v) } if v == "bars"));
+        assert!(matches!(&config[3], Config::LineStyle { value: Some(v) } if v == "dotted"));
+        assert_eq!(serde_json::to_value(&entry).unwrap(), input);
+    }
+
+    #[test]
+    fn test_override_config_parity_types_skip_unset_value() {
+        let cases = [
+            (Config::YAxis { value: None }, "y_axis"),
+            (Config::Transform { value: None }, "transform"),
+            (Config::DrawStyle { value: None }, "draw_style"),
+            (Config::LineStyle { value: None }, "line_style"),
+        ];
+        for (cfg, typ) in cases {
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json, serde_json::json!({"type": typ}));
+            let back: Config = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_parity_string_values_need_no_new_fields() {
+        let fields = serde_json::json!({
+            "tooltip_mode": "single",
+            "unit": "celsius",
+            "color": {"mode": "palette-from-thresholds"},
+            "thresholds": {"showAs": "dashed_line"},
+            "mappings": [{"type": "special", "match": "null", "text": "N/A"}],
+            "override_config": [{
+                "field": {"matchBy": "name", "value": "cpu"},
+                "config": [{"type": "field_type", "value": "sparkline"}]
+            }]
+        });
+        let cfg: PanelConfig = serde_json::from_value(panel_config_with(&fields)).unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        for (key, expected) in fields.as_object().unwrap() {
+            assert_eq!(&json[key], expected, "{key} changed on serialise");
+        }
     }
 
     #[test]

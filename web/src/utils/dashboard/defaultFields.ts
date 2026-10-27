@@ -129,6 +129,22 @@ export const rawValueYField = (column: string) => ({
   treatAsNonTimestamp: true,
 });
 
+/** Drops y fields a raw-value chart cannot read (a timestamp or a count's column) and falls back to the first numeric column. */
+export const keepRawValueFields = (
+  query: any,
+  groupedFields: any[],
+  timestampColumn = "_timestamp",
+) => {
+  const timestamps = new Set(["_timestamp", timestampColumn]);
+  query.fields.y = query.fields.y.filter(
+    (itemY: any) =>
+      itemY.isDerived || !timestamps.has(itemY?.args?.[0]?.value?.field ?? itemY?.column),
+  );
+  if (query.fields.y.length || query.customQuery) return;
+  const column = firstNumericField(groupedFields, query.fields.stream, timestampColumn);
+  if (column) query.fields.y = [rawValueYField(column)];
+};
+
 // Chart types that drive their own builder and must not get the cartesian x/y seed.
 // heatmap is included because its measure lives on the Z/value axis — its Y axis is
 // a dimension that disallows aggregation, so a count(_timestamp) Y seed is invalid.

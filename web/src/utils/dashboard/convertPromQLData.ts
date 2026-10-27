@@ -56,6 +56,7 @@ import {
   buildValueMappingCache,
   lookupDisplayedValueMapping,
   resolveMetricValueStyle,
+  showsMissingValue,
 } from "./tableConfigUtils";
 import {
   alignGaugeValueFonts,
@@ -88,6 +89,7 @@ import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChar
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { sortTooltipParams } from "./tooltipSort";
 import { fitStackedAxisBounds, stackTotalRows } from "./stackTotals";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
@@ -109,6 +111,7 @@ interface MetricPanelSchema {
   config?: {
     aggregation?: string;
     mappings?: unknown;
+    no_value_replacement?: string | null;
     background?: { value?: { color?: string } } | null;
     sparkline?: SparklineConfig | null;
   };
@@ -134,6 +137,8 @@ interface PromQLMetricCell {
   _metricLabel: string;
   _metricName: string;
   _metricRaw: string | number | null;
+  _metricRawValue: string | number | null;
+  _metricStatName: string;
   _metricSparkData: number[] | null;
   _metricSparkConfig: MetricSparkline["resolved"] | null;
   renderItem?: (params: MetricRenderParams) => unknown;
@@ -183,11 +188,12 @@ const buildPromQLMetricCell = (
   // "last" keeps the sample string, so a value mapping on "NaN" or "+Inf" still matches it.
   const reduced =
     aggregation === "last"
-      ? (values[values.length - 1]?.[1] ?? 0)
+      ? (values[values.length - 1]?.[1] ?? (showsMissingValue(panelSchema.config) ? null : 0))
       : applyAggregation(values, aggregation);
   const noFiniteSample = typeof reduced === "number" && !Number.isFinite(reduced);
   const value = noFiniteSample ? null : reduced;
   const unitArgs = seriesOverrides.unitArgs(name);
+  const label = seriesOverrides.get(name)?.displayName ?? name;
   const style = resolveMetricValueStyle(value, {
     mappings: panelSchema.config?.mappings,
     unit: unitArgs.unit,
@@ -197,6 +203,7 @@ const buildPromQLMetricCell = (
     panelBackground:
       seriesOverrides.get(name)?.color ?? panelSchema.config?.background?.value?.color ?? "",
     thresholds: getSeriesThresholds(panelSchema?.config, name),
+    missingValue: panelSchema.config?.no_value_replacement,
   });
   const sparkline = panelSchema.config?.sparkline?.enabled
     ? buildMetricSparkline(
@@ -211,14 +218,17 @@ const buildPromQLMetricCell = (
       type: "custom",
       coordinateSystem: "polar",
       z: 2,
-      _metricText: noFiniteSample ? "-" : style.text,
+      _metricText: noFiniteSample && !showsMissingValue(panelSchema.config) ? "-" : style.text,
       // An explicit mapping text colour wins; otherwise the text contrasts with its background.
       _metricFillColor:
         style.textColor ?? getContrastColor(style.bgColor, colors.text, colors.contrastThreshold),
       _metricBgColor: style.bgColor,
-      _metricLabel: seriesOverrides.get(name)?.displayName ?? name,
+      _metricLabel: label,
       _metricName: name,
       _metricRaw: value,
+      _metricRawValue: values.length > 0 ? value : null,
+      // A label-less result is named by its label dump "{}", which names nothing.
+      _metricStatName: label === "{}" ? "" : label,
       _metricSparkData: sparkline?.data ?? null,
       _metricSparkConfig: sparkline?.resolved ?? null,
     },
@@ -747,10 +757,7 @@ export const convertPromQLData = async (
 
         const date = new Date(name[0].data[0]);
 
-        // sort tooltip array based on value
-        name.sort((a: any, b: any) => {
-          return (b.value[1] || 0) - (a.value[1] || 0);
-        });
+        sortTooltipParams(name, panelSchema?.config, (it: any) => it.value[1]);
 
         // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -1115,6 +1122,7 @@ export const convertPromQLData = async (
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   );
                 } catch (error) {
                   console.warn("Failed to get series color:", error);
@@ -1217,6 +1225,7 @@ export const convertPromQLData = async (
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   );
                 } catch (error) {
                   console.warn("Failed to get series color:", error);
@@ -1321,6 +1330,7 @@ export const convertPromQLData = async (
                         chartMax,
                         store.state.theme,
                         panelSchema?.config?.color?.colorBySeries,
+                        panelSchema?.config,
                       ) ?? defaultColor
                     );
                   })(),
@@ -1440,6 +1450,10 @@ export const convertPromQLData = async (
 
   if (panelSchema.type === "metric") {
     const built = options.series.flat();
+    // With no series at all, a configured no-value text or null mapping still needs a cell to show on.
+    if (built.length === 0 && showsMissingValue(panelSchema.config)) {
+      built.push(buildPromQLMetricCell({}, "", panelSchema, seriesOverrides, metricColors));
+    }
     if (metricCellsSeen > metricCellCap) {
       setSeriesLimit(metricCellCap, extras.seriesLimit?.total ?? metricCellsSeen, metricCellCap);
     }

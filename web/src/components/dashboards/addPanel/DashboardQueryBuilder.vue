@@ -192,13 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
-            {{
-              dashboardPanelData.data.type == "table"
-                ? t("panel.pivotField")
-                : dashboardPanelData.data.type == "hostmap"
-                  ? t("panel.hostmapGroupBy")
-                  : t("panel.breakdown")
-            }}
+            {{ currentBreakdownLabel }}
             <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip side="top" align="center">
               <template #content>
@@ -773,8 +767,23 @@ export default defineComponent({
     // Translated axis labels. The composable's currentXLabel/currentYLabel return
     // hardcoded English; recompute them here through t() so they respect the
     // active locale (mirrors the composable's type/pivot branching).
+    // Hierarchy, row and category charts name each well by its job, as the sankey builder does.
+    const roleLabels = computed((): { x: string; y: string; b: string | null } | null => {
+      switch (dashboardPanelData.data.type) {
+        default:
+          return null;
+      }
+    });
+
+    const currentBreakdownLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") return t("panel.pivotField");
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapGroupBy");
+      return roleLabels.value?.b ?? t("panel.breakdown");
+    });
+
     const currentXLabel = computed(() => {
       if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapEntity");
+      if (roleLabels.value) return roleLabels.value.x;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
       }
@@ -785,6 +794,7 @@ export default defineComponent({
 
     const currentYLabel = computed(() => {
       if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapValue");
+      if (roleLabels.value) return roleLabels.value.y;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
       }
@@ -1593,6 +1603,7 @@ export default defineComponent({
       isDragArmed,
       currentXLabel,
       currentYLabel,
+      currentBreakdownLabel,
       labelWidthClass,
       isPivotMode,
       reorderItems,

@@ -21,6 +21,8 @@ import {
   hasValueColumn,
   buildDefaultSqlFields,
   buildDefaultBuilderFields,
+  keepRawValueFields,
+  firstNumericField,
   SKIP_SEED_TYPES,
 } from "./defaultFields";
 
@@ -179,6 +181,75 @@ describe("defaultFields", () => {
       const grouped = [{ name: "m1", schema: [{ name: "value" }] }];
       const { y } = buildDefaultBuilderFields("bar", "metrics", grouped, "m1");
       expect(y[0].functionName).toBe("avg");
+    });
+  });
+
+  describe("firstNumericField", () => {
+    const schema = [
+      {
+        name: "demo_app",
+        schema: [
+          { name: "_timestamp", type: "Int64" },
+          { name: "ts", type: "Int64" },
+          { name: "host", type: "Utf8" },
+          { name: "enabled", type: "Boolean" },
+          { name: "latency_ms", type: "Float64" },
+          { name: "bytes", type: "Int64" },
+        ],
+      },
+      { name: "other", schema: [{ name: "first", type: "Int64" }] },
+    ];
+
+    it("picks the stream's first numeric column that is not a timestamp", () => {
+      expect(firstNumericField(schema, "demo_app", "ts")).toBe("latency_ms");
+      expect(firstNumericField(schema, "other")).toBe("first");
+    });
+
+    it("returns null when only timestamps are numeric", () => {
+      expect(
+        firstNumericField([{ name: "s", schema: [{ name: "_timestamp", type: "Int64" }] }]),
+      ).toBeNull();
+    });
+  });
+
+  describe("keepRawValueFields", () => {
+    const grouped = [
+      {
+        name: "app",
+        schema: [
+          { name: "_timestamp", type: "Int64" },
+          { name: "ts", type: "Int64" },
+          { name: "took", type: "Float64" },
+        ],
+      },
+    ];
+    const query = (y: any[], customQuery = false) => ({
+      customQuery,
+      fields: { stream: "app", y },
+    });
+    const field = (column: string, isDerived = false) => ({
+      column,
+      isDerived,
+      args: [{ type: "field", value: { field: column } }],
+    });
+
+    it("drops timestamp y fields and falls back to the first numeric column", () => {
+      const q = query([field("_timestamp"), field("ts")]);
+      keepRawValueFields(q, grouped, "ts");
+      expect(q.fields.y.map((y: any) => y.column)).toEqual(["took"]);
+      expect(q.fields.y[0].functionName).toBeNull();
+    });
+
+    it("keeps numeric and derived y fields as they are", () => {
+      const q = query([field("took"), field("_timestamp", true)]);
+      keepRawValueFields(q, grouped);
+      expect(q.fields.y.map((y: any) => y.column)).toEqual(["took", "_timestamp"]);
+    });
+
+    it("leaves a custom query's y empty instead of guessing a column", () => {
+      const q = query([field("_timestamp")], true);
+      keepRawValueFields(q, grouped);
+      expect(q.fields.y).toEqual([]);
     });
   });
 });

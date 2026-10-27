@@ -42,10 +42,12 @@ export const emptyConditionalRule = (): ConditionalRuleUI => ({
   bgColor: null,
 });
 
+export type ColumnFieldType = "auto" | "num" | "text" | "bar_gauge" | "sparkline" | "json";
+
 export interface ColumnOverrideUI {
   field: string;
-  // "auto" detects numeric-ness from the data; "num"/"text" force it.
-  fieldType: "auto" | "num" | "text";
+  // "auto" detects numeric-ness from the data; the others force it and may pick a cell renderer.
+  fieldType: ColumnFieldType;
   unit: string | null; // null === inherit panel-level unit
   customUnit: string | null;
   alignment: string | null;
@@ -220,6 +222,7 @@ export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): Uni
   { label: t("dashboard.bytesPerSecondBinary"), value: "bps" },
   { label: t("dashboard.bytesPerSecondSi"), value: "bps-si" },
   { label: t("dashboard.bitsPerSecond"), value: "bits-per-sec" },
+  { label: t("dashboard.bytesPerSecondIec"), value: "bytes-per-sec" },
   { label: t("dashboard.unitGroupThroughput"), header: true },
   { label: t("dashboard.requestsPerSecond"), value: "req-per-sec" },
   { label: t("dashboard.opsPerSecond"), value: "ops-per-sec" },
@@ -237,6 +240,13 @@ export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): Uni
   { label: t("dashboard.minutes"), value: "minutes" },
   { label: t("dashboard.hours"), value: "hours" },
   { label: t("dashboard.days"), value: "days" },
+  { label: t("dashboard.unitDateTime"), value: "datetime" },
+  { label: t("dashboard.unitFromNow"), value: "from-now" },
+  { label: t("dashboard.unitGroupTemperature"), header: true },
+  { label: t("dashboard.unitCelsius"), value: "celsius" },
+  { label: t("dashboard.unitFahrenheit"), value: "fahrenheit" },
+  { label: t("dashboard.unitGroupFrequency"), header: true },
+  { label: t("dashboard.unitHertz"), value: "hertz" },
   { label: t("dashboard.unitGroupPercent"), header: true },
   { label: t("dashboard.percent1"), value: "percent-1" },
   { label: t("dashboard.percent"), value: "percent" },
@@ -246,6 +256,10 @@ export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): Uni
   { label: t("dashboard.currencyPound"), value: "currency-pound" },
   { label: t("dashboard.currencyYen"), value: "currency-yen" },
   { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
+  { label: t("dashboard.currencyYuan"), value: "currency-yuan" },
+  { label: t("dashboard.currencyWon"), value: "currency-won" },
+  { label: t("dashboard.unitGroupOther"), header: true },
+  { label: t("dashboard.unitBoolean"), value: "boolean" },
   { label: t("dashboard.unitGroupCustom"), header: true },
   { label: t("dashboard.custom"), value: "custom" },
 ];
@@ -287,6 +301,9 @@ export const useColumnFormattingOptions = () => {
     { value: "auto", label: t("dashboard.auto") },
     { value: "num", label: t("dashboard.typeNumeric") },
     { value: "text", label: t("dashboard.typeText") },
+    { value: "bar_gauge", label: t("dashboard.typeBarGauge") },
+    { value: "sparkline", label: t("dashboard.typeSparkline") },
+    { value: "json", label: t("dashboard.typeJson") },
   ];
 
   // "auto" maps to null alignment (renderer auto-aligns by type).
