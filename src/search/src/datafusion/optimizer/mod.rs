@@ -533,6 +533,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_create_physical_plan_rejects_non_select() {
+        let ctx = SessionContext::new();
+        register_tables(&ctx);
+        for sql in [
+            "COPY (SELECT * FROM t) TO 'file:///tmp/oo_verify_plan_test.parquet'",
+            "CREATE TABLE t3 (a INT)",
+            "INSERT INTO t2 VALUES (1)",
+        ] {
+            assert!(
+                create_physical_plan(&ctx, sql).await.is_err(),
+                "should reject: {sql}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_struct_field_access_matches_datafusion() {
         let mut sql = test_sql();
         sql.limit = config::QUERY_WITH_NO_LIMIT;
