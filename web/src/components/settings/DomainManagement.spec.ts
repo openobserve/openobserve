@@ -474,7 +474,60 @@ describe("DomainManagement Component", () => {
 
       expect(domain.blockedEmails).toEqual([]);
       expect(vm.confirmRemoveEmailOpen).toBe(false);
-      expect(vm.pendingRemoveEmail).toMatchObject({ email: "b@x.com", blocked: true });
+      expect(vm.shownRemoveEmail).toEqual({ email: "b@x.com", blocked: true });
+    });
+
+    it("removes only the chosen email when OK is clicked twice", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_specific",
+        allowedEmails: ["a@x.com", "b@x.com", "c@x.com"],
+        blockedEmails: [],
+      };
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      vm.doRemoveEmail();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.allowedEmails).toEqual(["b@x.com", "c@x.com"]);
+      expect(vm.pendingRemoveEmail).toBeNull();
+    });
+
+    it("removes nothing when OK is clicked after Cancel", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_specific",
+        allowedEmails: ["a@x.com", "b@x.com"],
+        blockedEmails: [],
+      };
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      vm.cancelRemoveEmail();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.allowedEmails).toEqual(["a@x.com", "b@x.com"]);
+    });
+
+    it("removes nothing when OK is clicked after the dialog was closed another way", async () => {
+      const vm = wrapper.vm;
+      const domain = {
+        name: "x.com",
+        policy: "allow_specific",
+        allowedEmails: ["a@x.com", "b@x.com"],
+        blockedEmails: [],
+      };
+      vm.removeEmail(domain, 0);
+      await flushPromises();
+      vm.confirmRemoveEmailOpen = false;
+      await flushPromises();
+      vm.doRemoveEmail();
+      await flushPromises();
+
+      expect(domain.allowedEmails).toEqual(["a@x.com", "b@x.com"]);
     });
   });
 

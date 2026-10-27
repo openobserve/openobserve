@@ -476,14 +476,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
-    :primary-button-variant="pendingRemoveEmail?.blocked ? 'primary' : 'destructive'"
-    @click:secondary="confirmRemoveEmailOpen = false"
+    :primary-button-variant="shownRemoveEmail.blocked ? 'primary' : 'destructive'"
+    @click:secondary="cancelRemoveEmail"
     @click:primary="doRemoveEmail"
   >
     <i18n-t
-      v-if="pendingRemoveEmail !== null"
       :keypath="
-        pendingRemoveEmail.blocked
+        shownRemoveEmail.blocked
           ? 'settings.confirmRemoveBlockedEmail'
           : 'settings.confirmRemoveEmail'
       "
@@ -492,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #email
         ><span class="text-text-heading font-semibold break-all">{{
-          pendingRemoveEmail.email
+          shownRemoveEmail.email
         }}</span></template
       >
     </i18n-t>
@@ -556,6 +555,8 @@ const pendingRemoveEmail = ref<{
   email: string;
   blocked: boolean;
 } | null>(null);
+// Display copy set on open and never cleared, so the fade keeps the text while pending is cleared.
+const shownRemoveEmail = ref({ email: "", blocked: false });
 const store = useStore();
 const router = useRouter();
 
@@ -805,6 +806,7 @@ const removeEmail = (domain: Domain, emailIndex: number) => {
     email: domain.allowedEmails[emailIndex],
     blocked: false,
   };
+  shownRemoveEmail.value = { email: domain.allowedEmails[emailIndex], blocked: false };
   confirmRemoveEmailOpen.value = true;
 };
 
@@ -834,6 +836,7 @@ const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
     email: domain.blockedEmails[emailIndex],
     blocked: true,
   };
+  shownRemoveEmail.value = { email: domain.blockedEmails[emailIndex], blocked: true };
   confirmRemoveEmailOpen.value = true;
 };
 
@@ -842,9 +845,20 @@ const doRemoveEmail = () => {
   if (!pending) return;
   const list = pending.blocked ? pending.domain.blockedEmails : pending.domain.allowedEmails;
   list.splice(pending.emailIndex, 1);
-  // Kept until the next open so the button colour and text hold while the dialog fades out.
+  // Cleared so a second OK click during the fade cannot splice the next email.
+  pendingRemoveEmail.value = null;
   confirmRemoveEmailOpen.value = false;
 };
+
+const cancelRemoveEmail = () => {
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
+};
+
+// Escape and the close button bypass cancelRemoveEmail, so they must drop the pending row too.
+watch(confirmRemoveEmailOpen, (open) => {
+  if (!open) pendingRemoveEmail.value = null;
+});
 
 // Load VRL functions from _meta org
 const loadFunctions = async () => {
