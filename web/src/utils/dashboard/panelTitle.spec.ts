@@ -15,11 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import i18n from "@/locales";
-import type { TranslateFn } from "@/types/i18n";
 import {
   getPanelDisplayTitle,
-  getPanelTitleSuggestions,
   isPanelTitleLoading,
   resolvePanelTitle,
   toPanelFileName,
@@ -155,55 +152,5 @@ describe("toPanelFileName", () => {
     expect(toPanelFileName("")).toBeUndefined();
     expect(toPanelFileName(" | ")).toBeUndefined();
     expect(toPanelFileName(undefined)).toBeUndefined();
-  });
-});
-
-describe("getPanelTitleSuggestions", () => {
-  const t = i18n.global.t as unknown as TranslateFn;
-  const suggest = (variables: any[], context = { tabId: "t1", panelId: "p1" }) =>
-    getPanelTitleSuggestions(variables, context, t);
-
-  it("offers a single-value variable once, labelled by its type", () => {
-    expect(
-      suggest([
-        { name: "cdu", type: "query_values", multiSelect: false },
-        { name: "env", type: "constant" },
-        { name: "q", type: "textbox" },
-        { name: "pick", type: "custom" },
-      ]),
-    ).toEqual([
-      { name: "cdu", description: "Query values" },
-      { name: "env", description: "Constant" },
-      { name: "q", description: "Text box" },
-      { name: "pick", description: "Custom" },
-    ]);
-  });
-
-  it("adds every list format the resolver supports for a multi-select variable", () => {
-    expect(suggest([{ name: "rack", type: "query_values", multiSelect: true }])).toEqual([
-      { name: "rack", description: "Query values · a, b" },
-      { name: "rack:csv", description: "Commas: a,b" },
-      { name: "rack:pipe", description: "Pipes: a|b" },
-      { name: "rack:doublequote", description: 'Double quotes: "a","b"' },
-      { name: "rack:singlequote", description: "Single quotes: 'a','b'" },
-    ]);
-  });
-
-  it("skips ad hoc filters, duplicates, and variables scoped to another tab or panel", () => {
-    const names = suggest([
-      { name: "adhoc", type: "dynamic_filters" },
-      { name: "a", type: "constant", scope: "global" },
-      { name: "a", type: "constant", scope: "global" },
-      { name: "here", type: "constant", scope: "tabs", tabs: ["t1"] },
-      { name: "elsewhere", type: "constant", scope: "tabs", tabs: ["t2"] },
-      { name: "mine", type: "constant", scope: "panels", panels: ["p1"] },
-      { name: "theirs", type: "constant", scope: "panels", panels: ["p2"] },
-    ]).map((s) => s.name);
-
-    expect(names).toEqual(["a", "here", "mine"]);
-  });
-
-  it("returns nothing without variables", () => {
-    expect(suggest(undefined as any)).toEqual([]);
   });
 });

@@ -8122,7 +8122,7 @@
     "exampleCharts": "Example Charts",
     "namePlaceholder": "Untitled panel",
     "renameHint": "Click to rename this panel",
-    "titleSuggestion": {
+    "variableSuggestion": {
       "queryValues": "Query values",
       "constant": "Constant",
       "textbox": "Text box",

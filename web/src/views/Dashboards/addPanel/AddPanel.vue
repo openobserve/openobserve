@@ -371,7 +371,7 @@ import {
 } from "@/utils/dashboard/panelValidation";
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
-import { getPanelTitleSuggestions } from "@/utils/dashboard/panelTitle";
+import { getVariableSuggestions } from "@/utils/dashboard/variableSuggestions";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -2080,11 +2080,10 @@ export default defineComponent({
     });
 
     const titleSuggestions = computed(() =>
-      getPanelTitleSuggestions(
-        currentDashboardData.data?.variables?.list,
-        { tabId: currentTabId.value, panelId: currentPanelId.value },
-        t,
-      ),
+      getVariableSuggestions(currentDashboardData.data?.variables?.list, t, {
+        tabId: currentTabId.value,
+        panelId: currentPanelId.value,
+      }),
     );
 
     const getLiveVariables = (): any[] => {
