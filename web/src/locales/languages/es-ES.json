@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Medio",
       "severityLow": "P4 · Bajo",
       "moreDimensions": "+{count} más",
+      "moreAlertGroups": "+{count} más",
+      "alertGroupTooltip": "{name}: disparada {count} vez | {name}: disparada {count} veces",
       "filterAll": "Todos",
       "filterActive": "Activo",
       "alertCount": "Alertas",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Reanalizando desde cero…",
         "reanalyzingBuildOnPrevious": "Basándose en el informe anterior…",
+        "resumingFrom": "Reanudando desde “{step}”…",
         "showDetails": "Mostrar detalles",
         "hideDetails": "Ocultar detalles",
         "stale": "Este análisis lleva más tiempo de lo habitual y puede que se haya detenido. No hay mensajes nuevos desde las {time} UTC. Cancélalo y vuelve a intentarlo.",

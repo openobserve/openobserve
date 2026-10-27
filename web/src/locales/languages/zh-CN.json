@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · 中",
       "severityLow": "P4 · 低",
       "moreDimensions": "+{count} 更多",
+      "moreAlertGroups": "+{count} 个",
+      "alertGroupTooltip": "{name}：已触发 {count} 次 | {name}：已触发 {count} 次",
       "filterAll": "全部",
       "filterActive": "活跃",
       "alertCount": "告警",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "正在从头重新分析…",
         "reanalyzingBuildOnPrevious": "正在基于上一份报告继续分析…",
+        "resumingFrom": "正在从“{step}”继续…",
         "showDetails": "显示详情",
         "hideDetails": "隐藏详情",
         "stale": "此分析运行时间异常长，可能已停止。自 {time} UTC 起没有新消息。请取消后重试。",

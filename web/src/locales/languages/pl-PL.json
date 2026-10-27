@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Średni",
       "severityLow": "P4 · Niski",
       "moreDimensions": "+{count} więcej",
+      "moreAlertGroups": "+{count} więcej",
+      "alertGroupTooltip": "{name}: wyzwolono {count} raz | {name}: wyzwolono {count} razy",
       "filterAll": "Wszystkie",
       "filterActive": "Aktywne",
       "alertCount": "Alerty",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Ponowna analiza od zera…",
         "reanalyzingBuildOnPrevious": "Kontynuowanie na podstawie poprzedniego raportu…",
+        "resumingFrom": "Wznawianie od „{step}”…",
         "showDetails": "Pokaż szczegóły",
         "hideDetails": "Ukryj szczegóły",
         "stale": "Ta analiza trwa nietypowo długo i mogła się zatrzymać. Brak nowych wiadomości od {time} UTC. Anuluj ją i spróbuj ponownie.",

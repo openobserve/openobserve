@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Средний",
       "severityLow": "P4 · Низкий",
       "moreDimensions": "+ещё {count}",
+      "moreAlertGroups": "+{count} ещё",
+      "alertGroupTooltip": "{name}: сработало {count} раз | {name}: сработало {count} раз",
       "filterAll": "Все",
       "filterActive": "Активные",
       "alertCount": "Оповещения",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Повторный анализ с нуля…",
         "reanalyzingBuildOnPrevious": "На основе предыдущего отчёта…",
+        "resumingFrom": "Возобновление с шага «{step}»…",
         "showDetails": "Показать подробности",
         "hideDetails": "Скрыть подробности",
         "stale": "Этот анализ выполняется необычно долго и мог остановиться. Новых сообщений с {time} UTC нет. Отмените его и попробуйте снова.",
