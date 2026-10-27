@@ -104,6 +104,7 @@ function clearAndBuild() {
         :load-values="loadValues"
         :fields-loading="fieldsLoading"
         size="sm"
+        appearance="plain"
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
         @submit="emit('submit')"

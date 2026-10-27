@@ -45,6 +45,7 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   placeholder: undefined,
   disabled: false,
   size: "md",
+  appearance: "field",
   dataTest: "query-filter-bar",
 });
 const emit = defineEmits<QueryFilterBarEmits>();
@@ -111,11 +112,6 @@ const emptyText = computed(() => {
 
 const multiStep = computed(() => step.value === "value" && editor.multiValue.value);
 const selectedCount = computed(() => draft.value?.values.length ?? 0);
-
-const hint = computed(() => {
-  if (step.value !== "field") return t("filterBar.hintBack");
-  return advanced.value ? t("filterBar.hintAdvanced") : t("filterBar.hintBasic");
-});
 
 watch(editingId, (id) => {
   if (!id) editAnchor.value = null;
@@ -192,6 +188,7 @@ const draftOperator = computed(() => {
     :aria-label="t('filterBar.ariaLabel')"
     :disabled="disabled"
     :size="size"
+    :appearance="appearance"
     :data-test="dataTest"
     @update:model-value="editor.onTextChange"
     @select="editor.select"
@@ -247,8 +244,8 @@ const draftOperator = computed(() => {
         @click.stop="clearAll"
       />
     </template>
-    <template #footer>
-      <div v-if="multiStep" class="flex items-center gap-2">
+    <template v-if="multiStep" #footer>
+      <div class="flex items-center gap-2">
         <span class="min-w-0 flex-1" :data-test="`${dataTest}-selected-count`">{{
           t("filterBar.selectedCount", { count: selectedCount }, selectedCount)
         }}</span>
@@ -262,7 +259,6 @@ const draftOperator = computed(() => {
           >{{ t("common.apply") }}</OButton
         >
       </div>
-      <template v-else>{{ hint }}</template>
     </template>
   </OChipInput>
 </template>

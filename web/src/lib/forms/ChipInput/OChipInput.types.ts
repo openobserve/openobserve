@@ -48,6 +48,8 @@ export interface ChipInputProps {
   multiple?: boolean;
   disabled?: boolean;
   size?: "sm" | "md";
+  /** `plain` drops the input frame, for a field that sits inside an editor surface. */
+  appearance?: "field" | "plain";
   ariaLabel?: I18nText;
   /** Prefix for `data-test`: `-add` target, `-input` search box, `-suggest` popover, `-suggest-item-{key}` rows. */
   dataTest?: string;

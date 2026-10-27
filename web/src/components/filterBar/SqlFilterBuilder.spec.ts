@@ -50,6 +50,11 @@ describe("SqlFilterBuilder", () => {
     );
   });
 
+  it("blends the bar into the editor surface instead of drawing an input frame", () => {
+    mountBuilder("");
+    expect(wrapper!.find('[data-test="b-bar-field"]').classes()).not.toContain("border");
+  });
+
   it("re-reads the query when it changes outside the bar", async () => {
     mountBuilder("level = 'error'");
     await wrapper!.setProps({ query: "level = 'error' AND status = 1" });

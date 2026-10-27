@@ -32,6 +32,8 @@ export interface QueryFilterBarProps {
   placeholder?: I18nText;
   disabled?: boolean;
   size?: "sm" | "md";
+  /** `plain` blends the bar into the editor surface it replaces. */
+  appearance?: "field" | "plain";
   dataTest?: string;
 }
 

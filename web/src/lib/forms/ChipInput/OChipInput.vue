@@ -37,6 +37,7 @@ const props = withDefaults(defineProps<ChipInputProps>(), {
   multiple: false,
   disabled: false,
   size: "md",
+  appearance: "field",
   ariaLabel: undefined,
   dataTest: undefined,
 });
@@ -53,6 +54,14 @@ const listId = `o-chip-input-${Math.random().toString(36).slice(2, 9)}`;
 
 const showList = computed(() => props.open && !props.disabled);
 const anchorElement = computed(() => props.anchor ?? addRef.value ?? undefined);
+
+const fieldClasses = computed(() => [
+  "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150",
+  props.disabled
+    ? "bg-input-disabled-bg border-input-disabled-border border-dashed"
+    : "bg-input-bg border-input-border hover:border-input-border-hover",
+  showList.value ? "border-input-border-focus ring-focus-ring-accent ring-[0.125rem]" : "",
+]);
 
 const sizeClasses = computed(() => (props.size === "sm" ? "min-h-8 text-xs" : "min-h-9 text-sm"));
 
@@ -170,13 +179,10 @@ function onFieldPointerDown(event: PointerEvent) {
         ref="rootRef"
         :data-test="testId('field')"
         :class="[
-          'rounded-default flex w-full min-w-0 cursor-text flex-wrap items-center gap-1 border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150',
-          'bg-input-bg border-input-border hover:border-input-border-hover',
-          showList ? 'border-input-border-focus ring-focus-ring-accent ring-[0.125rem]' : '',
+          'flex w-full min-w-0 cursor-text flex-wrap items-center gap-1',
           sizeClasses,
-          disabled
-            ? 'bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed'
-            : '',
+          appearance === 'plain' ? 'px-0.5 py-0.75' : fieldClasses,
+          disabled ? 'cursor-not-allowed' : '',
         ]"
         @pointerdown="onFieldPointerDown"
       >
