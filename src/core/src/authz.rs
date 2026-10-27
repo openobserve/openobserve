@@ -492,21 +492,26 @@ pub async fn denied_cipher_keys(
     }
     keys_used.sort_unstable();
     keys_used.dedup();
-    if keys_used.is_empty() || is_root_user(user_id) {
-        return Ok(Vec::new());
-    }
     log::info!("keys used : {keys_used:?}");
+    Ok(denied_named_cipher_keys(org_id, user_id, &keys_used).await)
+}
 
+/// The named cipher keys `user_id` may not read; a user that cannot be loaded may read none.
+#[cfg(feature = "enterprise")]
+pub async fn denied_named_cipher_keys(org_id: &str, user_id: &str, keys: &[String]) -> Vec<String> {
+    if keys.is_empty() || is_root_user(user_id) {
+        return Vec::new();
+    }
     let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
-        return Ok(keys_used);
+        return keys.to_vec();
     };
     let mut denied = Vec::new();
-    for key in keys_used {
-        if !cipher_key_allowed(org_id, user_id, &user, &key).await {
-            denied.push(key);
+    for key in keys {
+        if !cipher_key_allowed(org_id, user_id, &user, key).await {
+            denied.push(key.clone());
         }
     }
-    Ok(denied)
+    denied
 }
 
 #[cfg(feature = "enterprise")]
