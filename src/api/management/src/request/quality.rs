@@ -20,9 +20,11 @@ use axum::{
 use infra::table::score_configs::ScoreConfig;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
-    auth::{UserEmail, is_ofga_object_visible},
+    auth::{UserEmail, check_permissions, is_ofga_object_visible},
     http::map_error_to_http_response,
-    llm_evaluations::quality::{self, QualityConfigList, QualityError, QualityScorePage},
+    llm_evaluations::quality::{
+        self, QualityConfigList, QualityError, QualityScorePage, QualityTimeline,
+    },
 };
 
 use crate::{
@@ -41,14 +43,37 @@ async fn visible_configs(org_id: &str, user_id: &str) -> Result<impl Fn(&str) ->
     .await
     .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
     let org_id = org_id.to_string();
-    Ok(move |entity_id: &str| {
-        is_ofga_object_visible(
-            &org_id,
-            "score_config",
-            entity_id,
-            permitted_objects.as_deref(),
-        )
-    })
+    Ok(move |entity_id: &str| config_visible(&org_id, entity_id, permitted_objects.as_deref()))
+}
+
+fn config_visible(org_id: &str, entity_id: &str, permitted_objects: Option<&[String]>) -> bool {
+    is_ofga_object_visible(org_id, "score_config", entity_id, permitted_objects)
+}
+
+/// The per-config grant GetScoreConfig gets; the route itself only checks the org trace grant.
+async fn check_config_access(org_id: &str, entity_id: &str, user_id: &str) -> Result<(), Response> {
+    let allowed = check_permissions(
+        entity_id,
+        org_id,
+        user_id,
+        "score_configs",
+        "GET",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await;
+    require_visible(allowed, entity_id).map_err(quality_error_response)
+}
+
+/// A hidden config answers like a missing one, so the 404 does not reveal that it exists.
+fn require_visible(allowed: bool, entity_id: &str) -> Result<(), QualityError> {
+    if allowed {
+        Ok(())
+    } else {
+        Err(QualityError::NotFound(entity_id.to_string()))
+    }
 }
 
 fn quality_error_response(error: QualityError) -> Response {
@@ -146,13 +171,49 @@ pub async fn list_quality_scores(
     Query(query): Query<ListQualityScoresQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match visible_configs(&org_id, &user_email.user_id).await {
-        Ok(is_visible) if is_visible(&entity_id) => {}
-        Ok(_) => return quality_error_response(QualityError::NotFound(entity_id)),
-        Err(response) => return response,
+    if let Err(response) = check_config_access(&org_id, &entity_id, &user_email.user_id).await {
+        return response;
     }
     match quality::list_scores(&org_id, &entity_id, query.into()).await {
         Ok(page) => MetaHttpResponse::json(page),
+        Err(error) => quality_error_response(error),
+    }
+}
+
+/// GetScoreConfigQualityTimeline
+#[utoipa::path(
+    get,
+    path = "/{org_id}/score_configs/{entity_id}/quality/timeline",
+    context_path = "/api",
+    tag = "ScoreConfigs",
+    operation_id = "GetScoreConfigQualityTimeline",
+    summary = "Quality trend for one Score Config",
+    description = "Splits the time window into buckets and returns, per bucket, the count, unhealthy count, true count, average and p95 of the latest Score per evaluation for the config. Follows only the scope and agent filters, so paging or drilling into the Scores does not change it.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Score Config entity ID"),
+        ListQualityQuery,
+    ),
+    responses(
+        (status = 200, body = inline(QualityTimeline)),
+        (status = 400, description = "Invalid request or search query", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Score Config not found", content_type = "application/json", body = MetaHttpResponse),
+        (status = 500, description = "Quality query failed", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
+)]
+pub async fn get_quality_timeline(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Query(query): Query<ListQualityQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) = check_config_access(&org_id, &entity_id, &user_email.user_id).await {
+        return response;
+    }
+    match quality::timeline(&org_id, &entity_id, query.into()).await {
+        Ok(timeline) => MetaHttpResponse::json(timeline),
         Err(error) => quality_error_response(error),
     }
 }
@@ -174,5 +235,36 @@ mod tests {
             status(QualityError::Search(anyhow::anyhow!("private details"))),
             500
         );
+    }
+
+    #[test]
+    fn hidden_config_answers_404_like_a_missing_one() {
+        assert!(require_visible(true, "cfg").is_ok());
+        let error = require_visible(false, "cfg").unwrap_err();
+        assert!(matches!(&error, QualityError::NotFound(id) if id == "cfg"));
+        assert_eq!(quality_error_response(error).status().as_u16(), 404);
+    }
+
+    #[test]
+    fn list_shows_only_permitted_configs() {
+        let grants = |ids: &[&str]| ids.iter().map(|id| id.to_string()).collect::<Vec<_>>();
+
+        assert!(config_visible("org-1", "cfg-1", None));
+        assert!(config_visible(
+            "org-1",
+            "cfg-1",
+            Some(grants(&["score_config:cfg-1"]).as_slice())
+        ));
+        assert!(config_visible(
+            "org-1",
+            "cfg-1",
+            Some(grants(&["score_config:_all_org-1"]).as_slice())
+        ));
+        assert!(!config_visible(
+            "org-1",
+            "cfg-1",
+            Some(grants(&["score_config:cfg-2", "score_config:_all_org-2"]).as_slice())
+        ));
+        assert!(!config_visible("org-1", "cfg-1", Some(&[])));
     }
 }

@@ -31,9 +31,13 @@ pub struct ListQualityQuery {
     /// `span`, `trace` or `session`. Omit for all scopes.
     #[param(value_type = Option<String>, example = "trace")]
     pub scope: Option<LlmScoreTargetScope>,
+    /// Only Scores of this agent ID.
     pub agent_id: Option<String>,
+    /// Only Scores of this agent name.
     pub agent_name: Option<String>,
+    /// Only Scores of this agent environment.
     pub agent_env: Option<String>,
+    /// Only Scores of this agent version.
     pub agent_version: Option<String>,
 }
 
