@@ -1,5 +1,7 @@
-[target.aarch64-unknown-linux-musl]
-dockerfile = "cross/Dockerfile.musl"
+[target.aarch64-unknown-linux-musl.dockerfile]
+file = "cross/Dockerfile.musl"
+build-args = { MUSL_BASE_IMAGE = "ghcr.io/cross-rs/aarch64-unknown-linux-musl@sha256:4c29b5c7d0baf7d069dc48f0187f02c35e7a9df6f0f6a2b528400c6addb6a0cb" }
 
-[target.x86_64-unknown-linux-musl]
-dockerfile = "cross/Dockerfile.musl"
+[target.x86_64-unknown-linux-musl.dockerfile]
+file = "cross/Dockerfile.musl"
+build-args = { MUSL_BASE_IMAGE = "ghcr.io/cross-rs/x86_64-unknown-linux-musl@sha256:0e3f9c34e663a9985ea26f569ec1f886334ce805dd6c7d72177e52f7b324ecac" }
