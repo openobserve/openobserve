@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="date-time-rail flex flex-col py-1" data-test="date-time-rail">
+  <div
+    class="date-time-rail flex flex-col py-1 outline-none"
+    tabindex="-1"
+    data-test="date-time-rail"
+  >
     <div
       role="group"
       :aria-labelledby="recentHeadingId"
@@ -231,6 +235,10 @@ const removeFocusedRecent = async (id: string, event: Event) => {
   await nextTick();
   const rows = list?.querySelectorAll<HTMLElement>("[data-date-time-rail-recent]");
   if (rows && rows.length > 0) rows[Math.min(index, rows.length - 1)].focus();
-  else list?.querySelector<HTMLElement>("[data-date-time-rail-item]")?.focus();
+  else {
+    // With no rows left, the next enabled rail item or else the rail itself keeps focus inside the picker.
+    const next = list?.querySelector<HTMLElement>("[data-date-time-rail-item]:not([disabled])");
+    (next ?? (list as HTMLElement | null))?.focus();
+  }
 };
 </script>

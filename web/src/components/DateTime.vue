@@ -574,8 +574,7 @@ export default defineComponent({
     const pendingDay = ref<string | null>(null);
     // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
     let isSeedingAbsolute = false;
-    let seededEnd: { date: string; time: string; timezone: string; exclusiveUs: number } | null =
-      null;
+    let seededEnd: { date: string; time: string } | null = null;
     // Date-only pickers cannot show the times a recent range carries.
     const showRail = computed(() => !props.disableRelative);
     const lastValidCustomValue = ref(15);
@@ -933,18 +932,13 @@ export default defineComponent({
       (parseCalendarToken(token)?.offset ?? 0) < 0 ? endUs - 1 : endUs;
 
     // The shown 23:59:59 of a copied calendar end stands for the next period's start until the user edits it.
+    const rememberShownEnd = (exclusiveEndUs: number) => {
+      const shown = convertUnixTime(exclusiveEndUs - 1);
+      seededEnd = { date: shown.date, time: shown.time };
+    };
     const rememberSeededEnd = (token: string | null, endUs: number) => {
-      if ((parseCalendarToken(token)?.offset ?? 0) >= 0) {
-        seededEnd = null;
-        return;
-      }
-      const shown = convertUnixTime(endUs - 1);
-      seededEnd = {
-        date: shown.date,
-        time: shown.time,
-        timezone: store.state.timezone,
-        exclusiveUs: endUs,
-      };
+      if ((parseCalendarToken(token)?.offset ?? 0) >= 0) seededEnd = null;
+      else rememberShownEnd(endUs);
     };
 
     const setRelativeTime = (period: string) => {
@@ -1284,11 +1278,11 @@ export default defineComponent({
       const untouchedSeededEnd =
         seededEnd !== null &&
         seededEnd.date === selectedDate.value.to &&
-        seededEnd.time === selectedTime.value.endTime &&
-        seededEnd.timezone === store.state.timezone;
-      const endUTC = untouchedSeededEnd
-        ? seededEnd!.exclusiveUs
-        : convertToUtcTimestamp(endTime, store.state.timezone);
+        seededEnd.time === selectedTime.value.endTime;
+      // The shown last second stands for the exclusive end one second later, in whatever zone is now selected.
+      const endUTC =
+        convertToUtcTimestamp(endTime, store.state.timezone) +
+        (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
       return { startUTC, endUTC };
     };
 
@@ -1935,7 +1929,14 @@ export default defineComponent({
       const entry = timeRangeHistory.entries.value[Number(id)];
       if (!entry) return;
       const start = convertUnixTime(entry.startUs);
-      const end = convertUnixTime(entry.endUs);
+      // An exclusive midnight end shows as the previous day's last second, as the rail label does.
+      const endsAtMidnight =
+        entry.endUs > entry.startUs &&
+        entry.endUs % MICROS_PER_SECOND === 0 &&
+        convertUnixTime(entry.endUs).time === "00:00:00";
+      const end = convertUnixTime(endsAtMidnight ? entry.endUs - 1 : entry.endUs);
+      if (endsAtMidnight) rememberShownEnd(entry.endUs);
+      else seededEnd = null;
       // Saved once below, so the auto-apply date watcher must not save it a second time.
       isSeedingAbsolute = true;
       selectedDate.value.from = start.date;

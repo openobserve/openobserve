@@ -583,6 +583,20 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.selectedTime).toEqual({ startTime: "09:00:00", endTime: "10:00:00" });
     });
 
+    it("keeps the exact period end when the zone changes while the seeded fields are shown", async () => {
+      createWrapper({ autoApply: false, defaultRelativeTime: "calendar:month:-1" });
+      await flushPromises();
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+
+      store.state.timezone = "UTC";
+      expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
+        startTime: micros("2026-09-01T00:00:00Z"),
+        endTime: micros("2026-10-01T00:00:00Z"),
+      });
+    });
+
     it("applies the seeded range once the user edits it", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
@@ -806,6 +820,24 @@ describe("DateTime rail", () => {
       );
     });
 
+    it.each([
+      ["without calendar presets", { calendarPresets: false }],
+      ["when every calendar item is over the limit", { queryRangeRestrictionInHour: 0.001 }],
+    ])("keeps focus inside the rail after removing the last row %s", async (_label, props) => {
+      vi.useRealTimers();
+      seedHistory([hourRange(1)]);
+      createWrapper(props);
+      await openMenu();
+
+      const row = el("date-time-rail-recent-0")!;
+      row.focus();
+      row.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+      await flushPromises();
+
+      expect(storedHistory()).toEqual([]);
+      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail");
+    });
+
     it("opens on the first rail item and keeps the rail a single Tab stop", async () => {
       vi.useRealTimers();
       seedHistory([1, 2, 3, 4].map(hourRange));
@@ -846,6 +878,25 @@ describe("DateTime rail", () => {
       expect(document.activeElement?.getAttribute("data-test")).toBe(
         "date-time-rail-calendar-today",
       );
+    });
+
+    it("recalls a range ending at midnight as that day's last second and still queries the exact end", async () => {
+      const day = {
+        startUs: micros("2026-10-05T18:30:00Z"),
+        endUs: micros("2026-10-06T18:30:00Z"),
+      };
+      seedHistory([day]);
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      await openMenu();
+
+      el("date-time-rail-recent-0")!.click();
+      await flushPromises();
+
+      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/06", to: "2026/10/06" });
+      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
+      expect(lastEmit()).toMatchObject({ startTime: day.startUs, endTime: day.endUs });
+      expect(storedHistory()).toEqual([day]);
     });
 
     it("removes a range with its × button", async () => {

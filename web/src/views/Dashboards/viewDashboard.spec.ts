@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { inject, type Ref } from "vue";
+import { inject, nextTick, reactive, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
@@ -172,7 +172,8 @@ global.mockHistoryState = mockHistoryState;
 // Global store mock instances
 const mockStoreCommit = vi.fn();
 const mockStoreDispatch = vi.fn();
-const mockStoreState = {
+// Reactive like the real store, so watchers on store state (e.g. the timezone) run in specs.
+const mockStoreState = reactive({
   selectedOrganization: { identifier: "test-org" },
   theme: "light",
   printMode: false,
@@ -180,8 +181,8 @@ const mockStoreState = {
   organizationData: {
     folders: [{ folderId: "default", name: "Default" }],
   },
-  zoConfig: { min_auto_refresh_interval: 5 },
-};
+  zoConfig: { min_auto_refresh_interval: 5 } as Record<string, unknown>,
+}) as Record<string, any>;
 
 vi.mock("vuex", async () => {
   const actual = await vi.importActual("vuex");
@@ -1915,16 +1916,32 @@ describe("ViewDashboard", () => {
       };
       const UTC_START = Date.parse("2026-10-07T00:00:00Z") * 1000;
       const IST_START = Date.parse("2026-10-06T18:30:00Z") * 1000;
-
-      const mountOnRollingGlobal = async (autoRun: boolean) => {
+      const yesterdayAt = (startTime: number) => ({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:day:-1",
+        startTime,
+        endTime: startTime + 86_400_000_000,
+      });
+      // What any picker's DateTime.onTimezoneChange does: the store zone changes, then the app reacts.
+      const changeZone = async (zone: string) => {
+        global.mockStoreState.timezone = zone;
+        await flushPromises();
+      };
+      const setAutoRun = (on: boolean) => {
         global.mockStoreState.zoConfig = {
           ...global.mockStoreState.zoConfig,
-          auto_query_enabled: autoRun,
+          auto_query_enabled: on,
         };
+      };
+
+      const mountWith = async (autoRun: boolean, global0: Record<string, unknown>) => {
+        setAutoRun(autoRun);
         await mountWithPicker();
-        setPickerTimezoneSource(() => store.state.timezone);
+        setPickerTimezoneSource(() => global.mockStoreState.timezone);
         wrapper.vm.currentDashboardData.data = panelWithOwnYesterday;
-        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        wrapper.vm.timeGate.onPick(global0);
+        wrapper.vm.selectedDate = global0;
+        await flushPromises();
         wrapper.vm.computeAllPanelTimes(true);
         expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
       };
@@ -1932,57 +1949,103 @@ describe("ViewDashboard", () => {
       afterEach(() => {
         setPickerTimezoneSource(() => localStorage.getItem("timezone"));
         global.mockStoreState.zoConfig = { min_auto_refresh_interval: 5 };
+        global.mockStoreState.timezone = "UTC";
       });
 
-      it("moves a panel's own calendar range at once with Auto Run on, and only once", async () => {
-        await mountOnRollingGlobal(true);
+      it("moves a panel's own calendar range when the store zone changes, once", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
 
-        store.state.timezone = "Asia/Kolkata";
-        wrapper.vm.reResolveCalendarRanges();
+        await changeZone("Asia/Kolkata");
         const moved = wrapper.vm.currentTimeObjPerPanel.p1;
         expect(moved.start_time.getTime()).toBe(IST_START);
 
-        wrapper.vm.reResolveCalendarRanges();
+        await changeZone("Asia/Calcutta");
         expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(moved);
       });
 
       it("re-applies a global calendar range through the time gate", async () => {
-        global.mockStoreState.zoConfig = {
-          ...global.mockStoreState.zoConfig,
-          auto_query_enabled: true,
-        };
-        await mountWithPicker();
-        setPickerTimezoneSource(() => store.state.timezone);
-        const yesterdayUtc = {
-          valueType: "relative",
-          relativeTimePeriod: "calendar:day:-1",
-          startTime: UTC_START,
-          endTime: UTC_START + 86_400_000_000,
-        };
-        wrapper.vm.timeGate.onPick(yesterdayUtc);
-        wrapper.vm.selectedDate = yesterdayUtc;
-        await flushPromises();
+        await mountWith(true, yesterdayAt(UTC_START));
 
-        store.state.timezone = "Asia/Kolkata";
-        wrapper.vm.reResolveCalendarRanges();
-        await flushPromises();
+        await changeZone("Asia/Kolkata");
 
         expect(wrapper.vm.selectedDate.startTime).toBe(IST_START);
         expect(wrapper.vm.currentTimeObjPerPanel.__global.start_time.getTime()).toBe(IST_START);
       });
 
-      it("waits for Refresh with Auto Run off, then applies the new zone with everything else", async () => {
-        await mountOnRollingGlobal(false);
+      it("queries a panel once when its own picker raised the zone change", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
 
-        store.state.timezone = "Asia/Kolkata";
-        wrapper.vm.reResolveCalendarRanges();
+        global.mockStoreState.timezone = "Asia/Kolkata";
+        await nextTick();
         expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
-        expect(wrapper.vm.zoneRefreshPending).toBe(true);
+        // The panel's own gate re-applies it a tick later, as RenderDashboardCharts does.
+        wrapper.vm.refreshPanelRequest("p1");
+        const fromPanelGate = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(fromPanelGate.start_time.getTime()).toBe(IST_START);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(fromPanelGate);
+      });
+
+      it("waits for Refresh with Auto Run off and forgets the wait when the zone goes back", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
         expect(wrapper.vm.isRefreshPending).toBe(true);
 
+        await changeZone("UTC");
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+        expect(wrapper.vm.isRefreshPending).toBe(false);
+
+        await changeZone("Asia/Kolkata");
         await wrapper.vm.refreshData();
         expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
         expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("applies waiting panel windows when Auto Run is turned on", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.zoneRefreshPending).toBe(true);
+
+        setAutoRun(true);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("keeps a waiting header pick when the zone changes from another picker", async () => {
+        await mountWith(false, yesterdayAt(UTC_START));
+        const lastWeek = {
+          valueType: "relative",
+          relativeTimePeriod: "7d",
+          startTime: 1,
+          endTime: 2,
+        };
+        wrapper.vm.timeGate.onPick(lastWeek);
+        expect(wrapper.vm.timeGate.isWaiting.value).toBe(true);
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.relativeTimePeriod).toBe("7d");
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("7d");
+      });
+
+      it("moves a waiting calendar header pick to the new zone", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        wrapper.vm.timeGate.onPick(yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.startTime).toBe(IST_START);
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          relativeTimePeriod: "calendar:day:-1",
+          startTime: IST_START,
+        });
       });
     });
 

@@ -1082,8 +1082,11 @@ export default defineComponent({
       return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
 
-    // Panel calendar ranges moved by a zone change while Auto Run was off; Refresh applies them with the global range.
-    const zoneRefreshPending = ref(false);
+    // Panel calendar windows a zone change moved while Auto Run was off; Refresh or Auto Run applies them.
+    const zonePendingPanels = ref<Record<string, { start_time: Date; end_time: Date }>>({});
+    const zoneRefreshPending = computed(
+      () => !isAutoRunOn.value && Object.keys(zonePendingPanels.value).length > 0,
+    );
     const isRefreshPending = computed(
       () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
     );
@@ -1164,6 +1167,7 @@ export default defineComponent({
     const isInternalUrlUpdate = ref(false);
 
     const loadDashboard = async (onlyIfRequired = false) => {
+      zonePendingPanels.value = {};
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
         // if current dashboard id and tab is same,  skip loading
@@ -1527,6 +1531,8 @@ export default defineComponent({
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
+      // A forced recompute resolves every panel in the current zone, so nothing is left waiting from a zone change.
+      if (forceRefresh) zonePendingPanels.value = {};
       const globalTime = getAppliedGlobalTime();
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value || !globalTime) {
         return;
@@ -1597,10 +1603,13 @@ export default defineComponent({
     // A zone change from any picker (header, panel, ViewPanel) moves every calendar window, which no single picker re-emits.
     const reResolveCalendarRanges = () => {
       const applied = selectedDate.value;
-      if (applied?.valueType === "relative" && parseCalendarToken(applied.relativeTimePeriod)) {
-        const window = getConsumableRelativeTime(applied.relativeTimePeriod);
+      const picked = timeGate.picked.value;
+      // A header pick still waiting for Refresh is the range the user chose, so it is the one to keep or move.
+      const held = picked && !arePickerValuesEqual(picked, applied) ? picked : applied;
+      if (held?.valueType === "relative" && parseCalendarToken(held.relativeTimePeriod)) {
+        const window = getConsumableRelativeTime(held.relativeTimePeriod);
         if (window)
-          timeGate.onPick({ ...applied, startTime: window.startTime, endTime: window.endTime });
+          timeGate.onPick({ ...held, startTime: window.startTime, endTime: window.endTime });
       }
       const globalTime = getAppliedGlobalTime();
       if (!globalTime) return;
@@ -1617,17 +1626,29 @@ export default defineComponent({
           }
         }
       }
-      if (!moved.length) return;
       if (!isAutoRunOn.value) {
-        zoneRefreshPending.value = true;
+        zonePendingPanels.value = Object.fromEntries(moved);
         return;
       }
+      zonePendingPanels.value = {};
       for (const [id, next] of moved) currentTimeObjPerPanel.value[id] = next;
     };
     watch(
       () => store.state.timezone,
-      () => reResolveCalendarRanges(),
+      async () => {
+        // A panel picker re-applies its own panel a tick after the zone changes; waiting lets that path win, so it loads once.
+        await nextTick();
+        await nextTick();
+        reResolveCalendarRanges();
+      },
     );
+    watch(isAutoRunOn, (isOn) => {
+      if (!isOn) return;
+      for (const [id, next] of Object.entries(zonePendingPanels.value)) {
+        currentTimeObjPerPanel.value[id] = next;
+      }
+      zonePendingPanels.value = {};
+    });
 
     // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
@@ -1887,7 +1908,6 @@ export default defineComponent({
 
       // Applied before the recompute below, which reads the applied range and not the picker.
       timeGate.refresh();
-      zoneRefreshPending.value = false;
 
       // Recompute all panel times after syncing
       // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
