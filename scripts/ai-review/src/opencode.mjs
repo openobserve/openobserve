@@ -7,43 +7,70 @@ import { join } from "node:path";
 
 export const REVIEW_AGENT_PREFIX = "ai-review-";
 
-// Exactly what `GET /experimental/tool/ids` returns for the pinned opencode with our config; anything else means a plugin or tool dir was loaded.
+// REVIEW_OPENCODE_CONFIG picks one of these; anything else fails closed rather than falling back.
+export const OPENCODE_CONFIGS = {
+  default: { file: "opencode.jsonc", readOnly: true },
+  "ci-full": { file: "opencode.ci.jsonc", readOnly: false },
+};
+
+// The tools opencode 2.2.0 offers a primary agent when nothing is denied (2.x has no tool-id listing, so this is pinned).
+// Each is gated by the permission action of the same name, except write, which shares "edit".
 export const BUILTIN_TOOL_IDS = new Set([
-  "invalid", "question", "bash", "read", "glob", "grep", "edit", "write", "task",
-  "webfetch", "todowrite", "websearch", "skill", "apply_patch",
+  "read", "glob", "grep", "edit", "write", "shell", "webfetch", "websearch",
+  "question", "skill", "subagent", "execute",
 ]);
 
 const ALLOWED_TOOL_IDS = new Set(["read", "glob", "grep"]);
-const EDIT_TOOL_IDS = new Set(["edit", "write", "apply_patch"]);
-const MCP_READ_TOOL_IDS = new Set(["list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"]);
+const EDIT_TOOL_IDS = new Set(["edit", "write"]);
+// What ci-full must actually grant without asking; a config that fell back to the defaults fails here.
+const CI_FULL_TOOL_IDS = ["read", "glob", "grep", "edit", "write", "shell", "webfetch"];
 
+// 2.x dropped OPENCODE_PURE and the plugin, skill and LSP-download flags; sanitizePrTree covers what they did.
 const SANDBOX_FLAGS = {
   OPENCODE_DISABLE_PROJECT_CONFIG: "true",
-  OPENCODE_DISABLE_EXTERNAL_SKILLS: "true",
+  OPENCODE_CONFIG_PROJECT_DISABLE: "true",
   OPENCODE_DISABLE_CLAUDE_CODE: "true",
   OPENCODE_DISABLE_AUTOUPDATE: "true",
   OPENCODE_DISABLE_MODELS_FETCH: "true",
-  OPENCODE_DISABLE_LSP_DOWNLOAD: "true",
-  OPENCODE_DISABLE_DEFAULT_PLUGINS: "true",
-  OPENCODE_PURE: "true",
+  OPENCODE_DISABLE_FREE_MODELS: "true",
+  OPENCODE_DISABLE_FILEWATCHER: "true",
 };
+
+const SYSTEM_ENTRY_KEY = "review-instructions";
+const INTERRUPTED_ERROR = { type: "interrupted", message: "opencode interrupted the run" };
 
 const DEFAULT_REQUEST_HEADERS_TIMEOUT_MS = 30_000;
 const STATUS_POLL_MS = 15_000;
 const STREAM_RETRY_MS = 1_000;
 const TRANSIENT_ERROR_RE = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up|overloaded|rate limit|too many requests|temporarily unavailable|bad gateway|service unavailable|gateway timeout/i;
+// opencode 2.x StructuredError types; the first set is worth a fresh session, the second never is, whatever the message says.
+const TRANSIENT_ERROR_TYPES = new Set(["provider.rate-limit", "provider.transport", "provider.timeout", "provider.internal"]);
+const PERMANENT_ERROR_TYPES = new Set([
+  "provider.auth", "provider.invalid-request", "provider.content-filter", "provider.budget-limit",
+  "provider.model-budget-limit", "provider.quota", "provider.free-limit", "provider.unsupported-operation", "interrupted",
+]);
 
 export class OpencodeError extends Error {
-  constructor(message, { transient = false, name = "OpencodeError", cause } = {}) {
+  constructor(message, { transient = false, permanent = false, name = "OpencodeError", cause } = {}) {
     super(message, cause ? { cause } : undefined);
     this.name = name;
     this.transient = transient;
+    // Set when opencode classified the failure (auth, quota, ...): no message pattern may make it retryable.
+    this.permanent = permanent;
   }
 }
 
+export function resolveOpencodeConfig(name) {
+  const key = name || "default";
+  const config = OPENCODE_CONFIGS[key];
+  if (!config) throw new OpencodeError(`unknown REVIEW_OPENCODE_CONFIG "${key}" (expected ${Object.keys(OPENCODE_CONFIGS).join(" or ")})`);
+  return { name: key, ...config };
+}
+
 export class OpencodeServer {
-  constructor({ binary = process.env.OPENCODE_BIN || "opencode", cwd, configPath, providerKeyVars = [], parentEnv = process.env, startTimeoutMs = 30_000 }) {
+  constructor({ binary = process.env.OPENCODE_BIN || "opencode", cwd, configPath, providerKeyVars = [], parentEnv = process.env, startTimeoutMs = 30_000, readOnly = true }) {
     this.binary = binary;
+    this.readOnly = readOnly;
     this.cwd = cwd;
     this.configPath = configPath;
     this.providerKeyVars = providerKeyVars;
@@ -92,7 +119,7 @@ export class OpencodeServer {
       this.client?.close();
       this.client = null;
     });
-    this.client = new OpencodeClient({ baseUrl, password });
+    this.client = new OpencodeClient({ baseUrl, password, readOnly: this.readOnly });
     return this.client;
   }
 
@@ -107,10 +134,12 @@ export class OpencodeServer {
 }
 
 export class OpencodeClient {
-  constructor({ baseUrl, password, username = "opencode", headersTimeoutMs = DEFAULT_REQUEST_HEADERS_TIMEOUT_MS }) {
+  constructor({ baseUrl, password, username = "opencode", headersTimeoutMs = DEFAULT_REQUEST_HEADERS_TIMEOUT_MS, readOnly = true, statusPollMs = STATUS_POLL_MS }) {
     this.baseUrl = baseUrl;
+    this.statusPollMs = statusPollMs;
     this.auth = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
     this.headersTimeoutMs = headersTimeoutMs;
+    this.readOnly = readOnly;
     this.waiters = new Map();
     this.stream = null;
     this.streamReady = null;
@@ -133,7 +162,13 @@ export class OpencodeClient {
         transient: res.status === 429 || res.status >= 500,
       });
     }
-    return res.text ? JSON.parse(res.text) : null;
+    if (!res.text) return null;
+    try {
+      return JSON.parse(res.text);
+    } catch {
+      // 2.x answers unknown routes (every 1.x path) with its web app's HTML and a 200.
+      throw new OpencodeError(`opencode ${method} ${path} returned non-JSON (${res.text.slice(0, 80)}); is this opencode 2.x?`);
+    }
   }
 
   ensureEventStream() {
@@ -157,55 +192,61 @@ export class OpencodeClient {
   }
 
   dispatch(event) {
-    const props = event?.properties || {};
+    const props = event?.data || {};
     if (event?.type === "permission.asked") {
-      this.rejectPermission(props).catch(() => {});
+      this.answerPermission(props).catch(() => {});
       return;
     }
     const waiter = props.sessionID ? this.waiters.get(props.sessionID) : null;
     if (!waiter) return;
-    if (event.type === "session.idle") waiter.onIdle();
-    else if (event.type === "session.error") waiter.onError(props.error);
+    if (event.type === "session.execution.succeeded") waiter.onIdle();
+    else if (event.type === "session.execution.failed") waiter.onError(props.error);
+    else if (event.type === "session.execution.interrupted") waiter.onError(INTERRUPTED_ERROR);
   }
 
-  async rejectPermission(props) {
-    this.rejectedPermissions += 1;
-    const waiter = this.waiters.get(props.sessionID);
-    if (waiter) waiter.rejectedPermissions += 1;
-    await this.json("POST", `/permission/${encodeURIComponent(props.id)}/reply`, {
-      reply: "reject",
-      message: "Review agents run read-only inside the PR checkout.",
-    });
+  // Read-only reviews reject every prompt; ci-full allows everything in config, so an ask there is approved once.
+  async answerPermission(props) {
+    if (this.readOnly) {
+      this.rejectedPermissions += 1;
+      const waiter = this.waiters.get(props.sessionID);
+      if (waiter) waiter.rejectedPermissions += 1;
+    }
+    await this.json("POST", `/api/session/${encodeURIComponent(props.sessionID)}/permission/${encodeURIComponent(props.id)}/reply`, this.readOnly
+      ? { decision: "reject", message: "Review agents run read-only inside the PR checkout." }
+      : { decision: "once" });
   }
 
-  // Sends the prompt with prompt_async and waits on the event stream, so no request ever blocks for the length of an agent run (undici's 300 s headersTimeout killed every long review).
-  async prompt({ agent, model, variant, system, text, title, timeoutMs, format }) {
+  // Sends the prompt (2.x admits it and returns at once) and waits on the event stream, so no request ever blocks for the length of an agent run (undici's 300 s headersTimeout killed every long review).
+  async prompt({ agent, model, variant, system, text, title, timeoutMs }) {
     await this.ensureEventStream();
-    const session = await this.json("POST", "/session", { title });
+    // 2.x binds agent, model and variant to the session; the prompt itself carries only text.
+    const session = (await this.json("POST", "/api/session", {
+      title,
+      agent,
+      ...(model?.modelID ? { model: { providerID: model.providerID, id: model.modelID, ...(variant ? { variant } : {}) } } : {}),
+    })).data;
     const waiter = new SessionWaiter(this, session.id);
     this.waiters.set(session.id, waiter);
-    // Armed before the POST: a session.error can arrive before prompt_async returns, and nothing would replay it.
-    const finished = waiter.wait(timeoutMs);
     try {
-      await this.json("POST", `/session/${session.id}/prompt_async`, {
-        agent,
-        model,
-        ...(variant ? { variant } : {}),
-        ...(format ? { format } : {}),
-        system,
-        parts: [{ type: "text", text }],
-      });
+      // 2.x has no per-prompt system field; an instruction entry lands in the system prompt as <context key="...">.
+      if (system) {
+        await this.json("PUT", `/api/experimental/session/${session.id}/instructions/entries/${SYSTEM_ENTRY_KEY}`, { value: system });
+      }
+      // Armed before the POST: the run can fail before the prompt call returns, and nothing would replay it.
+      const finished = waiter.wait(timeoutMs);
+      await this.json("POST", `/api/session/${session.id}/prompt`, { text });
       const outcome = await finished;
       if (outcome.timedOut) {
-        await this.request("POST", `/session/${session.id}/abort`).catch(() => {});
+        await this.request("POST", `/api/session/${session.id}/interrupt`).catch(() => {});
         throw new OpencodeError(`opencode agent ${agent} timed out after ${timeoutMs}ms`, { name: "TimeoutError" });
       }
-      const messages = await this.json("GET", `/session/${session.id}/message`);
-      return finalAssistantResult(messages, outcome.error, waiter.rejectedPermissions);
+      const messages = await this.json("GET", `/api/session/${session.id}/message?type=assistant&order=desc&limit=1`);
+      const totals = await this.json("GET", `/api/session/${session.id}`).catch(() => null);
+      return finalAssistantResult(messages?.data, totals?.data, outcome.error, waiter.rejectedPermissions);
     } finally {
       waiter.cancel();
       this.waiters.delete(session.id);
-      await this.request("DELETE", `/session/${session.id}`).catch(() => {});
+      await this.request("DELETE", `/api/session/${session.id}`).catch(() => {});
     }
   }
 
@@ -228,7 +269,7 @@ class SessionWaiter {
   wait(timeoutMs) {
     return new Promise(resolvePromise => {
       const timer = setTimeout(() => finish({ timedOut: true }), timeoutMs);
-      const poll = setInterval(() => this.pollStatus().catch(() => {}), STATUS_POLL_MS);
+      const poll = setInterval(() => this.pollStatus().catch(() => {}), this.client.statusPollMs);
       const finish = outcome => {
         clearTimeout(timer);
         clearInterval(poll);
@@ -244,7 +285,7 @@ class SessionWaiter {
   }
 
   onError(error) {
-    this.settle?.({ timedOut: false, error: error || { name: "UnknownError" } });
+    this.settle?.({ timedOut: false, error: error || { type: "unknown", message: "opencode run failed" } });
   }
 
   onStreamLost() {
@@ -256,18 +297,18 @@ class SessionWaiter {
   }
 
   cancel() {
-    this.settle?.({ timedOut: false, error: { name: "UnknownError", data: { message: "opencode server stopped" } } });
+    this.settle?.({ timedOut: false, error: { type: "unknown", message: "opencode server stopped" } });
   }
 
-  // Safety net for a dropped event stream: idle only counts once the session is known to have finished an assistant turn.
+  // Safety net for a dropped event stream: the session holds one prompt, so its first idle record is the end of that run.
   async pollStatus() {
     if (!this.settle) return;
-    const statuses = await this.client.json("GET", "/session/status");
-    const status = statuses?.[this.sessionID];
-    if (status && status.type !== "idle") return;
-    const messages = await this.client.json("GET", `/session/${this.sessionID}/message`);
-    const last = lastAssistant(messages);
-    if (last && (last.info.time?.completed || last.info.error)) this.onIdle();
+    const idle = await this.client.json("GET", `/api/session/${this.sessionID}/message?type=idle&order=desc&limit=1`);
+    const record = idle?.data?.[0];
+    if (!record) return;
+    if (record.outcome === "succeeded") this.onIdle();
+    else if (record.outcome === "interrupted") this.onError(INTERRUPTED_ERROR);
+    else this.onError(record.error);
   }
 }
 
@@ -289,11 +330,21 @@ export function buildServerEnv({ parentEnv, home, configPath, password, provider
   return env;
 }
 
-// Mirrors opencode's Permission.disabled(): a tool is off when the last rule matching its permission is a "*" deny.
+// opencode 2.x evaluates rules last-match-wins; a tool is usable while some rule after its last blanket deny lets a resource through.
 export function toolEnabled(toolId, ruleset) {
-  const permission = EDIT_TOOL_IDS.has(toolId) ? "edit" : MCP_READ_TOOL_IDS.has(toolId) ? "read" : toolId;
-  const rule = [...ruleset].reverse().find(r => wildcardMatch(permission, r.permission));
-  return !(rule?.pattern === "*" && rule.action === "deny");
+  const rules = ruleset.filter(r => wildcardMatch(permissionAction(toolId), r.action));
+  const lastDeny = rules.findLastIndex(r => r.resource === "*" && r.effect === "deny");
+  return lastDeny === -1 || rules.slice(lastDeny + 1).some(r => r.effect !== "deny");
+}
+
+// True when the last rule for the tool allows every resource, so it runs without a permission prompt.
+export function toolAllowedWithoutAsking(toolId, ruleset) {
+  const rule = ruleset.findLast(r => wildcardMatch(permissionAction(toolId), r.action));
+  return rule?.resource === "*" && rule.effect === "allow";
+}
+
+function permissionAction(toolId) {
+  return EDIT_TOOL_IDS.has(toolId) ? "edit" : toolId;
 }
 
 export function wildcardMatch(input, pattern) {
@@ -304,14 +355,26 @@ export function wildcardMatch(input, pattern) {
   return new RegExp(`^${escaped}$`, "s").test(input);
 }
 
-export async function selfCheck(client, expectedAgents) {
-  const toolIds = await client.json("GET", "/experimental/tool/ids");
-  const unknownTools = toolIds.filter(id => !BUILTIN_TOOL_IDS.has(id));
-  if (unknownTools.length > 0) {
-    throw new OpencodeError(`opencode loaded non-built-in tools (${unknownTools.join(", ")}); refusing to review`);
+// 2.x lists no tool ids, so loaded code is checked at its sources: only built-in plugins, no MCP servers, and the
+// plugin behind every tool the config grants must be active. readOnly (the default config) also proves every agent
+// is read/glob/grep only; ci-full proves the full grant took effect.
+export async function selfCheck(client, expectedAgents, { readOnly = true } = {}) {
+  // Agents first: 2.x loads a directory's plugins on its first request, and an empty plugin list proves nothing.
+  const agents = (await client.json("GET", "/api/agent"))?.data || [];
+  const plugins = (await client.json("GET", "/api/plugin"))?.data || [];
+  const foreign = plugins.filter(p => p.source?.type !== "builtin");
+  if (foreign.length > 0) {
+    throw new OpencodeError(`opencode loaded non-built-in plugins (${foreign.map(p => p.id || p.source?.path || p.source?.target).join(", ")}); refusing to review`);
   }
-  const agents = await client.json("GET", "/agent");
-  const byName = new Map(agents.map(agent => [agent.name, agent]));
+  const broken = plugins.filter(p => p.state?.status !== "active");
+  if (broken.length > 0) throw new OpencodeError(`opencode plugins failed to load: ${broken.map(p => `${p.id}: ${p.state?.error || "unknown"}`).join("; ")}`);
+  const active = new Set(plugins.map(p => p.id));
+  const missing = (readOnly ? [...ALLOWED_TOOL_IDS] : CI_FULL_TOOL_IDS).filter(id => !active.has(`opencode.tool.${id}`));
+  if (missing.length > 0) throw new OpencodeError(`opencode tools did not load: ${missing.join(", ")}`);
+  const mcp = (await client.json("GET", "/api/mcp"))?.data || [];
+  if (mcp.length > 0) throw new OpencodeError(`opencode loaded MCP servers; refusing to review`);
+
+  const byName = new Map(agents.map(agent => [agent.id, agent]));
   const problems = [];
   for (const name of expectedAgents) {
     const agent = byName.get(name);
@@ -319,27 +382,31 @@ export async function selfCheck(client, expectedAgents) {
       problems.push(`${name}: not registered`);
       continue;
     }
-    for (const toolId of toolIds) {
-      const enabled = toolEnabled(toolId, agent.permission || []);
-      if (enabled !== ALLOWED_TOOL_IDS.has(toolId)) problems.push(`${name}: ${toolId} ${enabled ? "allowed" : "denied"}`);
+    const ruleset = agent.permissions || [];
+    if (readOnly) {
+      for (const toolId of BUILTIN_TOOL_IDS) {
+        const enabled = toolEnabled(toolId, ruleset);
+        if (enabled !== ALLOWED_TOOL_IDS.has(toolId)) problems.push(`${name}: ${toolId} ${enabled ? "allowed" : "denied"}`);
+      }
+      const problem = externalDirectoryProblem(ruleset);
+      if (problem) problems.push(`${name}: ${problem}`);
+    } else {
+      for (const toolId of CI_FULL_TOOL_IDS) {
+        if (!toolAllowedWithoutAsking(toolId, ruleset)) problems.push(`${name}: ${toolId} not fully allowed`);
+      }
     }
-    const problem = externalDirectoryProblem(agent.permission || []);
-    if (problem) problems.push(`${name}: ${problem}`);
   }
   if (problems.length > 0) throw new OpencodeError(`opencode permission self-check failed: ${problems.join("; ")}`);
-  return { toolIds, agents: expectedAgents.length };
+  return { toolIds: [...BUILTIN_TOOL_IDS], agents: expectedAgents.length, plugins: plugins.length };
 }
 
-// Rules before the last blanket deny are overridden (last match wins); after it only opencode's own truncation dir may be allowed.
+// Rules before the last blanket deny are overridden (last match wins); nothing after it may allow a directory.
 export function externalDirectoryProblem(ruleset) {
-  const applies = r => wildcardMatch("external_directory", r.permission);
-  let lastDeny = -1;
-  ruleset.forEach((r, i) => {
-    if (applies(r) && r.pattern === "*" && r.action === "deny") lastDeny = i;
-  });
+  const applies = r => wildcardMatch("external_directory", r.action);
+  const lastDeny = ruleset.findLastIndex(r => applies(r) && r.resource === "*" && r.effect === "deny");
   if (lastDeny === -1) return "external_directory is not denied";
-  const extra = ruleset.slice(lastDeny + 1).filter(r => applies(r) && r.action !== "deny" && !r.pattern.endsWith("/tool-output/*"));
-  return extra.length > 0 ? `external_directory allows ${extra.map(r => r.pattern).join(", ")}` : "";
+  const extra = ruleset.slice(lastDeny + 1).filter(r => applies(r) && r.effect !== "deny");
+  return extra.length > 0 ? `external_directory allows ${extra.map(r => r.resource).join(", ")}` : "";
 }
 
 // A retry must leave room for its own full timeout plus whatever still has to run after it (the coordinator).
@@ -349,47 +416,55 @@ export function shouldRetry({ err, attempt, maxRetries, remainingMs, timeoutMs, 
 
 export function isTransientError(err) {
   if (!err) return false;
-  if (err.name === "TimeoutError") return false;
+  if (err.name === "TimeoutError" || err.permanent) return false;
   if (err.transient) return true;
   return TRANSIENT_ERROR_RE.test(err.message || "");
 }
 
-export function extractText(parts) {
-  return (parts || [])
+export function extractText(content) {
+  return (content || [])
     .filter(p => p.type === "text" && !p.synthetic)
     .map(p => p.text || "")
     .join("\n")
     .trim();
 }
 
-function lastAssistant(messages) {
-  return [...(messages || [])].reverse().find(m => m?.info?.role === "assistant") || null;
-}
-
-function finalAssistantResult(messages, streamError, rejectedPermissions) {
-  const last = lastAssistant(messages);
-  const error = last?.info?.error || streamError;
+// messages is newest-first; totals is the session, whose cost and tokens cover every step of the run.
+function finalAssistantResult(messages, totals, streamError, rejectedPermissions) {
+  const last = (messages || []).find(m => m?.type === "assistant") || null;
+  const error = last?.error || streamError;
   if (error) throw agentError(error);
   if (!last) throw new OpencodeError("opencode finished without an assistant message");
   return {
-    info: last.info,
-    text: extractText(last.parts),
-    structured: last.info.structured,
-    responseId: last.info.id || "",
+    info: {
+      id: last.id,
+      modelID: last.model?.id,
+      finish: last.finish,
+      cost: totals?.cost ?? last.cost,
+      tokens: totals?.tokens ?? last.tokens,
+    },
+    text: extractText(last.content),
+    structured: undefined,
+    responseId: last.id || "",
     rejectedPermissions,
   };
 }
 
+// Accepts 2.x StructuredError ({ type, message, status }) and the 1.x { name, data } shape.
 function agentError(error) {
   const data = error.data || {};
-  const message = data.message || error.message || error.name || JSON.stringify(error).slice(0, 500);
-  const status = Number(data.statusCode);
-  const transient = data.isRetryable === true || status === 429 || status >= 500 || TRANSIENT_ERROR_RE.test(message);
-  return new OpencodeError(`opencode agent error (${error.name || "unknown"}): ${message}`, { transient });
+  const message = error.message || data.message || error.type || error.name || JSON.stringify(error).slice(0, 500);
+  const status = Number(error.status ?? data.statusCode);
+  const kind = error.type || error.name || "unknown";
+  const permanent = PERMANENT_ERROR_TYPES.has(kind);
+  const transient = !permanent && (TRANSIENT_ERROR_TYPES.has(kind)
+    || data.isRetryable === true || status === 429 || status >= 500 || TRANSIENT_ERROR_RE.test(message));
+  return new OpencodeError(`opencode agent error (${kind}): ${message}`, { transient, permanent });
 }
 
 function waitForListening(proc, timeoutMs, stderrTail) {
-  const pattern = /opencode server listening on (http:\/\/[^\s]+)/;
+  // 2.x prints "server listening on ..."; 1.x prefixed it with "opencode ".
+  const pattern = /server listening on (http:\/\/[^\s]+)/;
   return new Promise((resolvePromise, rejectPromise) => {
     let buf = "";
     const onData = chunk => {
@@ -453,7 +528,7 @@ export function httpRequest(baseUrl, method, path, { body, auth, headersTimeoutM
 }
 
 export function openEventStream(baseUrl, auth, { onOpen, onEvent, onClose, headersTimeoutMs = DEFAULT_REQUEST_HEADERS_TIMEOUT_MS }) {
-  const url = new URL("/event", baseUrl);
+  const url = new URL("/api/event", baseUrl);
   let closed = false;
   const parser = createSseParser(onEvent);
   const req = http.request(url, {
@@ -464,7 +539,7 @@ export function openEventStream(baseUrl, auth, { onOpen, onEvent, onClose, heade
     clearTimeout(timer);
     if (res.statusCode !== 200) {
       res.resume();
-      finish(new OpencodeError(`opencode GET /event failed ${res.statusCode}`));
+      finish(new OpencodeError(`opencode GET /api/event failed ${res.statusCode}`));
       return;
     }
     onOpen();
@@ -473,7 +548,7 @@ export function openEventStream(baseUrl, auth, { onOpen, onEvent, onClose, heade
     res.on("end", () => finish(null));
     res.on("error", err => finish(err));
   });
-  const timer = setTimeout(() => req.destroy(new OpencodeError("opencode GET /event: no response headers")), headersTimeoutMs);
+  const timer = setTimeout(() => req.destroy(new OpencodeError("opencode GET /api/event: no response headers")), headersTimeoutMs);
   const finish = err => {
     if (closed) return;
     closed = true;

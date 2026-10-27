@@ -43,20 +43,22 @@ A PR must never be able to run code next to the review secrets or weaken its own
 
 | Layer | What it does |
 |-------|--------------|
-| `pull_request_target` | The workflow file and the engine always come from `main`. A PR's edits to `scripts/ai-review/**`, `opencode.jsonc` or the workflow take effect only after merge. |
-| Two checkouts | `./engine` = `main` (sparse: this directory, `opencode.jsonc`, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
+| `pull_request_target` | The workflow file and the engine always come from `main`. A PR's edits to `scripts/ai-review/**`, `opencode.jsonc`, `opencode.ci.jsonc` or the workflow take effect only after merge. |
+| Two checkouts | `./engine` = `main` (sparse: this directory, the opencode configs, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
 | `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md`, or `CLAUDE.md` where a directory has no `AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
-| `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` from `./engine`), the `OPENCODE_DISABLE_*` flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
-| `opencode.jsonc` permissions | Each `ai-review-*` agent: `"*": "deny"`, then allow `read`, `glob`, `grep`; `external_directory` denied. LSP, formatters, snapshots and sharing are off. |
-| Startup self-check | Refuses to review if `GET /experimental/tool/ids` lists any non-built-in tool, or any agent resolves to allow for a tool other than `read`/`glob`/`grep`. Permission prompts during a run are rejected. |
+| `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` or `opencode.ci.jsonc` from `./engine`), the `OPENCODE_*` disable flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
+| Config selection | `REVIEW_OPENCODE_CONFIG` = `default` (`opencode.jsonc`) or `ci-full` (`opencode.ci.jsonc`); any other value stops the run. The workflow sets `ci-full`. |
+| `opencode.jsonc` permissions | Each `ai-review-*` agent: deny `*`, then allow `read`, `glob`, `grep`; `external_directory` denied. A `provider.use` policy allows only `deepseek-review`. LSP, formatters, snapshots and sharing are off. |
+| `opencode.ci.jsonc` permissions | Same provider, model and agents, but each agent allows `*`: shell, edit, write and webfetch run with no prompt. The PR checkout is untrusted input to an agent that can run commands, and the provider key is in the opencode process environment, so a shell command can read it. |
+| Startup self-check | Refuses to review if any agent is missing, any non-built-in plugin or MCP server loaded, or a granted tool's plugin is not active. Under `default` it also refuses any agent that resolves to allow a tool other than `read`/`glob`/`grep` or any outside directory; under `ci-full` it refuses an agent that does not allow every tool without asking. Permission prompts are rejected under `default` and approved once under `ci-full`. |
 | `src/comments.mjs` | The previous review is only ever a marker comment by the reviewer app (`REVIEW_BOT_LOGIN` = `<app-slug>[bot]`), read across every page; anyone else's comment carrying the marker is never fed to the reviewers or edited. When the app token cannot be minted the review posts as `github-actions[bot]`, which any same-repo PR workflow can also post as, so that run uses no previous review and posts a fresh comment. |
 | `src/scrub.mjs` | Before posting: redacts values of secret-named env vars and token-shaped strings (inside code too), breaks forged `<!-- o2-review` markers, and neutralises `@mentions` outside code. |
 
-Sanitize is load-bearing, not belt and braces: opencode 1.18.x still imports plugins from a
-project `.opencode/plugin(s)/` directory at prompt time even with
-`OPENCODE_DISABLE_PROJECT_CONFIG` set, and reads `AGENTS.md`-style files from every ancestor of a
-file it reads. `test/integration/opencode-sandbox.test.mjs` plants every loader and proves the
-combination holds.
+Sanitize is load-bearing, not belt and braces: opencode 1.18.x imported plugins from a project
+`.opencode/plugin(s)/` directory at prompt time even with `OPENCODE_DISABLE_PROJECT_CONFIG` set.
+2.2.0 no longer does in our tests, but 2.x dropped `OPENCODE_PURE` and the plugin and skill flags,
+so nothing pins that. `test/integration/opencode-sandbox.test.mjs` plants every loader and proves
+the combination holds.
 
 Fork PRs are skipped (they would need the on-request review of v2). Diffs over the API limit are
 rebuilt locally from the merge base, which the workflow fetches into `./pr`; the local diff
@@ -64,14 +66,18 @@ ignores the PR's `.gitattributes` (`--no-ext-diff --no-textconv --text`).
 
 ### opencode transport and pin
 
-The engine never makes a request that waits for an agent run. It sends `prompt_async`, follows
-`session.idle` / `session.error` on the `/event` stream (with a status poll as a safety net), then
-reads the messages. The old blocking `POST /session/:id/message` died at undici's 300 s
-`headersTimeout` on every long run ("fetch failed"). A timed-out agent is aborted server-side;
-transient provider errors are retried at most twice, each in a fresh session.
+The engine targets the opencode 2.x API under `/api`. It never makes a request that waits for an
+agent run: it creates a session bound to the agent, model and variant, puts the system prompt in a
+session instruction entry, sends `POST /api/session/:id/prompt` (which returns once the prompt is
+admitted), follows `session.execution.succeeded` / `failed` / `interrupted` on `/api/event` (with a
+poll for the session's idle record as a safety net), then reads the last assistant message. A
+blocking request that waits for the run dies at undici's 300 s `headersTimeout` ("fetch failed").
+A timed-out agent is interrupted server-side; transient provider errors are retried at most twice,
+each in a fresh session.
 
 The binary is pinned in `opencode-pin.env` and installed by `install-opencode.sh`, which verifies
-the release asset's SHA-256. Bump both lines together, to a 1.x release at least 14 days old.
+the release asset's SHA-256. Bump both lines together, to a release at least 14 days old (waived
+once, for 2.2.0).
 
 ## Setup: the `ai-review` environment (admin, one-time)
 
@@ -153,7 +159,7 @@ Actually executing the suite stays with `playwright.yml`; this agent only reads.
 
 Adding another conditional agent: define it in `AGENTS` (with `requiresFocus` if it is
 domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, register
-`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its glyph to
+`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy and in `opencode.ci.jsonc` with the allow-all one, and add its glyph to
 `CATEGORY_GLYPH` and to `agents/coordinator.md`.
 
 ## Identity: how the comment gets its author
@@ -193,8 +199,8 @@ This is **fail-safe at every stage**:
    *Any account* to install on org repos). Name: `OpenObserve Code Reviewer`; upload the brand
    logo as the avatar; **uncheck Webhook → Active** (no server, no events).
 2. **Permissions (minimum):** Pull requests **Read & write**, Contents **Read-only**, Metadata
-   **Read-only**. **Do NOT grant Contents write** — the review agents are read-only by design and
-   the token must not be write-capable.
+   **Read-only**. **Do NOT grant Contents write** — the review agents never see this token, and it
+   must not be write-capable.
 3. **Install** the App on `openobserve` and `o2-enterprise`.
 4. **Generate a private key** (`.pem`) and note the numeric **App ID**.
 5. **Set on both repos** (or at org level), under *Settings → Secrets and variables → Actions*:

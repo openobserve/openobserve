@@ -279,6 +279,8 @@ jobs:
           REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
+          # opencode.ci.jsonc: every tool (shell, edit, webfetch) allowed with no prompts; "default" is the read-only opencode.jsonc.
+          REVIEW_OPENCODE_CONFIG: ci-full
           # Empty under the github.token fallback: any workflow a same-repo PR adds can also post as github-actions[bot].
           REVIEW_BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
           # Review-only key held in the ai-review environment (the org-wide key is readable by any same-repo PR workflow).

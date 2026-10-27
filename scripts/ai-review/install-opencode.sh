@@ -15,7 +15,9 @@ echo "${OPENCODE_SHA256}  $tmp/opencode.tar.gz" | sha256sum --check --strict -
 
 mkdir -p "$dest"
 tar -xzf "$tmp/opencode.tar.gz" -C "$dest" opencode
-installed="$("$dest/opencode" --version)"
+# 2.x prints "opencode v2.2.0" (1.x printed a bare "1.18.35"): keep the last word and drop the "v".
+installed="$("$dest/opencode" --version | awk '{ print $NF }')"
+installed="${installed#v}"
 if [ "$installed" != "$OPENCODE_VERSION" ]; then
   echo "::error::installed opencode $installed, expected $OPENCODE_VERSION" >&2
   exit 1

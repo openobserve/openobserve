@@ -23,7 +23,7 @@ import {
   rightSideLines,
   selectInlineComments,
 } from "./src/inline.mjs";
-import { OpencodeServer, selfCheck, shouldRetry } from "./src/opencode.mjs";
+import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { fetchDiff, prefixDiffPaths } from "./src/pr-diff.mjs";
 import { failedReviewersNote, insertAfterCallout, mapStrings } from "./src/report.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
@@ -35,7 +35,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ENGINE_DIR is the trusted base-branch checkout; PR_DIR is the PR head, which is data only and never executed.
 const ENGINE_DIR = resolve(process.env.ENGINE_DIR || resolve(__dirname, "../.."));
 const PR_DIR = process.env.PR_DIR ? resolve(process.env.PR_DIR) : "";
-const OPENCODE_CONFIG_PATH = resolve(ENGINE_DIR, "opencode.jsonc");
+// REVIEW_OPENCODE_CONFIG: "default" (opencode.jsonc, read-only tools) or "ci-full" (opencode.ci.jsonc, every tool allowed).
+const OPENCODE_CONFIG = resolveOpencodeConfig(process.env.REVIEW_OPENCODE_CONFIG);
+const OPENCODE_CONFIG_PATH = resolve(ENGINE_DIR, OPENCODE_CONFIG.file);
 // A same-named PR in another repo reviewed together with this one (the OSS side of an ENT pair).
 const PAIRED = {
   repo: process.env.PAIRED_REPO || "",
@@ -726,6 +728,7 @@ const OPENCODE = new OpencodeServer({
   cwd: PR_DIR || ENGINE_DIR,
   configPath: OPENCODE_CONFIG_PATH,
   providerKeyVars: [API_KEY_VAR_NAME],
+  readOnly: OPENCODE_CONFIG.readOnly,
 });
 const MAX_TRANSIENT_RETRIES = 2;
 const selfChecks = new WeakMap();
@@ -738,8 +741,9 @@ async function opencodeClient() {
   if (!apiKey()) throw new Error(`${API_KEY_VAR_NAME} not set`);
   const client = await OPENCODE.ensureStarted();
   if (!selfChecks.has(client)) {
-    const check = selfCheck(client, reviewOpencodeAgents()).then(result => {
-      console.log(`[${isoNow()}] opencode self-check passed: ${result.toolIds.length} tools known, only read/glob/grep allowed for ${result.agents} agents`);
+    const check = selfCheck(client, reviewOpencodeAgents(), { readOnly: OPENCODE_CONFIG.readOnly }).then(result => {
+      const grant = OPENCODE_CONFIG.readOnly ? "only read/glob/grep allowed" : "every tool allowed (ci-full)";
+      console.log(`[${isoNow()}] opencode self-check passed: ${result.plugins} built-in plugins, ${grant} for ${result.agents} agents`);
       return result;
     });
     selfChecks.set(client, check);

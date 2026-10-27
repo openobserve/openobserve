@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/ai-review/**"
       - "opencode.jsonc"
+      - "opencode.ci.jsonc"
       - ".github/workflows/ai-code-review.yml"
       - ".github/workflows/ai-review-tests.yml"
     types: [opened, synchronize, reopened, labeled, ready_for_review]
