@@ -78,6 +78,7 @@ import {
   createSeriesOverrideLookup,
   gaugeOverrideTooltip,
 } from "./seriesOverrides";
+import { applyChartStyleOptions } from "./seriesStyleOverrides";
 import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChartSeriesProps";
@@ -444,6 +445,7 @@ export const convertPromQLData = async (
       });
 
       if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);
+      if (result.options) applyChartStyleOptions(result.options, panelSchema);
       if (result.options) fitStackedAxisBounds(panelSchema.type, result.options);
       if (result.options) applyLineAreaThresholds(result.options, panelSchema);
 
@@ -1664,6 +1666,7 @@ export const convertPromQLData = async (
   // console.timeEnd("convertPromQLData");
   // Override colours first: a threshold step outranks them and recolours on top.
   applySeriesOverrides(options, panelSchema, store.state.theme);
+  applyChartStyleOptions(options, panelSchema);
   fitStackedAxisBounds(panelSchema.type, options);
   applyLineAreaThresholds(options, panelSchema);
   // Reserve measured left space so wide y-axis labels don't clip.

@@ -283,7 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <AddUser
-      v-model:open="showAddUserDialog"
+      :open="showAddUserDialog"
+      @update:open="onAddUserOpenChange"
       v-model="selectedUser"
       :isUpdated="isUpdated"
       :userRole="currentUserRole"
@@ -1117,6 +1118,8 @@ export default defineComponent({
       showUpdateUserDialog.value = true;
     };
 
+    let openAddUserTimer: ReturnType<typeof setTimeout> | undefined;
+
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       selectedUser.value.organization = store.state.selectedOrganization.identifier;
@@ -1133,7 +1136,8 @@ export default defineComponent({
       } else {
         selectedUser.value = {};
       }
-      setTimeout(() => {
+      clearTimeout(openAddUserTimer);
+      openAddUserTimer = setTimeout(() => {
         showAddUserDialog.value = true;
       }, 100);
     };
@@ -1227,6 +1231,7 @@ export default defineComponent({
     };
 
     const hideForm = () => {
+      clearTimeout(openAddUserTimer);
       showAddUserDialog.value = false;
       router.replace({
         name: "users",
@@ -1234,6 +1239,11 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
+
+    const onAddUserOpenChange = (open: boolean) => {
+      if (open) showAddUserDialog.value = true;
+      else hideForm();
     };
 
     const addMember = async (res: any, data: any, operationType: string) => {
@@ -1576,6 +1586,7 @@ export default defineComponent({
       addRoutePush,
       addMember,
       hideForm,
+      onAddUserOpenChange,
       isUpdated,
       showAddUserDialog,
       selectedUser,

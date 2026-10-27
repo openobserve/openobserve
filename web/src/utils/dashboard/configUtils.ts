@@ -198,6 +198,17 @@ export const shouldShowNoValueReplacement = (
   );
 };
 
+/** True for panels that draw a "No Data" state the user can reword; HTML and Markdown panels show none. */
+export const shouldShowNoDataText = (dashboardPanelData: any): boolean =>
+  !["html", "markdown"].includes(dashboardPanelData?.data?.type);
+
+/** A typed minimum interval as stored: a positive number, or null for automatic. */
+export const toMinInterval = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 /**
  * Check if connect nulls toggle, show symbol select, and line interpolation select should be displayed
  * Used by: connect_nulls toggle, show_symbol select, line_interpolation select
