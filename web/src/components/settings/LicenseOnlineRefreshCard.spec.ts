@@ -503,4 +503,29 @@ describe("clicked outcome versus newer server attempts", () => {
     await w.setProps({ refresh: blocked(atSecond(1792748620)) });
     expect(outcomeText(w)).toContain("blocked");
   });
+
+  describe.each([
+    ["a lost response", { ok: false }],
+    ["an HTTP 500", { ok: false, status: 500, body: { error: "boom" } }],
+    ["an HTTP 403", { ok: false, status: 403 }],
+  ])("a click that failed with %s", (_name, failure) => {
+    it("gives way only to an attempt newer than the pre-click one", async () => {
+      vi.setSystemTime(1792748530000);
+      refresh.mockResolvedValue(failure);
+      const w = card({ last_outcome: { outcome: "unchanged" } });
+      await w.get('[data-test="license-online-refresh"]').trigger("click");
+      await flushPromises();
+      const clicked = outcomeText(w);
+      expect(clicked).not.toBe("License is up to date");
+      await w.setProps({ refresh: blocked(atSecond(1792748460)) });
+      expect(outcomeText(w)).toBe(clicked);
+      await w.setProps({
+        refresh: status({
+          last_attempt_at: atSecond(1792748520),
+          last_outcome: { outcome: "unchanged" },
+        }),
+      });
+      expect(outcomeText(w)).toBe("License is up to date");
+    });
+  });
 });
