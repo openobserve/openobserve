@@ -656,9 +656,15 @@ export default class DashboardactionPage {
 
   // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
   async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    const names = (await this.getChartSeries(scopeSelector)).map((s) => s.name).filter(Boolean);
+    return [...new Set(names)];
+  }
+
+  // Each series' name and plotted values (the last coordinate of a point), read from the live ECharts instance.
+  async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
     return this.page.evaluate((scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const names = new Set();
+      const series = [];
       const visited = new Set();
       const walk = (node, depth) => {
         if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
@@ -680,7 +686,12 @@ export default class DashboardactionPage {
             scopes.some((scope) => scope.contains(host))
           ) {
             try {
-              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+              for (const s of chart.getOption()?.series ?? []) {
+                const values = (s?.data ?? []).map((point) =>
+                  Array.isArray(point) ? point[point.length - 1] : (point?.value ?? point),
+                );
+                series.push({ name: s?.name ? String(s.name) : "", values });
+              }
             } catch {
               // A disposed instance throws; it draws nothing anyway.
             }
@@ -691,7 +702,7 @@ export default class DashboardactionPage {
         if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
       };
       walk(document.querySelector("#app")?._vnode, 0);
-      return [...names];
+      return series;
     }, scopeSelector);
   }
 

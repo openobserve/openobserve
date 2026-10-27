@@ -45,6 +45,7 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import { applyHeatmapTimePointer, sqlHeatmapTimeAxis } from "@/utils/dashboard/heatmapTimeAxis";
 import { escapeHtml } from "@/utils/html";
+import { spansStreamLifetime } from "@/utils/dashboard/streamLifetime";
 import { gt } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 
@@ -356,6 +357,7 @@ function histogramTimeField(panelSchema: any, store: any): any {
 }
 
 function queryRangeMs(ctx: SQLContext): [number, number] {
+  if (spansStreamLifetime(ctx?.panelSchema)) return [NaN, NaN];
   return [
     Number(ctx?.metadata?.queries?.[0]?.startTime) / 1000,
     Number(ctx?.metadata?.queries?.[0]?.endTime) / 1000,

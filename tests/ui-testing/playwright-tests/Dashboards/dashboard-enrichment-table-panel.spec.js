@@ -77,12 +77,31 @@ async function expectFirstColumn(page, values) {
   await expect.poll(() => firstColumn(page), { timeout: 30000 }).toEqual([...values].sort());
 }
 
-async function openOnLastWeek(page) {
+// Resolves with the panel request's own range, so a test can prove the dashboard really ran on last week.
+async function openOnLastWeek(page, tableName) {
+  const from = Date.now() - 2 * WEEK_MS;
+  const to = Date.now() - WEEK_MS;
   const url = new URL(page.url());
   url.searchParams.delete("period");
-  url.searchParams.set("from", String(Date.now() - 2 * WEEK_MS));
-  url.searchParams.set("to", String(Date.now() - WEEK_MS));
+  url.searchParams.set("from", String(from));
+  url.searchParams.set("to", String(to));
+  const panelRequest = page.waitForRequest(
+    (req) => req.url().includes("/_search_stream") && (req.postData() || "").includes(tableName),
+    { timeout: 30000 },
+  );
   await page.goto(url.toString());
+  const { query } = (await panelRequest).postDataJSON();
+  expect(query.start_time).toBeGreaterThanOrEqual((from - 60000) * 1000);
+  expect(query.end_time).toBeLessThanOrEqual((to + 60000) * 1000);
+}
+
+async function expectPlottedCount(pm, count) {
+  const plotted = async () =>
+    (await pm.dashboardPanelActions.getChartSeries())
+      .flatMap((series) => series.values)
+      .filter((value) => value !== null && value !== undefined && value !== "-")
+      .reduce((sum, value) => sum + Number(value), 0);
+  await expect.poll(plotted, { timeout: 30000 }).toBe(count);
 }
 
 async function addEnrichmentPanel(page, pm, dashboardName, tableName, chartType) {
@@ -125,7 +144,7 @@ test.describe("Dashboard panel on an enrichment table", () => {
       await pm.dashboardPanelActions.savePanel();
       await pm.dashboardPanelActions.waitForTablePanelWithData(30000);
 
-      await openOnLastWeek(page);
+      await openOnLastWeek(page, tableName);
       await pm.dashboardPanelActions.waitForTablePanelWithData(30000);
       await expectFirstColumn(page, ["Germany", "India", "USA"]);
       testLogger.info("Enrichment table panel renders on a range before the upload");
@@ -157,7 +176,7 @@ test.describe("Dashboard panel on an enrichment table", () => {
   );
 
   test(
-    "TC-ENR-003: builder bar chart with the default fields renders",
+    "TC-ENR-003: builder bar chart with the default fields renders, also on a range before the upload",
     { tag: ["@dashboard-enrichment-table", "@P1"] },
     async ({ page }) => {
       const pm = new PageManager(page);
@@ -169,8 +188,13 @@ test.describe("Dashboard panel on an enrichment table", () => {
       await pm.dashboardPanelActions.verifyChartRenders(expect);
       await expect(pm.dashboardPanelActions.getNoDataLocator()).toBeHidden({ timeout: 30000 });
       await pm.dashboardPanelActions.verifyChartHasData(expect);
+      await expectPlottedCount(pm, 3);
 
       await pm.dashboardPanelActions.savePanel();
+      await openOnLastWeek(page, tableName);
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await expectPlottedCount(pm, 3);
+
       await cleanupTestDashboard(page, pm, dashboardName);
     },
   );

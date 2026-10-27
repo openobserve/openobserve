@@ -522,7 +522,7 @@ function onStreamChange(val: SelectModelValue) {
 
 // ── Stream type options ────────────────────────────────────────────────
 
-// The logs Build and Visualize pages force stream_type to logs, so only the dashboard editor offers more.
+// Only a dashboard panel searches an enrichment table over its whole lifetime, so only it offers one.
 const streamTypeOptions = computed(() =>
   [
     "logs",

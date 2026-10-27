@@ -16,7 +16,11 @@
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,
     TIMESTAMP_COL_NAME,
-    meta::{sql::TableReferenceExt, stream::StreamType},
+    meta::{
+        search::SearchEventType,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
+        stream::StreamType,
+    },
     utils::time::now_micros,
 };
 use hashbrown::HashMap;
@@ -144,20 +148,39 @@ pub async fn validate_query_fields(
     Ok(())
 }
 
-/// Whole-table time range for an enrichment-table search, `None` for any other stream type.
+/// Whole-table time range for a dashboard or report search on enrichment tables only.
 pub async fn enrichment_table_time_range(
     org_id: &str,
     stream_type: StreamType,
-    stream_names: &[String],
+    search_type: Option<SearchEventType>,
+    sql: &str,
 ) -> Option<(i64, i64)> {
-    if stream_type != StreamType::EnrichmentTables {
+    if stream_type != StreamType::EnrichmentTables
+        || !matches!(
+            search_type,
+            Some(SearchEventType::Dashboards | SearchEventType::Reports)
+        )
+    {
         return None;
     }
-    let mut start_times = Vec::with_capacity(stream_names.len());
-    for name in stream_names {
-        start_times.push(db::enrichment_table::get_start_time(org_id, name).await);
+    let tables = resolve_stream_names_with_type(sql).ok()?;
+    // Joining another stream type keeps the request range, else that stream scans all history.
+    if tables
+        .iter()
+        .any(|t| t.get_stream_type(stream_type) != StreamType::EnrichmentTables)
+    {
+        return None;
     }
-    Some(full_table_range(&start_times, now_micros()))
+    let mut bounds = Vec::with_capacity(tables.len());
+    for table in &tables {
+        let name = table.stream_name();
+        let start = db::enrichment_table::get_start_time(org_id, &name).await;
+        let end = db::enrichment_table::get_meta_table_stats(org_id, &name)
+            .await
+            .map_or(0, |stats| stats.end_time);
+        bounds.push((start, end));
+    }
+    Some(full_table_range(&bounds, now_micros()))
 }
 
 /// Checks if a field is a system field that should always be allowed
@@ -169,13 +192,17 @@ fn is_system_field(field: &str) -> bool {
         || field == ALL_VALUES_COL_NAME
 }
 
-fn full_table_range(start_times: &[i64], now: i64) -> (i64, i64) {
-    let start = start_times.iter().copied().min().unwrap_or(now).min(now);
-    if start == now {
-        (start - 1, now + 1)
-    } else {
-        (start, now)
-    }
+// The end covers rows stamped ahead of this node's clock, as the range is half-open.
+fn full_table_range(bounds: &[(i64, i64)], now: i64) -> (i64, i64) {
+    let start = bounds.iter().map(|&(start, _)| start).min().unwrap_or(now);
+    let end = bounds
+        .iter()
+        .map(|&(_, end)| end + 1)
+        .max()
+        .unwrap_or(now)
+        .max(now)
+        .max(start + 1);
+    (start, end)
 }
 
 /// Guard that cancels an in-flight streaming search when the HTTP response is
@@ -252,29 +279,50 @@ mod tests {
 
     #[test]
     fn test_full_table_range_spans_earliest_start_to_now() {
-        assert_eq!(full_table_range(&[300, 100, 200], 1_000), (100, 1_000));
+        assert_eq!(
+            full_table_range(&[(300, 400), (100, 200), (200, 0)], 1_000),
+            (100, 1_000)
+        );
     }
 
     #[test]
-    fn test_full_table_range_widens_equal_bounds() {
-        assert_eq!(full_table_range(&[1_000], 1_000), (999, 1_001));
+    fn test_full_table_range_covers_rows_ahead_of_now() {
+        assert_eq!(full_table_range(&[(900, 1_500)], 1_000), (900, 1_501));
+        assert_eq!(full_table_range(&[(5_000, 0)], 1_000), (5_000, 5_001));
     }
 
     #[test]
-    fn test_full_table_range_without_tables_or_with_future_start() {
-        assert_eq!(full_table_range(&[], 1_000), (999, 1_001));
-        assert_eq!(full_table_range(&[5_000], 1_000), (999, 1_001));
+    fn test_full_table_range_without_tables() {
+        assert_eq!(full_table_range(&[], 1_000), (1_000, 1_001));
     }
 
     #[tokio::test]
-    async fn test_enrichment_table_time_range_skips_other_stream_types() {
-        let names = vec!["t".to_string()];
+    async fn test_enrichment_table_time_range_skips_other_requests() {
+        let sql = r#"SELECT * FROM "t""#;
+        let dashboards = Some(SearchEventType::Dashboards);
         for stream_type in [StreamType::Logs, StreamType::Metrics, StreamType::Traces] {
             assert_eq!(
-                enrichment_table_time_range("org", stream_type, &names).await,
+                enrichment_table_time_range("org", stream_type, dashboards, sql).await,
                 None
             );
         }
+        for search_type in [
+            None,
+            Some(SearchEventType::UI),
+            Some(SearchEventType::Alerts),
+        ] {
+            assert_eq!(
+                enrichment_table_time_range("org", StreamType::EnrichmentTables, search_type, sql)
+                    .await,
+                None
+            );
+        }
+        let join = r#"SELECT * FROM "t" JOIN "logs"."app" ON t.ip = app.ip"#;
+        assert_eq!(
+            enrichment_table_time_range("org", StreamType::EnrichmentTables, dashboards, join)
+                .await,
+            None
+        );
     }
 
     #[test]
