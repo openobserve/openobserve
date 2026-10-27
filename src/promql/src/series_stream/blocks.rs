@@ -37,7 +37,7 @@ use config::{
         },
         stream::FileKey,
     },
-    utils::hash::gxhash,
+    utils::hash::new_key_hasher,
 };
 use datafusion::error::DataFusionError;
 use hashbrown::{HashMap, HashSet};
@@ -403,7 +403,7 @@ impl SeriesStream for BlockSeriesStream {
                 continue;
             }
             self.samples.sort_unstable_by_key(|sample| sample.timestamp);
-            let mut signature = gxhash::new_hasher();
+            let mut signature = new_key_hasher();
             for name in &self.columns.group {
                 if let Some(value) = label_value(&head.0, head.1, name).map_err(external)? {
                     signature.write(name.as_bytes());

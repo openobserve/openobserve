@@ -20,7 +20,7 @@ use config::{
         NAME_LABEL,
         value::{EvalContext, Label, Labels, RangeValue, Sample, Value},
     },
-    utils::hash::gxhash,
+    utils::hash::new_key_hasher,
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{LabelModifier, token};
@@ -319,7 +319,7 @@ pub(crate) fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels
 /// vector and retaining it first. Label order and filtering exactly match
 /// [`projected_labels`], so the grouping key is unchanged.
 fn projected_labels_signature(modifier: &Option<LabelModifier>, labels: &Labels) -> u64 {
-    let mut hasher = gxhash::new_hasher();
+    let mut hasher = new_key_hasher();
     for label in projected_label_refs(modifier, labels) {
         hasher.write(label.name.as_bytes());
         hasher.write(label.value.as_bytes());

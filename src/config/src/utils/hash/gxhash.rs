@@ -13,25 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::hash::Hasher;
-
 use super::Sum64;
 
 pub struct GxHash {}
 
 pub fn new() -> GxHash {
     GxHash {}
-}
-
-pub fn new_hasher() -> impl Hasher {
-    #[cfg(feature = "gxhash")]
-    {
-        gxhash::GxHasher::default()
-    }
-    #[cfg(not(feature = "gxhash"))]
-    {
-        ahash::AHasher::default()
-    }
 }
 
 impl Sum64 for GxHash {
@@ -99,15 +86,6 @@ mod tests {
         assert_eq!(h.sum64("test1"), 17623087596200270265);
         assert_eq!(h.sum64("test2"), 2079727570557907492);
         assert_eq!(h.sum64("test3"), 3631677894875752354);
-    }
-
-    #[test]
-    fn test_gxhash_new_hasher_produces_nonzero_hash() {
-        use std::hash::Hasher;
-        let mut hasher = new_hasher();
-        hasher.write(b"hello");
-        let hash = hasher.finish();
-        assert_ne!(hash, 0);
     }
 
     #[test]

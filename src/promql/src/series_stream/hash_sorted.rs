@@ -24,7 +24,7 @@ use config::{
         HASH_LABEL, VALUE_LABEL,
         value::{Labels, Sample},
     },
-    utils::hash::gxhash,
+    utils::hash::new_key_hasher,
 };
 use datafusion::{
     arrow::{
@@ -129,7 +129,7 @@ impl SeriesStream for HashSortedSeriesStream {
         self.current = Some(hash);
         let (batch, row) = self.chain_head(hash);
         let cols = Self::label_columns(&self.cols.group, &batch)?;
-        let mut hasher = gxhash::new_hasher();
+        let mut hasher = new_key_hasher();
         for (values, name) in cols.iter().zip(self.cols.group.iter()) {
             if !values.is_null(row) {
                 hasher.write(name.as_bytes());

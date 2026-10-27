@@ -851,7 +851,7 @@ mod tests {
             "limitk(1, rate(m[1m]))",
             "limitk by(instance) (1, m)",
             "limitk(1, m offset 30s)",
-            "limit_ratio(0.5, rate(m[1m]))",
+            "limit_ratio(0.85, rate(m[1m]))",
             "limit_ratio(-0.5, m)",
         ] {
             let expected = generic_topk(provider(false, false), query).await;

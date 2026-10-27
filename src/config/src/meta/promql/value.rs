@@ -1001,7 +1001,7 @@ pub fn signature_with_labels(labels: &Labels, include_names: &[&str]) -> u64 {
 }
 
 fn hash_labels(labels: &Labels, include: impl Fn(&str) -> bool) -> u64 {
-    let mut hasher = crate::utils::hash::gxhash::new_hasher();
+    let mut hasher = crate::utils::hash::new_key_hasher();
     labels
         .iter()
         .filter(|item| include(item.name.as_str()))
