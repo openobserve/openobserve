@@ -498,8 +498,8 @@ const agentFilterClause = computed(() =>
 // the currently-selected agent has fewer than 2 versions across the wide
 // (retention-scoped) enumeration — checked via `versions` (page-window-scoped,
 // cheap) first; the wide-window `listVersionsForCompare` call is what actually
-// feeds the compare bar once entered (enumeration must ignore the page
-// date-picker window per the plan's baseline-enumeration requirement).
+// feeds the compare bar once entered (enumeration covers the retention window
+// and the page date-picker window, whichever reaches further back).
 const compareMode = ref(false);
 const compareVersionList = ref<GenAiAgentListItem[]>([]);
 const versionCompare = useVersionCompare();
@@ -536,6 +536,7 @@ async function enterCompareMode() {
     selectedAgentName.value,
     selectedEnv.value === "__unset__" ? null : selectedEnv.value,
     nowMicros,
+    props.startTime,
   );
 }
 
