@@ -1281,20 +1281,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
-      <OButton
-        v-if="!searchObj.meta.sqlMode && searchObj.meta.logsVisualizeToggle === 'logs'"
-        :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
-        data-test="logs-search-bar-filter-builder-toggle"
-        :aria-pressed="filterBuilderOn"
-        variant="ghost"
-        size="icon-toolbar"
-        @click="toggleFilterBuilder"
-        class="rounded-default border-card-glass-border! absolute! top-0.75 right-9.5 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
-      >
-        <OTooltip
-          :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
-        />
-      </OButton>
       <div class="flex h-full w-full min-w-0 flex-col">
         <OSplitter
           class="h-full!"
@@ -1312,6 +1298,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'fn-editor-open': showFunctionEditor,
               }"
             >
+              <OButton
+                v-if="
+                  !searchObj.meta.sqlMode &&
+                  !searchObj.meta.nlpMode &&
+                  searchObj.meta.logsVisualizeToggle === 'logs'
+                "
+                :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+                data-test="logs-search-bar-filter-builder-toggle"
+                :aria-pressed="filterBuilderOn"
+                variant="ghost"
+                size="icon-toolbar"
+                @click="toggleFilterBuilder"
+                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+                :style="{ right: filterBuilderToggleRight }"
+              >
+                <OTooltip
+                  :content="
+                    filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
+                  "
+                />
+              </OButton>
               <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-18">
                 <SqlFilterBuilder
                   :query="searchObj.data.query"
@@ -2242,6 +2249,19 @@ export default defineComponent({
         !searchObj.meta.sqlMode &&
         searchObj.meta.logsVisualizeToggle === "logs",
     );
+    // Mirrors QueryEditor's floating AI button, which takes the corner slot while the editor is shown.
+    const aiButtonShown = computed(() => {
+      const access = checkFeatureAccess(
+        "aiAssistant",
+        buildFeatureGateContext(store.state.zoConfig),
+      );
+      return !access.allowed || Boolean(store.state.zoConfig.ai_enabled);
+    });
+    const filterBuilderToggleRight = computed(() => {
+      const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.375;
+      const besideAi = !showFilterBuilder.value && aiButtonShown.value;
+      return `${besideAi ? corner + 2.125 : corner}rem`;
+    });
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );
@@ -5054,6 +5074,7 @@ export default defineComponent({
       filterBuilderOn,
       toggleFilterBuilder,
       showFilterBuilder,
+      filterBuilderToggleRight,
       filterBuilderFields,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
