@@ -319,8 +319,8 @@ const run = async (rotate: boolean) => {
       ? rotateInstanceKey(() => emit("refreshed"))
       : refreshLicenseLimits(() => emit("refreshed")));
     result.value = clicked;
-    // a refused click recorded no attempt; an answered one recorded its own by the time it responded
-    clearAfter = clicked.ok ? Math.max(before, clicked.respondedAt ?? Date.now() * 1000) : before;
+    // no attempt_at means no attempt was recorded or an older server answered
+    clearAfter = (typeof clicked.body === "object" ? clicked.body.attempt_at : undefined) ?? before;
     dropClickedOutcome();
     emit("refreshed");
   } finally {

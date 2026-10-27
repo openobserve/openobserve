@@ -83,23 +83,17 @@ describe("useLicenseRefresh", () => {
     expect(fetchQuery).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["license"] }));
   });
 
-  it("reports the latest server time the response can carry from its Date header", async () => {
+  it("passes the server's attempt time through and derives no time of its own", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
       status: 200,
-      data: { outcome: "unchanged" },
+      data: { outcome: "unchanged", attempt_at: 1792748530100000 },
       headers: { date: "Fri, 23 Oct 2026 03:02:00 GMT" },
     } as never);
-    const ok = await useLicenseRefresh().refreshLicenseLimits();
-    expect(ok.respondedAt).toBe(Date.parse("2026-10-23T03:02:00Z") * 1000 + 999_999);
-  });
-
-  it("leaves the response time unset without a readable Date header", async () => {
-    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+    expect(await useLicenseRefresh().refreshLicenseLimits()).toStrictEqual({
+      ok: true,
+      body: { outcome: "unchanged", attempt_at: 1792748530100000 },
       status: 200,
-      data: {},
-      headers: {},
-    } as never);
-    expect((await useLicenseRefresh().refreshLicenseLimits()).respondedAt).toBeUndefined();
+    });
   });
 
   it("a 403 returns its status and schedules nothing", async () => {

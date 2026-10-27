@@ -68,6 +68,9 @@ struct RefreshBody {
     limits_refreshed: bool,
     #[serde(flatten)]
     report: RefreshReport,
+    /// Unix microseconds of this click's own attempt, matching `refresh.last_attempt_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attempt_at: Option<i64>,
 }
 
 pub struct SaveLicenseRequest {
@@ -515,11 +518,13 @@ where
 fn refresh_response(
     limits_refreshed: bool,
     report: Result<RefreshReport, RefreshBusy>,
+    attempt_at: Option<i64>,
 ) -> Response {
     match report {
         Ok(report) => MetaHttpResponse::json(RefreshBody {
             limits_refreshed,
             report,
+            attempt_at,
         }),
         Err(RefreshBusy) => (
             StatusCode::CONFLICT,
@@ -532,6 +537,38 @@ fn refresh_response(
         )
             .into_response(),
     }
+}
+
+// the state is cluster-wide, so a later read may hold another node's attempt or an older one
+fn own_attempt_at(
+    before: Option<i64>,
+    after: &RefreshStatus,
+    user: &str,
+    report: &RefreshReport,
+) -> Option<i64> {
+    let at = after
+        .last_attempt_at
+        .filter(|at| before.is_none_or(|before| *at > before))?;
+    let same_outcome =
+        serde_json::to_value(&after.last_outcome).ok() == serde_json::to_value(Some(report)).ok();
+    (after.last_attempt_by.as_deref() == Some(user) && same_outcome).then_some(at)
+}
+
+async fn attempt_status() -> RefreshStatus {
+    refresh_status(true, true, false).await
+}
+
+async fn click_response<Fut>(user: &str, limits_refreshed: bool, click: Fut) -> Response
+where
+    Fut: std::future::Future<Output = Result<RefreshReport, RefreshBusy>>,
+{
+    let before = attempt_status().await.last_attempt_at;
+    let report = click.await;
+    let attempt_at = match &report {
+        Ok(report) => own_attempt_at(before, &attempt_status().await, user, report),
+        Err(RefreshBusy) => None,
+    };
+    refresh_response(limits_refreshed, report, attempt_at)
 }
 
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
@@ -666,10 +703,8 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
     }
 
     let limits_refreshed = get_license().await.is_some() && license::update().await.is_ok();
-    refresh_response(
-        limits_refreshed,
-        click_refresh(&email, || async { license::update().await }).await,
-    )
+    let click = click_refresh(&email, || async { license::update().await });
+    click_response(&email, limits_refreshed, click).await
 }
 
 pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Response {
@@ -679,7 +714,7 @@ pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Resp
     }
 
     let limits_refreshed = get_license().await.is_some() && license::update().await.is_ok();
-    refresh_response(limits_refreshed, rotate_instance_key(&email).await)
+    click_response(&email, limits_refreshed, rotate_instance_key(&email)).await
 }
 
 #[cfg(test)]
@@ -1443,6 +1478,68 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["limits_refreshed"], false);
         assert_eq!(body["error"], "no_license");
+    }
+
+    #[tokio::test]
+    async fn refresh_returns_its_own_attempt_time_and_none_when_refused_before_one() {
+        let _store = store_setup().await;
+        load_refresh_license("online").await;
+        // an unloaded stored key makes the click record a pending_reload attempt offline
+        infra::db::get_db()
+            .await
+            .put(LICENSE_DB_KEY, "pending-other-key".into(), false, None)
+            .await
+            .unwrap();
+        let (status, body) = refresh_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["error"], "pending_reload");
+        let attempt_at = body["attempt_at"].as_i64().expect("attempt_at");
+        let (_, got) = get_as(STORE_ROOT).await;
+        assert_eq!(got["refresh"]["last_attempt_at"].as_i64(), Some(attempt_at));
+
+        load_refresh_license("airgapped").await;
+        let (status, body) = refresh_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["error"], "airgapped");
+        assert!(body.get("attempt_at").is_none(), "{body}");
+        let (_, got) = get_as(STORE_ROOT).await;
+        assert_eq!(got["refresh"]["last_attempt_at"].as_i64(), Some(attempt_at));
+    }
+
+    #[test]
+    fn own_attempt_at_takes_only_a_newer_attempt_matching_this_click() {
+        let report = RefreshReport {
+            outcome: Some(o2_enterprise::enterprise::license::RefreshOutcome::Unchanged),
+            ..Default::default()
+        };
+        let after = |at: Option<i64>, by: &str, outcome: Option<RefreshReport>| RefreshStatus {
+            last_attempt_at: at,
+            last_attempt_by: Some(by.into()),
+            last_outcome: outcome,
+            ..refresh_status_fixture()
+        };
+        let mine = after(Some(20), "me@test", Some(report.clone()));
+        assert_eq!(
+            own_attempt_at(Some(10), &mine, "me@test", &report),
+            Some(20)
+        );
+        assert_eq!(own_attempt_at(None, &mine, "me@test", &report), Some(20));
+        assert_eq!(own_attempt_at(Some(20), &mine, "me@test", &report), None);
+        assert_eq!(own_attempt_at(Some(30), &mine, "me@test", &report), None);
+        let other_user = after(Some(20), "other@test", Some(report.clone()));
+        assert_eq!(
+            own_attempt_at(Some(10), &other_user, "me@test", &report),
+            None
+        );
+        let other_outcome = after(Some(20), "me@test", Some(RefreshReport::default()));
+        assert_eq!(
+            own_attempt_at(Some(10), &other_outcome, "me@test", &report),
+            None
+        );
+        assert_eq!(
+            own_attempt_at(Some(10), &after(None, "me@test", None), "me@test", &report),
+            None
+        );
     }
 
     fn refresh_status_fixture() -> o2_enterprise::enterprise::license::RefreshStatus {
