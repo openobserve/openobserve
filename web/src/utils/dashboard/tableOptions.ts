@@ -125,11 +125,8 @@ const valuesAreNumeric = (column: any, rows: any[]): boolean =>
     (value) => value === null || value === undefined || value === "" || typeof value === "number",
   );
 
-// A sparkline column is typed as text, yet its scalar cells still total like numbers.
 const isNumericColumn = (column: any, rows: any[]): boolean =>
-  column.cellType === "sparkline"
-    ? valuesAreNumeric(column, rows)
-    : (column.isNumeric ?? valuesAreNumeric(column, rows));
+  column.isNumeric ?? valuesAreNumeric(column, rows);
 
 const applyFooterCalcs = (result: any, calcs: TableFooterCalc[]) => {
   const columns: any[] = result.columns;

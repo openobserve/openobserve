@@ -15,10 +15,14 @@
 
 import {
   STATE_TIMELINE_Y_FUNCTION,
+  buildDefaultBuilderFields,
   firstNumericField,
   rawValueYField,
 } from "@/utils/dashboard/defaultFields";
-import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { isCustomSqlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+
+// Types that reset their own queries on a switch, so no builder state carries into them.
+const NON_BUILDER_TYPES = ["html", "markdown", "custom_chart", "alert-list"];
 
 /** The SQL a new logs panel starts from: the stream's latest rows, newest first. */
 export const defaultLogsPanelQuery = (stream: string, timestampColumn: string): string =>
@@ -27,6 +31,15 @@ export const defaultLogsPanelQuery = (stream: string, timestampColumn: string): 
 /** The SQL a new flame graph panel starts from: folded stacks and their summed samples. */
 export const defaultFlameGraphPanelQuery = (stream: string): string =>
   stream ? `SELECT stack, sum(samples) AS value FROM "${stream}" GROUP BY stack` : "";
+
+const STARTER_QUERY_PATTERNS = [
+  /^SELECT \* FROM "[^"]*" ORDER BY \S+ DESC LIMIT 100$/,
+  /^SELECT stack, sum\(samples\) AS value FROM "[^"]*" GROUP BY stack$/,
+];
+
+/** Whether `text` is still the untouched starter SQL a logs or flame graph panel was seeded with. */
+export const isPanelStarterQuery = (text: unknown): boolean =>
+  typeof text === "string" && STARTER_QUERY_PATTERNS.some((pattern) => pattern.test(text.trim()));
 
 export const usePanelAggregation = ({
   dashboardPanelData,
@@ -72,6 +85,47 @@ export const usePanelAggregation = ({
     if (column) query.fields.y = [rawValueYField(column)];
   };
 
+  // An untouched logs or flame graph starter is not the user's SQL, so a builder chart takes the query back.
+  const returnStartersToBuilder = () => {
+    dashboardPanelData.data.queries?.forEach((query: any) => {
+      if (!query?.customQuery || !isPanelStarterQuery(query.query)) return;
+      query.customQuery = false;
+      query.query = "";
+      if (query.fields.x.length || query.fields.y.length) return;
+      const { x, y } = buildDefaultBuilderFields(
+        dashboardPanelData.data.type,
+        query.fields.stream_type,
+        dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+        query.fields.stream,
+        getTimestampColumn(),
+      );
+      query.fields.x = x;
+      query.fields.y = y;
+    });
+  };
+
+  // A hand-written query survives a switch to logs or flame graph; anything else gets that type's starter.
+  const seedCustomSqlPanel = () => {
+    const current = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+    const typed =
+      dashboardPanelData.data.queryType === "sql" &&
+      current?.customQuery &&
+      (current.query ?? "").trim() !== "" &&
+      !isPanelStarterQuery(current.query)
+        ? current.query
+        : null;
+    const query = resetToSingleQuery();
+    query.customQuery = true;
+    query.query =
+      typed ??
+      (dashboardPanelData.data.type === "logs"
+        ? defaultLogsPanelQuery(query.fields.stream ?? "", getTimestampColumn())
+        : defaultFlameGraphPanelQuery(query.fields.stream ?? ""));
+    dashboardPanelData.data.queryType = "sql";
+    // The builder is hidden for these types, so the SQL editor is where the panel is built.
+    dashboardPanelData.layout.showQueryBar = true;
+  };
+
   const resetAggregationFunction = () => {
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
@@ -82,7 +136,10 @@ export const usePanelAggregation = ({
       return;
     }
 
-    switch (dashboardPanelData.data.type) {
+    const type = dashboardPanelData.data.type;
+    if (!isCustomSqlPanel(type) && !NON_BUILDER_TYPES.includes(type)) returnStartersToBuilder();
+
+    switch (type) {
       case "distribution":
         // A histogram buckets raw values, so every y field drops its aggregation and nothing is grouped by x.
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -462,19 +519,10 @@ export const usePanelAggregation = ({
         break;
       }
       case "logs":
-      case "flame-graph": {
+      case "flame-graph":
         // Both read raw rows of a hand-written query; the builder cannot ask for folded stacks or every column.
-        const query = resetToSingleQuery();
-        query.customQuery = true;
-        query.query =
-          dashboardPanelData.data.type === "logs"
-            ? defaultLogsPanelQuery(query.fields.stream ?? "", getTimestampColumn())
-            : defaultFlameGraphPanelQuery(query.fields.stream ?? "");
-        dashboardPanelData.data.queryType = "sql";
-        // The builder is hidden for these types, so the SQL editor is where the panel is built.
-        dashboardPanelData.layout.showQueryBar = true;
+        seedCustomSqlPanel();
         break;
-      }
       case "alert-list": {
         // The alert list reads the alerts API, so the panel keeps one empty query.
         resetToSingleQuery();

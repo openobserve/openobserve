@@ -116,6 +116,10 @@ const valueGroups = (panelSchema: any, data: any[]): ValueGroup[] => {
 };
 
 /** Converts SQL rows into a histogram of the y values: stacked bars per bucket, one series per group. */
+// A plain number's decimals are a ceiling on bucket edges, which are mostly round, so zero fractions are dropped.
+const trimZeroFraction = (text: string) =>
+  text.replace(/^(-?\d+)\.0+$/, "$1").replace(/^(-?\d+\.\d*?)0+$/, "$1");
+
 export const convertDistributionData = (panelSchema: any, data: any, store: any) => {
   const config = panelSchema?.config ?? {};
   const groups = valueGroups(panelSchema, Array.isArray(data) ? data : []);
@@ -196,8 +200,10 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
       axisLabel: {
         hideOverlap: true,
         color: chartColor("--color-text-secondary"),
-        formatter: (value: number) =>
-          formatAxisTickValue(value, config.unit, config.unit_custom, config.decimals),
+        formatter: (value: number) => {
+          const text = formatAxisTickValue(value, config.unit, config.unit_custom, config.decimals);
+          return !config.unit || config.unit === "default" ? trimZeroFraction(text) : text;
+        },
       },
       splitLine: { show: false },
     },

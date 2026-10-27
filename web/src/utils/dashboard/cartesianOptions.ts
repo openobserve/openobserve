@@ -15,7 +15,7 @@
 
 import { escapeHtml } from "@/utils/html";
 import { chartColor } from "@/utils/chartTheme";
-import { calculateWidthText } from "./chartDimensionUtils";
+import { calculateNiceTickValues, calculateWidthText } from "./chartDimensionUtils";
 import { absValue, createSeriesOverrideLookup, type SeriesOverrideLookup } from "./seriesOverrides";
 import { sortTooltipParams } from "./tooltipSort";
 import { DEFAULT_HEATMAP_PALETTE, HEATMAP_PALETTES } from "./heatmapPalettes";
@@ -380,6 +380,38 @@ const widestLabel = (series: any[], formatter: unknown): number => {
   return widest;
 };
 
+const MAX_LOG_TICKS = 64;
+
+const axisTickValues = (axis: any, series: any[]): number[] => {
+  const values = series
+    .flatMap((s) => (s.data ?? []).map(pointY))
+    .filter((y: number | null): y is number => y !== null);
+  const hardMin = typeof axis.min === "number" ? axis.min : null;
+  const hardMax = typeof axis.max === "number" ? axis.max : null;
+  if (axis.type === "log") {
+    const positive = [...values, hardMin, hardMax].filter((v): v is number => v !== null && v > 0);
+    if (!positive.length) return [];
+    const base = Number(axis.logBase) || 10;
+    const exponent = (v: number) => Math.log(v) / Math.log(base);
+    const from = Math.floor(exponent(Math.min(...positive)));
+    const to = Math.min(Math.ceil(exponent(Math.max(...positive))), from + MAX_LOG_TICKS);
+    return Array.from({ length: to - from + 1 }, (_, i) => base ** (from + i));
+  }
+  if (!values.length && hardMin === null && hardMax === null) return [];
+  const lo = hardMin ?? Math.min(0, ...values);
+  const hi = hardMax ?? Math.max(0, ...values);
+  return [...calculateNiceTickValues(lo, hi), ...[hardMin, hardMax].filter((v) => v !== null)];
+};
+
+// The name sits beyond the tick labels, so it is spaced by the ticks the axis draws, not by the raw data values.
+const widestTickLabel = (axis: any, series: any[]): number => {
+  const formatter = axis.axisLabel?.formatter;
+  if (typeof formatter !== "function") return widestLabel(series, formatter);
+  const ticks = axisTickValues(axis, series);
+  if (!ticks.length) return widestLabel(series, formatter);
+  return Math.max(...ticks.map((tick) => calculateWidthText(String(formatter(tick)))));
+};
+
 const placementOf = (series: any, lookup: SeriesOverrideLookup) =>
   lookup.get(series?.name)?.axisPlacement;
 
@@ -451,7 +483,7 @@ const applyValueAxisLabel = (options: any, panelSchema: any) => {
     }
     return;
   }
-  const widest = widestLabel(dataSeriesOf(options), axis.axisLabel?.formatter);
+  const widest = widestTickLabel(axis, dataSeriesOf(options));
   axis.nameGap = widest + Y_AXIS_NAME_GAP_PAD;
   if (!canMoveGrid) return;
   if (grid.containLabel) {

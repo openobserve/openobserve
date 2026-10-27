@@ -211,6 +211,81 @@ describe("node graph", () => {
     expect(small.emphasis.edgeLabel.show).toBe(true);
   });
 
+  it("lays a complete graph out differently in force and circular modes", async () => {
+    const names = ["payments", "auth", "search", "cart", "checkout", "inventory"];
+    const mesh = names.flatMap((source, i) =>
+      names
+        .filter((target) => target !== source)
+        .map((target, j) => ({ source, target, value: 500 + ((i * 7 + j * 13) % 70) })),
+    );
+    for (const size of [
+      { width: 400, height: 250 },
+      { width: 1200, height: 500 },
+    ]) {
+      const force = (await convert(panel(), [mesh], size)).options.series[0];
+      const ring = (await convert(panel({ node_graph_layout: "circular" }), [mesh], size)).options
+        .series[0];
+      // Circular: every node on one ellipse, stretched until the ring's bounding box fills the plot.
+      const reach = Math.max(...circularPositions(names.length).map(([x]) => Math.abs(x)));
+      const a = (size.width - ring.left - ring.right) / 2 / reach;
+      const b = (size.height - ring.top - ring.bottom) / 2;
+      ring.data.forEach((node: any) => {
+        const dx = (node.x - size.width / 2 - (ring.left - ring.right) / 2) / a;
+        const dy = (node.y - ring.top - b) / b;
+        expect(dx * dx + dy * dy).toBeCloseTo(1, 1);
+      });
+      const moved = force.data.map((node: any, i: number) =>
+        Math.hypot(node.x - ring.data[i].x, node.y - ring.data[i].y),
+      );
+      expect(Math.max(...moved)).toBeGreaterThan(size.width / 10);
+      // The chart stretches the node bounding box onto the plot, so a full fit keeps symbols round.
+      const xs = force.data.map((node: any) => node.x);
+      const ys = force.data.map((node: any) => node.y);
+      expect(Math.min(...xs)).toBeCloseTo(force.left);
+      expect(Math.max(...xs)).toBeCloseTo(size.width - force.right);
+      expect(Math.min(...ys)).toBeCloseTo(force.top);
+      expect(Math.max(...ys)).toBeCloseTo(size.height - force.bottom);
+      force.data.forEach((node: any) => {
+        expect(node.x).toBeGreaterThanOrEqual(force.left - 1e-6);
+        expect(node.x).toBeLessThanOrEqual(size.width - force.right + 1e-6);
+        expect(node.y).toBeGreaterThanOrEqual(force.top - 1e-6);
+        expect(node.y).toBeLessThanOrEqual(size.height - force.bottom + 1e-6);
+      });
+    }
+  });
+
+  it("keeps the force layout in place when only the edge values change", () => {
+    const { nodes, edges } = buildGraph(panel(), [rows]);
+    const doubled = edges.map((edge) => ({ ...edge, value: edge.value * 7 + 3 }));
+    expect(forcePositions(nodes, doubled)).toEqual(forcePositions(nodes, edges));
+  });
+
+  it("places each node by name, whatever order the query returns the rows in", async () => {
+    const names = ["payments", "auth", "search", "cart", "checkout", "inventory"];
+    const mesh = names.flatMap((source) =>
+      names.filter((target) => target !== source).map((target) => ({ source, target, value: 5 })),
+    );
+    for (const layout of ["force", "circular"]) {
+      const at = async (data: any[]) =>
+        Object.fromEntries(
+          (await convert(panel({ node_graph_layout: layout }), [data])).options.series[0].data.map(
+            (node: any) => [node.name, [node.x, node.y]],
+          ),
+        );
+      expect(await at([...mesh].reverse())).toEqual(await at(mesh));
+    }
+  });
+
+  it("draws node names and edge values on a translucent surface chip in the body text colour", async () => {
+    const series = (await convert(panel({ node_graph_show_edge_labels: true }), [rows])).options
+      .series[0];
+    for (const label of [series.label, series.edgeLabel]) {
+      expect(label.backgroundColor).toBe("rgba(255,255,255,0.85)");
+      expect(label.padding).toEqual([2, 4]);
+      expect(label.color).toBe("#404040");
+    }
+  });
+
   it("leaves edges unlabelled when edge values are off", async () => {
     const series = (await convert(panel(), [rows])).options.series[0];
     series.links.forEach((link: any) => expect(link.label).toBeUndefined());

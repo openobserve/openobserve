@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import FlameGraphPanelRenderer from "@/components/dashboards/panels/FlameGraphPanelRenderer.vue";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
@@ -60,6 +60,28 @@ describe("FlameGraphPanelRenderer", () => {
     expect(wrapper.find('[data-test="flame-graph-align-left"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="flame-graph-root-at-bottom"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="flame-graph-plot"]').exists()).toBe(true);
+  });
+
+  it("grows the rows to fill the panel height and keeps the zoom hint off the graph", async () => {
+    localStorage.removeItem("o2_flame_zoom_hint_hidden");
+    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    const wrapper = mountPanel({ data, config: {} });
+    await flushPromises();
+    // Root, main, http and handler: four rows sharing the 400 px the panel gives the graph.
+    expect(wrapper.get('[data-test="flame-graph-plot"]').attributes("style")).toContain(
+      "height: 400px",
+    );
+    expect(wrapper.find('[data-test="flame-graph-zoom-hint"]').exists()).toBe(false);
+    height.mockRestore();
+    const fixed = mount(FlameGraphView, {
+      props: { root: data.root, summaryLabel: "Total", summaryValue: "4", unitLabel: "samples" },
+      global: { plugins: [i18n], stubs: { ChartRenderer: ChartRendererStub, OTooltip: true } },
+    });
+    await flushPromises();
+    expect(fixed.get('[data-test="flame-graph-plot"]').attributes("style")).toContain(
+      "height: 124px",
+    );
+    expect(fixed.find('[data-test="flame-graph-zoom-hint"]').exists()).toBe(true);
   });
 
   it("highlights the searched frame and clears it on a second search", async () => {

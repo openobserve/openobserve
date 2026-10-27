@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { color as echartsColor } from "echarts/core";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { getDataValue } from "./aliasUtils";
@@ -26,7 +27,9 @@ const EDGE_WIDTH_MIN = 1;
 const EDGE_WIDTH_MAX = 6;
 const NODE_LABEL_WIDTH = 96;
 const EDGE_LABEL_CHAR_WIDTH = 6.5;
-const EDGE_LABEL_HEIGHT = 16;
+const LABEL_PADDING: [number, number] = [2, 4];
+const EDGE_LABEL_HEIGHT = 14 + 2 * LABEL_PADDING[0];
+const LABEL_CHIP_OPACITY = 0.85;
 const CURVENESS_FORCE = 0.12;
 // Curves bulge by a share of their length, so long ring edges stay near the ring.
 const CURVENESS_CIRCULAR = 0.15;
@@ -120,15 +123,46 @@ export const circularPositions = (count: number): Point[] =>
     return [Math.cos(angle), Math.sin(angle)];
   });
 
-/** A deterministic Fruchterman-Reingold layout; the chart stretches its bounding box to the plot, so no node leaves the panel. */
+/** Ring positions in name order, so the ring does not reshuffle when the query returns rows in another order. */
+const ringByName = (nodes: GraphNode[]): Point[] => {
+  const ring = circularPositions(nodes.length);
+  const slot = new Map(
+    nodes
+      .map((node) => node.name)
+      .sort()
+      .map((name, i) => [name, i]),
+  );
+  return nodes.map((node) => ring[slot.get(node.name)!]);
+};
+
+/** A small seeded PRNG (mulberry32), so the same graph always gets the same force layout. */
+const seededRandom = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+const hashNames = (names: string[]) =>
+  names
+    .join("\u0000")
+    .split("")
+    .reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
+
+/** A deterministic Fruchterman-Reingold layout from a start seeded by the node names, so a refresh with new values keeps every node in place. */
 export const forcePositions = (nodes: GraphNode[], edges: GraphEdge[]): Point[] => {
   const count = nodes.length;
-  const positions = circularPositions(count).map(([x, y]) => [x * 0.5, y * 0.5] as Point);
-  if (count < 3) return positions;
-  const index = new Map(nodes.map((node, i) => [node.name, i]));
+  if (count < 3) return circularPositions(count).map(([x, y]) => [x * 0.5, y * 0.5] as Point);
+  // A symmetric start (such as a ring) stays symmetric, so a complete graph would settle back into a ring.
+  // The query returns rows in no fixed order, so the simulation runs on names sorted, and its float sums repeat exactly.
+  const names = nodes.map((node) => node.name).sort();
+  const random = seededRandom(hashNames(names));
+  const positions: Point[] = names.map(() => [random() - 0.5, random() - 0.5]);
+  const index = new Map(names.map((name, i) => [name, i]));
   const links = edges
     .map((edge) => [index.get(edge.source)!, index.get(edge.target)!])
-    .filter(([from, to]) => from !== to);
+    .filter(([from, to]) => from !== to)
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const k = Math.sqrt(1 / count);
   // Each iteration is O(n²), so large graphs settle in fewer steps.
   const iterations = Math.max(20, Math.min(300, Math.round(3_000_000 / (count * count))));
@@ -167,7 +201,7 @@ export const forcePositions = (nodes: GraphNode[], edges: GraphEdge[]): Point[] 
       position[1] += (shift[i][1] / length) * move;
     });
   }
-  return positions;
+  return nodes.map((node) => positions[index.get(node.name)!]);
 };
 
 /** Maps layout coordinates onto the inset plot the way the chart does, in pixels. */
@@ -182,6 +216,7 @@ const toPlot = (positions: Point[], panel: { width: number; height: number }): P
   ];
   const width = Math.max(panel.width - PLOT_INSET.left - PLOT_INSET.right, 1);
   const height = Math.max(panel.height - PLOT_INSET.top - PLOT_INSET.bottom, 1);
+  // The chart stretches the nodes' bounding box onto the plot, so anything but a full fit would distort the symbols.
   return positions.map(([x, y]) => [
     PLOT_INSET.left + (maxX > minX ? ((x - minX) / (maxX - minX)) * width : width / 2),
     PLOT_INSET.top + (maxY > minY ? ((y - minY) / (maxY - minY)) * height : height / 2),
@@ -232,7 +267,8 @@ export const fittingEdgeLabels = (
   const byName = new Map(nodes.map((node) => [node.name, node]));
   const taken: Box[] = nodes.flatMap((node) => {
     const radius = (node.symbolSize ?? NODE_SIZE_MIN) / 2;
-    const nameWidth = Math.min(node.name.length * EDGE_LABEL_CHAR_WIDTH, NODE_LABEL_WIDTH);
+    const nameWidth =
+      Math.min(node.name.length * EDGE_LABEL_CHAR_WIDTH, NODE_LABEL_WIDTH) + 2 * LABEL_PADDING[1];
     return [
       { x: node.x!, y: node.y!, halfWidth: radius, halfHeight: radius, angle: 0 },
       {
@@ -259,7 +295,7 @@ export const fittingEdgeLabels = (
     const box: Box = {
       x: 0.25 * from.x! + 0.5 * control[0] + 0.25 * to.x!,
       y: 0.25 * from.y! + 0.5 * control[1] + 0.25 * to.y!,
-      halfWidth: (format(edge.value).length * EDGE_LABEL_CHAR_WIDTH) / 2 + 2,
+      halfWidth: (format(edge.value).length * EDGE_LABEL_CHAR_WIDTH) / 2 + LABEL_PADDING[1],
       halfHeight: EDGE_LABEL_HEIGHT / 2,
       angle,
     };
@@ -305,14 +341,20 @@ export const convertNodeGraphData = (
     height: chartPanelRef?.value?.offsetHeight || FALLBACK_PANEL.height,
   };
   // Pixel positions make the chart's view transform an identity, so edge labels render at their real size.
-  const points = toPlot(
-    circular ? circularPositions(nodes.length) : forcePositions(nodes, edges),
-    panel,
-  );
+  const points = toPlot(circular ? ringByName(nodes) : forcePositions(nodes, edges), panel);
   nodes.forEach((node, index) => {
     [node.x, node.y] = points[index];
   });
   const showEdgeLabels = config.node_graph_show_edge_labels === true;
+  // Labels sit on a chip of the panel surface so the edges crossing them do not cut through the text.
+  const chip = {
+    backgroundColor: echartsColor.modifyAlpha(
+      chartColor("--color-surface-base"),
+      LABEL_CHIP_OPACITY,
+    ),
+    padding: LABEL_PADDING,
+    borderRadius: 3,
+  };
   if (showEdgeLabels) {
     const fits = fittingEdgeLabels(edges, nodes, curveness, format, panel);
     edges.forEach((edge, index) => {
@@ -356,11 +398,13 @@ export const convertNodeGraphData = (
           color: chartColor("--color-text-body"),
           width: NODE_LABEL_WIDTH,
           overflow: "truncate",
+          ...chip,
         },
         lineStyle: { opacity: 0.55, curveness },
         edgeLabel: {
           show: showEdgeLabels,
-          color: chartColor("--color-text-secondary"),
+          color: chartColor("--color-text-body"),
+          ...chip,
           formatter: (params: any) => format(params?.value),
         },
         emphasis: {

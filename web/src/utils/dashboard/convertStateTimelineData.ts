@@ -35,6 +35,7 @@ import { STATE_VALUE_ALIGNS } from "./panelTypeOptions";
 import { HEATMAP_PALETTES, samplePalette } from "./heatmapPalettes";
 import { isRowTimeline } from "./chartTypeGroups";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { calculateWidthText } from "./chartDimensionUtils";
 
 export const STATE_TIMELINE_MAX_ROWS = 500;
 export const STATE_TIMELINE_MAX_STATES = 20;
@@ -995,6 +996,19 @@ export const convertStateTimelineData = (
     });
   }
 
+  // A status cell shows a number, and a cut number misleads, so it is shown whole or not at all.
+  const textWidths = new Map<string, number>();
+  const textFits = (text: string, room: number) => {
+    if (!isStatusHistory) return true;
+    let width = textWidths.get(text);
+    if (width === undefined) {
+      // eslint-disable-next-line local/no-hardcoded-px -- matches the cell text's ECharts fontSize, which is literal px
+      width = calculateWidthText(text, "11px");
+      textWidths.set(text, width);
+    }
+    return width <= room;
+  };
+
   const renderItem = (params: any, api: any) => {
     const from = api.coord([api.value(0), api.value(2)]);
     const to = api.coord([api.value(1), api.value(2)]);
@@ -1019,6 +1033,7 @@ export const convertStateTimelineData = (
           : { fill: style.color },
     };
     if (!showText || style === null || x2 - x1 < MIN_TEXT_WIDTH) return rect;
+    if (!textFits(String(style.text ?? ""), x2 - x1 - TEXT_PADDING * 2)) return rect;
     return {
       type: "group",
       children: [

@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
-import { defaultFlameGraphPanelQuery, usePanelAggregation } from "./usePanelAggregation";
+import {
+  defaultFlameGraphPanelQuery,
+  isPanelStarterQuery,
+  usePanelAggregation,
+} from "./usePanelAggregation";
 
 const DEFAULT_CUSTOM_CHART_TEXT = "option = {};";
 const getDefaultCustomChartText = vi.fn(() => DEFAULT_CUSTOM_CHART_TEXT);
@@ -672,6 +676,53 @@ describe("usePanelAggregation", () => {
           query: 'SELECT stack, sum(samples) AS value FROM "demo_app" GROUP BY stack',
         });
         expect(defaultFlameGraphPanelQuery("")).toBe("");
+      });
+
+      it("swaps one type's untouched starter for the other's, but keeps hand-written SQL", () => {
+        const panelData = makePanelData("flame-graph");
+        Object.assign(panelData.data.queries[0], {
+          customQuery: true,
+          query: 'SELECT * FROM "test_stream" ORDER BY _timestamp DESC LIMIT 100',
+        });
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries[0].query).toBe(defaultFlameGraphPanelQuery("test_stream"));
+
+        const typed = makePanelData("logs");
+        Object.assign(typed.data.queries[0], {
+          customQuery: true,
+          query: "SELECT host, message FROM \"test_stream\" WHERE level = 'error'",
+        });
+        makeAggregation(typed).resetAggregationFunction();
+        expect(typed.data.queries[0]).toMatchObject({
+          customQuery: true,
+          query: "SELECT host, message FROM \"test_stream\" WHERE level = 'error'",
+        });
+      });
+
+      it("returns an untouched logs starter to the builder on a switch to status history", () => {
+        const panelData = makePanelData("status-history");
+        Object.assign(panelData.data.queries[0], {
+          customQuery: true,
+          query: 'SELECT * FROM "test_stream" ORDER BY _timestamp DESC LIMIT 100',
+        });
+        makeAggregation(panelData).resetAggregationFunction();
+        const [query] = panelData.data.queries;
+        expect(query.customQuery).toBe(false);
+        expect(query.query).toBe("");
+        expect(query.fields.x.map((field: any) => field.alias)).toEqual(["x_axis_1"]);
+        expect(query.fields.y.map((field: any) => field.functionName)).toEqual(["count"]);
+        expect(isPanelStarterQuery(defaultFlameGraphPanelQuery("s"))).toBe(true);
+      });
+
+      it("leaves hand-written SQL in custom mode on a switch to a builder chart", () => {
+        const panelData = makePanelData("status-history");
+        Object.assign(panelData.data.queries[0], {
+          customQuery: true,
+          query: 'SELECT histogram(_timestamp) AS x, count(*) AS y FROM "test_stream" GROUP BY x',
+        });
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries[0].customQuery).toBe(true);
+        expect(panelData.data.queries[0].query).toContain("histogram(_timestamp)");
       });
 
       it("alert list keeps one empty builder query and no query type", () => {

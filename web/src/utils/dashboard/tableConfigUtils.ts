@@ -65,11 +65,11 @@ const warnedValueMappingPatterns = new Set<string>();
 /** Why a value-mapping regex cannot be saved. */
 export type ValueMappingPatternError = "tooLong" | "unsupported";
 
-/** Apply a per-column field-type override ("num"/"bar_gauge" and "text"/"sparkline"/"json" force; "auto"/absent keep detected). */
+/** Apply a per-column field-type override ("num"/"bar_gauge" and "text"/"json" force; "sparkline", "auto" and absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
   fieldType === "num" || fieldType === "bar_gauge"
     ? true
-    : fieldType === "text" || fieldType === "sparkline" || fieldType === "json"
+    : fieldType === "text" || fieldType === "json"
       ? false
       : detected;
 

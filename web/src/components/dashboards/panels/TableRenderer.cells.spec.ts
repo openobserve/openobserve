@@ -145,6 +145,29 @@ describe("TableRenderer cell types and footer (real converter, OTable and cells)
     expect(foot.find('[data-test="o2-table-pivot-total-cell-requests"]').text()).toBe("40");
   });
 
+  it("formats a fractional scalar column under sparkline like a number: decimals, right edge, footer", async () => {
+    const schema = panel({
+      override_config: [fieldType("requests", "sparkline")],
+      table_footer_calcs: ["sum"],
+    });
+    const fractional = [
+      { service: "api", requests: 51.30213903743314, trend: [1, 2] },
+      { service: "web", requests: 51.21682242990654, trend: [2, 1] },
+    ];
+    const table: any = convertTableData(schema, [fractional], store);
+    applyTableOptions(table, schema);
+    wrapper = mount(TableRenderer, {
+      props: { data: table, valueMapping: [] },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+    const cells = wrapper.findAll("td").filter((td) => td.text() === "51");
+    expect(cells).toHaveLength(2);
+    expect(cells.every((td) => td.classes().includes("text-right"))).toBe(true);
+    const foot = wrapper.find('[data-test="o2-table-pivot-total-foot"]');
+    expect(foot.find('[data-test="o2-table-pivot-total-cell-requests"]').text()).toBe("103");
+  });
+
   it("renders the footer row from the footer calculations", async () => {
     await mountTable({ table_footer_calcs: ["sum", "mean"] });
     const foot = wrapper!.find('[data-test="o2-table-pivot-total-foot"]');

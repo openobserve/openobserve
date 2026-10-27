@@ -197,6 +197,28 @@ describe("distribution through convertPanelData", () => {
     expect(tick(200)).toBe("200ms");
   });
 
+  it("shows round bucket edges of a plain number without a zero fraction", async () => {
+    for (const unit of [null, "default"]) {
+      const { options } = await viaPanel(
+        panel("distribution", { y: [latency] }, { unit, decimals: 2 }),
+        [rows],
+      );
+      const tick = options.xAxis.axisLabel.formatter;
+      expect([tick(0), tick(20000), tick(2.5), tick(0.125), tick(-40)]).toEqual([
+        "0",
+        "20000",
+        "2.5",
+        "0.125",
+        "-40",
+      ]);
+    }
+    const bytes = await viaPanel(
+      panel("distribution", { y: [latency] }, { unit: "bytes", decimals: 2 }),
+      [rows],
+    );
+    expect(bytes.options.xAxis.axisLabel.formatter(0)).toBe("0.00B");
+  });
+
   it("returns an empty series list when no value is numeric", async () => {
     const { options } = await viaPanel(panel("distribution", { y: [latency] }), [
       [{ y_axis_1: "x" }],

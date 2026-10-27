@@ -171,6 +171,8 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
         right: 8,
         bottom: config.treemap_show_breadcrumb === false ? 8 : 32,
         roam: false,
+        // Without a leaf depth the breadcrumb names whatever tile sits under the panel centre instead of the view root.
+        leafDepth: nested ? 2 : 1,
         // A click opens the drilldown menu, so it must not also zoom the tile away under it.
         nodeClick: hasDrilldown ? false : "zoomToNode",
         breadcrumb: {

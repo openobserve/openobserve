@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { convertPanelData } from "./convertPanelData";
 import { buildSQLChartQuery } from "./dashboardAutoQueryBuilder";
+import { labelColorOn } from "./chartLabelContrast";
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -66,12 +67,12 @@ const panel = (fields: any, config: Record<string, any> = {}) => ({
   config: { show_legends: true, unit: "default", decimals: 0, ...config },
 });
 
-const convert = async (schema: any, data: any[]) =>
+const convert = async (schema: any, data: any[], size = { width: 800, height: 400 }) =>
   (await convertPanelData(
     schema,
     data,
     store,
-    { value: { offsetWidth: 800, offsetHeight: 400 } },
+    { value: { offsetWidth: size.width, offsetHeight: size.height } },
     { value: null },
     { value: [] },
     { queries: [] },
@@ -131,6 +132,36 @@ describe("sunburst", () => {
     const flat = (await convert(panel({ breakdown: [] }), [rows])).options.series[0];
     expect(flat.data.every((node: any) => !node.children)).toBe(true);
     expect((await convert(panel({}), [[]])).options.series).toEqual([]);
+  });
+
+  it("labels each slice in white or black by the colour it is painted, outer ring included", async () => {
+    const series = (
+      await convert(panel({}, { color: { mode: "fixed", fixedColor: ["#5b8ef0"] } }), [rows])
+    ).options.series[0];
+    const [usEast] = series.data;
+    expect(usEast.label.color).toBe(labelColorOn(usEast.itemStyle.color));
+    usEast.children.forEach((child: any) => {
+      // The outer ring is the parent colour faded toward the panel surface, so pale slices get dark text.
+      expect(child.itemStyle.color).not.toBe(usEast.itemStyle.color);
+      expect(child.label.color).toBe(labelColorOn(child.itemStyle.color));
+    });
+    expect(series.levels[2].itemStyle).toBeUndefined();
+    expect(labelColorOn("rgba(206,221,251,1)")).toBe("#000000");
+  });
+
+  it("fits labels to the ring depth and hides them on slices or rings too thin for text", async () => {
+    const small = (await convert(panel({}), [rows], { width: 400, height: 250 })).options.series[0];
+    const large = (await convert(panel({}), [rows], { width: 1200, height: 500 })).options
+      .series[0];
+    const [, innerSmall, outerSmall] = small.levels.map((level: any) => level.label);
+    expect(innerSmall.width).toBeGreaterThanOrEqual(24);
+    expect(innerSmall.width).toBeLessThan(large.levels[1].label.width);
+    // A slice needs a text line of arc at its middle, so the inner ring needs a wider angle.
+    expect(innerSmall.minAngle).toBeGreaterThan(outerSmall.minAngle);
+    expect(outerSmall.minAngle).toBeGreaterThan(large.levels[2].label.minAngle);
+    const tiny = (await convert(panel({}), [rows], { width: 120, height: 90 })).options.series[0];
+    expect(tiny.levels[1].label.show).toBe(false);
+    expect(tiny.levels[2].label.show).toBe(false);
   });
 
   it("formats the tooltip path with the panel unit", async () => {

@@ -17,6 +17,7 @@ import { gt } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
 import { echartsPaletteColor } from "./thresholds";
+import { labelColorOn } from "./chartLabelContrast";
 
 export const GAUGE_STYLES = ["semi", "arc", "circle"] as const;
 export const PIE_LABEL_CONTENTS = ["name", "value", "percent"] as const;
@@ -28,6 +29,7 @@ const GAUGE_ANGLES: Record<string, { startAngle: number; endAngle: number }> = {
 };
 
 const SEGMENT_GAP_WIDTH = 3;
+const OUTSIDE_LABEL_RADIUS_SHARE = 0.72;
 const MAX_GAUGE_SEGMENTS = 100;
 
 const toNumber = (value: unknown): number | null => {
@@ -185,6 +187,52 @@ const applyDonutInnerRadius = (series: any, innerPercent: number) => {
   series.radius = [`${Number((outer * share).toFixed(2))}%`, series.radius[1]];
 };
 
+const sliceColor = (series: any, item: any, index: number): unknown => {
+  if (typeof item?.itemStyle?.color === "string") return item.itemStyle.color;
+  const color = series?.itemStyle?.color;
+  if (typeof color === "function") {
+    return (
+      color({ name: item?.name, value: item?.value, data: item, dataIndex: index }) ??
+      echartsPaletteColor(index)
+    );
+  }
+  return typeof color === "string" ? color : echartsPaletteColor(index);
+};
+
+const shrinkRadius = (radius: unknown, share: number): unknown => {
+  const scale = (value: unknown) => {
+    const percent = parseFloat(String(value));
+    return String(value).trim().endsWith("%") && Number.isFinite(percent)
+      ? `${Number((percent * share).toFixed(2))}%`
+      : value;
+  };
+  return Array.isArray(radius) ? radius.map(scale) : scale(radius);
+};
+
+// A name or value outgrows the ring, so those labels go outside, where only the panel background is behind them.
+const placePieLabels = (series: any, contents: readonly string[]) => {
+  const inside = series.label?.position === "inside";
+  if (inside && contents.every((content) => content === "percent")) {
+    series.data = series.data.map((item: any, index: number) => ({
+      ...item,
+      label: { ...item?.label, color: labelColorOn(sliceColor(series, item, index)) },
+    }));
+    return;
+  }
+  series.label = {
+    ...series.label,
+    position: "outside",
+    color: chartColor("--color-text-body"),
+    textBorderColor: "transparent",
+    overflow: "truncate",
+  };
+  series.labelLine = { ...series.labelLine, show: true, length: 6, length2: 6 };
+  series.labelLayout = { ...series.labelLayout, hideOverlap: true };
+  // ECharts truncates outside labels at the panel edge only while it lays them out to avoid overlap.
+  series.avoidLabelOverlap = true;
+  if (inside) series.radius = shrinkRadius(series.radius, OUTSIDE_LABEL_RADIUS_SHARE);
+};
+
 /** Applies the pie and donut slice settings to converted options; a no-op while every key is absent. */
 export const applyPieOptions = (options: any, panelSchema: any): void => {
   if (panelSchema?.type !== "pie" && panelSchema?.type !== "donut") return;
@@ -209,6 +257,7 @@ export const applyPieOptions = (options: any, panelSchema: any): void => {
     if (panelSchema.type === "donut" && innerRadius !== null) {
       applyDonutInnerRadius(series, innerRadius);
     }
+    if (contents?.length) placePieLabels(series, contents);
   });
 };
 

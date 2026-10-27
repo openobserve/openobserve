@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 import { buildTreemapNodes, contrastLabels } from "./convertTreemapData";
 
@@ -128,6 +129,28 @@ describe("treemap through convertPanelData", () => {
     expect(options.tooltip.formatter({ data: { path: ["api", "eu"] }, value: 30 })).toContain(
       "api / eu",
     );
+  });
+
+  it("names only the view root in the breadcrumb until the user zooms in", async () => {
+    const { options } = await viaPanel(
+      panel("treemap", { x: [serviceX], y: [count], breakdown: [regionB] }, { title: "" }),
+      [rows],
+    );
+    const chart = echarts.init(null as any, null, {
+      renderer: "svg",
+      ssr: true,
+      width: 800,
+      height: 400,
+    });
+    chart.setOption({ ...options, animation: false });
+    const crumbs = () =>
+      (chart as any)._chartsViews[0]._breadcrumb.group
+        .children()
+        .map((item: any) => item.style.text);
+    expect(crumbs()).toHaveLength(1);
+    chart.dispatchAction({ type: "treemapZoomToNode", targetNodeId: "api" });
+    expect(crumbs()).toHaveLength(2);
+    chart.dispose();
   });
 
   it("hides the breadcrumb when switched off and keeps tiles in place when a drilldown is set", async () => {

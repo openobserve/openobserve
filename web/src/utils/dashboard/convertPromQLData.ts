@@ -1145,7 +1145,8 @@ export const convertPromQLData = async (
               },
             ],
             detail: {
-              valueAnimation: true,
+              // A counting label keeps animating after a same-value re-render snaps the dial, so a throttled tab freezes it on a stale number.
+              valueAnimation: false,
               offsetCenter: [0, 0],
               fontSize: 12,
             },

@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :search-query="highlight"
       hide-profile-actions
       hide-view-options
+      fill-height
+      no-zoom-hint
       @search="(name: string) => (highlight = highlight === name ? '' : name)"
     />
   </div>

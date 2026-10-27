@@ -45,6 +45,12 @@ vi.mock("@/utils/chartTheme", async (importOriginal) => ({
   chartColor: (token: string) => token,
 }));
 
+// The canvas mock measures one pixel per character; cell text is 11px, about 6.6px a character.
+vi.mock("./chartDimensionUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./chartDimensionUtils")>()),
+  calculateWidthText: (text: string) => text.length * 6.6,
+}));
+
 const S = 1000;
 const store = {
   state: { timezone: "UTC", theme: "light", selectedOrganization: { identifier: "default" } },
@@ -1636,6 +1642,41 @@ describe("status history", () => {
       null,
     );
     expect(render(hidden).type).toBe("rect");
+  });
+
+  it("leaves a value out of a cell too narrow to show it whole, instead of cutting the number", () => {
+    const narrow = (result: any) => {
+      const [segment] = segmentsOf(result);
+      return result.options.series[0].renderItem(
+        { coordSys: { x: 0, y: 0, width: 1000, height: 100 } },
+        {
+          value: (i: number) => segment.value[i],
+          coord: ([x]: number[]) => [x === segment.value[0] ? 100 : 140, 10],
+          size: () => [0, 20],
+        },
+      );
+    };
+    const data = [[row(0, "p1", 1234.56)]];
+    const status = convertStateTimelineData(
+      statusPanel({ decimals: 2 }),
+      data,
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(narrow(status).type).toBe("rect");
+    expect(render(status).children[1].style.text).toBe("1234.56");
+    // A state timeline names states, so a long name is still cut to fit.
+    const timeline = convertStateTimelineData(
+      sqlPanel(),
+      [[row(0, "p1", "maintenance")]],
+      store,
+      null,
+      sqlMeta,
+      null,
+    );
+    expect(narrow(timeline).children[1].style.overflow).toBe("truncate");
   });
 
   it("a state timeline still merges runs and draws without gaps", () => {

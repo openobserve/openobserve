@@ -159,6 +159,16 @@ describe("usePanelLivePreview", () => {
       expect(hasTypedChanges(builder, applied)).toBe(false);
     });
 
+    it("does not hold a type switch's starter SQL back as typed text", () => {
+      const applied = makePanel();
+      const flame = clone(applied);
+      flame.queries[0].customQuery = true;
+      flame.queries[0].query = 'SELECT stack, sum(samples) AS value FROM "default" GROUP BY stack';
+      expect(hasTypedChanges(flame, applied)).toBe(false);
+      flame.queries[0].query += " LIMIT 10";
+      expect(hasTypedChanges(flame, applied)).toBe(true);
+    });
+
     it("holds only for an open select list, not tooltips, menus or popovers", () => {
       document.body.innerHTML =
         '<div data-reka-popper-content-wrapper><span role="tooltip">tip</span></div>' +

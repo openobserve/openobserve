@@ -19,6 +19,8 @@ import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
 import { applyCartesianOptions, tooltipPointValue } from "./cartesianOptions";
 import { toSeriesOverrideEntry } from "./seriesOverrides";
+import { calculateWidthText } from "./chartDimensionUtils";
+import * as echarts from "echarts";
 
 // The custom-chart runner imports the ECharts bundle as a URL, which only resolves in a browser build.
 vi.mock("./convertCustomChartData", () => ({
@@ -399,6 +401,45 @@ describe("y_axis_label", () => {
     const prom = await viaPanel(promPanel("line", { y_axis_label: "Rate" }), promData());
     expect(prom.yAxis.name).toBe("Rate");
     expect(prom.yAxis.nameGap).toBeGreaterThan(0);
+  });
+
+  it("keeps the name on the canvas with a log scale, spaced by the drawn ticks", async () => {
+    const panel = sqlPanel(
+      "line",
+      { y_axis_scale: "log", y_axis_label: "ms" },
+      { x: [timeX], y: [yField()], breakdown: [breakdown] },
+    );
+    const rows = timeRows({ api: [67.3, 151.234, 403.1034], web: [88.81, 120.5, 97.25] });
+    const options = await viaPanel(panel, [rows]);
+    expect(options.yAxis.type).toBe("log");
+    const widest = Math.max(...["10ms", "100ms", "1s"].map((t) => calculateWidthText(t)));
+    expect(options.yAxis.nameGap).toBe(widest + 12);
+    const chart = echarts.init(null as any, null, {
+      renderer: "svg",
+      ssr: true,
+      width: 480,
+      height: 260,
+    });
+    chart.setOption({ ...options, animation: false });
+    const svg = chart.renderToSVGString();
+    chart.dispose();
+    const name = svg.match(/matrix\(0,-1,1,0,([-\d.]+),[-\d.]+\)"[^>]*>ms<\/text>/);
+    expect(name).not.toBeNull();
+    expect(Number(name![1])).toBeGreaterThanOrEqual(7);
+  });
+
+  it("spaces a linear axis name by its nice ticks and hard bounds", async () => {
+    const panel = sqlPanel(
+      "line",
+      { y_axis_label: "ms", y_axis_min: 100, y_axis_max: 300 },
+      { x: [timeX], y: [yField()] },
+    );
+    const rows = TIMES.map((t, i) => ({ x_axis_1: t, y_axis_1: [120.123, 150.456, 280.789][i] }));
+    const options = await viaPanel(panel, [rows]);
+    const format = options.yAxis.axisLabel.formatter;
+    const ticks = [100, 150, 200, 250, 300, options.yAxis.min, options.yAxis.max];
+    const widest = Math.max(...ticks.map((t) => calculateWidthText(String(format(t)))));
+    expect(options.yAxis.nameGap).toBe(widest + 12);
   });
 });
 

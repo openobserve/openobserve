@@ -646,7 +646,13 @@ export function useConfigPanel(
       },
     },
     valueTransformations: {
-      "value-transformations": { label: t("dashboard.configSectionValueTransformations") },
+      "value-transformations": {
+        label: [
+          t("dashboard.configSectionValueTransformations"),
+          t("dashboard.valueMappingsTitle"),
+          t("dashboard.addValueMapping"),
+        ],
+      },
     },
     fieldOverrides: {
       "field-overrides": {

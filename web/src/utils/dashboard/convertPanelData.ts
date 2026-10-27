@@ -221,7 +221,7 @@ export const convertPanelData = async (
     case "sunburst": {
       return {
         chartType: panelSchema.type,
-        ...convertSunburstData(panelSchema, data, store),
+        ...convertSunburstData(panelSchema, data, store, chartPanelRef),
       };
     }
     case "funnel": {

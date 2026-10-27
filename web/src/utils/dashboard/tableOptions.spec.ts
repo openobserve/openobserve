@@ -136,9 +136,10 @@ describe("footer calculations", () => {
 });
 
 describe("cell types", () => {
-  it("forces numeric for bar gauge and text for sparkline and JSON", () => {
+  it("forces numeric for bar gauge and text for JSON, and keeps the detected type for sparkline", () => {
     expect(resolveIsNumber(false, "bar_gauge")).toBe(true);
-    expect(resolveIsNumber(true, "sparkline")).toBe(false);
+    expect(resolveIsNumber(true, "sparkline")).toBe(true);
+    expect(resolveIsNumber(false, "sparkline")).toBe(false);
     expect(resolveIsNumber(true, "json")).toBe(false);
   });
 

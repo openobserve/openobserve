@@ -21,6 +21,13 @@ import { applyGaugeOptions, applyHeatmapOptions, applyPieOptions } from "./panel
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts";
 
+// jsdom has no canvas to measure text, so labels get the same average-glyph estimate the app's helpers use.
+echarts.setPlatformAPI({
+  measureText: (text: string, font?: string) => ({
+    width: text.length * (parseFloat(String(font).match(/(\d+)px/)?.[1] ?? "12") * 0.6),
+  }),
+});
+
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
   validateUserCode: vi.fn(() => null),
@@ -331,6 +338,76 @@ describe("pie and donut", () => {
   it("hides labels when no part is chosen", async () => {
     const series = pieSeries(await viaPanel(sqlPanel("pie", { pie_label_content: [] }), [rows()]));
     expect(series.label.show).toBe(false);
+  });
+
+  it("colours percent labels inside each slice by the slice's luminance", () => {
+    const options = {
+      series: [
+        {
+          type: "pie",
+          label: { show: true, position: "inside" },
+          data: [
+            { name: "pale", value: 1, itemStyle: { color: "#fde68a" } },
+            { name: "deep", value: 1, itemStyle: { color: "#1e3a8a" } },
+          ],
+        },
+      ],
+    };
+    applyPieOptions(options, { type: "donut", config: { pie_label_content: ["percent"] } });
+    const [pale, deep] = options.series[0].data as any[];
+    expect(options.series[0].label.position).toBe("inside");
+    expect(pale.label.color).toBe(chartColor("--color-black"));
+    expect(deep.label.color).toBe(chartColor("--color-white"));
+  });
+
+  it("puts name labels outside in the theme text colour, truncated inside a narrow panel", async () => {
+    const regions = ["eu-west", "us-west", "sa-east", "ap-south", "us-east"].map((name, i) => ({
+      x_axis_1: name,
+      y_axis_1: 3500 + i * 40,
+    }));
+    const narrow = { value: { offsetWidth: 146, offsetHeight: 190 } };
+    const panel = sqlPanel("donut", {
+      pie_label_content: ["name", "percent"],
+      donut_inner_radius: 55,
+      show_legends: false,
+    });
+    const options = (
+      (await convertPanelData(
+        panel,
+        [regions],
+        store,
+        narrow,
+        { value: null },
+        { value: [] },
+        metadata,
+        { height: "190px" },
+        { value: [] },
+        false,
+      )) as any
+    ).options;
+    const series = pieSeries(options);
+    expect(series.label.position).toBe("outside");
+    expect(series.label.color).toBe(chartColor("--color-text-body"));
+    expect(series.avoidLabelOverlap).toBe(true);
+    const chart = echarts.init(null as any, null, {
+      renderer: "svg",
+      ssr: true,
+      width: 146,
+      height: 190,
+    });
+    chart.setOption({ ...options, animation: false });
+    const labels = chart
+      .getZr()
+      .storage.getDisplayList(true)
+      .filter((el: any) => typeof el.style?.text === "string" && el.style.text !== "");
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels as any[]) {
+      const box = label.getBoundingRect().clone();
+      box.applyTransform(label.getComputedTransform());
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(146);
+    }
+    chart.dispose();
   });
 
   it("buckets small slices into Other and keeps it last", async () => {
