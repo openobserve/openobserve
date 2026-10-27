@@ -38,6 +38,12 @@ import { parseShorthand } from "@/utils/query/filterBarParser";
 
 export type FilterBarStep = "field" | "operator" | "value";
 
+/** Symbols read the same in every language; word operators show their translated label. */
+export const operatorChipLabel = (id: FilterOperatorId, t: TranslateFn): I18nText => {
+  const op = OPERATORS[id];
+  return /^[a-z ]+$/.test(op.symbol) ? t(op.labelKey) : raw(op.symbol);
+};
+
 export interface FilterBarDraft {
   field: string;
   operator: FilterOperatorId | null;
@@ -212,9 +218,11 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const valueSuggestions = computed<ChipInputSuggestion[]>(() => {
     const needle = editedValue.value === null ? text.value.trim() : "";
     const loaded = draftType.value === "boolean" ? ["true", "false"] : values.value;
-    const current = editedValue.value;
-    const source = current === null ? loaded : [current, ...loaded.filter((v) => v !== current)];
     const chosen = new Set(draft.value?.values ?? []);
+    // A picked value missing from the loaded list stays listed, so it can still be unticked.
+    const typedPicks = multiValue.value ? [...chosen].filter((v) => !loaded.includes(v)) : [];
+    const pinned = editedValue.value !== null ? [editedValue.value] : typedPicks;
+    const source = [...pinned, ...loaded.filter((v) => !pinned.includes(v))];
     const ranked = rankByMatch(source, needle).slice(0, MAX_ROWS);
     const rows: ChipInputSuggestion[] = ranked.map((value) => ({
       key: value,
@@ -251,8 +259,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   });
 
   const searchPlaceholder = computed<I18nText>(() => {
-    if (step.value === "operator")
-      return t("filterBar.searchOperators", { field: draft.value!.field });
+    if (step.value === "operator") return t("filterBar.searchOperators");
     if (step.value === "value") {
       return multiValue.value ? t("filterBar.searchValues") : t("filterBar.searchValue");
     }
@@ -422,6 +429,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     }
   }
 
+  function applyValues() {
+    if (multiValue.value && draft.value?.values.length) commitDraft();
+  }
+
   function onSeparator() {
     if (step.value === "value" && multiValue.value && text.value.trim())
       addValue(text.value.trim());
@@ -573,6 +584,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     select,
     onEnter,
     onSeparator,
+    applyValues,
     onTextChange,
     onBackspace,
     onEscape,

@@ -24,6 +24,7 @@ import {
   type FilterField,
   type FilterGroup,
   type FilterNode,
+  splitPromRegexLiterals,
 } from "./filterBar";
 
 const fields: FilterField[] = [
@@ -173,5 +174,18 @@ describe("PromQL", () => {
     expect(applyPromMatchers('up{env="p"}', ['job="api"'])).toBe('up{env="p", job="api"}');
     expect(applyPromMatchers("up{}", ['job="api"'])).toBe('up{job="api"}');
     expect(applyPromMatchers("up", [])).toBe("up");
+  });
+});
+
+describe("splitPromRegexLiterals", () => {
+  it("reads back the alternation that is any of writes", () => {
+    expect(splitPromRegexLiterals("a\\.b|c")).toEqual(["a.b", "c"]);
+    expect(splitPromRegexLiterals("a:9090|b:9090")).toEqual(["a:9090", "b:9090"]);
+  });
+
+  it("leaves a real pattern, or a single literal, as a regex", () => {
+    expect(splitPromRegexLiterals("api-.*")).toBeNull();
+    expect(splitPromRegexLiterals("\\d+|x")).toBeNull();
+    expect(splitPromRegexLiterals("api")).toBeNull();
   });
 });

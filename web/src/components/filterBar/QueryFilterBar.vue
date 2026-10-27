@@ -25,12 +25,11 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import {
   countConditions,
   emptyFilterGroup,
-  OPERATORS,
   toggleConnector,
   type FilterGroup,
 } from "@/utils/query/filterBar";
 import FilterBarNodes from "./FilterBarNodes.vue";
-import { useFilterBarEditor } from "./useFilterBarEditor";
+import { operatorChipLabel, useFilterBarEditor } from "./useFilterBarEditor";
 import type {
   QueryFilterBarEmits,
   QueryFilterBarExpose,
@@ -110,8 +109,10 @@ const emptyText = computed(() => {
   return t("filterBar.noOperators");
 });
 
+const multiStep = computed(() => step.value === "value" && editor.multiValue.value);
+const selectedCount = computed(() => draft.value?.values.length ?? 0);
+
 const hint = computed(() => {
-  if (step.value === "value" && editor.multiValue.value) return t("filterBar.hintMultiValue");
   if (step.value !== "field") return t("filterBar.hintBack");
   return advanced.value ? t("filterBar.hintAdvanced") : t("filterBar.hintBasic");
 });
@@ -171,7 +172,7 @@ function clearAll() {
 
 const draftOperator = computed(() => {
   const op = newDraft.value?.operator;
-  return op ? raw(OPERATORS[op].symbol) : undefined;
+  return op ? operatorChipLabel(op, t) : undefined;
 });
 </script>
 
@@ -186,6 +187,7 @@ const draftOperator = computed(() => {
     :empty-text="emptyText"
     :loading="step === 'value' ? valuesLoading : step === 'field' && fieldsLoading"
     :auto-highlight="autoHighlight"
+    :multiple="multiStep"
     :placeholder="placeholderText"
     :aria-label="t('filterBar.ariaLabel')"
     :disabled="disabled"
@@ -245,6 +247,22 @@ const draftOperator = computed(() => {
         @click.stop="clearAll"
       />
     </template>
-    <template #footer>{{ hint }}</template>
+    <template #footer>
+      <div v-if="multiStep" class="flex items-center gap-2">
+        <span class="min-w-0 flex-1" :data-test="`${dataTest}-selected-count`">{{
+          t("filterBar.selectedCount", { count: selectedCount }, selectedCount)
+        }}</span>
+        <OButton
+          variant="primary"
+          size="xs"
+          :disabled="!selectedCount"
+          :data-test="`${dataTest}-apply`"
+          @mousedown.prevent
+          @click="editor.applyValues"
+          >{{ t("common.apply") }}</OButton
+        >
+      </div>
+      <template v-else>{{ hint }}</template>
+    </template>
   </OChipInput>
 </template>

@@ -293,6 +293,31 @@ const escapePromValue = (value: string): string =>
 export const escapePromRegexLiteral = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const PROM_REGEX_META = ".*+?^${}()|[]\\";
+
+/** The values of a regex made only of escaped literals joined by `|`, as `is any of` writes it; null otherwise. */
+export const splitPromRegexLiterals = (pattern: string): string[] | null => {
+  const parts: string[] = [];
+  let current = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i];
+    if (char === "\\") {
+      const next = pattern[++i];
+      if (next === undefined || !PROM_REGEX_META.includes(next)) return null;
+      current += next;
+    } else if (char === "|") {
+      parts.push(current);
+      current = "";
+    } else if (PROM_REGEX_META.includes(char)) {
+      return null;
+    } else {
+      current += char;
+    }
+  }
+  parts.push(current);
+  return parts.length > 1 ? parts : null;
+};
+
 const conditionToPromMatcher = (condition: FilterCondition): string => {
   const [first = ""] = condition.values;
   const label = condition.field;

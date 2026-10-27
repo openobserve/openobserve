@@ -20,6 +20,7 @@ import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { conditionValueLabel, OPERATORS, type FilterCondition } from "@/utils/query/filterBar";
 import type { FilterBarNodesEmits, FilterBarNodesProps } from "./QueryFilterBar.types";
+import { operatorChipLabel } from "./useFilterBarEditor";
 
 defineOptions({ name: "FilterBarNodes" });
 
@@ -38,12 +39,8 @@ const testKey = (condition: FilterCondition) => condition.field || "text";
 const fieldLabel = (condition: FilterCondition): I18nText =>
   condition.field ? raw(condition.field) : t("filterBar.textField");
 
-// Symbols read the same in every language; word operators show their translated label.
-const operatorLabel = (condition: FilterCondition): I18nText | undefined => {
-  if (!condition.field) return undefined;
-  const op = OPERATORS[condition.operator];
-  return /^[a-z ]+$/.test(op.symbol) ? t(op.labelKey) : raw(op.symbol);
-};
+const operatorLabel = (condition: FilterCondition): I18nText | undefined =>
+  condition.field ? operatorChipLabel(condition.operator, t) : undefined;
 
 const valueLabel = (condition: FilterCondition): I18nText | undefined =>
   OPERATORS[condition.operator].arity === "none" ? undefined : raw(conditionValueLabel(condition));

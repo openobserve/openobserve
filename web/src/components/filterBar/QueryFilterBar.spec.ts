@@ -196,6 +196,39 @@ describe("QueryFilterBar", () => {
     expect(sql(state)).toBe("level IN ('error', 'warn')");
   });
 
+  it("ticks several values for is any of and applies them from the footer", async () => {
+    const state = mountBar();
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    const footer = () =>
+      document.body.querySelector('[data-test="query-filter-bar-selected-count"]')!.textContent;
+    expect(footer()).toBe("No values selected");
+    await clickRow("error");
+    await clickRow("warn");
+    expect(footer()).toBe("2 values selected");
+    expect(rows().map((row) => row.getAttribute("aria-selected"))).toEqual([
+      "true",
+      "true",
+      "false",
+    ]);
+    document.body
+      .querySelector<HTMLElement>('[data-test="query-filter-bar-apply"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    expect(sql(state)).toBe("level IN ('error', 'warn')");
+    await editPart("level", "value");
+    await vi.waitFor(() => expect(rowKeys()).toEqual(["error", "warn", "info"]));
+    await clickRow("warn");
+    await clickRow("info");
+    document.body
+      .querySelector<HTMLElement>('[data-test="query-filter-bar-apply"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    expect(sql(state)).toBe("level IN ('error', 'info')");
+  });
+
   it("emits submit on Enter in an empty search box", async () => {
     const onSubmit = vi.fn();
     mountBar({ onSubmit });
