@@ -767,7 +767,7 @@ export default defineComponent({
     const firstLoginRedirect = async () => {
       if (localStorage.getItem("isFirstTimeLogin") !== store.state.userInfo?.email) return;
       await router.isReady();
-      // A pending redirect (a marketplace or deep link) keeps the flag, so a later visit still onboards.
+      // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
       if (
         config.isCloud === "true" &&
         redirectPending(router.currentRoute.value.name as string | undefined)

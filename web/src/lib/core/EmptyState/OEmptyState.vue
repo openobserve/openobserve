@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • block  inside a card or panel — medium illustration, tighter copy
     • inline  inside a table body / dropdown — tiny: just icon + one line
   Plus `intro`: a page's product intro — hero copy over a smaller illustration,
-  sized to its content and sitting at the top, so the cards below it stay in view.
+  centred in its pane and growing past it, so the pane scrolls rather than clips.
 
   Driven by a PRESET (the common path) or by props/slots (the escape hatch):
     <OEmptyState preset="no-search-results" @action="clearFilters" />
@@ -352,7 +352,7 @@ const SIZE_MAP: Record<
     iconWrap: "",
   },
   intro: {
-    root: "w-full px-6 pt-6 pb-10 max-md:px-4 max-md:py-5",
+    root: "w-full min-h-full px-6 py-8 max-md:px-4 max-md:py-5",
     stack: "gap-4 max-md:gap-3",
     copy: "gap-2 max-md:gap-1.5",
     actions: "gap-3 max-md:gap-2",

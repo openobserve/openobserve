@@ -85,12 +85,12 @@ export function useSetupTarget(orgSource?: MaybeRefOrGetter<string>) {
   const onboarding = computed(
     () => config.isCloud === "true" && hasUserData.value === false && !isFetching.value,
   );
-  // A null choice opens onboarding's first step.
-  const target = (choice: OnboardingChoiceId | "agent" | null, route: string) =>
+  // A null choice opens onboarding's first step; a row opens that row of the choice.
+  const target = (choice: OnboardingChoiceId | "agent" | null, route: string, row?: string) =>
     onboarding.value
       ? {
           name: "onboarding",
-          params: { path: choice ? [choice] : [] },
+          params: { path: choice ? (row ? [choice, row] : [choice]) : [] },
           query: { org_identifier: org() },
         }
       : { name: route, query: { org_identifier: org() } };

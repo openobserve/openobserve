@@ -5042,20 +5042,16 @@
       "setUp": "Set up logs",
       "features": {
         "search": {
-          "title": "Search with SQL or full text",
-          "text": "Filter by any field, over any time range."
+          "title": "Search with SQL or full text"
         },
         "patterns": {
-          "title": "Spot patterns",
-          "text": "Group similar lines and find the new ones."
+          "title": "Spot patterns"
         },
         "dashboards": {
-          "title": "Chart your logs",
-          "text": "Turn a search into a chart and pin it to a dashboard."
+          "title": "Chart your logs"
         },
         "alerts": {
-          "title": "Alert on errors",
-          "text": "Get notified when error counts jump."
+          "title": "Alert on errors"
         }
       }
     },
@@ -5065,16 +5061,13 @@
       "setUp": "Set up metrics",
       "features": {
         "explore": {
-          "title": "Browse every metric",
-          "text": "Each metric opens as a chart, with no query to write."
+          "title": "Browse every metric"
         },
         "dashboards": {
-          "title": "Build dashboards",
-          "text": "Put the charts you watch on one screen."
+          "title": "Build dashboards"
         },
         "alerts": {
-          "title": "Alert on limits",
-          "text": "Get notified when a value crosses a threshold."
+          "title": "Alert on limits"
         }
       }
     },
@@ -5084,16 +5077,13 @@
       "setUp": "Set up traces",
       "features": {
         "spans": {
-          "title": "See each request end to end",
-          "text": "Every step in order, with how long it took."
+          "title": "See each request end to end"
         },
         "latency": {
-          "title": "Find slow and failing endpoints",
-          "text": "Latency and errors for each service and operation."
+          "title": "Find slow and failing endpoints"
         },
         "logs": {
-          "title": "Jump to the matching logs",
-          "text": "Open the logs of the same request from its trace."
+          "title": "Jump to the matching logs"
         }
       }
     },
@@ -5103,16 +5093,13 @@
       "setUp": "Set up LLM tracing",
       "features": {
         "cost": {
-          "title": "Track cost and tokens",
-          "text": "Spend and token use for each model and agent."
+          "title": "Track cost and tokens"
         },
         "latency": {
-          "title": "Find slow and failing calls",
-          "text": "Latency and errors for every model call."
+          "title": "Find slow and failing calls"
         },
         "agents": {
-          "title": "Follow agent runs",
-          "text": "Each step and tool call an agent makes, in order."
+          "title": "Follow agent runs"
         }
       }
     },
@@ -5120,16 +5107,13 @@
       "setUp": "Set up frontend monitoring",
       "features": {
         "performance": {
-          "title": "Measure page speed",
-          "text": "Load times from the browsers your users actually use."
+          "title": "Measure page speed"
         },
         "errors": {
-          "title": "Catch frontend errors",
-          "text": "Each error with the page and browser it came from."
+          "title": "Catch frontend errors"
         },
         "replay": {
-          "title": "Replay user sessions",
-          "text": "Watch what a user did before something broke."
+          "title": "Replay user sessions"
         }
       }
     }

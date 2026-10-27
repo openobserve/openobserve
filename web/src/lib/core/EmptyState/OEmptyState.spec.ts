@@ -240,10 +240,12 @@ describe("OEmptyState", () => {
   // ── intro size + eyebrow ────────────────────────────────────────────────────
 
   describe("intro size", () => {
-    it("sizes to its content with the hero type ramp and a smaller illustration", () => {
+    it("fills its pane, centred, with the hero type ramp and a smaller illustration", () => {
       wrapper = buildWrapper({ size: "intro" });
 
       const root = wrapper.find('[data-test="o2-empty-state"]');
+      // min-h, not h: a taller stack grows the pane's scroll instead of clipping
+      expect(root.classes()).toEqual(expect.arrayContaining(["min-h-full", "justify-center"]));
       expect(root.classes()).not.toContain("h-full");
       expect(wrapper.find("h2").classes()).toContain("text-2xl!");
       expect(wrapper.findComponent({ name: "IllustrationStub" }).props("width")).toBe(136);

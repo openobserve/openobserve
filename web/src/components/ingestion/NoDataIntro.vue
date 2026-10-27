@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   NoDataIntro — the product intro a data page shows in place of its query UI while the org
-  has no data yet: what the page does, how long setup takes, where to set it up, and what
+  has no data yet: what the page does, where to set it up, the ways to send data, and what
   the user can do once data arrives. One layout for Logs, Metrics, Traces, AI and RUM.
 -->
 <template>
@@ -37,15 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot name="status" />
         </div>
         <template v-if="!hideSetup">
-          <div class="flex basis-full justify-center">
-            <OTag
-              :label="t('noDataIntro.aboutMinutes', { count: spec.minutes }, spec.minutes)"
-              variant="primary-soft"
-              icon="schedule"
-              size="md"
-              data-test="no-data-intro-time"
-            />
-          </div>
+          <p
+            v-if="spec.minutes"
+            class="text-text-secondary basis-full text-sm"
+            data-test="no-data-intro-time"
+          >
+            {{ t("noDataIntro.aboutMinutes", { count: spec.minutes }, spec.minutes) }}
+          </p>
           <OButton
             variant="primary"
             size="md"
@@ -68,37 +66,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #extra>
-        <section
-          class="flex w-full max-w-3xl flex-col gap-2.5 text-start"
-          aria-labelledby="no-data-intro-after-setup"
+        <div
+          v-if="spec.sources"
+          class="grid grid-cols-[repeat(2,minmax(0,18rem))] gap-3 max-md:w-full max-md:grid-cols-1 max-md:gap-2"
         >
-          <h3 id="no-data-intro-after-setup" class="text-text-secondary text-sm font-semibold">
-            {{ t("noDataIntro.afterSetup") }}
-          </h3>
-          <ul class="grid grid-cols-3 gap-3 max-md:grid-cols-1">
-            <li v-for="feature in features" :key="feature.id">
-              <OCard
-                variant="outlined"
-                class="h-full gap-1.5 px-4 py-3"
-                :data-test="`no-data-intro-feature-${feature.id}`"
-              >
-                <span class="flex items-center gap-2.5">
-                  <span
-                    class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex size-7 shrink-0 items-center justify-center"
-                  >
-                    <OIcon :name="feature.icon" size="sm" />
-                  </span>
-                  <span class="text-text-heading text-sm font-semibold">{{
-                    t(`noDataIntro.${signal}.features.${feature.id}.title`)
-                  }}</span>
-                </span>
-                <span class="text-text-secondary text-xs leading-relaxed">{{
-                  t(`noDataIntro.${signal}.features.${feature.id}.text`)
-                }}</span>
-              </OCard>
-            </li>
-          </ul>
-        </section>
+          <EmptyStateIngestionCard
+            v-for="source in spec.sources"
+            :key="source.id"
+            :icon="source.icon"
+            :label="t(`${rowKey(source)}.name`, source.params)"
+            :sublabel="t(`${rowKey(source)}.description`, source.params)"
+            :data-test="`${signal}-no-data-intro-${source.id}-card`"
+            @click="go(spec.choice, source)"
+          />
+        </div>
+        <ul
+          class="text-text-secondary flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-sm"
+          :aria-label="t('noDataIntro.afterSetup')"
+        >
+          <li
+            v-for="feature in features"
+            :key="feature"
+            class="flex items-center gap-1.5"
+            :data-test="`no-data-intro-feature-${feature}`"
+          >
+            <OIcon name="check" size="sm" />
+            {{ t(`noDataIntro.${signal}.features.${feature}.title`) }}
+          </li>
+        </ul>
         <slot name="extra" />
       </template>
     </OEmptyState>
@@ -109,12 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
@@ -123,9 +117,14 @@ import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseF
 
 export type NoDataSignal = "logs" | "metrics" | "traces" | "llm" | "rum";
 
-interface Feature {
+interface Source {
   id: string;
+  /** The onboarding row it opens on cloud; the card shows that row's copy. */
+  row: string;
   icon: IconName;
+  /** Otherwise: the ingestion page for the same source. */
+  route: string;
+  params: Record<string, unknown>;
 }
 
 interface IntroSpec {
@@ -134,12 +133,14 @@ interface IntroSpec {
   title: I18nKey;
   description: I18nKey;
   illustration: IllustrationName;
-  minutes: number;
+  /** Left out where no one estimate holds for every way in. */
+  minutes?: number;
   /** The onboarding choice this signal starts from (cloud, org with no data). */
   choice: OnboardingChoiceId;
   /** Otherwise: the setup page this page's empty state already linked to. */
   route: string;
-  features: Feature[];
+  sources?: Source[];
+  features: string[];
 }
 
 const SPECS: Record<NoDataSignal, IntroSpec> = {
@@ -148,14 +149,40 @@ const SPECS: Record<NoDataSignal, IntroSpec> = {
     title: "noDataIntro.logs.title",
     description: "noDataIntro.logs.description",
     illustration: "logs",
-    minutes: 2,
     choice: "logs",
     route: "curl",
-    features: [
-      { id: "search", icon: "search" },
-      { id: "patterns", icon: "pattern" },
-      { id: "alerts", icon: "notifications-active" },
+    sources: [
+      {
+        id: "shipper",
+        row: "from-a-log-shipper-you-run",
+        icon: "extension",
+        route: "fluentbit",
+        // the row's first guides; the spec checks them against onboarding
+        params: { examples: raw("Fluent Bit, Fluentd, Vector, Filebeat"), count: 3 },
+      },
+      {
+        id: "curl",
+        row: "over-http-with-curl",
+        icon: "send",
+        route: "curl",
+        params: { curl: raw("curl") },
+      },
+      {
+        id: "otel",
+        row: "from-opentelemetry",
+        icon: "code",
+        route: "ingestLogsFromOtel",
+        params: { otel: raw("OpenTelemetry") },
+      },
+      {
+        id: "other",
+        row: "something-else",
+        icon: "swap-horiz",
+        route: "recommended",
+        params: { splunk: raw("Splunk"), cribl: raw("Cribl") },
+      },
     ],
+    features: ["search", "patterns", "alerts"],
   },
   metrics: {
     module: "menu.metrics",
@@ -165,11 +192,7 @@ const SPECS: Record<NoDataSignal, IntroSpec> = {
     minutes: 5,
     choice: "infrastructure",
     route: "ingestMetrics",
-    features: [
-      { id: "explore", icon: "show-chart" },
-      { id: "dashboards", icon: "dashboard" },
-      { id: "alerts", icon: "notifications-active" },
-    ],
+    features: ["explore", "dashboards", "alerts"],
   },
   traces: {
     module: "menu.traces",
@@ -179,11 +202,7 @@ const SPECS: Record<NoDataSignal, IntroSpec> = {
     minutes: 10,
     choice: "backend",
     route: "tracesOTLP",
-    features: [
-      { id: "spans", icon: "timeline" },
-      { id: "latency", icon: "speed" },
-      { id: "logs", icon: "article" },
-    ],
+    features: ["spans", "latency", "logs"],
   },
   llm: {
     module: "menu.aiObservability",
@@ -193,11 +212,7 @@ const SPECS: Record<NoDataSignal, IntroSpec> = {
     minutes: 5,
     choice: "llm",
     route: "ai-integrations",
-    features: [
-      { id: "cost", icon: "paid" },
-      { id: "latency", icon: "speed" },
-      { id: "agents", icon: "account-tree" },
-    ],
+    features: ["cost", "latency", "agents"],
   },
   rum: {
     module: "menu.rum",
@@ -208,16 +223,12 @@ const SPECS: Record<NoDataSignal, IntroSpec> = {
     minutes: 5,
     choice: "frontend",
     route: "frontendMonitoring",
-    features: [
-      { id: "performance", icon: "speed" },
-      { id: "errors", icon: "error-outline" },
-      { id: "replay", icon: "play-circle" },
-    ],
+    features: ["performance", "errors", "replay"],
   },
 };
 
-// log patterns are enterprise-only; other builds get a card every build has
-const LOG_DASHBOARDS: Feature = { id: "dashboards", icon: "dashboard" };
+// log patterns are enterprise-only; other builds get a point every build has
+const LOG_DASHBOARDS = "dashboards";
 
 const props = defineProps<{
   signal: NoDataSignal;
@@ -226,9 +237,9 @@ const props = defineProps<{
 }>();
 
 defineSlots<{
-  /** FirstDataPanel's status line, above the time estimate. */
+  /** FirstDataPanel's status line, above the setup buttons. */
   status?(): unknown;
-  /** Extra links under the "After setup you can" cards. */
+  /** Extra links under the "After setup you can" line. */
   extra?(): unknown;
 }>();
 
@@ -243,10 +254,14 @@ const features = computed(() => {
     "logPatterns",
     buildFeatureGateContext(store.state.zoConfig),
   ).allowed;
-  return spec.value.features.map((f) => (f.id === "patterns" && !patterns ? LOG_DASHBOARDS : f));
+  return spec.value.features.map((f) => (f === "patterns" && !patterns ? LOG_DASHBOARDS : f));
 });
 
-const go = (choice: OnboardingChoiceId | "agent") => {
-  void router.push(target(choice, spec.value.route));
+// a row's copy sits under the camelCase of its id, as onboarding reads it
+const rowKey = (source: Source) =>
+  `onboarding.${spec.value.choice}.rows.${source.row.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())}`;
+
+const go = (choice: OnboardingChoiceId | "agent", source?: Source) => {
+  void router.push(target(choice, source?.route ?? spec.value.route, source?.row));
 };
 </script>

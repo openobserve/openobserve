@@ -17,6 +17,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import type { TranslateFn } from "@/types/i18n";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { buildChoices } from "@/components/onboarding/onboardingChoices";
 import NoDataIntro, { type NoDataSignal } from "./NoDataIntro.vue";
 
 const awsConfig = vi.hoisted(() => ({ isEnterprise: "false", isCloud: "false" }));
@@ -51,6 +55,13 @@ const ROUTES: Record<NoDataSignal, string> = {
   llm: "ai-integrations",
   rum: "frontendMonitoring",
 };
+// each Logs way in: its onboarding row (cloud) and its ingestion page (elsewhere)
+const SOURCES = [
+  { id: "shipper", row: "from-a-log-shipper-you-run", route: "fluentbit" },
+  { id: "curl", row: "over-http-with-curl", route: "curl" },
+  { id: "otel", row: "from-opentelemetry", route: "ingestLogsFromOtel" },
+  { id: "other", row: "something-else", route: "recommended" },
+];
 const ORG = store.state.selectedOrganization.identifier;
 
 let wrapper: VueWrapper;
@@ -61,6 +72,7 @@ const mountIntro = (signal: NoDataSignal, { slots = {}, hideSetup = false } = {}
     global: { plugins: [i18n, store] },
   }));
 const find = (id: string) => wrapper.find(`[data-test="${id}"]`);
+const card = (id: string) => find(`logs-no-data-intro-${id}-card`);
 const featureIds = () =>
   wrapper
     .findAll('[data-test^="no-data-intro-feature-"]')
@@ -82,7 +94,6 @@ describe("NoDataIntro", () => {
     expect(text).not.toMatch(/noDataIntro\.|menu\.|emptyState\./);
     expect(find("no-data-intro").attributes("data-signal")).toBe(signal);
     expect(find("no-data-intro-module").text()).not.toBe("");
-    expect(find("no-data-intro-time").text()).toMatch(/^About \d+ minutes?$/);
     expect(find("no-data-intro-setup-btn").text()).toMatch(/^Set up /);
     expect(featureIds()).toHaveLength(3);
   });
@@ -92,7 +103,39 @@ describe("NoDataIntro", () => {
 
     expect(find("no-data-intro-module").text()).toBe("Logs");
     expect(wrapper.find("h2").text()).toBe("Search every log line in seconds, from any source");
-    expect(find("no-data-intro-time").text()).toBe("About 2 minutes");
+  });
+
+  // logs offers four ways in, and the estimate held only for curl
+  it("drops the time estimate on Logs and shows it elsewhere as plain text, not a tag", () => {
+    mountIntro("logs");
+    expect(find("no-data-intro-time").exists()).toBe(false);
+    wrapper.unmount();
+
+    mountIntro("traces");
+    expect(find("no-data-intro-time").text()).toBe("About 10 minutes");
+    expect(wrapper.findComponent(OTag).exists()).toBe(false);
+  });
+
+  it("lists what setup unlocks as one line of check marks, not cards", () => {
+    mountIntro("logs");
+
+    expect(wrapper.findComponent(OCard).exists()).toBe(false);
+    const items = wrapper.findAll('[data-test^="no-data-intro-feature-"]');
+    expect(items.map((li) => li.element.tagName)).toEqual(["LI", "LI", "LI"]);
+    expect(items[0].text()).toBe("Search with SQL or full text");
+  });
+
+  it("offers four ways to send logs, worded as the onboarding Logs rows", () => {
+    mountIntro("logs");
+    const rows = buildChoices(i18n.global.t as unknown as TranslateFn).find(
+      (c) => c.id === "logs",
+    )!.rows;
+
+    expect(rows.map((r) => r.id)).toEqual(SOURCES.map((s) => s.row));
+    for (const [i, s] of SOURCES.entries()) {
+      expect(card(s.id).element.tagName).toBe("BUTTON");
+      expect(card(s.id).text()).toBe(`${rows[i].name}${rows[i].description}`);
+    }
   });
 
   it("keeps the copy the RUM empty state already had", () => {
@@ -110,6 +153,18 @@ describe("NoDataIntro", () => {
       expect(push).toHaveBeenCalledWith({
         name: "onboarding",
         params: { path: [CHOICES[signal]] },
+        query: { org_identifier: ORG },
+      });
+    });
+
+    it.each(SOURCES)("opens the $row onboarding guide from the $id card", async ({ id, row }) => {
+      awsConfig.isCloud = "true";
+      mountIntro("logs");
+      await card(id).trigger("click");
+
+      expect(push).toHaveBeenCalledWith({
+        name: "onboarding",
+        params: { path: ["logs", row] },
         query: { org_identifier: ORG },
       });
     });
@@ -155,6 +210,13 @@ describe("NoDataIntro", () => {
       });
     });
 
+    it.each(SOURCES)("opens the $route ingestion page from the $id card", async ({ id, route }) => {
+      mountIntro("logs");
+      await card(id).trigger("click");
+
+      expect(push).toHaveBeenCalledWith({ name: route, query: { org_identifier: ORG } });
+    });
+
     it("has no coding agent button, since that page exists only on cloud", () => {
       mountIntro("logs");
 
@@ -170,6 +232,7 @@ describe("NoDataIntro", () => {
     expect(find("no-data-intro-setup-btn").exists()).toBe(false);
     expect(find("no-data-intro-agent-btn").exists()).toBe(false);
     expect(featureIds()).toHaveLength(3);
+    expect(card("curl").exists()).toBe(true);
   });
 
   it("promises log patterns only on builds that have them", () => {
