@@ -8254,6 +8254,17 @@
     "exampleCharts": "Przykładowe wykresy",
     "namePlaceholder": "Panel bez tytułu",
     "renameHint": "Kliknij, aby zmienić nazwę tego panelu",
+    "variableSuggestion": {
+      "queryValues": "Wartości zapytania",
+      "constant": "Stała",
+      "textbox": "Pole tekstowe",
+      "custom": "Niestandardowy",
+      "list": "{type} · {example}",
+      "csv": "Przecinki: {example}",
+      "pipe": "Kreski pionowe: {example}",
+      "doublequote": "Podwójne cudzysłowy: {example}",
+      "singlequote": "Pojedyncze cudzysłowy: {example}"
+    },
     "add": "Dodaj panel",
     "save": "Zapisz",
     "cancel": "Anuluj",

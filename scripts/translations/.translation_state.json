@@ -19420,6 +19420,17 @@
     "unsupportedPanelTypeAlert": "7293beda0a3b203f",
     "value": "8e37953d23daca5f",
     "valueFields": "012ad5409862a161",
+    "variableSuggestion": {
+      "constant": "8ab253e4aab66e2a",
+      "csv": "90afcf937330e97f",
+      "custom": "494ca78f7374e46f",
+      "doublequote": "0e1af56126edd381",
+      "list": "e547bf4f1b91ebb8",
+      "pipe": "b2114e05a8ef3080",
+      "queryValues": "1acacb08feadac61",
+      "singlequote": "712ec9d33806c31b",
+      "textbox": "449d1c52f1b8acf6"
+    },
     "weight": "81d27ef6d5033c3e",
     "xAxisShort": "5dff361d210ed230",
     "yAxisShort": "ce423a87ba8e56c8",

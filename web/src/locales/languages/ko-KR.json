@@ -8254,6 +8254,17 @@
     "exampleCharts": "예제 차트",
     "namePlaceholder": "제목 없는 패널",
     "renameHint": "이 패널의 이름을 바꾸려면 클릭하세요",
+    "variableSuggestion": {
+      "queryValues": "쿼리 값",
+      "constant": "상수",
+      "textbox": "텍스트 상자",
+      "custom": "사용자 지정",
+      "list": "{type} · {example}",
+      "csv": "쉼표: {example}",
+      "pipe": "파이프: {example}",
+      "doublequote": "큰따옴표: {example}",
+      "singlequote": "작은따옴표: {example}"
+    },
     "add": "패널 추가",
     "save": "저장",
     "cancel": "취소",
