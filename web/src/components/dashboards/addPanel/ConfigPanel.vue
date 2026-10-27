@@ -480,6 +480,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OToggleGroup>
 
+        <OSelect
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'chart-tooltip-mode')"
+          :label="t('dashboard.chartTooltipMode')"
+          v-model="chartTooltipModeModel"
+          :options="chartTooltipModeOptions"
+          data-test="dashboard-config-tooltip_mode"
+        />
+
+        <OSelect
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'tooltip-sort')"
+          :label="t('dashboard.tooltipSort')"
+          v-model="tooltipSortModel"
+          :options="tooltipSortOptions"
+          data-test="dashboard-config-tooltip_sort"
+        />
+
         <OToggleGroup
           v-if="shouldShowLegendValues(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-values')"
@@ -731,6 +749,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OToggleGroup>
 
+        <div
+          v-if="dashboardPanelData.data.type === 'heatmap'"
+          v-show="isConfigOptionVisible('data', 'heatmap-cells')"
+          class="flex gap-2"
+        >
+          <OInput
+            class="min-w-0 flex-1"
+            :model-value="dashboardPanelData.data.config.heatmap_cell_gap ?? null"
+            type="number"
+            :min="0"
+            :label="t('dashboard.heatmapCellGap')"
+            :placeholder="defaultPlaceholder(t, t('dashboard.heatmapCellGapPlaceholder'))"
+            data-test="dashboard-config-heatmap_cell_gap"
+            @update:model-value="(value: any) => setNumberConfig('heatmap_cell_gap', value)"
+          />
+          <OInput
+            class="min-w-0 flex-1"
+            :model-value="dashboardPanelData.data.config.heatmap_hide_below ?? null"
+            type="number"
+            :label="t('dashboard.heatmapHideBelow')"
+            :placeholder="defaultPlaceholder(t, t('dashboard.sortNone'))"
+            data-test="dashboard-config-heatmap_hide_below"
+            @update:model-value="(value: any) => setNumberConfig('heatmap_hide_below', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.heatmapHideBelowTooltip')" max-width="15.625rem" />
+            </template>
+          </OInput>
+        </div>
+
         <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
@@ -873,12 +921,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.layout.currentQueryIndex
               ].config.limit = 0)
           "
-          :placeholder="t('dashboard.zeroPlaceholder')"
+          :placeholder="
+            isRawValueChart(dashboardPanelData.data.type)
+              ? raw(String(DISTRIBUTION_ROW_LIMIT))
+              : t('dashboard.zeroPlaceholder')
+          "
           :label="t('dashboard.queryLimit')"
+          :help-text="
+            rawRowLimitHelp(
+              dashboardPanelData.data.type,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+                .limit,
+            )
+          "
           data-test="dashboard-config-limit"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.limitForQueryResult')" />
+            <OTooltip
+              :content="
+                isRawValueChart(dashboardPanelData.data.type)
+                  ? t('dashboard.rawValueRowLimit', { count: DISTRIBUTION_ROW_LIMIT })
+                  : t('dashboard.limitForQueryResult')
+              "
+              data-test="dashboard-config-limit-info"
+            />
           </template>
         </OInput>
 
@@ -941,6 +1007,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSwitch>
 
         <OInput
+          v-if="shouldShowConnectNullsThreshold(dashboardPanelData)"
+          v-show="isConfigOptionVisible('data', 'connect-nulls-threshold')"
+          :model-value="dashboardPanelData.data.config.connect_nulls_threshold ?? null"
+          type="number"
+          :min="0"
+          :label="t('dashboard.connectNullsThreshold')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.connectNullsThresholdPlaceholder'))"
+          data-test="dashboard-config-connect_nulls_threshold"
+          @update:model-value="(value: any) => setNumberConfig('connect_nulls_threshold', value)"
+        >
+          <template #tooltip>
+            <OTooltip
+              :content="t('dashboard.connectNullsThresholdTooltip')"
+              max-width="15.625rem"
+            />
+          </template>
+        </OInput>
+
+        <template v-if="shouldShowScatterEncoding(dashboardPanelData, promqlMode)">
+          <div v-show="isConfigOptionVisible('data', 'scatter-encoding')" class="flex gap-2">
+            <OSelect
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_size_field ?? null"
+              :options="scatterFieldOptions"
+              :label="t('dashboard.scatterSizeField')"
+              data-test="dashboard-config-scatter_size_field"
+              @update:model-value="(value: any) => setTextConfig('scatter_size_field', value)"
+            />
+            <OSelect
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_color_field ?? null"
+              :options="scatterFieldOptions"
+              :label="t('dashboard.scatterColorField')"
+              data-test="dashboard-config-scatter_color_field"
+              @update:model-value="(value: any) => setTextConfig('scatter_color_field', value)"
+            />
+          </div>
+          <div
+            v-if="dashboardPanelData.data.config.scatter_size_field"
+            v-show="isConfigOptionVisible('data', 'scatter-encoding')"
+            class="flex gap-2"
+          >
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_size_min ?? null"
+              type="number"
+              :min="1"
+              :label="t('dashboard.scatterSizeMin')"
+              :placeholder="defaultPlaceholder(t, DEFAULT_SCATTER_SIZE_MIN)"
+              data-test="dashboard-config-scatter_size_min"
+              @update:model-value="(value: any) => setNumberConfig('scatter_size_min', value)"
+            />
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_size_max ?? null"
+              type="number"
+              :min="1"
+              :label="t('dashboard.scatterSizeMax')"
+              :placeholder="defaultPlaceholder(t, DEFAULT_SCATTER_SIZE_MAX)"
+              data-test="dashboard-config-scatter_size_max"
+              @update:model-value="(value: any) => setNumberConfig('scatter_size_max', value)"
+            />
+          </div>
+        </template>
+
+        <OInput
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelDataModel.data.config.no_value_replacement"
@@ -949,7 +1081,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-no-value-replacement"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.noValueReplacementTooltip')" />
+            <OTooltip
+              :content="
+                ['metric', 'gauge', 'table'].includes(dashboardPanelData.data.type)
+                  ? t('dashboard.noValueReplacementTooltipValue')
+                  : t('dashboard.noValueReplacementTooltip')
+              "
+            />
           </template>
         </OInput>
       </div>
@@ -958,7 +1096,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: State timeline -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type === 'state-timeline'"
+      v-if="isRowTimeline(dashboardPanelData.data.type)"
       v-show="isSectionVisible('stateTimeline')"
       :model-value="isExpanded('stateTimeline')"
       :icon="SECTION_ICONS.stateTimeline"
@@ -1067,6 +1205,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             size="sm"
             data-test="dashboard-config-state-timeline-tooltip-mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OToggleGroup
+          v-show="isConfigOptionVisible('stateTimeline', 'state-value-align')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.stateValueAlign')"
+          v-model="stateValueAlignModel"
+          data-test="dashboard-config-state_value_align"
+          :data-test-selected-value="stateValueAlignModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in stateValueAlignOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-state_value_align-option"
             :data-test-label="opt.label"
             >{{ opt.label }}</OToggleGroupItem
           >
@@ -1490,6 +1648,123 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
+        <div
+          class="flex gap-2"
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-hard-range')"
+        >
+          <OInput
+            class="min-w-0 flex-1"
+            :model-value="dashboardPanelData.data.config.y_axis_hard_min ?? null"
+            type="number"
+            :placeholder="defaultPlaceholder(t, t('dashboard.defaultAutoFromData'))"
+            :label="t('dashboard.yAxisHardMin')"
+            data-test="dashboard-config-y_axis_hard_min"
+            @update:model-value="(value: any) => setNumberConfig('y_axis_hard_min', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.yAxisHardRangeTooltip')" max-width="15.625rem" />
+            </template>
+          </OInput>
+          <OInput
+            class="min-w-0 flex-1"
+            :model-value="dashboardPanelData.data.config.y_axis_hard_max ?? null"
+            type="number"
+            :placeholder="defaultPlaceholder(t, t('dashboard.defaultAutoFromData'))"
+            :label="t('dashboard.yAxisHardMax')"
+            data-test="dashboard-config-y_axis_hard_max"
+            @update:model-value="(value: any) => setNumberConfig('y_axis_hard_max', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.yAxisHardRangeTooltip')" max-width="15.625rem" />
+            </template>
+          </OInput>
+        </div>
+
+        <OToggleGroup
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-scale')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.yAxisScale')"
+          v-model="yAxisScaleModel"
+          data-test="dashboard-config-y_axis_scale"
+          :data-test-selected-value="yAxisScaleModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in yAxisScaleOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-y_axis_scale-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OSelect
+          v-if="
+            shouldShowCartesianSeriesConfig(dashboardPanelData) &&
+            dashboardPanelData.data.config.y_axis_scale === 'log'
+          "
+          v-show="isConfigOptionVisible('axis', 'y-axis-scale')"
+          v-model="yAxisLogBaseModel"
+          :options="yAxisLogBaseOptions"
+          :label="t('dashboard.yAxisLogBase')"
+          data-test="dashboard-config-y_axis_log_base"
+        />
+
+        <OInput
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-label')"
+          :model-value="dashboardPanelData.data.config.y_axis_label ?? ''"
+          :label="t('dashboard.yAxisLabel')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.defaultAutoFromData'))"
+          data-test="dashboard-config-y_axis_label"
+          @update:model-value="(value: any) => setTextConfig('y_axis_label', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.yAxisLabelTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OToggleGroup
+          v-if="shouldShowStackMode(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'stack-mode')"
+          type="single"
+          label-position="top"
+          v-model="stackModeModel"
+          data-test="dashboard-config-stack_mode"
+          :data-test-selected-value="stackModeModel"
+        >
+          <template #label>
+            <span class="flex items-center gap-1">
+              {{ t("dashboard.stackMode") }}
+              <OIcon name="info-outline" size="sm" class="cursor-help">
+                <OTooltip :content="t('dashboard.stackModeTooltip')" max-width="15.625rem" />
+              </OIcon>
+            </span>
+          </template>
+          <OToggleGroupItem
+            v-for="opt in stackModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-stack_mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OSelect
+          v-if="shouldShowSortOrder(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'sort-order')"
+          :label="t('dashboard.barSortOrder')"
+          v-model="sortOrderModel"
+          :options="sortOrderOptions"
+          data-test="dashboard-config-sort_order"
+        />
+
         <OInput
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'y-axis-min-interval')"
@@ -1714,6 +1989,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="dashboardPanelData.data.config.line_thickness ?? ''"
           type="number"
           :min="0"
+          step="any"
           :max="MAX_LINE_THICKNESS"
           :error-message="lineThicknessError"
           @update:model-value="setLineThickness"
@@ -1727,6 +2003,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('dashboard.lineThicknessDefault')"
           data-test="dashboard-config-line_thickness"
         />
+
+        <OToggleGroup
+          v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'line-style')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.lineStyle')"
+          v-model="lineStyleModel"
+          data-test="dashboard-config-line_style"
+          :data-test-selected-value="lineStyleModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in lineStyleOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-line_style-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OInput
+          v-if="shouldShowBarRadius(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'bar-radius')"
+          :model-value="dashboardPanelData.data.config.bar_radius ?? null"
+          type="number"
+          :min="0"
+          :label="t('dashboard.barRadius')"
+          :placeholder="defaultPlaceholder(t, DEFAULT_BAR_RADIUS)"
+          data-test="dashboard-config-bar_radius"
+          @update:model-value="(value: any) => setNumberConfig('bar_radius', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.barRadiusTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
 
         <OInput
           v-if="shouldShowAreaFillConfig(dashboardPanelData)"
@@ -1886,6 +2199,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="15.625rem" />
           </template>
         </OInput>
+
+        <OSelect
+          v-show="isConfigOptionVisible('table', 'table-density')"
+          :label="t('dashboard.tableDensity')"
+          v-model="tableDensityModel"
+          :options="tableDensityOptions"
+          data-test="dashboard-config-table_density"
+        />
+
+        <OSelect
+          v-if="!promqlMode && !isPivotMode"
+          v-show="isConfigOptionVisible('table', 'table-footer-calcs')"
+          :model-value="tableFooterCalcsModel"
+          :options="tableFooterCalcOptions"
+          multiple
+          :label="t('dashboard.tableFooterCalcs')"
+          :placeholder="defaultHint(t, t('dashboard.sortNone'))"
+          data-test="dashboard-config-table_footer_calcs"
+          @update:model-value="(value: any) => setListConfig('table_footer_calcs', value)"
+        />
       </div>
     </OCollapsible>
 
@@ -2149,6 +2482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSelect
           v-if="dashboardPanelData.data.type == 'geomap'"
+          v-show="isConfigOptionVisible('map', 'map-config')"
           v-model="dashboardPanelDataModel.data.config.base_map.type"
           :options="basemapTypeOptions"
           :valueKey="'value'"
@@ -2158,115 +2492,146 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div v-if="dashboardPanelData.data.type == 'geomap'" class="flex flex-col gap-y-3">
-          <span>{{ t("dashboard.initialView") }}</span>
-          <div class="flex gap-2">
+          <div v-show="isConfigOptionVisible('map', 'map-config')" class="flex flex-col gap-y-3">
+            <span>{{ t("dashboard.initialView") }}</span>
+            <div class="flex gap-2">
+              <OInput
+                class="min-w-0 flex-1"
+                v-model.number="dashboardPanelDataModel.data.config.map_view.lat"
+                :label="t('dashboard.latitudeLabel')"
+                type="number"
+                @blur="handleBlur(dashboardPanelData.data.config.map_view, 0, 'lat')"
+                data-test="dashboard-config-latitude"
+              />
+              <OInput
+                class="min-w-0 flex-1"
+                v-model.number="dashboardPanelDataModel.data.config.map_view.lng"
+                :label="t('dashboard.longitudeLabel')"
+                type="number"
+                @blur="handleBlur(dashboardPanelData.data.config.map_view, 0, 'lng')"
+                data-test="dashboard-config-longitude"
+              />
+            </div>
             <OInput
-              class="min-w-0 flex-1"
-              v-model.number="dashboardPanelDataModel.data.config.map_view.lat"
-              :label="t('dashboard.latitudeLabel')"
+              v-model.number="dashboardPanelDataModel.data.config.map_view.zoom"
+              :label="t('dashboard.zoomLabel')"
               type="number"
-              @blur="handleBlur(dashboardPanelData.data.config.map_view, 0, 'lat')"
-              data-test="dashboard-config-latitude"
+              @blur="handleBlur(dashboardPanelData.data.config.map_view, 1, 'zoom')"
+              data-test="dashboard-config-zoom"
             />
-            <OInput
-              class="min-w-0 flex-1"
-              v-model.number="dashboardPanelDataModel.data.config.map_view.lng"
-              :label="t('dashboard.longitudeLabel')"
-              type="number"
-              @blur="handleBlur(dashboardPanelData.data.config.map_view, 0, 'lng')"
-              data-test="dashboard-config-longitude"
-            />
-          </div>
-          <OInput
-            v-model.number="dashboardPanelDataModel.data.config.map_view.zoom"
-            :label="t('dashboard.zoomLabel')"
-            type="number"
-            @blur="handleBlur(dashboardPanelData.data.config.map_view, 1, 'zoom')"
-            data-test="dashboard-config-zoom"
-          />
 
-          <OSelect
-            v-model="dashboardPanelDataModel.data.config.map_symbol_style.size"
-            :label="t('dashboard.symbolsize')"
-            :options="symbolOptions"
-            :valueKey="'value'"
-            :labelKey="'label'"
-            data-test="dashboard-config-symbol"
-          />
-
-          <div class="flex gap-2">
-            <OInput
-              class="min-w-0 flex-1"
-              v-if="dashboardPanelData.data.config.map_symbol_style.size === 'by Value'"
-              v-model.number="
-                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value.min
-              "
-              :label="t('dashboard.minimum')"
-              type="number"
-              :min="0"
-              @blur="
-                handleBlur(dashboardPanelData.data.config.map_symbol_style.size_by_value, 1, 'min')
-              "
-              data-test="dashboard-config-map-symbol-min"
+            <OSelect
+              v-model="dashboardPanelDataModel.data.config.map_symbol_style.size"
+              :label="t('dashboard.symbolsize')"
+              :options="symbolOptions"
+              :valueKey="'value'"
+              :labelKey="'label'"
+              data-test="dashboard-config-symbol"
             />
+
+            <div class="flex gap-2">
+              <OInput
+                class="min-w-0 flex-1"
+                v-if="dashboardPanelData.data.config.map_symbol_style.size === 'by Value'"
+                v-model.number="
+                  dashboardPanelDataModel.data.config.map_symbol_style.size_by_value.min
+                "
+                :label="t('dashboard.minimum')"
+                type="number"
+                :min="0"
+                @blur="
+                  handleBlur(
+                    dashboardPanelData.data.config.map_symbol_style.size_by_value,
+                    1,
+                    'min',
+                  )
+                "
+                data-test="dashboard-config-map-symbol-min"
+              />
+              <OInput
+                class="min-w-0 flex-1"
+                v-if="dashboardPanelData.data.config.map_symbol_style.size === 'by Value'"
+                v-model.number="
+                  dashboardPanelDataModel.data.config.map_symbol_style.size_by_value.max
+                "
+                :label="t('dashboard.maximum')"
+                type="number"
+                :min="0"
+                @blur="
+                  handleBlur(
+                    dashboardPanelData.data.config.map_symbol_style.size_by_value,
+                    100,
+                    'max',
+                  )
+                "
+                data-test="dashboard-config-map-symbol-max"
+              />
+            </div>
+
             <OInput
-              class="min-w-0 flex-1"
-              v-if="dashboardPanelData.data.config.map_symbol_style.size === 'by Value'"
-              v-model.number="
-                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value.max
-              "
-              :label="t('dashboard.maximum')"
+              v-if="dashboardPanelData.data.config.map_symbol_style.size === 'fixed'"
+              v-model.number="dashboardPanelDataModel.data.config.map_symbol_style.size_fixed"
+              :label="t('dashboard.fixedValue')"
               type="number"
-              :min="0"
+              @blur="handleBlur(dashboardPanelData.data.config.map_symbol_style, 2, 'size_fixed')"
+              data-test="dashboard-config-map-symbol-fixed"
+            />
+
+            <OSelect
+              v-model="
+                dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                  .config.layer_type
+              "
+              :options="layerTypeOptions"
+              :label="t('dashboard.layerType')"
+              :valueKey="'value'"
+              :labelKey="'label'"
+              data-test="dashboard-config-layer-type"
+            />
+
+            <OInput
+              v-if="!isWeightFieldPresent"
+              v-model.number="
+                dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                  .config.weight_fixed
+              "
+              :label="t('common.weight')"
+              type="number"
               @blur="
                 handleBlur(
-                  dashboardPanelData.data.config.map_symbol_style.size_by_value,
-                  100,
-                  'max',
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .config,
+                  1,
+                  'weight_fixed',
                 )
               "
-              data-test="dashboard-config-map-symbol-max"
+              data-test="dashboard-config-weight"
             />
           </div>
 
+          <OSwitch
+            v-show="isConfigOptionVisible('map', 'map-cluster')"
+            :model-value="dashboardPanelData.data.config.map_cluster === true"
+            :label="t('dashboard.mapCluster')"
+            data-test="dashboard-config-map_cluster"
+            size="lg"
+            @update:model-value="(value: any) => setFlagConfig('map_cluster', value)"
+          />
           <OInput
-            v-if="dashboardPanelData.data.config.map_symbol_style.size === 'fixed'"
-            v-model.number="dashboardPanelDataModel.data.config.map_symbol_style.size_fixed"
-            :label="t('dashboard.fixedValue')"
+            v-if="dashboardPanelData.data.config.map_cluster === true"
+            v-show="isConfigOptionVisible('map', 'map-cluster')"
+            :model-value="dashboardPanelData.data.config.map_cluster_radius ?? null"
             type="number"
-            @blur="handleBlur(dashboardPanelData.data.config.map_symbol_style, 2, 'size_fixed')"
-            data-test="dashboard-config-map-symbol-fixed"
-          />
-
-          <OSelect
-            v-model="
-              dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                .config.layer_type
-            "
-            :options="layerTypeOptions"
-            :label="t('dashboard.layerType')"
-            :valueKey="'value'"
-            :labelKey="'label'"
-            data-test="dashboard-config-layer-type"
-          />
-
-          <OInput
-            v-if="!isWeightFieldPresent"
-            v-model.number="
-              dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                .config.weight_fixed
-            "
-            :label="t('common.weight')"
-            type="number"
-            @blur="
-              handleBlur(
-                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config,
-                1,
-                'weight_fixed',
-              )
-            "
-            data-test="dashboard-config-weight"
-          />
+            :min="1"
+            :label="t('dashboard.mapClusterRadius')"
+            :placeholder="defaultPlaceholder(t, DEFAULT_MAP_CLUSTER_RADIUS)"
+            data-test="dashboard-config-map_cluster_radius"
+            @update:model-value="(value: any) => setNumberConfig('map_cluster_radius', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.mapClusterRadiusTooltip')" max-width="15.625rem" />
+            </template>
+          </OInput>
         </div>
       </div>
     </OCollapsible>
@@ -2372,6 +2737,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-gauge-end-labels"
           size="lg"
         />
+        <OToggleGroup
+          v-show="isConfigOptionVisible('gauge', 'gauge-style')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.gaugeStyle')"
+          v-model="gaugeStyleModel"
+          data-test="dashboard-config-gauge_style"
+          :data-test-selected-value="gaugeStyleModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in gaugeStyleOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-gauge_style-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OInput
+          v-show="isConfigOptionVisible('gauge', 'gauge-segments')"
+          :model-value="dashboardPanelData.data.config.gauge_segments ?? null"
+          type="number"
+          :min="2"
+          :max="100"
+          :label="t('dashboard.gaugeSegments')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.gaugeSegmentsPlaceholder'))"
+          data-test="dashboard-config-gauge_segments"
+          @update:model-value="(value: any) => setNumberConfig('gauge_segments', value)"
+        />
+        <OInput
+          v-show="isConfigOptionVisible('gauge', 'gauge-neutral')"
+          :model-value="dashboardPanelData.data.config.gauge_neutral ?? null"
+          type="number"
+          :label="t('dashboard.gaugeNeutral')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.gaugeNeutralPlaceholder'))"
+          data-test="dashboard-config-gauge_neutral"
+          @update:model-value="(value: any) => setNumberConfig('gauge_neutral', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.gaugeNeutralTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+        <OSwitch
+          v-show="isConfigOptionVisible('gauge', 'gauge-round-cap')"
+          :model-value="dashboardPanelData.data.config.gauge_round_cap === true"
+          :label="t('dashboard.gaugeRoundCap')"
+          data-test="dashboard-config-gauge_round_cap"
+          size="lg"
+          @update:model-value="(value: any) => setFlagConfig('gauge_round_cap', value)"
+        />
+      </div>
+    </OCollapsible>
+
+    <!-- Section: Pie -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type === 'pie' || dashboardPanelData.data.type === 'donut'"
+      v-show="isSectionVisible('pie')"
+      :model-value="isExpanded('pie')"
+      :icon="SECTION_ICONS.pie"
+      @update:modelValue="
+        (v) => {
+          expandedSections.pie = v;
+        }
+      "
+      :label="t('dashboard.configSectionPie')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OSelect
+          v-show="isConfigOptionVisible('pie', 'pie-label-content')"
+          :model-value="pieLabelContentModel"
+          :options="pieLabelContentOptions"
+          multiple
+          :label="t('dashboard.pieLabelContent')"
+          :placeholder="t('dashboard.default')"
+          :help-text="pieLabelContentIsDefault ? pieLabelContentDefaultHint : undefined"
+          data-test="dashboard-config-pie_label_content"
+          @update:model-value="setPieLabelContent"
+        />
+        <OSelect
+          v-show="isConfigOptionVisible('pie', 'pie-sort-order')"
+          :label="t('dashboard.pieSortOrder')"
+          v-model="sortOrderModel"
+          :options="sortOrderOptions"
+          data-test="dashboard-config-pie_sort_order"
+        />
+        <OInput
+          v-show="isConfigOptionVisible('pie', 'pie-other-threshold')"
+          :model-value="dashboardPanelData.data.config.pie_other_threshold ?? null"
+          type="number"
+          :min="0"
+          :max="100"
+          :label="t('dashboard.pieOtherThreshold')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.sortNone'))"
+          data-test="dashboard-config-pie_other_threshold"
+          @update:model-value="(value: any) => setNumberConfig('pie_other_threshold', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.pieOtherThresholdTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+        <OInput
+          v-if="dashboardPanelData.data.type === 'donut'"
+          v-show="isConfigOptionVisible('pie', 'donut-inner-radius')"
+          :model-value="dashboardPanelData.data.config.donut_inner_radius ?? null"
+          type="number"
+          :min="0"
+          :max="95"
+          :label="t('dashboard.donutInnerRadius')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.auto'))"
+          data-test="dashboard-config-donut_inner_radius"
+          @update:model-value="(value: any) => setNumberConfig('donut_inner_radius', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.donutInnerRadiusTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
       </div>
     </OCollapsible>
 
@@ -2625,7 +3109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="15.625rem" />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
-        <MarkLineConfig />
+        <MarkLineConfig v-show="isConfigOptionVisible('markLines', 'mark-lines')" />
+        <MarkAreaConfig v-show="isConfigOptionVisible('markLines', 'mark-areas')" />
       </div>
     </OCollapsible>
 
@@ -2693,6 +3178,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCollapsible>
 
+    <!-- Section: Metric -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type == 'metric'"
+      v-show="isSectionVisible('metric')"
+      :model-value="isExpanded('metric')"
+      :icon="SECTION_ICONS.metric"
+      @update:modelValue="
+        (v) => {
+          expandedSections.metric = v;
+        }
+      "
+      :label="t('dashboard.configSectionMetric')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OSelect
+          v-show="isConfigOptionVisible('metric', 'stat-text-mode')"
+          :label="t('dashboard.statTextMode')"
+          v-model="statTextModeModel"
+          :options="statTextModeOptions"
+          data-test="dashboard-config-stat_text_mode"
+        />
+
+        <OInput
+          v-show="isConfigOptionVisible('metric', 'value-font-size')"
+          :model-value="dashboardPanelData.data.config.value_font_size ?? null"
+          type="number"
+          :min="1"
+          :label="t('dashboard.valueFontSize')"
+          :placeholder="defaultPlaceholder(t, t('dashboard.auto'))"
+          data-test="dashboard-config-value_font_size"
+          @update:model-value="(value: any) => setNumberConfig('value_font_size', value)"
+        />
+      </div>
+    </OCollapsible>
+
     <!-- Section: Background -->
     <OCollapsible
       variant="config"
@@ -2737,6 +3259,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import { DEFAULT_STAT_TEXT_MODE, STAT_TEXT_MODES } from "@/utils/dashboard/metricOptions";
+import {
+  DEFAULT_GAUGE_STYLE,
+  DEFAULT_STATE_VALUE_ALIGN,
+  GAUGE_STYLES,
+  STATE_VALUE_ALIGNS,
+} from "@/utils/dashboard/panelTypeOptions";
+import {
+  DEFAULT_BAR_RADIUS,
+  DEFAULT_LINE_STYLE,
+  DEFAULT_SCATTER_SIZE_MAX,
+  DEFAULT_SCATTER_SIZE_MIN,
+  DEFAULT_SORT_ORDER,
+  DEFAULT_STACK_MODE,
+  DEFAULT_TOOLTIP_MODE,
+  DEFAULT_Y_AXIS_LOG_BASE,
+  DEFAULT_Y_AXIS_SCALE,
+} from "@/utils/dashboard/cartesianOptions";
+import { DEFAULT_MAP_CLUSTER_RADIUS } from "@/utils/dashboard/geoMapCluster";
+import {
+  defaultHint,
+  defaultPlaceholder,
+  withDefaultChoice,
+} from "@/utils/dashboard/optionDefaults";
+import {
+  DISTRIBUTION_ROW_LIMIT,
+  isRawValueChart,
+  isRowTimeline,
+} from "@/utils/dashboard/chartTypeGroups";
+import { rawRowLimitHelp } from "@/utils/dashboard/rawRowCap";
+import { DEFAULT_TABLE_DENSITY, TABLE_DENSITIES } from "@/utils/dashboard/tableOptions";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
 import {
@@ -2782,6 +3335,7 @@ import {
   onMounted,
   ref,
   markRaw,
+  unref,
   watchEffect,
   watch,
 } from "vue";
@@ -2794,6 +3348,7 @@ import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
+import MarkAreaConfig from "./MarkAreaConfig.vue";
 import ThresholdsConfig from "./ThresholdsConfig.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -2861,11 +3416,21 @@ import {
   shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  shouldShowStackMode,
+  shouldShowSortOrder,
+  shouldShowBarRadius,
+  shouldShowScatterEncoding,
+  shouldShowConnectNullsThreshold,
+  shouldShowCartesianSeriesConfig,
   allVisibleQueriesInstant,
+  dependentOptionState,
+  pruneDependentOptions,
 } from "@/utils/dashboard/configUtils";
 import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
 import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
+import { resolveTooltipSort, TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 
 export default defineComponent({
   components: {
@@ -2884,6 +3449,7 @@ export default defineComponent({
     ColorBySeries,
     OCombobox,
     MarkLineConfig,
+    MarkAreaConfig,
     ThresholdsConfig,
     CustomDateTimePicker,
     DateTimePickerDashboard,
@@ -3023,6 +3589,200 @@ export default defineComponent({
       { label: t("dashboard.stateTimelineSortName"), value: "name" },
       { label: t("dashboard.stateTimelineSortNonOkTime"), value: "non_ok_time" },
     ];
+    const config = () => dashboardPanelData.data.config as Record<string, any>;
+    // An empty or cleared field drops the key, so the panel renders as if it was never set.
+    const setNumberConfig = (key: string, value: unknown) => {
+      const numeric = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+      if (typeof numeric === "number" && Number.isFinite(numeric)) config()[key] = numeric;
+      else delete config()[key];
+    };
+    const setTextConfig = (key: string, value: unknown) => {
+      const text = typeof value === "string" ? value.trim() : "";
+      if (text) config()[key] = text;
+      else delete config()[key];
+    };
+    // Default drops the key, so a panel left on it follows whatever the default behaviour is at render time.
+    const choiceModel = <T extends string>(key: string, allowed: readonly T[]) =>
+      computed({
+        get: (): string => (allowed.includes(config()[key]) ? config()[key] : TOGGLE_AUTO),
+        set: (v: string) => {
+          if (allowed.includes(v as T)) config()[key] = v;
+          else delete config()[key];
+        },
+      });
+    // Each Default entry names the option the renderer falls back to, so the user sees what "Default" means.
+    const withDefault = <O extends { label: I18nText; value: unknown }>(
+      options: readonly O[],
+      fallback: unknown,
+    ) => withDefaultChoice(t, TOGGLE_AUTO, options, fallback);
+    const chartTooltipModeModel = choiceModel("tooltip_mode", ["single", "all", "hidden"]);
+    const chartTooltipModeOptions = withDefault(
+      [
+        { label: t("dashboard.chartTooltipSingle"), value: "single" },
+        { label: t("dashboard.chartTooltipAll"), value: "all" },
+        { label: t("common.hide"), value: "hidden" },
+      ],
+      DEFAULT_TOOLTIP_MODE,
+    );
+    const tooltipSortModel = choiceModel("tooltip_sort", TOOLTIP_SORT_VALUES);
+    const sortChoices: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.sortUnsorted"), value: "none" },
+      { label: t("dashboard.heatmapYSortAsc"), value: "asc" },
+      { label: t("dashboard.heatmapYSortDesc"), value: "desc" },
+    ];
+    const tooltipSortOptions = withDefault(sortChoices, resolveTooltipSort({}));
+    const sortOrderModel = choiceModel("sort_order", ["none", "asc", "desc"]);
+    const sortOrderOptions = withDefault(sortChoices, DEFAULT_SORT_ORDER);
+    const yAxisScaleModel = choiceModel("y_axis_scale", ["linear", "log"]);
+    const yAxisScaleOptions = withDefault(
+      [
+        { label: t("dashboard.yAxisScaleLinear"), value: "linear" },
+        { label: t("dashboard.yAxisScaleLog"), value: "log" },
+      ],
+      DEFAULT_Y_AXIS_SCALE,
+    );
+    const yAxisLogBaseModel = computed({
+      get: (): number | string =>
+        [2, 10].includes(Number(config().y_axis_log_base))
+          ? Number(config().y_axis_log_base)
+          : TOGGLE_AUTO,
+      set: (v: number | string) => {
+        if ([2, 10].includes(Number(v))) config().y_axis_log_base = Number(v);
+        else delete config().y_axis_log_base;
+      },
+    });
+    const yAxisLogBaseOptions = withDefault(
+      [
+        { label: raw("2"), value: 2 },
+        { label: raw("10"), value: 10 },
+      ],
+      DEFAULT_Y_AXIS_LOG_BASE,
+    );
+    const stackModeModel = choiceModel("stack_mode", ["normal", "percent"]);
+    const stackModeOptions = withDefault(
+      [
+        { label: t("dashboard.stackModeNormal"), value: "normal" },
+        { label: t("dashboard.stackModePercent"), value: "percent" },
+      ],
+      DEFAULT_STACK_MODE,
+    );
+    const lineStyleModel = choiceModel("line_style", ["solid", "dashed", "dotted"]);
+    const lineStyleOptions = withDefault(
+      [
+        { label: t("dashboard.lineStyleSolid"), value: "solid" },
+        { label: t("dashboard.lineStyleDashed"), value: "dashed" },
+        { label: t("dashboard.lineStyleDotted"), value: "dotted" },
+      ],
+      DEFAULT_LINE_STYLE,
+    );
+    const setFlagConfig = (key: string, value: unknown) => {
+      if (value === true) config()[key] = true;
+      else delete config()[key];
+    };
+    // For a flag that is on by default: only turning it off is stored.
+    const setDefaultOnFlag = (key: string, value: unknown) => {
+      if (value === false) config()[key] = false;
+      else delete config()[key];
+    };
+    const setListConfig = (key: string, value: unknown) => {
+      const list = Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === "string")
+        : [];
+      if (list.length > 0) config()[key] = list;
+      else delete config()[key];
+    };
+    const listModel = (key: string) =>
+      computed(() => (Array.isArray(config()[key]) ? config()[key] : []));
+    const statTextModeModel = choiceModel("stat_text_mode", STAT_TEXT_MODES);
+    const statTextModeOptions = withDefault(
+      [
+        { label: t("dashboard.statTextModeValue"), value: "value" },
+        { label: t("dashboard.statTextModeValueAndName"), value: "value_and_name" },
+        { label: t("dashboard.statTextModeName"), value: "name" },
+      ],
+      DEFAULT_STAT_TEXT_MODE,
+    );
+    const gaugeStyleModel = choiceModel("gauge_style", GAUGE_STYLES);
+    const gaugeStyleOptions = withDefault(
+      [
+        { label: t("dashboard.gaugeStyleSemi"), value: "semi" },
+        { label: t("dashboard.gaugeStyleArc"), value: "arc" },
+        { label: t("dashboard.gaugeStyleCircle"), value: "circle" },
+      ],
+      DEFAULT_GAUGE_STYLE,
+    );
+    // Absent, the converters label SQL slices by percent and PromQL slices by all three, so the picker starts there.
+    const pieLabelContentDefault = () =>
+      unref(promqlMode) ? ["name", "value", "percent"] : ["percent"];
+    const pieLabelContentModel = computed(() => {
+      const saved = config().pie_label_content;
+      return Array.isArray(saved) ? saved : pieLabelContentDefault();
+    });
+    const pieLabelContentIsDefault = computed(() => !Array.isArray(config().pie_label_content));
+    const pieLabelContentDefaultHint = computed(() =>
+      defaultHint(
+        t,
+        pieLabelContentOptions
+          .filter((option) => pieLabelContentDefault().includes(option.value))
+          .map((option) => option.label)
+          .join(", "),
+      ),
+    );
+    // Picking exactly the default labels stores nothing, so the panel keeps following the default.
+    const setPieLabelContent = (value: unknown) => {
+      const dflt = pieLabelContentDefault();
+      const isDefault =
+        Array.isArray(value) &&
+        value.length === dflt.length &&
+        dflt.every((label) => value.includes(label));
+      if (isDefault) delete config().pie_label_content;
+      else setListConfig("pie_label_content", value);
+    };
+    const pieLabelContentOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.pieLabelName"), value: "name" },
+      { label: t("dashboard.pieLabelValue"), value: "value" },
+      { label: t("dashboard.pieLabelPercent"), value: "percent" },
+    ];
+    const tableDensityModel = choiceModel("table_density", TABLE_DENSITIES);
+    const tableDensityOptions = withDefault(
+      [
+        { label: t("dashboard.tableDensityCompact"), value: "compact" },
+        { label: t("dashboard.tableDensityStandard"), value: "standard" },
+        { label: t("dashboard.tableDensityComfortable"), value: "comfortable" },
+      ],
+      DEFAULT_TABLE_DENSITY,
+    );
+    const tableFooterCalcsModel = listModel("table_footer_calcs");
+    const tableFooterCalcOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.tableFooterCalcSum"), value: "sum" },
+      { label: t("dashboard.tableFooterCalcMean"), value: "mean" },
+      { label: t("dashboard.tableFooterCalcMin"), value: "min" },
+      { label: t("dashboard.tableFooterCalcMax"), value: "max" },
+      { label: t("dashboard.tableFooterCalcCount"), value: "count" },
+      { label: t("dashboard.tableFooterCalcLast"), value: "last" },
+    ];
+    const stateValueAlignModel = choiceModel(
+      "state_value_align",
+      STATE_VALUE_ALIGNS as readonly string[],
+    );
+    const stateValueAlignOptions = withDefault(
+      [
+        { label: t("dashboard.alignLeft"), value: "left" },
+        { label: t("dashboard.alignCenter"), value: "center" },
+        { label: t("dashboard.alignRight"), value: "right" },
+      ],
+      DEFAULT_STATE_VALUE_ALIGN,
+    );
+    const scatterFieldOptions = computed(() => [
+      { label: t("dashboard.sortNone"), value: null },
+      ...(
+        dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields?.y ??
+        []
+      ).map((field: any) => ({
+        label: raw(getFieldLabel(field, dashboardPanelData.data.config) || field?.alias || ""),
+        value: field?.alias ?? null,
+      })),
+    ]);
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
@@ -3814,6 +4574,11 @@ export default defineComponent({
       }
     };
 
+    watch(
+      () => dependentOptionState(dashboardPanelData.data.config),
+      () => pruneDependentOptions(dashboardPanelData.data.config),
+    );
+
     // Auto-save: watch picker value changes and sync to config
     watch(
       pickerValue,
@@ -4068,6 +4833,57 @@ export default defineComponent({
       rowSortModel,
       rowSortOptions,
       tooltipModeModel,
+      setNumberConfig,
+      setFlagConfig,
+      setDefaultOnFlag,
+      isRowTimeline,
+      isRawValueChart,
+      DISTRIBUTION_ROW_LIMIT,
+      rawRowLimitHelp,
+      setListConfig,
+      statTextModeModel,
+      statTextModeOptions,
+      gaugeStyleModel,
+      gaugeStyleOptions,
+      pieLabelContentModel,
+      pieLabelContentIsDefault,
+      pieLabelContentDefaultHint,
+      setPieLabelContent,
+      defaultHint,
+      defaultPlaceholder,
+      DEFAULT_BAR_RADIUS,
+      DEFAULT_MAP_CLUSTER_RADIUS,
+      DEFAULT_SCATTER_SIZE_MAX,
+      DEFAULT_SCATTER_SIZE_MIN,
+      pieLabelContentOptions,
+      tableDensityModel,
+      tableDensityOptions,
+      tableFooterCalcsModel,
+      tableFooterCalcOptions,
+      stateValueAlignModel,
+      stateValueAlignOptions,
+      setTextConfig,
+      chartTooltipModeModel,
+      chartTooltipModeOptions,
+      tooltipSortModel,
+      tooltipSortOptions,
+      sortOrderModel,
+      sortOrderOptions,
+      yAxisScaleModel,
+      yAxisScaleOptions,
+      yAxisLogBaseModel,
+      yAxisLogBaseOptions,
+      stackModeModel,
+      stackModeOptions,
+      lineStyleModel,
+      lineStyleOptions,
+      scatterFieldOptions,
+      shouldShowStackMode,
+      shouldShowSortOrder,
+      shouldShowBarRadius,
+      shouldShowScatterEncoding,
+      shouldShowConnectNullsThreshold,
+      shouldShowCartesianSeriesConfig,
       tooltipModeOptions,
       unitOptions,
       bucketUnitOptions,

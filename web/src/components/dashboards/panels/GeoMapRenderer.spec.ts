@@ -81,6 +81,7 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  PictorialBarChart: vi.fn(),
 }));
 
 // Mock ECharts components
@@ -892,6 +893,53 @@ describe("GeoMapRenderer", () => {
       // Component should exist and handle coordinate data
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.props("data").options.lmap.center).toEqual([-74.006, 40.7128]);
+    });
+  });
+
+  describe("point clusters", () => {
+    it("reclusters the clustered layers when the map zoom ends", async () => {
+      (mockLeafletMap as any).getZoom = vi.fn(() => 16);
+      const clustered = {
+        options: {
+          lmap: { center: [0, 51.5], zoom: 2 },
+          series: [
+            {
+              type: "scatter",
+              data: [[-0.125, 51.505, 20, 2]],
+              _clusterSource: [
+                [-0.12, 51.5, 10],
+                [-0.13, 51.51, 30],
+              ],
+              _clusterRadius: 40,
+            },
+          ],
+        },
+      };
+      wrapper = createWrapper({ data: clustered });
+      await waitForChartInit(wrapper);
+      const zoomEnd = mockLeafletMap.on.mock.calls.find((call: any[]) => call[0] === "zoomend");
+      expect(zoomEnd).toBeTruthy();
+      mockChart.setOption.mockClear();
+      zoomEnd![1]();
+      expect(mockChart.setOption).toHaveBeenCalledWith({
+        series: [
+          {
+            data: [
+              [-0.12, 51.5, 10, 1],
+              [-0.13, 51.51, 30, 1],
+            ],
+          },
+        ],
+      });
+    });
+
+    it("does nothing on zoom for a map without clusters", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      const zoomEnd = mockLeafletMap.on.mock.calls.find((call: any[]) => call[0] === "zoomend");
+      mockChart.setOption.mockClear();
+      zoomEnd?.[1]();
+      expect(mockChart.setOption).not.toHaveBeenCalled();
     });
   });
   describe("Map lifecycle across refreshes", () => {

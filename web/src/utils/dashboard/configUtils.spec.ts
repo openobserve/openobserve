@@ -40,6 +40,7 @@ import {
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
+  pruneDependentOptions,
 } from "./configUtils";
 
 describe("configUtils", () => {
@@ -1190,9 +1191,10 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(data, false)).toBe(false);
     });
 
-    it("should return false for table chart in non-promql mode", () => {
-      const data = { data: { type: "table" } };
-      expect(shouldShowNoValueReplacement(data, false)).toBe(false);
+    it.each(["metric", "gauge", "table"])("shows for %s in SQL and PromQL mode", (type) => {
+      const data = { data: { type } };
+      expect(shouldShowNoValueReplacement(data, false)).toBe(true);
+      expect(shouldShowNoValueReplacement(data, true)).toBe(true);
     });
   });
 
@@ -1556,5 +1558,38 @@ describe("configUtils", () => {
       expect(shouldShowAxisConfig(panel)).toBe(false);
       expect(shouldShowCartesianAxisConfig(panel)).toBe(false);
     });
+  });
+});
+
+describe("pruneDependentOptions", () => {
+  it("drops the saved values of options whose parent no longer applies", () => {
+    const config: Record<string, any> = {
+      scatter_size_min: 2,
+      scatter_size_max: 30,
+      y_axis_scale: "linear",
+      y_axis_log_base: 2,
+      map_cluster: false,
+      map_cluster_radius: 40,
+      connect_nulls: false,
+      connect_nulls_threshold: 300,
+    };
+    pruneDependentOptions(config);
+    expect(config).toEqual({ y_axis_scale: "linear", map_cluster: false, connect_nulls: false });
+  });
+
+  it("keeps them while the parent applies", () => {
+    const config = {
+      scatter_size_field: "count",
+      scatter_size_min: 2,
+      y_axis_scale: "log",
+      y_axis_log_base: 2,
+      map_cluster: true,
+      map_cluster_radius: 40,
+      connect_nulls: true,
+      connect_nulls_threshold: 300,
+    };
+    const before = { ...config };
+    pruneDependentOptions(config);
+    expect(config).toEqual(before);
   });
 });

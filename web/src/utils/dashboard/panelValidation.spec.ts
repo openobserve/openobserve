@@ -509,6 +509,211 @@ describe("validateConditions", () => {
   });
 });
 
+describe("validatePanel on cartesian settings", () => {
+  const run = (config: any, { type = "line", queryType = "sql" } = {}) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: true,
+              query: "SELECT 1",
+              fields: { x: [], y: [{ alias: "y_axis_1" }, { alias: "y_axis_2" }] },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts every supported value and an empty config", () => {
+    expect(run({})).toEqual([]);
+    expect(
+      run({
+        tooltip_mode: "single",
+        tooltip_sort: "asc",
+        y_axis_scale: "log",
+        y_axis_log_base: 2,
+        line_style: "dotted",
+        y_axis_hard_min: 1,
+        y_axis_hard_max: 5,
+        connect_nulls_threshold: 60,
+        bar_radius: 4,
+        mark_area: [{ axis: "y", from: "1", to: "2" }],
+      }),
+    ).toEqual([]);
+    expect(run({ stack_mode: "percent" }, { type: "stacked" })).toEqual([]);
+    expect(run({ sort_order: "desc" }, { type: "h-bar" })).toEqual([]);
+    // A panel switched from a state timeline keeps its tooltip mode.
+    expect(run({ tooltip_mode: "all_rows" })).toEqual([]);
+  });
+
+  it("rejects unsupported choices", () => {
+    expect(run({ y_axis_scale: "sqrt", y_axis_log_base: 3 })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "y_axis_scale", value: "sqrt" }),
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "y_axis_log_base", value: "3" }),
+    ]);
+    expect(run({ stack_mode: "fill" }, { type: "stacked" })).toHaveLength(1);
+  });
+
+  it("rejects negative sizes, inverted soft ranges and a log axis from zero", () => {
+    expect(run({ bar_radius: -1 })).toEqual([
+      gt("dashboard.utils.configValueNotNegative", { setting: "bar_radius" }),
+    ]);
+    expect(run({ y_axis_hard_min: 5, y_axis_hard_max: 1 })).toEqual([
+      gt("dashboard.utils.yAxisHardRangeInverted"),
+    ]);
+    expect(run({ y_axis_scale: "log", y_axis_min: 0 })).toEqual([
+      gt("dashboard.utils.yAxisLogMinInvalid"),
+    ]);
+  });
+
+  it("checks mark areas", () => {
+    expect(run({ mark_area: [{ axis: "y", from: "1" }] })).toEqual([
+      gt("dashboard.utils.markAreaIncomplete", { index: 1 }),
+    ]);
+    expect(run({ mark_area: [{ axis: "y", from: "low", to: "2" }] })).toEqual([
+      gt("dashboard.utils.markAreaNotNumeric", { index: 1 }),
+    ]);
+    // The x axis of an h-bar is its value axis; its y axis holds category names.
+    expect(run({ mark_area: [{ axis: "y", from: "a", to: "b" }] }, { type: "h-bar" })).toEqual([]);
+  });
+
+  it("checks scatter fields against the y fields", () => {
+    expect(run({ scatter_size_field: "y_axis_2" }, { type: "scatter" })).toEqual([]);
+    expect(run({ scatter_color_field: "nope" }, { type: "scatter" })).toEqual([
+      gt("dashboard.utils.scatterFieldUnknown", { setting: "scatter_color_field" }),
+    ]);
+    expect(run({ scatter_size_min: 9, scatter_size_max: 2 }, { type: "scatter" })).toEqual([
+      gt("dashboard.utils.scatterSizeRangeInverted"),
+    ]);
+  });
+
+  it("skips charts that do not use the settings", () => {
+    expect(run({ y_axis_scale: "sqrt" }, { type: "pie" })).toEqual([]);
+  });
+});
+
+describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline and geomap settings", () => {
+  const run = (type: string, config: any) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType: "sql",
+          config,
+          queries: [
+            { customQuery: true, query: "SELECT 1", fields: { x: [], y: [{ alias: "y" }] } },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts every supported value", () => {
+    expect(
+      run("metric", {
+        stat_text_mode: "value_and_name",
+        value_font_size: 32,
+      }),
+    ).toEqual([]);
+    expect(run("gauge", { gauge_style: "circle", gauge_segments: 10, gauge_neutral: -5 })).toEqual(
+      [],
+    );
+    expect(
+      run("donut", {
+        pie_label_content: ["name", "percent"],
+        pie_other_threshold: 5,
+        donut_inner_radius: 60,
+        sort_order: "asc",
+      }),
+    ).toEqual([]);
+    expect(
+      run("table", { table_density: "comfortable", table_footer_calcs: ["sum", "last"] }),
+    ).toEqual([]);
+    expect(run("heatmap", { heatmap_cell_gap: 0, heatmap_hide_below: -1 })).toEqual([]);
+    expect(run("state-timeline", { state_value_align: "center" })).toEqual([]);
+    expect(run("geomap", { map_cluster: true, map_cluster_radius: 60 })).toEqual([]);
+  });
+
+  it("accepts special value mappings with a known match and rejects any other", () => {
+    const mappings = (match: unknown) => [
+      { type: "value", value: "1", text: "One" },
+      { type: "special", match, text: "x" },
+    ];
+    for (const match of ["null", "nan", "empty", "true", "false"]) {
+      expect(run("table", { mappings: mappings(match) })).toEqual([]);
+    }
+    expect(run("metric", { mappings: mappings("zero") })).toEqual([
+      gt("dashboard.utils.valueMappingSpecialInvalid", { index: 2 }),
+    ]);
+    expect(run("table", { mappings: mappings(undefined) })).toEqual([
+      gt("dashboard.utils.valueMappingSpecialInvalid", { index: 2 }),
+    ]);
+  });
+
+  it("rejects unsupported choices and list entries", () => {
+    expect(run("metric", { stat_text_mode: "ratio" })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "stat_text_mode", value: "ratio" }),
+    ]);
+    expect(run("table", { table_footer_calcs: ["sum", "median"] })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", {
+        setting: "table_footer_calcs",
+        value: "median",
+      }),
+    ]);
+    expect(run("gauge", { gauge_style: "dial" })).toHaveLength(1);
+    expect(run("state-timeline", { state_value_align: "justify" })).toHaveLength(1);
+  });
+
+  it("rejects out-of-range numbers", () => {
+    expect(run("gauge", { gauge_segments: 1 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: "gauge_segments",
+        min: "2",
+        max: "100",
+      }),
+    ]);
+    expect(run("donut", { donut_inner_radius: 99 })).toHaveLength(1);
+    expect(run("pie", { pie_other_threshold: -1 })).toHaveLength(1);
+    expect(run("metric", { value_font_size: 0 })).toHaveLength(1);
+    expect(run("geomap", { map_cluster_radius: 0 })).toHaveLength(1);
+    expect(run("heatmap", { heatmap_cell_gap: -2 })).toHaveLength(1);
+    expect(run("heatmap", { heatmap_hide_below: "low" })).toEqual([
+      gt("dashboard.utils.configValueNotNumeric", { setting: "heatmap_hide_below" }),
+    ]);
+  });
+
+  it("ignores settings of another chart type", () => {
+    expect(
+      run("line", { stat_text_mode: "ratio", gauge_segments: 1, table_density: "huge" }),
+    ).toEqual([]);
+  });
+});
+
 describe("validatePanel on a gauge range", () => {
   const run = (configs: any[]) => {
     const errors: string[] = [];

@@ -10,6 +10,24 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
+import {
+  CARTESIAN_CHART_TYPES,
+  CARTESIAN_TOOLTIP_MODES,
+  LINE_STYLES,
+  SORT_ORDERS,
+  STACK_MODES,
+  Y_AXIS_LOG_BASES,
+  Y_AXIS_SCALES,
+} from "@/utils/dashboard/cartesianOptions";
+import { TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
+import { STAT_TEXT_MODES } from "@/utils/dashboard/metricOptions";
+import {
+  GAUGE_STYLES,
+  PIE_LABEL_CONTENTS,
+  STATE_VALUE_ALIGNS,
+} from "@/utils/dashboard/panelTypeOptions";
+import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOptions";
+import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
 import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
@@ -972,6 +990,210 @@ const validateHeatmapConfig = (
   if (isHeatmapYRangeInverted(config)) errors.push(t("dashboard.utils.heatmapYRangeInverted"));
 };
 
+// The state timeline stores its own tooltip modes in the same key.
+const TOOLTIP_MODE_VALUES: readonly unknown[] = [...CARTESIAN_TOOLTIP_MODES, "segment", "all_rows"];
+
+const CARTESIAN_CHOICE_KEYS: ReadonlyArray<[string, readonly unknown[]]> = [
+  ["tooltip_mode", TOOLTIP_MODE_VALUES],
+  ["tooltip_sort", TOOLTIP_SORT_VALUES],
+  ["y_axis_scale", Y_AXIS_SCALES],
+  ["y_axis_log_base", Y_AXIS_LOG_BASES],
+  ["line_style", LINE_STYLES],
+  ["stack_mode", STACK_MODES],
+  ["sort_order", SORT_ORDERS],
+];
+
+const NON_NEGATIVE_KEYS = ["connect_nulls_threshold", "bar_radius"];
+
+const isSetValue = (value: unknown) => value !== null && value !== undefined && value !== "";
+
+const asFiniteNumber = (value: unknown): number | null => {
+  if (!isSetValue(value)) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const validateCartesianChoices = (t: TranslateFn, config: any, errors: string[]) => {
+  for (const [key, allowed] of CARTESIAN_CHOICE_KEYS) {
+    const value = key === "y_axis_log_base" ? Number(config[key]) : config[key];
+    if (isSetValue(config[key]) && !allowed.includes(value)) {
+      errors.push(
+        t("dashboard.utils.unsupportedConfigValue", {
+          setting: key,
+          value: String(config[key]),
+        }),
+      );
+    }
+  }
+  for (const key of NON_NEGATIVE_KEYS) {
+    const value = asFiniteNumber(config[key]);
+    if (isSetValue(config[key]) && (value === null || value < 0)) {
+      errors.push(t("dashboard.utils.configValueNotNegative", { setting: key }));
+    }
+  }
+};
+
+const validateCartesianRanges = (t: TranslateFn, config: any, errors: string[]) => {
+  const hardMin = asFiniteNumber(config.y_axis_hard_min);
+  const hardMax = asFiniteNumber(config.y_axis_hard_max);
+  if (hardMin !== null && hardMax !== null && hardMin >= hardMax) {
+    errors.push(t("dashboard.utils.yAxisHardRangeInverted"));
+  }
+  const softMin = asFiniteNumber(config.y_axis_min);
+  if (config.y_axis_scale === "log" && softMin !== null && softMin <= 0) {
+    errors.push(t("dashboard.utils.yAxisLogMinInvalid"));
+  }
+};
+
+const validateMarkAreas = (t: TranslateFn, panel: any, errors: string[]) => {
+  const areas = panel?.config?.mark_area;
+  if (!Array.isArray(areas)) return;
+  const verticalValueAxis = !["h-bar", "h-stacked"].includes(panel?.type);
+  areas.forEach((area: any, index: number) => {
+    const position = index + 1;
+    if (
+      !area ||
+      (area.axis !== "x" && area.axis !== "y") ||
+      !isSetValue(area.from) ||
+      !isSetValue(area.to)
+    ) {
+      errors.push(t("dashboard.utils.markAreaIncomplete", { index: position }));
+      return;
+    }
+    const numericAxis = area.axis === "y" ? verticalValueAxis : !verticalValueAxis;
+    if (numericAxis && (asFiniteNumber(area.from) === null || asFiniteNumber(area.to) === null)) {
+      errors.push(t("dashboard.utils.markAreaNotNumeric", { index: position }));
+    }
+  });
+};
+
+const validateScatterEncoding = (
+  t: TranslateFn,
+  panel: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  const config = panel?.config ?? {};
+  if (panel?.type !== "scatter" || isPromQLMode) return;
+  const aliases = (panel?.queries?.[0]?.fields?.y ?? []).map((field: any) => field?.alias);
+  for (const key of ["scatter_size_field", "scatter_color_field"]) {
+    if (isSetValue(config[key]) && !aliases.includes(config[key])) {
+      errors.push(t("dashboard.utils.scatterFieldUnknown", { setting: key }));
+    }
+  }
+  const minSize = asFiniteNumber(config.scatter_size_min);
+  const maxSize = asFiniteNumber(config.scatter_size_max);
+  if (minSize !== null && maxSize !== null && minSize > maxSize) {
+    errors.push(t("dashboard.utils.scatterSizeRangeInverted"));
+  }
+};
+
+/** Cartesian settings the renderer would silently ignore or misread. */
+const validateCartesianConfig = (
+  t: TranslateFn,
+  panelData: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  const panel = panelData?.data;
+  if (!CARTESIAN_CHART_TYPES.has(panel?.type) || !panel?.config) return;
+  validateCartesianChoices(t, panel.config, errors);
+  validateCartesianRanges(t, panel.config, errors);
+  validateMarkAreas(t, panel, errors);
+  validateScatterEncoding(t, panel, errors, isPromQLMode);
+};
+
+const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
+  ["stat_text_mode", ["metric"], STAT_TEXT_MODES],
+  ["gauge_style", ["gauge"], GAUGE_STYLES],
+  ["table_density", ["table"], TABLE_DENSITIES],
+  ["state_value_align", ["state-timeline"], STATE_VALUE_ALIGNS],
+  ["sort_order", ["pie", "donut"], SORT_ORDERS],
+];
+
+const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
+  ["pie_label_content", ["pie", "donut"], PIE_LABEL_CONTENTS],
+  ["table_footer_calcs", ["table"], TABLE_FOOTER_CALCS],
+];
+
+// [key, chart types, lowest allowed, highest allowed, lowest is exclusive]
+const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, boolean]> = [
+  ["value_font_size", ["metric"], 0, Infinity, true],
+  ["gauge_segments", ["gauge"], 2, 100, false],
+  ["pie_other_threshold", ["pie", "donut"], 0, 100, false],
+  ["donut_inner_radius", ["donut"], 0, 95, false],
+  ["heatmap_cell_gap", ["heatmap"], 0, Infinity, false],
+  ["map_cluster_radius", ["geomap"], 0, Infinity, true],
+];
+
+const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
+  const config = panel.config;
+  const unsupported = (setting: string, value: unknown) =>
+    errors.push(t("dashboard.utils.unsupportedConfigValue", { setting, value: String(value) }));
+  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
+    if (types.includes(panel.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
+      unsupported(key, config[key]);
+    }
+  }
+  for (const [key, types, allowed] of PANEL_TYPE_LIST_KEYS) {
+    if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
+    const values = Array.isArray(config[key]) ? config[key] : [config[key]];
+    values
+      .filter((value: unknown) => !allowed.includes(value))
+      .forEach((value: unknown) => {
+        unsupported(key, value);
+      });
+  }
+};
+
+const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
+  const config = panel.config;
+  for (const [key, types, min, max, exclusive] of PANEL_TYPE_RANGE_KEYS) {
+    if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
+    const value = asFiniteNumber(config[key]);
+    const tooLow = value === null || (exclusive ? value <= min : value < min);
+    if (tooLow || (value as number) > max) {
+      errors.push(
+        t("dashboard.utils.configValueOutOfRange", {
+          setting: key,
+          min: exclusive ? `> ${min}` : String(min),
+          max: Number.isFinite(max) ? String(max) : "∞",
+        }),
+      );
+    }
+  }
+  if (panel.type === "gauge" && isSetValue(config.gauge_neutral)) {
+    if (asFiniteNumber(config.gauge_neutral) === null) {
+      errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "gauge_neutral" }));
+    }
+  }
+  if (panel.type === "heatmap" && isSetValue(config.heatmap_hide_below)) {
+    if (asFiniteNumber(config.heatmap_hide_below) === null) {
+      errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "heatmap_hide_below" }));
+    }
+  }
+};
+
+/** A special value mapping that names no known match would never apply. */
+const validateSpecialMappings = (t: TranslateFn, panel: any, errors: string[]) => {
+  const mappings = panel?.config?.mappings;
+  if (!Array.isArray(mappings)) return;
+  mappings.forEach((mapping: any, index: number) => {
+    if (mapping?.type === "special" && !SPECIAL_VALUE_MATCHES.includes(mapping.match)) {
+      errors.push(t("dashboard.utils.valueMappingSpecialInvalid", { index: index + 1 }));
+    }
+  });
+};
+
+/** Chart-specific settings the renderer would silently ignore or misread. */
+const validatePanelTypeConfig = (t: TranslateFn, panelData: any, errors: string[]) => {
+  const panel = panelData?.data;
+  if (!panel?.config) return;
+  validatePanelTypeChoices(t, panel, errors);
+  validatePanelTypeRanges(t, panel, errors);
+  validateSpecialMappings(t, panel, errors);
+};
+
 /**
  * Validates a dashboard panel's configuration
  * @param {object} panelData - The panel data object to validate
@@ -999,6 +1221,8 @@ export const validatePanel = (
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
+  validateCartesianConfig(t, panelData, errors, isPromQLMode);
+  validatePanelTypeConfig(t, panelData, errors);
 
   if (
     ["area", "area-stacked", "line"].includes(panelData?.data?.type) &&

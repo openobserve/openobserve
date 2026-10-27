@@ -34,21 +34,19 @@ describe("searchLabelsConfig", () => {
     "seriesOverrides",
     "map",
     "gauge",
+    "pie",
     "layout",
     "colors",
     "drilldown",
     "comparison",
     "markLines",
     "thresholds",
+    "metric",
     "background",
     "sparkline",
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {
-    it("contains all 25 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(25);
-    });
-
     it("contains every expected section ID", () => {
       for (const id of EXPECTED_SECTIONS) {
         expect(ORDERED_SECTION_IDS).toContain(id);
@@ -78,8 +76,10 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("has exactly 25 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(25);
+    it("has exactly one key per section", () => {
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS).sort()).toEqual(
+        [...ORDERED_SECTION_IDS].sort(),
+      );
     });
 
     it("has no section set to true", () => {

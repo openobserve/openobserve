@@ -25,6 +25,7 @@ import {
   seriesStyleKeyOf,
   type SeriesDrawStyle,
   type SeriesLineStyle,
+  type SeriesTransform,
   type SeriesYAxisSide,
 } from "@/utils/dashboard/seriesOverrides";
 
@@ -34,7 +35,7 @@ export type SeriesDraftMatch = "name" | "regex";
 /** Thresholds as an override stores them; same shape as `config.thresholds`. */
 export interface SeriesOverrideThresholds {
   mode?: "absolute" | "percentage";
-  showAs?: "color_line" | "color" | "line" | "color_band";
+  showAs?: "color_line" | "color" | "line" | "color_band" | "dashed_line";
   baseColor?: string | null;
   steps?: { value: number; color: string }[];
 }
@@ -55,6 +56,7 @@ export interface SeriesStyleDraft {
   stackGroup: string;
   yAxis: SeriesYAxisSide | null;
   hideFrom: { chart: boolean; legend: boolean; tooltip: boolean };
+  transform: SeriesTransform | null;
 }
 
 /** One override while the Series Formatting dialog edits it; "" and null mean inherit. */
@@ -97,6 +99,7 @@ export const emptySeriesStyleDraft = (): SeriesStyleDraft => ({
   stackGroup: "",
   yAxis: null,
   hideFrom: { chart: false, legend: false, tooltip: false },
+  transform: null,
 });
 
 const numberText = (value: unknown): string =>

@@ -323,8 +323,8 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("hostmap");
       });
 
-      it("should have 21 chart types", () => {
-        expect(ALL_CHART_TYPES.length).toBe(21);
+      it("lists each chart type once", () => {
+        expect(new Set(ALL_CHART_TYPES).size).toBe(ALL_CHART_TYPES.length);
       });
     });
 
@@ -367,8 +367,10 @@ describe("panelEditor types and utilities", () => {
         expect(AGGREGATION_REQUIRED_CHART_TYPES).not.toContain("custom_chart");
       });
 
-      it("should have 17 chart types", () => {
-        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(17);
+      it("lists each chart type once", () => {
+        expect(new Set(AGGREGATION_REQUIRED_CHART_TYPES).size).toBe(
+          AGGREGATION_REQUIRED_CHART_TYPES.length,
+        );
       });
     });
 

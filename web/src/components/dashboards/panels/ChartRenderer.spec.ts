@@ -19,6 +19,8 @@ import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
+import { use as echartsUse } from "echarts/core";
+import { LineChart } from "echarts/charts";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
@@ -111,6 +113,15 @@ vi.mock("lodash-es", () => ({
   }),
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
+
+// ChartRenderer registers its series at import, before any beforeEach clears the mock.
+const registeredAtImport = vi.mocked(echartsUse).mock.calls.flat(2);
+
+describe("ChartRenderer series registration", () => {
+  it("registers the line series", () => {
+    expect(registeredAtImport).toContain(LineChart);
+  });
+});
 
 describe("ChartRenderer", () => {
   let wrapper: any;

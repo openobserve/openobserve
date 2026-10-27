@@ -31,6 +31,7 @@ import { normalizeThresholds, resolveStepValues, stepColorFor } from "./threshol
 import { getAnnotationsData } from "./getAnnotationsData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSeriesOverride } from "./seriesOverrides";
+import { DEFAULT_STATE_VALUE_ALIGN, STATE_VALUE_ALIGNS } from "./panelTypeOptions";
 import { isRowTimeline } from "./chartTypeGroups";
 import { HOSTMAP_MAX_CELLS } from "./convertHostmapData";
 
@@ -794,6 +795,9 @@ export const convertStateTimelineData = (
   const rowHeight = positiveOr(config.row_height, DEFAULT_ROW_HEIGHT) || DEFAULT_ROW_HEIGHT;
   const rowGap = positiveOr(config.row_gap, DEFAULT_ROW_GAP);
   const showText = config.show_state_text !== false;
+  const textAlign = STATE_VALUE_ALIGNS.includes(config.state_value_align)
+    ? config.state_value_align
+    : DEFAULT_STATE_VALUE_ALIGN;
   const showLegend = config.show_legends !== false;
   const noDataFill = chartColor("--color-surface-subtle");
   const noDataBorder = chartColor("--color-border-strong");
@@ -914,8 +918,14 @@ export const convertStateTimelineData = (
           silent: true,
           style: {
             text: style.text,
-            x: x1 + TEXT_PADDING,
+            x:
+              textAlign === "center"
+                ? (x1 + x2) / 2
+                : textAlign === "right"
+                  ? x2 - TEXT_PADDING
+                  : x1 + TEXT_PADDING,
             y: from[1],
+            ...(textAlign === "left" ? {} : { align: textAlign }),
             verticalAlign: "middle",
             fill: style.textColor,
             fontSize: 11,
