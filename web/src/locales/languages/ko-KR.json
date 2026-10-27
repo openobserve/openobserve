@@ -27056,7 +27056,7 @@
       "joinsFleet": "이 토큰으로 설치된 수집기는 플릿 {fleet}에 합류하여 {config} v{version}을(를) 실행합니다.",
       "joinsFleetNoConfig": "이 토큰으로 설치된 수집기는 아직 구성이 없는 플릿 {fleet}에 합류합니다.",
       "envRefNote": "시크릿이 호스트에 머물도록 구성의 자격 증명에는 {ref} 참조를 사용하세요.",
-      "httpTransport": "프록시 또는 로드 밸런서가 WebSocket을 지원하지 않습니다 (HTTP 폴링 사용)",
+      "websocketTransport": "WebSocket 사용 (구성을 즉시 전달, 프록시 지원 필요)",
       "kubernetesNote": "슈퍼바이저와 수집기를 하나의 컨테이너에서 실행하는 DaemonSet을 배포합니다. 이미지 태그를 변경하여 업그레이드하세요.",
       "kubernetesAgent": "에이전트(DaemonSet)",
       "kubernetesGateway": "게이트웨이(StatefulSet)",
