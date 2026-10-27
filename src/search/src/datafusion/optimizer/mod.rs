@@ -18,6 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
     common::{Result, TableReference},
+    execution::context::SQLOptions,
     optimizer::{
         AnalyzerRule, OptimizerRule,
         common_subexpr_eliminate::CommonSubexprEliminate,
@@ -298,6 +299,12 @@ pub async fn create_physical_plan(
     sql: &str,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let plan = ctx.state().create_logical_plan(sql).await?;
+    // Defense in depth: reject DDL/DML/COPY plans so search SQL cannot write files on the node.
+    SQLOptions::new()
+        .with_allow_ddl(false)
+        .with_allow_dml(false)
+        .with_allow_statements(false)
+        .verify_plan(&plan)?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     optimize_distribute_analyze(physical_plan)
 }
