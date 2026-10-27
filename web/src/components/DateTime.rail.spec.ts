@@ -27,16 +27,16 @@ const micros = (iso: string) => Date.parse(iso) * 1000;
 const HISTORY_KEY = timeRangeHistoryKey("default", "example@gmail.com");
 
 const CALENDAR_IDS = [
-  "today",
   "yesterday",
-  "this-week",
+  "today",
   "last-week",
-  "this-month",
+  "this-week",
   "last-month",
-  "this-quarter",
+  "this-month",
   "last-quarter",
-  "this-year",
+  "this-quarter",
   "last-year",
+  "this-year",
 ];
 
 const SELECTED_CLASS = "bg-button-primary!";
@@ -108,8 +108,7 @@ describe("DateTime rail", () => {
         "Ranges you apply will show up here.",
       );
       for (const id of CALENDAR_IDS) expect(calendarItem(id)).not.toBeNull();
-      expect(calendarItem("today")?.textContent).toContain("Today");
-      expect(calendarItem("today")?.textContent).toContain("so far");
+      expect(calendarItem("today")?.textContent?.trim()).toBe("Today");
       expect(calendarItem("last-month")?.textContent?.trim()).toBe("Last month");
       expect(el("date-time-relative-15-m-btn")).not.toBeNull();
       expect(el("date-time-relative-tab")).not.toBeNull();
@@ -185,7 +184,7 @@ describe("DateTime rail", () => {
       expect(calendarItem("last-year")?.disabled).toBe(true);
     });
 
-    it("moves between rail items with the arrow keys and stays out of the grid", async () => {
+    it("moves between rail items with the arrow keys, pairing calendar rows two at a time", async () => {
       seedHistory([hourRange(1)]);
       createWrapper();
       await openMenu();
@@ -197,11 +196,19 @@ describe("DateTime rail", () => {
         return document.activeElement?.getAttribute("data-test");
       };
 
-      expect(press("date-time-rail-recent-0", "ArrowDown")).toBe("date-time-rail-calendar-today");
-      expect(press("date-time-rail-calendar-today", "ArrowDown")).toBe(
+      expect(press("date-time-rail-recent-0", "ArrowDown")).toBe(
         "date-time-rail-calendar-yesterday",
       );
-      expect(press("date-time-rail-calendar-today", "ArrowUp")).toBe("date-time-rail-recent-0");
+      expect(press("date-time-rail-calendar-yesterday", "ArrowRight")).toBe(
+        "date-time-rail-calendar-today",
+      );
+      expect(press("date-time-rail-calendar-today", "ArrowDown")).toBe(
+        "date-time-rail-calendar-this-week",
+      );
+      expect(press("date-time-rail-calendar-this-week", "ArrowLeft")).toBe(
+        "date-time-rail-calendar-last-week",
+      );
+      expect(press("date-time-rail-calendar-yesterday", "ArrowUp")).toBe("date-time-rail-recent-0");
       expect(press("date-time-rail-calendar-last-year", "ArrowDown")).toBe(
         "date-time-rail-calendar-last-year",
       );
@@ -535,8 +542,11 @@ describe("DateTime rail", () => {
       const groups = Array.from(
         document.querySelectorAll('[data-test="date-time-rail"] [role="group"]'),
       );
-      const names = groups.map((g) =>
-        document.getElementById(g.getAttribute("aria-labelledby") ?? "")?.textContent?.trim(),
+      // "Recent" is labelled by the shared header band outside the rail, not a heading inside it.
+      const names = groups.map(
+        (g) =>
+          g.getAttribute("aria-label") ??
+          document.getElementById(g.getAttribute("aria-labelledby") ?? "")?.textContent?.trim(),
       );
       expect(names).toEqual(["Recent", "Calendar"]);
       expect(groups[0].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(2);
@@ -820,7 +830,7 @@ describe("DateTime rail", () => {
 
       expect(storedHistory()).toEqual([]);
       expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-today",
+        "date-time-rail-calendar-yesterday",
       );
     });
 
@@ -869,9 +879,9 @@ describe("DateTime rail", () => {
       press("ArrowDown");
       await flushPromises();
       expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-today",
+        "date-time-rail-calendar-yesterday",
       );
-      expect(tabbable()).toEqual(["date-time-rail-calendar-today"]);
+      expect(tabbable()).toEqual(["date-time-rail-calendar-yesterday"]);
       expect(el("date-time-relative-tab")?.getAttribute("tabindex")).not.toBe("-1");
     });
 
@@ -880,7 +890,7 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(document.activeElement?.getAttribute("data-test")).toBe(
-        "date-time-rail-calendar-today",
+        "date-time-rail-calendar-yesterday",
       );
     });
 

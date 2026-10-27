@@ -20,22 +20,23 @@ import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 
 const MICROS_PER_SECOND = 1_000_000;
 
+// Ordered as this/last pairs, last on the left: the rail renders two per row.
 export const CALENDAR_RAIL_ITEMS: readonly CalendarRailPreset[] = [
-  { id: "today", token: "calendar:day:0", labelKey: "common.today", soFar: true },
   { id: "yesterday", token: "calendar:day:-1", labelKey: "common.yesterday", soFar: false },
-  { id: "this-week", token: "calendar:week:0", labelKey: "common.thisWeek", soFar: true },
+  { id: "today", token: "calendar:day:0", labelKey: "common.today", soFar: true },
   { id: "last-week", token: "calendar:week:-1", labelKey: "common.lastWeek", soFar: false },
-  { id: "this-month", token: "calendar:month:0", labelKey: "common.thisMonth", soFar: true },
+  { id: "this-week", token: "calendar:week:0", labelKey: "common.thisWeek", soFar: true },
   { id: "last-month", token: "calendar:month:-1", labelKey: "common.lastMonth", soFar: false },
-  { id: "this-quarter", token: "calendar:quarter:0", labelKey: "common.thisQuarter", soFar: true },
+  { id: "this-month", token: "calendar:month:0", labelKey: "common.thisMonth", soFar: true },
   {
     id: "last-quarter",
     token: "calendar:quarter:-1",
     labelKey: "common.lastQuarter",
     soFar: false,
   },
-  { id: "this-year", token: "calendar:year:0", labelKey: "common.thisYear", soFar: true },
+  { id: "this-quarter", token: "calendar:quarter:0", labelKey: "common.thisQuarter", soFar: true },
   { id: "last-year", token: "calendar:year:-1", labelKey: "common.lastYear", soFar: false },
+  { id: "this-year", token: "calendar:year:0", labelKey: "common.thisYear", soFar: true },
 ];
 
 export interface CalendarRailPreset {
@@ -49,7 +50,6 @@ export interface CalendarRailPreset {
 export interface TimeRangeRailItem {
   id: string;
   label: I18nText;
-  suffix: I18nText | null;
   tooltip: I18nText | undefined;
   selected: boolean;
   disabled: boolean;

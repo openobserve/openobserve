@@ -40,8 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :align="menuAlign"
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
+      :collision-padding="POPOVER_COLLISION_PADDING"
       content-class="p-1"
       @update:open="onMenuOpenChange"
+      @open-auto-focus="onPopoverOpenAutoFocus"
     >
       <template #trigger>
         <OButton
@@ -79,30 +81,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] max-sm:flex-col max-sm:overflow-y-auto"
+        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col max-sm:overflow-y-auto"
         :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
         @keydown.capture="onPickerKeydown"
       >
+        <!--
+          Desktop: a 2x2 grid places the rail (col 1) beside the picker (col 2), header row above
+          body row, so each pane's own border-b/border-e falls on the shared row/column edge and
+          reads as one continuous line. Narrow: the same cells become a flex column, reordered so
+          the whole rail block (heading + rows + calendar) precedes the whole picker block, instead
+          of the grid's row-major order splitting the rail across the top and bottom of the stack.
+        -->
         <div
-          v-if="showRail"
-          class="border-border-default relative w-77 shrink-0 border-e max-sm:w-full max-sm:border-e-0 max-sm:border-b"
-          data-test="date-time-rail-frame"
+          class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
+          :class="
+            showRail ? 'grid-cols-[19.25rem_1fr] grid-rows-[auto_1fr]' : 'grid-rows-[auto_1fr]'
+          "
         >
-          <DateTimeRail
-            :recent="recentRailItems"
-            :calendar="calendarRailItems"
-            :restriction-msg="raw(queryRangeRestrictionMsg)"
-            class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:overflow-visible"
-            @hover="refreshTooltipNow"
-            @select-recent="applyRecentRange"
-            @remove-recent="removeRecentRange"
-            @select-calendar="applyCalendarItem"
-          />
-        </div>
-        <div
-          class="flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] min-h-0 w-81.25 max-w-full min-w-0 shrink-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
-        >
-          <div class="flex shrink-0 items-center gap-1 px-3 py-2">
+          <div
+            v-if="showRail"
+            class="border-border-default col-start-1 row-start-1 flex items-center border-e border-b px-3 py-2 max-sm:order-1 max-sm:border-e-0 max-sm:border-b-0"
+            data-test="date-time-rail-header"
+          >
+            <span class="text-sm font-semibold">{{ t("common.timeRangeRecent") }}</span>
+          </div>
+          <div
+            class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
+            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
+          >
             <div v-if="!disableRelative" class="flex flex-1 gap-1">
               <OButton
                 data-test="date-time-relative-tab"
@@ -145,8 +151,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OTooltip>
           </div>
-          <OSeparator class="shrink-0" />
-          <div class="flex min-h-0 flex-1 flex-col max-sm:flex-none">
+          <div
+            v-if="showRail"
+            class="border-border-default relative col-start-1 row-start-2 border-e max-sm:static max-sm:order-2 max-sm:border-e-0 max-sm:border-b"
+            data-test="date-time-rail-frame"
+          >
+            <DateTimeRail
+              :recent="recentRailItems"
+              :calendar="calendarRailItems"
+              :restriction-msg="raw(queryRangeRestrictionMsg)"
+              class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:overflow-visible"
+              @hover="refreshTooltipNow"
+              @select-recent="applyRecentRange"
+              @remove-recent="removeRecentRange"
+              @select-calendar="applyCalendarItem"
+            />
+          </div>
+          <div
+            class="row-start-2 flex min-h-0 min-w-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
+            :class="showRail ? 'col-start-2 max-sm:order-4' : 'col-start-1'"
+          >
             <OTabPanels
               v-model="selectedType"
               animated
@@ -312,34 +336,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTabPanel>
             </OTabPanels>
           </div>
-          <div v-if="!hideRelativeTimezone" class="shrink-0 pe-3">
-            <OSelect
-              data-test="datetime-timezone-select"
-              v-model="timezone"
-              :options="timezoneSelectOptions"
-              searchable
-              :label="t('logStream.timezone')"
-              @update:model-value="onTimezoneChange"
-              @open="isTimezoneSelectOpen = true"
-              @close="isTimezoneSelectOpen = false"
-              class="mx-[0.4rem] my-2"
-            />
-          </div>
-          <div
+        </div>
+        <!-- Shared footer: Timezone (and Apply, when not auto-applying) spans both panes, one top border. -->
+        <div
+          v-if="!hideRelativeTimezone || !autoApply"
+          class="border-border-default flex shrink-0 items-center gap-3 border-t px-3 py-2"
+        >
+          <OSelect
+            v-if="!hideRelativeTimezone"
+            data-test="datetime-timezone-select"
+            v-model="timezone"
+            :options="timezoneSelectOptions"
+            searchable
+            :label="t('logStream.timezone')"
+            @update:model-value="onTimezoneChange"
+            @open="isTimezoneSelectOpen = true"
+            @close="isTimezoneSelectOpen = false"
+            class="min-w-0 flex-1"
+          />
+          <div v-else class="flex-1" />
+          <OButton
             v-if="!autoApply"
-            class="border-border-default flex shrink-0 items-center border-t px-3 py-2"
+            data-test="date-time-apply-btn"
+            variant="primary"
+            size="xs"
+            class="element-box-shadow"
+            @click="applyAndClose"
           >
-            <div class="flex-1" />
-            <OButton
-              data-test="date-time-apply-btn"
-              variant="primary"
-              size="xs"
-              class="element-box-shadow"
-              @click="applyAndClose"
-            >
-              {{ t("common.apply") }}
-            </OButton>
-          </div>
+            {{ t("common.apply") }}
+          </OButton>
         </div>
       </div>
     </OPopover>
@@ -423,6 +448,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { fromZonedTime } from "date-fns-tz";
 
 const MICROS_PER_SECOND = 1_000_000;
+// Keeps a flipped-to-top popover clear of the app's fixed h-10 (2.5rem) header instead of painting over it.
+const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
 // Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
 const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   s: 315_360_000,
@@ -748,7 +775,6 @@ export default defineComponent({
         return {
           id: preset.id,
           label,
-          suffix: preset.soFar ? t("common.calendarSoFar") : null,
           tooltip: state?.tooltip,
           selected: selectedType.value === "relative" && calendarToken.value === preset.token,
           disabled: state?.disabled ?? false,
@@ -761,7 +787,6 @@ export default defineComponent({
       return timeRangeHistory.entries.value.map((entry, index) => ({
         id: String(index),
         label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
-        suffix: null,
         tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
         selected:
           current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
@@ -1604,6 +1629,25 @@ export default defineComponent({
       return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
     };
 
+    // The calendar section is a 2-column grid of this/last pairs; everything else in
+    // the rail is one column, so each recent row and the toggle are their own 1-item row.
+    const railRows = (panel: HTMLElement): HTMLButtonElement[][] => {
+      const recentRows = Array.from(
+        panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-recent]"),
+      ).map((btn) => [btn]);
+      const toggle = panel.querySelector<HTMLButtonElement>(
+        "[data-test='date-time-rail-recent-toggle']",
+      );
+      const calendarButtons = Array.from(
+        panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-calendar]"),
+      );
+      const calendarRows: HTMLButtonElement[][] = [];
+      for (let i = 0; i < calendarButtons.length; i += 2) {
+        calendarRows.push(calendarButtons.slice(i, i + 2));
+      }
+      return [...recentRows, ...(toggle ? [[toggle]] : []), ...calendarRows];
+    };
+
     // Arrow-key navigation for the picker panel: Left/Right switch the
     // Relative/Absolute tabs, and arrows roam the relative preset grid.
     // stopPropagation keeps reka's dropdown-menu keydown from swallowing them.
@@ -1616,15 +1660,47 @@ export default defineComponent({
 
       const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
       if (railItem) {
-        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        // Only the calendar grid uses Left/Right; a recent row's own listener reaches its × with it.
+        const isCalendarItem = railItem.hasAttribute("data-date-time-rail-calendar");
+        if (!isCalendarItem && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
         event.preventDefault();
         event.stopPropagation();
-        const items = Array.from(
-          panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-item]:not([disabled])"),
-        );
-        const index = items.indexOf(railItem);
-        const step = event.key === "ArrowDown" ? 1 : -1;
-        items[index + step]?.focus();
+
+        const rows = railRows(panel);
+        const enabled = (btn?: HTMLButtonElement) => !!btn && !btn.disabled;
+        let r = -1;
+        let c = -1;
+        rows.forEach((row, ri) => {
+          const ci = row.indexOf(railItem);
+          if (ci !== -1) {
+            r = ri;
+            c = ci;
+          }
+        });
+        if (r === -1) return;
+
+        const stepInRow = (dir: number) => {
+          for (let ci = c + dir; ci >= 0 && ci < rows[r].length; ci += dir)
+            if (enabled(rows[r][ci])) return rows[r][ci];
+          return null;
+        };
+        const stepRows = (dir: number) => {
+          for (let ri = r + dir; ri >= 0 && ri < rows.length; ri += dir) {
+            const row = rows[ri];
+            const col = Math.min(c, row.length - 1);
+            if (enabled(row[col])) return row[col];
+            const alt = row.find((btn) => enabled(btn));
+            if (alt) return alt;
+          }
+          return null;
+        };
+
+        let next: HTMLButtonElement | null = null;
+        if (event.key === "ArrowLeft") next = stepInRow(-1);
+        else if (event.key === "ArrowRight") next = stepInRow(1);
+        else if (event.key === "ArrowUp") next = stepRows(-1);
+        else if (event.key === "ArrowDown") next = stepRows(1);
+        next?.focus();
         return;
       }
 
@@ -1865,6 +1941,16 @@ export default defineComponent({
       }
     };
 
+    // The rail sits after the header band in DOM order (for visual/focus-order reasons), so
+    // reka's default "focus the first tabbable descendant" would land on a tab button instead.
+    const onPopoverOpenAutoFocus = (event: Event) => {
+      if (!showRail.value) return;
+      event.preventDefault();
+      document
+        .querySelector<HTMLElement>("#date-time-menu [data-date-time-rail-item]:not([disabled])")
+        ?.focus();
+    };
+
     // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
     const closeMenu = () => {
       if (!menuOpen.value) return;
@@ -1939,8 +2025,10 @@ export default defineComponent({
     return {
       raw,
       t,
+      POPOVER_COLLISION_PADDING,
       menuOpen,
       onMenuOpenChange,
+      onPopoverOpenAutoFocus,
       datetimeBtn,
       getImageURL,
       onCustomPeriodSelect,

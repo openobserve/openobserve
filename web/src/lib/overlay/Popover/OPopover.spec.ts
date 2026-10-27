@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, inject } from "vue";
+import { PopoverContent } from "reka-ui";
 import OPopover from "./OPopover.vue";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -119,5 +120,38 @@ describe("OPopover", () => {
     const release = registry!.open();
     expect(typeof release).toBe("function");
     release();
+  });
+
+  it("overrides the breakpoint collision padding when collisionPadding is set", () => {
+    const wrapper = mount(OPopover, {
+      props: { open: true, collisionPadding: { top: 48, right: 8, bottom: 8, left: 8 } },
+      slots: {
+        trigger: "<button>Open</button>",
+        default: '<div data-testid="content">Body</div>',
+      },
+    });
+    // The mock renders PopoverPortal AS PopoverContent (to skip the real portal), so the
+    // actual content node — the one carrying our props — is the last/innermost match.
+    const content = wrapper.findAllComponents(PopoverContent).at(-1)!;
+    expect(content.props("collisionPadding")).toEqual({
+      top: 48,
+      right: 8,
+      bottom: 8,
+      left: 8,
+    });
+  });
+
+  it("forwards open-auto-focus so a consumer can redirect initial focus", () => {
+    const wrapper = mount(OPopover, {
+      props: { open: true },
+      slots: {
+        trigger: "<button>Open</button>",
+        default: '<div data-testid="content">Body</div>',
+      },
+    });
+    const content = wrapper.findAllComponents(PopoverContent).at(-1)!;
+    const event = new Event("focus");
+    content.vm.$emit("open-auto-focus", event);
+    expect(wrapper.emitted("open-auto-focus")?.[0]).toEqual([event]);
   });
 });

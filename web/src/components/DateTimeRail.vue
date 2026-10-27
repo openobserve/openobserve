@@ -22,13 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       role="group"
-      :aria-labelledby="recentHeadingId"
+      :aria-label="t('common.timeRangeRecent')"
       class="flex flex-col"
       data-test="date-time-rail-recent-group"
     >
-      <div :id="recentHeadingId" class="text-text-secondary px-2 pt-1 pb-1 text-xs font-semibold">
-        {{ t("common.timeRangeRecent") }}
-      </div>
       <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
       <div
         v-if="recent.length === 0"
@@ -72,12 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
           >
             <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
-            <span
-              v-if="item.suffix"
-              class="text-2xs shrink-0"
-              :class="item.selected ? '' : 'text-text-secondary'"
-              >{{ item.suffix }}</span
-            >
           </OButton>
           <OButton
             variant="ghost"
@@ -117,15 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col"
       data-test="date-time-rail-calendar-group"
     >
-      <div :id="calendarHeadingId" class="text-text-secondary px-2 pt-3 pb-1 text-xs font-semibold">
+      <div :id="calendarHeadingId" class="px-2 pt-3 pb-1 text-sm font-semibold">
         {{ t("common.timeRangeCalendar") }}
       </div>
       <div
         role="list"
-        class="max-sm:grid max-sm:grid-cols-2"
+        class="grid grid-cols-2 gap-1.5 px-1"
         data-test="date-time-rail-calendar-list"
       >
-        <div v-for="item in calendar" :key="item.id" role="listitem" class="px-1">
+        <div v-for="item in calendar" :key="item.id" role="listitem" class="min-w-0">
           <OTooltip
             side="right"
             align="center"
@@ -137,10 +128,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="xs"
             data-date-time-rail-item
+            data-date-time-rail-calendar
             :tabindex="tabindexFor(`calendar-${item.id}`)"
             :data-test="`date-time-rail-calendar-${item.id}`"
-            class="w-full justify-start! font-normal disabled:opacity-35"
-            :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
+            class="h-8! w-full font-bold! disabled:opacity-35"
+            :class="
+              item.selected
+                ? 'bg-button-primary! text-button-primary-foreground!'
+                : 'bg-text-heading/7!'
+            "
             :disabled="item.disabled"
             :aria-pressed="item.selected"
             @mouseenter="emit('hover')"
@@ -148,12 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="emit('select-calendar', item.id)"
           >
             <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
-            <span
-              v-if="item.suffix"
-              class="text-2xs ms-auto shrink-0"
-              :class="item.selected ? '' : 'text-text-secondary'"
-              >{{ item.suffix }}</span
-            >
           </OButton>
         </div>
       </div>
@@ -188,7 +178,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const recentHeadingId = useId();
 const recentKeysHintId = useId();
 const calendarHeadingId = useId();
 

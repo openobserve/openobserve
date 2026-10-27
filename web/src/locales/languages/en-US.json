@@ -682,7 +682,6 @@
     "lastQuarter": "Last quarter",
     "lastYear": "Last year",
     "calendarQuarterOf": "Q{quarter} {year}",
-    "calendarSoFar": "so far",
     "timeRangeRecent": "Recent",
     "timeRangeCalendar": "Calendar",
     "timeRangeRecentEmpty": "Ranges you apply will show up here.",
