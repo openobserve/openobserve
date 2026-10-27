@@ -27097,7 +27097,7 @@
       "joinsFleet": "Collectors installed with this token join fleet {fleet} and run {config} v{version}.",
       "joinsFleetNoConfig": "Collectors installed with this token join fleet {fleet}, which has no configuration yet.",
       "envRefNote": "Use {ref} references for credentials in configurations, so secrets stay on the host.",
-      "httpTransport": "The proxy or load balancer cannot carry WebSocket (use HTTP polling)",
+      "websocketTransport": "Use WebSocket (pushes configuration instantly; the proxy must support it)",
       "kubernetesNote": "Deploys a DaemonSet that runs the supervisor and the collector in one container. Upgrade by changing the image tag.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",

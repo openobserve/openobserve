@@ -27056,7 +27056,7 @@
       "joinsFleet": "تنضم Collectors المثبّتة بهذا الرمز إلى الأسطول {fleet} وتشغّل {config} v{version}.",
       "joinsFleetNoConfig": "تنضم Collectors المثبّتة بهذا الرمز إلى الأسطول {fleet}، وليس له تكوين بعد.",
       "envRefNote": "استخدم مراجع {ref} لبيانات الاعتماد في التكوينات، لتبقى الأسرار على المضيف.",
-      "httpTransport": "لا يستطيع الوكيل أو موزّع الأحمال حمل WebSocket (استخدم استطلاع HTTP)",
+      "websocketTransport": "استخدام WebSocket (يدفع الإعدادات فورًا؛ يجب أن يدعمه الوكيل)",
       "kubernetesNote": "ينشر DaemonSet يشغّل المشرف والـ Collector في حاوية واحدة. للترقية، غيّر وسم الصورة.",
       "kubernetesAgent": "وكيل (DaemonSet)",
       "kubernetesGateway": "بوابة (StatefulSet)",
