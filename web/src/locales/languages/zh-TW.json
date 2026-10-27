@@ -17149,143 +17149,122 @@
     },
     "quality": {
       "allAgents": "所有代理",
-      "agentLabel": "代理",
-      "agentPlaceholder": "所有代理",
-      "kpisAriaLabel": "第一層關鍵績效指標",
-      "dataTypes": {
-        "numericShort": "數值",
-        "categoricalShort": "類別",
-        "booleanShort": "布林"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} 天前"
+        }
       },
+      "healthyIf": "符合 {rule} 時為健康",
+      "noHealthyValue": "無",
+      "setThreshold": "設定健康閾值",
+      "noScoresInWindow": "此時間範圍內沒有分數",
+      "outOf": "{count} 個，共 {total} 個",
+      "scopeCount": "{scope}：{count}",
       "scopes": {
-        "filterLabel": "分數範圍",
-        "filterHint": "比較此分數設定在不同評估目標範圍間的結果。",
         "all": "全部",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "分數結果"
-        },
-        "evaluationCost": {
-          "title": "評估成本"
-        },
-        "scorerSuccess": {
-          "title": "評分器成功率"
-        },
-        "scorerFailures": {
-          "title": "評分器失敗數"
-        },
-        "latencyP95": {
-          "title": "評分器延遲第 95 百分位數"
-        },
-        "vsPrev": "對比前期",
-        "noPriorData": "無先前資料",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "Span",
+        "trace": "追蹤",
+        "session": "工作階段"
+      },
+      "tiles": {
+        "attention": "需要注意的設定",
+        "ofTotal": "共 {total}",
+        "attentionNote": "顯示它們",
+        "attentionTooltip": "至少有一個不健康分數的設定",
+        "withoutResult": "沒有結果的設定",
+        "withoutResultTooltip": "此時間範圍內沒有分數，或沒有健康閾值的設定。點擊以顯示它們。",
+        "noScores": "{count} 個沒有分數 | {count} 個沒有分數",
+        "noThreshold": "{count} 個沒有閾值 | {count} 個沒有閾值",
+        "allGiveResult": "每個設定都有結果"
+      },
+      "table": {
+        "searchPlaceholder": "篩選設定…",
+        "openUnhealthy": "開啟不健康的分數",
+        "configLink": "設定",
+        "averageRange": "平均，{min} 至 {max}",
+        "mostCommon": "最常見 · {count}／{total}",
+        "columns": {
+          "scoreConfig": "評分設定",
+          "health": "健康狀態",
+          "typicalScore": "典型分數",
+          "unhealthy": "不健康",
+          "scores": "分數",
+          "updated": "已更新"
+        }
       },
       "detail": {
-        "loading": "正在載入各設定的分解資料…",
-        "noData": "此時段內此設定尚無評分。",
-        "empty": {
-          "title": "正在等待您的第一筆評分",
-          "titleScoped": "此視窗中沒有 {scope} 分數",
-          "description": "在選定的時間範圍內，此設定尚無評分到達。一旦使用它的評分器執行後，評分將自動顯示於此處。",
-          "descriptionScoped": "所選時間範圍內此設定尚無 {scope} 分數。請選擇其他範圍或擴大時間範圍。"
-        },
-        "trendTitle": "趨勢",
-        "distributionTitle": "評分分佈",
-        "categoryDistributionTitle": "類別分佈",
-        "healthyRateTitle": "健康率隨時間變化",
-        "trueRateTitle": "真實率隨時間變化",
-        "trueFalseTitle": "True 對 False",
-        "legendAvg": "平均值",
-        "legendThreshold": "臨界值 {'{'}方向{'}'} {'{'}值{'}'}",
-        "markLineHealthy": "健康 {direction} {value}",
-        "healthyThreshold": "健康 {threshold}",
+        "back": "所有設定",
+        "backToAll": "返回所有設定",
+        "editConfig": "編輯設定",
+        "notFound": "找不到評分設定",
+        "notFoundDescription": "它可能已被刪除，或連結指向舊的設定。",
+        "emptyTitle": "等待您的第一批分數",
+        "emptyTitleScoped": "此時間範圍內沒有 {scope} 分數",
+        "emptyDescription": "在選取的時間範圍內，此設定沒有收到任何分數。使用此設定的評分器執行後，分數就會顯示在這裡。",
+        "distributionNumeric": "分數分佈",
+        "distributionValues": "值分佈",
+        "averageValue": "平均 {value}",
         "legendHealthy": "健康",
         "legendUnhealthy": "不健康",
-        "legendHealthyRate": "健康率",
-        "legendTrueRate": "真實率",
-        "legendTrueCount": "真 ({count})",
-        "legendFalseCount": "假 ({count})",
-        "kpis": {
-          "average": "平均值",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "不健康",
-          "healthy": "健康",
-          "trueRate": "真實率",
-          "falseRate": "虛假率",
-          "coverage": "涵蓋率",
-          "targetsScored": "已評分目標"
+        "legendScores": "分數",
+        "chartTooltip": "{count} 個分數，{unhealthy} 個不健康 | {count} 個分數，{unhealthy} 個不健康",
+        "chartTooltipCount": "{count} 個分數 | {count} 個分數",
+        "trendTitle": {
+          "score": "趨勢",
+          "healthyRate": "健康率隨時間變化",
+          "trueRate": "True 比率隨時間變化",
+          "count": "分數隨時間變化"
         },
-        "health": {
-          "title": "健康狀態",
-          "noThreshold": "尚未設定健康臨界值。分數尚無法分類為健康或退化。",
-          "thresholdOnly": "若 {threshold} 則健康",
-          "summary": "低於臨界值 {percent}% · 若 {threshold} 則健康"
+        "trendLegend": {
+          "healthyRate": "健康率",
+          "trueRate": "正確率",
+          "count": "評分"
         },
-        "ofScoreResults": "在 {count} 個評分結果中",
-        "range": "範圍 {min}–{max}"
+        "legendAvg": "平均值",
+        "legendThreshold": "閾值 {direction} {value}",
+        "markLineHealthy": "健康 {direction} {value}",
+        "filterRange": "{from} 至 {to}",
+        "filterBelow": "低於 {to}",
+        "filterAtLeast": "{from} 以上",
+        "filterAny": "任意值",
+        "filterByBar": "依值篩選評分",
+        "barButton": "{label}：{count} 個評分 | {label}：{count} 個評分",
+        "clearFilter": "清除篩選"
       },
-      "runs": {
-        "title": "評估分數",
-        "hint": "分數和推理來自 _llm_scores。選擇一個執行以開啟其評估器追蹤進行進一步調查。",
-        "filterLabel": "篩選評估分數",
-        "noThresholdHint": "在此分數設定上設定健康臨界值，以分類並標記不健康的分數。",
-        "noReasoning": "無記錄的推理",
-        "unknownAgent": "未知代理",
-        "unknownScope": "未知範圍",
-        "queryError": "無法刷新評估分數。仍顯示最後成功的頁面。",
-        "empty": "此時間範圍內無評估分數。",
-        "emptyUnhealthy": "此時間範圍內無不健康分數。",
-        "filters": {
-          "all": "所有分數",
-          "unhealthy": "不健康"
-        },
-        "health": {
-          "healthy": "健康",
-          "unhealthy": "不健康"
-        },
-        "columns": {
-          "time": "已評估",
-          "result": "分數",
-          "reasoning": "推理",
-          "target": "目標",
-          "agent": "代理"
-        }
+      "review": {
+        "title": "評估評分",
+        "all": "全部",
+        "unhealthy": "不健康",
+        "unhealthyDisabled": "設定健康閾值以分類評分",
+        "inputNotCaptured": "未擷取輸入",
+        "outputNotCaptured": "未擷取輸出",
+        "noMatch": "沒有評分符合此篩選條件"
       },
-      "overview": {
-        "searchPlaceholder": "篩選設定…",
-        "relativeTime": {
-          "daysAgo": "{day} 天前",
-          "monthsAgo": "{month} 個月前"
+      "pane": {
+        "noneSelected": "未選取評分",
+        "healthy": "健康",
+        "unhealthy": "不健康",
+        "noThreshold": "未設定健康閾值",
+        "previous": "上一筆評分",
+        "next": "下一筆評分",
+        "reasoning": "推理過程",
+        "noReasoning": "未記錄推理過程",
+        "fullTextUnavailable": "目前顯示簡短預覽，無法載入完整追蹤。",
+        "open": {
+          "span": "開啟 Span",
+          "trace": "開啟追蹤",
+          "session": "開啟工作階段"
         },
-        "status": {
-          "healthy": "健康",
-          "unhealthy": "需要注意",
-          "noThreshold": "未設定閾值",
-          "noData": "無分數資料"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% 低於 · 若 {threshold} 則健康",
-          "noThresholdHint": "設定健康閾值",
-          "noDataHint": "此視窗中無分數"
-        },
-        "columns": {
-          "health": "健康狀態",
-          "scoreConfig": "評分設定",
-          "type": "類型",
-          "quality": "品質",
-          "totalScores": "總評分數",
-          "scopeMix": "範圍混合",
-          "volumeTrend": "數量趨勢",
-          "updated": "更新時間"
-        }
-      },
-      "averageWithHealthyRate": "平均 · {rate}% 健康"
+        "evaluatorTrace": "評估器追蹤",
+        "addToDataset": "新增至資料集",
+        "datasetSession": "資料集只接受單一追蹤或 Span。請開啟工作階段以新增其中一筆追蹤。",
+        "datasetNoStream": "此評分沒有可新增的來源串流。"
+      }
     },
     "singular": {
       "jobs": "評估作業",
@@ -18001,22 +17980,18 @@
       }
     },
     "importCount": "匯入 ({count})",
-    "count": "計數",
     "failedToDeriveSchema": "無法推導結構",
     "failedToImportScoreConfig": "無法匯入評分配置",
     "failedToImportScorer": "無法匯入評分器",
     "failedToFetchCatalog": "無法取得目錄 ({status})",
     "failedToLoadCatalog": "無法載入目錄",
     "failedToRunScorerTest": "無法執行評分器測試",
-    "healthyRate": "健康率",
     "invalidJsonFormat": "無效的 JSON 格式",
     "jsonIsEmpty": "JSON 為空",
     "scorerTestFailed": "評分器測試失敗",
     "scorerTestSampleContext": "法國國家概況：巴黎是首都。",
     "scorerTestSampleInput": "法國的首都是巴黎，位於塞納河畔。",
     "scorerTestSampleOutput": "巴黎是法國的首都。",
-    "topCategory": "頂層類別",
-    "trueRate": "真實率",
     "unknownError": "未知錯誤",
     "import": {
       "createdSuccessfully": "\"{name}\" 已成功建立",
@@ -20186,6 +20161,7 @@
       "evalTemplates": "線上評估 — 範本",
       "scorers": "線上評估 — 評分器",
       "evalJobs": "線上評估 — 作業",
+      "quality": "線上評估 — 品質",
       "scoreConfigs": "線上評估 — 分數設定",
       "actions": "動作",
       "llmProviders": "LLM 提供者",
@@ -20301,6 +20277,7 @@
       "evalTemplatesRefresh": "刷新列表",
       "scorersRefresh": "刷新列表",
       "evalJobsRefresh": "刷新列表",
+      "qualityBack": "返回所有設定",
       "scoreConfigsRefresh": "刷新列表",
       "actionsRefresh": "刷新列表",
       "llmProvidersRefresh": "刷新列表",
@@ -20547,11 +20524,10 @@
         "high": "高"
       },
       "qualityStatus": {
-        "nothreshold": "無門檻",
-        "nodata": "無資料",
+        "attention": "需要關注",
         "healthy": "健康",
-        "warn": "警告",
-        "unhealthy": "不健康"
+        "unset": "未設定閾值",
+        "nodata": "無評分資料"
       },
       "rumEventType": {
         "longtask": "長任務",

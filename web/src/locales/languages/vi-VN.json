@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Tất cả Tác nhân",
-      "agentLabel": "Tác nhân",
-      "agentPlaceholder": "Tất cả tác nhân",
-      "kpisAriaLabel": "KPI cấp 1",
-      "dataTypes": {
-        "numericShort": "Số",
-        "categoricalShort": "Danh mục",
-        "booleanShort": "Luận lý"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} ngày trước"
+        }
       },
+      "healthyIf": "Đạt nếu {rule}",
+      "noHealthyValue": "không có",
+      "setThreshold": "Thiết lập ngưỡng đạt",
+      "noScoresInWindow": "Không có điểm trong khoảng thời gian này",
+      "outOf": "{count} trên {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Phạm vi điểm số",
-        "filterHint": "So sánh cấu hình điểm số này trên các phạm vi mục tiêu đánh giá.",
         "all": "Tất cả",
         "span": "Span",
         "trace": "Trace",
         "session": "Phiên"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Kết quả điểm số"
-        },
-        "evaluationCost": {
-          "title": "Chi phí đánh giá"
-        },
-        "scorerSuccess": {
-          "title": "Thành công của bộ chấm điểm"
-        },
-        "scorerFailures": {
-          "title": "Lỗi bộ chấm điểm"
-        },
-        "latencyP95": {
-          "title": "Độ trễ bộ chấm điểm p95"
-        },
-        "vsPrev": "so với trước",
-        "noPriorData": "không có dữ liệu trước đó",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "phiên"
       },
-      "detail": {
-        "loading": "Đang tải phân tích chi tiết theo cấu hình…",
-        "noData": "Chưa có điểm nào cho cấu hình này trong cửa sổ này.",
-        "empty": {
-          "title": "Đang chờ điểm đầu tiên của bạn",
-          "titleScoped": "Không có điểm {scope} nào trong cửa sổ này",
-          "description": "Không có điểm nào được ghi cho cấu hình này trong khoảng thời gian đã chọn. Chúng sẽ tự động xuất hiện khi bộ chấm điểm sử dụng nó chạy.",
-          "descriptionScoped": "Không có điểm {scope} nào cho cấu hình này trong khoảng thời gian đã chọn. Hãy chọn phạm vi khác hoặc mở rộng khoảng thời gian."
-        },
-        "trendTitle": "Xu hướng",
-        "distributionTitle": "Phân bố điểm",
-        "categoryDistributionTitle": "Phân bố danh mục",
-        "healthyRateTitle": "Tỷ lệ lành mạnh theo thời gian",
-        "trueRateTitle": "Tỷ lệ đúng theo thời gian",
-        "trueFalseTitle": "Đúng vs Sai",
-        "legendAvg": "TB",
-        "legendThreshold": "ngưỡng {'{'}hướng{'}'} {'{'}giá trị{'}'}",
-        "markLineHealthy": "khỏe mạnh {direction} {value}",
-        "healthyThreshold": "Khỏe mạnh {threshold}",
-        "legendHealthy": "khỏe mạnh",
-        "legendUnhealthy": "không khỏe mạnh",
-        "legendHealthyRate": "Tỷ lệ lành mạnh",
-        "legendTrueRate": "Tỷ lệ đúng",
-        "legendTrueCount": "đúng ({count})",
-        "legendFalseCount": "sai ({count})",
-        "kpis": {
-          "average": "Trung bình",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Không khỏe mạnh",
-          "healthy": "Khỏe mạnh",
-          "trueRate": "Tỷ lệ đúng",
-          "falseRate": "Tỷ lệ sai",
-          "coverage": "Phạm vi phủ sóng",
-          "targetsScored": "Mục tiêu đã chấm điểm"
-        },
-        "health": {
-          "title": "Trạng thái sức khỏe",
-          "noThreshold": "Chưa cấu hình ngưỡng lành mạnh. Điểm số chưa thể được phân loại là lành mạnh hoặc suy giảm.",
-          "thresholdOnly": "Lành mạnh nếu {threshold}",
-          "summary": "{percent}% dưới ngưỡng · Lành mạnh nếu {threshold}"
-        },
-        "ofScoreResults": "trên {count} kết quả điểm",
-        "range": "Khoảng {min}–{max}"
+      "tiles": {
+        "attention": "Cấu hình cần chú ý",
+        "ofTotal": "trên {total}",
+        "attentionNote": "Hiển thị chúng",
+        "attentionTooltip": "Cấu hình có ít nhất một điểm không đạt",
+        "withoutResult": "Cấu hình không có kết quả",
+        "withoutResultTooltip": "Cấu hình không có điểm trong khoảng thời gian này hoặc không có ngưỡng đạt. Nhấp để hiển thị chúng.",
+        "noScores": "{count} không có điểm | {count} không có điểm",
+        "noThreshold": "{count} không có ngưỡng | {count} không có ngưỡng",
+        "allGiveResult": "Mọi cấu hình đều cho kết quả"
       },
-      "runs": {
-        "title": "Điểm đánh giá",
-        "hint": "Điểm số và lý giải đến từ _llm_scores. Chọn một lần chạy để mở trace đánh giá của nó nhằm điều tra thêm.",
-        "filterLabel": "Lọc điểm đánh giá",
-        "noThresholdHint": "Đặt ngưỡng lành mạnh trên cấu hình điểm số này để phân loại và làm nổi bật các điểm không lành mạnh.",
-        "noReasoning": "Không có lý luận nào được ghi lại",
-        "unknownAgent": "Tác nhân không xác định",
-        "unknownScope": "Phạm vi không xác định",
-        "queryError": "Không thể làm mới điểm đánh giá. Trang thành công cuối cùng vẫn được hiển thị.",
-        "empty": "Không có điểm đánh giá nào trong khoảng thời gian này.",
-        "emptyUnhealthy": "Không có điểm không lành mạnh nào trong khoảng thời gian này.",
-        "filters": {
-          "all": "Tất cả điểm",
-          "unhealthy": "Không lành mạnh"
-        },
-        "health": {
-          "healthy": "Lành mạnh",
-          "unhealthy": "Không lành mạnh"
-        },
-        "columns": {
-          "time": "Đã đánh giá",
-          "result": "Điểm",
-          "reasoning": "Lý luận",
-          "target": "Mục tiêu",
-          "agent": "Tác nhân"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Lọc cấu hình…",
-        "relativeTime": {
-          "daysAgo": "{day} ngày trước",
-          "monthsAgo": "{month} tháng trước"
-        },
-        "status": {
-          "healthy": "Lành mạnh",
-          "unhealthy": "Cần chú ý",
-          "noThreshold": "Ngưỡng chưa được thiết lập",
-          "noData": "Không có dữ liệu điểm"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% dưới · Lành mạnh nếu {threshold}",
-          "noThresholdHint": "Đặt ngưỡng lành mạnh",
-          "noDataHint": "Không có điểm trong cửa sổ này"
-        },
+        "openUnhealthy": "Mở các điểm không đạt",
+        "configLink": "Cấu hình",
+        "averageRange": "trung bình, {min} đến {max}",
+        "mostCommon": "phổ biến nhất · {count} trên {total}",
         "columns": {
-          "health": "Sức khỏe",
           "scoreConfig": "Cấu hình điểm",
-          "type": "Loại",
-          "quality": "Chất lượng",
-          "totalScores": "Tổng điểm",
-          "scopeMix": "Hỗn hợp phạm vi",
-          "volumeTrend": "Xu hướng khối lượng",
+          "health": "Trạng thái",
+          "typicalScore": "Điểm điển hình",
+          "unhealthy": "Không đạt",
+          "scores": "Điểm",
           "updated": "Đã cập nhật"
         }
       },
-      "averageWithHealthyRate": "Trung bình · {rate}% khỏe mạnh"
+      "detail": {
+        "back": "Tất cả cấu hình",
+        "backToAll": "Quay lại tất cả cấu hình",
+        "editConfig": "Chỉnh sửa cấu hình",
+        "notFound": "Không tìm thấy cấu hình điểm",
+        "notFoundDescription": "Có thể nó đã bị xóa hoặc liên kết trỏ đến một cấu hình cũ.",
+        "emptyTitle": "Đang chờ những điểm đầu tiên của bạn",
+        "emptyTitleScoped": "Không có điểm {scope} trong khoảng thời gian này",
+        "emptyDescription": "Không có điểm nào được ghi nhận cho cấu hình này trong khoảng thời gian đã chọn. Chúng sẽ xuất hiện ở đây khi một bộ chấm điểm sử dụng cấu hình này chạy.",
+        "distributionNumeric": "Phân bố điểm",
+        "distributionValues": "Phân bố giá trị",
+        "averageValue": "trung bình {value}",
+        "legendHealthy": "Bình thường",
+        "legendUnhealthy": "Bất thường",
+        "legendScores": "Điểm",
+        "chartTooltip": "{count} điểm, {unhealthy} không đạt | {count} điểm, {unhealthy} không đạt",
+        "chartTooltipCount": "{count} điểm | {count} điểm",
+        "trendTitle": {
+          "score": "Xu hướng",
+          "healthyRate": "Tỷ lệ đạt theo thời gian",
+          "trueRate": "Tỷ lệ đúng theo thời gian",
+          "count": "Điểm theo thời gian"
+        },
+        "trendLegend": {
+          "healthyRate": "Tỷ lệ đạt",
+          "trueRate": "Tỷ lệ đúng",
+          "count": "Điểm số"
+        },
+        "legendAvg": "TB",
+        "legendThreshold": "ngưỡng {direction} {value}",
+        "markLineHealthy": "khỏe mạnh {direction} {value}",
+        "filterRange": "{from} đến {to}",
+        "filterBelow": "Dưới {to}",
+        "filterAtLeast": "{from} trở lên",
+        "filterAny": "Mọi giá trị",
+        "filterByBar": "Lọc điểm số theo giá trị",
+        "barButton": "{label}: {count} điểm | {label}: {count} điểm",
+        "clearFilter": "Xóa bộ lọc"
+      },
+      "review": {
+        "title": "Điểm đánh giá",
+        "all": "Tất cả",
+        "unhealthy": "Không đạt chuẩn",
+        "unhealthyDisabled": "Đặt ngưỡng đạt chuẩn để phân loại điểm số",
+        "inputNotCaptured": "Chưa ghi nhận đầu vào",
+        "outputNotCaptured": "Chưa ghi nhận đầu ra",
+        "noMatch": "Không có điểm nào khớp với bộ lọc này"
+      },
+      "pane": {
+        "noneSelected": "Chưa chọn điểm nào",
+        "healthy": "Đạt chuẩn",
+        "unhealthy": "Không đạt chuẩn",
+        "noThreshold": "Chưa đặt ngưỡng đạt chuẩn",
+        "previous": "Điểm trước",
+        "next": "Điểm tiếp theo",
+        "reasoning": "Lập luận",
+        "noReasoning": "Không có lập luận nào được ghi lại",
+        "fullTextUnavailable": "Đang hiển thị bản xem trước ngắn. Không thể tải toàn bộ trace.",
+        "open": {
+          "span": "Mở span",
+          "trace": "Mở trace",
+          "session": "Mở phiên"
+        },
+        "evaluatorTrace": "Trace của bộ đánh giá",
+        "addToDataset": "Thêm vào bộ dữ liệu",
+        "datasetSession": "Bộ dữ liệu chỉ nhận một trace hoặc span. Mở phiên để thêm một trong các trace của phiên đó.",
+        "datasetNoStream": "Điểm này không có stream nguồn để thêm từ đó."
+      }
     },
     "singular": {
       "jobs": "Công việc đánh giá",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Nhập ({count})",
-    "count": "Số lượng",
     "failedToDeriveSchema": "Không thể suy ra lược đồ",
     "failedToImportScoreConfig": "Không thể nhập cấu hình điểm số",
     "failedToImportScorer": "Không thể nhập bộ chấm điểm",
     "failedToFetchCatalog": "Không thể tải danh mục ({status})",
     "failedToLoadCatalog": "Không thể tải danh mục",
     "failedToRunScorerTest": "Không thể chạy kiểm tra bộ chấm điểm",
-    "healthyRate": "Tỷ lệ khỏe mạnh",
     "invalidJsonFormat": "Định dạng JSON không hợp lệ",
     "jsonIsEmpty": "JSON trống",
     "scorerTestFailed": "Kiểm tra bộ chấm điểm thất bại",
     "scorerTestSampleContext": "Hồ sơ quốc gia Pháp: Paris là thủ đô.",
     "scorerTestSampleInput": "Thủ đô của Pháp là Paris, nằm trên sông Seine.",
     "scorerTestSampleOutput": "Paris là thủ đô của Pháp.",
-    "topCategory": "Danh mục hàng đầu",
-    "trueRate": "Tỷ lệ đúng",
     "unknownError": "Lỗi không xác định",
     "import": {
       "createdSuccessfully": "\"{name}\" đã được tạo thành công",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Đánh giá trực tuyến — Mẫu",
       "scorers": "Đánh giá trực tuyến — Bộ chấm điểm",
       "evalJobs": "Đánh giá trực tuyến — Công việc",
+      "quality": "Online Evals — Chất lượng",
       "scoreConfigs": "Đánh giá trực tuyến — Cấu hình điểm",
       "actions": "Hành động",
       "llmProviders": "Nhà cung cấp LLM",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Làm mới danh sách",
       "scorersRefresh": "Làm mới danh sách",
       "evalJobsRefresh": "Làm mới danh sách",
+      "qualityBack": "Quay lại tất cả cấu hình",
       "scoreConfigsRefresh": "Làm mới danh sách",
       "actionsRefresh": "Làm mới danh sách",
       "llmProvidersRefresh": "Làm mới danh sách",
@@ -20552,11 +20529,10 @@
         "high": "Cao"
       },
       "qualityStatus": {
-        "nothreshold": "Không có ngưỡng",
-        "nodata": "Không có dữ liệu",
+        "attention": "Cần chú ý",
         "healthy": "Khỏe mạnh",
-        "warn": "Cảnh báo",
-        "unhealthy": "Không khỏe"
+        "unset": "Chưa đặt ngưỡng",
+        "nodata": "Không có dữ liệu điểm số"
       },
       "rumEventType": {
         "longtask": "Tác vụ dài",

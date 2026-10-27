@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Todos os Agentes",
-      "agentLabel": "Agente",
-      "agentPlaceholder": "Todos os agentes",
-      "kpisAriaLabel": "KPIs de Nível 1",
-      "dataTypes": {
-        "numericShort": "Núm",
-        "categoricalShort": "Cat",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}d atrás"
+        }
       },
+      "healthyIf": "Saudável se {rule}",
+      "noHealthyValue": "nenhum",
+      "setThreshold": "Definir um limiar saudável",
+      "noScoresInWindow": "Sem pontuações nesta janela",
+      "outOf": "{count} de {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Âmbito da pontuação",
-        "filterHint": "Compare esta Configuração de Pontuação entre âmbitos de destino de avaliação.",
         "all": "Todos",
         "span": "Span",
         "trace": "Trace",
         "session": "Sessão"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Resultados da Pontuação"
-        },
-        "evaluationCost": {
-          "title": "Custo de avaliação"
-        },
-        "scorerSuccess": {
-          "title": "Sucesso do Avaliador"
-        },
-        "scorerFailures": {
-          "title": "Falhas no avaliador"
-        },
-        "latencyP95": {
-          "title": "Latência do Avaliador p95"
-        },
-        "vsPrev": "versus anterior",
-        "noPriorData": "sem dados anteriores",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "sessão"
       },
-      "detail": {
-        "loading": "A carregar discriminação por configuração...",
-        "noData": "Ainda não há pontuações para esta configuração nesta janela.",
-        "empty": {
-          "title": "A aguardar as suas primeiras pontuações",
-          "titleScoped": "Nenhuma pontuação de {scope} nesta janela",
-          "description": "Nenhuma pontuação foi registada para esta configuração no intervalo de tempo selecionado. Aparecerão aqui automaticamente assim que um avaliador que a utilize for executado.",
-          "descriptionScoped": "Nenhuma pontuação de {scope} foi recebida para esta configuração no intervalo de tempo selecionado. Escolha outro âmbito ou amplie o intervalo de tempo."
-        },
-        "trendTitle": "Tendência",
-        "distributionTitle": "Distribuição de pontuação",
-        "categoryDistributionTitle": "Distribuição de categorias",
-        "healthyRateTitle": "Taxa saudável ao longo do tempo",
-        "trueRateTitle": "Taxa verdadeira ao longo do tempo",
-        "trueFalseTitle": "Verdadeiro versus falso",
-        "legendAvg": "Média",
-        "legendThreshold": "limiar {'{'}direção{'}'} {'{'}valor{'}'}",
-        "markLineHealthy": "saudável {direction} {value}",
-        "healthyThreshold": "Saudável {threshold}",
-        "legendHealthy": "saudável",
-        "legendUnhealthy": "não saudável",
-        "legendHealthyRate": "Taxa saudável",
-        "legendTrueRate": "Taxa verdadeira",
-        "legendTrueCount": "verdadeiro ({count})",
-        "legendFalseCount": "falso ({count})",
-        "kpis": {
-          "average": "Média",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Não saudável",
-          "healthy": "Saudável",
-          "trueRate": "Taxa verdadeira",
-          "falseRate": "Taxa falsa",
-          "coverage": "Cobertura",
-          "targetsScored": "Alvos pontuados"
-        },
-        "health": {
-          "title": "Estado de saúde",
-          "noThreshold": "Nenhum limite saudável está configurado. As pontuações ainda não podem ser classificadas como saudáveis ou em degradação.",
-          "thresholdOnly": "Saudável se {threshold}",
-          "summary": "{percent}% abaixo do limite · Saudável se {threshold}"
-        },
-        "ofScoreResults": "de {count} resultados de pontuação",
-        "range": "Faixa {min}–{max}"
+      "tiles": {
+        "attention": "Configurações que precisam de atenção",
+        "ofTotal": "de {total}",
+        "attentionNote": "Mostrar",
+        "attentionTooltip": "Configurações com pelo menos uma pontuação não saudável",
+        "withoutResult": "Configurações sem resultado",
+        "withoutResultTooltip": "Configurações sem pontuações neste intervalo de tempo ou sem um limiar saudável. Clique para as mostrar.",
+        "noScores": "{count} não recebeu pontuações | {count} não receberam pontuações",
+        "noThreshold": "{count} não tem limiar | {count} não têm limiar",
+        "allGiveResult": "Cada configuração dá um resultado"
       },
-      "runs": {
-        "title": "Pontuações de avaliação",
-        "hint": "As pontuações e o raciocínio vêm de _llm_scores. Selecione uma execução para abrir o trace do avaliador para investigação adicional.",
-        "filterLabel": "Filtrar pontuações de avaliação",
-        "noThresholdHint": "Defina um limite saudável nesta Configuração de Pontuação para classificar e destacar pontuações não saudáveis.",
-        "noReasoning": "Nenhum raciocínio registado",
-        "unknownAgent": "Agente desconhecido",
-        "unknownScope": "Âmbito desconhecido",
-        "queryError": "Não foi possível atualizar as pontuações de avaliação. A última página bem-sucedida continua a ser apresentada.",
-        "empty": "Nenhuma pontuação de avaliação neste intervalo de tempo.",
-        "emptyUnhealthy": "Nenhuma pontuação não saudável neste intervalo de tempo.",
-        "filters": {
-          "all": "Todas as pontuações",
-          "unhealthy": "Não saudável"
-        },
-        "health": {
-          "healthy": "Saudável",
-          "unhealthy": "Não saudável"
-        },
-        "columns": {
-          "time": "Avaliado",
-          "result": "Pontuação",
-          "reasoning": "Raciocínio",
-          "target": "Alvo",
-          "agent": "Agente"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filtrar configurações…",
-        "relativeTime": {
-          "daysAgo": "{day}d atrás",
-          "monthsAgo": "{month}mo atrás"
-        },
-        "status": {
-          "healthy": "Saudável",
-          "unhealthy": "Precisa de atenção",
-          "noThreshold": "Limiar não definido",
-          "noData": "Sem dados de pontuação"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% abaixo · Saudável se {threshold}",
-          "noThresholdHint": "Definir um limiar saudável",
-          "noDataHint": "Nenhuma pontuação nesta janela"
-        },
+        "openUnhealthy": "Abrir as pontuações não saudáveis",
+        "configLink": "Configuração",
+        "averageRange": "média, {min} a {max}",
+        "mostCommon": "mais comum · {count} de {total}",
         "columns": {
-          "health": "Saúde",
           "scoreConfig": "Configuração de pontuação",
-          "type": "Tipo",
-          "quality": "Qualidade",
-          "totalScores": "Pontuações totais",
-          "scopeMix": "Mistura de Âmbitos",
-          "volumeTrend": "Tendência de Volume",
+          "health": "Saúde",
+          "typicalScore": "Pontuação típica",
+          "unhealthy": "Não saudável",
+          "scores": "Pontuações",
           "updated": "Atualizado"
         }
       },
-      "averageWithHealthyRate": "Média · {rate}% saudável"
+      "detail": {
+        "back": "Todas as configurações",
+        "backToAll": "Voltar a todas as configurações",
+        "editConfig": "Editar configuração",
+        "notFound": "Configuração de pontuação não encontrada",
+        "notFoundDescription": "Pode ter sido eliminada ou a ligação aponta para uma configuração antiga.",
+        "emptyTitle": "À espera das suas primeiras pontuações",
+        "emptyTitleScoped": "Sem pontuações de {scope} nesta janela",
+        "emptyDescription": "Não chegaram pontuações para esta configuração no intervalo de tempo selecionado. Aparecem aqui quando um avaliador que a utiliza for executado.",
+        "distributionNumeric": "Distribuição das pontuações",
+        "distributionValues": "Distribuição dos valores",
+        "averageValue": "média {value}",
+        "legendHealthy": "Saudável",
+        "legendUnhealthy": "Não saudável",
+        "legendScores": "Pontuações",
+        "chartTooltip": "{count} pontuação, {unhealthy} não saudável | {count} pontuações, {unhealthy} não saudáveis",
+        "chartTooltipCount": "{count} pontuação | {count} pontuações",
+        "trendTitle": {
+          "score": "Tendência",
+          "healthyRate": "Taxa de saudáveis ao longo do tempo",
+          "trueRate": "Taxa de verdadeiros ao longo do tempo",
+          "count": "Pontuações ao longo do tempo"
+        },
+        "trendLegend": {
+          "healthyRate": "Taxa de saudáveis",
+          "trueRate": "Taxa de verdadeiros",
+          "count": "Pontuações"
+        },
+        "legendAvg": "Média",
+        "legendThreshold": "limiar {direction} {value}",
+        "markLineHealthy": "saudável {direction} {value}",
+        "filterRange": "{from} a {to}",
+        "filterBelow": "Abaixo de {to}",
+        "filterAtLeast": "{from} ou mais",
+        "filterAny": "Qualquer valor",
+        "filterByBar": "Filtrar pontuações por valor",
+        "barButton": "{label}: {count} pontuação | {label}: {count} pontuações",
+        "clearFilter": "Limpar filtro"
+      },
+      "review": {
+        "title": "Pontuações de avaliação",
+        "all": "Todas",
+        "unhealthy": "Não saudáveis",
+        "unhealthyDisabled": "Defina um limiar para classificar pontuações como saudáveis",
+        "inputNotCaptured": "Entrada não capturada",
+        "outputNotCaptured": "Saída não capturada",
+        "noMatch": "Nenhuma pontuação corresponde a este filtro"
+      },
+      "pane": {
+        "noneSelected": "Nenhuma pontuação selecionada",
+        "healthy": "Saudável",
+        "unhealthy": "Não saudável",
+        "noThreshold": "Nenhum limiar de saúde definido",
+        "previous": "Pontuação anterior",
+        "next": "Pontuação seguinte",
+        "reasoning": "Raciocínio",
+        "noReasoning": "Nenhum raciocínio registado",
+        "fullTextUnavailable": "A mostrar uma pré-visualização curta. Não foi possível carregar o trace completo.",
+        "open": {
+          "span": "Abrir span",
+          "trace": "Abrir trace",
+          "session": "Abrir sessão"
+        },
+        "evaluatorTrace": "Trace do avaliador",
+        "addToDataset": "Adicionar ao conjunto de dados",
+        "datasetSession": "Os conjuntos de dados aceitam um único trace ou span. Abra a sessão para adicionar um dos seus traces.",
+        "datasetNoStream": "Esta pontuação não tem um stream de origem de onde adicionar."
+      }
     },
     "singular": {
       "jobs": "Trabalho de avaliação",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Importar ({count})",
-    "count": "Contagem",
     "failedToDeriveSchema": "Falha ao derivar esquema",
     "failedToImportScoreConfig": "Falha ao importar configuração de pontuação",
     "failedToImportScorer": "Falha ao importar avaliador",
     "failedToFetchCatalog": "Falha ao obter catálogo ({status})",
     "failedToLoadCatalog": "Falha ao carregar catálogo",
     "failedToRunScorerTest": "Falha ao executar teste do avaliador",
-    "healthyRate": "Taxa saudável",
     "invalidJsonFormat": "Formato JSON inválido",
     "jsonIsEmpty": "JSON está vazio",
     "scorerTestFailed": "Falha no teste do avaliador",
     "scorerTestSampleContext": "Perfil do país França: Paris é a capital.",
     "scorerTestSampleInput": "A capital de França é Paris, situada no rio Sena.",
     "scorerTestSampleOutput": "Paris é a capital de França.",
-    "topCategory": "Categoria principal",
-    "trueRate": "Taxa verdadeira",
     "unknownError": "Erro desconhecido",
     "import": {
       "createdSuccessfully": "\"{name}\" criado com sucesso",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Avaliações online — Modelos",
       "scorers": "Avaliações online — Avaliadores",
       "evalJobs": "Avaliações online — Tarefas",
+      "quality": "Avaliações online — Qualidade",
       "scoreConfigs": "Avaliações online — Configurações de pontuação",
       "actions": "Ações",
       "llmProviders": "Fornecedores de LLM",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Atualizar lista",
       "scorersRefresh": "Atualizar lista",
       "evalJobsRefresh": "Atualizar lista",
+      "qualityBack": "Voltar a todas as configurações",
       "scoreConfigsRefresh": "Atualizar lista",
       "actionsRefresh": "Atualizar lista",
       "llmProvidersRefresh": "Atualizar lista",
@@ -20552,11 +20529,10 @@
         "high": "Alto"
       },
       "qualityStatus": {
-        "nothreshold": "Sem limite",
-        "nodata": "Sem dados",
+        "attention": "Requer atenção",
         "healthy": "Saudável",
-        "warn": "Aviso",
-        "unhealthy": "Não saudável"
+        "unset": "Limiar não definido",
+        "nodata": "Sem dados de pontuação"
       },
       "rumEventType": {
         "longtask": "Tarefa longa",

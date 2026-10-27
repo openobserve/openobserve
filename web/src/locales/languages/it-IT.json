@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Tutti gli agenti",
-      "agentLabel": "Agente",
-      "agentPlaceholder": "Tutti gli agenti",
-      "kpisAriaLabel": "KPI di livello 1",
-      "dataTypes": {
-        "numericShort": "Num",
-        "categoricalShort": "Cat",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} g fa"
+        }
       },
+      "healthyIf": "Integro se {rule}",
+      "noHealthyValue": "nessuno",
+      "setThreshold": "Imposta una soglia di integrità",
+      "noScoresInWindow": "Nessun punteggio in questa finestra",
+      "outOf": "{count} su {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Ambito del punteggio",
-        "filterHint": "Confronta questa configurazione del punteggio tra gli ambiti di destinazione della valutazione.",
         "all": "Tutti",
         "span": "Span",
         "trace": "Traccia",
         "session": "Sessione"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Risultati del punteggio"
-        },
-        "evaluationCost": {
-          "title": "Costo di valutazione"
-        },
-        "scorerSuccess": {
-          "title": "Successo del valutatore"
-        },
-        "scorerFailures": {
-          "title": "Errori del valutatore"
-        },
-        "latencyP95": {
-          "title": "Latenza del valutatore p95"
-        },
-        "vsPrev": "vs precedente",
-        "noPriorData": "nessun dato precedente",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "traccia",
+        "session": "sessione"
       },
-      "detail": {
-        "loading": "Caricamento della suddivisione per configurazione...",
-        "noData": "Non ci sono ancora punteggi per questa configurazione in questa finestra.",
-        "empty": {
-          "title": "In attesa dei tuoi primi punteggi",
-          "titleScoped": "Nessun punteggio {scope} in questa finestra",
-          "description": "Nessun punteggio è arrivato per questa configurazione nell'intervallo di tempo selezionato. Verranno visualizzati qui automaticamente non appena viene eseguito un valutatore che la utilizza.",
-          "descriptionScoped": "Nessun punteggio {scope} è stato ricevuto per questa configurazione nell'intervallo di tempo selezionato. Scegli un altro ambito o amplia l'intervallo di tempo."
-        },
-        "trendTitle": "Tendenza",
-        "distributionTitle": "Distribuzione del punteggio",
-        "categoryDistributionTitle": "Distribuzione delle categorie",
-        "healthyRateTitle": "Tasso di healthy nel tempo",
-        "trueRateTitle": "Tasso di risultati veri nel tempo",
-        "trueFalseTitle": "Vero vs falso",
-        "legendAvg": "Media",
-        "legendThreshold": "soglia {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "sano {direction} {value}",
-        "healthyThreshold": "Sano {threshold}",
-        "legendHealthy": "sano",
-        "legendUnhealthy": "non sano",
-        "legendHealthyRate": "Tasso di healthy",
-        "legendTrueRate": "Tasso di risultati veri",
-        "legendTrueCount": "vero ({count})",
-        "legendFalseCount": "falso ({count})",
-        "kpis": {
-          "average": "Media",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Non sano",
-          "healthy": "Sano",
-          "trueRate": "Tasso di risultati veri",
-          "falseRate": "Tasso di falso",
-          "coverage": "Copertura",
-          "targetsScored": "Target valutati"
-        },
-        "health": {
-          "title": "Stato di salute",
-          "noThreshold": "Nessuna soglia di healthy è configurata. I punteggi non possono ancora essere classificati come healthy o in degrado.",
-          "thresholdOnly": "Healthy se {threshold}",
-          "summary": "{percent}% sotto la soglia · Healthy se {threshold}"
-        },
-        "ofScoreResults": "di {count} risultati del punteggio",
-        "range": "Intervallo {min}–{max}"
+      "tiles": {
+        "attention": "Configurazioni che richiedono attenzione",
+        "ofTotal": "di {total}",
+        "attentionNote": "Mostrale",
+        "attentionTooltip": "Configurazioni con almeno un punteggio non integro",
+        "withoutResult": "Configurazioni senza un risultato",
+        "withoutResultTooltip": "Configurazioni senza punteggi in questo intervallo di tempo, o senza una soglia di integrità. Fai clic per mostrarle.",
+        "noScores": "{count} non ha ricevuto punteggi | {count} non hanno ricevuto punteggi",
+        "noThreshold": "{count} non ha una soglia | {count} non hanno una soglia",
+        "allGiveResult": "Ogni configurazione restituisce un risultato"
       },
-      "runs": {
-        "title": "Punteggi di valutazione",
-        "hint": "I punteggi e il ragionamento provengono da _llm_scores. Seleziona una esecuzione per aprire la sua traccia di valutazione per ulteriori indagini.",
-        "filterLabel": "Filtra punteggi di valutazione",
-        "noThresholdHint": "Imposta una soglia di healthy su questa configurazione del punteggio per classificare ed evidenziare i punteggi non healthy.",
-        "noReasoning": "Nessuna motivazione registrata",
-        "unknownAgent": "Agente sconosciuto",
-        "unknownScope": "Ambito sconosciuto",
-        "queryError": "I punteggi di valutazione non possono essere aggiornati. Viene ancora mostrata l'ultima pagina con successo.",
-        "empty": "Nessun punteggio di valutazione in questo intervallo di tempo.",
-        "emptyUnhealthy": "Nessun punteggio non sano in questo intervallo di tempo.",
-        "filters": {
-          "all": "Tutti i punteggi",
-          "unhealthy": "Non sano"
-        },
-        "health": {
-          "healthy": "Sano",
-          "unhealthy": "Non sano"
-        },
-        "columns": {
-          "time": "Valutato",
-          "result": "Punteggio",
-          "reasoning": "Ragionamento",
-          "target": "Obiettivo",
-          "agent": "Agente"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filtra configurazioni…",
-        "relativeTime": {
-          "daysAgo": "{day} g fa",
-          "monthsAgo": "{month} m fa"
-        },
-        "status": {
-          "healthy": "Sano",
-          "unhealthy": "Richiede attenzione",
-          "noThreshold": "Soglia non impostata",
-          "noData": "Nessun dato del punteggio"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% sotto · Sano se {threshold}",
-          "noThresholdHint": "Imposta una soglia sana",
-          "noDataHint": "Nessun punteggio in questa finestra"
-        },
+        "openUnhealthy": "Apri i punteggi non integri",
+        "configLink": "Configurazione",
+        "averageRange": "media, da {min} a {max}",
+        "mostCommon": "più comune · {count} su {total}",
         "columns": {
-          "health": "Salute",
-          "scoreConfig": "Configurazione del punteggio",
-          "type": "Tipo",
-          "quality": "Qualità",
-          "totalScores": "Punteggi totali",
-          "scopeMix": "Miscela di ambiti",
-          "volumeTrend": "Andamento del volume",
+          "scoreConfig": "Configurazione punteggio",
+          "health": "Integrità",
+          "typicalScore": "Punteggio tipico",
+          "unhealthy": "Non integri",
+          "scores": "Punteggi",
           "updated": "Aggiornato"
         }
       },
-      "averageWithHealthyRate": "Media · {rate}% in salute"
+      "detail": {
+        "back": "Tutte le configurazioni",
+        "backToAll": "Torna a tutte le configurazioni",
+        "editConfig": "Modifica configurazione",
+        "notFound": "Configurazione punteggio non trovata",
+        "notFoundDescription": "Potrebbe essere stata eliminata oppure il link punta a una configurazione precedente.",
+        "emptyTitle": "In attesa dei primi punteggi",
+        "emptyTitleScoped": "Nessun punteggio per {scope} in questa finestra",
+        "emptyDescription": "Nessun punteggio è arrivato per questa configurazione nell'intervallo di tempo selezionato. Compariranno qui quando verrà eseguito un valutatore che la utilizza.",
+        "distributionNumeric": "Distribuzione dei punteggi",
+        "distributionValues": "Distribuzione dei valori",
+        "averageValue": "media {value}",
+        "legendHealthy": "Sano",
+        "legendUnhealthy": "Non sano",
+        "legendScores": "Punteggi",
+        "chartTooltip": "{count} punteggio, {unhealthy} non integro | {count} punteggi, {unhealthy} non integri",
+        "chartTooltipCount": "{count} punteggio | {count} punteggi",
+        "trendTitle": {
+          "score": "Andamento",
+          "healthyRate": "Tasso di integrità nel tempo",
+          "trueRate": "Tasso di valori veri nel tempo",
+          "count": "Punteggi nel tempo"
+        },
+        "trendLegend": {
+          "healthyRate": "Tasso di integrità",
+          "trueRate": "Tasso di veri",
+          "count": "Punteggi"
+        },
+        "legendAvg": "Media",
+        "legendThreshold": "soglia {direction} {value}",
+        "markLineHealthy": "sano {direction} {value}",
+        "filterRange": "da {from} a {to}",
+        "filterBelow": "Sotto {to}",
+        "filterAtLeast": "{from} o più",
+        "filterAny": "Qualsiasi valore",
+        "filterByBar": "Filtra i punteggi per valore",
+        "barButton": "{label}: {count} punteggio | {label}: {count} punteggi",
+        "clearFilter": "Cancella filtro"
+      },
+      "review": {
+        "title": "Punteggi di valutazione",
+        "all": "Tutti",
+        "unhealthy": "Non sani",
+        "unhealthyDisabled": "Imposta una soglia di salute per classificare i punteggi",
+        "inputNotCaptured": "Input non acquisito",
+        "outputNotCaptured": "Output non acquisito",
+        "noMatch": "Nessun punteggio corrisponde a questo filtro"
+      },
+      "pane": {
+        "noneSelected": "Nessun punteggio selezionato",
+        "healthy": "Sano",
+        "unhealthy": "Non sano",
+        "noThreshold": "Nessuna soglia di salute impostata",
+        "previous": "Punteggio precedente",
+        "next": "Punteggio successivo",
+        "reasoning": "Ragionamento",
+        "noReasoning": "Nessun ragionamento registrato",
+        "fullTextUnavailable": "Visualizzazione di un'anteprima breve. Impossibile caricare la traccia completa.",
+        "open": {
+          "span": "Apri span",
+          "trace": "Apri traccia",
+          "session": "Apri sessione"
+        },
+        "evaluatorTrace": "Traccia del valutatore",
+        "addToDataset": "Aggiungi al dataset",
+        "datasetSession": "I dataset accettano una singola traccia o span. Apri la sessione per aggiungere una delle sue tracce.",
+        "datasetNoStream": "Questo punteggio non ha uno stream di origine da cui aggiungere dati."
+      }
     },
     "singular": {
       "jobs": "Job di valutazione",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Importa ({count})",
-    "count": "Conteggio",
     "failedToDeriveSchema": "Impossibile derivare lo schema",
     "failedToImportScoreConfig": "Impossibile importare la configurazione del punteggio",
     "failedToImportScorer": "Impossibile importare il valutatore",
     "failedToFetchCatalog": "Impossibile recuperare il catalogo ({status})",
     "failedToLoadCatalog": "Impossibile caricare il catalogo",
     "failedToRunScorerTest": "Impossibile eseguire il test del valutatore",
-    "healthyRate": "Tasso di salute",
     "invalidJsonFormat": "Formato JSON non valido",
     "jsonIsEmpty": "JSON è vuoto",
     "scorerTestFailed": "Test del valutatore fallito",
     "scorerTestSampleContext": "Profilo paese Francia: Parigi è la capitale.",
     "scorerTestSampleInput": "La capitale della Francia è Parigi, situata sul fiume Senna.",
     "scorerTestSampleOutput": "Parigi è la capitale della Francia.",
-    "topCategory": "Categoria principale",
-    "trueRate": "Tasso reale",
     "unknownError": "Errore sconosciuto",
     "import": {
       "createdSuccessfully": "\"{name}\" creato con successo",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Valutazioni online — Template",
       "scorers": "Valutazioni online — Valutatori",
       "evalJobs": "Valutazioni online — Job",
+      "quality": "Valutazioni online — Qualità",
       "scoreConfigs": "Valutazioni online — Configurazioni dei punteggi",
       "actions": "Azioni",
       "llmProviders": "Provider LLM",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Aggiorna elenco",
       "scorersRefresh": "Aggiorna elenco",
       "evalJobsRefresh": "Aggiorna elenco",
+      "qualityBack": "Torna a tutte le configurazioni",
       "scoreConfigsRefresh": "Aggiorna elenco",
       "actionsRefresh": "Aggiorna elenco",
       "llmProvidersRefresh": "Aggiorna elenco",
@@ -20552,11 +20529,10 @@
         "high": "Alto"
       },
       "qualityStatus": {
-        "nothreshold": "Nessuna soglia",
-        "nodata": "Nessun dato",
+        "attention": "Richiede attenzione",
         "healthy": "Sano",
-        "warn": "Attenzione",
-        "unhealthy": "Non sano"
+        "unset": "Soglia non impostata",
+        "nodata": "Nessun dato di punteggio"
       },
       "rumEventType": {
         "longtask": "Attività lunga",
