@@ -1376,6 +1376,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
+    #[cfg(feature = "cloud")]
+    infra::table::paid_overage_attribution::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/paid_overage_attribution: {e}"))?;
     // Through the db layer, not the table layer: it also evicts the token caches cluster-wide.
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await

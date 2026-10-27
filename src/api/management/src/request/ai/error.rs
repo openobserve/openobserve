@@ -54,10 +54,11 @@ pub enum AiErrorCode {
     TurnExpired,
     ChangedSince,
     UndoExpired,
+    BelowUsage,
 }
 
 impl AiErrorCode {
-    pub const ALL: [AiErrorCode; 28] = [
+    pub const ALL: [AiErrorCode; 29] = [
         AiErrorCode::SessionExpired,
         AiErrorCode::PermissionDenied,
         AiErrorCode::NotEnabled,
@@ -86,6 +87,7 @@ impl AiErrorCode {
         AiErrorCode::TurnExpired,
         AiErrorCode::ChangedSince,
         AiErrorCode::UndoExpired,
+        AiErrorCode::BelowUsage,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -118,6 +120,7 @@ impl AiErrorCode {
             AiErrorCode::TurnExpired => "turn_expired",
             AiErrorCode::ChangedSince => "changed_since",
             AiErrorCode::UndoExpired => "undo_expired",
+            AiErrorCode::BelowUsage => "below_usage",
         }
     }
 
@@ -188,7 +191,8 @@ impl AiErrorCode {
             | AiErrorCode::SessionOwnerUnavailable
             | AiErrorCode::RestoreRequired
             | AiErrorCode::StaleEpoch
-            | AiErrorCode::ChangedSince => StatusCode::CONFLICT,
+            | AiErrorCode::ChangedSince
+            | AiErrorCode::BelowUsage => StatusCode::CONFLICT,
             AiErrorCode::NotFound => StatusCode::NOT_FOUND,
             AiErrorCode::TurnExpired | AiErrorCode::UndoExpired => StatusCode::GONE,
             AiErrorCode::PersistenceFailed
@@ -244,7 +248,8 @@ impl AiErrorCode {
             | AiErrorCode::NotFound
             | AiErrorCode::Internal
             | AiErrorCode::ChangedSince
-            | AiErrorCode::UndoExpired => Some(AiErrorAction::None),
+            | AiErrorCode::UndoExpired
+            | AiErrorCode::BelowUsage => Some(AiErrorAction::None),
             AiErrorCode::AlreadySubmitted
             | AiErrorCode::RestoreRequired
             | AiErrorCode::StaleEpoch
@@ -559,6 +564,7 @@ mod tests {
                 "turn_expired",
                 "changed_since",
                 "undo_expired",
+                "below_usage",
             ]
         );
         for code in AiErrorCode::ALL {

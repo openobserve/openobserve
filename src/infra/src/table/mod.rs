@@ -90,6 +90,8 @@ pub mod org_storage_providers;
 pub mod org_telephony;
 pub mod org_users;
 pub mod organizations;
+#[cfg(feature = "cloud")]
+pub mod paid_overage_attribution;
 pub mod providers;
 pub mod public_dashboards;
 pub mod query_history;

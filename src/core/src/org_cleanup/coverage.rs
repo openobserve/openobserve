@@ -168,6 +168,7 @@ pub const COVERAGE: &[Coverage] = &[
         "organizations",
         "the tombstone row; swept by the promotion scheduler",
     ),
+    table("paid_overage_attribution", DB),
     table("pipeline", DB),
     table("pipeline_last_errors", DB),
     table("providers", DB),

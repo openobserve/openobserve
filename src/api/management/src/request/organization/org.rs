@@ -727,22 +727,105 @@ pub async fn extend_trial_period(
 #[cfg(feature = "cloud")]
 async fn set_pool_limit(
     caller_org: &str,
-    target_org: &str,
     pool: openobserve_core::trial_quota::TrialQuotaPool,
-    limit: u64,
+    req: &SetQuotaUsageLimitRequest,
+    actor: &str,
 ) -> Result<openobserve_core::trial_quota::PoolUsageResponse, Response> {
+    use openobserve_core::trial_quota::{
+        get_limit_for_pool, get_pool_usage, get_pool_used_from_db, set_limit_for_pool,
+    };
+
     if caller_org != "_meta" {
         return Err(MetaHttpResponse::unauthorized(
             "not authorized to access this resource",
         ));
     }
+    let target_org = req.org_id.as_str();
     if infra::table::organizations::get(target_org).await.is_err() {
         return Err(MetaHttpResponse::not_found("organization not found"));
     }
-    openobserve_core::trial_quota::set_limit_for_pool(target_org, pool, limit)
-        .await
-        .map_err(MetaHttpResponse::internal_error)?;
-    Ok(openobserve_core::trial_quota::get_pool_usage(target_org, pool).await)
+    let forced_below = apply_pool_limit(
+        req.limit,
+        req.force,
+        get_limit_for_pool(target_org, pool),
+        || get_pool_used_from_db(target_org, pool),
+        || set_limit_for_pool(target_org, pool, req.limit),
+    )
+    .await?;
+    if let Some(used) = forced_below {
+        log::warn!(
+            "[TRIAL_QUOTA] {actor} forced org={target_org} pool={} limit={} below used={used}",
+            pool.key(),
+            req.limit,
+        );
+    }
+    Ok(get_pool_usage(target_org, pool).await)
+}
+
+/// Writes `limit` unless the floor refuses it; `Some(used)` when a forced write went below usage.
+#[cfg(feature = "cloud")]
+async fn apply_pool_limit<U, UF, W, WF>(
+    limit: u64,
+    force: bool,
+    current_limit: u64,
+    read_used: U,
+    write: W,
+) -> Result<Option<u64>, Response>
+where
+    U: FnOnce() -> UF,
+    UF: std::future::Future<Output = Result<u64, anyhow::Error>>,
+    W: FnOnce() -> WF,
+    WF: std::future::Future<Output = Result<(), anyhow::Error>>,
+{
+    use openobserve_core::trial_quota::limit_is_below_usage;
+
+    // A raise needs no usage read, so a DB hiccup can never block one.
+    let used = if force || limit < current_limit {
+        match read_used().await {
+            Ok(used) => Some(used),
+            // An operator who sent `force` already accepted any usage.
+            Err(error) if force => {
+                log::warn!("[TRIAL_QUOTA] forced limit written without a usage read: {error}");
+                None
+            }
+            Err(error) => return Err(usage_unavailable(error)),
+        }
+    } else {
+        None
+    };
+    if let Some(used) = used
+        && limit_is_below_usage(used, current_limit, limit, force)
+    {
+        return Err(below_usage(used, limit));
+    }
+    write().await.map_err(MetaHttpResponse::internal_error)?;
+    Ok(used.filter(|used| force && limit < *used))
+}
+
+#[cfg(feature = "cloud")]
+fn below_usage(used: u64, limit: u64) -> Response {
+    use crate::request::ai::error::{AiErrorCode, AiErrorEnvelope};
+
+    AiErrorEnvelope::new(
+        AiErrorCode::BelowUsage,
+        format!("limit {limit} is below the {used} already used; send force to confirm"),
+    )
+    .with("used", used)
+    .with("limit", limit)
+    .into_response()
+}
+
+#[cfg(feature = "cloud")]
+fn usage_unavailable(error: anyhow::Error) -> Response {
+    use crate::request::ai::error::{AiErrorAction, AiErrorCode, AiErrorEnvelope};
+
+    log::warn!("[TRIAL_QUOTA] usage read for the allowance floor failed: {error}");
+    AiErrorEnvelope::new(
+        AiErrorCode::AuthorizationUnavailable,
+        "pool usage could not be read; retry, or send force to confirm",
+    )
+    .action(Some(AiErrorAction::Retry))
+    .into_response()
 }
 
 /// SetQuotaUsageLimit — pool-generic replacement for `SetAiUsageLimit`.
@@ -765,11 +848,13 @@ async fn set_pool_limit(
         (status = 400, description = "Unknown pool"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Organization not found"),
+        (status = 409, description = "`below_usage`: the limit is below the pool's current usage and `force` is not set"),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn set_quota_usage_limit(
     Path((org_id, pool)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Json(req): Json<SetQuotaUsageLimitRequest>,
 ) -> Response {
     use openobserve_core::trial_quota::TrialQuotaPool;
@@ -779,7 +864,7 @@ pub async fn set_quota_usage_limit(
         return MetaHttpResponse::bad_request(unknown_quota_pool_message(&pool));
     };
 
-    match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
+    match set_pool_limit(&org_id, pool, &req, &user_email.user_id).await {
         Ok(usage) => MetaHttpResponse::json(usage),
         Err(response) => response,
     }
@@ -790,6 +875,15 @@ pub async fn set_quota_usage_limit(
 #[serde(deny_unknown_fields)]
 pub struct PaidOverageUpdateRequest {
     pub enabled: bool,
+}
+
+/// The 200 body of a consent change; `Revoked` only when a stored revoke's status read failed.
+#[cfg(feature = "cloud")]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+pub enum PaidOverageUpdateResponse {
+    Status(Box<openobserve_core::trial_quota::PaidOverageStatus>),
+    Revoked { effective: bool },
 }
 
 #[cfg(feature = "cloud")]
@@ -821,6 +915,49 @@ fn paid_overage_unavailable(error: impl std::fmt::Display) -> Response {
         )),
     )
         .into_response()
+}
+
+/// Enabling needs an eligible billing status; revoking never waits on the status read.
+#[cfg(feature = "cloud")]
+async fn apply_paid_overage_change<R, RF, W, WF>(enabled: bool, read: R, write: W) -> Response
+where
+    R: Fn() -> RF,
+    RF: std::future::Future<
+            Output = Result<openobserve_core::trial_quota::PaidOverageStatus, anyhow::Error>,
+        >,
+    W: FnOnce() -> WF,
+    WF: std::future::Future<Output = Result<(), anyhow::Error>>,
+{
+    use openobserve_core::trial_quota::PaidOverageBillingStatus;
+
+    if enabled {
+        match read().await {
+            Ok(status) if status.billing_status != PaidOverageBillingStatus::Eligible => {
+                return (
+                    StatusCode::CONFLICT,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::CONFLICT,
+                        "organization is not eligible for paid overage",
+                    )),
+                )
+                    .into_response();
+            }
+            Ok(_) => {}
+            Err(error) => return paid_overage_unavailable(error),
+        }
+    }
+    if let Err(error) = write().await {
+        return paid_overage_unavailable(error);
+    }
+    match read().await {
+        Ok(status) => MetaHttpResponse::json(PaidOverageUpdateResponse::Status(Box::new(status))),
+        Err(error) if enabled => paid_overage_unavailable(error),
+        // The revoke is stored; a degraded read must not make the admin think it failed.
+        Err(error) => {
+            log::warn!("[TRIAL_QUOTA] paid-overage status read failed after revoke: {error}");
+            MetaHttpResponse::json(PaidOverageUpdateResponse::Revoked { effective: false })
+        }
+    }
 }
 
 /// GetPaidOverageStatus
@@ -873,7 +1010,7 @@ pub async fn get_paid_overage_status(
     ),
     request_body(content = PaidOverageUpdateRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 200, description = "Updated cumulative paid-overage state; a revoke whose status read fails returns `{\"effective\": false}`", body = PaidOverageUpdateResponse),
         (status = 400, description = "Unknown or unsupported quota feature"),
         (status = 403, description = "Only organization administrators may change consent"),
         (status = 409, description = "Organization is not eligible for paid overage"),
@@ -886,7 +1023,6 @@ pub async fn set_paid_overage_status(
     Json(request): Json<PaidOverageUpdateRequest>,
 ) -> Response {
     use config::meta::user::UserRole;
-    use openobserve_core::trial_quota::PaidOverageBillingStatus;
 
     let pool = match paid_overage_pool(&feature) {
         Ok(pool) => pool,
@@ -903,42 +1039,18 @@ pub async fn set_paid_overage_status(
         );
     }
 
-    let current = match openobserve_core::trial_quota::get_paid_overage_status(
-        &org_id,
-        pool,
-        &user_email.user_id,
-    )
-    .await
-    {
-        Ok(status) => status,
-        Err(error) => return paid_overage_unavailable(error),
-    };
-    if request.enabled && current.billing_status != PaidOverageBillingStatus::Eligible {
-        return (
-            StatusCode::CONFLICT,
-            Json(MetaHttpResponse::error(
-                StatusCode::CONFLICT,
-                "organization is not eligible for paid overage",
-            )),
-        )
-            .into_response();
-    }
+    let actor = user_email.user_id.as_str();
+    let read = || openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, actor);
     // One cumulative flag: the pool owns its backing rows, the API never names them.
-    if let Err(error) = openobserve_core::trial_quota::set_paid_overage_enabled_for_pool(
-        &org_id,
-        pool,
-        request.enabled,
-    )
-    .await
-    {
-        return paid_overage_unavailable(error);
-    }
-    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
-        .await
-    {
-        Ok(status) => MetaHttpResponse::json(status),
-        Err(error) => paid_overage_unavailable(error),
-    }
+    let write = || {
+        openobserve_core::trial_quota::set_paid_overage_enabled_for_pool(
+            &org_id,
+            pool,
+            request.enabled,
+            actor,
+        )
+    };
+    apply_paid_overage_change(request.enabled, read, write).await
 }
 
 /// CreateExternalContract
@@ -1976,6 +2088,35 @@ mod tests {
     }
 
     #[cfg(feature = "cloud")]
+    fn overage_status(
+        billing_status: openobserve_core::trial_quota::PaidOverageBillingStatus,
+    ) -> openobserve_core::trial_quota::PaidOverageStatus {
+        use openobserve_core::trial_quota::{PaidOverageOrganizationStatus, PaidOverageStatus};
+
+        PaidOverageStatus {
+            feature: "ai_credits".to_string(),
+            organization: PaidOverageOrganizationStatus {
+                org_id: "acme".to_string(),
+                enabled: false,
+                can_manage: true,
+                enabled_by: None,
+                disabled_by: None,
+            },
+            payer: None,
+            effective: false,
+            billing_status,
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn body_of(response: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[cfg(feature = "cloud")]
     async fn add_member(org: &str, email: &str, role: config::meta::user::UserRole) {
         use config::meta::user::UserType;
         use infra::table::users::UserRecord;
@@ -2001,6 +2142,235 @@ mod tests {
         infra::table::org_users::add(org, email, role, "lister-token", None)
             .await
             .unwrap();
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn revoke_is_stored_and_answered_when_the_status_read_fails() {
+        let wrote = std::sync::atomic::AtomicBool::new(false);
+        let response = apply_paid_overage_change(
+            false,
+            || async { Err(anyhow::anyhow!("billing database unavailable")) },
+            || async {
+                wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await;
+
+        assert!(wrote.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            body_of(response).await,
+            serde_json::json!({ "effective": false })
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn revoke_ignores_billing_status() {
+        use openobserve_core::trial_quota::PaidOverageBillingStatus;
+
+        let response = apply_paid_overage_change(
+            false,
+            || async {
+                Ok(overage_status(
+                    PaidOverageBillingStatus::SubscriptionRequired,
+                ))
+            },
+            || async { Ok(()) },
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(body_of(response).await["effective"], false);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn enabling_still_fails_closed_on_a_degraded_status_read() {
+        let wrote = std::sync::atomic::AtomicBool::new(false);
+        let response = apply_paid_overage_change(
+            true,
+            || async { Err(anyhow::anyhow!("billing database unavailable")) },
+            || async {
+                wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!wrote.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn enabling_an_ineligible_org_is_a_conflict() {
+        use openobserve_core::trial_quota::PaidOverageBillingStatus;
+
+        let response = apply_paid_overage_change(
+            true,
+            || async {
+                Ok(overage_status(
+                    PaidOverageBillingStatus::SubscriptionRequired,
+                ))
+            },
+            || async { panic!("an ineligible org must not be enabled") },
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_failed_revoke_write_is_still_reported() {
+        let response = apply_paid_overage_change(
+            false,
+            || async {
+                Ok(overage_status(
+                    openobserve_core::trial_quota::PaidOverageBillingStatus::Eligible,
+                ))
+            },
+            || async { Err(anyhow::anyhow!("write failed")) },
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn below_usage_is_a_typed_conflict_with_used_and_limit() {
+        let response = below_usage(500, 400);
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = body_of(response).await;
+        assert_eq!(body["code"], "below_usage");
+        assert_eq!(body["used"], 500);
+        assert_eq!(body["limit"], 400);
+        assert_eq!(body["retryable"], false);
+        assert_eq!(body["action"], "none");
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn usage_limit_force_defaults_to_false_for_old_clients() {
+        let req: SetQuotaUsageLimitRequest =
+            serde_json::from_value(serde_json::json!({"org_id": "acme", "limit": 10})).unwrap();
+        assert!(!req.force);
+        let req: SetQuotaUsageLimitRequest = serde_json::from_value(
+            serde_json::json!({"org_id": "acme", "limit": 10, "force": true}),
+        )
+        .unwrap();
+        assert!(req.force);
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn floor(
+        limit: u64,
+        force: bool,
+        current_limit: u64,
+        used: Result<u64, &'static str>,
+    ) -> (Result<Option<u64>, Response>, bool) {
+        let wrote = std::sync::atomic::AtomicBool::new(false);
+        let result = apply_pool_limit(
+            limit,
+            force,
+            current_limit,
+            || async move { used.map_err(|e| anyhow::anyhow!(e)) },
+            || async {
+                wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await;
+        (result, wrote.load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_limit_below_usage_without_force_is_refused_before_any_write() {
+        let (result, wrote) = floor(400, false, 1000, Ok(500)).await;
+        let body = body_of(result.unwrap_err()).await;
+        assert_eq!(body["code"], "below_usage");
+        assert!(!wrote);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_forced_limit_below_usage_is_written_and_reported() {
+        let (result, wrote) = floor(400, true, 1000, Ok(500)).await;
+        assert_eq!(result.unwrap(), Some(500));
+        assert!(wrote);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_limit_equal_to_usage_is_accepted() {
+        let (result, wrote) = floor(500, false, 1000, Ok(500)).await;
+        assert_eq!(result.unwrap(), None);
+        assert!(wrote);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_raise_still_below_usage_is_accepted_without_reading_usage() {
+        let (result, wrote) = floor(300, false, 100, Err("db down")).await;
+        assert_eq!(result.unwrap(), None);
+        assert!(wrote);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn an_unreadable_usage_refuses_a_lowering_with_a_retryable_error() {
+        let (result, wrote) = floor(400, false, 1000, Err("db down")).await;
+        let response = result.unwrap_err();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = body_of(response).await;
+        assert_eq!(body["code"], "authorization_unavailable");
+        assert_eq!(body["retryable"], true);
+        assert_eq!(body["action"], "retry");
+        assert!(!wrote);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_forced_limit_is_written_even_when_usage_is_unreadable() {
+        let (result, wrote) = floor(400, true, 1000, Err("db down")).await;
+        assert_eq!(result.unwrap(), None);
+        assert!(wrote);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn the_usage_limit_route_is_meta_only() {
+        let response = set_quota_usage_limit(
+            Path(("acme".to_string(), "ai_credits".to_string())),
+            Headers(UserEmail {
+                user_id: "admin@acme.io".to_string(),
+            }),
+            Json(SetQuotaUsageLimitRequest {
+                org_id: "acme".to_string(),
+                limit: 0,
+                force: true,
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_revoke_fallback_body_is_the_documented_variant() {
+        let body =
+            serde_json::to_value(PaidOverageUpdateResponse::Revoked { effective: false }).unwrap();
+        assert_eq!(body, serde_json::json!({ "effective": false }));
+        let schema =
+            serde_json::to_value(<PaidOverageUpdateResponse as utoipa::PartialSchema>::schema())
+                .unwrap();
+        assert!(schema.get("oneOf").is_some(), "{schema}");
     }
 
     #[cfg(feature = "cloud")]
