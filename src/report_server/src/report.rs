@@ -168,6 +168,7 @@ pub async fn generate_report(
     // Only one tab is supported for now
     let tab_id = &dashboard.tabs[0];
 
+    let _chrome_permit = config::chrome_semaphore().acquire().await?;
     log::info!("launching browser for dashboard {dashboard_id}");
     let browser_config = get_chrome_launch_options()
         .await
