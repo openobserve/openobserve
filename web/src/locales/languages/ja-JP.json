@@ -27056,7 +27056,7 @@
       "joinsFleet": "このトークンでインストールされたコレクターはフリート {fleet} に参加し、{config} v{version} を実行します。",
       "joinsFleetNoConfig": "このトークンでインストールされたコレクターはフリート {fleet} に参加します。このフリートにはまだ構成がありません。",
       "envRefNote": "認証情報には構成内で {ref} 参照を使用すると、シークレットがホスト上に留まります。",
-      "httpTransport": "プロキシまたはロードバランサーが WebSocket を通せません（HTTP ポーリングを使用）",
+      "websocketTransport": "WebSocket を使用（設定を即時配信、プロキシの対応が必要）",
       "kubernetesNote": "スーパーバイザーとコレクターを 1 つのコンテナーで実行する DaemonSet をデプロイします。アップグレードはイメージタグを変更して行います。",
       "kubernetesAgent": "エージェント（DaemonSet）",
       "kubernetesGateway": "ゲートウェイ（StatefulSet）",
