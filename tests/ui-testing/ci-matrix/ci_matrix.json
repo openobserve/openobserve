@@ -67,7 +67,8 @@
       "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
-      "dashboard-config-unit-locale.spec.js"
+      "dashboard-config-unit-locale.spec.js",
+      "dashboard-chart-options-foundation.spec.js"
     ],
     "disabled": []
   },
@@ -82,6 +83,7 @@
       "dashboard-maps.spec.js",
       "dashboard-multi-y-axis.spec.js",
       "dashboard-html-chart.spec.js",
+      "dashboard-text-panel-variables.spec.js",
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
       "dashboard-metric-camelcase.spec.js",

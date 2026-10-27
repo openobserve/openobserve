@@ -54,13 +54,11 @@ export default class ChartTypeSelector {
     this.markdownRenderer = page.locator('[data-test="markdown-renderer"]');
   }
 
-  // Enter Markdown into the Markdown chart Monaco editor
   async fillMarkdownEditor(markdown) {
     await this.markdownEditor.locator(".monaco-editor").click();
     await this.markdownEditor.locator(".inputarea").fill(markdown);
   }
 
-  // Rendered HTML output: element matched by a CSS selector inside the panel
   getHtmlRendererElement(selector) {
     return this.htmlRenderer.locator(selector);
   }

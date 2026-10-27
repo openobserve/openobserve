@@ -46,6 +46,10 @@ export default class DashboardVariables {
     await this.adhocValueSelectorInput.fill(value);
   }
 
+  async clickAddVariableBtn() {
+    await this.addVariableBtn.click();
+  }
+
   /**
    * Get the dashboard settings button locator
    * @returns {import('@playwright/test').Locator}

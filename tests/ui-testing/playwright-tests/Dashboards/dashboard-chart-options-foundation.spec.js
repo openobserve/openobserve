@@ -20,6 +20,7 @@ test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
 
 const PROMQL_RANGE_URL = /\/prometheus\/api\/v1\/query_range\?/;
+const TAGS = ["@dashboard", "@dashboardChartOptions", "@P1", "@all"];
 
 /** Builds a PromQL panel of `chartType` and opens the config sidebar. */
 async function setupPromQLChart(page, pm, dashboardName, chartType, query = "cpu_usage") {
@@ -44,7 +45,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await navigateToBase(page);
   });
 
-  test("series limit: shown for PromQL stacked, hidden for PromQL line", async ({ page }) => {
+  test("series limit: shown for PromQL stacked, hidden for PromQL line", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
@@ -62,7 +63,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("series limit: limit 1 caps the series, shows the notice, and persists after save", async ({ page }) => {
+  test("series limit: limit 1 caps the series, shows the notice, and persists after save", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
@@ -84,7 +85,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("query type: custom mode Instant sends start == end and persists after save", async ({ page }) => {
+  test("query type: custom mode Instant sends start == end and persists after save", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
@@ -108,7 +109,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("reducer: aggregation shown for PromQL gauge and h-bar, persists after save", async ({ page }) => {
+  test("reducer: aggregation shown for PromQL gauge and h-bar, persists after save", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
@@ -119,7 +120,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await pm.chartTypeSelector.selectChartType("h-bar");
     await configs.expandAllConfigSections();
     await expect(configs.aggregation).toBeVisible();
-    await configs.selectConfigOption("dashboard-config-aggregation", "Max (maximum value)");
+    await configs.selectAggregation("Max (maximum value)");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForPanelRenderSettled(page, pm);
 
@@ -131,7 +132,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("reducer: PromQL metric hides aggregation once every query is Instant", async ({ page }) => {
+  test("reducer: PromQL metric hides aggregation once every query is Instant", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
@@ -157,7 +158,7 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
   });
 
   for (const chartType of ["stacked", "h-stacked"]) {
-    test(`thresholds: ${chartType} offers line/band show-as and a step persists after save`, async ({ page }) => {
+    test(`thresholds: ${chartType} offers line/band show-as and a step persists after save`, { tag: TAGS }, async ({ page }) => {
       const pm = new PageManager(page);
       const configs = pm.dashboardPanelConfigs;
       const dashboardName = generateDashboardName();
@@ -190,16 +191,17 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
     });
   }
 
-  test("maps: pan and zoom off persists after save", async ({ page }) => {
+  test("maps: pan and zoom on persists after save", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
 
     await setupMapsPanelWithConfig(page, pm, dashboardName);
     await configs.scrollSidebarToElement(configs.mapRoam);
-    await expect(configs.mapRoamBtn).toHaveAttribute("aria-checked", "true");
-    await configs.toggleMapRoam();
+    // SQL maps default pan and zoom off; only PromQL maps default it on.
     await expect(configs.mapRoamBtn).toHaveAttribute("aria-checked", "false");
+    await configs.toggleMapRoam();
+    await expect(configs.mapRoamBtn).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForPanelRenderSettled(page, pm);
 
@@ -207,7 +209,7 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
     await reopenPanelConfig(page, pm);
     await configs.scrollSidebarToElement(configs.mapRoam);
     // Needs a backend that carries enable_roam in PanelConfig (#15806); older builds drop it on save.
-    await expect(configs.mapRoamBtn).toHaveAttribute("aria-checked", "false");
+    await expect(configs.mapRoamBtn).toHaveAttribute("aria-checked", "true");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

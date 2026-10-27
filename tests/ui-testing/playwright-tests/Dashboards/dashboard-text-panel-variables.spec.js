@@ -12,6 +12,8 @@ const testLogger = require("../utils/test-logger.js");
 test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
 
+const TAGS = ["@dashboard", "@dashboardTextPanelVariables", "@P1", "@all"];
+
 const MARKDOWN_TIME_RANGE = "Range: ${start_time} to ${end_time}";
 
 const HTML_URL_FORMATS = `<p id="pe">PE=\${variablename:percentencode}</p>
@@ -24,23 +26,32 @@ test.describe("Dashboard text panels — variables", () => {
   });
 
   for (const chartType of ["html", "markdown"]) {
-    test(`${chartType} editor: Add Variable button opens the variable drawer`, async ({ page }) => {
+    test(`${chartType} editor: Add Variable button opens the variable drawer`, { tag: TAGS }, async ({ page }) => {
       const pm = new PageManager(page);
       const dashboardName = generateDashboardName();
+      await ingestion(page);
 
       await setupTestDashboard(page, pm, dashboardName);
+      // VariablesValueSelector renders the Add Variable button only once the dashboard has a variable.
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardVariables.addDashboardVariable(
+        "variablename",
+        "logs",
+        "e2e_automate",
+        "kubernetes_container_name"
+      );
       await pm.dashboardCreate.addPanel();
       await pm.chartTypeSelector.selectChartType(chartType);
 
       await expect(pm.dashboardVariables.addVariableBtn).toBeVisible();
-      await pm.dashboardVariables.addVariableBtn.click();
+      await pm.dashboardVariables.clickAddVariableBtn();
       await expect(pm.dashboardVariables.variableNameField).toBeVisible({ timeout: 10000 });
 
       await discardAndCleanupTestDashboard(page, dashboardName);
     });
   }
 
-  test("markdown: ${start_time} and ${end_time} are replaced with the panel time range", async ({ page }) => {
+  test("markdown: ${start_time} and ${end_time} are replaced with the panel time range", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
@@ -61,7 +72,7 @@ test.describe("Dashboard text panels — variables", () => {
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("html: percentencode and queryparam variable formats", async ({ page }) => {
+  test("html: percentencode and queryparam variable formats", { tag: TAGS }, async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
     await ingestion(page);

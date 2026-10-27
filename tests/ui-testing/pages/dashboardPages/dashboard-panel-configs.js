@@ -293,6 +293,9 @@ export default class DashboardPanelConfigs {
     this.thresholdsShowAs = page.locator('[data-test="dashboard-config-thresholds-show-as"]');
     this.thresholdsShowAsTrigger = page.locator('[data-test="dashboard-config-thresholds-show-as-trigger"]');
     this.thresholdsAddStep = page.locator('[data-test="dashboard-config-thresholds-add-step"]');
+    this.thresholdStepValueFields = page.locator(
+      '[data-test^="dashboard-config-thresholds-step-"][data-test$="-value-field"]'
+    );
     this.thresholdStepValueField = (index) =>
       page.locator(`[data-test="dashboard-config-thresholds-step-${index}-value-field"]`);
   }
@@ -308,6 +311,11 @@ export default class DashboardPanelConfigs {
     await this.selectConfigOption("dashboard-promql-builder-query-type", label);
   }
 
+  /** Picks the reducer, e.g. "Max (maximum value)", in the aggregation select. */
+  async selectAggregation(label) {
+    await this.selectConfigOption("dashboard-config-aggregation", label);
+  }
+
   /** Picks how thresholds draw, e.g. "Shaded band" or "Limit line only". */
   async selectThresholdsShowAs(label) {
     await this.scrollSidebarToElement(this.thresholdsShowAs);
@@ -316,7 +324,7 @@ export default class DashboardPanelConfigs {
 
   /** Adds a threshold step and sets its value. */
   async addThresholdStep(value) {
-    const index = await this.page.locator('[data-test^="dashboard-config-thresholds-step-"][data-test$="-value-field"]').count();
+    const index = await this.thresholdStepValueFields.count();
     await this.thresholdsAddStep.click();
     const field = this.thresholdStepValueField(index);
     await field.fill(String(value));
