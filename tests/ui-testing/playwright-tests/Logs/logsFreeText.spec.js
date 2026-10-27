@@ -343,18 +343,18 @@ test.describe('Logs bare-word search (item 1)', () => {
     expect(await editorText(page)).toBe('timeout');
   });
 
-  test('the SQL toggle waits for a slow schema and is still refused on a no-FTS stream (#15549)', {
+  test('the SQL toggle waits for a slow schema load and is still refused on a no-FTS stream (#15549)', {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
     const logsPage = new PageManager(page).logsPage;
-    const schemaRoute = new RegExp(`/api/${ORG}/streams/${NOFTS}/schema`);
+    const schemaRoute = new RegExp(`/api/${ORG}/streams(/${NOFTS}/schema)?\\?type=logs`);
     await page.route(schemaRoute, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 4000));
+      await new Promise((resolve) => setTimeout(resolve, 6000));
       await route.continue();
     });
     await open(page, NOFTS, 'timeout');
     await logsPage._setSqlModeViaVue(true);
-    await expect(page.locator(panel)).toBeVisible({ timeout: 30000 });
+    await expect(page.locator(panel)).toBeVisible({ timeout: 15000 });
     await expect.poll(() => logsPage._isSqlModeEnabledViaVue()).toBe(false);
     expect(await editorText(page)).toBe('timeout');
     expect(await editorText(page)).not.toContain('SELECT');
