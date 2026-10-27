@@ -39,7 +39,7 @@ export async function processPromQLData(
   const queryIndexOf = (index: number) => shift.parentQueryIndex?.[index] ?? index;
 
   // Apply series limit
-  const seriesLimit = panelSchema.config?.promql_series_limit || 100;
+  const seriesLimit = getPromqlSeriesLimit(panelSchema.config, store);
   const histogramMode =
     panelSchema.type === "heatmap" &&
     panelSchema.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE;
@@ -122,6 +122,16 @@ export async function processPromQLData(
   });
 
   return result;
+}
+
+/** The per-query series cap, never above the server's; anything but a positive number means 100. */
+export function getPromqlSeriesLimit(
+  config: { promql_series_limit?: unknown } | null | undefined,
+  store: { state?: { zoConfig?: { max_dashboard_series?: number } } } | null | undefined,
+): number {
+  const serverMax = store?.state?.zoConfig?.max_dashboard_series ?? 100;
+  const limit = Math.floor(Number(config?.promql_series_limit));
+  return Math.min(limit > 0 ? limit : 100, serverMax);
 }
 
 /**
@@ -252,7 +262,7 @@ export function fillMissingTimestamps(
  *
  * @param values - Array of [timestamp, value] tuples
  * @param aggregation - Aggregation function to apply
- * @returns Aggregated single value
+ * @returns Aggregated value of the finite samples, NaN when none is finite
  */
 // Unknown aggregation strings from panel config fall through to the `last` default case
 export function applyAggregation(
@@ -260,8 +270,11 @@ export function applyAggregation(
   aggregation: AggregationFunction | (string & {}) = "last",
 ): number {
   if (!values || values.length === 0) return 0;
+  if (aggregation === "count") return values.length;
 
-  const numericValues = values.map(([, val]) => parseFloat(val));
+  // Prometheus sends "NaN"/"+Inf" for empty or unbounded steps; one of them would poison every reducer.
+  const numericValues = values.map(([, val]) => parseFloat(val)).filter(Number.isFinite);
+  if (numericValues.length === 0) return NaN;
 
   switch (aggregation) {
     case "last":
@@ -276,8 +289,6 @@ export function applyAggregation(
       return numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
     case "sum":
       return numericValues.reduce((a, b) => a + b, 0);
-    case "count":
-      return numericValues.length;
     case "range":
       return Math.max(...numericValues) - Math.min(...numericValues);
     case "diff":

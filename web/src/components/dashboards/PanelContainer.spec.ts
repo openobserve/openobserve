@@ -2667,14 +2667,8 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
-    // THE ANTI-DRIFT PIN. Everything above fires at a stub, so it is only
-    // trustworthy while the stub matches reality. This calls the REAL converter
-    // and pins the fact that made the original implementation inert: for a
-    // `metric` panel — the type the curated tiles use — an EMPTY promql result
-    // still produces exactly ONE synthetic rendering series. So counting
-    // `options.series` can never detect an empty metric tile, and any future
-    // "simplification" back to a length check fails here.
-    it("an empty metric result still emits one synthetic series — length cannot detect it", async () => {
+    // Pins the real converter the stubs above stand in for; the tile reads the renderer's noData, not series.
+    it("an empty metric result builds no cells, a populated one builds one", async () => {
       const { convertPanelData } = await import("@/utils/dashboard/convertPanelData");
       const panelSchema = {
         type: "metric",
@@ -2709,10 +2703,8 @@ describe("PanelContainer", () => {
       expect(Array.isArray(emptyResult)).toBe(false);
       expect(emptyResult).toHaveProperty("chartType");
 
-      // ...and the empty case is INDISTINGUISHABLE from the populated one by length.
-      expect(emptyResult.options.series.length).toBe(1);
+      expect(emptyResult.options.series.length).toBe(0);
       expect(populated.options.series.length).toBe(1);
-      expect(emptyResult.options.series.length).toBe(populated.options.series.length);
     });
 
     // The inline subtitle was withdrawn: sharing the one-line PanelBar with the
@@ -3097,6 +3089,30 @@ describe("PanelContainer", () => {
       for (const dot of [triggerDot(), itemDot()]) {
         expect(dot.classes()).not.toContain("ring-badge-amber-ol-text");
       }
+    });
+  });
+
+  describe("add annotation button", () => {
+    const timeSeriesRenderer = {
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ checkIfPanelIsTimeSeries: true, isAddAnnotationMode: false }),
+        methods: { toggleAddAnnotationMode: vi.fn() },
+      },
+    };
+    const button = '[data-test="panel-schema-renderer-annotation-button"]';
+
+    it.each([
+      ["line", true],
+      ["stacked", true],
+      ["h-bar", false],
+      ["h-stacked", false],
+    ])("%s time-series panel shows it: %s", async (type, shown) => {
+      wrapper = createWrapper({ data: { ...mockPanelData, type } }, timeSeriesRenderer);
+      await flushPromises();
+      expect(wrapper.find(button).exists()).toBe(shown);
     });
   });
 });

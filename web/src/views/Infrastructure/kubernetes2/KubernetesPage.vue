@@ -336,6 +336,15 @@ watch(
   { immediate: true },
 );
 
+const viewsRef = ref<HTMLElement | null>(null);
+
+watch(
+  () => state.value.view,
+  () => {
+    if (viewsRef.value) viewsRef.value.scrollTop = 0;
+  },
+);
+
 const paletteOpen = ref(false);
 const paletteGroup = ref<"clusters" | null>(null);
 
@@ -559,7 +568,11 @@ k8s.loadStreams();
           :content="t(banner.key, banner.params ?? {})"
           :data-test="`k8s2-banner-${banner.id}`"
         />
-        <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-k8s2-views>
+        <div
+          ref="viewsRef"
+          class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
+          data-k8s2-views
+        >
           <OEmptyState
             v-if="offline"
             preset="no-data"

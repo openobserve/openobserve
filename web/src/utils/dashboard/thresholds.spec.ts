@@ -283,6 +283,18 @@ describe("gauge", () => {
     expect(gauge.axisLine.lineStyle.color[0][1]).toBe("rgba(80, 112, 221, 0.28)");
   });
 
+  it("keeps a value-mapping colour on the dial without using it for the lowest band", () => {
+    const gauge: any = {
+      min: 0,
+      max: 100,
+      _mappedColor: "#abcdef",
+      data: [{ value: 80, itemStyle: { color: "#abcdef" } }],
+    };
+    applyGaugeThresholds(gauge, t({ steps: [{ value: 50, color: RED }] }), "#5070dd");
+    expect(gauge.data[0].itemStyle.color).toBe("#abcdef");
+    expect(gauge.axisLine.lineStyle.color[0][1]).toBe("rgba(80, 112, 221, 0.28)");
+  });
+
   it("resolves percentage steps against the gauge min..max", () => {
     const gauge: any = { min: 0, max: 200, data: [{ value: 150, itemStyle: { color: "#000" } }] };
     applyGaugeThresholds(
@@ -341,8 +353,8 @@ describe("applyLineAreaThresholds", () => {
     const options = lineOptions();
     const before = JSON.stringify(options);
     applyLineAreaThresholds(options, panel("line", undefined));
-    applyLineAreaThresholds(options, panel("stacked", steps));
-    applyLineAreaThresholds(options, panel("h-stacked", steps));
+    applyLineAreaThresholds(options, panel("heatmap", steps));
+    applyLineAreaThresholds(options, panel("pie", steps));
     expect(JSON.stringify(options)).toBe(before);
     expect(options).not.toHaveProperty("visualMap");
   });
@@ -373,6 +385,18 @@ describe("applyLineAreaThresholds", () => {
     expect(markers(options)).toHaveLength(0);
   });
 
+  it("turns off large mode only on bars it recolours with a visualMap", () => {
+    const limitsOnly = lineOptions({ type: "bar", large: true });
+    applyLineAreaThresholds(limitsOnly, panel("bar", { ...steps, showAs: "line" }));
+    expect(limitsOnly.series[0].large).toBe(true);
+    const stacked = lineOptions({ type: "bar", large: true });
+    applyLineAreaThresholds(stacked, panel("stacked", { ...steps, showAs: "color" }));
+    expect(stacked.series[0].large).toBe(true);
+    const coloured = lineOptions({ type: "bar", large: true });
+    applyLineAreaThresholds(coloured, panel("bar", { ...steps, showAs: "color" }));
+    expect(coloured.series[0].large).toBe(false);
+  });
+
   it("line: limit lines only", () => {
     const options: any = lineOptions();
     applyLineAreaThresholds(options, panel("line", { ...steps, showAs: "line" }));
@@ -396,6 +420,21 @@ describe("applyLineAreaThresholds", () => {
     applyLineAreaThresholds(options, panel("area", steps));
     expect(options.series[0].areaStyle.color).toBeUndefined();
     expect(typeof options.series[0].areaStyle.opacity).toBe("number");
+  });
+
+  it("area: a set fill opacity replaces the theme alpha on the recoloured fill", () => {
+    const gradient = { type: "linear", colorStops: [] };
+    const options: any = lineOptions({ areaStyle: { color: gradient, opacity: 0.3 } });
+    applyLineAreaThresholds(options, panel("area", steps, { fill_opacity: 30 }));
+    expect(options.series[0].areaStyle).toEqual({ opacity: 0.3 });
+  });
+
+  it("line ignores fill_opacity in the recolour path", () => {
+    const plain: any = lineOptions({ areaStyle: { color: "x" } });
+    const withKey: any = lineOptions({ areaStyle: { color: "x" } });
+    applyLineAreaThresholds(plain, panel("line", steps));
+    applyLineAreaThresholds(withKey, panel("line", steps, { fill_opacity: 30 }));
+    expect(withKey.series[0].areaStyle).toEqual(plain.series[0].areaStyle);
   });
 
   it("area-stacked: never recoloured, limit lines only", () => {
@@ -514,6 +553,30 @@ describe("axis reach for limit lines", () => {
     expect(colourOnly.yAxis.max).toBeUndefined();
   });
 
+  it("stretches a bar track pinned to the data max to a limit above it", () => {
+    const hBar = (max: number) => ({
+      series: [{ type: "bar", data: [{ value: 40 }, { value: 90 }] }],
+      yAxis: { type: "category", data: ["a", "b"] },
+      xAxis: { type: "value", max },
+    });
+    const options: any = hBar(90);
+    applyLineAreaThresholds(
+      options,
+      panel("h-bar", { steps: [{ value: 1000, color: RED }] }, { show_bar_track: true }),
+    );
+    expect(options.xAxis.max).toBe(1500);
+    const userMax: any = hBar(50);
+    applyLineAreaThresholds(
+      userMax,
+      panel(
+        "h-bar",
+        { steps: [{ value: 1000, color: RED }] },
+        { show_bar_track: true, y_axis_max: 50 },
+      ),
+    );
+    expect(userMax.xAxis.max).toBe(50);
+  });
+
   it("stretches each trellis axis by its own limits", () => {
     const options: any = { ...lineOptions(), yAxis: [{}, {}] };
     options.series[1].yAxisIndex = 1;
@@ -575,6 +638,12 @@ describe("tooltip over-limit cue", () => {
       .split("<br/>");
     expect(web).toBe(`${marker} web : 1s`);
     expect(api).toBe(`${marker} api : 1s · over 500ms`);
+  });
+
+  it.each(["area-stacked", "stacked", "h-stacked"])("adds no segment cue on %s", (type) => {
+    const options: any = { ...lineOptions(), tooltip: { formatter: rowFormatter } };
+    applyLineAreaThresholds(options, panel(type, steps));
+    expect(options.tooltip.formatter).toBe(rowFormatter);
   });
 
   it("leaves tooltips alone without thresholds", () => {
@@ -683,6 +752,15 @@ describe("gaugeDialRange", () => {
     expect(gaugeDialRange(10, 100, "percent-1")).toEqual({ min: 10, max: 100 });
     expect(gaugeDialRange(5, 2000, "milliseconds")).toEqual({ min: 5, max: 2000 });
   });
+
+  it("keeps an explicit max of 0 above a negative min", () => {
+    expect(gaugeDialRange(-50, 0, "default")).toEqual({ min: -50, max: 0 });
+  });
+
+  it("draws an empty or inverted span as 100 wide", () => {
+    expect(gaugeDialRange(0, 0, "default")).toEqual({ min: 0, max: 100 });
+    expect(gaugeDialRange(20, 10, "default")).toEqual({ min: 20, max: 120 });
+  });
 });
 
 describe("getStackedPercentRange", () => {
@@ -721,13 +799,24 @@ describe("getStackedPercentRange", () => {
     expect(getStackedPercentRange({}, series)).toEqual({ min: 0, max: 400 });
   });
 
-  it("treats series without a stack name as one group and keys plain values by index", () => {
-    const series = [{ data: [10, 20] }, { data: [5, 30] }];
-    expect(getStackedPercentRange({}, series)).toEqual({ min: 0, max: 50 });
+  it("keys plain values by index, and a series without a stack name stands alone", () => {
+    const stacked = [
+      { stack: "s", data: [10, 20] },
+      { stack: "s", data: [5, 30] },
+    ];
+    expect(getStackedPercentRange({}, stacked)).toEqual({ min: 0, max: 50 });
+    expect(getStackedPercentRange({}, [{ data: [100] }, { data: [80] }])).toEqual({
+      min: 0,
+      max: 100,
+    });
   });
 
   it("keeps a negative total as the minimum and honours a full configured range", () => {
-    expect(getStackedPercentRange({}, [{ data: [-30, 10] }, { data: [-20, 5] }])).toEqual({
+    const pair = [
+      { stack: "s", data: [-30, 10] },
+      { stack: "s", data: [-20, 5] },
+    ];
+    expect(getStackedPercentRange({}, pair)).toEqual({
       min: -50,
       max: 15,
     });
@@ -736,6 +825,15 @@ describe("getStackedPercentRange", () => {
       max: 9,
     });
     expect(getStackedPercentRange({}, [{ data: [null] }])).toBeNull();
+  });
+
+  it("stacks positive and negative values apart, as the chart draws them", () => {
+    const series = [
+      { stack: "s", data: [100, 20] },
+      { stack: "s", data: [-50, -10] },
+      { stack: "s", data: [30, 5] },
+    ];
+    expect(getStackedPercentRange({}, series)).toEqual({ min: -50, max: 130 });
   });
 });
 
