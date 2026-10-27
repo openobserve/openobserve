@@ -22,8 +22,8 @@
       "models": {
         "deepseek-flash": {
           "name": "DeepSeek-V4.1-Flash",
-          // Max reasoning effort for every agent; opencode sends it as "reasoning_effort": "max".
-          "options": { "reasoningEffort": "max" },
+          // Selected with REVIEW_MODEL_VARIANT=max (the workflow matrix); opencode sends "reasoning_effort": "max".
+          "variants": { "max": { "reasoningEffort": "max" } },
           "limit": { "context": 1048576, "output": 262144 },
           // USD per 1M tokens at peak rate; models fetch is disabled, so without this every cost reads 0.
           // TODO: these are still the V4-Pro rates; replace them with the Flash price list.

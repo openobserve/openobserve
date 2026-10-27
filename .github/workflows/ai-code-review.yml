@@ -61,7 +61,7 @@ jobs:
           - name: deepseek
             provider_id: deepseek-review
             model_id: deepseek-flash
-            model_variant: ""
+            model_variant: max
             api_key_env: DEEPSEEK_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
