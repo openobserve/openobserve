@@ -120,6 +120,7 @@ const showTabs = computed(() => {
     "rumPerformanceErrors",
     "rumPerformanceApis",
     "SourceMaps",
+    "RumClickHeatmap",
   ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
@@ -148,6 +149,10 @@ const tabs = [
   {
     label: t("rum.sourceMaps"),
     value: "source_maps",
+  },
+  {
+    label: t("rum.heatmap.title"),
+    value: "heatmap",
   },
 ];
 
@@ -178,6 +183,7 @@ onMounted(async () => {
     Sessions: "sessions",
     rumPerformanceSummary: "performance",
     SourceMaps: "source_maps",
+    RumClickHeatmap: "heatmap",
   };
 
   if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -188,7 +194,7 @@ onMounted(async () => {
 
   // This is temporary fix, as we have kept sessionViewer keep-alive as false.
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
+  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps", "RumClickHeatmap"];
 
   if (ignoreRoutes.includes(routeName.value as string)) return;
   if (keepsOwnTimeRange()) return;
@@ -205,6 +211,7 @@ onUpdated(async () => {
       Sessions: "sessions",
       rumPerformanceSummary: "performance",
       SourceMaps: "source_maps",
+      RumClickHeatmap: "heatmap",
     };
 
     if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -216,7 +223,7 @@ onUpdated(async () => {
 
     // This is temporary fix, as we have kept sessionViewer keep-alive as false.
     // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps", "RumClickHeatmap"];
 
     if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
   }
@@ -242,6 +249,7 @@ const updateTabOnRouteChange = () => {
     rumPerformanceErrors: "performance",
     rumPerformanceApis: "performance",
     SourceMaps: "source_maps",
+    RumClickHeatmap: "heatmap",
   };
   const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   if (tab !== activeTab.value && tab !== undefined) {
@@ -324,6 +332,14 @@ const changeTab = (tab: string | number) => {
     router.push({
       name: "Sessions",
       query: getQueryParams(performanceState.data.datetime, sessionState.data.editorValue),
+    });
+    return;
+  }
+
+  if (tab === "heatmap") {
+    router.push({
+      name: "RumClickHeatmap",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
     });
     return;
   }

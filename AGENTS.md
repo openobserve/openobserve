@@ -1,5 +1,11 @@
 # OpenObserve — project rules
 
+## Principles
+
+- Make the best decision that will elevate all three: the user experience (UX),
+  developer experience (DX), and agent experience (AX) always, without breaking
+  anything.
+
 ## Build & workflow
 
 - Build with `cargo build` (debug). Never use `--release` unless explicitly asked.
@@ -15,6 +21,8 @@
   before considering the task done. If it flags a file, fix it with
   `npx prettier --write <file>` (not a full-repo `--write`) and re-run
   `format:check` to confirm it's clean.
+- Cut taglines, helper text and secondary labels. If a screen needs them to
+  make sense, fix the layout.
 
 ## Rust code organization
 

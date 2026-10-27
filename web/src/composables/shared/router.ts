@@ -200,6 +200,7 @@ const NamedEventsListPage = () =>
   import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
 const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
+const ClickHeatmap = () => import("@/views/RUM/ClickHeatmap.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
 const ReportList = () => import("@/components/reports/ReportList.vue");
@@ -1257,6 +1258,17 @@ const useRoutes = () => {
           props: true,
           meta: {
             keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "heatmap",
+          name: "RumClickHeatmap",
+          component: ClickHeatmap,
+          meta: {
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
