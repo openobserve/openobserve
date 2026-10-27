@@ -20,6 +20,8 @@ export interface RefreshReport {
 export type RefreshBody =
   | (RefreshReport & {
       limits_refreshed?: boolean;
+      /** Unix microseconds of this click's own attempt, matching `refresh.last_attempt_at`. */
+      attempt_at?: number;
       code?: number;
       reason?: string;
       message?: string;
@@ -50,6 +52,4 @@ export interface RefreshResult {
   ok: boolean;
   body?: RefreshBody;
   status?: number;
-  /** Latest server time, in Unix microseconds, at which the response can have been sent. */
-  respondedAt?: number;
 }
