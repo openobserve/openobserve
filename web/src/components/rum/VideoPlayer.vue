@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container flex h-full flex-col p-2">
+  <div
+    class="player-container flex h-full flex-col p-2"
+    :class="{ 'bg-surface-base fixed inset-0 z-5000': isFullscreen }"
+    data-test="video-player-root"
+  >
     <div ref="playerContainerRef" class="relative flex min-h-0 flex-1 items-center justify-center">
       <div
         v-if="showLoader"
@@ -165,6 +169,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :searchable="false"
             @update:model-value="setSpeed"
           />
+          <OButton
+            v-if="fullscreenSupported"
+            class="ms-2"
+            variant="ghost"
+            size="icon-sm"
+            :aria-label="fullscreenLabel"
+            data-test="video-player-fullscreen-btn"
+            @click="handleFullscreenToggle"
+          >
+            <template #icon-left
+              ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
+            /></template>
+            <OTooltip :content="fullscreenLabel" />
+          </OButton>
         </div>
       </div>
     </div>
@@ -191,9 +209,11 @@ import { useStore } from "vuex";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import ReplayLoadBand from "@/components/rum/ReplayLoadBand.vue";
@@ -328,6 +348,12 @@ const localSkipInactivity = ref(true);
 const timelineMs = ref(0);
 const hoverMs = ref<number | null>(null);
 const hoverEvent = ref<any>(null);
+const fullscreenSupported = document.fullscreenEnabled === true;
+const isFullscreen = ref(false);
+// The page-level full screen may belong to another component; only one this player requested pins it.
+let startedFullscreen = false;
+// A second click while a request is pending would reject and clear the ownership the first one set.
+let fullscreenRequestPending = false;
 
 const speedOptions = [
   {
@@ -358,6 +384,9 @@ const speedOptions = [
 
 const speedValue = computed(() => props.speed ?? localSpeed.value);
 const skipInactivityValue = computed(() => props.skipInactivity ?? localSkipInactivity.value);
+const fullscreenLabel = computed(() =>
+  isFullscreen.value ? t("rum.exitFullScreen") : t("rum.fullScreen"),
+);
 
 // Covers the replay surface until the player is built or loading settles, so its first frame never shows under the loader.
 const showLoader = computed(
@@ -433,7 +462,6 @@ const playerState = ref({
     actions: true,
     errors: true,
   },
-  fullScreen: false,
   startTime: 0,
   endTime: 0,
   totalTime: 0,
@@ -510,10 +538,12 @@ onBeforeMount(async () => {
 
 onMounted(() => {
   attachResizeObserver();
+  document.addEventListener("fullscreenchange", syncFullscreen);
 });
 
 onActivated(() => {
   attachResizeObserver();
+  document.addEventListener("fullscreenchange", syncFullscreen);
   if (player.value) {
     const { width, height } = calculatePlayerDimensions();
     if (playerRef.value) playerRef.value.style.width = `${width}px`;
@@ -524,6 +554,7 @@ onActivated(() => {
 
 onDeactivated(() => {
   detachResizeObserver();
+  leaveFullscreen();
 });
 
 const importVideoPlayer = async () => {
@@ -536,6 +567,7 @@ const importVideoPlayer = async () => {
 
 onBeforeUnmount(() => {
   detachResizeObserver();
+  leaveFullscreen();
   if (worker.value) {
     worker.value.terminate();
   }
@@ -571,6 +603,45 @@ function attachResizeObserver() {
 function detachResizeObserver() {
   resizeObserver.value?.disconnect();
   resizeObserver.value = null;
+}
+
+function syncFullscreen() {
+  const active = document.fullscreenElement === document.documentElement;
+  if (!active) startedFullscreen = false;
+  isFullscreen.value = active && startedFullscreen;
+}
+
+// The listener is gone before the exit's fullscreenchange arrives, so the state is reset here.
+function leaveFullscreen() {
+  document.removeEventListener("fullscreenchange", syncFullscreen);
+  if (isFullscreen.value && document.fullscreenElement) {
+    void document.exitFullscreen().catch(() => {});
+  }
+  isFullscreen.value = false;
+  startedFullscreen = false;
+}
+
+async function handleFullscreenToggle() {
+  if (fullscreenRequestPending) return;
+  if (isFullscreen.value) {
+    await document.exitFullscreen().catch(() => {});
+    return;
+  }
+  startedFullscreen = true;
+  // Re-requesting the current full-screen element may fire no fullscreenchange, so ownership is synced here.
+  if (document.fullscreenElement === document.documentElement) {
+    syncFullscreen();
+    return;
+  }
+  fullscreenRequestPending = true;
+  try {
+    await document.documentElement.requestFullscreen();
+  } catch {
+    // A denied request changes nothing, so this player must not claim a later full screen.
+    startedFullscreen = false;
+  } finally {
+    fullscreenRequestPending = false;
+  }
 }
 
 function calculatePlayerDimensions(): { width: number; height: number } {

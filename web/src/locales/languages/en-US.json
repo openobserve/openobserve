@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "No network data for this view",
     "apiEmptyDescription": "The selected stream has no resource or network requests in this time range. Network metrics appear once the app instruments its HTTP calls.",
     "skipInactivity": "Skip Inactivity",
+    "fullScreen": "Full screen",
+    "exitFullScreen": "Exit full screen",
     "error": "Error",
     "errorCount": "Error Count",
     "all": "All",

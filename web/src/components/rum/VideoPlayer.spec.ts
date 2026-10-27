@@ -1490,6 +1490,257 @@ describe("VideoPlayer", () => {
     });
   });
 
+  describe("Full screen", () => {
+    let fullscreenEl: Element | null;
+    let requestSpy: ReturnType<typeof vi.fn>;
+    let exitSpy: ReturnType<typeof vi.fn>;
+
+    const fireChange = async (el: Element | null) => {
+      fullscreenEl = el;
+      document.dispatchEvent(new Event("fullscreenchange"));
+      await flushPromises();
+    };
+
+    const mountSupported = async () => {
+      const local = mountComponent();
+      await flushPromises();
+      return local;
+    };
+
+    const button = (local: ReturnType<typeof mountComponent>) =>
+      local.find('[data-test="video-player-fullscreen-btn"]');
+
+    const isPinned = (local: ReturnType<typeof mountComponent>) =>
+      local.find('[data-test="video-player-root"]').classes().includes("fixed");
+
+    beforeEach(() => {
+      fullscreenEl = null;
+      requestSpy = vi.fn(() => Promise.resolve());
+      exitSpy = vi.fn(() => Promise.resolve());
+      Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
+      Object.defineProperty(document, "fullscreenElement", {
+        configurable: true,
+        get: () => fullscreenEl,
+      });
+      Object.defineProperty(document, "exitFullscreen", { configurable: true, value: exitSpy });
+      Object.defineProperty(document.documentElement, "requestFullscreen", {
+        configurable: true,
+        value: requestSpy,
+      });
+    });
+
+    afterEach(() => {
+      delete (document as any).fullscreenEnabled;
+      delete (document as any).fullscreenElement;
+      delete (document as any).exitFullscreen;
+      delete (document.documentElement as any).requestFullscreen;
+    });
+
+    it("renders the button when the browser supports full screen", async () => {
+      const local = await mountSupported();
+      expect(button(local).exists()).toBe(true);
+      expect(button(local).attributes("aria-label")).toBe("Full screen");
+      expect(button(local).find('[data-test="OIcon"]').attributes("data-name")).toBe("fullscreen");
+      local.unmount();
+    });
+
+    it("hides the button when the browser does not allow full screen", async () => {
+      Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: false });
+      const local = await mountSupported();
+      expect(button(local).exists()).toBe(false);
+      local.unmount();
+    });
+
+    it("requests full screen on the page, and exits it on a click while active", async () => {
+      const local = await mountSupported();
+      await button(local).trigger("click");
+      await flushPromises();
+      expect(requestSpy).toHaveBeenCalledTimes(1);
+      expect(requestSpy.mock.contexts[0]).toBe(document.documentElement);
+
+      await fireChange(document.documentElement);
+      await button(local).trigger("click");
+      await flushPromises();
+      expect(exitSpy).toHaveBeenCalledTimes(1);
+      local.unmount();
+    });
+
+    it("pins the player and swaps icon and label on entry, and unpins on a browser exit", async () => {
+      const local = await mountSupported();
+      await button(local).trigger("click");
+      await fireChange(document.documentElement);
+
+      expect(isPinned(local)).toBe(true);
+      expect(button(local).attributes("aria-label")).toBe("Exit full screen");
+      expect(button(local).find('[data-test="OIcon"]').attributes("data-name")).toBe(
+        "fullscreen-exit",
+      );
+
+      await fireChange(null);
+      expect(isPinned(local)).toBe(false);
+      expect(button(local).attributes("aria-label")).toBe("Full screen");
+      expect(button(local).find('[data-test="OIcon"]').attributes("data-name")).toBe("fullscreen");
+      local.unmount();
+    });
+
+    it("does not pin the player for a full screen another component started", async () => {
+      const local = await mountSupported();
+      await fireChange(document.documentElement);
+      expect(isPinned(local)).toBe(false);
+
+      await fireChange(null);
+      await fireChange(document.createElement("div"));
+      expect(isPinned(local)).toBe(false);
+      local.unmount();
+    });
+
+    it("claims a page full screen another component owns instead of exiting it", async () => {
+      const local = await mountSupported();
+      await fireChange(document.documentElement);
+      expect(isPinned(local)).toBe(false);
+
+      await button(local).trigger("click");
+      await flushPromises();
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(requestSpy).not.toHaveBeenCalled();
+      expect(isPinned(local)).toBe(true);
+      expect(button(local).attributes("aria-label")).toBe("Exit full screen");
+      local.unmount();
+    });
+
+    it("ignores a second click while the first request is pending, then pins on entry", async () => {
+      let settle: () => void = () => {};
+      requestSpy.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+      );
+      const local = await mountSupported();
+      await button(local).trigger("click");
+      await button(local).trigger("click");
+      expect(requestSpy).toHaveBeenCalledTimes(1);
+
+      await fireChange(document.documentElement);
+      settle();
+      await flushPromises();
+      expect(isPinned(local)).toBe(true);
+      expect(button(local).attributes("aria-label")).toBe("Exit full screen");
+      local.unmount();
+    });
+
+    it("leaves the player unchanged when the browser denies the request", async () => {
+      requestSpy.mockImplementation(() => Promise.reject(new Error("denied")));
+      const local = await mountSupported();
+      await button(local).trigger("click");
+      await flushPromises();
+      expect(isPinned(local)).toBe(false);
+      expect(button(local).attributes("aria-label")).toBe("Full screen");
+
+      await fireChange(document.documentElement);
+      expect(isPinned(local)).toBe(false);
+      local.unmount();
+    });
+
+    it("exits full screen and drops its listener on unmount while active", async () => {
+      const removeSpy = vi.spyOn(document, "removeEventListener");
+      const local = await mountSupported();
+      await button(local).trigger("click");
+      await fireChange(document.documentElement);
+
+      local.unmount();
+      expect(exitSpy).toHaveBeenCalledTimes(1);
+      expect(removeSpy).toHaveBeenCalledWith("fullscreenchange", expect.any(Function));
+      removeSpy.mockRestore();
+    });
+
+    it("exits full screen when deactivated by keep-alive while active", async () => {
+      const Host = defineComponent({
+        components: { VideoPlayer },
+        props: { show: { type: Boolean, default: true } },
+        setup: () => ({ events: mockEvents }),
+        template: `<KeepAlive><VideoPlayer v-if="show" :events="events" :segments="[]" :is-loading="false" /><div v-else /></KeepAlive>`,
+      });
+      const host = mount(Host, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            OIcon: {
+              template: '<i data-test="OIcon" :data-name="name"></i>',
+              props: ["name", "size"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+      await host.find('[data-test="video-player-fullscreen-btn"]').trigger("click");
+      await fireChange(document.documentElement);
+
+      await host.setProps({ show: false });
+      await flushPromises();
+      expect(exitSpy).toHaveBeenCalledTimes(1);
+      host.unmount();
+    });
+
+    it("re-fits the frame and the bar through the ResizeObserver after entering and exiting", async () => {
+      const OriginalResizeObserver = global.ResizeObserver;
+      const callbacks: ResizeObserverCallback[] = [];
+      function MockRO(this: any, cb: ResizeObserverCallback) {
+        callbacks.push(cb);
+      }
+      MockRO.prototype.observe = vi.fn();
+      MockRO.prototype.disconnect = vi.fn();
+      MockRO.prototype.unobserve = vi.fn();
+      global.ResizeObserver = MockRO as unknown as typeof ResizeObserver;
+
+      const local = mountComponent();
+      await flushPromises();
+      await local.setProps({ segments: mockSegments });
+      await flushPromises();
+      const instance = playerSpies.instances.at(-1);
+      const fire = () => callbacks.forEach((cb) => cb([], {} as ResizeObserver));
+      const setSize = (width: number, height: number) => {
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+          configurable: true,
+          value: width,
+        });
+        Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+          configurable: true,
+          value: height,
+        });
+      };
+      const markerLeft = () =>
+        parseFloat(
+          (local.find('[data-test="video-player-event-marker"]').element as HTMLElement).style.left,
+        );
+      fire();
+      await flushPromises();
+      const leftBefore = markerLeft();
+      expect(leftBefore).toBeGreaterThan(0);
+
+      setSize(1600, 1200);
+      await button(local).trigger("click");
+      await fireChange(document.documentElement);
+      fire();
+      await flushPromises();
+      expect((local.vm as any).playerState.width).toBe(1600);
+      expect(instance.$set).toHaveBeenLastCalledWith(expect.objectContaining({ width: 1600 }));
+      expect(markerLeft()).toBeCloseTo(leftBefore * 2);
+
+      setSize(800, 600);
+      await fireChange(null);
+      fire();
+      await flushPromises();
+      expect((local.vm as any).playerState.width).toBe(800);
+      expect(instance.$set).toHaveBeenLastCalledWith(expect.objectContaining({ width: 800 }));
+      expect(markerLeft()).toBeCloseTo(leftBefore);
+
+      local.unmount();
+      global.ResizeObserver = OriginalResizeObserver;
+    });
+  });
+
   describe("Error and empty states", () => {
     it("shows the load error with a Retry that reaches the parent", async () => {
       const local = mountComponent({ loadState: "error" });
