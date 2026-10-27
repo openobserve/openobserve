@@ -20429,7 +20429,10 @@
     "pagination": {
       "pagination": "ページネーション",
       "previousPage": "前のページ",
-      "nextPage": "次のページ"
+      "nextPage": "次のページ",
+      "firstPage": "最初のページ",
+      "lastPage": "最後のページ",
+      "recordsPerPage": "1 ページあたりのレコード数"
     },
     "select": {
       "more": "もっと",

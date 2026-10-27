@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <i18n-t keypath="assistant.toolsets.mcpLine" tag="span">
             <template #link>
               <router-link
-                class="text-text-link hover:text-text-link-hover underline"
+                class="text-text-link-hover underline hover:no-underline"
                 data-test="settings-assistant-mcp-link"
                 :to="{ name: 'mcpServer', query: { org_identifier: page.org.value } }"
                 >{{ t("assistant.toolsets.mcpLink") }}</router-link

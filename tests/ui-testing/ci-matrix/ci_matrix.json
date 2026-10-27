@@ -646,7 +646,9 @@
       "helper.spec.js",
       "admin.spec.js",
       "admin-tools.spec.js",
-      "billing.spec.js"
+      "billing.spec.js",
+      "a11y.spec.js",
+      "stack.spec.js"
     ],
     "disabled": [
       {

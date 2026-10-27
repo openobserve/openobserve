@@ -20429,7 +20429,10 @@
     "pagination": {
       "pagination": "分页",
       "previousPage": "上一页",
-      "nextPage": "下一页"
+      "nextPage": "下一页",
+      "firstPage": "第一页",
+      "lastPage": "最后一页",
+      "recordsPerPage": "每页记录数"
     },
     "select": {
       "more": "更多",

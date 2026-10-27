@@ -29,12 +29,13 @@ test.describe("assistant shell", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("SHELL-01 the chord opens the sidebar, focuses it and never closes it", async ({
+  test("SHELL-01 the chord opens the sidebar, focuses it and never closes it", { tag: ["@mock", "@stack-ee", "@responsive"] }, async ({
     page,
   }) => {
     await gotoLogs(page);
-    await page.locator("body").click({ position: { x: 5, y: 300 } });
+    await assistant.blurPage();
     await assistant.open("chord");
+    await expect(page).toHaveURL(/\/logs\?/);
     await expect(assistant.sidebar).toBeVisible();
     const focusedInside = () =>
       page.evaluate(
@@ -52,14 +53,23 @@ test.describe("assistant shell", () => {
     ).toEqual(expect.arrayContaining(["open"]));
   });
 
-  test("SHELL-02 row-door variant: Escape hands focus back to the cell whose toolbar holds the door", async ({
+  test("SHELL-01 the chord works the moment the header reports idle, before the async host loads", { tag: ["@mock", "@stack-ee"] }, async ({
+    page,
+  }) => {
+    await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
+    await page.keyboard.press("ControlOrMeta+i");
+    await expect(assistant.sidebar).toBeVisible();
+    await expect(assistant.composer()).toBeFocused();
+    await expect(assistant.sidebar.locator('[data-test="assistant-status-region"]')).toHaveText("O2 Assistant opened.");
+  });
+
+  test("SHELL-02 row-door variant: Escape hands focus back to the cell whose toolbar holds the door", { tag: ["@mock", "@responsive"] }, async ({
     page,
   }) => {
     await page.goto(`${logsUrl()}&period=1d`, { waitUntil: "domcontentloaded" });
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
-    const cell = page.locator('[data-test="logs-search-result-logs-table"] td[data-o2-focus-cell]').first();
-    await expect(cell).toBeVisible({ timeout: 30_000 });
+    const cell = await assistant.logRowCell();
     await cell.focus();
     const toolbar = page.locator(".o2-table-cell-hover-actions");
     await expect(toolbar).toBeVisible();
@@ -76,7 +86,7 @@ test.describe("assistant shell", () => {
     await expect(toolbar.locator('[data-test="ai-entry-log-row-explain"]')).toBeVisible();
   });
 
-  test("SHELL-02 Escape closes the menu first, then the container, and focus returns to the button", async ({
+  test("SHELL-02 Escape closes the menu first, then the container, and focus returns to the button", { tag: ["@mock", "@responsive"] }, async ({
     page,
   }) => {
     await gotoLogs(page);
@@ -105,7 +115,7 @@ test.describe("assistant shell", () => {
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle");
   });
 
-  test("the empty sidebar shows the welcome with grounded starters and the chrome", async ({
+  test("the empty sidebar shows the welcome with grounded starters and the chrome", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await gotoLogs(page);
@@ -130,7 +140,7 @@ test.describe("assistant shell", () => {
     expect(aiRequests).toBe(0);
   });
 
-  test("the full view takes over from the sidebar and hands the session back", async ({
+  test("the full view takes over from the sidebar and hands the session back", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await gotoLogs(page);
@@ -156,7 +166,7 @@ test.describe("assistant shell", () => {
     await expect(assistant.sidebar).toBeVisible();
   });
 
-  test("SHELL-08 below lg the sidebar is a non-modal snap sheet that insets the page", async ({
+  test("SHELL-08 below lg the sidebar is a non-modal snap sheet that insets the page", { tag: ["@mock", "@responsive"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -200,7 +210,7 @@ test.describe("assistant shell", () => {
     ).toHaveText("Collapsed.");
   });
 
-  test("A11Y-09 no page control Tab reaches lies under the sheet", async ({
+  test("A11Y-09 no page control Tab reaches lies under the sheet", { tag: ["@mock", "@responsive"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -243,7 +253,7 @@ test.describe("assistant shell", () => {
     expect(contentBottom).toBeLessThanOrEqual(sheetTop + 1);
   });
 
-  test("SHELL-12 Escape in the composer closes and never stops a running turn; an IME Escape does nothing", async ({
+  test("SHELL-12 Escape in the composer closes and never stops a running turn; an IME Escape does nothing", { tag: ["@mock", "@responsive"] }, async ({
     page,
   }) => {
     await gotoLogs(page);

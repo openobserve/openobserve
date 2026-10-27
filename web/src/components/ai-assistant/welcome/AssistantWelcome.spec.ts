@@ -120,6 +120,12 @@ describe("AssistantWelcome", () => {
     expect(wrapper.get("ul").html()).not.toMatch(/truncate|line-clamp/);
   });
 
+  it("grows every starter to a 2.75 rem target on coarse pointers at any width", () => {
+    for (const button of mountWelcome().findAll("ul > li button")) {
+      expect(button.classes()).toContain("pointer-coarse:min-h-11");
+    }
+  });
+
   it("renders neutral cards in the roomy variant", () => {
     expect(mountWelcome({ variant: "roomy" }).findAllComponents(OCard)).toHaveLength(3);
   });

@@ -29,7 +29,7 @@ test.describe("assistant on Home", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("HOME-01 the launcher sends to /assistant/{id} and Home renders no thread", async ({ page }) => {
+  test("HOME-01 the launcher sends to /assistant/{id} and Home renders no thread", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openHome(page);
     await expect(page.locator('[data-test="home-tab-ai"]')).toHaveCount(0);
     await expect(assistant.launcher().locator('[data-test="assistant-transcript"]')).toHaveCount(0);
@@ -41,7 +41,7 @@ test.describe("assistant on Home", () => {
     await expect(assistant.status()).toBeVisible();
   });
 
-  test("HOME-02 a slow config shows the skeleton, then the launcher, with no tab pop-in", async ({ context, page }) => {
+  test("HOME-02 a slow config shows the skeleton, then the launcher, with no tab pop-in", { tag: ["@mock"] }, async ({ context, page }) => {
     await context.route(/\/config(\?|$)/, async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 2_000));
       return route.fallback();
@@ -55,7 +55,7 @@ test.describe("assistant on Home", () => {
     expect(after).not.toContain("home-tab-ai");
   });
 
-  test("HOME-03 Escape keeps the typed text, the clear button clears it, and an outage still sends", async ({ page }) => {
+  test("HOME-03 Escape keeps the typed text, the clear button clears it, and an outage still sends", { tag: ["@mock"] }, async ({ page }) => {
     await openHome(page);
     await input().fill("keep this");
     await input().press("Escape");
@@ -73,7 +73,7 @@ test.describe("assistant on Home", () => {
     await expect(input()).toBeEnabled();
   });
 
-  test("SHELL-05 a turn started from Home keeps running when the full view moves to the sidebar", async ({ page }) => {
+  test("SHELL-05 a turn started from Home keeps running when the full view moves to the sidebar", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openHome(page);
     await harness.nextScenario(page, "slow");
     await input().fill("why 5xx?");

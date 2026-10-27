@@ -20424,7 +20424,10 @@
     "pagination": {
       "pagination": "分頁",
       "previousPage": "上一頁",
-      "nextPage": "下一頁"
+      "nextPage": "下一頁",
+      "firstPage": "第一頁",
+      "lastPage": "最後一頁",
+      "recordsPerPage": "每頁記錄數"
     },
     "select": {
       "more": "更多",

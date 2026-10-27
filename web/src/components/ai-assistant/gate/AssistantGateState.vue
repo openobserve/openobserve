@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #whereToGrant>
             <router-link
               v-if="isAdmin"
-              class="text-text-link hover:text-text-link-hover underline"
+              class="text-text-link-hover underline hover:no-underline"
               data-test="assistant-gate-where-to-grant"
               :to="{ name: 'roles', query: { org_identifier: context?.org } }"
               >{{ whereToGrant }}</router-link

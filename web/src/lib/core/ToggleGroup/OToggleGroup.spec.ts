@@ -353,6 +353,13 @@ describe("OToggleGroup labelled group", () => {
     expect(wrapper.find(`[id="${labelId}"]`).text()).toBe("Tier");
   });
 
+  it("marks a disabled labelled group aria-disabled, so its dimmed label counts as inactive", () => {
+    const group = (disabled: boolean) =>
+      mountGroup({ label: "Tier", disabled }, [{ value: "a", label: "A" }]).find('[role="group"]');
+    expect(group(true).attributes("aria-disabled")).toBe("true");
+    expect(group(false).attributes("aria-disabled")).toBeUndefined();
+  });
+
   it("puts aria-describedby on the group a screen reader enters", () => {
     const wrapper = mount(OToggleGroup, {
       props: { label: "Tier" },

@@ -61,6 +61,11 @@ const closers = new Set<() => void>();
 
 let ownerRef: ShallowRef<symbol | undefined> | null = null;
 
+// Mounted header buttons in mount order; the first binds the open chord, and the binding passes on when it unmounts.
+const openChordInstances: symbol[] = [];
+
+let openChordOwnerRef: ShallowRef<symbol | undefined> | null = null;
+
 // Mounted history triggers answer the `assistantHistory` chord, the rail before any header.
 const historyTargets: HistoryTarget[] = [];
 
@@ -83,11 +88,10 @@ export interface AssistantShortcutsOptions {
   assistantCanChat?: ComputedRef<boolean>;
 }
 
-/** Binds the assistant chords once per tab; called by the layout that mounts the assistant. */
+/** Binds the history and close chords once per tab for the host; the open chord binds with the header button. */
 export function useAssistantShortcuts(options: AssistantShortcutsOptions = {}): void {
   const capability = options.gate ? null : getAssistantRuntime().capability;
   const gate = options.gate ?? capability!.gate;
-  const canChat = options.assistantCanChat ?? capability!.assistantCanChat;
   const focusInside = ref(false);
   const token = Symbol("assistantShortcuts");
   instances.push(token);
@@ -97,10 +101,6 @@ export function useAssistantShortcuts(options: AssistantShortcutsOptions = {}): 
     focusInside.value = !!document.activeElement?.closest(ASSISTANT_ROOT_SELECTOR);
   };
 
-  // G2 and off_for_org leave the chord unbound so the key is not swallowed (`10` §6.2).
-  useShortcuts([{ id: "assistantOpen", handler: onAssistantOpen }], undefined, {
-    active: computed(() => registered.value && canChat.value),
-  });
   useShortcuts([{ id: "assistantHistory", handler: runHistoryTarget }], undefined, {
     active: registered,
   });
@@ -122,6 +122,27 @@ export function useAssistantShortcuts(options: AssistantShortcutsOptions = {}): 
     if (owner().value === token) owner().value = instances[0];
     document.removeEventListener("focusin", syncFocus);
     document.removeEventListener("focusout", syncFocus);
+  });
+}
+
+/** Binds the open chord from the header button, which mounts before the async host, so the chord works once the button shows. */
+export function useAssistantOpenChord(options: AssistantShortcutsOptions = {}): void {
+  const capability = options.gate ? null : getAssistantRuntime().capability;
+  const gate = options.gate ?? capability!.gate;
+  const canChat = options.assistantCanChat ?? capability!.assistantCanChat;
+  const token = Symbol("assistantOpenChord");
+  openChordInstances.push(token);
+  openChordOwner().value ??= token;
+  // G2 and off_for_org leave the chord unbound so the key is not swallowed (`10` §6.2).
+  useShortcuts([{ id: "assistantOpen", handler: onAssistantOpen }], undefined, {
+    active: computed(
+      () =>
+        openChordOwner().value === token && !UNREGISTERED_GATES.has(gate.value) && canChat.value,
+    ),
+  });
+  onUnmounted(() => {
+    openChordInstances.splice(openChordInstances.indexOf(token), 1);
+    if (openChordOwner().value === token) openChordOwner().value = openChordInstances[0];
   });
 }
 
@@ -234,6 +255,8 @@ export function resetAssistantShortcutsForTests(): void {
   focusTargets.clear();
   instances.length = 0;
   owner().value = undefined;
+  openChordInstances.length = 0;
+  openChordOwner().value = undefined;
 }
 
 // Rung a lets an open overlay take the key; rung f closes the sidebar or sheet (the turn keeps running); rung g closes only a docked chat, never its host; rung h keeps the full view.
@@ -277,6 +300,11 @@ function focusedPlacement(event: KeyboardEvent): string | null {
 function owner(): ShallowRef<symbol | undefined> {
   ownerRef ??= shallowRef<symbol | undefined>(undefined);
   return ownerRef;
+}
+
+function openChordOwner(): ShallowRef<symbol | undefined> {
+  openChordOwnerRef ??= shallowRef<symbol | undefined>(undefined);
+  return openChordOwnerRef;
 }
 
 function focusFirst(): boolean {

@@ -16,6 +16,11 @@ signatures.
 | `mocks.mjs` | Every mock payload: config patch, SSE scenarios (`SCENARIOS`), HTTP refusal scenarios (`HTTP_SCENARIOS`), chats, shares, toolsets, paid-overage status |
 | `stream-shim.js` | Browser init script; answers `fetch` for `/ai/chat_stream`, `/ai/confirm/*` and `/ai/chats/*/cancel` with a real, incrementally delivered SSE `ReadableStream` |
 | `setup.mjs` | `ENV`, `createMockState()`, `installMocks(context, state)`, `nextScenario(page, name)`, `login(page)` and the helpers below |
+| `modes.mjs` | `ASSISTANT_E2E_MODE`, the mode tags and the checks that skip a flow outside its declared modes |
+| `a11y.mjs` | axe with the shared-component allow-list, live-region recording and captures (used by `../a11y.spec.js`) |
+| `../stack/run.mjs` | the stack runner: runs the flows tagged for the current mode |
+| `../stack/replay-proxy/` | the replay LLM proxy o2-ai uses in `stack-ee` (see its README) |
+| `out/` | captures, axe reports, telemetry exports and server switches of a run (git-ignored; the nightly uploads it) |
 | `../*.spec.js` | The assistant flows; every flow uses `tests/ui-testing/pages/assistantPage.js` |
 | `../fixme.spec.js` | One `test.fixme` per state the harness cannot reach yet, naming the WP that adds it |
 
@@ -56,6 +61,45 @@ without the wrapper config the design folder used.
 | `O2_APP_URL` | Where Vite serves the app (default `http://localhost:8093/web`) |
 | `O2_API_ORIGIN` | API origin baked into the bundle (default `http://localhost:5080`); every request to it is routed |
 | `O2_BACKEND` | If set, non-mocked API calls are re-sent here and CORS headers normalised |
+
+## Modes and tags
+
+`ASSISTANT_E2E_MODE` picks the server a run talks to: `mock` (the default) fakes every AI
+endpoint, and `stack-ee`, `stack-ee-noagent`, `stack-oss` and `stack-cloud` run the same
+specs against a real server. Every flow declares where it runs with Playwright tags:
+
+| Tag | Runs in |
+|---|---|
+| `@mock` | mock mode, on every PR |
+| `@stack-ee` | an enterprise build with OpenFGA, o2-ai and the replay proxy (nightly, persistence on and off) |
+| `@stack-ee-noagent` | an enterprise build with no agent configured (nightly) |
+| `@stack-oss` | an OSS build (nightly) |
+| `@stack-cloud` | the scripted Cloud run by a person with access |
+| `@responsive` | declared for 768 and 375 too; the a11y matrix runs these sizes, the runner does not fan out |
+
+`installMocks` and `login` skip a flow whose tags do not name the current mode, and a
+flow with no mode tag runs in mock mode only. In a stack mode nothing is faked except the
+telemetry sink. `nextScenario`, `setKnobs`, `expireSession`, a `createMockState` override,
+reading or writing any key of the mock state, `send(text, scenario)` and an edition
+rewrite of another edition each skip the flow and name the mock it needed. Stack flows
+send a `[replay:<scenario>]` tag in the prompt, which only the replay proxy reads, and
+assert structure only: states, `data-test` ids, network calls and telemetry, never model
+prose. Stack runs pass `--retries=0`, so a flow that passes only on a retry shows as a
+failure. `ASSISTANT_E2E_GREP` is case-sensitive, so `STACK-` selects flow ids and never the
+`@stack-*` tags. `STACK-02` signs in as the seeded viewer from `ASSISTANT_E2E_VIEWER_EMAIL` and
+`ASSISTANT_E2E_MEMBER_PASSWORD` and skips without them.
+
+```bash
+cd tests/ui-testing
+ASSISTANT_E2E_MODE=stack-ee node playwright-tests/assistant/stack/run.mjs            # every @stack-ee flow
+ASSISTANT_E2E_MODE=stack-ee ASSISTANT_E2E_GREP=SMOKE node playwright-tests/assistant/stack/run.mjs
+```
+
+The nightly workflows are `.github/workflows/assistant-stack-nightly.yml` here
+(`stack-oss`) and in o2-enterprise (`stack-ee` with persistence off and on, and
+`stack-ee-noagent`). Scheduled runs keep to the flows that are structural today
+(`STACK-|SMOKE-`, plus the OSS gate flows on `stack-oss`); a manual dispatch with an empty
+`grep` runs every tagged flow.
 
 ## Scenario selection
 

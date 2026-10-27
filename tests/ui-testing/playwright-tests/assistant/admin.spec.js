@@ -35,7 +35,7 @@ test.describe("assistant settings", () => {
     await expect(assistant.settings(tab)).toBeVisible({ timeout: 30_000 });
   }
 
-  test("ADMIN-01 the rail item opens the page and every tab deep-links", async ({ context, page }) => {
+  test("ADMIN-01 the rail item opens the page and every tab deep-links", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page);
     await page.goto(url("/settings/general"), { waitUntil: "domcontentloaded" });
     const item = page.locator('[data-test="settings-assistant-tab"]');
@@ -50,7 +50,7 @@ test.describe("assistant settings", () => {
     }
   });
 
-  test("ADMIN-02 status without the health probe reads Configured and offers no Test", async ({ context, page }) => {
+  test("ADMIN-02 status without the health probe reads Configured and offers no Test", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openTab(page, "status");
     await expect(assistant.settingsControl("status-chip")).toHaveText("Configured");
@@ -60,7 +60,7 @@ test.describe("assistant settings", () => {
     await expect(assistant.settingsControl("test-btn")).toHaveCount(0);
   });
 
-  test("ADMIN-03 Test passes then fails, announced once each, without a chat", async ({ context, page }) => {
+  test("ADMIN-03 Test passes then fails, announced once each, without a chat", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, {
       capabilitiesEnabled: true,
       capabilitiesTestDelayMs: 800,
@@ -84,7 +84,7 @@ test.describe("assistant settings", () => {
     expect(state.log.filter((line) => /\/ai\/(chat_stream|chats)/.test(line))).toEqual([]);
   });
 
-  test("ADMIN-04 turning the assistant off confirms with Cancel focused and the doors follow", async ({
+  test("ADMIN-04 turning the assistant off confirms with Cancel focused and the doors follow", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -108,7 +108,7 @@ test.describe("assistant settings", () => {
     await expect(page.locator('[data-test="assistant-gate-state"][data-gate="off_for_org"]')).toBeVisible();
   });
 
-  test("ADMIN-05 without org settings the Access tab is read-only at the deployment values", async ({
+  test("ADMIN-05 without org settings the Access tab is read-only at the deployment values", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -122,7 +122,7 @@ test.describe("assistant settings", () => {
     await expect(assistant.settingsControl("policy-save")).toHaveCount(0);
   });
 
-  test("ADMIN-06 without an enforced policy only Act with approval is selectable", async ({ context, page }) => {
+  test("ADMIN-06 without an enforced policy only Act with approval is selectable", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, { capabilitiesEnabled: true, settingsEnabled: true, policyEnforced: false });
     await openTab(page, "access");
     await expect(assistant.settingsControl("tier-read")).toBeDisabled();
@@ -133,7 +133,7 @@ test.describe("assistant settings", () => {
     );
   });
 
-  test("ADMIN-08 a tier save under a deployment public-links lock keeps the stored public value", async ({
+  test("ADMIN-08 a tier save under a deployment public-links lock keeps the stored public value", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -153,7 +153,7 @@ test.describe("assistant settings", () => {
     ]);
   });
 
-  test("ADMIN-07 a member reads every tab, writes nothing, and sees one helper", async ({ context, page }) => {
+  test("ADMIN-07 a member reads every tab, writes nothing, and sees one helper", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, () => member({ settingsEnabled: true, capabilitiesEnabled: true }));
     for (const tab of TABS) {
       await openTab(page, tab);
@@ -167,7 +167,7 @@ test.describe("assistant settings", () => {
     await expect(assistant.settingsControl("own-access")).toContainText("You: ");
   });
 
-  test("GATE-10 an org turned off shows the off-for-org gate to admins and members", async ({ context, page }) => {
+  test("GATE-10 an org turned off shows the off-for-org gate to admins and members", { tag: ["@mock"] }, async ({ context, page }) => {
     const off = { enabled: false, permission_tier: "act_with_approval", org_sharing: true, public_sharing: true, data_sharing_level: "raw" };
     await start(context, page, () => member({ capabilitiesEnabled: true, settingsEnabled: true, settings: off }));
     await page.goto(url("/logs"), { waitUntil: "domcontentloaded" });

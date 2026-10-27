@@ -355,6 +355,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       :orientation="orientation"
       :data-variant="variant"
       :aria-labelledby="labelId"
+      :aria-disabled="disabled ? 'true' : undefined"
       :aria-describedby="describedBy"
       :class="[
         'relative inline-flex items-stretch',

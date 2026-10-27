@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="secondary"
             size="sm"
             block
-            class="h-auto! min-h-8 justify-start! py-1.5 text-start whitespace-normal! max-md:min-h-11"
+            class="h-auto! min-h-8 justify-start! py-1.5 text-start whitespace-normal! max-md:min-h-11 pointer-coarse:min-h-11"
             :data-test="starter.dataTest"
             @click="select(starter, index)"
           >

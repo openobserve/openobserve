@@ -39,16 +39,19 @@ test.describe("assistant gates", () => {
     assistant = new AssistantPage(page);
   }
 
-  test("GATE-01 OSS shows only the locked header door with a real pitch @edition", async ({
+  test("GATE-01 OSS shows only the locked header door with a real pitch @edition", { tag: ["@mock", "@stack-oss"] }, async ({
     context,
     page,
   }) => {
-    test.skip(
-      !process.env.O2_VITE_DEV,
-      "edition rewrite needs the Vite dev server",
-    );
     await start(context, page);
     await harness.forceOssBuild(context);
+    // The network sees a real server's stream; the mock's stream shim answers in the page, so its own log is read too.
+    const streamRequests = [];
+    context.on("request", (request) => {
+      if (/\/ai\/chat_stream$/.test(new URL(request.url()).pathname)) streamRequests.push(request.url());
+    });
+    const shimStreams = () =>
+      page.evaluate(() => (window.__o2mock?.requests ?? []).filter((r) => /\/ai\/chat_stream/.test(r.url)).length);
     await page.goto(url("/logs"), { waitUntil: "domcontentloaded" });
     await expect(assistant.headerButton).toHaveAttribute(
       "data-state",
@@ -73,16 +76,16 @@ test.describe("assistant gates", () => {
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(assistant.headerButton).toBeFocused();
+    expect(await shimStreams(), "chat_stream calls on /logs").toBe(0);
     await page.goto(url("/assistant"), { waitUntil: "domcontentloaded" });
     await expect(
       page.locator('[data-gate="not_entitled"][data-size="hero"]'),
     ).toBeVisible({ timeout: 30_000 });
-    expect(
-      state.log.filter((line) => line.includes("/ai/chat_stream")),
-    ).toEqual([]);
+    expect(await shimStreams(), "chat_stream calls on /assistant").toBe(0);
+    expect(streamRequests).toEqual([]);
   });
 
-  test("GATE-02 not configured hides the door from members", async ({
+  test("GATE-02 not configured hides the door from members", { tag: ["@mock", "@stack-ee-noagent"] }, async ({
     context,
     page,
   }) => {
@@ -100,7 +103,7 @@ test.describe("assistant gates", () => {
     });
   });
 
-  test("GATE-02 not configured mutes the door for admins and opens the setup card", async ({
+  test("GATE-02 not configured mutes the door for admins and opens the setup card", { tag: ["@mock", "@stack-ee-noagent"] }, async ({
     context,
     page,
   }) => {
@@ -129,7 +132,7 @@ test.describe("assistant gates", () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
-  test("GATE-02 below lg the setup sheet closes by Escape and hands focus back", async ({ context, page }) => {
+  test("GATE-02 below lg the setup sheet closes by Escape and hands focus back", { tag: ["@mock", "@stack-ee-noagent"] }, async ({ context, page }) => {
     await start(context, page, { aiEnabled: false });
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(url("/logs"), { waitUntil: "domcontentloaded" });
@@ -145,7 +148,7 @@ test.describe("assistant gates", () => {
     await expect(sheet).toHaveCount(0);
   });
 
-  test("GATE-03 a viewer's row door is locked, focusable and opens the reason, nothing else", async ({
+  test("GATE-03 a viewer's row door is locked, focusable and opens the reason, nothing else", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({
     context,
     page,
   }) => {
@@ -155,9 +158,7 @@ test.describe("assistant gates", () => {
       { waitUntil: "domcontentloaded" },
     );
     await expect(assistant.headerButton).toHaveAttribute("data-state", "locked", { timeout: 30_000 });
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
-    const cell = page.locator('[data-test="logs-search-result-logs-table"] td[data-o2-focus-cell]').first();
-    await expect(cell).toBeVisible({ timeout: 30_000 });
+    const cell = await assistant.logRowCell();
     await cell.focus();
     const door = page.locator('.o2-table-cell-hover-actions [data-test="ai-entry-log-row-explain"]');
     await expect(door).toHaveAttribute("aria-disabled", "true");
@@ -177,7 +178,7 @@ test.describe("assistant gates", () => {
     });
   });
 
-  test("GATE-03 a viewer is locked before the first keystroke and can ask an admin", async ({
+  test("GATE-03 a viewer is locked before the first keystroke and can ask an admin", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({
     context,
     page,
   }) => {
@@ -228,7 +229,7 @@ test.describe("assistant gates", () => {
     ).toEqual([]);
   });
 
-  test("GATE-04 a custom role refused by the access probe is locked and cached", async ({
+  test("GATE-04 a custom role refused by the access probe is locked and cached", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -257,7 +258,7 @@ test.describe("assistant gates", () => {
     expect(probes()).toHaveLength(1);
   });
 
-  test("GATE-11 a custom role the probe admits chats without the notice", async ({
+  test("GATE-11 a custom role the probe admits chats without the notice", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -277,7 +278,7 @@ test.describe("assistant gates", () => {
       .toBe(1);
   });
 
-  test("GATE-12 with RBAC off everyone chats and nothing is probed", async ({
+  test("GATE-12 with RBAC off everyone chats and nothing is probed", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -297,7 +298,7 @@ test.describe("assistant gates", () => {
     expect(probes()).toEqual([]);
   });
 
-  test("GATE-13 a probe that cannot settle keeps the composer live with the notice", async ({
+  test("GATE-13 a probe that cannot settle keeps the composer live with the notice", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -318,7 +319,7 @@ test.describe("assistant gates", () => {
     await expect(notice).toHaveCount(0);
   });
 
-  test("GATE-06 a 403 mid-session swaps the container to the G2 gate", async ({
+  test("GATE-06 a 403 mid-session swaps the container to the G2 gate", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -333,7 +334,7 @@ test.describe("assistant gates", () => {
     await expect(assistant.container().locator('[data-test="assistant-composer"]')).toHaveCount(0);
   });
 
-  test("GATE-05 B-06 overrides the heuristic", async ({ context, page }) => {
+  test("GATE-05 B-06 overrides the heuristic", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, () =>
       member({
         role: "custom",

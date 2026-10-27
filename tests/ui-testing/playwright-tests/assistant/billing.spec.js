@@ -53,7 +53,7 @@ test.describe("assistant billing @edition", () => {
     assistant = new AssistantPage(page);
   }
 
-  test("CRED-08 Plans and Usage show the same credits and mode, with paid usage status unavailable", async ({
+  test("CRED-08 Plans and Usage show the same credits and mode, with paid usage status unavailable", { tag: ["@mock", "@stack-cloud"] }, async ({
     context,
     page,
   }) => {
@@ -74,7 +74,7 @@ test.describe("assistant billing @edition", () => {
     await expect(usageSummary).toContainText("Pay as you go");
   });
 
-  test("CONS-12 the paid usage switch follows the org's own flag and waits for the payer", async ({ context, page }) => {
+  test("CONS-12 the paid usage switch follows the org's own flag and waits for the payer", { tag: ["@mock", "@stack-cloud"] }, async ({ context, page }) => {
     const overage = () => ({
       ...harness.createMockState().overage,
       organization: { org_id: harness.ENV.org, enabled: true, can_manage: true },
@@ -102,7 +102,7 @@ test.describe("assistant billing @edition", () => {
     expect(state.log.filter((line) => line.startsWith("PUT paid_overage"))).toHaveLength(1);
   });
 
-  test("CONS-12 an admin of the payer turns its paid usage off from this org, after a confirm", async ({ context, page }) => {
+  test("CONS-12 an admin of the payer turns its paid usage off from this org, after a confirm", { tag: ["@mock", "@stack-cloud"] }, async ({ context, page }) => {
     const overage = () => ({
       ...harness.createMockState().overage,
       organization: { org_id: harness.ENV.org, enabled: true, can_manage: true },

@@ -348,6 +348,114 @@ describe("AssistantShell chrome and focus", () => {
   });
 });
 
+describe("AssistantShell mounted after the open", () => {
+  const origin = { entryKind: "header_button", objectKind: "none", container: "sidebar" } as const;
+  const mountShell = () =>
+    mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+      attachTo: document.body,
+    });
+  const pageButton = (name: string) => {
+    const el = document.createElement("button");
+    el.dataset.test = name;
+    document.body.appendChild(el);
+    return el;
+  };
+  const openFrom = (invoker: HTMLElement | null, focus: "composer" | "none" = "composer") => {
+    invoker?.focus();
+    fake.current!.store.open({ kind: "sidebar", mode: "pinned" }, { focus });
+  };
+
+  beforeEach(() => {
+    fake.current = fakeAssistant();
+    fake.current.store.createSession({ origin });
+  });
+
+  it("takes the focus an open asked for before the host loaded, and announces it", async () => {
+    openFrom(pageButton("header"));
+    const wrapper = mountShell();
+    await flushPromises();
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-composer-field"]').element,
+    );
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
+      "O2 Assistant opened.",
+    );
+  });
+
+  it("leaves focus on a page control the reader moved to while the host loaded", async () => {
+    openFrom(pageButton("header"));
+    const other = pageButton("other");
+    other.focus();
+    const wrapper = mountShell();
+    await flushPromises();
+    expect(document.activeElement).toBe(other);
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe("");
+  });
+
+  it("retires a request it turned down, so a later remount never replays it", async () => {
+    const header = pageButton("header");
+    openFrom(header);
+    pageButton("other").focus();
+    const first = mountShell();
+    await flushPromises();
+    expect(first.get('[data-test="assistant-status-region"]').text()).toBe("");
+    first.unmount();
+    header.focus();
+    const again = mountShell();
+    await flushPromises();
+    expect(document.activeElement).toBe(header);
+    expect(again.get('[data-test="assistant-status-region"]').text()).toBe("");
+  });
+
+  it("retires a request turned down during the mount tick as well", async () => {
+    const header = pageButton("header");
+    openFrom(header);
+    const first = mountShell();
+    pageButton("other").focus();
+    await flushPromises();
+    first.unmount();
+    header.focus();
+    const again = mountShell();
+    await flushPromises();
+    expect(document.activeElement).toBe(header);
+    expect(again.get('[data-test="assistant-status-region"]').text()).toBe("");
+  });
+
+  it("drops a request that a later silent open superseded", async () => {
+    openFrom(null);
+    openFrom(null, "none");
+    const wrapper = mountShell();
+    await flushPromises();
+    expect(wrapper.element.contains(document.activeElement)).toBe(false);
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe("");
+  });
+
+  it("drops the request when focus moves away during the mount tick", async () => {
+    const header = pageButton("header");
+    openFrom(header);
+    const other = pageButton("other");
+    const wrapper = mountShell();
+    other.focus();
+    await flushPromises();
+    expect(document.activeElement).toBe(other);
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe("");
+  });
+
+  it("never serves the same request again when the shell remounts", async () => {
+    openFrom(null);
+    mountShell().unmount();
+    await flushPromises();
+    const outside = pageButton("outside");
+    outside.focus();
+    const again = mountShell();
+    await flushPromises();
+    expect(document.activeElement).toBe(outside);
+    expect(again.get('[data-test="assistant-status-region"]').text()).toBe("");
+  });
+});
+
 describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
   function live(props: Partial<AssistantShellProps> = {}) {
     fake.current = fakeAssistant();

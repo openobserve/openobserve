@@ -20429,7 +20429,10 @@
     "pagination": {
       "pagination": "Пагинация",
       "previousPage": "Предыдущая страница",
-      "nextPage": "Следующая страница"
+      "nextPage": "Следующая страница",
+      "firstPage": "Первая страница",
+      "lastPage": "Последняя страница",
+      "recordsPerPage": "Записей на странице"
     },
     "select": {
       "more": "ещё",

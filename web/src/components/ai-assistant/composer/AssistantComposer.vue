@@ -553,6 +553,7 @@ const textboxAttrs = computed(() => ({
   "aria-controls": mentionAt.value !== null ? listboxId : undefined,
   "aria-activedescendant": mentionAt.value !== null ? mention.value?.activeId : undefined,
   "data-assistant-composer": "",
+  class: "max-md:min-h-11 pointer-coarse:min-h-11",
 }));
 
 function el(): HTMLTextAreaElement | null {

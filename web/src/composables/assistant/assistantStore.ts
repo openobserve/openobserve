@@ -154,6 +154,10 @@ export interface AssistantStoreIdentity {
 export interface FocusRequest {
   seq: number;
   target: "composer";
+  /** What held focus when the request was made; a container that mounts late serves it only while focus stays there. */
+  from: WeakRef<Element> | null;
+  /** A later open that asked for no focus voids this request for a container that has not served it yet. */
+  superseded: boolean;
 }
 
 /** The turn region's next line (`95` §2). */
@@ -748,6 +752,7 @@ function createPlacementSlice(core: StoreCore) {
       }
       apply(target);
       if (opts.focus === "composer") requestFocus(core);
+      else supersedeFocus(core);
     },
     close(reason) {
       const { placement, previousPlacement } = state.shell;
@@ -1484,7 +1489,19 @@ function reviveDraft(core: StoreCore, sid: Sid): void {
 }
 
 function requestFocus(core: StoreCore): void {
-  core.focusRequest.value = { seq: (core.focusRequest.value?.seq ?? 0) + 1, target: "composer" };
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  core.focusRequest.value = {
+    seq: (core.focusRequest.value?.seq ?? 0) + 1,
+    target: "composer",
+    from: active ? new WeakRef(active) : null,
+    superseded: false,
+  };
+}
+
+// Keeps the seq, so a mounted container's seq watcher never fires for it.
+function supersedeFocus(core: StoreCore): void {
+  const request = core.focusRequest.value;
+  if (request && !request.superseded) core.focusRequest.value = { ...request, superseded: true };
 }
 
 function isIdle(core: StoreCore, session: AssistantSession): boolean {

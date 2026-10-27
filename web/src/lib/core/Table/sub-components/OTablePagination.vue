@@ -138,7 +138,7 @@ const selectionLabel = computed(() => {
           :options="pageSizeSelectOptions"
           :searchable="false"
           size="sm"
-          :aria-label="t('search.recordsPerPage')"
+          :aria-label="t('components.pagination.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
       </div>
@@ -148,7 +148,7 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
-          :aria-label="t('search.firstPage')"
+          :aria-label="t('components.pagination.firstPage')"
           data-test="o2-table-first-page-btn"
           @click="emit('first-page')"
         >
@@ -179,7 +179,7 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
-          :aria-label="t('search.lastPage')"
+          :aria-label="t('components.pagination.lastPage')"
           data-test="o2-table-last-page-btn"
           @click="emit('last-page')"
         >

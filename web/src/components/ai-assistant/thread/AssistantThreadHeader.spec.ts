@@ -108,6 +108,31 @@ describe("AssistantThreadHeader", () => {
     expect(wrapper.find('[data-test="assistant-thread-menu-rename"]').exists()).toBe(false);
   });
 
+  it("keeps the title button at least 1.5 rem when squeezed and 2.75 rem below md and on coarse pointers", async () => {
+    const { wrapper } = await setup();
+    const classes = wrapper.get('[data-test="assistant-thread-title-button"]').classes();
+    for (const cls of [
+      "min-h-6",
+      "min-w-6",
+      "max-md:min-h-11",
+      "max-md:min-w-11",
+      "pointer-coarse:min-h-11",
+      "pointer-coarse:min-w-11",
+    ]) {
+      expect(classes).toContain(cls);
+    }
+    expect(classes).not.toContain("min-w-0");
+    // The heading reserves the same floor, so a squeezed title never slides under the controls beside it.
+    const heading = wrapper.get('[data-test="assistant-thread-title"]').classes();
+    expect(heading).toEqual(
+      expect.arrayContaining(["min-w-6", "max-md:min-w-11", "pointer-coarse:min-w-11"]),
+    );
+    const chats = wrapper.get(
+      '[data-test="assistant-thread-history"] span.sr-only, [data-test="assistant-thread-history"] span[class*="sr-only"]',
+    );
+    expect(chats.classes()).toContain("@max-[24rem]:sr-only");
+  });
+
   it("renames inline: the title becomes sticky renamed, Escape restores without a request", async () => {
     const { wrapper, sid, store, db } = await setup();
     await wrapper.get('[data-test="assistant-thread-title-button"]').trigger("click");

@@ -20429,7 +20429,10 @@
     "pagination": {
       "pagination": "Phân trang",
       "previousPage": "Trang trước",
-      "nextPage": "Trang sau"
+      "nextPage": "Trang sau",
+      "firstPage": "Trang đầu",
+      "lastPage": "Trang cuối",
+      "recordsPerPage": "Số bản ghi mỗi trang"
     },
     "select": {
       "more": "thêm",

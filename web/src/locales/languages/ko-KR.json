@@ -20429,7 +20429,10 @@
     "pagination": {
       "pagination": "페이지네이션",
       "previousPage": "이전 페이지",
-      "nextPage": "다음 페이지"
+      "nextPage": "다음 페이지",
+      "firstPage": "첫 페이지",
+      "lastPage": "마지막 페이지",
+      "recordsPerPage": "페이지당 레코드"
     },
     "select": {
       "more": "더보기",

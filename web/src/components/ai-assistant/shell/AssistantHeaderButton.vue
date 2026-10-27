@@ -171,6 +171,7 @@ import {
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
+  useAssistantOpenChord,
   useAssistantPlacement,
   useAssistantStore,
 } from "@/composables/assistant";
@@ -196,6 +197,8 @@ const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const placement = useAssistantPlacement(store);
 const lockedPanel = useLockedPanel();
+// The open chord lives here, not in the async host, so it works from the moment the button does.
+useAssistantOpenChord({ gate: capability.gate, assistantCanChat: capability.assistantCanChat });
 const route = useRoute();
 const vuex = useStore();
 const { lgUp } = useBreakpoint();
@@ -290,7 +293,14 @@ function lightView(): HeaderView {
     return {
       ...plain(
         "needs_you",
-        t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p),
+        waiting > 0
+          ? t(
+              open
+                ? "assistant.header.needsYouCountNameOpen"
+                : "assistant.header.needsYouCountName",
+              { ...p, count: waiting },
+            )
+          : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p),
         consent ? t("assistant.turn.waitingConsent") : t("assistant.header.stateNeedsApproval"),
       ),
       signal: "attention",

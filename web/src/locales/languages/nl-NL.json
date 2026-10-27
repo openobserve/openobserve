@@ -20429,7 +20429,10 @@
     "pagination": {
       "pagination": "Paginering",
       "previousPage": "Vorige pagina",
-      "nextPage": "Volgende pagina"
+      "nextPage": "Volgende pagina",
+      "firstPage": "Eerste pagina",
+      "lastPage": "Laatste pagina",
+      "recordsPerPage": "Records per pagina"
     },
     "select": {
       "more": "meer",
