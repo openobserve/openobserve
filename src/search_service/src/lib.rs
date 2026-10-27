@@ -1064,7 +1064,10 @@ pub fn leader_trace_id(trace_id: &str) -> String {
 }
 
 #[inline]
-pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
+pub fn check_search_allowed(
+    _org_id: &str,
+    _stream: Option<(&str, StreamType)>,
+) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
     {
         if is_license_exempt_stream(_org_id, _stream) {
@@ -1114,12 +1117,16 @@ fn merge_cancel_outcomes(outcomes: Vec<Result<bool, Error>>) -> Result<bool, Err
     first_err.map_or(Ok(false), Err)
 }
 
-/// The meta org's usage and audit, and every org's own operational streams, stay searchable.
+/// The meta org's usage and audit logs, and every org's own operational logs, stay searchable.
 #[cfg(any(feature = "enterprise", test))]
 #[inline]
-fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
-    (org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM)))
-        || stream.is_some_and(is_operational_stream)
+fn is_license_exempt_stream(org_id: &str, stream: Option<(&str, StreamType)>) -> bool {
+    // a customer can ingest traces or metrics under any name, so only the logs stream is exempt
+    let Some((name, StreamType::Logs)) = stream else {
+        return false;
+    };
+    (org_id == META_ORG_ID && (name == USAGE_STREAM || name == AUDIT_STREAM))
+        || is_operational_stream(name)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1258,7 +1265,7 @@ mod tests {
     #[test]
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
-        assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+        assert!(check_search_allowed("myorg", Some(("logs", StreamType::Logs))).is_ok());
     }
 
     #[test]
@@ -1342,17 +1349,26 @@ mod tests {
 
     #[test]
     fn usage_and_audit_stay_meta_only() {
-        assert!(is_license_exempt_stream(META_ORG_ID, Some(USAGE_STREAM)));
-        assert!(is_license_exempt_stream(META_ORG_ID, Some(AUDIT_STREAM)));
-        assert!(!is_license_exempt_stream(
-            "customer_org",
-            Some(AUDIT_STREAM)
+        assert!(is_license_exempt_stream(
+            META_ORG_ID,
+            Some((USAGE_STREAM, StreamType::Logs))
+        ));
+        assert!(is_license_exempt_stream(
+            META_ORG_ID,
+            Some((AUDIT_STREAM, StreamType::Logs))
         ));
         assert!(!is_license_exempt_stream(
             "customer_org",
-            Some(USAGE_STREAM)
+            Some((AUDIT_STREAM, StreamType::Logs))
         ));
-        assert!(!is_license_exempt_stream(META_ORG_ID, Some("logs")));
+        assert!(!is_license_exempt_stream(
+            "customer_org",
+            Some((USAGE_STREAM, StreamType::Logs))
+        ));
+        assert!(!is_license_exempt_stream(
+            META_ORG_ID,
+            Some(("logs", StreamType::Logs))
+        ));
         assert!(!is_license_exempt_stream(META_ORG_ID, None));
     }
 
@@ -1416,7 +1432,7 @@ mod tests {
             for stream in OPERATIONAL_STREAMS {
                 assert!(is_operational_stream(stream), "{stream}");
                 assert!(
-                    is_license_exempt_stream(org, Some(stream)),
+                    is_license_exempt_stream(org, Some((stream, StreamType::Logs))),
                     "{org} {stream}"
                 );
             }
@@ -1431,7 +1447,32 @@ mod tests {
             "_agent_signals",
         ] {
             assert!(!is_operational_stream(stream), "{stream}");
-            assert!(!is_license_exempt_stream("acme", Some(stream)), "{stream}");
+            assert!(
+                !is_license_exempt_stream("acme", Some((stream, StreamType::Logs))),
+                "{stream}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_logs_streams_are_exempt() {
+        for stream_type in [
+            StreamType::Traces,
+            StreamType::Metrics,
+            StreamType::Metadata,
+        ] {
+            for stream in OPERATIONAL_STREAMS {
+                assert!(
+                    !is_license_exempt_stream("acme", Some((stream, stream_type))),
+                    "{stream} {stream_type}"
+                );
+            }
+            for stream in [USAGE_STREAM, AUDIT_STREAM] {
+                assert!(
+                    !is_license_exempt_stream(META_ORG_ID, Some((stream, stream_type))),
+                    "{stream} {stream_type}"
+                );
+            }
         }
     }
 
@@ -1443,7 +1484,7 @@ mod tests {
             assert!(!is_operational_stream(stream), "{stream}");
             for org in ["acme", META_ORG_ID] {
                 assert!(
-                    !is_license_exempt_stream(org, Some(stream)),
+                    !is_license_exempt_stream(org, Some((stream, StreamType::Logs))),
                     "{org} {stream}"
                 );
             }
@@ -1466,7 +1507,10 @@ mod tests {
         assert!(!config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(digests));
         assert!(!is_operational_stream(digests));
         for org in ["acme", META_ORG_ID] {
-            assert!(!is_license_exempt_stream(org, Some(digests)), "{org}");
+            assert!(
+                !is_license_exempt_stream(org, Some((digests, StreamType::Logs))),
+                "{org}"
+            );
         }
     }
 
@@ -1484,11 +1528,11 @@ mod tests {
         let _gate = close_search_gate_for_tests().await;
         for stream in OPERATIONAL_STREAMS {
             assert!(
-                check_search_allowed("acme", Some(stream)).is_ok(),
+                check_search_allowed("acme", Some((stream, StreamType::Logs))).is_ok(),
                 "{stream}"
             );
         }
-        let refused = check_search_allowed("acme", Some("logs"))
+        let refused = check_search_allowed("acme", Some(("logs", StreamType::Logs)))
             .unwrap_err()
             .to_string();
         assert!(
@@ -1496,7 +1540,13 @@ mod tests {
             "{refused}"
         );
         assert!(check_search_allowed("acme", None).is_err());
-        assert!(check_search_allowed("acme", Some(TRIGGERS_STREAM)).is_err());
-        assert!(check_search_allowed("acme", Some("synthetics_results")).is_err());
+        assert!(check_search_allowed("acme", Some((TRIGGERS_STREAM, StreamType::Logs))).is_err());
+        assert!(
+            check_search_allowed("acme", Some((AI_CHAT_EVENTS_STREAM, StreamType::Traces)))
+                .is_err()
+        );
+        assert!(
+            check_search_allowed("acme", Some(("synthetics_results", StreamType::Logs))).is_err()
+        );
     }
 }

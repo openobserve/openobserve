@@ -22,7 +22,7 @@ use axum::{
 #[cfg(any(feature = "enterprise", test))]
 use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(any(feature = "enterprise", test))]
-use config::META_ORG_ID;
+use config::{META_ORG_ID, meta::stream::StreamType};
 
 /// Answers the search handlers' licence 429 before a gated route reads any data.
 pub async fn search_license_middleware(request: Request, next: Next) -> Response {
@@ -55,7 +55,7 @@ async fn refusal(parts: &mut Parts) -> Option<Response> {
 #[cfg(any(feature = "enterprise", test))]
 fn refusal_for(
     org_id: &str,
-    gate: impl Fn(&str, Option<&str>) -> Result<(), infra::errors::Error>,
+    gate: impl Fn(&str, Option<(&str, StreamType)>) -> Result<(), infra::errors::Error>,
 ) -> Option<Response> {
     if org_id == META_ORG_ID {
         return None;
@@ -76,11 +76,11 @@ mod tests {
 
     const BLOCKED: &str = "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.";
 
-    fn open(_: &str, _: Option<&str>) -> Result<(), Error> {
+    fn open(_: &str, _: Option<(&str, StreamType)>) -> Result<(), Error> {
         Ok(())
     }
 
-    fn closed(_: &str, _: Option<&str>) -> Result<(), Error> {
+    fn closed(_: &str, _: Option<(&str, StreamType)>) -> Result<(), Error> {
         Err(Error::Message(BLOCKED.to_string()))
     }
 
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn meta_org_is_never_refused_and_never_asks_the_gate() {
         let calls = AtomicUsize::new(0);
-        let counting = |org: &str, stream: Option<&str>| {
+        let counting = |org: &str, stream: Option<(&str, StreamType)>| {
             calls.fetch_add(1, Ordering::SeqCst);
             closed(org, stream)
         };
@@ -128,11 +128,11 @@ mod tests {
     #[test]
     fn the_gate_is_asked_about_the_org_and_never_a_stream() {
         let asked = std::sync::Mutex::new(Vec::new());
-        let recording = |org: &str, stream: Option<&str>| {
+        let recording = |org: &str, stream: Option<(&str, StreamType)>| {
             asked
                 .lock()
                 .unwrap()
-                .push((org.to_string(), stream.map(str::to_string)));
+                .push((org.to_string(), stream.map(|(name, _)| name.to_string())));
             closed(org, stream)
         };
         assert!(refusal_for("acme", recording).is_some());

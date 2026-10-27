@@ -2678,7 +2678,10 @@ mod tests {
         seed_member(custom, config::meta::user::UserRole::User, ORG);
         openfga_on(&[], None);
         let gate = close_search_gate_for_tests().await;
-        let exempt = search_service::check_search_allowed(config::META_ORG_ID, Some(AUDIT_STREAM));
+        let exempt = search_service::check_search_allowed(
+            config::META_ORG_ID,
+            Some((AUDIT_STREAM, config::meta::stream::StreamType::Logs)),
+        );
         let customer = search_service::check_search_allowed(ORG, None);
         let res = list_audit(
             Path(ORG.to_string()),
