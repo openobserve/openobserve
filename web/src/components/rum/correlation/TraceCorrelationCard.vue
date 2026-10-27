@@ -37,6 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <!-- Trace ID Section -->
       <div class="bg-card-glass-bg p-3">
+        <OBanner
+          v-if="error"
+          variant="error-soft"
+          :content="t('correlation.failedToLoad')"
+          class="mb-3"
+          data-test="trace-correlation-error"
+        />
         <div class="mb-3 flex items-center">
           <div class="text-text-label w-1/4">{{ t("traces.correlation.traceIdLabel") }}</div>
           <div class="flex w-3/4 flex-nowrap items-center">
@@ -96,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Performance Breakdown -->
-        <div v-if="performanceData" class="mb-3">
+        <div v-if="performanceData && !error" class="mb-3">
           <div class="text-text-label mb-1">{{ t("traces.correlation.performanceBreakdown") }}</div>
           <div class="bg-surface-accent rounded-default p-2 text-sm">
             <div class="mb-1 flex items-center">
@@ -161,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="git-branch" size="sm" class="me-1" />
             {{ t("traces.correlation.viewTraceDetails") }}
             <OTooltip
-              v-if="!hasBackendTrace"
+              v-if="!hasBackendTrace && !error"
               :content="t('traces.correlation.backendTraceNotAvailable')"
             />
           </OButton>
@@ -171,7 +178,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Missing trace notice -->
-        <div v-if="!hasBackendTrace && traceId" class="bg-surface-accent rounded-default mt-3 p-2">
+        <div
+          v-if="!hasBackendTrace && traceId && !error"
+          class="bg-surface-accent rounded-default mt-3 p-2"
+        >
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="me-2" />
             <div class="text-text-secondary text-xs">
@@ -185,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
@@ -236,6 +247,7 @@ const correlationRange = computed(() =>
 
 const {
   isLoading,
+  error,
   hasBackendTrace,
   fetchCorrelation,
   backendSpanCount,
