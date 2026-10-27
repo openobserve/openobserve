@@ -29,12 +29,12 @@ import type {
 
 const props = withDefaults(defineProps<ChipInputProps>(), {
   placeholder: undefined,
-  header: undefined,
+  searchPlaceholder: undefined,
+  anchor: null,
   emptyText: undefined,
   loading: false,
   autoHighlight: true,
   disabled: false,
-  inputGrow: true,
   size: "md",
   ariaLabel: undefined,
   dataTest: undefined,
@@ -43,18 +43,15 @@ const emit = defineEmits<ChipInputEmits>();
 defineSlots<ChipInputSlots>();
 
 const rootRef = ref<HTMLElement | null>(null);
+const addRef = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLInputElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 const highlighted = ref(-1);
 
 const listId = `o-chip-input-${Math.random().toString(36).slice(2, 9)}`;
 
-const showList = computed(
-  () =>
-    props.open &&
-    !props.disabled &&
-    (props.suggestions.length > 0 || props.loading || Boolean(props.emptyText)),
-);
+const showList = computed(() => props.open && !props.disabled);
+const anchorElement = computed(() => props.anchor ?? addRef.value ?? undefined);
 
 const sizeClasses = computed(() => (props.size === "sm" ? "min-h-8 text-xs" : "min-h-9 text-sm"));
 
@@ -76,16 +73,19 @@ watch(highlighted, async (index) => {
     ?.scrollIntoView({ block: "nearest" });
 });
 
-function focus() {
+// Each newly opened step selects its search text, so typing replaces a value being edited.
+watch([showList, anchorElement], async ([shown]) => {
+  if (!shown) return;
+  await nextTick();
   inputRef.value?.focus();
-}
-
-function focusSelect() {
-  focus();
   inputRef.value?.select();
+});
+
+function focus() {
+  addRef.value?.focus();
 }
 
-defineExpose<ChipInputExpose>({ focus, focusSelect });
+defineExpose<ChipInputExpose>({ focus });
 
 function move(step: number) {
   const count = props.suggestions.length;
@@ -95,7 +95,7 @@ function move(step: number) {
 
 function onEnter(event: KeyboardEvent) {
   event.preventDefault();
-  const active = showList.value ? props.suggestions[highlighted.value] : undefined;
+  const active = props.suggestions[highlighted.value];
   if (active) emit("select", active.key);
   else emit("enter");
 }
@@ -115,11 +115,9 @@ function onKeydown(event: KeyboardEvent) {
       onEnter(event);
       return;
     case "Escape":
-      if (showList.value) {
-        event.preventDefault();
-        emit("close");
-      }
+      event.preventDefault();
       emit("escape");
+      focus();
       return;
     case "Backspace":
       if (props.modelValue === "") {
@@ -133,33 +131,47 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+function onAddKeydown(event: KeyboardEvent) {
+  if (event.isComposing || props.disabled) return;
+  if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+    event.preventDefault();
+    emit("activate", "");
+  } else if (event.key === "Backspace") {
+    event.preventDefault();
+    emit("backspace-empty");
+  } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    emit("activate", event.key);
+  }
+}
+
 function onInput(event: Event) {
   emit("update:modelValue", (event.target as HTMLInputElement).value);
 }
 
-// A pointerdown inside the field (a chip, the caret) is not an outside interaction.
+// A pointerdown inside the field (a chip, the add target) is not an outside interaction.
 function onInteractOutside(event: Event) {
   if (rootRef.value?.contains(event.target as Node)) event.preventDefault();
   else emit("close");
 }
 
 function onFieldPointerDown(event: PointerEvent) {
-  if (event.target === rootRef.value) {
-    event.preventDefault();
-    focus();
-  }
+  if (props.disabled || event.target !== rootRef.value) return;
+  event.preventDefault();
+  emit("activate", "");
 }
 </script>
 
 <template>
   <PopoverRoot :open="showList">
-    <PopoverAnchor as-child>
+    <PopoverAnchor as-child :reference="anchorElement">
       <div
         ref="rootRef"
         :data-test="testId('field')"
         :class="[
           'rounded-default flex w-full min-w-0 cursor-text flex-wrap items-center gap-1 border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150',
-          'bg-input-bg border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-focus-ring-accent focus-within:ring-[0.125rem]',
+          'bg-input-bg border-input-border hover:border-input-border-hover',
+          showList ? 'border-input-border-focus ring-focus-ring-accent ring-[0.125rem]' : '',
           sizeClasses,
           disabled
             ? 'bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed'
@@ -168,32 +180,21 @@ function onFieldPointerDown(event: PointerEvent) {
         @pointerdown="onFieldPointerDown"
       >
         <slot />
-        <input
-          ref="inputRef"
-          :value="modelValue"
-          type="text"
-          role="combobox"
-          autocomplete="off"
-          spellcheck="false"
+        <span
+          ref="addRef"
+          role="button"
+          :tabindex="disabled ? -1 : 0"
+          :aria-label="ariaLabel"
           :aria-expanded="showList"
           :aria-controls="listId"
-          :aria-activedescendant="
-            showList && highlighted >= 0 ? `${listId}-${highlighted}` : undefined
-          "
-          :aria-label="ariaLabel"
-          :placeholder="placeholder"
-          :disabled="disabled"
-          :data-test="testId('input')"
-          :class="[
-            'text-text-body placeholder:text-text-secondary min-w-24 basis-24 border-0 bg-transparent px-1 py-0.5 outline-none',
-            inputGrow ? 'flex-1' : 'w-24 flex-none',
-          ]"
-          @input="onInput"
-          @keydown="onKeydown"
-          @focus="emit('focus')"
-          @blur="emit('blur')"
-        />
-        <slot name="after" />
+          :data-test="testId('add')"
+          class="text-text-secondary rounded-default focus-visible:ring-focus-ring-accent flex min-h-6 min-w-8 flex-1 items-center px-1 outline-none focus-visible:ring-2"
+          @click="!disabled && emit('activate', '')"
+          @keydown="onAddKeydown"
+        >
+          <OTruncatedText v-if="placeholder" class="min-w-0">{{ placeholder }}</OTruncatedText>
+          <OIcon v-else name="add" size="xs" />
+        </span>
         <div v-if="$slots.trailing" class="ms-auto flex shrink-0 items-center gap-1">
           <slot name="trailing" />
         </div>
@@ -209,24 +210,38 @@ function onFieldPointerDown(event: PointerEvent) {
         :collision-padding="8"
         :data-test="testId('suggest')"
         class="rounded-default bg-select-content-bg border-select-content-border z-10001 flex w-80 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden border shadow-md"
-        :style="{ maxHeight: 'min(20rem, var(--reka-popover-content-available-height, 20rem))' }"
+        :style="{ maxHeight: 'min(22rem, var(--reka-popover-content-available-height, 22rem))' }"
         @open-auto-focus.prevent
         @close-auto-focus.prevent
         @interact-outside="onInteractOutside"
-        @escape-key-down="emit('close')"
+        @escape-key-down.prevent
       >
-        <div
-          v-if="header"
-          class="text-text-secondary border-select-content-border flex items-center gap-2 border-b px-3 py-1.5 text-xs"
-        >
-          <span class="min-w-0 flex-1">{{ header }}</span>
+        <div class="border-select-content-border flex items-center gap-2 border-b px-3">
+          <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
+          <input
+            ref="inputRef"
+            :value="modelValue"
+            type="text"
+            role="combobox"
+            autocomplete="off"
+            spellcheck="false"
+            aria-expanded="true"
+            :aria-controls="listId"
+            :aria-activedescendant="highlighted >= 0 ? `${listId}-${highlighted}` : undefined"
+            :aria-label="searchPlaceholder ?? ariaLabel"
+            :placeholder="searchPlaceholder"
+            :data-test="testId('input')"
+            class="text-text-body placeholder:text-text-secondary min-w-0 flex-1 border-0 bg-transparent py-2 text-xs outline-none"
+            @input="onInput"
+            @keydown="onKeydown"
+          />
           <OSpinner v-if="loading" size="xs" />
         </div>
         <div
           :id="listId"
           ref="listRef"
           role="listbox"
-          :aria-label="header ?? ariaLabel"
+          :aria-label="searchPlaceholder ?? ariaLabel"
           class="min-h-0 flex-1 overflow-y-auto p-1"
         >
           <div
