@@ -79,6 +79,26 @@ export interface OTableCellActionsContext {
 export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
   Symbol("OTableCellActions");
 
+/** `focusToolbar` on: one roving tab stop across the cells, and the cell keyboard focus returns to. */
+export interface OTableFocusToolbarContext {
+  enabled: ComputedRef<boolean>;
+  /** The cell that holds the table's one tab stop; `null` until a cell is focused. */
+  current: Ref<string | null>;
+  /** The first rendered row's first cell: the tab stop while `current` is unset or scrolled away. */
+  fallback: Ref<string | null>;
+  /** Re-reads `fallback` from the rendered rows; cells call it as they mount and unmount. */
+  refresh: (table: Element | null) => void;
+  /** A row's 0-based position across pages, so a checkbox's name follows what the reader sees. */
+  positionOf: (rowId: string) => number | undefined;
+}
+
+export const OTableFocusToolbarKey: InjectionKey<OTableFocusToolbarContext> =
+  Symbol("OTableFocusToolbar");
+
+/** Lets a control inside a cell's toolbar name the cell as where focus goes back to (the toolbar unmounts on blur). */
+export const OTableToolbarOwnerKey: InjectionKey<() => HTMLElement | null> =
+  Symbol("OTableToolbarOwner");
+
 // ─── Cut-off cell tooltip context ────────────────────────────────
 /** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
 export interface OTableOverflowTooltipContext {
@@ -550,6 +570,8 @@ export interface OTableProps<TData = any> {
   getCellStyle?: (params: { columnId: string; row: TData; value: any }) => Record<string, any>;
   /** Show hover-visible copy button on each cell */
   enableCellCopy?: boolean;
+  /** `#cell-hover-actions` also opens on focus with a roving tab stop, and the first cell gets a touch kebab. */
+  focusToolbar?: boolean;
   /** Fixed row height in px (for virtual scroll accuracy) */
   rowHeight?: number;
 
@@ -653,6 +675,8 @@ export interface OTableSlots<TData = any> {
     column: OTableColumnDef<TData>;
     value: any;
     active?: boolean;
+    /** With `focusToolbar`: rendered once more in the row's first cell as the touch kebab's content. */
+    menu?: boolean;
   }) => any;
   /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
   "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;

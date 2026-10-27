@@ -12,6 +12,8 @@ import {
   inject,
   nextTick,
   onBeforeUnmount,
+  onMounted,
+  provide,
   ref,
   useSlots,
   watch,
@@ -21,10 +23,16 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey, OTableOverflowTooltipKey } from "../OTable.types";
+import {
+  OTableCellActionsKey,
+  OTableFocusToolbarKey,
+  OTableOverflowTooltipKey,
+  OTableToolbarOwnerKey,
+} from "../OTable.types";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18nTyped } from "@/types/i18n";
+import { LAYER_ROOT_ATTR } from "@/lib/overlay/Drawer/drawerInset";
 
 const slots = useSlots();
 
@@ -64,6 +72,8 @@ const props = defineProps<{
   /** Pivot row-field cell merge: hide the cell's content / inner border so a
    *  group of equal row-field values reads as one merged cell. */
   pivotMerge?: { hideContent: boolean; hideBorder: boolean } | null;
+  /** Opt-in: the hover toolbar also opens on focus, with a roving tab stop and a touch kebab. */
+  focusToolbar?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -319,11 +329,17 @@ const cellActionsBelow = ref(false);
 const cellActionsPointerX = ref(0);
 const cellActionsArrowX = ref(0);
 
+const cellActionsBeside = ref(false);
+
 const cellActionsStyle = computed(() => ({
   // px because these are viewport coordinates read off getBoundingClientRect.
   left: `${cellActionsX.value}px`,
   top: `${cellActionsY.value}px`,
-  transform: cellActionsBelow.value ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+  transform: cellActionsBeside.value
+    ? "translate(0, -50%)"
+    : cellActionsBelow.value
+      ? "translate(-50%, 0)"
+      : "translate(-50%, -100%)",
 }));
 
 // Clip the rotated square to the half outside the bar plus a ~1.5px sliver that hides
@@ -345,9 +361,18 @@ function onCellActionsEnter(event: MouseEvent) {
   // Pre-placed so the toolbar doesn't flash at the window origin before measurement.
   cellActionsY.value = cellEl.value?.getBoundingClientRect().top ?? event.clientY ?? 0;
   cellActionsBelow.value = false;
+  // Beside the cell from the first frame, never under the pointer it was opened by.
+  const rect = focusToolbarOn.value ? cellEl.value?.getBoundingClientRect() : undefined;
+  if (rect) {
+    cellActionsBeside.value = true;
+    cellActionsX.value = rect.right;
+    cellActionsY.value = rect.top + rect.height / 2;
+  }
   cellActionsCtx?.setActiveCell(props.cell.id);
 }
 function onCellActionsLeave() {
+  // Keyboard focus inside the cell or its toolbar keeps it open when the pointer drifts away.
+  if (focusToolbarOn.value && focusWithin(document.activeElement)) return;
   if (hasCellActions.value) cellActionsCtx?.setActiveCell(null);
 }
 
@@ -406,6 +431,12 @@ function cellActionsSide(): TooltipSide | null {
 // Fixed coordinates don't follow a scrolling row, so drop the toolbar instead of
 // letting it hang over unrelated content.
 function onScrollDismiss() {
+  // Arrow keys scroll the focused cell into view; the toolbar follows it instead of vanishing.
+  if (focusToolbarOn.value && focusWithin(document.activeElement)) {
+    anchorToCell();
+    void placeCellActions();
+    return;
+  }
   cellActionsCtx?.setActiveCell(null);
 }
 
@@ -415,10 +446,25 @@ watch(isCellActionActive, async (active) => {
     return;
   }
   window.addEventListener("scroll", onScrollDismiss, { capture: true, passive: true });
+  await placeCellActions();
+});
+
+async function placeCellActions() {
   await nextTick();
   const bar = cellActionsEl.value?.getBoundingClientRect();
   const cellRect = cellEl.value?.getBoundingClientRect();
   if (!bar || !cellRect) return;
+  cellActionsBeside.value = focusToolbarOn.value;
+  if (cellActionsBeside.value) {
+    cellActionsY.value = cellRect.top + cellRect.height / 2;
+    // A wide cell holds the bar at its own end, so the next cell's value stays readable.
+    const inside = cellRect.width >= bar.width * 2;
+    cellActionsX.value =
+      !inside && cellRect.right + bar.width <= window.innerWidth
+        ? cellRect.right
+        : cellRect.right - bar.width;
+    return;
+  }
   // The sticky header, not the window edge, is the ceiling: flip below rather than cover it.
   const headerBottom =
     cellEl.value?.closest("table")?.querySelector("thead")?.getBoundingClientRect().bottom ?? 0;
@@ -434,9 +480,165 @@ watch(isCellActionActive, async (active) => {
     Math.max(cellActionsPointerX.value - (cellActionsX.value - half), 10),
     Math.max(bar.width - 10, 10),
   );
-});
+}
 
 onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true));
+
+const TOOLBAR_CONTROLS =
+  "button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+
+const focusCtx = inject(OTableFocusToolbarKey, null);
+const focusToolbarOn = computed(() => !!props.focusToolbar || !!focusCtx?.enabled.value);
+const isFirstVisibleCell = computed(() => props.row.getVisibleCells()[0]?.id === props.cell.id);
+// The touch kebab in the row's first cell; a v-for, not a v-if, so an empty list leaves the default render byte-identical.
+const rowMenus = computed(() =>
+  focusToolbarOn.value && hasCellActions.value && isFirstVisibleCell.value ? [props.cell.id] : [],
+);
+const cellTabIndex = computed(() => {
+  if (!focusToolbarOn.value) return undefined;
+  const current = focusCtx?.current.value ?? null;
+  if (current) return current === props.cell.id ? 0 : -1;
+  return focusCtx?.fallback.value === props.cell.id ? 0 : -1;
+});
+let skipFocusOpen = false;
+
+if (focusToolbarOn.value) provide(OTableToolbarOwnerKey, () => cellEl.value);
+
+const tableOf = () => cellEl.value?.closest("table") ?? null;
+
+onMounted(() => {
+  if (focusToolbarOn.value && isFirstVisibleCell.value) focusCtx?.refresh(tableOf());
+});
+
+onBeforeUnmount(() => {
+  if (!focusToolbarOn.value) return;
+  const table = tableOf();
+  if (focusCtx?.current.value === props.cell.id) focusCtx.current.value = null;
+  if (isFirstVisibleCell.value) focusCtx?.refresh(table);
+});
+
+// A popover a toolbar door opened (the locked gate's reason) lives in a portal; focus there is still the toolbar's.
+function focusWithin(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false;
+  if (cellEl.value?.contains(target) || cellActionsEl.value?.contains(target)) return true;
+  return target instanceof Element && !!target.closest("[data-o-popover-content]");
+}
+
+function anchorToCell() {
+  const rect = cellEl.value?.getBoundingClientRect();
+  if (!rect) return;
+  cellActionsPointerX.value = rect.left + rect.width / 2;
+  cellActionsBeside.value = true;
+  cellActionsX.value = rect.right;
+  cellActionsY.value = rect.top + rect.height / 2;
+}
+
+function toolbarControls(): HTMLElement[] {
+  return [...(cellActionsEl.value?.querySelectorAll<HTMLElement>(TOOLBAR_CONTROLS) ?? [])];
+}
+
+function focusCell(reopen: boolean) {
+  skipFocusOpen = !reopen;
+  cellEl.value?.focus();
+  skipFocusOpen = false;
+}
+
+function onCellFocusIn(event: FocusEvent) {
+  if (!focusToolbarOn.value) return;
+  if (focusCtx) focusCtx.current.value = props.cell.id;
+  if (event.target !== cellEl.value || skipFocusOpen || !hasCellActions.value) return;
+  anchorToCell();
+  cellActionsBelow.value = false;
+  cellActionsCtx?.setActiveCell(props.cell.id);
+}
+
+function onCellFocusOut(event: FocusEvent) {
+  if (!focusToolbarOn.value || focusWithin(event.relatedTarget)) return;
+  if (isCellActionActive.value) cellActionsCtx?.setActiveCell(null);
+}
+
+// The cell next to this one in a row or column; rows without a focusable cell there (expansions) are skipped.
+function neighbourCell(key: string): HTMLElement | null {
+  const td = cellEl.value;
+  const tr = td?.parentElement;
+  if (!td || !tr) return null;
+  const isCell = (el: Element | null | undefined): el is HTMLElement =>
+    el instanceof HTMLElement && el.hasAttribute("data-o2-focus-cell");
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    let el = key === "ArrowRight" ? td.nextElementSibling : td.previousElementSibling;
+    while (el && !isCell(el))
+      el = key === "ArrowRight" ? el.nextElementSibling : el.previousElementSibling;
+    return isCell(el) ? el : null;
+  }
+  if (key !== "ArrowUp" && key !== "ArrowDown") return null;
+  const index = Array.prototype.indexOf.call(tr.children, td);
+  let row = key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+  while (row && !isCell(row.children[index]))
+    row = key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
+  const next = row?.children[index];
+  return isCell(next) ? next : null;
+}
+
+function onCellKeydown(event: KeyboardEvent) {
+  if (!focusToolbarOn.value || event.target !== cellEl.value) return;
+  if (event.key === "Escape" && isCellActionActive.value) {
+    event.stopPropagation();
+    cellActionsCtx?.setActiveCell(null);
+    return;
+  }
+  if (event.key === "Tab" && !event.shiftKey) {
+    const first = toolbarControls()[0];
+    if (!first) return leaveTable(event);
+    event.preventDefault();
+    first.focus();
+    return;
+  }
+  const next = neighbourCell(event.key);
+  if (!next) return;
+  event.preventDefault();
+  // OTable's container keyboard handler would otherwise move a second step from the new cell.
+  event.stopPropagation();
+  next.focus();
+}
+
+// Tab walks the toolbar in reading order; past its ends focus goes back to the cell, and on out of the table.
+function onToolbarKeydown(event: KeyboardEvent) {
+  if (!focusToolbarOn.value) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    focusCell(false);
+    cellActionsCtx?.setActiveCell(null);
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const controls = toolbarControls();
+  const index = controls.indexOf(document.activeElement as HTMLElement);
+  if (event.shiftKey && index === 0) {
+    event.preventDefault();
+    focusCell(false);
+  } else if (!event.shiftKey && index === controls.length - 1) {
+    leaveTable(event);
+  }
+}
+
+// Tab out of the roving set lands after the table, never on the next row's checkbox or chevron.
+function leaveTable(event: KeyboardEvent): void {
+  const table = tableOf();
+  if (!table) return;
+  const after = Array.from(document.querySelectorAll<HTMLElement>(TOOLBAR_CONTROLS)).find(
+    (el) =>
+      !table.contains(el) &&
+      !cellActionsEl.value?.contains(el) &&
+      el.tabIndex >= 0 &&
+      el.getClientRects().length > 0 &&
+      !!(table.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING),
+  );
+  if (!after) return;
+  event.preventDefault();
+  if (focusCtx) focusCtx.current.value = props.cell.id;
+  after.focus();
+}
 </script>
 
 <template>
@@ -480,7 +682,15 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       isTreeColumn && treeMeta && treeMeta.parentId !== null && !treeMeta.hasChildren
         ? 'o2-tree-leaf'
         : '',
+      focusToolbarOn
+        ? 'focus-visible:outline-focus-ring-accent outline-none focus-visible:outline-2 focus-visible:-outline-offset-2'
+        : '',
+      rowMenus.length ? 'relative max-md:pe-12 pointer-coarse:pe-12' : '',
     ]"
+    :tabindex="cellTabIndex"
+    :data-o2-focus-cell="focusToolbarOn ? '' : undefined"
+    :data-o2-row-first="focusToolbarOn && isFirstVisibleCell ? '' : undefined"
+    :data-o2-cell-id="focusToolbarOn ? cell.id : undefined"
     :style="[
       cellStyle,
       isTreeColumn
@@ -494,6 +704,9 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
     @contextmenu="handleContextMenu"
     @mouseenter="onCellEnter"
     @mouseleave="onCellLeave"
+    @focusin="onCellFocusIn"
+    @focusout="onCellFocusOut"
+    @keydown="onCellKeydown"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
@@ -600,6 +813,23 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       </span>
     </template>
 
+    <div
+      v-for="menuKey in rowMenus"
+      :key="menuKey"
+      class="absolute inset-y-0 end-0 hidden items-center pe-1 max-md:flex pointer-coarse:flex"
+      data-o2-row-menu
+      @click.stop
+    >
+      <slot
+        name="cell-hover-actions"
+        :row="row.original"
+        :column="cell.column.columnDef"
+        :value="rawValue"
+        :active="false"
+        :menu="true"
+      />
+    </div>
+
     <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
          the cell, which is one row tall and clips overflow. The wrapper's padding is
          the gap the user sees AND the hover bridge from the row up to the buttons —
@@ -608,12 +838,18 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
     <Teleport v-if="hasCellActions && isCellActionActive && hasCellActionsContent" to="body">
       <div
         ref="cellActionsEl"
+        :[LAYER_ROOT_ATTR]="focusToolbarOn ? '' : undefined"
         class="o2-table-cell-hover-actions fixed z-1000"
-        :class="cellActionsBelow ? 'pt-1.5' : 'pb-1.5'"
+        :class="[
+          cellActionsBeside ? 'ps-1' : cellActionsBelow ? 'pt-1.5' : 'pb-1.5',
+          focusToolbarOn ? 'max-md:hidden pointer-coarse:hidden' : '',
+        ]"
         :style="cellActionsStyle"
         :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
         @mouseenter="onCellActionsHoverEnter"
         @mouseleave="onCellActionsLeave"
+        @keydown="onToolbarKeydown"
+        @focusout="onCellFocusOut"
       >
         <div class="relative">
           <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
@@ -633,7 +869,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
                tying it to the row it acts on. -->
           <span
             class="bg-surface-overlay border-border-default absolute -ms-1 size-2 rotate-45 border-solid peer-empty:hidden"
-            :class="cellActionsArrowClass"
+            :class="[cellActionsArrowClass, cellActionsBeside ? 'hidden' : '']"
             :style="cellActionsArrowStyle"
             :data-test="`o2-table-cell-hover-arrow-${cell.column.id}`"
             aria-hidden="true"

@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText>{{ span.operation_name }}</OTruncatedText>
       </div>
 
+      <div v-if="assistantV2" class="flex shrink-0 items-center gap-0.5">
+        <AiEntryButton
+          v-if="hasSpanError"
+          v-bind="spanDoor('troubleshoot')"
+          appearance="toolbar-icon"
+        />
+        <AiEntryButton v-bind="spanDoor('explain')" appearance="toolbar-icon" />
+        <AiEntryButton v-bind="spanDoor('add_to_chat')" appearance="toolbar-icon" />
+      </div>
       <OButton
         :aria-label="t('common.close')"
         variant="ghost"
@@ -991,6 +1000,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { spanBuild } from "@/plugins/traces/tracesDoors";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -1140,6 +1152,10 @@ export default defineComponent({
       type: Object as PropType<Span>,
       default: () => null,
     },
+    parentOperation: {
+      type: String,
+      default: undefined,
+    },
     baseTracePosition: {
       type: Object,
       default: () => null,
@@ -1191,6 +1207,9 @@ export default defineComponent({
     },
   },
   components: {
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     OSeparator,
     OTabs,
     OTab,
@@ -1265,6 +1284,42 @@ export default defineComponent({
       attrs: {},
       events: [],
     });
+
+    // Span doors sit in the detail header, never on a bar's hover.
+    const assistantV2 = isAssistantV2();
+    const spanDoor = (verb: "explain" | "troubleshoot" | "add_to_chat") => {
+      const ids = {
+        explain: "ai-entry-span-explain",
+        troubleshoot: "ai-entry-span-troubleshoot",
+        add_to_chat: "ai-entry-span-add",
+      } as const;
+      const labels = {
+        explain: "assistant.entry.explainSpan",
+        troubleshoot: "assistant.entry.troubleshootSpan",
+        add_to_chat: "assistant.entry.addSpan",
+      } as const;
+      const tooltips = {
+        explain: "assistant.entry.tooltip.explainSpan",
+        troubleshoot: "assistant.entry.tooltip.troubleshootSpan",
+        add_to_chat: "assistant.entry.tooltip.add",
+      } as const;
+      return {
+        verb,
+        entryKind: "object_verb" as const,
+        boundOrg: loadedOrg?.value,
+        objectKind: "span" as const,
+        label: t(labels[verb]),
+        tooltip: t(tooltips[verb]),
+        dataTest: ids[verb],
+        objectKey: String((props.span as Record<string, unknown> | null)?.span_id ?? ""),
+        build: spanBuild(
+          () => ({ ...(props.span as Record<string, unknown>) }),
+          () => props.parentOperation,
+          verb === "troubleshoot" ? "troubleshoot" : "explain",
+          store.state,
+        ),
+      };
+    };
 
     const { hasSpanError, hasExceptionEvents } = useTraceDetails(
       computed(() => props.span),
@@ -1372,6 +1427,12 @@ export default defineComponent({
     };
 
     const store = useStore();
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => props.span,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
     const promptAttributionTarget = ref<{
       entityId: string;
       version: number;
@@ -2787,6 +2848,8 @@ export default defineComponent({
       tags,
       hasExceptionEvents,
       hasSpanError,
+      assistantV2,
+      spanDoor,
       spanHttpResendCount,
       navigateToError,
       getDuration,

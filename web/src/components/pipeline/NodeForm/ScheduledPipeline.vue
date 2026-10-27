@@ -798,14 +798,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       :cell-overflow-tooltip="false"
                       data-test="scheduled-pipeline-sql-preview-table"
+                      v-bind="assistantV2 ? { focusToolbar: true } : {}"
                     >
                       <!-- eslint-enable local/no-hardcoded-px -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
-                      <template #cell-hover-actions="{ row, column, active }">
+                      <template #cell-hover-actions="{ row, column, active, menu }">
+                        <ODropdown v-if="assistantV2 && menu">
+                          <template #trigger>
+                            <OButton
+                              variant="ghost"
+                              size="icon-sm"
+                              class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                              :aria-label="t('assistant.entry.rowActions')"
+                              data-test="scheduled-pipeline-preview-row-menu"
+                            >
+                              <OIcon name="more-vert" size="sm" />
+                            </OButton>
+                          </template>
+                          <AiEntryButton v-bind="previewRowDoor(row)" appearance="menu-item" />
+                        </ODropdown>
+                        <AiEntryButton
+                          v-else-if="assistantV2 && active && column.id === previewTimestampColumn"
+                          v-bind="previewRowDoor(row)"
+                          appearance="toolbar-icon"
+                        />
                         <O2AIContextAddBtn
-                          v-if="active && column.id === '_timestamp'"
+                          v-else-if="!assistantV2 && active && column.id === '_timestamp'"
                           data-test="scheduled-pipeline-send-to-ai-btn"
                           @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                         />
@@ -967,6 +987,7 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -992,6 +1013,9 @@ import {
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { rowKeyOf } from "@/plugins/logs/logsDoors";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
 import config from "../../../aws-exports";
@@ -2529,6 +2553,53 @@ const removeAiContextHandler = () => {
 };
 
 // [END] O2 AI Context Handler
+
+const assistantV2 = isAssistantV2();
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => rows.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The org's timestamp column, not the literal `_timestamp`.
+const previewTimestampColumn = computed(
+  () => store.state.zoConfig?.timestamp_column || "_timestamp",
+);
+
+const previewRowDoor = (row: Record<string, unknown>) => ({
+  verb: "add_to_chat" as const,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg?.value,
+  objectKind: "log_row" as const,
+  thread: "current" as const,
+  dockHost: "scheduled_query" as const,
+  label: t("assistant.entry.addPreviewRow"),
+  tooltip: t("assistant.entry.tooltip.add"),
+  dataTest: "ai-entry-pipeline-preview-add" as const,
+  objectKey: rowKeyOf(row, previewTimestampColumn.value),
+  build: async () => {
+    const now = Date.now();
+    const from = Number(dateTime.value.startTime) / 1000;
+    const to = Number(dateTime.value.endTime) / 1000;
+    return (await import("@/utils/assistant/prompts")).buildLogRowPrompt({
+      org: store.state.selectedOrganization?.identifier ?? "",
+      stream: selectedStreamName.value || "",
+      row,
+      timestampField: previewTimestampColumn.value,
+      range: from > 0 && to > 0 ? { from, to } : { from: now - 15 * 60_000, to: now },
+      timeZone: store.state.timezone || "UTC",
+      query: String(query.value ?? ""),
+      mode: "sql",
+      source: {
+        kind: "pipeline",
+        name: String(pipelineObj.currentSelectedPipeline?.name ?? ""),
+      },
+    });
+  },
+});
 
 const sendToAiChat = (value: any, append: boolean = true) => {
   aiChatAppendMode.value = append;

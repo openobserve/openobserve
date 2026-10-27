@@ -32,12 +32,12 @@ import {
   MAX_ATTACHED_BYTES,
   MAX_ATTACHED_ROWS,
   ROW_KINDS,
-  SERIALIZED_KINDS,
   WHITELIST_FIELDS,
   browserTimezone,
   byteSize,
   isPresent,
   fieldRowOf,
+  serializedNameOf,
   timeWindowOf,
   truncateChip,
   wireDataOf,
@@ -82,7 +82,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
   };
   const window = timeWindowOf(page, composer.timeOverride, now);
   sentWindows.set(session.sid, window);
-  const attached = composer.chips.filter((chip) => SERIALIZED_KINDS[chip.kind] !== undefined);
+  const attached = composer.chips.filter((chip) => serializedNameOf(chip) !== undefined);
   const typed = turn?.attachments ?? false;
   const blocks = typed ? null : serializeBlocks(attached, makeNonce());
   const typedText = neutralizeBlockSyntax(snapshot.text.trim());
@@ -145,7 +145,7 @@ export function serializeBlocks(chips: readonly ContextChip[], nonce: string): S
   let bytes = 0;
   let omitted = 0;
   for (const chip of chips) {
-    const name = SERIALIZED_KINDS[chip.kind];
+    const name = serializedNameOf(chip);
     if (!name) continue;
     const rowsLeft = MAX_ATTACHED_ROWS - rows;
     const left = MAX_ATTACHED_BYTES - bytes;

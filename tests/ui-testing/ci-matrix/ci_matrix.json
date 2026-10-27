@@ -632,7 +632,8 @@
       "refusals.spec.js",
       "home.spec.js",
       "perf.spec.js",
-      "security.spec.js"
+      "security.spec.js",
+      "doors.spec.js"
     ],
     "disabled": []
   }

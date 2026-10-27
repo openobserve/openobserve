@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`OTableBodyCell default render > is byte-identical without focusToolbar (snapshot taken before the prop existed) 1`] = `
+"<tbody data-test="o2-table-body">
+  <!-- Spans every visible column: a heading is about the run below it, not
+         about one column. -->
+  <tr data-v-5e072a9b="" data-test="o2-table-row-0" class="group/row transition-colors duration-150 hover:bg-table-row-hover-bg" style="height: var(--table-row-height, 2.25rem);">
+    <!-- Expand button cell -->
+    <!--v-if-->
+    <!-- Selection checkbox cell -->
+    <!--v-if-->
+    <!-- Drag handle cell -->
+    <!--v-if-->
+    <!-- Data cells -->
+    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-name" class="text-text-body px-2 align-middle border-table-row-divider border-b text-left overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-name-size); max-width: var(--header-name-size);">
+      <!-- Tree-mode wrapper: indent + chevron + cell content -->
+      <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+      <!-- Default: plain text --><span data-v-0d408c72="" class="text-inherit">checkout</span>
+      <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
+         the cell, which is one row tall and clips overflow. The wrapper's padding is
+         the gap the user sees AND the hover bridge from the row up to the buttons —
+         without it the pointer would cross bare table on the way and activate the
+         row above. -->
+      <!--v-if-->
+    </td>
+    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-code" class="text-text-body px-2 align-middle border-table-row-divider border-b text-right overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-code-size); max-width: var(--header-code-size);">
+      <!-- Tree-mode wrapper: indent + chevron + cell content -->
+      <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+      <!-- Default: plain text --><span data-v-0d408c72="" class="text-inherit">502</span>
+      <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
+         the cell, which is one row tall and clips overflow. The wrapper's padding is
+         the gap the user sees AND the hover bridge from the row up to the buttons —
+         without it the pointer would cross bare table on the way and activate the
+         row above. -->
+      <!--v-if-->
+    </td>
+  </tr><!-- Tree-mode warning row (rendered between parent and its children) -->
+  <!--v-if-->
+  <!-- Expanded row content -->
+  <!--v-if-->
+  <!-- Spans every visible column: a heading is about the run below it, not
+         about one column. -->
+  <tr data-v-5e072a9b="" data-test="o2-table-row-1" class="group/row transition-colors duration-150 hover:bg-table-row-hover-bg" style="height: var(--table-row-height, 2.25rem);">
+    <!-- Expand button cell -->
+    <!--v-if-->
+    <!-- Selection checkbox cell -->
+    <!--v-if-->
+    <!-- Drag handle cell -->
+    <!--v-if-->
+    <!-- Data cells -->
+    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-name" class="text-text-body px-2 align-middle border-table-row-divider border-b text-left overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-name-size); max-width: var(--header-name-size);">
+      <!-- Tree-mode wrapper: indent + chevron + cell content -->
+      <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+      <!-- Default: plain text --><span data-v-0d408c72="" class="text-inherit">cart</span>
+      <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
+         the cell, which is one row tall and clips overflow. The wrapper's padding is
+         the gap the user sees AND the hover bridge from the row up to the buttons —
+         without it the pointer would cross bare table on the way and activate the
+         row above. -->
+      <!--v-if-->
+    </td>
+    <td data-v-0d408c72="" data-v-5e072a9b="" data-test="o2-table-cell-code" class="text-text-body px-2 align-middle border-table-row-divider border-b text-right overflow-hidden text-ellipsis whitespace-nowrap" style="width: var(--header-code-size); max-width: var(--header-code-size);">
+      <!-- Tree-mode wrapper: indent + chevron + cell content -->
+      <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+      <!-- Default: plain text --><span data-v-0d408c72="" class="text-inherit">200</span>
+      <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
+         the cell, which is one row tall and clips overflow. The wrapper's padding is
+         the gap the user sees AND the hover bridge from the row up to the buttons —
+         without it the pointer would cross bare table on the way and activate the
+         row above. -->
+      <!--v-if-->
+    </td>
+  </tr><!-- Tree-mode warning row (rendered between parent and its children) -->
+  <!--v-if-->
+  <!-- Expanded row content -->
+  <!--v-if-->
+</tbody>"
+`;

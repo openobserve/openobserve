@@ -60,6 +60,21 @@ export const SERIALIZED_KINDS: Readonly<Partial<Record<ChipKind, string>>> = {
   report: "Report",
 };
 
+/** Door chips of these kinds carry observed values the prompt text must not hold, so they are serialised too; page chips of the same kinds are not. */
+export const DOOR_SERIALIZED_KINDS: Readonly<Partial<Record<ChipKind, string>>> = {
+  panel: "Panel",
+  alert: "Alert",
+  query: "Query",
+};
+
+/** The block name a chip is serialised under, or `undefined` when it never reaches the message body. */
+export function serializedNameOf(chip: ContextChip): string | undefined {
+  return (
+    SERIALIZED_KINDS[chip.kind] ??
+    (chip.provenance === "door" ? DOOR_SERIALIZED_KINDS[chip.kind] : undefined)
+  );
+}
+
 /** Kinds that count as rows against the 20-row cap. */
 export const ROW_KINDS: ReadonlySet<ChipKind> = new Set(["log_row", "cell", "span"]);
 

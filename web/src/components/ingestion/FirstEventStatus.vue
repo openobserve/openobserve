@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, shallowRef, toRef, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -30,12 +30,19 @@ import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEve
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
 import {
   useFirstEventWatch,
+  type FirstEventDiagnosis,
   type FirstEventResult,
   type FirstEventState,
   type StreamSignal,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
-import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
+import {
+  FIRST_EVENT_ASK_AI,
+  REJECTION_REASON_KEYS,
+  askAiQuery,
+  type AskAiContext,
+} from "./firstEventAskAi";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 const props = withDefaults(
   defineProps<{
@@ -360,18 +367,48 @@ const copyLabel = computed(() =>
 const aiEnabled = computed(
   () => config.isEnterprise === "true" && !!store.state.zoConfig?.ai_enabled,
 );
-const stillStuckQuery = computed(() => {
-  if (!askAiFn || !aiEnabled.value || !diagnosis.value) return undefined;
-  return askAiQuery(
-    {
-      guideName: props.guideName,
-      diagnosis: { ...diagnosis.value, form: diagnosisForm.value },
-      org: props.org,
-      endpoint: endpoint.value,
-    },
-    t,
-  );
+// With the assistant on the door gates itself and is offered on every page, not only under /ingestion.
+const assistantV2 = isAssistantV2();
+// The pill never diagnoses, so once its watch stops the door asks with no known cause.
+const pillDiagnosis = computed((): FirstEventDiagnosis | null =>
+  assistantV2 && props.display === "pill" && state.value === "stopped"
+    ? { form: "unavailable", trigger: "auto", rejections: [] }
+    : null,
+);
+const stillStuckContext = computed((): AskAiContext | undefined => {
+  const found = diagnosis.value ?? pillDiagnosis.value;
+  if (!found) return undefined;
+  if (!assistantV2 && (!askAiFn || !aiEnabled.value)) return undefined;
+  return {
+    guideName: props.guideName,
+    diagnosis: { ...found, form: diagnosisForm.value },
+    org: props.org,
+    endpoint: endpoint.value,
+  };
 });
+const stillStuckQuery = computed(() =>
+  stillStuckContext.value ? askAiQuery(stillStuckContext.value, t) : undefined,
+);
+// The door hides itself on some gates, and a step with nothing after "Still stuck?" is a dead end.
+const DOOR_GATES: ReadonlySet<string> = new Set([
+  "available",
+  "unhealthy",
+  "no_permission",
+  "off_for_org",
+]);
+const doorGate = shallowRef<{ readonly value: string } | null>(null);
+if (assistantV2)
+  void import("@/composables/assistant").then(
+    (assistant) => (doorGate.value = assistant.useAssistantCapability().gate),
+  );
+const doorShown = computed(
+  () => !!stillStuckContext.value && !!doorGate.value && DOOR_GATES.has(doorGate.value.value),
+);
+const stillStuckShown = computed(() =>
+  assistantV2
+    ? !!props.docUrl || doorShown.value
+    : !!props.docUrl || (!!askAiFn && !!stillStuckQuery.value),
+);
 
 const hint = computed((): I18nText | undefined => {
   if (state.value === "idle") return undefined;
@@ -506,6 +543,12 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
       >
         {{ t("ingestion.firstEvent.checkAgain") }}
       </OButton>
+      <FirstEventStillStuck
+        v-if="assistantV2 && doorShown"
+        :guide-name="guideName"
+        :ask-ai-context="stillStuckContext"
+        door-shown
+      />
     </template>
     <template v-else-if="state === 'idle'">
       <OText variant="meta" data-test="first-event-status-meta">{{
@@ -786,7 +829,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
       </div>
 
       <div
-        v-if="docUrl || (askAiFn && stillStuckQuery)"
+        v-if="stillStuckShown"
         class="border-border-default rounded-default flex items-start gap-3 border px-3 py-2"
       >
         <span
@@ -797,6 +840,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
           :guide-name="guideName"
           :doc-url="docUrl"
           :ask-ai-query="stillStuckQuery"
+          v-bind="assistantV2 ? { askAiContext: stillStuckContext, doorShown } : {}"
         />
       </div>
     </div>

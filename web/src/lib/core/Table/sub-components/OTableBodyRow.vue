@@ -9,6 +9,7 @@ import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { OTableFocusToolbarKey } from "../OTable.types";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
 const props = defineProps<{
@@ -149,6 +150,7 @@ const hasExpansionSlot = computed(() => !!slots.expansion);
 
 // ── Tree mode ────────────────────────────────────────────────────
 const treeCtx = inject(OTableTreeContextKey, null);
+const focusToolbarCtx = inject(OTableFocusToolbarKey, null);
 const treeMeta = computed(() => {
   if (!treeCtx?.value?.enabled) return null;
   return treeCtx.value.getMeta(props.row.original);
@@ -208,6 +210,10 @@ function onRowMouseenter(e: MouseEvent) {
 }
 function onRowMouseleave() {
   emit("row-mouseleave", props.row.original);
+}
+
+function displayPosition(): number | undefined {
+  return focusToolbarCtx?.positionOf(props.row.id) ?? props.virtualIndex;
 }
 </script>
 
@@ -280,6 +286,7 @@ function onRowMouseleave() {
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
+          v-bind="focusToolbarCtx?.enabled.value ? { position: displayPosition() } : {}"
           :label="selectLabel"
           :disabled="isRowSelectable ? !isRowSelectable(row.original) : false"
           @update:model-value="emit('toggle-selection', row.original)"

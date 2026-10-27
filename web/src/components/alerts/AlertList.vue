@@ -625,6 +625,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
+                    <template v-if="assistantV2">
+                      <AiEntryButton v-bind="alertDoor(row, 'explain')" appearance="menu-item" />
+                      <AiEntryButton
+                        v-bind="alertDoor(row, 'troubleshoot')"
+                        appearance="menu-item"
+                      />
+                    </template>
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="!!alertStateLoadingMap[row.uuid]"
@@ -957,6 +964,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { alertDetailQuery } from "@/services/alerts.queries";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { alertBuild } from "@/components/alerts/alertDoors";
 import { alertsListQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
@@ -1070,6 +1080,9 @@ export default defineComponent({
     QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
@@ -1104,6 +1117,27 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
+
+    const assistantV2 = isAssistantV2();
+    const alertDoor = (row: Record<string, any>, verb: "explain" | "troubleshoot") => ({
+      verb,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg?.value,
+      objectKind: "alert" as const,
+      label: t(
+        verb === "explain" ? "assistant.entry.explainAlert" : "assistant.entry.troubleshootAlert",
+      ),
+      tooltip: t(
+        verb === "explain"
+          ? "assistant.entry.tooltip.explainAlert"
+          : "assistant.entry.tooltip.troubleshootAlert",
+      ),
+      dataTest:
+        verb === "explain"
+          ? ("ai-entry-alert-explain" as const)
+          : ("ai-entry-alert-troubleshoot" as const),
+      build: alertBuild(() => ({ ...row, id: row.alert_id ?? row.id }), verb, store.state),
+    });
     const { lgUp } = useBreakpoint();
 
     // On-call is separately gated, so the column and its lookup vanish with it
@@ -1611,6 +1645,12 @@ export default defineComponent({
       // counts. A failed anomaly is still active here (failed is an overlay).
       return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
     });
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => displayedAlerts.value,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
     const onStatSelect = (key: string) => {
       if (key === "total") {
         stateFilter.value = null;
@@ -3877,6 +3917,8 @@ export default defineComponent({
     ]);
 
     return {
+      assistantV2,
+      alertDoor,
       downtimesEnabled,
       muteDialogOpen,
       muteSelection,
