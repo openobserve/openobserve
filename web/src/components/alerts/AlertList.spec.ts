@@ -2598,3 +2598,128 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     );
   });
 }, 15000);
+
+describe("AlertList - first run and the alert library", () => {
+  let originalHideMenus: unknown;
+
+  beforeEach(() => {
+    originalHideMenus = (store.state as any).zoConfig.custom_hide_menus;
+  });
+
+  afterEach(() => {
+    (store.state as any).zoConfig.custom_hide_menus = originalHideMenus;
+  });
+
+  // A stale ?action= from an earlier spec's navigation can swap the whole page for the editor.
+  const mountList = async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  /** A loaded org with no alerts at all, so the table shows its empty slot. */
+  const mountEmpty = async () => {
+    const wrapper: any = await mountList();
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    return wrapper;
+  };
+
+  const emptyState = (wrapper: any) =>
+    wrapper
+      .findAllComponents({ name: "OEmptyState" })
+      .find((c: any) => c.props("preset") === "no-alerts");
+
+  it("puts an Alert library button in the header that opens the library", async () => {
+    const wrapper: any = await mountList();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+
+    const button = wrapper.find('[data-test="alert-list-alert-library-btn"]');
+    expect(button.text()).toContain("Alert library");
+    await button.trigger("click");
+
+    expect(push).toHaveBeenCalledWith({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("shows the first-run empty state at block size with New alert, Alert library and Import", async () => {
+    const wrapper = await mountEmpty();
+    const state = emptyState(wrapper);
+    expect(state.props("size")).toBe("block");
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New alert");
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').text()).toContain(
+      "Alert library",
+    );
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').text()).toContain("Import alert");
+  });
+
+  it("starts a new alert from the empty state, as the header's New alert does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ action: "add" }),
+      }),
+    );
+  });
+
+  it("opens the library from the empty state", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-alert-library"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("opens the import dialog from the empty state, as the header's Import does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-import"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.showImportAlertDialog).toBe(true);
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ action: "import" }) }),
+    );
+  });
+
+  it("keeps the filtered empty state to Clear filters alone", async () => {
+    const wrapper = await mountEmpty();
+    wrapper.vm.filterQuery = "nothing-matches";
+    await flushPromises();
+
+    expect(emptyState(wrapper).props("filtered")).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
+    expect(emptyState(wrapper).text()).toContain("Clear filters");
+
+    emptyState(wrapper).vm.$emit("action", "clear-filters");
+    await flushPromises();
+    expect(wrapper.vm.filterQuery).toBe("");
+  });
+
+  it("hides both library entry points when custom_hide_menus lists alertLibrary", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "billings,alertLibrary";
+    const wrapper = await mountEmpty();
+    expect(wrapper.find('[data-test="alert-list-alert-library-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
+  });
+
+  it("renders the summary strip compact, so its six tiles share one row", async () => {
+    const wrapper: any = await mountList();
+    expect(wrapper.findComponent({ name: "OStatStrip" }).props("compact")).toBe(true);
+  });
+});

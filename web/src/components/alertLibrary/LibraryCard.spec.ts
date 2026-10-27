@@ -342,4 +342,51 @@ describe("LibraryCard", () => {
       expect(open.find('[data-test="alert-library-card-enterprise"]').exists()).toBe(false);
     });
   });
+
+  describe("actions", () => {
+    const ADD = `[data-test="alert-library-card-add-${entry.id}"]`;
+    const CUSTOMIZE = `[data-test="alert-library-card-customize-${entry.id}"]`;
+    const anomaly: AlertLibraryEntry = {
+      ...entry,
+      query_type: "sql",
+      alert_type: "anomaly_detection",
+    };
+
+    it("offers Add alert and Customize in editor on a scheduled card", () => {
+      const wrapper = mountCard();
+      expect(wrapper.find(ADD).text()).toBe("Add alert");
+      expect(wrapper.find(CUSTOMIZE).text()).toBe("Customize in editor");
+    });
+
+    it("offers Customize on a SQL card as well as a PromQL one", () => {
+      const wrapper = mountCard({ entry: { ...entry, query_type: "sql" } });
+      expect(wrapper.find(CUSTOMIZE).exists()).toBe(true);
+    });
+
+    it("emits install from Add alert without opening the card", async () => {
+      const wrapper = mountCard();
+      await wrapper.find(ADD).trigger("click");
+      expect(wrapper.emitted("install")).toHaveLength(1);
+      expect(wrapper.emitted("open")).toBeUndefined();
+    });
+
+    it("emits customize from Customize in editor without opening the card", async () => {
+      const wrapper = mountCard();
+      await wrapper.find(CUSTOMIZE).trigger("click");
+      expect(wrapper.emitted("customize")).toHaveLength(1);
+      expect(wrapper.emitted("open")).toBeUndefined();
+    });
+
+    it("offers Add but not Customize on an anomaly card, which has no editor prefill", () => {
+      const wrapper = mountCard({ entry: anomaly });
+      expect(wrapper.find(ADD).exists()).toBe(true);
+      expect(wrapper.find(CUSTOMIZE).exists()).toBe(false);
+    });
+
+    it("offers neither on a locked card, whose click is the upsell", () => {
+      const wrapper = mountCard({ entry: anomaly, locked: true });
+      expect(wrapper.find(ADD).exists()).toBe(false);
+      expect(wrapper.find(CUSTOMIZE).exists()).toBe(false);
+    });
+  });
 });

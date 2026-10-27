@@ -31,7 +31,9 @@
 // Pure and file-in/file-out, so the install wizard stays markup and this stays
 // tested.
 
-import type { AlertLibraryFile } from "@/types/alertLibrary";
+import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
+
+import { alertTypeOf } from "./libraryFacets";
 
 /** The structured knobs the install wizard edits, per alert. */
 export interface LibraryTunables {
@@ -173,4 +175,11 @@ export function applyTunables(file: AlertLibraryFile, tunables: LibraryTunables)
     : { ...queryCondition };
 
   return next;
+}
+
+/** The file an add receives: floored when scheduled, untouched when it is an anomaly body. */
+export function fileForInstall(entry: AlertLibraryEntry, file: AlertLibraryFile): AlertLibraryFile {
+  // The threshold floors would write a trigger_condition into a body that must not have one.
+  const isAnomaly = alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection";
+  return isAnomaly ? file : applyTunables(file, readTunables(file));
 }
