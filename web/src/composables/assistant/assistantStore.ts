@@ -85,6 +85,9 @@ export const IDLE_SESSION_LIMIT = 10;
 
 export const UNDO_WINDOW_MS = 10_000;
 
+/** Sign-out waits at most this long for this tab's turns to be stopped before it resets (`00` §12.3). */
+export const SIGN_OUT_STOP_WAIT_MS = 300;
+
 export const SIDEBAR_MIN_REM = 20;
 
 export const SIDEBAR_MAX_REM = 32;
@@ -1006,6 +1009,9 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
       return "proceed";
     },
     async onSignOut() {
+      // The streams abort at once and the keepalive cancels are already posted; only the stopped states are awaited.
+      const waited = new Promise((resolve) => setTimeout(resolve, SIGN_OUT_STOP_WAIT_MS));
+      await Promise.race([deps.engine.stopAll("sign_out"), waited]);
       const orgKeys = await core.signOutKeys().catch(() => []);
       const keys = new Set([...core.identities, ...markedUserOrgKeys(), ...orgKeys]);
       forgetTabs(keys);

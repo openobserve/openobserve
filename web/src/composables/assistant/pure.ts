@@ -21,6 +21,7 @@ import type { Sid } from "./assistantStore.types";
 
 export { isAssistantV2 } from "./flags";
 export { useAssistantName } from "./useAssistantName";
+export { foldTurns, mergeIncremental, messagesFromTurns } from "./record";
 export type * from "./assistantStore.types";
 export type * from "./turnStates";
 export type * from "./frames";

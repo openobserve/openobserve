@@ -235,7 +235,11 @@ async function handleAi(route, request, state) {
     }
     return json(route, { shares: state.shares.filter((s) => s.session_id === sid) }), true;
   }
-  if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats\/([^/]+)\/cancel$/))) return json(route, { cancelled: true }), true;
+  if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats\/([^/]+)\/cancel$/))) {
+    if (state.cancelDelayMs) await new Promise((r) => setTimeout(r, state.cancelDelayMs));
+    const status = state.cancelStatus || 200;
+    return json(route, status === 200 ? { cancelled: true } : { code: status, message: "cancel failed" }, status), true;
+  }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats\/([^/]+)$/))) {
     const sid = decodeURIComponent(mt[1]);
     const chat = state.chats.find((c) => c.session_id === sid);
@@ -296,6 +300,7 @@ export async function installMocks(context, state = createMockState()) {
     content:
       `window.__O2MOCK_SCENARIOS__ = ${JSON.stringify(SCENARIOS)};\n` +
       `window.__O2MOCK_HTTP_SCENARIOS__ = ${JSON.stringify(HTTP_SCENARIOS)};\n` +
+      `window.__O2MOCK_KNOBS__ = ${JSON.stringify(browserKnobs(state))};\n` +
       // trackAssistant copies every event into window.__o2telemetry only when this is set.
       "window.__O2_TELEMETRY_SINK__ = true;\n" +
       shim,
@@ -310,6 +315,17 @@ export async function installMocks(context, state = createMockState()) {
     return passthrough(route, request);
   });
   return state;
+}
+
+/** The knobs the stream shim reads in the page; `setKnobs` changes them after load. */
+function browserKnobs(state) {
+  const { tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus } = state;
+  return { tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus };
+}
+
+/** Flips browser-side knobs on a loaded page (the init script only reads them at load). */
+export async function setKnobs(page, knobs) {
+  await page.evaluate((k) => Object.assign(window.__o2mock.knobs, k), knobs);
 }
 
 /** Sets the scenario for the next chat_stream call (see SCENARIOS / HTTP_SCENARIOS). */
