@@ -58,10 +58,7 @@ export function humanizeElapsed(ms: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-/**
- * "18:49 GMT+5:30": a time in the viewer's zone, named so it does not read as the UTC times
- * around it. The answer deadline and the "Unblocked by" time use it; other RCA times are UTC.
- */
+/** "18:49 GMT+5:30": the viewer's zone, named because the other RCA times are UTC. */
 export const formatRcaLocalClock = (us: number, timezone: string): string =>
   `${formatTimestampInTimezone(us, "HH:mm", timezone)} ${timezoneAbbr(timezone, new Date(us / 1000))}`;
 
@@ -242,8 +239,7 @@ export function rcaCellModel(
           rerunNote,
         });
       }
-      // Preserve the server's special cancellation reason, including incident resolution.
-      // The step open at the cancel did not finish, so it is not counted.
+      // The server's cancellation reason wins; the step open at the cancel did not finish.
       const finished = Math.max(rca.summary.steps - 1, 0);
       const detail =
         rca.state === "failed" || rca.summary.detail
@@ -255,7 +251,11 @@ export function rcaCellModel(
                 finished,
               )
             : gt("alerts.incidents.aiAnalysis.cancelledAfterChecks", { count: finished }, finished);
-      return state(gt("alerts.incidents.aiAnalysis.failed"), "err", detail);
+      const label =
+        rca.state === "failed"
+          ? gt("alerts.incidents.aiAnalysis.failed")
+          : gt("alerts.incidents.rcaRun.state.cancelled");
+      return state(label, "err", detail);
     }
   }
 }

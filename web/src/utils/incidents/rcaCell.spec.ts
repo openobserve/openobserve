@@ -378,7 +378,7 @@ const cases: [string, Row, boolean, Expected][] = [
     },
   ],
   [
-    "SG41: a run stopped on resolve shows its detail",
+    "SG41: a run stopped on resolve is Cancelled, as in the drawer, and shows its detail",
     {
       rca: rca({ state: "cancelled", summary: { detail: "Stopped: incident resolved" } }),
       severity: "P2",
@@ -386,7 +386,7 @@ const cases: [string, Row, boolean, Expected][] = [
     true,
     {
       kind: "state",
-      label: "Failed",
+      label: "Cancelled",
       tone: "err",
       detail: "Stopped: incident resolved",
       rerunNote: "",

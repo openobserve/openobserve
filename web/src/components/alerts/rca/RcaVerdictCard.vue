@@ -283,9 +283,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- A re-run of an analyzed incident is live. -->
+    <!-- A re-run of an analyzed incident, or a resumed run, is live. -->
     <OBanner
-      v-else-if="cardState === 'investigating' && hasEarlierReport"
+      v-else-if="cardState === 'investigating' && (hasEarlierReport || liveResumeStep)"
       data-test="rca-reanalyzing-banner"
       variant="info"
       inline-actions

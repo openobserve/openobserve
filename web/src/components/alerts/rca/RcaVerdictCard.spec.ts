@@ -139,14 +139,18 @@ describe("RcaVerdictCard", () => {
       );
     });
 
-    it("M (resumed): names the step the run resumed from", () => {
+    it.each([
+      ["after an analyzed run", true],
+      ["after a run that never finished", false],
+    ])("M (resumed %s): names the step the run resumed from", (_label, hasEarlierReport) => {
       const wrapper = mountCard({
         cardState: "investigating",
         liveMode: "fresh",
         liveResumeStep: "Await flag change actor",
-        hasEarlierReport: true,
+        hasEarlierReport,
       });
 
+      expect(shownBanners(wrapper)).toEqual(["rca-reanalyzing-banner"]);
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
         "Resuming from “Await flag change actor”…",
       );
