@@ -428,17 +428,33 @@ mod tests {
         assert_eq!(pointer(&db, "ran").await, ran);
     }
 
-    /// Paging resumes after the last row read, skipped rows included.
+    /// Paging resumes after the last row read, skipped rows included, and a page's pointers
+    /// land in one batched update per page.
     #[tokio::test]
     async fn up_reaches_v1_incidents_past_the_first_page() {
         let db = incidents_db().await;
+        // Even rows are v1 reports, odd rows are not: page 1 both skips rows and batches
+        // PAGE_SIZE / 2 pointers.
         for n in 0..PAGE_SIZE {
-            incident(&db, &format!("a{n:04}"), None, r#"{"nodes":[]}"#).await;
+            let topology = if n % 2 == 0 {
+                r#"{"suggested_root_cause":"current"}"#
+            } else {
+                r#"{"nodes":[]}"#
+            };
+            incident(&db, &format!("a{n:04}"), None, topology).await;
         }
         incident(&db, "z-last", None, r#"{"suggested_root_cause":"current"}"#).await;
 
         Migration.up(&SchemaManager::new(&db)).await.unwrap();
 
+        for n in 0..PAGE_SIZE {
+            let expected = if n % 2 == 0 {
+                v1(CREATED_AT)
+            } else {
+                untouched()
+            };
+            assert_eq!(pointer(&db, &format!("a{n:04}")).await, expected, "a{n:04}");
+        }
         assert_eq!(pointer(&db, "z-last").await, v1(CREATED_AT));
     }
 }
