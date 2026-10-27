@@ -129,6 +129,12 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftKind,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   buildCreateBrowserTestPayload,
@@ -160,6 +166,7 @@ const baseStubs = {
       "currentPage",
       "sortBy",
       "sortOrder",
+      "draftSavedAt",
     ],
     emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
   },
@@ -1176,6 +1183,63 @@ describe("SyntheticMonitoring", () => {
 
       expect(mockServiceBulkDelete).toHaveBeenCalled();
       expect(analytics.track).toHaveBeenCalledWith("synthetic_test_deleted", { count: 2 });
+    });
+
+    const draftScope = (kind: EditorDraftKind, entityId: string | null): EditorDraftScope => ({
+      kind,
+      org: "default",
+      entityId,
+      userEmail: "example@gmail.com",
+    });
+
+    it("passes each check's newest draft to the table and marks New check for a new draft", async () => {
+      localStorage.clear();
+      writeEditorDraft(draftScope("synthetic_check", "m1"), { data: {} });
+      writeEditorDraft(draftScope("synthetic_browser", null), { data: {} });
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(Object.keys(table().props("draftSavedAt") as Record<string, number>)).toEqual(["m1"]);
+      const button = wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]');
+      expect(button.find('[data-test="synthetic-monitoring-new-check-draft-dot"]').exists()).toBe(
+        true,
+      );
+      // This suite's i18n returns keys, so the label is checked by key.
+      expect(button.attributes("aria-label")).toBe("common.editorDraft.newDot");
+      localStorage.clear();
+    });
+
+    it("marks New check for a new protocol check draft kept under its type", async () => {
+      localStorage.clear();
+      writeEditorDraft({ ...draftScope("synthetic_check", null), variant: "tcp" }, { data: {} });
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-draft-dot"]').exists()).toBe(
+        true,
+      );
+      localStorage.clear();
+    });
+
+    it("drops the drafts of checks that were deleted, singly or in bulk", async () => {
+      localStorage.clear();
+      for (const id of ["m1", "a", "b"]) {
+        writeEditorDraft(draftScope("synthetic_check", id), { data: {} });
+        writeEditorDraft(draftScope("synthetic_browser", id), { data: {} });
+      }
+      wrapper = mountPage();
+      await flushPromises();
+
+      table().vm.$emit("delete", { id: "m1", name: "n" });
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["a"]);
+      await (wrapper.vm as any).bulkDeleteMonitors();
+
+      expect(readEditorDraft(draftScope("synthetic_check", "m1"))).toBeNull();
+      expect(readEditorDraft(draftScope("synthetic_browser", "m1"))).toBeNull();
+      expect(readEditorDraft(draftScope("synthetic_browser", "a"))).toBeNull();
+      expect(readEditorDraft(draftScope("synthetic_check", "b"))).not.toBeNull();
+      localStorage.clear();
     });
 
     it("does not track synthetic_test_deleted when the bulk delete fails", async () => {

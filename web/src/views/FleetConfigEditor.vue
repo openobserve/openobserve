@@ -372,18 +372,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
+    <EditorDraftDialogs :draft="configDraft" />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import {
-  onBeforeRouteLeave,
-  onBeforeRouteUpdate,
-  useRoute,
-  useRouter,
-  type RouteLocationNormalized,
-} from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useMutation } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -410,6 +406,14 @@ import FleetComponentProperties from "@/components/fleet/editor/FleetComponentPr
 import FleetConfigHistory from "@/components/fleet/editor/FleetConfigHistory.vue";
 import FleetConfigVariables from "@/components/fleet/editor/FleetConfigVariables.vue";
 import FleetAddPipelineDialog from "@/components/fleet/editor/FleetAddPipelineDialog.vue";
+import {
+  blankYamlSecretKeys,
+  changedYamlSecretLines,
+  redactYamlSecrets,
+  restoreYamlSecrets,
+  yamlLineKeyPaths,
+} from "@/components/fleet/editor/yamlDraftSecrets";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import type { GroupIssue } from "@/components/fleet/editor/FleetEditorGroupNode.vue";
 import FleetCodeEditor from "@/components/fleet/FleetCodeEditor.vue";
 import FleetCreateConfigDialog from "@/components/fleet/FleetCreateConfigDialog.vue";
@@ -439,7 +443,8 @@ import {
   useFleetConfigVersion,
 } from "@/components/fleet/useFleetApi";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useEditorDraft, type EditorDraftApplyContext } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   deleteFleetConfigMutation,
@@ -453,7 +458,7 @@ const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
-const { confirm } = useConfirmDialog();
+const store = useStore();
 
 const backTo = fleetLocation("configurations", {}, route.query);
 
@@ -534,7 +539,8 @@ const name = computed(() => (isNew.value ? "untitled-config" : id.value));
 const unsaved = computed(
   () => loaded.value && yamlText.value.trimEnd() !== savedText.value.trimEnd(),
 );
-let leaveAllowed = false;
+// Taken off the list page at load and applied only once the draft baseline is the seed.
+let pendingImport: string | null = null;
 const subtitle = computed(() =>
   isNew.value ? t("fleet.editor.newDescription") : (detail.value?.description ?? ""),
 );
@@ -744,6 +750,7 @@ function onCreated(newId: string) {
   if (createReplaces.value) {
     // Saving a new config creates it from this text, so moving to its page loses nothing.
     savedText.value = yamlText.value;
+    configDraft.markSaved();
     router.replace(target);
   } else router.push(target);
 }
@@ -884,7 +891,7 @@ async function validate() {
 }
 
 function onPublish() {
-  if (!loaded.value) return;
+  if (!loaded.value || blockOnBlankSecrets()) return;
   if (isNew.value) {
     toast({ variant: "warning", message: t("fleet.editor.saveNewFirst") });
     return;
@@ -915,7 +922,7 @@ function showPublishErrors(found: Record<string, GroupIssue[]>) {
 }
 
 async function confirmPublish() {
-  if (!loaded.value || isNew.value) return;
+  if (!loaded.value || isNew.value || blockOnBlankSecrets()) return;
   const sent = yamlText.value;
   const sentId = id.value;
   try {
@@ -934,6 +941,10 @@ async function confirmPublish() {
     if (yamlText.value === sent) {
       if (fresh) dirty.value = false;
       issues.value = warnings;
+      if (id.value === sentId) {
+        configDraft.markSaved();
+        notKeptYamlKeys = [];
+      }
     }
     toast({
       variant: count ? "warning" : "success",
@@ -960,25 +971,34 @@ async function confirmPublish() {
   }
 }
 
-async function save() {
-  if (!loaded.value || saving.value) return;
+/** Saves the server draft without navigating; a new config opens the create dialog and stays unsaved. */
+async function save(): Promise<boolean> {
+  if (!loaded.value || saving.value || blockOnBlankSecrets()) return false;
   if (isNew.value) {
     createReplaces.value = true;
     openCreate(t("fleet.configs.newConfig"), yamlText.value, "", "");
-    return;
+    return false;
   }
   try {
     const sent = yamlText.value;
     const sentId = id.value;
     await saveDraftMutation.mutateAsync({ id: sentId, yaml: sent });
     // A reply for a config the user has since left must not mark this one saved.
-    if (id.value === sentId) savedText.value = sent;
+    if (id.value !== sentId) return false;
+    savedText.value = sent;
     // Until the refetch lands, the cached detail may have no draft and the chip would read published.
     const fresh = (await config.refetch()).isSuccess;
     if (fresh && yamlText.value === sent) dirty.value = false;
+    // An edit typed during the request is still unsaved, so only a matching text clears the local draft.
+    if (yamlText.value === sent) {
+      configDraft.markSaved();
+      notKeptYamlKeys = [];
+    }
     toast({ variant: "success", message: t("fleet.editor.draftSaved") });
+    return true;
   } catch (err) {
     toastFailure(err);
+    return false;
   }
 }
 
@@ -989,7 +1009,8 @@ async function deleteConfig() {
     await deleteMutation.mutateAsync(id.value);
     deleteOpen.value = false;
     toast({ variant: "success", message: t("fleet.editor.deleted", { name: raw(name.value) }) });
-    leaveAllowed = true;
+    configDraft.discard();
+    dropDrafts();
     router.push(backTo);
   } catch (err) {
     // A 409 names what still references the configuration, which the counts ignore permissions for.
@@ -1006,10 +1027,8 @@ watch(
   () => {
     loadedFor.value = null;
     if (isNew.value) {
-      const imported = takePendingImport();
-      loadText(imported ?? graphToYaml(seedGraph()));
-      // An imported file exists nowhere else yet, so leaving would lose it.
-      if (imported !== null) savedText.value = "";
+      pendingImport = takePendingImport();
+      loadText(graphToYaml(seedGraph()));
       loadedFor.value = "new";
     }
   },
@@ -1032,6 +1051,7 @@ watch(config.error, (err) => {
   const status = (err as { response?: { status?: number } } | null)?.response?.status;
   if (status === 404) {
     toast({ variant: "error", message: t("fleet.editor.notFound", { name: raw(id.value) }) });
+    dropDrafts();
     router.push(backTo);
   } else if (err && !isForbidden(err)) toastFailure(err);
 });
@@ -1046,27 +1066,135 @@ watch([panelOpen, paletteCollapsed], ([open, collapsed], [wasOpen, wasCollapsed]
   if (narrowed && selection.value) canvasRef.value?.reveal(selection.value.nodeId);
 });
 
-function guardLeave() {
-  if (leaveAllowed || !unsaved.value) return true;
-  return confirm({
-    title: t("common.unsavedChanges"),
-    message: t("common.unsavedMessage"),
-    confirmLabel: t("common.discardChanges"),
-    confirmVariant: "destructive",
-    focusCancel: true,
+interface FleetConfigDraft {
+  yamlText: string;
+  mode: "visual" | "yaml";
+  selectedPipeline: string | null;
+  selection: { nodeId: string; pipelineId: string | null; key: string } | null;
+}
+
+// Key paths of secrets the user changed that the draft did not keep; Save and Publish wait until they are typed again.
+let notKeptYamlKeys: string[] = [];
+
+function blockOnBlankSecrets(): boolean {
+  const blank = blankYamlSecretKeys(yamlText.value, notKeptYamlKeys);
+  if (!blank.length) return false;
+  const keys = raw(blank.map((path) => path.split("/").join(".")).join(", "));
+  toast({
+    variant: "error",
+    message: t("fleet.editor.reenterSecrets", { keys }, blank.length),
+  });
+  return true;
+}
+
+function applyDraft(
+  data: FleetConfigDraft,
+  { notKeptPaths, storedData }: EditorDraftApplyContext<FleetConfigDraft>,
+) {
+  // The line numbers point into the stored text, where refilled multi-line secrets are still one line.
+  notKeptYamlKeys = yamlLineKeyPaths(
+    storedData.yamlText,
+    notKeptPaths.flatMap((path) => {
+      const line = /^\/yamlText\/(\d+)$/.exec(path);
+      return line ? [Number(line[1])] : [];
+    }),
+  );
+  yamlText.value = data.yamlText;
+  graph.value = yamlToGraph(data.yamlText);
+  const g = graph.value;
+  mode.value = g && data.mode === "visual" ? "visual" : "yaml";
+  leavePropertiesWithoutGraph();
+  past.value = [];
+  future.value = [];
+  dirty.value = true;
+  issues.value = null;
+  selectedPipeline.value =
+    g && g.pipelines.some((p) => p.id === data.selectedPipeline) ? data.selectedPipeline : null;
+  selection.value = g && data.selection && g.components[data.selection.key] ? data.selection : null;
+  if (selection.value) openPanel("properties");
+}
+
+const configDraft = useEditorDraft<FleetConfigDraft>({
+  kind: "fleet_config",
+  entityLabel: () => t("common.editorDraft.entities.fleet_config"),
+  entityId: () => (isNew.value ? null : id.value),
+  snapshot: () => ({
+    yamlText: yamlText.value,
+    mode: mode.value,
+    selectedPipeline: selectedPipeline.value,
+    selection: selection.value,
+  }),
+  apply: applyDraft,
+  base: () => (isNew.value ? null : savedYaml.value),
+  hasChanges: () => unsaved.value,
+  save,
+  redact: (data) => {
+    const redacted = redactYamlSecrets(data.yamlText);
+    const saved = isNew.value ? "" : savedYaml.value;
+    return {
+      data: { ...data, yamlText: redacted.text },
+      paths: redacted.lines.map((line) => `/yamlText/${line}`),
+      changedPaths: changedYamlSecretLines(redacted, data.yamlText, saved).map(
+        (line) => `/yamlText/${line}`,
+      ),
+    };
+  },
+  // Blanked lines are refilled from the saved YAML by key path, so continuing never wipes a stored credential.
+  restoreSecrets: (data, _current, paths) => {
+    if (isNew.value) return data;
+    const lines = paths.flatMap((path) => {
+      const line = /^\/yamlText\/(\d+)$/.exec(path);
+      return line ? [Number(line[1])] : [];
+    });
+    return { ...data, yamlText: restoreYamlSecrets(data.yamlText, lines, savedYaml.value) };
+  },
+  restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
+  // Another config's page reuses this view, so only an id change leaves the draft.
+  leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
+});
+
+/** Drops every draft of this config once it no longer exists. */
+function dropDrafts() {
+  deleteEditorDraftsFor({
+    kind: "fleet_config",
+    org: String(store.state.selectedOrganization?.identifier ?? ""),
+    entityId: id.value,
   });
 }
+
+async function startDraft() {
+  notKeptYamlKeys = [];
+  await configDraft.start();
+  const imported = pendingImport;
+  pendingImport = null;
+  if (imported === null) return;
+  // A continued draft is what the user chose to keep, so it is not overwritten by the import.
+  if (configDraft.hasUnsavedChanges()) {
+    toast({ variant: "info", message: t("fleet.editor.importNotApplied") });
+    return;
+  }
+  // Baselines on the seed, so the imported file counts as unsaved until it is saved.
+  configDraft.discard();
+  loadText(imported);
+  savedText.value = "";
+}
+
+const draftKey = computed(() => (loaded.value ? id.value : null));
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (unsaved.value) e.preventDefault();
 }
 
-onBeforeRouteLeave(guardLeave);
-// Another config's page reuses this view, so only an id change leaves the draft.
-onBeforeRouteUpdate((to: RouteLocationNormalized, from: RouteLocationNormalized) =>
-  to.params.id === from.params.id ? true : guardLeave(),
-);
-onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
+onMounted(() => {
+  window.addEventListener("beforeunload", onBeforeUnload);
+  watch(
+    draftKey,
+    (key) => {
+      if (key !== null) void startDraft();
+    },
+    { immediate: true },
+  );
+});
 onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
 
 useShortcuts([

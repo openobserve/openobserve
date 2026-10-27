@@ -23,6 +23,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import OTable from "@/lib/core/Table/OTable.vue";
 import FleetConfigurations from "./FleetConfigurations.vue";
 import { takePendingImport } from "./useFleetApi";
+import { deleteEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -117,6 +118,27 @@ describe("FleetConfigurations", () => {
       wrapper.find('[data-test="fleet-configurations-fleets-hidden-edge-minimal"]').text(),
     ).toBe("+2 you cannot view");
     expect(wrapper.text()).toContain("Used by fleets");
+  });
+
+  it("marks a row with an unsaved draft and drops the mark once the draft is gone", async () => {
+    localStorage.clear();
+    const scope = {
+      kind: "fleet_config" as const,
+      org: "default",
+      entityId: "org-baseline",
+      userEmail: "example@gmail.com",
+    };
+    writeEditorDraft(scope, { data: { yamlText: "x: 1\n" } });
+    wrapper = await mountList();
+    const dot = () => wrapper.find('[data-test="fleet-configurations-draft-dot-org-baseline"]');
+    expect(dot().exists()).toBe(true);
+    expect(wrapper.find('[data-test="fleet-configurations-draft-dot-edge-minimal"]').exists()).toBe(
+      false,
+    );
+
+    deleteEditorDraft(scope);
+    await flushPromises();
+    expect(dot().exists()).toBe(false);
   });
 
   it("renders the rows the API returns", async () => {

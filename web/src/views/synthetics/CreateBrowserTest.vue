@@ -23,13 +23,7 @@ import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { cloneDeep } from "lodash-es";
-import {
-  useRouter,
-  useRoute,
-  onBeforeRouteLeave,
-  onBeforeRouteUpdate,
-  type NavigationGuard,
-} from "vue-router";
+import { useRouter, useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
@@ -102,6 +96,18 @@ import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import {
+  deleteEditorDraft,
+  deleteEditorDraftsFor,
+  readEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+import {
+  redactCheckDraftSecrets,
+  reentryValidationKey,
+} from "@/utils/synthetics/checkDraftSecrets";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -461,34 +467,54 @@ async function loadForEdit(id: string) {
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.value = mapped;
     savedCheck.value = cloneDeep(mapped);
+    serverCheck = cloneDeep(mapped);
     // Not on `BrowserCheck`: `buildCreateBrowserTestPayload` spreads it, and the form never sends it.
     journeyBudgetMs.value = (res.data as any).config?.journey_budget_ms;
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
     void loadReferencedBy(id);
+    return true;
   } catch (err) {
     console.error("[synthetics] failed to load check for edit", err);
     if ((err as any)?.response?.status === 404) {
-      router.push(backTo.value);
-      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isLoadingEdit.value = false;
-      return;
+      leaveMissingCheck();
+      return false;
     }
     loadError.value = true;
     toast({
       variant: "error",
       message: t("synthetics.createBrowserTest.loadFailed"),
     });
+    return false;
   } finally {
     isLoadingEdit.value = false;
   }
 }
 
+/** A save that stays on the page moves the draft base to the saved check, so the next restore sees no server change. */
+async function refreshServerCheck(id: string) {
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const folder = check.value.folder || String(route.query.folder ?? "");
+    const res = await syntheticsService.get(org, id, folder);
+    serverCheck = cloneDeep(mapResponseToBrowserCheck(res.data as Record<string, unknown>));
+  } catch (err) {
+    // The old base stays: a failed read must not look like a deleted check.
+    console.error("[synthetics] failed to re-read the saved check", err);
+  }
+}
+
+/** Opens the drafts once the check is in the form. */
+async function loadForEditAndStartDraft(id: string) {
+  if (await loadForEdit(id)) await browserDraft.start();
+}
+
 function onLoadRetry(actionId?: string) {
   if (!actionId) return;
   if (actionId === "retry" && props.editId) {
-    loadForEdit(props.editId);
+    void loadForEditAndStartDraft(props.editId);
   }
 }
 
@@ -517,7 +543,7 @@ onMounted(() => {
   loadDestinations();
 
   if (props.editId) {
-    loadForEdit(props.editId).catch(console.error);
+    loadForEditAndStartDraft(props.editId).catch(console.error);
   } else {
     // Preselect the folder the user came from (New Monitor within a folder).
     const folderQuery = route.query.folder;
@@ -554,6 +580,8 @@ onMounted(() => {
         }
       });
     }
+    dropDraftCarriedByQuery();
+    void browserDraft.start();
   }
 });
 
@@ -562,6 +590,8 @@ const autoRecord = ref(false);
 
 /** The check as last loaded or saved, which is what server-side moves act on. */
 const savedCheck = ref<BrowserCheck | null>(null);
+/** The check as the server returned it, kept unmodified so its draft hash is stable. */
+let serverCheck: BrowserCheck | null = null;
 
 const check = ref<BrowserCheck>({
   name: "",
@@ -752,9 +782,6 @@ const apiPayload = computed(() => buildCreateBrowserTestPayload(check.value));
 
 // ── Unsaved changes guard ───────────────────────────────────────────────────
 const isDirty = ref(false);
-const showUnsavedDialog = ref(false);
-let pendingLeavePath: string | null = null;
-let forceLeave = false;
 
 // Create mode only: edit mode compares against the saved check instead.
 watch(
@@ -789,14 +816,107 @@ function stopActiveExtension() {
   }
 }
 
-function onConfirmLeave() {
+interface BrowserTestDraft {
+  check: BrowserCheck;
+  currentStep: number;
+  journeyStepDone: boolean;
+}
+
+const browserDraft = useEditorDraft<BrowserTestDraft>({
+  kind: "synthetic_browser",
+  entityLabel: () => t("common.editorDraft.entities.synthetic_browser"),
+  entityId: () => props.editId ?? null,
+  snapshot: () => ({
+    check: check.value,
+    currentStep: currentStep.value,
+    journeyStepDone: journeyStepDone.value,
+  }),
+  apply: (data) => {
+    // A restored journey opens still: nothing records or replays until the author asks.
+    autoRecord.value = false;
+    check.value = data.check;
+    checkName.value = data.check.name;
+    startUrl.value = data.check.url;
+    journeyStepDone.value = data.journeyStepDone;
+    currentStep.value = data.currentStep;
+    isDirty.value = true;
+    phase.value = "editor";
+  },
+  base: () => serverCheck,
+  hasChanges: () => hasUnsavedChanges.value,
+  save: saveFromLeaveDialog,
+  redact: (data) => {
+    const redacted = redactCheckDraftSecrets(data.check, "/check");
+    return { data: { ...data, check: redacted.data }, paths: redacted.paths };
+  },
+  // Only an id change leaves this check: a query-only update (the setup `router.replace`) must pass.
+  leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
+});
+
+/** A changed secret the draft did not keep is flagged on its field until it is typed again. */
+const reentryErrors = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    browserDraft
+      .pendingReentries()
+      .map((path) => [reentryValidationKey(path, "/check"), t("common.editorDraft.reenterField")]),
+  ),
+);
+
+// Registered after the draft guards, so a recording or replay stops only once the leave goes ahead.
+onBeforeRouteLeave(() => {
   stopActiveExtension();
-  showUnsavedDialog.value = false;
-  forceLeave = true;
-  if (pendingLeavePath) {
-    router.push(pendingLeavePath);
-    pendingLeavePath = null;
+  return true;
+});
+onBeforeRouteUpdate((to, from) => {
+  if (to.params.id !== from.params.id) stopActiveExtension();
+  return true;
+});
+
+/** The setup checklist's reload carries the gate fields in the query, so a draft of only those is redundant. */
+function dropDraftCarriedByQuery() {
+  if (typeof route.query.url !== "string" || !route.query.url) return;
+  const scope: EditorDraftScope = {
+    kind: "synthetic_browser",
+    org: orgIdentifier.value,
+    entityId: null,
+    userEmail: String(store.state.userInfo?.email ?? ""),
+  };
+  const stored = readEditorDraft<BrowserTestDraft>(scope)?.data.check;
+  if (
+    stored &&
+    stored.journey.length === 0 &&
+    stored.url.trim() === startUrl.value.trim() &&
+    stored.name.trim() === checkName.value.trim()
+  ) {
+    deleteEditorDraft(scope);
   }
+}
+
+/** A check missing from this org takes its drafts there with it. */
+function forgetMissingCheck() {
+  browserDraft.discard();
+  if (props.editId) {
+    deleteEditorDraftsFor({
+      kind: "synthetic_browser",
+      org: orgIdentifier.value,
+      entityId: props.editId,
+    });
+  }
+  toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
+}
+
+function leaveMissingCheck() {
+  forgetMissingCheck();
+  router.push(backTo.value);
+}
+
+/** The leave dialog's Save; a save that first needs the used-by confirmation keeps the author here. */
+async function saveFromLeaveDialog(): Promise<boolean> {
+  let saved = false;
+  await checkUsageThenSave(async () => {
+    saved = await persist("leaveDialog");
+  });
+  return saved;
 }
 
 onMounted(() => {
@@ -807,28 +927,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
   recorder.cleanup();
 });
-
-// Registered for updates too: opening a child is a param-only push on this same route record.
-const guardUnsavedChanges: NavigationGuard = (to, from, next) => {
-  if (forceLeave) {
-    forceLeave = false;
-    next();
-    return;
-  }
-  if (!hasUnsavedChanges.value) {
-    next();
-    return;
-  }
-  // Cancel the route; show a Vue dialog instead
-  next(false);
-  pendingLeavePath = to.fullPath;
-  showUnsavedDialog.value = true;
-};
-onBeforeRouteLeave(guardUnsavedChanges);
-// Only an id change leaves this check: a query-only update (the setup `router.replace`) must pass.
-onBeforeRouteUpdate((to, from, next) =>
-  to.params.id === from.params.id ? next() : guardUnsavedChanges(to, from, next),
-);
 
 function beforeUnloadHandler(e: BeforeUnloadEvent) {
   if (!hasUnsavedChanges.value) return;
@@ -860,11 +958,16 @@ function startUrlHostMismatch(): { host: string; other: string } | null {
  * Validates and persists the check. Owns validation, the API call and all
  * toasts — but deliberately NOT navigation, so the footer buttons can decide
  * where to go afterwards (stay on Configure vs. return to the checks list).
- * Returns true only when the check was actually written.
+ * Returns true only when the check was actually written, or is gone and the leave dialog may go on.
  */
-async function persist(): Promise<boolean> {
+async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean> {
   // ── Pre-save validation ───────────────────────────────────────────
   validationErrors.value = {};
+  if (browserDraft.pendingReentries().length) {
+    currentStep.value = 2;
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return false;
+  }
   const toValidate = {
     name: check.value.name,
     url: check.value.url,
@@ -968,14 +1071,19 @@ async function persist(): Promise<boolean> {
     }
     isDirty.value = false;
     savedCheck.value = cloneDeep(check.value);
+    if (props.editId && after === "stay") await refreshServerCheck(props.editId);
+    browserDraft.markSaved();
     return true;
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) {
+      // The leave guard is still pending, so a deleted check lets that navigation go on instead of opening the list.
+      if (after === "leaveDialog") {
+        forgetMissingCheck();
+        return true;
+      }
       // Already navigated away — the caller must not push on top of this.
-      forceLeave = true;
-      router.push(backTo.value);
-      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
+      leaveMissingCheck();
       return false;
     }
     if (mapReferencedSaveConflict(err)) return false;
@@ -1278,7 +1386,7 @@ async function confirmUsedBySave() {
 /** Edit mode, Journey step: persist, then move on to Configure. */
 async function onSaveAndContinue() {
   await checkUsageThenSave(async () => {
-    if (!(await persist())) return;
+    if (!(await persist("stay"))) return;
     journeyStepDone.value = true;
     currentStep.value = 2;
   });
@@ -1287,7 +1395,7 @@ async function onSaveAndContinue() {
 /** Persist, then return to the checks list. */
 async function onSaveAndExit() {
   await checkUsageThenSave(async () => {
-    if (!(await persist())) return;
+    if (!(await persist("exit"))) return;
     router.push(backTo.value);
   });
 }
@@ -2157,7 +2265,7 @@ function onClearResults() {
               :destinations="destinations"
               :folders="folders"
               :folders-loading="foldersLoading"
-              :validation-errors="validationErrors"
+              :validation-errors="{ ...validationErrors, ...reentryErrors }"
               :variable-suggestions="variableSuggestions"
               :allow-private-locations="privateLocationsEnabled"
               :target-hint="targetHint"
@@ -2447,19 +2555,7 @@ function onClearResults() {
       @replay-anyway="onReplayAnyway"
     />
 
-    <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
-       available in ALL phases (gate, extension-setup, editor), not just editor. -->
-    <ODialog
-      v-model:open="showUnsavedDialog"
-      size="sm"
-      :title="t('synthetics.newCheck.unsavedTitle')"
-      :primary-button-label="t('synthetics.newCheck.leave')"
-      :secondary-button-label="t('synthetics.newCheck.stay')"
-      data-test="synthetics-create-unsaved-dialog"
-      @click:primary="onConfirmLeave"
-      @click:secondary="showUnsavedDialog = false"
-    >
-      <p class="py-2">{{ t("synthetics.newCheck.unsavedBody") }}</p>
-    </ODialog>
+    <!-- At top level so it is available in every phase, not just the editor. -->
+    <EditorDraftDialogs :draft="browserDraft" />
   </OPageLayout>
 </template>

@@ -18,6 +18,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import MonitorTable from "./MonitorTable.vue";
 import { mockMonitorList } from "@/test/unit/mockData/synthetics";
+import store from "@/test/unit/helpers/store";
 
 // ── Stubs ───────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ function mountMonitorTable(props: Record<string, unknown> = {}) {
       ...props,
     },
     global: {
-      plugins: [i18n],
+      plugins: [i18n, store],
       stubs: {
         OTable: OTableStub,
         OButton: OButtonStub,
@@ -185,6 +186,14 @@ describe("MonitorTable", () => {
   });
 
   // ── OTable prop forwarding ────────────────────────────────────────────
+
+  describe("draft dots", () => {
+    it("marks only the rows that have an unsaved editor draft", () => {
+      wrapper = mountMonitorTable({ draftSavedAt: { "mon-tcp-1": Date.UTC(2026, 9, 1, 9, 30) } });
+      expect(wrapper.find('[data-test="monitor-table-draft-dot-mon-tcp-1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-draft-dot-mon-http-1"]').exists()).toBe(false);
+    });
+  });
 
   describe("OTable integration", () => {
     it("should pass data prop to OTable", () => {
