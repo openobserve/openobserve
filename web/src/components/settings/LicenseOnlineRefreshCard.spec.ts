@@ -528,4 +528,41 @@ describe("clicked outcome versus newer server attempts", () => {
       expect(outcomeText(w)).toBe("License is up to date");
     });
   });
+
+  describe("a status update observed while the click is pending", () => {
+    const seen = () =>
+      status({ last_attempt_at: atSecond(1792748520), last_outcome: { outcome: "unchanged" } });
+    const newer = () =>
+      status({ last_attempt_at: atSecond(1792748540), last_outcome: { outcome: "unchanged" } });
+    const pending = async (resolved: unknown) => {
+      vi.setSystemTime(1792748530000);
+      let finish!: (value: unknown) => void;
+      refresh.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+      const w = card({ last_outcome: { outcome: "unchanged" } });
+      await w.get('[data-test="license-online-refresh"]').trigger("click");
+      await w.setProps({ refresh: seen() });
+      finish(resolved);
+      await flushPromises();
+      return w;
+    };
+
+    it.each([
+      ["an HTTP 403", { ok: false, status: 403 }],
+      ["an HTTP 500", { ok: false, status: 500, body: { error: "boom" } }],
+      [
+        "attempt_recorded false",
+        { ok: true, status: 200, body: { error: "airgapped", attempt_recorded: false } },
+      ],
+    ])("keeps a definitive failure (%s) until a still-newer attempt", async (_n, resolved) => {
+      const w = await pending(resolved);
+      expect(outcomeText(w)).not.toBe("License is up to date");
+      await w.setProps({ refresh: newer() });
+      expect(outcomeText(w)).toBe("License is up to date");
+    });
+
+    it("lets an in-flight newer attempt clear a lost response", async () => {
+      const w = await pending({ ok: false });
+      expect(outcomeText(w)).toBe("License is up to date");
+    });
+  });
 });

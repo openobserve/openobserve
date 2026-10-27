@@ -291,14 +291,15 @@ const outcomeIcon = computed(() =>
 );
 let newestAttempt = 0;
 let clearAfter: number | undefined;
-// only a 2xx report lacking both fields may come from an older server, so only the next click replaces it
+// a lost response may have recorded an attempt so it uses the pre-click value; a 2xx lacking both fields may be an older server, so only the next click replaces it
 const clickBoundary = (clicked: RefreshResult, before: number) => {
   const body = clicked.body;
   if (typeof body === "object" && body !== null) {
     if (typeof body.attempt_at === "number") return body.attempt_at;
-    if (body.attempt_recorded === false) return before;
+    if (body.attempt_recorded === false) return newestAttempt;
   }
-  return clicked.ok ? undefined : before;
+  if (clicked.ok) return undefined;
+  return clicked.status === undefined ? before : newestAttempt;
 };
 const dropClickedOutcome = () => {
   if (clearAfter === undefined || newestAttempt <= clearAfter) return;
