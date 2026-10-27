@@ -65,6 +65,11 @@ import templateService from "@/services/alert_templates";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +105,7 @@ const OTableStub = {
       <slot name="actions" />
       <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
+        <slot name="cell-name" :row="row" />
         <div :data-test="'destination-url-' + row.name">
           <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
         </div>
@@ -456,6 +462,89 @@ describe("AlertsDestinationList", () => {
 
       expect((wrapper.vm as any).confirmDelete.visible).toBe(false);
       expect((wrapper.vm as any).confirmDelete.data).toBeNull();
+    });
+  });
+
+  describe("drafts", () => {
+    const scope = (entityId: string | null): EditorDraftScope => ({
+      kind: "alert_destination",
+      org: "default",
+      entityId,
+      userEmail: "example@gmail.com",
+    });
+
+    beforeEach(() => {
+      localStorage.clear();
+      writeEditorDraft(scope(null), { data: {} });
+      writeEditorDraft(scope("destination-2"), { data: {} });
+    });
+
+    afterEach(() => localStorage.clear());
+
+    it("marks the Add button and the drafted row only", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const add = wrapper.get('[data-test="alert-destination-list-add-alert-btn"]');
+      expect(add.find('[data-test="alert-destination-list-add-draft-dot"]').exists()).toBe(true);
+      expect(add.attributes("aria-label")).toContain("unsaved draft");
+      expect(
+        wrapper.find('[data-test="alert-destination-list-draft-dot-destination-2"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="alert-destination-list-draft-dot-destination-1"]').exists(),
+      ).toBe(false);
+    });
+
+    it("drops a deleted destination's draft and keeps it when the delete fails", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const dest = (wrapper.vm as any).destinations[1];
+
+      (destinationService.delete as any).mockRejectedValueOnce({ response: { status: 500 } });
+      (wrapper.vm as any).confirmDelete.data = dest;
+      (wrapper.vm as any).deleteDestination();
+      await flushPromises();
+      expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
+
+      (wrapper.vm as any).confirmDelete.data = dest;
+      (wrapper.vm as any).deleteDestination();
+      await flushPromises();
+      expect(readEditorDraft(scope("destination-2"))).toBeNull();
+      expect(readEditorDraft(scope(null))).not.toBeNull();
+    });
+
+    it("drops drafts of bulk-deleted names the refetch no longer lists, on an unrecognised response", async () => {
+      writeEditorDraft(scope("destination-1"), { data: {} });
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.handleSelectedIdsUpdate(["destination-1", "destination-2"]);
+
+      (destinationService.bulkDelete as any).mockResolvedValueOnce({ data: {} });
+      (destinationService.list as any).mockResolvedValue({
+        data: [makeDestination(1), makeDestination(3)],
+      });
+      await vm.bulkDeleteDestinations();
+      await flushPromises();
+
+      expect(readEditorDraft(scope("destination-2"))).toBeNull();
+      expect(readEditorDraft(scope("destination-1"))).not.toBeNull();
+      expect(readEditorDraft(scope(null))).not.toBeNull();
+    });
+
+    it("keeps every bulk-delete draft when the fallback refetch fails", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.handleSelectedIdsUpdate(["destination-2"]);
+
+      (destinationService.bulkDelete as any).mockResolvedValueOnce({ data: {} });
+      (destinationService.list as any).mockRejectedValue({ response: { status: 500 } });
+      await vm.bulkDeleteDestinations();
+      await flushPromises();
+
+      expect(readEditorDraft(scope("destination-2"))).not.toBeNull();
     });
   });
 

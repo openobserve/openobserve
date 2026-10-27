@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="add-destination-title"
     :back="{
       label: t('alert_destinations.header'),
-      onClick: () => emit('cancel:hideform'),
+      onClick: closeEditor,
     }"
     bleed
   >
@@ -238,9 +238,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="me-2 text-sm font-medium">
               {{ t("alert_destinations.noEmailTemplates") }}
             </div>
-            <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
-              t("alert_destinations.createEmailTemplate")
-            }}</OButton>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="add-destination-create-email-template-btn"
+              @click="createEmailTemplate"
+              >{{ t("alert_destinations.createEmailTemplate") }}</OButton
+            >
           </div>
           <!-- Name + Template row for custom alert destinations -->
           <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
@@ -445,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-close-popup="true"
             variant="outline"
             size="sm-action"
-            @click="$emit('cancel:hideform')"
+            @click="closeEditor"
             >{{ t("alerts.cancel") }}</OButton
           >
           <OButton
@@ -482,13 +486,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
+    <EditorDraftDialogs :draft="destinationDraft" />
   </OPageLayout>
 </template>
 <script lang="ts" setup>
 import { saveDestinationMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
-import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
+import { ref, computed, nextTick, onBeforeMount, onActivated, onMounted, watch } from "vue";
 import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -511,7 +516,7 @@ import {
   usePrebuiltDestinations,
   type SlackSetupMetadata,
 } from "@/composables/usePrebuiltDestinations";
-import { detectPrebuiltType } from "@/utils/prebuilt-templates";
+import { detectPrebuiltType, getPrebuiltConfig } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
@@ -528,6 +533,8 @@ import {
   addDestinationDefaults,
   type AddDestinationForm,
 } from "./AddDestination.schema";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
 const props = defineProps({
   templates: {
@@ -647,6 +654,7 @@ const form = useOForm({
 // pipeline via saveCustomDestination. Returned so OForm awaits the real save (the
 // footer Save spinner spans it).
 function saveDestination(value: AddDestinationForm): Promise<void> | undefined {
+  if (blockOnPendingReentries()) return undefined;
   return isPrebuiltDestination.value ? handlePrebuiltSave(value) : saveCustomDestination(value);
 }
 
@@ -1289,8 +1297,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
 
     // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
     // which invalidates the scope itself.
-    emit("get:destinations");
-    emit("cancel:hideform");
+    finishSave();
   } catch {
     // The composable presents a sanitized error toast and rethrows so submission
     // state settles without exposing credential-bearing request details.
@@ -1346,8 +1353,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
-        emit("get:destinations");
-        emit("cancel:hideform");
+        finishSave();
         toast({
           variant: "success",
           message: t("alert_destinations.saved"),
@@ -1372,8 +1378,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
-        emit("get:destinations");
-        emit("cancel:hideform");
+        finishSave();
         toast({
           variant: "success",
           message: t("alert_destinations.saved"),
@@ -1405,6 +1410,182 @@ const deleteApiHeader = (index: number) => {
   }[];
   // Always keep at least one (blank) row so the add button stays reachable.
   if (!rows.length) (form as any).pushFieldValue("apiHeaders", { key: "", value: "" });
+};
+
+// Drafts belong to the alert destinations page; the pipeline host keeps the plain editor.
+const draftsActive = props.isAlerts && router.currentRoute.value.name === "alertDestinations";
+// Set while the leave dialog's Save runs, so a successful save does not close the editor itself.
+let leaveSave: { saved: boolean } | null = null;
+
+// These types' URL is the webhook itself, so the URL is the credential.
+const SECRET_URL_TYPES = new Set(["slack", "discord", "msteams"]);
+// Webhook hosts whose path carries the token.
+const SECRET_WEBHOOK_HOST =
+  /(^|\.)(hooks\.slack\.com|discord(app)?\.com|webhook\.office\.com|logic\.azure\.com|api\.telegram\.org|hooks\.zapier\.com)$/i;
+// A long path segment with a digit (Mattermost or Rocket.Chat hook keys), or a Telegram `bot<id>:` token.
+const TOKEN_SEGMENT = /^(?=.*\d)[\w:-]{20,}$|^bot\d/i;
+
+const parseUrl = (url: string): URL | null => {
+  for (const text of [url, `https://${url}`]) {
+    try {
+      return new URL(text);
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+const urlCarriesSecret = (url: string, destinationType: string): boolean => {
+  if (SECRET_URL_TYPES.has(destinationType)) return true;
+  const parsed = parseUrl(url.trim());
+  if (!parsed) return /[@?]/.test(url);
+  return (
+    !!(parsed.username || parsed.password || parsed.search) ||
+    SECRET_WEBHOOK_HOST.test(parsed.hostname) ||
+    parsed.pathname.split("/").some((segment) => TOKEN_SEGMENT.test(segment))
+  );
+};
+
+// Header values carry auth, and a URL that can hold a token is one, so neither is drafted.
+const redactDestinationDraft = (data: AddDestinationForm) => {
+  const copy = JSON.parse(JSON.stringify(data)) as AddDestinationForm;
+  const paths: string[] = [];
+  const blank = (holder: Record<string, unknown>, key: string, path: string) => {
+    if (typeof holder[key] !== "string" || holder[key] === "") return;
+    holder[key] = "";
+    paths.push(path);
+  };
+  if (urlCarriesSecret(copy.url, copy.destination_type)) blank(copy, "url", "/url");
+  copy.apiHeaders.forEach((row, index) => blank(row, "value", `/apiHeaders/${index}/value`));
+  const credentials = copy.credentials as Record<string, unknown>;
+  (getPrebuiltConfig(copy.destination_type)?.credentialFields ?? [])
+    .filter((field) => field.type === "password" || field.key === "webhookUrl")
+    .forEach((field) => blank(credentials, field.key, `/credentials/${field.key}`));
+  return { data: copy, paths };
+};
+
+const describeRedactedDestination = (paths: string[], data: AddDestinationForm): I18nText[] => {
+  const credentialFields = getPrebuiltConfig(data.destination_type)?.credentialFields ?? [];
+  const fields = paths.flatMap((path): I18nText[] => {
+    if (path === "/url") return [t("alert_destinations.url")];
+    const header = /^\/apiHeaders\/(\d+)\/value$/.exec(path);
+    if (header) {
+      const name = data.apiHeaders[Number(header[1])]?.key;
+      return [
+        name ? t("common.editorDraft.headerField", { name }) : t("alert_destinations.headers"),
+      ];
+    }
+    const field = credentialFields.find((f) => path === `/credentials/${f.key}`);
+    return field ? [t(field.labelKey)] : [];
+  });
+  return [...new Set(fields)];
+};
+
+// A not-kept header is found again by its name, since rows may have moved since the draft was written.
+let notKeptHeaderKeys = new Map<string, string>();
+
+const fieldNameFor = (path: string): FormFieldPath<AddDestinationForm> | null => {
+  const key = notKeptHeaderKeys.get(path);
+  if (key !== undefined) {
+    const index = form.state.values.apiHeaders.findIndex((row) => row.key === key);
+    return index < 0 ? null : (`apiHeaders[${index}].value` as FormFieldPath<AddDestinationForm>);
+  }
+  return path.slice(1).split("/").join(".") as FormFieldPath<AddDestinationForm>;
+};
+
+const flagReentries = (paths: string[]) => {
+  for (const path of paths) {
+    const name = fieldNameFor(path);
+    const meta = name ? form.getFieldMeta(name) : undefined;
+    if (!name || !meta) continue;
+    form.setFieldMeta(name, {
+      ...meta,
+      errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
+    });
+  }
+};
+
+/** A changed secret the draft could not keep must be typed again before saving. */
+const blockOnPendingReentries = (): boolean => {
+  const pending = draftsActive ? destinationDraft.pendingReentries() : [];
+  if (!pending.length) return false;
+  flagReentries(pending);
+  toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+  return true;
+};
+
+const serverDestination = () => {
+  const saved = props.destination;
+  if (!saved) return null;
+  return {
+    name: saved.name,
+    type: saved.type,
+    url: saved.url ?? "",
+    method: saved.method ?? "",
+    skip_tls_verify: !!saved.skip_tls_verify,
+    template: saved.template ?? "",
+    headers: saved.headers ?? {},
+    emails: saved.emails ?? [],
+    output_format: saved.output_format ?? "",
+    metadata: saved.metadata ?? "",
+  };
+};
+
+const destinationDraft = useEditorDraft<AddDestinationForm>({
+  kind: "alert_destination",
+  entityLabel: () => t("common.editorDraft.entities.alert_destination"),
+  entityId: () => props.destination?.name ?? null,
+  snapshot: () => ({ ...formValues.value }),
+  apply: async (data, { notKeptPaths }) => {
+    form.reset({ ...data, name: props.destination ? form.state.values.name : data.name });
+    notKeptHeaderKeys = new Map(
+      notKeptPaths.flatMap((path) => {
+        const header = /^\/apiHeaders\/(\d+)\/value$/.exec(path);
+        const key = header ? data.apiHeaders[Number(header[1])]?.key : undefined;
+        return key === undefined ? [] : [[path, key] as const];
+      }),
+    );
+    // After the form's own error sweep, which runs on the reset values.
+    await nextTick();
+    flagReentries(notKeptPaths);
+  },
+  base: serverDestination,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      onSaveClick();
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  redact: redactDestinationDraft,
+  describeRedacted: describeRedactedDestination,
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path ||
+    to.query.action !== from.query.action ||
+    to.query.name !== from.query.name,
+});
+
+onMounted(async () => {
+  if (draftsActive) await destinationDraft.start();
+});
+
+function finishSave() {
+  emit("get:destinations");
+  if (leaveSave) {
+    leaveSave.saved = true;
+    return;
+  }
+  destinationDraft.markSaved();
+  emit("cancel:hideform");
+}
+
+const closeEditor = async () => {
+  if (await destinationDraft.confirmLeave()) emit("cancel:hideform");
 };
 
 const createEmailTemplate = () => {

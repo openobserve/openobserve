@@ -5,6 +5,17 @@ import { createRouter, createWebHistory } from "vue-router";
 import AddAlertView from "./AddAlertView.vue";
 import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: vi.fn(() => () => {}),
+}));
 
 vi.mock("@/services/alert_destination", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -36,6 +47,7 @@ describe("AddAlertView.vue", () => {
         selectedOrganization: {
           identifier: "test-org",
         },
+        userInfo: { email: "me@example.com" },
         organizationData: {
           allAlertsListByFolderId: {},
         },
@@ -349,6 +361,57 @@ describe("AddAlertView.vue", () => {
 
       // An empty form here would save as a NEW alert.
       expect(replaceSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+    });
+
+    describe("drafts", () => {
+      const missingScope: EditorDraftScope = {
+        kind: "alert",
+        org: "test-org",
+        entityId: "missing",
+        userEmail: "me@example.com",
+      };
+
+      beforeEach(() => {
+        localStorage.clear();
+        vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+        writeEditorDraft(missingScope, { data: { values: {}, tab: "condition" } });
+      });
+
+      it("drops the draft of a deleted alert with an info toast and never shows the form", async () => {
+        vi.mocked(alertsService.get_by_alert_id).mockRejectedValue({ response: { status: 404 } });
+
+        const wrapper = await mountEditing("missing");
+
+        expect(readEditorDraft(missingScope)).toBeNull();
+        expect(toast).toHaveBeenCalledWith({
+          variant: "info",
+          message: "This alert no longer exists, so its unsaved draft was discarded.",
+        });
+        expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+      });
+
+      it("keeps the draft when the alert fails to load for another reason", async () => {
+        vi.mocked(alertsService.get_by_alert_id).mockRejectedValue({ response: { status: 500 } });
+
+        await mountEditing("missing");
+
+        expect(readEditorDraft(missingScope)).not.toBeNull();
+        expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      });
+    });
+
+    it("stays put when the leave dialog's Save reports the save", async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+        data: { name: "my-alert" },
+      } as any);
+      const wrapper = await mountEditing();
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.findComponent(AddAlertStub).vm.$emit("update:list", "default", { navigate: false });
+      await flushPromises();
+
+      expect(pushSpy).not.toHaveBeenCalled();
     });
 
     it("still opens the editor when the org has no destinations left", async () => {

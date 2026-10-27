@@ -83,6 +83,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import {
+  deleteEditorDraft,
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // Every test mounts the full list; on a loaded CI runner one mount can exceed the 5s default.
 vi.setConfig({ testTimeout: 20000 });
@@ -2173,3 +2179,169 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
 }, 15000);
+
+describe("AlertList - editor drafts", () => {
+  // Read at call time: earlier specs in this file switch the shared store's org and user.
+  const scope = (entityId: string | null, userEmail?: string): EditorDraftScope => ({
+    kind: "alert",
+    org: String(store.state.selectedOrganization?.identifier ?? ""),
+    entityId,
+    userEmail: userEmail ?? String(store.state.userInfo?.email ?? ""),
+  });
+  const draftData = { values: {}, tab: "condition", folderId: "default" };
+
+  beforeEach(() => localStorage.clear());
+
+  it("marks the New alert button and the rows that have drafts", async () => {
+    writeEditorDraft(scope(null), { data: draftData });
+    writeEditorDraft(scope("alert-3"), { data: draftData });
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    // A stale ?action from an earlier spec's navigation can swap the table for the editor.
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+
+    const addButton = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+    expect(addButton.attributes("aria-label")).toBe("New alert · unsaved draft");
+    expect(wrapper.find('[data-test="alert-list-add-alert-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-Scheduled Alert C-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alert-list-Scheduled Alert A-draft-dot"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("on the anomaly tab, marks the Add button only for a new anomaly detection's draft", async () => {
+    writeEditorDraft(scope(null), { data: draftData });
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    wrapper.vm.activeTab = "anomalyDetection";
+    await flushPromises();
+    const dot = () => wrapper.find('[data-test="alert-list-add-alert-draft-dot"]').exists();
+    expect(dot()).toBe(false);
+
+    writeEditorDraft({ ...scope(null), variant: "anomaly" }, { data: draftData });
+    await flushPromises();
+    expect(dot()).toBe(true);
+
+    wrapper.vm.activeTab = "all";
+    deleteEditorDraft(scope(null));
+    await flushPromises();
+    expect(dot()).toBe(false);
+  });
+
+  it("drops every user's draft of a deleted alert and keeps the rest", async () => {
+    writeEditorDraft(scope("alert-1"), { data: draftData });
+    writeEditorDraft(scope("alert-1", "teammate@example.com"), { data: draftData });
+    writeEditorDraft(scope("alert-2"), { data: draftData });
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    await wrapper.vm.showDeleteDialogFn({
+      row: { alert_id: "alert-1", name: "Scheduled Alert A" },
+    });
+    await wrapper.vm.deleteAlertByAlertId();
+    await flushPromises();
+
+    expect(readEditorDraft(scope("alert-1"))).toBeNull();
+    expect(readEditorDraft(scope("alert-1", "teammate@example.com"))).toBeNull();
+    expect(readEditorDraft(scope("alert-2"))).not.toBeNull();
+  });
+
+  it("keeps the draft when the delete fails", async () => {
+    writeEditorDraft(scope("alert-1"), { data: draftData });
+    alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    await wrapper.vm.showDeleteDialogFn({
+      row: { alert_id: "alert-1", name: "Scheduled Alert A" },
+    });
+    await wrapper.vm.deleteAlertByAlertId();
+    await flushPromises();
+
+    expect(readEditorDraft(scope("alert-1"))).not.toBeNull();
+  });
+
+  it("drops drafts only for the alerts a bulk delete removed", async () => {
+    writeEditorDraft(scope("alert-1"), { data: draftData });
+    writeEditorDraft(scope("alert-2"), { data: draftData });
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults[0].selected = true;
+    wrapper.vm.filteredResults[1].selected = true;
+    await wrapper.vm.$nextTick();
+    const [first, second] = wrapper.vm.selectedAlerts.map((a: AlertV2) => a.alert_id);
+    alertsSvc.bulkDelete.mockResolvedValueOnce({
+      data: { successful: [first], unsuccessful: [{ alert_id: second, code: "internal" }] },
+    });
+
+    await wrapper.vm.bulkDeleteAlerts();
+    await flushPromises();
+
+    expect(readEditorDraft(scope(first))).toBeNull();
+    expect(readEditorDraft(scope(second))).not.toBeNull();
+  });
+
+  it("on an unrecognised bulk-delete response, keeps drafts of alerts in folders it did not refetch", async () => {
+    writeEditorDraft(scope("alert-1"), { data: draftData });
+    writeEditorDraft(scope("alert-3"), { data: draftData });
+    writeEditorDraft(scope("alert-ops"), { data: draftData });
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = [
+      ...wrapper.vm.filteredResults,
+      { alert_id: "alert-ops", name: "Ops alert", folder_name: { id: "ops", name: "Ops" } },
+    ];
+    for (const row of wrapper.vm.filteredResults)
+      row.selected = ["alert-1", "alert-3", "alert-ops"].includes(row.alert_id);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.selectedAlerts).toHaveLength(3);
+    alertsSvc.bulkDelete.mockImplementationOnce(async () => {
+      alertsDB = alertsDB.filter((a) => a.alert_id !== "alert-1");
+      return { data: {} };
+    });
+
+    await wrapper.vm.bulkDeleteAlerts();
+    await flushPromises();
+
+    expect(readEditorDraft(scope("alert-1"))).toBeNull();
+    expect(readEditorDraft(scope("alert-3"))).not.toBeNull();
+    expect(readEditorDraft(scope("alert-ops"))).not.toBeNull();
+  });
+
+  it("drops the draft of an alert that no longer exists when its edit link opens", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    writeEditorDraft(scope("gone-1"), { data: draftData });
+    alertsSvc.get_by_alert_id.mockRejectedValueOnce({ response: { status: 404 } });
+    wrapper.vm.router.currentRoute.value.query = { action: "update", alert_id: "gone-1" };
+
+    await wrapper.vm.handleActionQuery("update");
+    await flushPromises();
+
+    expect(readEditorDraft(scope("gone-1"))).toBeNull();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "info",
+        message: "This alert no longer exists, so its unsaved draft was discarded.",
+      }),
+    );
+  });
+
+  it("refreshes without closing the editor when the leave dialog saved", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.router.currentRoute.value.query = { action: "add" };
+    wrapper.vm.showAddAlertDialog = true;
+    const pushSpy = vi.spyOn(router, "push");
+
+    await wrapper.vm.refreshList("default", { navigate: false });
+
+    expect(alertsSvc.listByFolderId).toHaveBeenCalled();
+    expect(pushSpy).not.toHaveBeenCalled();
+    expect(wrapper.vm.showAddAlertDialog).toBe(true);
+  });
+});

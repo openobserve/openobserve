@@ -42,8 +42,10 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ currentRoute: { value: { query: {} } }, push: vi.fn() }),
   useRoute: () => ({ params: {}, query: {} }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 // Passthrough spy: real toasts still render, and specs can read what was raised.

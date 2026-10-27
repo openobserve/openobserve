@@ -19,6 +19,7 @@ import fs from 'fs';
 import { CommonActions } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
+import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -1962,6 +1963,7 @@ export class AlertsPage {
 
             // Try clicking with force to bypass potential overlays
             await backButton.click({ force: true, timeout: 10000 });
+            await discardEditorDraftIfAsked(this.page);
             testLogger.info('Closed alert wizard via back button');
         } catch (error) {
             testLogger.warn('Back button click failed, trying close button', { error: error.message });
@@ -3718,6 +3720,7 @@ export class AlertsPage {
      */
     async clickBackButton() {
         await this.page.locator(this.locators.alertBackButton).first().click({ timeout: 15000 });
+        await discardEditorDraftIfAsked(this.page);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 

@@ -44,6 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           :disabled="!templates.length"
+          :aria-label="
+            hasNewDraft ? t('common.editorDraft.newDot', { label: t('alerts.add') }) : undefined
+          "
           @click="
             activeTab === 'anomalyDetection'
               ? router.push({
@@ -56,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
               : showAddUpdateFn({})
           "
-          >{{ t(`alerts.add`) }}</OButton
-        >
+          >{{ t(`alerts.add`) }}
+          <EditorDraftDot v-if="hasNewDraft" corner data-test="alert-list-add-alert-draft-dot" />
+        </OButton>
       </template>
 
       <template #actions-overflow>
@@ -246,6 +250,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
+                  <EditorDraftDot
+                    v-if="alertDrafts.ids.has(row.alert_id)"
+                    :saved-at="alertDrafts.savedAt(row.alert_id)"
+                    :data-test="`alert-list-${row.name}-draft-dot`"
+                  />
                   <MutedChip
                     v-if="row.active_downtime"
                     :downtime="row.active_downtime"
@@ -1059,8 +1068,20 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import {
+  ALERT_DRAFT_KIND,
+  ANOMALY_DRAFT_VARIANT,
+  dropDraftOfMissingAlert,
+  isNotFoundError,
+  type AlertSavedOptions,
+} from "@/utils/alerts/alertEditorDraft";
 
 // import alertList from "./alerts";
+
+type AlertRowRef = { alert_id?: unknown; folder_name?: { id?: unknown } };
 
 export default defineComponent({
   name: "AlertList",
@@ -1070,6 +1091,7 @@ export default defineComponent({
     QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
+    EditorDraftDot,
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
@@ -1159,6 +1181,13 @@ export default defineComponent({
     );
     const showAddAlertDialog: any = ref(false);
     const selectedDelete: any = ref(null);
+    const alertDrafts = useEditorDraftIds(ALERT_DRAFT_KIND);
+    const dropAlertDrafts = (alertIds: string[]) => {
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      alertIds.forEach((entityId) =>
+        deleteEditorDraftsFor({ kind: ALERT_DRAFT_KIND, org, entityId }),
+      );
+    };
     const isUpdated: any = ref(false);
     /**
      * Render a multi-alert group count, marking it as a lower bound when the
@@ -1331,6 +1360,12 @@ export default defineComponent({
     );
 
     const filteredResults: Ref<any[]> = ref([]);
+    // The Add button opens a new anomaly detection on the anomaly tab, which drafts in its own slot.
+    const hasNewDraft = computed(() =>
+      activeTab.value === "anomalyDetection"
+        ? alertDrafts.hasNewVariant(ANOMALY_DRAFT_VARIANT)
+        : alertDrafts.hasNew,
+    );
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
     // Keyed on firing time, not run time; raw µs keeps it timezone-independent.
@@ -2511,10 +2546,26 @@ export default defineComponent({
           }
         } catch (error) {
           console.error("AlertList: Failed to load alert", error);
-          toast({
-            variant: "error",
-            message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
-          });
+          const draftDropped =
+            isNotFoundError(error) &&
+            dropDraftOfMissingAlert({
+              org: String(store.state.selectedOrganization?.identifier ?? ""),
+              entityId: alertId,
+              userEmail: String(store.state.userInfo?.email ?? ""),
+            });
+          toast(
+            draftDropped
+              ? {
+                  variant: "info",
+                  message: t("common.editorDraft.itemDeleted", {
+                    entity: t("common.editorDraft.entities.alert"),
+                  }),
+                }
+              : {
+                  variant: "error",
+                  message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
+                },
+          );
         }
       }
 
@@ -2853,7 +2904,7 @@ export default defineComponent({
         });
       }
     };
-    const refreshList = async (folderId?: string) => {
+    const refreshList = async (folderId?: string, options?: AlertSavedOptions) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
       //and then we are setting the activeFolderId to the folderId
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
@@ -2873,6 +2924,8 @@ export default defineComponent({
       if (filterQuery.value) {
         filterAlertsByQuery(filterQuery.value);
       }
+      // The leave dialog's Save: the pending navigation decides where the user goes.
+      if (options?.navigate === false) return;
       await hideForm();
       activeFolderId.value = resolvedFolderId;
     };
@@ -2948,6 +3001,7 @@ export default defineComponent({
     const dropAlerts = (alertIds: any[]) => {
       const gone = new Set(alertIds.filter(Boolean).map((id: any) => String(id)));
       if (!gone.size) return;
+      dropAlertDrafts([...gone]);
 
       const keep = (row: any) => !gone.has(String(row?.alert_id));
       // Read before the splice below removes the rows this has to inspect.
@@ -3804,11 +3858,23 @@ export default defineComponent({
             response.data.successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry),
           );
         } else {
+          const refetchedFolder = String(activeFolderId.value ?? "");
+          // Only the active folder is refetched, so only its rows can be proven gone.
+          const checkable = selectedAlerts.value
+            .filter(
+              (row: AlertRowRef) =>
+                String(row?.folder_name?.id ?? refetchedFolder) === refetchedFolder,
+            )
+            .map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
           if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
+          const remaining = new Set(
+            allAlerts.value.map((row: AlertRowRef) => String(row?.alert_id)),
+          );
+          dropAlertDrafts(checkable.filter((id) => !remaining.has(id)));
         }
       } catch (error: any) {
         dismiss();
@@ -3925,6 +3991,8 @@ export default defineComponent({
       showDeleteDialogFn,
       duplicateAlert,
       showAddAlertDialog,
+      alertDrafts,
+      hasNewDraft,
       showForm,
       toBeCloneAlertName,
       toBeClonedAlert,

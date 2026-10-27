@@ -33,6 +33,9 @@ export class DowntimesPage {
     this.nameValue = '[data-test="add-downtime-name-value"]';
     this.saveBtn = '[data-test="add-downtime-save"]';
     this.cancelBtn = '[data-test="add-downtime-cancel"]';
+    // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
+    this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
+    this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
     this.checkScheduleBanner = '[data-test="add-downtime-check-schedule"]';
     this.staleBanner = '[data-test="add-downtime-stale-banner"]';
     this.reloadBtn = '[data-test="add-downtime-reload"]';
@@ -604,6 +607,15 @@ export class DowntimesPage {
 
   async cancelCreate() {
     await this.page.locator(this.cancelBtn).click();
+    // Unsaved changes are discarded through the leave dialog so no draft is left behind.
+    const asked = await this.page.locator(this.draftLeaveDialog)
+      .waitFor({ state: 'visible', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (asked) {
+      await this.page.locator(this.draftLeaveDiscardBtn).click();
+      await this.page.locator(this.draftLeaveDialog).waitFor({ state: 'hidden', timeout: 10000 });
+    }
   }
 
   async expectCheckScheduleNudge() {
