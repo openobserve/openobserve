@@ -100,9 +100,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-add-pipeline-btn"
               variant="primary"
               size="sm"
+              :aria-label="
+                pipelineDrafts.hasNew
+                  ? t('common.editorDraft.newDot', { label: t('pipeline.addPipeline') })
+                  : undefined
+              "
               @click="goToAddPipeline"
             >
               {{ t("pipeline.addPipeline") }}
+              <EditorDraftDot
+                v-if="pipelineDrafts.hasNew"
+                corner
+                data-test="pipeline-list-add-pipeline-draft-dot"
+              />
             </OButton>
             <ODropdown v-if="shouldCollapseActions" align="end">
               <template #trigger>
@@ -164,6 +174,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 export default defineComponent({
   name: "AppFunctions",
@@ -174,12 +186,14 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    EditorDraftDot,
   },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
+    const pipelineDrafts = useEditorDraftIds("pipeline");
 
     // Maps each route to the Level-2 section it belongs under. Pipeline
     // drill-down sub-pages all resolve to the Pipelines section.
@@ -295,6 +309,7 @@ export default defineComponent({
       raw,
       store,
       config,
+      pipelineDrafts,
       orgIdentifier,
       activeTab,
       isDetailView,

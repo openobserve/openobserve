@@ -4,6 +4,8 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
+import { nextTick } from "vue";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import Functions from "./Functions.vue";
 
 // Mock heavy child components that are not under test
@@ -251,6 +253,28 @@ describe("Functions.vue", () => {
       wrapper = await createWrapper({}, "pipelines");
       const historyBtn = wrapper.find('[data-test="pipeline-list-history-btn"]');
       expect(historyBtn.exists()).toBe(true);
+    });
+
+    it("dots the add pipeline button while a new-pipeline draft exists", async () => {
+      localStorage.clear();
+      wrapper = await createWrapper({ userInfo: { email: "me@x.io" } }, "pipelines");
+      const addBtn = () => wrapper.find('[data-test="pipeline-list-add-pipeline-btn"]');
+      expect(addBtn().find('[data-test="pipeline-list-add-pipeline-draft-dot"]').exists()).toBe(
+        false,
+      );
+      expect(addBtn().attributes("aria-label")).toBeUndefined();
+
+      writeEditorDraft(
+        { kind: "pipeline", org: "test-org-id", entityId: null, userEmail: "me@x.io" },
+        { data: {} },
+      );
+      await nextTick();
+
+      expect(addBtn().find('[data-test="pipeline-list-add-pipeline-draft-dot"]').exists()).toBe(
+        true,
+      );
+      expect(addBtn().attributes("aria-label")).toBeTruthy();
+      localStorage.clear();
     });
 
     it("should not show pipeline actions on functionList route", async () => {
