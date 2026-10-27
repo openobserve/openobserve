@@ -42,6 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="title"
               :placeholder="t('panel.namePlaceholder')"
               :aria-label="t('panel.name')"
+              :suggestions="titleSuggestions"
+              delimiter="dollar"
               :edit-hint="
                 panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('panel.renameHint')
               "
@@ -371,6 +373,7 @@ import {
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import { getVariableSuggestions } from "@/utils/dashboard/variableSuggestions";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -2085,6 +2088,13 @@ export default defineComponent({
       return dashboardPanelData.data.id || "current_panel";
     });
 
+    const titleSuggestions = computed(() =>
+      getVariableSuggestions(currentDashboardData.data?.variables?.list, t, {
+        tabId: currentTabId.value,
+        panelId: currentPanelId.value,
+      }),
+    );
+
     const getLiveVariables = (): any[] => {
       if (variablesManager && variablesManager.variablesData.isInitialized) {
         return variablesManager.getVariablesForPanel(
@@ -2375,6 +2385,7 @@ export default defineComponent({
 
     return {
       t,
+      titleSuggestions,
       isMobile,
       updateDateTime,
       goBack,

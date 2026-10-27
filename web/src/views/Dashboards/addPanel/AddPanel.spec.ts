@@ -655,6 +655,28 @@ describe("AddPanel.vue", () => {
       });
     });
 
+    it("offers the dashboard's variables, with list formats for multi-select ones, to the title field", async () => {
+      wrapper.vm.currentDashboardData.data = {
+        tabs: [{ tabId: "default" }],
+        variables: {
+          list: [
+            { name: "cdu", type: "query_values", multiSelect: false },
+            { name: "rack", type: "query_values", multiSelect: true },
+          ],
+        },
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.titleSuggestions.map((s: { name: string }) => s.name)).toEqual([
+        "cdu",
+        "rack",
+        "rack:csv",
+        "rack:pipe",
+        "rack:doublequote",
+        "rack:singlequote",
+      ]);
+    });
+
     it("should compute panelTitle correctly when in edit mode", () => {
       wrapper.vm.editMode = true;
       wrapper.vm.dashboardPanelData.data.title = "Test Panel";

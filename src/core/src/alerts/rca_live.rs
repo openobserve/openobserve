@@ -50,7 +50,7 @@ use super::{
     rca_turn::RcaTurnError,
 };
 use crate::ai_chat::{
-    CommittedPrefix, ReadError,
+    CommittedPrefix, ReadError, fork,
     rca_ledger::{RunTranscript, decode_run},
     rca_thread::{self, RcaThread, Transcript},
     read_committed_prefix,
@@ -370,6 +370,9 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
             rca_thread::project_rca_thread(&prefix.events, &turns, active, show_tool_io);
         thread.run_id = run_id.clone();
         thread.state_version = session_version(session, self.run, show_tool_io);
+        if !active {
+            thread.reusable_steps = fork::reusable_steps(&prefix.events);
+        }
         if let Some(lost_from) = prefix.lost_from {
             thread.truncated = true;
             thread.saved_through_seq = Some(lost_from - 1);
@@ -1450,6 +1453,25 @@ pub(crate) mod tests {
         assert_eq!(names(&frames).last(), Some(&"end"));
         assert_eq!(data(&frames, "end"), json!({"state": "cancelled"}));
         assert!(live.is_done());
+    }
+
+    /// The cancel banner counts the finished steps a Resume keeps; a live run offers none.
+    #[tokio::test]
+    async fn a_cancelled_runs_thread_counts_the_steps_a_resume_keeps() {
+        let _db = db().await;
+        let (org, inc, run_id) = live_run().await;
+        let events = crate::ai_chat::fork::tests::three_steps();
+        let kept = fork::plan_resume(&events).unwrap().reused_steps;
+        assert_ne!(kept, 0);
+        let reader = Reader::new(events);
+        let now = now_micros();
+        let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
+        let frames = live.tick(now).await;
+        assert!(data(&frames, "thread").get("reusable_steps").is_none());
+
+        cancel_write(&org, &run_id).await;
+        let frames = live.tick(now + SEC).await;
+        assert_eq!(data(&frames, "thread")["reusable_steps"], kept);
     }
 
     #[tokio::test]
