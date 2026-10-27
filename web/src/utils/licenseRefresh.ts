@@ -32,6 +32,8 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   validator_rejected: "about.online_error_validator_rejected",
   instance_key_unreadable: "about.online_error_instance_key_unreadable",
   lock_unavailable: "about.online_error_lock_unavailable",
+  pending_reload: "about.online_error_pending_reload",
+  rotation_unsettled: "about.online_error_rotation_unsettled",
   internal: "about.online_error_internal",
 };
 const STATUS_KEYS: Record<string, I18nKey> = {
@@ -75,9 +77,15 @@ export function refreshMessage(
       return { variant: "warning", text: t("about.online_env_renewal") };
     const variant = ["disabled", "airgapped", "not_online", "not_v2"].includes(body.error)
       ? "info"
-      : ["unreachable", "timeout", "rate_limited", "refused_by_env", "rev_ignored"].includes(
-            body.error,
-          )
+      : [
+            "unreachable",
+            "timeout",
+            "rate_limited",
+            "refused_by_env",
+            "rev_ignored",
+            "pending_reload",
+            "rotation_unsettled",
+          ].includes(body.error)
         ? "warning"
         : "error";
     return {
