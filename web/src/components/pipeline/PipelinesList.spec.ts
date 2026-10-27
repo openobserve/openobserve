@@ -17,6 +17,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi, type MockedFunction } from "vitest";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import i18n from "@/locales";
 import { nextTick, reactive } from "vue";
 import pipelineService from "@/services/pipelines";
@@ -229,7 +230,7 @@ describe("PipelinesList", () => {
 
   const mockPipelines = [mockRealtimePipeline, mockScheduledPipeline];
 
-  function createWrapper() {
+  function createWrapper(extraStubs: Record<string, any> = {}) {
     return mount(PipelinesList, {
       shallow: true,
       global: {
@@ -241,6 +242,7 @@ describe("PipelinesList", () => {
         stubs: {
           ODialog: ODialogStub,
           ODrawer: ODrawerStub,
+          ...extraStubs,
         },
       },
     });
@@ -368,6 +370,28 @@ describe("PipelinesList", () => {
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
       expect(wrapper.vm.confirmDialogMeta.data).toStrictEqual(mockRealtimePipeline);
+      expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBe("pipeline.deletePipelineConfirm");
+      expect(wrapper.vm.confirmDialogMeta.messageName).toBe(mockRealtimePipeline.name);
+      expect(wrapper.vm.confirmDialogMeta.okVariant).toBe("destructive");
+    });
+
+    it("names the pipeline in bold with a destructive OK in the real ConfirmDialog", async () => {
+      const w = createWrapper({ ConfirmDialog, "i18n-t": false });
+      await flushPromises();
+      w.vm.openDeleteDialog(mockRealtimePipeline);
+      await nextTick();
+
+      const confirm = w.findComponent(ConfirmDialog);
+      const name = confirm.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe(mockRealtimePipeline.name);
+      expect(name.classes()).toContain("font-semibold");
+      expect(confirm.text()).toContain(
+        `Are you sure you want to delete the ${mockRealtimePipeline.name} pipeline?`,
+      );
+      const dialog = confirm.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primaryButtonLabel")).toBe(i18n.global.t("confirmDialog.ok"));
+      w.unmount();
     });
 
     it("resetConfirmDialog hides dialog and clears state", () => {
@@ -910,6 +934,17 @@ describe("PipelinesList", () => {
       wrapper.vm.openBulkDeleteDialog();
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
+    });
+
+    it("openBulkDeleteDialog drops a named message left by a dismissed single delete", () => {
+      wrapper.vm.openDeleteDialog(mockRealtimePipeline);
+      wrapper.vm.filteredPipelines = [mockRealtimePipeline];
+      wrapper.vm.selectedPipelineIds = [mockRealtimePipeline.pipeline_id];
+
+      wrapper.vm.openBulkDeleteDialog();
+
+      expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBeUndefined();
+      expect(wrapper.vm.confirmDialogMeta.okVariant).toBe("destructive");
     });
   });
 

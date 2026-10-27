@@ -131,20 +131,26 @@ describe("Dashboards.vue public links entry", () => {
   });
 
   it("warns that deleting a dashboard deletes its public links while the feature is on", async () => {
-    const message = (w: VueWrapper, id: string) =>
-      w.findAll(`[data-test="${id}"]`)[0]?.attributes("message");
+    const prop = (w: VueWrapper, id: string, name: string) =>
+      w
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.attributes("data-test") === id)
+        ?.props(name);
     wrapper = await mountAt(router, true);
-    expect(message(wrapper, "dashboard-confirm-dialog")).toBe(
-      "Are you sure you want to delete the dashboard? Its public links will stop working and be deleted.",
+    expect(prop(wrapper, "dashboard-confirm-dialog", "messageKeypath")).toBe(
+      "dashboard.deleteDashboardConfirmMsgPublicLinks",
     );
-    expect(message(wrapper, "dashboard-confirm-bulk-delete-dialog")).toContain(
+    expect(i18n.global.t("dashboard.deleteDashboardConfirmMsgPublicLinks", { name: "cpu" })).toBe(
+      "Are you sure you want to delete the cpu dashboard? Its public links will stop working and be deleted.",
+    );
+    expect(prop(wrapper, "dashboard-confirm-bulk-delete-dialog", "message")).toContain(
       "Their public links will stop working and be deleted.",
     );
     wrapper.unmount();
 
     wrapper = await mountAt(router, false);
-    expect(message(wrapper, "dashboard-confirm-dialog")).toBe(
-      "Are you sure you want to delete the dashboard?",
+    expect(prop(wrapper, "dashboard-confirm-dialog", "messageKeypath")).toBe(
+      "dashboard.deleteDashboardConfirmMsg",
     );
   });
 });

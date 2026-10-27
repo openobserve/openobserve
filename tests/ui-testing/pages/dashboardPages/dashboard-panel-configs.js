@@ -298,6 +298,37 @@ export default class DashboardPanelConfigs {
     );
     this.thresholdStepValueField = (index) =>
       page.locator(`[data-test="dashboard-config-thresholds-step-${index}-value-field"]`);
+
+    // Heatmap colour settings
+    this.heatmapColorMin = page.locator('[data-test="dashboard-config-heatmap_color_min"]');
+    this.heatmapColorMinField = page.locator('[data-test="dashboard-config-heatmap_color_min-field"]');
+    this.heatmapColorMax = page.locator('[data-test="dashboard-config-heatmap_color_max"]');
+    this.heatmapColorMaxField = page.locator('[data-test="dashboard-config-heatmap_color_max-field"]');
+    this.heatmapColorMaxError = page.locator('[data-test="dashboard-config-heatmap_color_max-error"]');
+    this.heatmapPalette = page.locator('[data-test="dashboard-config-heatmap_palette"]');
+    this.heatmapPaletteTrigger = page.locator('[data-test="dashboard-config-heatmap_palette-trigger"]');
+    this.heatmapPaletteReverse = page.locator('[data-test="dashboard-config-heatmap_palette_reverse"]');
+    this.heatmapPaletteReverseBtn = page.locator('[data-test="dashboard-config-heatmap_palette_reverse-btn"]');
+    this.heatmapColorScale = page.locator('[data-test="dashboard-config-heatmap_color_scale"]');
+
+    // Heatmap PromQL histogram settings
+    this.heatmapHistogramMode = page.locator('[data-test="dashboard-config-heatmap_mode"]');
+    this.heatmapHistogramModeBtn = page.locator('[data-test="dashboard-config-heatmap_mode-btn"]');
+    this.heatmapBucketUnit = page.locator('[data-test="dashboard-config-bucket_unit"]');
+
+    // Heatmap y-axis settings
+    this.heatmapYSort = page.locator('[data-test="dashboard-config-heatmap_y_sort"]');
+    this.heatmapYSortOptions = page.locator('[data-test="dashboard-config-heatmap_y_sort-option"]');
+    this.heatmapYBucket = page.locator('[data-test="dashboard-config-heatmap_y_bucket"]');
+    this.heatmapYBucketSize = page.locator('[data-test="dashboard-config-heatmap_y_bucket_size"]');
+    this.heatmapYBucketSizeField = page.locator('[data-test="dashboard-config-heatmap_y_bucket_size-field"]');
+    this.heatmapYBucketSizeError = page.locator('[data-test="dashboard-config-heatmap_y_bucket_size-error"]');
+    this.heatmapYBucketBase = page.locator('[data-test="dashboard-config-heatmap_y_bucket_base"]');
+    this.heatmapYMin = page.locator('[data-test="dashboard-config-heatmap_y_min"]');
+    this.heatmapYMinField = page.locator('[data-test="dashboard-config-heatmap_y_min-field"]');
+    this.heatmapYMax = page.locator('[data-test="dashboard-config-heatmap_y_max"]');
+    this.heatmapYMaxField = page.locator('[data-test="dashboard-config-heatmap_y_max-field"]');
+    this.heatmapYMaxError = page.locator('[data-test="dashboard-config-heatmap_y_max-error"]');
   }
 
   /** Types a PromQL series limit into the config sidebar input. */
@@ -2027,6 +2058,92 @@ export default class DashboardPanelConfigs {
 
     throw new Error(
       `hoverDrilldownInfoForTooltip: none of the ${total} drilldown info icons opened a tooltip`
+    );
+  }
+
+  // ========== Heatmap ==========
+
+  /** Fill the colour scale min/max inputs; pass "" to clear a bound back to Auto. */
+  async setHeatmapColorRange(min, max) {
+    await this.scrollSidebarToElement(this.heatmapColorMin);
+    await this.heatmapColorMinField.fill(min);
+    await this.heatmapColorMaxField.fill(max);
+    await expect(this.heatmapColorMinField).toHaveValue(min);
+    await expect(this.heatmapColorMaxField).toHaveValue(max);
+  }
+
+  getHeatmapYSortOption(label) {
+    return this.heatmapYSortOptions.and(this.page.locator(`[data-test-label="${label}"]`));
+  }
+
+  async selectHeatmapPalette(label) {
+    await this.selectConfigOption("dashboard-config-heatmap_palette", label);
+  }
+
+  async toggleHeatmapPaletteReverse() {
+    const before = await this.heatmapPaletteReverseBtn.getAttribute("aria-checked");
+    await this.scrollSidebarToElement(this.heatmapPaletteReverse);
+    await this.heatmapPaletteReverseBtn.click();
+    await expect(this.heatmapPaletteReverseBtn).toHaveAttribute(
+      "aria-checked",
+      before === "true" ? "false" : "true"
+    );
+  }
+
+  /** Pick an option of a heatmap OToggleGroup and wait for the group to report it. */
+  async _selectHeatmapToggle(group, baseTestId, label, value) {
+    await this.scrollSidebarToElement(group);
+    await this._clickVirtualOption(baseTestId, label);
+    await expect(group).toHaveAttribute("data-test-selected-value", value);
+  }
+
+  async selectHeatmapColorScale(label, value) {
+    await this._selectHeatmapToggle(
+      this.heatmapColorScale,
+      "dashboard-config-heatmap_color_scale",
+      label,
+      value
+    );
+  }
+
+  async selectHeatmapYSort(label, value) {
+    await this._selectHeatmapToggle(this.heatmapYSort, "dashboard-config-heatmap_y_sort", label, value);
+  }
+
+  async selectHeatmapYBucketMode(label, value) {
+    await this._selectHeatmapToggle(this.heatmapYBucket, "dashboard-config-heatmap_y_bucket", label, value);
+  }
+
+  async selectHeatmapYBucketBase(base) {
+    await this._selectHeatmapToggle(
+      this.heatmapYBucketBase,
+      "dashboard-config-heatmap_y_bucket_base",
+      base,
+      base
+    );
+  }
+
+  async setHeatmapYBucketSize(size) {
+    await this.scrollSidebarToElement(this.heatmapYBucketSize);
+    await this.heatmapYBucketSizeField.fill(size);
+    await expect(this.heatmapYBucketSizeField).toHaveValue(size);
+  }
+
+  async setHeatmapYRange(min, max) {
+    await this.scrollSidebarToElement(this.heatmapYMin);
+    await this.heatmapYMinField.fill(min);
+    await this.heatmapYMaxField.fill(max);
+    await expect(this.heatmapYMinField).toHaveValue(min);
+    await expect(this.heatmapYMaxField).toHaveValue(max);
+  }
+
+  async toggleHeatmapHistogramMode() {
+    const before = await this.heatmapHistogramModeBtn.getAttribute("aria-checked");
+    await this.scrollSidebarToElement(this.heatmapHistogramMode);
+    await this.heatmapHistogramModeBtn.click();
+    await expect(this.heatmapHistogramModeBtn).toHaveAttribute(
+      "aria-checked",
+      before === "true" ? "false" : "true"
     );
   }
 }

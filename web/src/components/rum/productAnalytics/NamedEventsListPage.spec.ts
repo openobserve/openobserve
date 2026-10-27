@@ -96,6 +96,12 @@ describe("NamedEventsListPage (AC-44)", () => {
     [...document.querySelectorAll('[data-test^="rum-analytics-named-events-row-"]')]
       .filter((el) => /row-\d+$/.test(el.getAttribute("data-test") ?? ""))
       .map((el) => el.textContent?.trim());
+  const deleteName = () => q("rum-analytics-named-events-delete-name");
+  const deleteText = () => deleteName()?.closest("p")?.textContent;
+  const answerDelete = async (ok: boolean) => {
+    q(ok ? "o-dialog-primary-btn" : "o-dialog-secondary-btn")!.click();
+    await settle();
+  };
   const selectRow = async (i: number) => {
     q(`o2-table-row-${i}`)!
       .querySelector<HTMLElement>('[data-test="o2-table-select-cell"]')!
@@ -196,9 +202,15 @@ describe("NamedEventsListPage (AC-44)", () => {
     await mountList();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
-    expect(confirmMock.mock.calls[0][0].message).toBe(
-      'Delete "Event 0"? Funnels that use it will show a deleted-step tag.',
+    expect(deleteName()?.textContent).toBe("Event 0");
+    expect(deleteName()?.classList.contains("font-semibold")).toBe(true);
+    expect(deleteText()).toBe(
+      "Delete the Event 0 named event? Funnels that use it will show a deleted-step tag.",
     );
+    expect(q("o-dialog-primary-btn")?.textContent?.trim()).toBe("Delete");
+    expect(q("o-dialog-primary-btn")?.getAttribute("data-o2-variant")).toBe("destructive");
+    expect(api.service.deleteEvent).not.toHaveBeenCalled();
+    await answerDelete(true);
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, false]]);
     expect(rowText()).toEqual([]);
   });
@@ -216,10 +228,11 @@ describe("NamedEventsListPage (AC-44)", () => {
     await mountList();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    expect(confirmMock.mock.calls[0][0].message).toBe(
-      'Delete "Event 0"? It is used by 1 saved funnel: Signup. That funnel will show a Deleted event step.',
+    expect(deleteText()).toBe(
+      "Delete the Event 0 named event? It is used by 1 saved funnel: Signup. That funnel will show a Deleted event step.",
     );
+    await answerDelete(true);
+    expect(deleteName()).toBeNull();
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, true]]);
     expect(api.events.has(ev.id)).toBe(false);
   });
@@ -238,11 +251,11 @@ describe("NamedEventsListPage (AC-44)", () => {
       });
       return { data: { list: [] } };
     });
-    confirmMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
-    expect(confirmMock).toHaveBeenCalledTimes(2);
-    expect(confirmMock.mock.calls[1][0].message).toContain("1 saved funnel: Late");
+    await answerDelete(true);
+    expect(deleteText()).toContain("1 saved funnel: Late");
+    await answerDelete(false);
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, false]]);
     expect(api.events.has(ev.id)).toBe(true);
     expect(toastMock).not.toHaveBeenCalled();
@@ -254,16 +267,18 @@ describe("NamedEventsListPage (AC-44)", () => {
     await selectRow(0);
     const bulk = () => q("rum-analytics-named-events-bulk-delete-btn");
     expect(bulk()).not.toBeNull();
-    confirmMock.mockResolvedValueOnce(false);
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(false);
     expect(bulk()).not.toBeNull();
     api.failNext("deleteEvent", 503);
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(true);
     expect(bulk()).not.toBeNull();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(true);
     expect(bulk()).toBeNull();
   });
 
@@ -286,6 +301,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     expect(confirmMock.mock.calls[0][0].message).toBe(
       "Delete 2 named events? Saved funnels will show a Deleted event step for: Event 1 (Signup).",
     );
+    expect(confirmMock.mock.calls[0][0].confirmVariant).toBe("destructive");
     expect(api.service.deleteEvent.mock.calls).toEqual([
       ["org1", "web", a.id, false],
       ["org1", "web", b.id, true],
@@ -419,6 +435,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     await mountList();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(true);
     expect(useNamedEvents().permission.value).toBe("read");
     expect(q("rum-analytics-named-events-read-only")?.textContent).toContain(
       "can view but not change",

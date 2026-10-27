@@ -118,7 +118,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 118: add the lease columns to org_cleanup_tasks.
 // 119: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
 // 120: add search_type to search_queue.
-pub const DB_SCHEMA_VERSION: u64 = 120;
+// 121: point pre-run incidents' run summary at their newest v1 report.
+pub const DB_SCHEMA_VERSION: u64 = 121;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2635,8 +2636,8 @@ pub struct Common {
     pub auto_query_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PROFILING_ENABLED",
-        default = false,
-        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+        default = true,
+        help = "Show the Profiles module in the UI. Ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
     #[env_config(
@@ -3191,6 +3192,12 @@ pub struct Limit {
         help = "maximum PromQL series a state timeline panel loads; restarts split one entity into several series"
     )]
     pub max_dashboard_state_timeline_series: usize,
+    #[env_config(
+        name = "ZO_MAX_DASHBOARD_HOSTMAP_CELLS",
+        default = 5000,
+        help = "maximum cells a host map panel draws, also the PromQL series it loads; the rest are counted in a notice"
+    )]
+    pub max_dashboard_hostmap_cells: usize,
     #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
@@ -4135,6 +4142,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.max_dashboard_state_timeline_series < 1 {
         cfg.limit.max_dashboard_state_timeline_series = 2000;
+    }
+    if cfg.limit.max_dashboard_hostmap_cells < 1 {
+        cfg.limit.max_dashboard_hostmap_cells = 5000;
     }
 
     // check query timeout
@@ -6527,6 +6537,19 @@ mod tests {
         cfg.limit.max_dashboard_state_timeline_series = 50;
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_hostmap_cells() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+        cfg.limit.max_dashboard_hostmap_cells = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+
+        cfg.limit.max_dashboard_hostmap_cells = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 300);
     }
 
     #[test]

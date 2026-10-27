@@ -31,6 +31,7 @@ import { normalizeThresholds, resolveStepValues, stepColorFor } from "./threshol
 import { getAnnotationsData } from "./getAnnotationsData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSeriesOverride } from "./seriesOverrides";
+import { HOSTMAP_MAX_CELLS } from "./convertHostmapData";
 
 export const STATE_TIMELINE_MAX_ROWS = 500;
 export const STATE_TIMELINE_MAX_STATES = 20;
@@ -671,11 +672,14 @@ const rowWheelZoom = (visibleRows: number) => ({
   filterMode: "filter",
 });
 
-/** The series cap the PromQL loader applies to a panel; a state timeline merges series into rows, so it has its own. */
-export const promqlSeriesCap = (panelType: string | undefined, zoConfig: any): number =>
-  panelType === "state-timeline"
-    ? (zoConfig?.max_dashboard_state_timeline_series ?? STATE_TIMELINE_MAX_SERIES)
-    : (zoConfig?.max_dashboard_series ?? 100);
+/** The series cap the PromQL loader applies to a panel; a state timeline and a host map draw far more series, so each has its own. */
+export const promqlSeriesCap = (panelType: string | undefined, zoConfig: any): number => {
+  if (panelType === "state-timeline") {
+    return zoConfig?.max_dashboard_state_timeline_series ?? STATE_TIMELINE_MAX_SERIES;
+  }
+  if (panelType === "hostmap") return zoConfig?.max_dashboard_hostmap_cells ?? HOSTMAP_MAX_CELLS;
+  return zoConfig?.max_dashboard_series ?? 100;
+};
 
 /** The raw row behind a clicked segment: in SQL the entity's row at or just before the segment start, in PromQL its labels. */
 export const stateTimelineSourceRecord = (

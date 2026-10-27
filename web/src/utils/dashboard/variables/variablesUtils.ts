@@ -377,7 +377,12 @@ export const withTimeRangeVariables = <T extends { values?: ContentVariable[] }>
   return { ...variablesData, values: [...values, ...builtins] };
 };
 
-const formatContentValue = (name: string, value: any, format?: ContentVariableFormat): string => {
+const formatContentValue = (
+  name: string,
+  value: any,
+  format?: ContentVariableFormat,
+  listSeparator = ",",
+): string => {
   if (format === "percentencode") {
     return encodeURIComponent(Array.isArray(value) ? value.join(",") : String(value));
   }
@@ -396,8 +401,10 @@ const formatContentValue = (name: string, value: any, format?: ContentVariableFo
       return value.map((v) => `"${v}"`).join(",");
     case "singlequote":
       return value.map((v) => `'${v}'`).join(",");
-    default:
+    case "csv":
       return value.join(",");
+    default:
+      return value.join(listSeparator);
   }
 };
 
@@ -406,7 +413,12 @@ export const processVariableContent = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
-  options?: { allLabel?: string; escapeValue?: (value: string) => string },
+  options?: {
+    allLabel?: string;
+    escapeValue?: (value: string) => string;
+    /** Joins an unformatted multi-value variable; defaults to ",". */
+    listSeparator?: string;
+  },
 ) => {
   const processedContent: string = normalizeVariableSyntax(content);
 
@@ -450,7 +462,7 @@ export const processVariableContent = (
       if (allLabel !== undefined && Array.isArray(value)) {
         value = value.map((v) => (v === SELECT_ALL_VALUE ? allLabel : v));
       }
-      return escapeValue(formatContentValue(name, value, format));
+      return escapeValue(formatContentValue(name, value, format, options?.listSeparator));
     },
     CONTENT_VARIABLE_FORMATS,
   );

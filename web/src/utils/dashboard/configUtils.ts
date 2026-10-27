@@ -58,7 +58,8 @@ export const shouldShowGridlines = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "pie" &&
     dashboardPanelData.data.type != "donut" &&
     dashboardPanelData.data.type != "sankey" &&
-    dashboardPanelData.data.type != "maps"
+    dashboardPanelData.data.type != "maps" &&
+    dashboardPanelData.data.type != "hostmap"
   );
 };
 
@@ -96,6 +97,7 @@ export const shouldShowLegendPosition = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    dashboardPanelData.data.type !== "hostmap" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -116,6 +118,7 @@ export const shouldShowLegendType = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    dashboardPanelData.data.type !== "hostmap" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -137,6 +140,7 @@ export const shouldShowLegendWidth = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    dashboardPanelData.data.type !== "hostmap" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -160,6 +164,7 @@ export const shouldShowLegendHeight = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    dashboardPanelData.data.type !== "hostmap" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -192,10 +197,23 @@ export const shouldShowNoValueReplacement = (
   dashboardPanelData: any,
   promqlMode: boolean,
 ): boolean => {
+  // A host map cell with no data shows this text in both query modes.
+  if (dashboardPanelData.data.type === "hostmap") return true;
   return (
     ["area", "line", "area-stacked", "bar", "stacked"].includes(dashboardPanelData.data.type) &&
     !promqlMode
   );
+};
+
+/** True for panels that draw a "No Data" state the user can reword; HTML and Markdown panels show none. */
+export const shouldShowNoDataText = (dashboardPanelData: any): boolean =>
+  !["html", "markdown"].includes(dashboardPanelData?.data?.type);
+
+/** A typed minimum interval as stored: a positive number, or null for automatic. */
+export const toMinInterval = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
 /**
@@ -242,7 +260,8 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "donut" &&
     dashboardPanelData.data.type != "sankey" &&
     dashboardPanelData.data.type != "maps" &&
-    dashboardPanelData.data.type != "state-timeline"
+    dashboardPanelData.data.type != "state-timeline" &&
+    dashboardPanelData.data.type != "hostmap"
   );
 };
 

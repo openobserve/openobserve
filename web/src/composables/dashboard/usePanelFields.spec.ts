@@ -217,6 +217,27 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.y[0].functionName).toBe("max");
     });
 
+    it("reads a numeric host map value with max, and keeps count for text fields", () => {
+      panelData.data.type = "hostmap";
+      (panelData as any).meta.streamFields = {
+        groupedFields: [
+          {
+            stream_alias: null,
+            schema: [
+              { name: "temperature", type: "Float64" },
+              { name: "status", type: "Utf8" },
+            ],
+          },
+        ],
+      };
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addYAxisItem({ name: "temperature" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("max");
+      panelData.data.queries[0].fields.y = [];
+      fields.addYAxisItem({ name: "status" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+
     it("does not add second item to pie chart (max 1 y)", () => {
       panelData.data.type = "pie";
       fields = usePanelFields({ dashboardPanelData: panelData, store });

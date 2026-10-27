@@ -31,7 +31,7 @@ use config::{
     RwAHashMap, RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
-        hash::{Sum64, gxhash},
+        hash::{Sum64, gxhash, key_sum64},
         time::{HourFormat, get_ymdh_from_micros, now_micros},
     },
 };
@@ -1589,7 +1589,7 @@ fn get_bucket_idx(file: &str) -> usize {
     if cfg.disk_cache.bucket_num <= 1 {
         0
     } else {
-        let h = gxhash::new().sum64(file);
+        let h = key_sum64(file);
         (h as usize) % cfg.disk_cache.bucket_num
     }
 }
@@ -2438,7 +2438,7 @@ mod tests {
         let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
         // Get the appropriate bucket for this file
-        let bucket_id = gxhash::new().sum64(&file_key);
+        let bucket_id = key_sum64(&file_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
         let _ = file_data.set(&file_key, &tmp_file, data_size).await;
@@ -2473,7 +2473,7 @@ mod tests {
             );
             let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
-            let bucket_id = gxhash::new().sum64(&file_key);
+            let bucket_id = key_sum64(&file_key);
             let bucket_id = (bucket_id as usize) % RESULT_FILES.len();
             let mut file_data = RESULT_FILES[bucket_id].write().await;
             let _ = file_data.set(&file_key, &tmp_file, data_size).await;

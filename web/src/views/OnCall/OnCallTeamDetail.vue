@@ -384,7 +384,9 @@
     <ConfirmDialog
       :model-value="!!rotationToDelete"
       :title="t('oncall.laneDeleteTitle')"
-      :message="t('oncall.laneDeleteMessage', { name: rotationNameToDelete })"
+      message-keypath="oncall.laneDeleteMessage"
+      :message-name="rotationNameToDelete"
+      ok-variant="destructive"
       @update:ok="deleteRotation"
       @update:cancel="rotationToDelete = null"
     />
