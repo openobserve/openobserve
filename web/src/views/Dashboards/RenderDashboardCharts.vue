@@ -243,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :allowAlertCreation="allowAlertCreation"
                   :showLegendsButton="showLegendsButton"
                   :simplifiedPanelView="simplifiedPanelView"
+                  :injectedPanelData="injectedPanelData?.[item.id]"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
@@ -481,6 +482,12 @@ export default defineComponent({
     frame: {
       type: Boolean,
       default: true,
+    },
+    /** Pre-built results keyed by panel id; a panel with an entry renders it
+     *  instead of querying (public dashboards read materialized snapshots). */
+    injectedPanelData: {
+      type: Object,
+      default: undefined,
     },
     /** "live" drags and saves at once; "view" locks the layout; "edit" unlocks it and emits layoutChange instead of saving. */
     layoutMode: {
