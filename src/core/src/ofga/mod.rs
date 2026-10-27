@@ -78,6 +78,7 @@ struct PendingMigrations {
     downtimes: bool,
     ai_chat_shares: bool,
     fleet: bool,
+    public_dashboards: bool,
     missing_ownership: bool,
 }
 
@@ -559,6 +560,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
             "slack",
         ]);
     }
+    if pending.public_dashboards {
+        keys.push("public_dashboards");
+    }
     keys
 }
 
@@ -740,6 +744,11 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] missing org-ownership back-fill needed");
         pending.missing_ownership = true;
     }
+    let v0_0_60 = version_compare::Version::from("0.0.60").unwrap();
+    if meta_version >= v0_0_60 && existing_model_version < v0_0_60 {
+        log::info!("[OFGA:Local] public dashboards permissions migration needed");
+        pending.public_dashboards = true;
+    }
 
     pending
 }
@@ -833,5 +842,17 @@ mod tests {
 
         assert!(all_org_ownership_keys(&pending_migrations("0.0.58", "0.0.58")).is_empty());
         assert!(!pending_migrations("0.0.57", "0.0.57").missing_ownership);
+    }
+
+    #[test]
+    fn public_dashboards_back_fill_runs_once_across_0_0_60() {
+        assert!(pending_migrations("0.0.60", "0.0.59").public_dashboards);
+        assert!(!pending_migrations("0.0.60", "0.0.60").public_dashboards);
+        assert!(!pending_migrations("0.0.59", "0.0.58").public_dashboards);
+        let pending = PendingMigrations {
+            public_dashboards: true,
+            ..Default::default()
+        };
+        assert_eq!(all_org_ownership_keys(&pending), vec!["public_dashboards"]);
     }
 }
