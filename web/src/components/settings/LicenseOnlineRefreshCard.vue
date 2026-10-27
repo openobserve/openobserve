@@ -152,7 +152,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { useI18nTyped } from "@/types/i18n";
-import type { RefreshBody, RefreshResult } from "@/ts/interfaces/licenseRefresh";
+import type { RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { refreshMessage, statusLabel, type RefreshStatus } from "@/utils/licenseRefresh";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtc, issuedOn } from "@/utils/licenseWaivers";
