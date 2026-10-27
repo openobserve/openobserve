@@ -37,10 +37,11 @@ use infra::db::get_orm_client_ro;
 use serde::Serialize;
 use stream::try_get_streams;
 
-pub const DEFAULT_TOP_N: usize = 5;
-pub const MAX_TOP_N: usize = 20;
-/// Stream types the overview reports; index and metadata streams are internal.
-pub const OVERVIEW_STREAM_TYPES: [StreamType; 4] = [
+const DEFAULT_TOP_N: usize = 5;
+const MAX_TOP_N: usize = 20;
+/// User-facing stream types; profiles, service graph, filelist, index and metadata streams are left
+/// out.
+const OVERVIEW_STREAM_TYPES: [StreamType; 4] = [
     StreamType::Logs,
     StreamType::Metrics,
     StreamType::Traces,
@@ -86,6 +87,7 @@ pub enum SectionStatus {
     Ok,
     Error,
     Locked,
+    Forbidden,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -111,6 +113,14 @@ impl<T> Section<T> {
             status: SectionStatus::Error,
             data: None,
             error: Some(message.to_string()),
+        }
+    }
+
+    pub fn forbidden() -> Self {
+        Self {
+            status: SectionStatus::Forbidden,
+            data: None,
+            error: None,
         }
     }
 
@@ -194,6 +204,7 @@ pub struct PipelinesData {
     pub total: u64,
     pub enabled: u64,
     pub disabled: u64,
+    /// Pipelines with an error row inside the pipeline error retention window.
     pub errored: u64,
 }
 
@@ -235,25 +246,36 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
     })
 }
 
-/// Returns the overview for the caller, from the short-lived per-caller cache when fresh.
-pub async fn get_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> Overview {
-    let ttl_micros = get_config().limit.overview_cache_ttl as i64 * 1_000_000;
+/// Returns a fresh cached overview for the caller, so a hit can skip the permission lookups.
+pub fn cached_overview(org_id: &str, user_id: &str, top_n: usize) -> Option<Overview> {
+    let ttl_micros = (get_config().limit.overview_cache_ttl as i64).saturating_mul(1_000_000);
+    if ttl_micros <= 0 {
+        return None;
+    }
     let key = CacheKey {
         org_id: org_id.to_string(),
-        user_id: scope.user_id.clone(),
+        user_id: user_id.to_string(),
         top_n,
     };
-    if ttl_micros > 0
-        && let Some(hit) = CACHE.get(&key)
-        && now_micros() - hit.generated_at < ttl_micros
-    {
-        let mut overview = hit.clone();
-        overview.cached = true;
-        return overview;
+    let hit = CACHE.get(&key)?;
+    if now_micros() - hit.generated_at >= ttl_micros {
+        return None;
     }
+    let mut overview = hit.clone();
+    overview.cached = true;
+    Some(overview)
+}
 
+/// Builds the overview and caches it per caller when every section loaded.
+pub async fn get_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> Overview {
+    let ttl_micros = (get_config().limit.overview_cache_ttl as i64).saturating_mul(1_000_000);
     let overview = build_overview(org_id, scope, top_n).await;
     if ttl_micros > 0 && !overview.has_error() {
+        let key = CacheKey {
+            org_id: org_id.to_string(),
+            user_id: scope.user_id.clone(),
+            top_n,
+        };
         cache_put(key, overview.clone(), ttl_micros);
     }
     overview
@@ -261,18 +283,36 @@ pub async fn get_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> 
 
 async fn build_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> Overview {
     let (streams, alerts, pipelines) = tokio::join!(
-        load_streams(org_id, scope, top_n),
-        load_alerts(org_id, &scope.user_id),
-        load_pipelines(org_id, scope.pipeline_grants.clone()),
+        async {
+            if streams_forbidden(scope) {
+                return Section::forbidden();
+            }
+            Section::from_result(load_streams(org_id, scope, top_n).await, "streams")
+        },
+        async { Section::from_result(load_alerts(org_id, &scope.user_id).await, "alerts") },
+        async {
+            if scope.pipeline_grants.as_ref().is_some_and(Vec::is_empty) {
+                return Section::forbidden();
+            }
+            let loaded = load_pipelines(org_id, scope.pipeline_grants.clone()).await;
+            Section::from_result(loaded, "pipelines")
+        },
     );
     Overview {
-        streams: Section::from_result(streams, "streams"),
-        alerts: Section::from_result(alerts, "alerts"),
-        pipelines: Section::from_result(pipelines, "pipelines"),
+        streams,
+        alerts,
+        pipelines,
         limits: limits_section().await,
         generated_at: now_micros(),
         cached: false,
     }
+}
+
+/// True when the caller holds an empty grant list for every overview stream type.
+fn streams_forbidden(scope: &OverviewScope) -> bool {
+    OVERVIEW_STREAM_TYPES
+        .iter()
+        .all(|t| scope.stream_grants.get(t).is_some_and(Vec::is_empty))
 }
 
 fn cache_put(key: CacheKey, overview: Overview, ttl_micros: i64) {
@@ -583,10 +623,28 @@ mod tests {
         assert_eq!(err, serde_json::json!({"status": "error", "error": "boom"}));
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_limits_locked_without_enterprise() {
-        #[cfg(not(feature = "enterprise"))]
         assert_eq!(limits_section().await.status, SectionStatus::Locked);
+    }
+
+    #[test]
+    fn test_streams_forbidden_only_when_every_type_has_empty_grants() {
+        let none: HashMap<StreamType, Vec<String>> =
+            OVERVIEW_STREAM_TYPES.iter().map(|t| (*t, vec![])).collect();
+        let mut scope = OverviewScope {
+            user_id: "u".to_string(),
+            stream_grants: none,
+            pipeline_grants: None,
+        };
+        assert!(streams_forbidden(&scope));
+        scope
+            .stream_grants
+            .insert(StreamType::Logs, vec!["logs:app".to_string()]);
+        assert!(!streams_forbidden(&scope));
+        scope.stream_grants.remove(&StreamType::Logs);
+        assert!(!streams_forbidden(&scope));
     }
 
     async fn seed_stream(org: &str, stream_type: StreamType, name: &str, size: f64) {
@@ -675,11 +733,12 @@ mod tests {
             generated_at: now_micros(),
             cached: false,
         };
-        CACHE.insert(key, seeded);
+        cache_put(key, seeded, 30 * 1_000_000);
 
-        let hit = get_overview(org, &admin, 5).await;
+        let hit = cached_overview(org, &admin.user_id, 5).unwrap();
         assert!(hit.cached);
         assert_eq!(hit.streams.data.unwrap().total_streams, 1);
+        assert!(cached_overview(org, &limited.user_id, 5).is_none());
 
         let limited_key = CacheKey {
             org_id: org.to_string(),
