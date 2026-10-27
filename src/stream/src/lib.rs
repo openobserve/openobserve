@@ -168,6 +168,7 @@ fn is_stream_permitted(
         || permitted.contains(&format!("{s_type}:{stream_name}"))
 }
 
+// org_id is only for pattern associations, which is ent only
 pub fn stream_res(
     org_id: &str,
     stream_name: &str,
@@ -381,6 +382,21 @@ pub async fn save_stream_settings(
     sync_associated_metadata_stream_retention(org_id, stream_name, stream_type, &settings).await;
 
     Ok(MetaHttpResponse::ok(""))
+}
+
+/// Checks a stream against the caller's permitted object list, using the stream's own type.
+fn is_stream_permitted(
+    permitted: &[String],
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> bool {
+    let s_type = match stream_type {
+        StreamType::EnrichmentTables => "enrichment_table",
+        _ => stream_type.as_str(),
+    };
+    permitted.contains(&format!("{s_type}:_all_{org_id}"))
+        || permitted.contains(&format!("{s_type}:{stream_name}"))
 }
 
 async fn sync_associated_metadata_stream_retention(
