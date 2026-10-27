@@ -63,8 +63,9 @@ use crate::{
         },
     },
     search::{
-        build_search_request_per_field, error_utils::map_error_to_http_response,
-        utils::SearchStreamGuard,
+        build_search_request_per_field,
+        error_utils::map_error_to_http_response,
+        utils::{SearchStreamGuard, enrichment_table_time_range},
     },
 };
 
@@ -253,6 +254,13 @@ pub async fn search_http2_stream(
         }
     }
 
+    // Enrichment rows carry their upload time, so a dashboard time range would hide them.
+    let enrichment_range = enrichment_table_time_range(&org_id, stream_type, &stream_names).await;
+    if let Some((start_time, end_time)) = enrichment_range {
+        req.query.start_time = start_time;
+        req.query.end_time = end_time;
+    }
+
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
         Err(e) => {
@@ -428,7 +436,9 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
+    // A re-uploaded enrichment table replaces its rows, so cached results would be stale.
+    req.use_cache =
+        get_use_cache_from_request(&query) && !req.clear_cache && enrichment_range.is_none();
 
     // Set search type if not set
     if req.search_type.is_none() {

@@ -356,7 +356,7 @@ export default defineComponent({
     const queryEditorPlaceholderFlag = ref(true);
     const dashboardTitles = reactive({});
     const streamTypes = reactive({});
-    const streamTypeOptions = ["logs", "metrics", "traces"];
+    const streamTypeOptions = ["logs", "metrics", "traces", "enrichment_tables"];
     const streamTypeSelectOptions = streamTypeOptions.map((t) => ({ label: t, value: t }));
     // import type values
     const ImportType = {

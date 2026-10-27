@@ -522,8 +522,14 @@ function onStreamChange(val: SelectModelValue) {
 
 // ── Stream type options ────────────────────────────────────────────────
 
+// The logs Build and Visualize pages force stream_type to logs, so only the dashboard editor offers more.
 const streamTypeOptions = computed(() =>
-  ["logs", "metrics", "traces"].map((t: string) => ({ label: raw(t), value: t })),
+  [
+    "logs",
+    "metrics",
+    "traces",
+    ...(dashboardPanelDataPageKey === "dashboard" ? ["enrichment_tables"] : []),
+  ].map((t: string) => ({ label: raw(t), value: t })),
 );
 
 // ── Stream list ────────────────────────────────────────────────────────

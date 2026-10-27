@@ -17,6 +17,7 @@ use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,
     TIMESTAMP_COL_NAME,
     meta::{sql::TableReferenceExt, stream::StreamType},
+    utils::time::now_micros,
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
@@ -143,6 +144,22 @@ pub async fn validate_query_fields(
     Ok(())
 }
 
+/// Whole-table time range for an enrichment-table search, `None` for any other stream type.
+pub async fn enrichment_table_time_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_names: &[String],
+) -> Option<(i64, i64)> {
+    if stream_type != StreamType::EnrichmentTables {
+        return None;
+    }
+    let mut start_times = Vec::with_capacity(stream_names.len());
+    for name in stream_names {
+        start_times.push(db::enrichment_table::get_start_time(org_id, name).await);
+    }
+    Some(full_table_range(&start_times, now_micros()))
+}
+
 /// Checks if a field is a system field that should always be allowed
 fn is_system_field(field: &str) -> bool {
     field == TIMESTAMP_COL_NAME
@@ -150,6 +167,15 @@ fn is_system_field(field: &str) -> bool {
         || field == ID_COL_NAME
         || field == ORIGINAL_DATA_COL_NAME
         || field == ALL_VALUES_COL_NAME
+}
+
+fn full_table_range(start_times: &[i64], now: i64) -> (i64, i64) {
+    let start = start_times.iter().copied().min().unwrap_or(now).min(now);
+    if start == now {
+        (start - 1, now + 1)
+    } else {
+        (start, now)
+    }
 }
 
 /// Guard that cancels an in-flight streaming search when the HTTP response is
@@ -223,6 +249,33 @@ mod tests {
     use hashbrown::HashMap;
 
     use super::*;
+
+    #[test]
+    fn test_full_table_range_spans_earliest_start_to_now() {
+        assert_eq!(full_table_range(&[300, 100, 200], 1_000), (100, 1_000));
+    }
+
+    #[test]
+    fn test_full_table_range_widens_equal_bounds() {
+        assert_eq!(full_table_range(&[1_000], 1_000), (999, 1_001));
+    }
+
+    #[test]
+    fn test_full_table_range_without_tables_or_with_future_start() {
+        assert_eq!(full_table_range(&[], 1_000), (999, 1_001));
+        assert_eq!(full_table_range(&[5_000], 1_000), (999, 1_001));
+    }
+
+    #[tokio::test]
+    async fn test_enrichment_table_time_range_skips_other_stream_types() {
+        let names = vec!["t".to_string()];
+        for stream_type in [StreamType::Logs, StreamType::Metrics, StreamType::Traces] {
+            assert_eq!(
+                enrichment_table_time_range("org", stream_type, &names).await,
+                None
+            );
+        }
+    }
 
     #[test]
     fn test_search_stream_guard_mark_finished() {
