@@ -11,7 +11,21 @@
           size="md"
           class="confirmation-icon text-icon-color mt-0.5 shrink-0"
         />
+        <i18n-t
+          v-if="deleteTarget?.name"
+          keypath="aiAssistant.aiChat.confirmDeleteNamedEntity"
+          tag="span"
+          class="confirmation-title text-text-heading flex-1 text-sm leading-normal font-medium"
+        >
+          <template #name>
+            <span data-test="o2-ai-confirm-dialog-name" class="font-semibold break-all">{{
+              deleteTarget.name
+            }}</span>
+          </template>
+          <template #entity>{{ deleteTarget.entity }}</template>
+        </i18n-t>
         <span
+          v-else
           class="confirmation-title text-text-heading flex-1 text-sm leading-normal font-medium"
           >{{ formattedMessage }}</span
         >
@@ -75,6 +89,21 @@
         <!-- For other actions, show 2 buttons -->
         <template v-else>
           <OButton
+            v-if="isDeleteAction"
+            ref="yesButtonRef"
+            variant="destructive"
+            :block="true"
+            data-test="o2-ai-confirm-dialog-confirm"
+            class="confirmation-btn rounded-default w-full text-sm font-semibold tracking-normal normal-case"
+            :class="isFocusedYes ? 'ring-status-negative/40 ring-3' : ''"
+            tabindex="0"
+            @click="handleConfirm"
+            @focus="handleYesFocus"
+            @blur="handleYesBlur"
+            >{{ resolvedConfirmLabel }}</OButton
+          >
+          <OButton
+            v-else
             ref="yesButtonRef"
             variant="outline"
             :block="true"
@@ -114,7 +143,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -164,6 +193,31 @@ const emit = defineEmits<{
 // Check if this is a navigation action
 const isNavigationAction = computed(() => props.confirmation?.tool === "navigation_action");
 
+const isDeleteAction = computed(() => !!props.confirmation?.tool?.startsWith("Delete"));
+
+/** Ids only as a last resort: a raw id names nothing the user recognises. */
+const ID_ARGS = ["alert_id", "dashboard_id", "pipeline_id", "id"];
+
+function readableName(args: Record<string, any>): string {
+  const named = ["name", "title", ...Object.keys(args).filter((k) => k.endsWith("_name"))];
+  for (const key of [...named, ...ID_ARGS]) {
+    const value = args[key];
+    if (typeof value === "string" && value) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return "";
+}
+
+const deleteTarget = computed(() => {
+  if (!isDeleteAction.value || !props.confirmation?.tool) return null;
+  // Gated on a list, not te(): te() ignores the fallback locale, so it misses for non-English users.
+  const lowerEntity = props.confirmation.tool.replace("Delete", "").toLowerCase();
+  const entity = DELETABLE_ENTITIES.has(lowerEntity)
+    ? t(`aiAssistant.aiChat.entity.${lowerEntity}`)
+    : raw(lowerEntity);
+  return { name: readableName(props.confirmation.args || {}), entity };
+});
+
 // Format message based on confirmation data
 const formattedMessage = computed(() => {
   if (!props.confirmation) return "";
@@ -185,32 +239,8 @@ const formattedMessage = computed(() => {
     return t("aiAssistant.aiChat.navigateConfirmQuestion");
   }
 
-  // Handle Delete* operations generically (DeleteAlert, DeleteDashboard, DeletePipeline, etc.)
-  if (props.confirmation.tool && props.confirmation.tool.startsWith("Delete")) {
-    // Extract entity type (e.g., "Alert" from "DeleteAlert")
-    const entityType = props.confirmation.tool.replace("Delete", "");
-    // The noun is server-supplied English, so it needs translating before it goes into
-    // a translated sentence. Gated on a list, not te(): te() ignores the fallback locale,
-    // so it returns false for every non-English user until the entity keys are translated.
-    const lowerEntity = entityType.toLowerCase();
-    const entityTypeLower = DELETABLE_ENTITIES.has(lowerEntity)
-      ? t(`aiAssistant.aiChat.entity.${lowerEntity}`)
-      : lowerEntity;
-    const args = props.confirmation.args || {};
-
-    // Try to find a name or title for the entity
-    const name =
-      args.name || args.title || args.alert_id || args.dashboard_id || args.pipeline_id || args.id;
-
-    if (name) {
-      return t("aiAssistant.aiChat.confirmDeleteNamedEntity", {
-        name,
-        entity: entityTypeLower,
-      });
-    }
-
-    // Fallback if no identifier found
-    return t("aiAssistant.aiChat.confirmDeleteEntity", { entity: entityTypeLower });
+  if (deleteTarget.value) {
+    return t("aiAssistant.aiChat.confirmDeleteEntity", { entity: deleteTarget.value.entity });
   }
 
   // Fallback to message property

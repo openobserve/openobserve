@@ -866,6 +866,18 @@ describe("ServiceAccountsList Component", () => {
       expect(openDialogs.length).toBeGreaterThan(0);
     });
 
+    it("names the account and uses a destructive OK button", async () => {
+      wrapper.vm.confirmDeleteAction({ email: "service1@example.com", is_system: false });
+      await nextTick();
+      const deleteDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d) => d.props("modelValue") === true);
+      expect(deleteDialog.props("messageKeypath")).toBe("serviceAccounts.confirmDeleteMsg");
+      expect(deleteDialog.props("messageName")).toBe(wrapper.vm.deleteUserEmailIdentifier);
+      expect(deleteDialog.props("messageName")).toBeTruthy();
+      expect(deleteDialog.props("okVariant")).toBe("destructive");
+    });
+
     it("closes confirm delete dialog when ConfirmDialog emits update:cancel", async () => {
       wrapper.vm.confirmDelete = true;
       wrapper.vm.deleteUserEmailIdentifier = "service1@example.com";
@@ -930,6 +942,10 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.openBulkDeleteDialog();
       await nextTick();
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
+      const bulkDialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d) => d.vm.$attrs["data-test"] === "service-accounts-list-bulk-delete-dialog");
+      expect(bulkDialog.props("okVariant")).toBe("destructive");
     });
 
     it("closes bulk delete dialog when ConfirmDialog emits update:cancel", async () => {

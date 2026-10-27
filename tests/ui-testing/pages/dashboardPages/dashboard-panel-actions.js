@@ -55,6 +55,8 @@ export default class DashboardactionPage {
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    // Panel validation messages listed under the chart (DashboardErrors.vue)
+    this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
     // panel name is empty on save — the form schema blocks submit before any
     // toast is produced).
@@ -148,6 +150,10 @@ export default class DashboardactionPage {
   // Get the inner <canvas> element inside the chart-renderer
   getChartRendererCanvasElement() {
     return this.chartRendererCanvasEl;
+  }
+
+  getErrorToastWithText(text) {
+    return this.errorToast.filter({ hasText: text });
   }
 
   // Get dashboard-error locator

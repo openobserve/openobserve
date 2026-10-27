@@ -1125,6 +1125,33 @@ describe("Dashboards.vue", () => {
       expect(typeof wrapper.vm.showDeleteDialogFn).toBe("function");
     });
 
+    it("names the dashboard in the delete dialog with a destructive button", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await nextTick();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-dialog");
+      expect(dialog.props()).toMatchObject({
+        messageKeypath: "dashboard.deleteDashboardConfirmMsg",
+        messageName: "cpu-overview",
+        okVariant: "destructive",
+      });
+    });
+
+    it("uses a destructive button in the bulk delete dialog", () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-bulk-delete-dialog");
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
+
     it("should handle editFolder method", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),

@@ -16,11 +16,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
+import { defineComponent } from "vue";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import {
-  ConfirmDialogStub,
   FAKE_APP_TOKEN,
   FAKE_CONFIG_ACCESS_TOKEN,
   FAKE_CONFIG_REFRESH_TOKEN,
@@ -98,6 +98,27 @@ const metaStore = () =>
     },
   });
 
+// Adds the named-message props the shared stub does not declare.
+const NamedConfirmDialogStub = defineComponent({
+  name: "ConfirmDialog",
+  props: {
+    modelValue: { type: Boolean, default: false },
+    title: { type: String, default: "" },
+    message: { type: String, default: "" },
+    messageKeypath: { type: String, default: "" },
+    messageName: { type: String, default: "" },
+    okLabel: { type: String, default: "" },
+    okVariant: { type: String, default: "primary" },
+  },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  template: `
+    <div v-if="modelValue" data-test-stub="confirm-dialog">
+      <span data-test-stub="confirm-message">{{ message }}</span>
+      <span data-test-stub="confirm-name">{{ messageName }}</span>
+      <button data-test-stub="confirm-ok" @click="$emit('update:modelValue', false); $emit('update:ok')">{{ okLabel }}</button>
+    </div>`,
+});
+
 const mountWizard = async (
   installation: InstallationView | null = null,
   email = "ana@acme.example",
@@ -109,7 +130,7 @@ const mountWizard = async (
     global: {
       plugins: [i18n, store],
       config: { errorHandler },
-      stubs: { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
+      stubs: { OTable: OTableStub, ConfirmDialog: NamedConfirmDialogStub },
     },
   });
   await flushPromises();
@@ -476,7 +497,10 @@ describe("SlackSelfHostedWizard Step 3", () => {
   it("AC-7.8 Start over removes the pending app and returns to Create the app", async () => {
     const w = await mountWizard(pending);
     await w.find('[data-test="slack-wizard-start-over"]').trigger("click");
-    expect(w.find('[data-test-stub="confirm-message"]').text()).toContain("A0SAMPLE01");
+    expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("A0SAMPLE01");
+    const dialog = w.findComponent(NamedConfirmDialogStub);
+    expect(dialog.props("messageKeypath")).toBe("slackApp.wizard.install.startOverMessage");
+    expect(dialog.props("okVariant")).toBe("destructive");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.uninstallInstallation).toHaveBeenCalledWith("acme", "inst-1");

@@ -146,6 +146,13 @@ describe("playlist URL contract", () => {
     });
   });
 
+  it("keeps a calendar period from the URL", () => {
+    expect(parsePlaylistQuery({ playlist: "d1", period: "calendar:week:-1" })?.period).toBe(
+      "calendar:week:-1",
+    );
+    expect(parsePlaylistQuery({ playlist: "d1", period: "calendar:week:1" })?.period).toBeNull();
+  });
+
   it("ignores garbage period and theme and returns null without dashboards", () => {
     const parsed = parsePlaylistQuery({ playlist: "d1", period: "yesterday", theme: "neon" });
     expect(parsed?.period).toBeNull();

@@ -272,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <DateTimePickerDashboard
                           :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
                           :auto-apply-dashboard="true"
+                          calendar-presets
                           size="sm"
                           class="panel-time-picker-widget"
                           @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"

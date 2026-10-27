@@ -211,8 +211,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       v-model="deleteDialog.show"
-      :title="deleteDialog.title"
-      :message="deleteDialog.message"
+      :title="t('settings.regexPatternList.deleteTitle')"
+      message-keypath="settings.regexPatternList.deleteMessage"
+      :message-name="deleteDialog.name"
+      ok-variant="destructive"
       @update:ok="deleteRegexPattern"
       @update:cancel="deleteDialog.show = false"
     />
@@ -220,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('settings.regexPatternList.bulkDeleteTitle')"
       :message="t('settings.regexPatternList.bulkDeleteMessage', { n: selectedPatterns.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteRegexPatterns"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -366,9 +369,8 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: t("settings.regexPatternList.deleteTitle"),
-      message: t("settings.regexPatternList.deleteMessage"),
       data: "" as any,
+      name: "",
     });
 
     const orgIdForList = useOrgId();
@@ -495,6 +497,7 @@ export default defineComponent({
     const confirmDeleteRegexPattern = (row: any) => {
       deleteDialog.value.show = true;
       deleteDialog.value.data = row.id;
+      deleteDialog.value.name = row.name;
     };
 
     const deleteRegexPattern = async () => {

@@ -373,6 +373,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDialog.show"
       :title="confirmDialog.title"
       :message="confirmDialog.message"
+      :message-keypath="confirmDialog.messageKeypath"
+      :message-name="confirmDialog.messageName"
+      :ok-variant="confirmDialog.okVariant"
       @update:ok="confirmDialog.onConfirm"
       @update:cancel="resetConfirmDialog"
     />
@@ -404,7 +407,8 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -424,8 +428,18 @@ const selectedJob = ref<BackfillJob | null>(null);
 const errorDialogVisible = ref(false);
 const errorDialogData = ref<BackfillJob | null>(null);
 
+interface ConfirmDialogState {
+  show: boolean;
+  title: I18nText;
+  message: I18nText;
+  messageKeypath?: I18nKey;
+  messageName?: string;
+  okVariant?: ButtonVariant;
+  onConfirm: () => void;
+}
+
 // Confirm dialog
-const confirmDialog = ref({
+const confirmDialog = ref<ConfirmDialogState>({
   show: false,
   // raw("") is only the empty placeholder — the real values are assigned from t().
   title: raw(""),
@@ -656,9 +670,10 @@ const confirmDeleteJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
     title: t("pipeline.deleteBackfillJobTitle"),
-    message: t("pipeline.confirmDeleteBackfillJob", {
-      name: job.pipeline_name || job.pipeline_id,
-    }),
+    message: raw(""),
+    messageKeypath: "pipeline.confirmDeleteBackfillJob",
+    messageName: job.pipeline_name || job.pipeline_id,
+    okVariant: "destructive",
     onConfirm: () => deleteJob(job.pipeline_id, job.job_id),
   };
 };
