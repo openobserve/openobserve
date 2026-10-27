@@ -20,6 +20,15 @@ import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 import { gaugeDialRange } from "../../thresholds";
 import { createSeriesOverrideLookup, gaugeOverrideTooltip } from "../../seriesOverrides";
+import { buildValueMappingCache, lookupDisplayedValueMapping } from "../../tableConfigUtils";
+import {
+  alignGaugeValueFonts,
+  gaugeAutoRange,
+  gaugeEndLabels,
+  gaugeValueText,
+  isGaugeAutoRange,
+  sizeGaugeDial,
+} from "../../gaugeDial";
 
 /**
  * Applies chart-specific options for: gauge
@@ -94,40 +103,28 @@ export function applyGaugeChart(ctx: SQLContext): void {
   // for each gauge we have separate grid
   options.grid = gridDataForGauge.gridArray;
 
-  // Gauges apply no value mappings, so only a no-value replacement turns an empty dial into a missing one.
-  const hasNoValueText = String(panelSchema?.config?.no_value_replacement ?? "") !== "";
-  const gaugeData = yAxisValue.length > 0 ? yAxisValue : [hasNoValueText ? null : 0];
+  // No rows is no value, drawn as "-" like PromQL, never a real 0.
+  const gaugeData = yAxisValue.length > 0 ? yAxisValue : [null];
   const gaugeNames = xAxisValue.length > 0 ? xAxisValue : [""];
+  const queryConfig = panelSchema?.queries[0]?.config;
+  const autoRange = isGaugeAutoRange(queryConfig) ? gaugeAutoRange(gaugeData) : null;
+  const mappingCache = buildValueMappingCache(panelSchema?.config?.mappings);
+  const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
 
   options.series = gaugeData.map((it: any, index: any) => {
-    return {
+    const name = gaugeNames[index] ?? "";
+    const unit = seriesOverrides.unitArgs(name);
+    const mapping = lookupDisplayedValueMapping(it, mappingCache, unit.decimals);
+    const gauge: any = {
       ...defaultSeriesProps,
-      ...gaugeDialRange(
-        panelSchema?.queries[0]?.config?.min,
-        panelSchema?.queries[0]?.config?.max,
-        seriesOverrides.unitArgs(gaugeNames[index] ?? "").unit,
-      ),
+      ...(autoRange ?? gaugeDialRange(queryConfig?.min, queryConfig?.max, unit.unit)),
+      ...gaugeEndLabels(panelSchema?.config?.show_gauge_end_labels, unit),
+      // Read after the multi-query merge, which recomputes the range across every query.
+      _autoRange: isGaugeAutoRange(queryConfig),
+      _mappedColor: mapping?.color || undefined,
 
       //which grid will be used
       gridIndex: index,
-      // radius, progress and axisline width will be calculated based on grid width and height
-      radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
-      progress: {
-        show: true,
-        width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-      },
-      axisLine: {
-        lineStyle: {
-          width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-        },
-      },
-      title: {
-        fontSize: 10,
-        offsetCenter: [0, "70%"],
-        // width: upto chart width
-        width: `${gridDataForGauge.gridWidth}`,
-        overflow: "truncate",
-      },
 
       // center of gauge
       // x: left + width / 2,
@@ -140,43 +137,39 @@ export function applyGaugeChart(ctx: SQLContext): void {
       data: [
         {
           // gauge name may have or may not have
-          name: gaugeNames[index] ?? "",
+          name,
           value: it,
           detail: {
-            formatter: function (value: any) {
-              try {
-                const unit = seriesOverrides.unitArgs(gaugeNames[index] ?? "");
-                const unitValue = getUnitValue(value, unit.unit, unit.unitCustom, unit.decimals);
-                return unitValue.value + unitValue.unit;
-              } catch (error) {
-                return value ?? "";
-              }
-            },
+            formatter: (value: unknown) => gaugeValueText(value, mapping, unit),
+            ...(mapping?.textColor ? { color: mapping.textColor } : {}),
           },
           itemStyle: {
             color:
-              seriesOverrides.get(gaugeNames[index] ?? "")?.color ??
-              getSeriesColor(
-                panelSchema?.config?.color,
-                gaugeNames[index] ?? "",
-                [it],
-                chartMin,
-                chartMax,
-                store.state.theme,
-                panelSchema?.config?.color?.colorBySeries,
-                panelSchema?.config,
-              ) ??
-              null,
+              mapping?.color ||
+              (seriesOverrides.get(name)?.color ??
+                getSeriesColor(
+                  panelSchema?.config?.color,
+                  gaugeNames[index] ?? "",
+                  [it],
+                  chartMin,
+                  chartMax,
+                  store.state.theme,
+                  panelSchema?.config?.color?.colorBySeries,
+                  panelSchema?.config,
+                ) ??
+                null),
           },
         },
       ],
-      ...gaugeOverrideTooltip(seriesOverrides, gaugeNames[index] ?? ""),
+      ...gaugeOverrideTooltip(seriesOverrides, name),
       detail: {
         // A counting label keeps animating after a same-value re-render snaps the dial, so a throttled tab freezes it on a stale number.
         valueAnimation: false,
         offsetCenter: [0, 0],
-        fontSize: 12,
       },
     };
+    sizeGaugeDial(gauge, minDim, gridDataForGauge.gridWidth);
+    return gauge;
   });
+  alignGaugeValueFonts(options.series, minDim);
 }

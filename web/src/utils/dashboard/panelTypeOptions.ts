@@ -115,7 +115,11 @@ const isMissingValue = (value: unknown) =>
 const applyGaugeNoValue = (gauge: any, text: string) => {
   const item = gauge?.data?.[0];
   if (!item || !isMissingValue(item.value)) return;
-  item.detail = { ...item.detail, formatter: () => text };
+  const base = item.detail?.formatter;
+  // A value mapping's text outranks the panel's no-value text; only the bare "-" is replaced.
+  const shown = typeof base === "function" ? base(null) : "-";
+  const formatter = () => (shown === "-" || shown === "" ? text : shown);
+  item.detail = { ...item.detail, formatter };
 };
 
 /** Applies the gauge shape settings to converted gauge options; a no-op while every key is absent. */

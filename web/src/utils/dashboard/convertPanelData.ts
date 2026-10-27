@@ -21,8 +21,12 @@ import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
+import {
+  runJavaScriptCode,
+  validateUserCode,
+  type CustomChartContext,
+} from "./convertCustomChartData";
 import { convertStateTimelineData } from "./convertStateTimelineData";
-import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
 import { applyCartesianOptions } from "./cartesianOptions";
 import { applyPanelTypeOptions } from "./panelTypeOptions";
 import { applyMetricOptions, isStatChangeOn, splitStatChangeResults } from "./metricOptions";
@@ -57,6 +61,7 @@ export const convertPanelData = async (
   loading: any = false,
   // Metric sparkline: per-query histogram hits (SQL metric only).
   sparklineData?: any,
+  customChartContext?: CustomChartContext,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -376,7 +381,7 @@ export const convertPanelData = async (
           : data.length > 0 && data[0].length > 0;
 
       if (hasData) {
-        const result = await runJavaScriptCode(panelSchema, data);
+        const result = await runJavaScriptCode(panelSchema, data, customChartContext);
         const safeResult = result && typeof result === "object" ? result : {};
         return {
           chartType: panelSchema.type,

@@ -95,18 +95,19 @@ export default defineComponent({
   setup(props: any) {
     const chartRef: any = ref(null);
     let chart: any;
-    let lmap: any;
-    let lmapComponent: any;
-    const lmapOptions = props.data.options?.lmap ? { ...props.data.options.lmap } : {};
+    let tiledMap: any;
+    let appliedView = "";
+
+    const getLeaflet = () => chart?.getModel()?.getComponent("lmap")?.getLeaflet();
 
     // Clusters are cut at one zoom level, so a zoom regroups the raw points for the new level.
     const onZoomEnd = () => {
+      const lmap = getLeaflet();
       const series = props.data.options?.series;
       if (!lmap || !Array.isArray(series) || !series.some((s: any) => s?._clusterSource)) return;
       chart?.setOption({ series: reclusterSeries(series, lmap.getZoom()) });
     };
-    const bindRecluster = () => {
-      if (!lmap) return;
+    const bindRecluster = (lmap: any) => {
       lmap.off("zoomend", onZoomEnd);
       lmap.on("zoomend", onZoomEnd);
     };
@@ -115,6 +116,40 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       chart?.resize();
+    };
+
+    const applyOptions = () => {
+      if (!chart) return;
+      const options = props.data.options;
+      const lmapOptions = options?.lmap;
+      const view = JSON.stringify([lmapOptions?.center, lmapOptions?.zoom]);
+      if (!lmapOptions || !getLeaflet()) {
+        chart.setOption(withChartFont(options || {}), true);
+      } else if (view === appliedView) {
+        // Leaving center/zoom out keeps the user's pan and zoom across refreshes.
+        const { center: _center, zoom: _zoom, ...lmap } = lmapOptions;
+        chart.setOption(withChartFont({ ...options, lmap }), {
+          replaceMerge: ["series", "visualMap"],
+        });
+      } else {
+        chart.setOption(withChartFont(options), { replaceMerge: ["series", "visualMap"] });
+      }
+
+      const lmap = getLeaflet();
+      if (!lmap) return;
+      if (lmap !== tiledMap) {
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(lmap);
+        tiledMap = lmap;
+        appliedView = "";
+        bindRecluster(lmap);
+      }
+      if (view !== appliedView && lmapOptions?.center) {
+        lmap.setView([lmapOptions.center[1], lmapOptions.center[0]], lmapOptions.zoom);
+      }
+      appliedView = view;
     };
 
     onMounted(async () => {
@@ -128,45 +163,12 @@ export default defineComponent({
       if (chartRef.value) {
         chart = echarts.init(chartRef.value);
       }
-      const options = {
-        ...props.data.options,
-        lmap: lmapOptions,
-      };
-      chart?.setOption(withChartFont(options || {}), true);
+      applyOptions();
       window.addEventListener("resize", windowResizeEventCallback);
-
-      // Get Leaflet extension component
-      // getModel and getComponent do not seem to be exported in echarts typescript
-      // add the following two comments to circumvent this
-
-      // @ts-ignore
-      lmapComponent = chart?.getModel()?.getComponent("lmap");
-
-      // Get the instance of Leaflet
-
-      // @ts-ignore
-      lmap = lmapComponent?.getLeaflet();
-
-      if (lmap) {
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(lmap);
-      }
-      if (props.data.options?.lmap?.center) {
-        lmap.setView(
-          [props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]],
-          props.data.options?.lmap?.zoom,
-        );
-      }
-      bindRecluster();
-      // L.geoJson(mapData).addTo(lmap);
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
-      if (lmap) {
-        lmap.off();
-      }
+      getLeaflet()?.off();
       if (chart) {
         chart?.dispose();
       }
@@ -177,36 +179,7 @@ export default defineComponent({
       async () => {
         await nextTick();
         chart?.resize();
-        const options = {
-          ...props.data.options,
-          lmap: lmapOptions,
-        };
-        chart?.setOption(withChartFont(options || {}), true);
-        // Get Leaflet extension component
-        // getModel and getComponent do not seem to be exported in echarts typescript
-        // add the following two comments to circumvent this
-
-        // @ts-ignore
-        lmapComponent = chart?.getModel().getComponent("lmap");
-
-        // Get the instance of Leaflet
-
-        // @ts-ignore
-        lmap = lmapComponent?.getLeaflet();
-
-        if (lmap) {
-          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          }).addTo(lmap);
-        }
-        if (props.data.options?.lmap?.center) {
-          lmap?.setView(
-            [props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]],
-            props.data.options?.lmap?.zoom,
-          );
-        }
-        bindRecluster();
+        applyOptions();
       },
       { deep: true },
     );

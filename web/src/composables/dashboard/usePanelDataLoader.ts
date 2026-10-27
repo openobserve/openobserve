@@ -40,7 +40,10 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import {
+  isSkippedByPanelRefresh,
+  settlePanelRefresh,
+} from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
@@ -206,10 +209,15 @@ export const usePanelDataLoader = (
   // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
   const isFirstLoadSettled = ref(false);
   let latestLoadCall = 0;
+  // A single-panel refresh ends when its targets settle; until then, every other custom chart skips its re-runs.
+  const settleLoad = () => {
+    isFirstLoadSettled.value = true;
+    settlePanelRefresh(panelSchema.value?.id);
+  };
   watch(
     () => state.loading,
     (loading) => {
-      if (!loading) isFirstLoadSettled.value = true;
+      if (!loading) settleLoad();
     },
     { flush: "sync" },
   );
@@ -470,7 +478,11 @@ export const usePanelDataLoader = (
       state.lastTriggeredAt = new Date().getTime();
 
       // The superseded run was aborted above, so an off-screen panel must not keep reporting it as loading.
-      if (!isVisible.value && forceLoad?.value != true) state.loading = false;
+      if (!isVisible.value && forceLoad?.value != true) {
+        state.loading = false;
+        // An off-screen target loads only once shown, so it must not hold a single-panel refresh open.
+        settlePanelRefresh(panelSchema.value?.id);
+      }
 
       // Wait for visibility BEFORE the cache restore below — restoring first
       // rendered every cached panel on mount, visible or not.
@@ -550,7 +562,7 @@ export const usePanelDataLoader = (
       }
     } finally {
       // Covers every early return: a call that was not superseded and left nothing running has its answer.
-      if (loadCall === latestLoadCall && !state.loading) isFirstLoadSettled.value = true;
+      if (loadCall === latestLoadCall && !state.loading) settleLoad();
     }
   };
 
@@ -560,9 +572,8 @@ export const usePanelDataLoader = (
     async () => {
       log("PanelSchema/Time Wather: called");
 
-      // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
       // This prevents all panels from refreshing when only one panel's time changes
-      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.value.id) {
+      if (isSkippedByPanelRefresh(panelSchema.value.id)) {
         log("PanelSchema/Time Wather: skipping - different panel is being refreshed");
         return;
       }
@@ -798,6 +809,8 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
+    // An aborted stream never reports loading=false, so an unmounted target would block other panels' re-runs.
+    settlePanelRefresh(panelSchema.value?.id);
     // abort on unmount
     if (abortController) {
       // Only set isPartialData if we're still loading or haven't received complete response

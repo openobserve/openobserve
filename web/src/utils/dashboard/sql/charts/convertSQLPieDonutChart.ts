@@ -21,6 +21,8 @@ import {
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   calculatePieChartContainer,
+  MAX_SEATS_PRECISION,
+  pieLegendPercentDecimals,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
 import { escapeHtml } from "@/utils/html";
@@ -112,7 +114,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
           textBorderColor: "transparent",
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(
+          pieLegendPercentDecimals(panelSchema.config?.decimals),
+          MAX_SEATS_PRECISION,
+        ),
       };
       return seriesObj;
     });
@@ -252,7 +257,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
           textBorderColor: "transparent",
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(
+          pieLegendPercentDecimals(panelSchema.config?.decimals),
+          MAX_SEATS_PRECISION,
+        ),
       };
       return seriesObj;
     });

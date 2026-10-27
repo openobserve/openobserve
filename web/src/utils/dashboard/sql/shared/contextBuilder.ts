@@ -42,6 +42,7 @@ import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { sortTooltipParams } from "../../tooltipSort";
 import { tooltipPointValue } from "../../cartesianOptions";
+import { stackTotalRows } from "../../stackTotals";
 
 /**
  * Finds the largest label in the given data array.
@@ -597,7 +598,14 @@ export function buildSQLContext(
             }
           });
 
-          return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it.value,
+          );
+          return `${escapeHtml(name?.[0]?.name)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }

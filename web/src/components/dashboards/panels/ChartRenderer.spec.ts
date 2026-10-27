@@ -28,6 +28,8 @@ import {
   SunburstChart,
   TreemapChart,
 } from "echarts/charts";
+import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
+import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -1507,6 +1509,149 @@ describe("ChartRenderer", () => {
         "api-1 (1 day ago)": false,
       });
     });
+
+    const isolateFirstSlice = async (options: any) => {
+      const echarts = await import("echarts/core");
+      wrapper.unmount();
+      vi.clearAllMocks();
+      wrapper = mount(ChartRenderer, {
+        props: { data: { ...mockChartData, options }, renderType: "canvas", height: "100%" },
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: mockHoveredSeriesState },
+        },
+      });
+      await flushPromises();
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const onLegend = chart.on.mock.calls.find(
+        ([event]: any[]) => event === "legendselectchanged",
+      )[1];
+      chart.getOption.mockReturnValue({ legend: [{}] });
+      const selected = { a: true, b: false };
+      onLegend({ name: "a", selected });
+      return { chart, selected };
+    };
+
+    it("recomputes a pie legend's percents over the visible slices, and again on restore", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        series: [
+          {
+            type: "pie",
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applyLegendConfiguration(
+        {
+          type: "pie",
+          config: { show_legends: true, legend_values: ["percent"], decimals: 0 },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
+        options,
+      );
+      expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+
+      const { chart, selected } = await isolateFirstSlice(options);
+
+      expect(options.legend.selected).toEqual({ a: true, b: false });
+      expect(options.legend.selected).not.toBe(selected);
+      expect(options.legend.formatter("a")).toBe("{b|a}  100%");
+
+      chart.getOption.mockReturnValue({ legend: [{}] });
+      const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
+      onDataZoom({ batch: [{}, {}] });
+
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+      expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+    });
+
+    it("keeps a pie legend's percents on the slices a restore leaves isolated", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        series: [
+          {
+            type: "pie",
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applyLegendConfiguration(
+        {
+          type: "pie",
+          config: { show_legends: true, legend_values: ["percent"], decimals: 0 },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
+        options,
+      );
+      const { chart } = await isolateFirstSlice(options);
+      chart.getOption.mockReturnValue({ legend: [{ selected: { a: true, b: false } }] });
+
+      const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
+      onDataZoom({ batch: [{}, {}] });
+
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+      expect(options.legend.formatter("a")).toBe("{b|a}  100%");
+    });
+
+    it("recomputes a pie slice's override-decimals label over the visible slices", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        legend: { show: true },
+        series: [
+          {
+            type: "pie",
+            label: { show: true, formatter: "{d}%" },
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applySeriesOverrides(
+        options,
+        {
+          type: "pie",
+          config: {
+            override_config: [
+              {
+                field: { matchBy: "series", value: "a" },
+                config: [{ type: "decimals", value: 1 }],
+              },
+            ],
+          },
+        },
+        "light",
+      );
+      const label = options.series[0].data[0].label;
+      expect(label.formatter()).toBe("50.0%");
+
+      await isolateFirstSlice(options);
+
+      expect(label.formatter()).toBe("100.0%");
+    });
+
+    it.each(["pie", "line"])(
+      "leaves the source legend of a %s chart without legend values untouched",
+      async (type) => {
+        const options: any = {
+          ...mockChartData.options,
+          legend: { show: true },
+          series: [{ name: "a", type, data: [] }],
+        };
+        await isolateFirstSlice(options);
+        expect(options.legend.selected).toBeUndefined();
+      },
+    );
   });
 
   describe("heatmap time columns", () => {

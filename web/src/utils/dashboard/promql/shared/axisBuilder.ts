@@ -20,6 +20,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { absValue, createSeriesOverrideLookup } from "../../seriesOverrides";
 import { sortTooltipParams } from "../../tooltipSort";
+import { stackTotalRows } from "../../stackTotals";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
@@ -36,12 +37,15 @@ export function buildTooltip(
   hoveredSeriesState?: any,
   // Pie slices and plain h-bar categories carry the series identity in the item name.
   seriesKey: "seriesName" | "name" = "seriesName",
+  // The chart's series, which carry the stack keys the tooltip totals by.
+  stackSeries?: any[],
 ): any {
   const config = panelSchema.config || {};
   const decimals = config.decimals ?? 2;
   const unit = config.unit;
   const unitCustom = config.unit_custom;
-  const seriesOverrides = createSeriesOverrideLookup(config);
+  // The stack total formats with the same decimal fallback as the rows.
+  const seriesOverrides = createSeriesOverrideLookup({ ...config, decimals });
 
   return {
     trigger: triggerType,
@@ -79,19 +83,30 @@ export function buildTooltip(
         tooltipItems.push(escapeHtml(params[0].axisValue));
       }
 
+      tooltipItems.push(
+        ...stackTotalRows(
+          panelSchema.type,
+          params,
+          stackSeries,
+          seriesOverrides,
+          (it: any) => it.value?.[1] ?? it.value,
+        ),
+      );
+
       // Sort by value and hoist the hovered series, matching SQL tooltips
       const hoveredName = hoveredSeriesState?.value?.hoveredSeriesName;
       sortTooltipParams(params, config, (it: any) => (it.value?.[1] ?? it.value) || 0);
-      const hoveredIndex = params.findIndex((it: any) => it.seriesName === hoveredName);
+      const hoveredIndex = params.findIndex((it: any) => it[seriesKey] === hoveredName);
       if (hoveredIndex > 0) {
         params.unshift(params.splice(hoveredIndex, 1)[0]);
       }
 
       // Add series data with unit formatting; bold ONLY the hovered series
       params.forEach((param: any) => {
-        if (param.seriesName) {
+        const name = param[seriesKey];
+        if (name) {
           const marker = param.marker || "";
-          const override = seriesOverrides.get(param[seriesKey]);
+          const override = seriesOverrides.get(name);
           const point = param.value?.[1] ?? param.value;
           const value = override?.transform === "negative_y" ? absValue(point) : point;
 
@@ -104,10 +119,10 @@ export function buildTooltip(
               override?.decimals ?? decimals,
             ),
           );
-          const label = override?.displayName ?? param.seriesName;
+          const label = override?.displayName ?? name;
 
           const row = `${marker} ${escapeHtml(label)}: ${escapeHtml(formattedValue)}`;
-          tooltipItems.push(param.seriesName === hoveredName ? `<strong>${row}</strong>` : row);
+          tooltipItems.push(name === hoveredName ? `<strong>${row}</strong>` : row);
         }
       });
 
@@ -126,7 +141,7 @@ export function buildTooltip(
  */
 export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true): any {
   const config = panelSchema.config || {};
-  const showGridlines = config.show_grid !== false; // Default to true
+  const showGridlines = config.show_gridlines !== false;
 
   return {
     type: "time",
@@ -160,7 +175,7 @@ export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true
  */
 export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any): any {
   const config = panelSchema.config || {};
-  const showGridlines = config.show_grid !== false; // Default to true
+  const showGridlines = config.show_gridlines !== false;
 
   // Get Y-axis label from query configuration (same as SQL)
   const query = panelSchema.queries?.[queryIndex];
@@ -229,7 +244,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any
  */
 export function buildCategoryXAxis(categories: string[], panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
-  const showGridlines = config.show_grid !== false;
+  const showGridlines = config.show_gridlines !== false;
 
   return {
     type: "category",
@@ -262,11 +277,13 @@ export function buildCategoryXAxis(categories: string[], panelSchema: any, store
  */
 export function buildCategoryYAxis(categories: string[], panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
-  const showGridlines = config.show_grid !== false;
+  const showGridlines = config.show_gridlines !== false;
 
   return {
     type: "category",
     data: categories,
+    // ECharts draws the first category at the bottom; the SQL horizontal charts invert too.
+    inverse: true,
     axisLabel: {
       show: config.axis_label !== false,
       // hide colliding labels instead of drawing them on top of each other
@@ -293,7 +310,7 @@ export function buildCategoryYAxis(categories: string[], panelSchema: any, store
  */
 export function buildValueAxis(panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
-  const showGridlines = config.show_grid !== false;
+  const showGridlines = config.show_gridlines !== false;
 
   const valueAxis: any = {
     type: "value",

@@ -164,11 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
               'status-history',
             ].includes(props.data.type) &&
@@ -505,6 +503,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
+        @sankey-notice-update="handleSankeyNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -890,11 +890,14 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      sankeyNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -969,6 +972,9 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
+        !!sankeyNotice.value?.returnLinks ||
+        !!sankeyNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
@@ -1495,6 +1501,8 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       canInspectFromNotice,

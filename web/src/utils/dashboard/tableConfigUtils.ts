@@ -492,6 +492,12 @@ export const formatNumericValue = (
 // Metric single-value styling (driven by config.mappings)
 // ---------------------------------------------------------------------------
 
+export interface DisplayedValueMapping {
+  text?: string | null;
+  color?: string | null;
+  textColor?: string | null;
+}
+
 export interface ResolvedMetricStyle {
   /** Display text: mapped string when a mapping matched, else the unit-formatted value. */
   text: string;
@@ -525,23 +531,7 @@ export const resolveMetricValueStyle = (
   opts: MetricStyleOptions,
 ): ResolvedMetricStyle => {
   const { mappings, unit, customUnit, decimals, panelBackground, thresholds } = opts;
-  const cache = buildValueMappingCache(mappings);
-  let mapping = lookupValueMappingFull(rawValue, cache);
-
-  const numValue =
-    rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
-  if (!mapping && cache && !Number.isNaN(numValue)) {
-    const fixed = numValue.toFixed(decimals ?? 2);
-    if (fixed !== String(rawValue)) {
-      mapping = lookupValueMappingFull(fixed, cache);
-    }
-    if (!mapping) {
-      const normalized = String(Number(fixed));
-      if (normalized !== fixed && normalized !== String(rawValue)) {
-        mapping = lookupValueMappingFull(normalized, cache);
-      }
-    }
-  }
+  const mapping = lookupDisplayedValueMapping(rawValue, buildValueMappingCache(mappings), decimals);
 
   const missingValue = String(opts.missingValue ?? "");
   const isMissing =
@@ -557,6 +547,30 @@ export const resolveMetricValueStyle = (
     mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
 
   return { text, textColor, bgColor };
+};
+
+/** First mapping for a single displayed value, also trying the value as rounded to `decimals`. */
+export const lookupDisplayedValueMapping = (
+  rawValue: unknown,
+  cache: ReturnType<typeof buildValueMappingCache>,
+  decimals: number | null | undefined,
+): DisplayedValueMapping | null => {
+  let mapping = lookupValueMappingFull(rawValue, cache);
+  const numValue =
+    rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
+  if (!mapping && cache && !Number.isNaN(numValue)) {
+    const fixed = numValue.toFixed(decimals ?? 2);
+    if (fixed !== String(rawValue)) {
+      mapping = lookupValueMappingFull(fixed, cache);
+    }
+    if (!mapping) {
+      const normalized = String(Number(fixed));
+      if (normalized !== fixed && normalized !== String(rawValue)) {
+        mapping = lookupValueMappingFull(normalized, cache);
+      }
+    }
+  }
+  return mapping;
 };
 
 /** Compile a `/pattern/flags` or plain pattern with the linear-time engine; null when it does not compile. */

@@ -384,7 +384,7 @@ describe("text mode and value size", () => {
     const mapped = await viaPanel(promMetric({ mappings }), [empty], metadata);
     expect(textSeries(mapped)._metricText).toBe("N/A");
     const plain = await viaPanel(promMetric(), [empty], metadata);
-    expect(textSeries(plain)._metricText).toBe("0");
+    expect(textSeries(plain)).toBeUndefined();
   });
 
   it("drops the grid label in value mode", async () => {

@@ -20,6 +20,15 @@ const OWN_LAYOUT_TYPES = [
   "node-graph",
 ];
 
+interface PanelQueriesState {
+  data: { queries?: Array<{ config?: { query_type?: string } } | null> };
+  layout?: { hiddenQueries?: number[] };
+}
+
+interface PanelLegendState {
+  data: { type?: string; config: { show_legends?: boolean } };
+}
+
 /**
  * Check that chart align option should be applied
  * @param dashboardPanelData - The dashboard panel data
@@ -36,6 +45,21 @@ export const shouldApplyChartAlign = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
+
+/** True when every visible query of the panel is a PromQL instant query, which has one sample per series. */
+export const allVisibleQueriesInstant = (dashboardPanelData: PanelQueriesState): boolean => {
+  const hidden = dashboardPanelData.layout?.hiddenQueries ?? [];
+  const visible = (dashboardPanelData.data.queries ?? []).filter(
+    (_, index) => !hidden.includes(index),
+  );
+  // With every query hidden the panel may still be range, so its reducer must stay reachable.
+  return visible.length > 0 && visible.every((query) => query?.config?.query_type === "instant");
+};
+
+/** Pie and donut legends can append each slice's value and percent. */
+export const shouldShowLegendValues = (dashboardPanelData: PanelLegendState): boolean =>
+  (dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut") &&
+  !!dashboardPanelData.data.config.show_legends;
 
 /**
  * Check that show Gridlines option should be applied
@@ -281,20 +305,42 @@ export const shouldShowAxisLabelConfig = (dashboardPanelData: any): boolean => {
   );
 };
 
+/** Fill opacity and gradient apply to the unstacked area chart only. */
+export const shouldShowAreaFillConfig = (dashboardPanelData: any): boolean => {
+  return dashboardPanelData.data.type === "area";
+};
+
 /**
- * Check if line thickness input should be displayed
- * Used by: line_thickness input
+ * Check if the scatter point size and opacity inputs should be displayed
+ * Used by: symbol_size input, symbol_opacity input
+ * @param dashboardPanelData - The dashboard panel data
+ * @returns boolean indicating if the point inputs should be displayed
+ */
+export const shouldShowScatterPointConfig = (dashboardPanelData: {
+  data: { type?: string };
+}): boolean => {
+  return dashboardPanelData.data.type === "scatter";
+};
+
+/**
+ * Check if the bar track switch should be displayed
+ * Used by: show_bar_track switch
+ * @param dashboardPanelData - The dashboard panel data
+ * @returns boolean indicating if the bar track switch should be displayed
+ */
+export const shouldShowBarStyleConfig = (dashboardPanelData: any): boolean =>
+  dashboardPanelData.data.type === "h-bar";
+
+/**
+ * Check if the bar width input should be displayed: wherever a converter reads bar_width
+ * Used by: bar_width input
  * @param dashboardPanelData - The dashboard panel data
  * @param promqlMode - Whether promql mode is active
- * @returns boolean indicating if line thickness input should be displayed
+ * @returns boolean indicating if the bar width input should be displayed
  */
-export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boolean): boolean => {
-  return (
-    !promqlMode &&
-    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
-    ["area", "area-stacked", "line"].includes(dashboardPanelData.data.type)
-  );
-};
+export const shouldShowBarWidthConfig = (dashboardPanelData: any, promqlMode: boolean): boolean =>
+  dashboardPanelData.data.type === "h-bar" ||
+  (promqlMode && ["bar", "stacked", "h-stacked"].includes(dashboardPanelData.data.type));
 
 /**
  * Check if Drilldown component should be displayed

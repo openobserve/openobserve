@@ -55,8 +55,7 @@ export class TableConverter implements PromQLChartConverter {
 
   /**
    * Apply custom column ordering based on config
-   * Note: Sticky columns remain in their ordered position (they don't move to front)
-   * Sticky is just a CSS property for horizontal scrolling
+   * Note: the table pins sticky columns to the left edge, ahead of the ordered columns
    */
   private applyColumnOrdering(labelKeys: string[], config: any): string[] {
     const columnOrder: string[] = config.column_order || [];
@@ -127,14 +126,12 @@ export class TableConverter implements PromQLChartConverter {
     const makeTimestampColumn = (sticky = false): any => ({
       ...baseColumn("timestamp", gt("dashboard.utils.promqlTableTimestampColumn"), "left"),
       mono: true,
-      ...(sticky ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" } : {}),
+      ...(sticky ? { pinned: "left" } : {}),
     });
 
     const makeLabelColumn = (key: string, sticky = false): any => ({
       ...baseColumn(key, key, "left"),
-      sticky,
-      headerClasses: sticky ? "sticky-column" : undefined,
-      classes: sticky ? "sticky-column" : undefined,
+      ...(sticky ? { pinned: "left" } : {}),
       format: textFormat,
     });
 

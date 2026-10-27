@@ -16,6 +16,55 @@
 import { gt } from "@/types/i18n";
 
 import { getDataValue } from "./aliasUtils";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { escapeHtml } from "@/utils/html";
+import { TOOLTIP_SCROLL_STYLE } from "./promql/shared/types";
+
+interface GeoUnitConfig {
+  config?: { unit?: string; unit_custom?: string; decimals?: number };
+}
+
+interface GeoTooltipParams {
+  seriesName?: string;
+  value?: unknown[];
+  data?: { fields?: Record<string, unknown> };
+}
+
+// Equal weights (one point, or no weight field) would divide by zero and hide every marker.
+export function normalizeGeoWeight(value: number, minValue: number, maxValue: number) {
+  if (maxValue === minValue) return 0.5;
+  return (value - minValue) / (maxValue - minValue);
+}
+
+/** Formats a geomap weight with the panel's unit and decimals. */
+export const formatGeoWeight = (value: unknown, panelSchema: GeoUnitConfig) =>
+  formatUnitValue(
+    getUnitValue(
+      value,
+      panelSchema.config?.unit as string,
+      panelSchema.config?.unit_custom as string,
+      panelSchema.config?.decimals,
+    ),
+  );
+
+const formatTooltipValue = (value: unknown) =>
+  escapeHtml(value !== null && typeof value === "object" ? JSON.stringify(value) : String(value));
+
+/** Tooltip formatter shared by the SQL and PromQL geomap converters. */
+export const geoMapTooltipFormatter =
+  (panelSchema: GeoUnitConfig) => (params: GeoTooltipParams) => {
+    const [lon, lat, weight] = params.value ?? [];
+    const rows: [string, unknown][] = [
+      [gt("panel.latitude"), lat],
+      [gt("panel.longitude"), lon],
+      [gt("panel.weight"), formatGeoWeight(weight, panelSchema)],
+      ...Object.entries(params.data?.fields ?? {}),
+    ];
+    return [
+      `<b>${escapeHtml(params.seriesName ?? "")}</b>`,
+      ...rows.map(([key, value]) => `${escapeHtml(key)}: ${formatTooltipValue(value)}`),
+    ].join("<br/>");
+  };
 
 /**
  * Converts Map data into a format suitable for rendering a chart.
@@ -24,13 +73,6 @@ import { getDataValue } from "./aliasUtils";
  * @param {any} mapData - the map data
  * @return {Object} - the option object for rendering the map chart
  */
-function normalizeValue(value: any, minValue: any, maxValue: any) {
-  return (value - minValue) / (maxValue - minValue);
-}
-
-import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { escapeHtml } from "@/utils/html";
-
 export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   //if no latitude and longitude than return it
   if (
@@ -97,21 +139,10 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
-      formatter: function (params: any) {
-        let formattedValue = params.value[2];
-        if (getUnitValue && formatUnitValue) {
-          formattedValue = formatUnitValue(
-            getUnitValue(
-              formattedValue,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          );
-        }
-
-        return `${escapeHtml(params.seriesName)}: ${escapeHtml(formattedValue)}`;
-      },
+      // Without it the tooltip hides when the pointer leaves the marker, so it can never be scrolled.
+      enterable: true,
+      extraCssText: TOOLTIP_SCROLL_STYLE,
+      formatter: geoMapTooltipFormatter(panelSchema),
     },
     visualMap: {
       left: "right",
@@ -132,6 +163,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
       text: [gt("dashboard.utils.visualMapHigh"), gt("dashboard.utils.visualMapLow")],
       calculable: true,
+      formatter: (value: any) => formatGeoWeight(value, panelSchema),
     },
     toolbox: {
       show: true,
@@ -162,6 +194,9 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   };
 
   options.series = panelSchema.queries.map((query: any, index: any) => {
+    const aliases = [query.fields.longitude, query.fields.latitude, query.fields.weight]
+      .map((field: any) => field?.alias)
+      .filter((alias: any) => alias !== null && alias !== undefined);
     return {
       name: gt("dashboard.utils.mapLayerNameIndexed", { index: index + 1 }),
       type: query.config.layer_type,
@@ -173,25 +208,31 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
       data: filteredMapData[index]?.map((item: any) => {
         if (query.customQuery) {
-          // For custom queries
-          return [
+          const weight = getDataValue(item, query.fields.weight?.alias);
+          const hasWeight = weight !== null && weight !== undefined;
+          const value = [
             getDataValue(item, query.fields.longitude.alias),
             getDataValue(item, query.fields.latitude.alias),
-            getDataValue(item, query.fields.weight.alias) == null
-              ? query.config.weight_fixed
-              : getDataValue(item, query.fields.weight.alias),
+            hasWeight ? weight : (query.config.weight_fixed ?? 1),
           ];
-        } else {
-          // For auto queries
-          return [
-            item.longitude,
-            item.latitude,
-            item.weight == null ? query.config.weight_fixed : item.weight,
-          ];
+          const fields = Object.fromEntries(
+            Object.entries(item).filter(
+              ([key]) =>
+                !aliases.some((alias: any) => key === alias || key === String(alias).toLowerCase()),
+            ),
+          );
+          return Object.keys(fields).length ? { value, fields } : value;
         }
+        return [
+          item.longitude,
+          item.latitude,
+          item.weight !== null && item.weight !== undefined
+            ? item.weight
+            : (query.config.weight_fixed ?? 1),
+        ];
       }),
       symbolSize: function (val: any) {
-        const normalizedSize = normalizeValue(val[2], minValue, maxValue);
+        const normalizedSize = normalizeGeoWeight(val[2], minValue, maxValue);
         const minSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.min ?? 1;
         const maxSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.max ?? 100;
         const mapSymbolStyleSelected = panelSchema.config?.map_symbol_style?.size ?? "by Value";
@@ -214,18 +255,13 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   if (!options.series.map((item: any) => item.data).every(Array.isArray)) {
     return;
   }
-  //min max for symbol size
-  const seriesData = options.series.flatMap((series: any) => series.data);
-
-  // Calculate min/max values once +
-  const values = seriesData.map((item: any) => item[2]);
+  const values = options.series.flatMap((series: any) =>
+    series.data.map((item: any) => (Array.isArray(item) ? item : item.value)[2]),
+  );
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
 
-  if (seriesData.length > 0) {
-    const minValue = Math.min(...seriesData.map((item: any) => item[2]));
-    const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
-
+  if (values.length > 0) {
     options.visualMap.min = minValue;
     options.visualMap.max = maxValue;
   } else {

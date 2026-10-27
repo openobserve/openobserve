@@ -263,7 +263,7 @@ export const applyMetricOptions = (
       mode,
       fontSize,
       change,
-      name: String(series._metricLabel ?? series._metricStatName ?? ""),
+      name: String(series._metricStatName ?? series._metricLabel ?? ""),
       bounds: layout
         ? {
             top: Number(layout.top) || 0,

@@ -7,6 +7,7 @@ import {
   shouldShowLegendWidth,
   shouldShowLegendHeight,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
@@ -15,7 +16,10 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
+  shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
+  shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowStackMode,
@@ -24,6 +28,7 @@ import {
   shouldShowScatterEncoding,
   shouldShowConnectNullsThreshold,
   shouldShowCartesianSeriesConfig,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import {
   SectionId,
@@ -35,6 +40,8 @@ import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQ
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 import { isStatChangeOn } from "@/utils/dashboard/metricOptions";
 import { isHtmlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
+import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,6 +64,8 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "area-stacked",
   "bar",
   "h-bar",
+  "stacked",
+  "h-stacked",
   "scatter",
   "gauge",
   "metric",
@@ -185,10 +194,16 @@ export function useConfigPanel(
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
   const isStatusHistory = computed(() => dashboardPanelData.data.type === "status-history");
   const isRowChart = computed(() => isRowTimeline(dashboardPanelData.data.type));
-  const isGaugeFamily = computed(
-    () => dashboardPanelData.data.type === "gauge" || dashboardPanelData.data.type === "bar-gauge",
-  );
   const isBarGauge = computed(() => dashboardPanelData.data.type === "bar-gauge");
+  // An auto-range gauge picks its own bounds; a bar gauge has no range mode, so it always shows them.
+  const showGaugeBounds = computed(
+    () =>
+      isBarGauge.value ||
+      (dashboardPanelData.data.type === "gauge" &&
+        !isGaugeAutoRange(
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+        )),
+  );
   const isPieOrDonut = computed(
     () => dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut",
   );
@@ -201,6 +216,11 @@ export function useConfigPanel(
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
+      },
+      "promql-series-limit": {
+        label: t("dashboard.promqlSeriesLimit"),
+        visible:
+          !!promqlMode.value && PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
       },
       "show-exemplars": {
         label: t("dashboard.showExemplarsLabel"),
@@ -309,6 +329,10 @@ export function useConfigPanel(
       "tooltip-sort": {
         label: t("dashboard.tooltipSort"),
         visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "legend-values": {
+        label: t("dashboard.legendValues"),
+        visible: shouldShowLegendValues(dashboardPanelData),
       },
       "promql-legend": {
         label: t("dashboard.query"),
@@ -545,6 +569,14 @@ export function useConfigPanel(
         label: t("dashboard.showGridlines"),
         visible: shouldShowGridlines(dashboardPanelData),
       },
+      "bar-width": {
+        label: t("dashboard.barWidth"),
+        visible: shouldShowBarWidthConfig(dashboardPanelData, promqlMode.value),
+      },
+      "bar-track": {
+        label: t("dashboard.showBarTrack"),
+        visible: shouldShowBarStyleConfig(dashboardPanelData),
+      },
     },
     labels: {
       "label-position": {
@@ -571,7 +603,23 @@ export function useConfigPanel(
       },
       "line-thickness": {
         label: t("dashboard.lineThickness"),
-        visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
+        visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+      },
+      "fill-opacity": {
+        label: t("dashboard.fillOpacity"),
+        visible: shouldShowAreaFillConfig(dashboardPanelData),
+      },
+      "fill-gradient": {
+        label: t("dashboard.fillGradient"),
+        visible: shouldShowAreaFillConfig(dashboardPanelData),
+      },
+      "point-size": {
+        label: t("dashboard.pointSize"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
+      },
+      "point-opacity": {
+        label: t("dashboard.pointOpacity"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
       },
       "line-style": {
         label: t("dashboard.lineStyle"),
@@ -598,6 +646,10 @@ export function useConfigPanel(
       filtering: {
         label: t("dashboard.tableFiltering"),
         visible: dashboardPanelData.data.type === "table",
+      },
+      "expandable-rows": {
+        label: t("dashboard.tableExpandableRows"),
+        visible: dashboardPanelData.data.type === "table" && !isPivotMode.value,
       },
       pagination: {
         label: t("dashboard.pagination"),
@@ -689,15 +741,27 @@ export function useConfigPanel(
         label: [t("dashboard.mapCluster"), t("dashboard.mapClusterRadius")],
         visible: dashboardPanelData.data.type === "geomap",
       },
+      "map-roam": {
+        label: t("dashboard.mapsEnableRoam"),
+        visible: dashboardPanelData.data.type === "maps",
+      },
     },
     gauge: {
+      "gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible: isGaugeFamily.value,
+        visible: showGaugeBounds.value,
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
-        visible: isGaugeFamily.value,
+        visible: showGaugeBounds.value,
+      },
+      "gauge-end-labels": {
+        label: t("dashboard.showGaugeEndLabels"),
+        visible: dashboardPanelData.data.type === "gauge",
       },
       "bar-gauge-mode": {
         label: t("dashboard.barGaugeMode"),
@@ -830,7 +894,13 @@ export function useConfigPanel(
     sparkline: {
       sparkline: {
         label: t("dashboard.configSectionSparkline"),
-        visible: dashboardPanelData.data.type === "metric",
+        // Matches ConfigPanel, which drops the section for an all-instant PromQL metric.
+        visible:
+          dashboardPanelData.data.type === "metric" &&
+          !(
+            dashboardPanelData.data.queryType === "promql" &&
+            allVisibleQueriesInstant(dashboardPanelData)
+          ),
       },
     },
     logs: {

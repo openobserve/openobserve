@@ -122,6 +122,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
 
+        <OInput
+          v-if="promqlMode && promqlSeriesLimitEligible"
+          v-show="isConfigOptionVisible('general', 'promql-series-limit')"
+          :model-value="dashboardPanelDataModel.data.config.promql_series_limit ?? undefined"
+          type="number"
+          :min="1"
+          :max="maxDashboardSeries"
+          @update:model-value="setPromqlSeriesLimit"
+          :placeholder="raw(String(defaultPromqlSeriesLimit))"
+          :label="t('dashboard.promqlSeriesLimit')"
+          data-test="dashboard-config-promql-series-limit"
+        >
+          <template #tooltip>
+            <OTooltip
+              :content="t('dashboard.promqlSeriesLimitTooltip', { max: maxDashboardSeries })"
+              max-width="15.625rem"
+            />
+          </template>
+        </OInput>
+
         <OSwitch
           v-if="promqlMode && exemplarsSwitchEligible"
           v-show="isConfigOptionVisible('general', 'show-exemplars')"
@@ -476,6 +496,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             data-test="dashboard-config-tooltip_sort-option"
             :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OToggleGroup
+          v-if="shouldShowLegendValues(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'legend-values')"
+          type="multiple"
+          label-position="top"
+          :label="t('dashboard.legendValues')"
+          v-model="legendValuesModel"
+          data-test="dashboard-config-legend-values"
+        >
+          <OToggleGroupItem
+            v-for="opt in legendValuesOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-legend-values-option"
+            :data-test-label="opt.value"
             >{{ opt.label }}</OToggleGroupItem
           >
         </OToggleGroup>
@@ -1766,6 +1806,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-show-gridlines"
           size="lg"
         />
+
+        <OInput
+          v-if="shouldShowBarWidthConfig(dashboardPanelData, promqlMode)"
+          v-show="isConfigOptionVisible('axis', 'bar-width')"
+          :model-value="dashboardPanelData.data.config.bar_width ?? ''"
+          :model-modifiers="{ number: true }"
+          type="number"
+          :min="1"
+          :max="BAR_WIDTH_MAX"
+          :label="t('dashboard.barWidth')"
+          :placeholder="t('dashboard.auto')"
+          :error="!isBarWidthValid(dashboardPanelData.data.config.bar_width)"
+          :error-message="t('dashboard.barWidthInvalid', { max: BAR_WIDTH_MAX })"
+          @update:model-value="
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.bar_width = value === '' ? null : value)
+          "
+          data-test="dashboard-config-bar-width"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.barWidthTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OSwitch
+          v-if="shouldShowBarStyleConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'bar-track')"
+          v-model="dashboardPanelDataModel.data.config.show_bar_track"
+          :label="t('dashboard.showBarTrack')"
+          data-test="dashboard-config-show-bar-track"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.showBarTrackTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
       </div>
     </OCollapsible>
 
@@ -1893,7 +1969,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.lineStyle = v;
         }
       "
-      :label="t('dashboard.configSectionLineStyle')"
+      :label="
+        shouldShowScatterPointConfig(dashboardPanelData)
+          ? t('dashboard.configSectionPointStyle')
+          : t('dashboard.configSectionLineStyle')
+      "
       class="border-card-glass-border border-t border-solid"
     >
       <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
@@ -1920,21 +2000,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OInput
-          v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
+          v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
-          v-model.number="dashboardPanelDataModel.data.config.line_thickness"
+          :model-value="dashboardPanelData.data.config.line_thickness ?? ''"
           type="number"
           :min="0"
           step="any"
-          @update:model-value="
-            (value: any) =>
-              (dashboardPanelDataModel.data.config.line_thickness =
-                typeof value == 'number' && value >= 0 ? value : null)
-          "
+          :max="MAX_LINE_THICKNESS"
+          :error-message="lineThicknessError"
+          @update:model-value="setLineThickness"
           @blur="
             () => {
-              if (dashboardPanelData.data.config.line_thickness == null)
-                dashboardPanelDataModel.data.config.line_thickness = 1.5;
+              if (dashboardPanelData.data.config.line_thickness === null)
+                dashboardPanelDataModel.data.config.line_thickness = DEFAULT_LINE_THICKNESS;
             }
           "
           :label="t('dashboard.lineThickness')"
@@ -1978,6 +2056,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('dashboard.barRadiusTooltip')" max-width="15.625rem" />
           </template>
         </OInput>
+
+        <OInput
+          v-if="shouldShowAreaFillConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'fill-opacity')"
+          :model-value="dashboardPanelData.data.config.fill_opacity ?? ''"
+          type="number"
+          :min="0"
+          :max="100"
+          @update:model-value="setFillOpacity"
+          @blur="clampFillOpacity"
+          :label="t('dashboard.fillOpacity')"
+          :placeholder="t('dashboard.fillOpacityDefault')"
+          data-test="dashboard-config-fill_opacity"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.fillOpacityTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OSwitch
+          v-if="shouldShowAreaFillConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'fill-gradient')"
+          :model-value="dashboardPanelData.data.config.fill_gradient !== false"
+          @update:model-value="
+            (value: unknown) => (dashboardPanelDataModel.data.config.fill_gradient = !!value)
+          "
+          :label="t('dashboard.fillGradient')"
+          data-test="dashboard-config-fill_gradient"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.fillGradientTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
+        <OInput
+          v-if="shouldShowScatterPointConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'point-size')"
+          :model-value="dashboardPanelData.data.config.symbol_size ?? ''"
+          :model-modifiers="{ number: true }"
+          type="number"
+          :min="1"
+          :max="SYMBOL_SIZE_MAX"
+          :error="!isScatterSymbolSizeValid(dashboardPanelData.data.config.symbol_size)"
+          :error-message="t('dashboard.pointSizeInvalid', { max: SYMBOL_SIZE_MAX })"
+          @update:model-value="
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.symbol_size = value === '' ? null : value)
+          "
+          :label="t('dashboard.pointSize')"
+          :placeholder="t('dashboard.pointSizeDefault')"
+          data-test="dashboard-config-symbol_size"
+        />
+
+        <OInput
+          v-if="shouldShowScatterPointConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'point-opacity')"
+          v-model.number="dashboardPanelDataModel.data.config.symbol_opacity"
+          type="number"
+          :min="0"
+          :max="100"
+          @update:model-value="
+            (value: string | number) =>
+              (dashboardPanelDataModel.data.config.symbol_opacity =
+                typeof value === 'number' ? Math.min(100, Math.max(0, value)) : null)
+          "
+          :label="t('dashboard.pointOpacity')"
+          :placeholder="t('dashboard.pointOpacityDefault')"
+          data-test="dashboard-config-symbol_opacity"
+        />
       </div>
     </OCollapsible>
 
@@ -2032,6 +2180,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-table-filtering"
           size="lg"
         />
+
+        <OSwitch
+          v-show="isConfigOptionVisible('table', 'expandable-rows')"
+          v-model="dashboardPanelDataModel.data.config.table_expandable_rows"
+          :label="t('dashboard.tableExpandableRows')"
+          data-test="dashboard-config-table-expandable-rows"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.tableExpandableRowsTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
 
         <OSwitch
           v-show="isConfigOptionVisible('table', 'pagination')"
@@ -2181,7 +2341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCollapsible
       variant="config"
       v-if="
-        ['table', 'metric', 'state-timeline', 'status-history'].includes(
+        ['table', 'metric', 'gauge', 'state-timeline', 'status-history'].includes(
           dashboardPanelData.data.type,
         )
       "
@@ -2330,6 +2490,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OSelect>
         </div>
+
+        <OSwitch
+          v-if="dashboardPanelData.data.type === 'maps'"
+          v-show="isConfigOptionVisible('map', 'map-roam')"
+          v-model="mapsEnableRoam"
+          :label="t('dashboard.mapsEnableRoam')"
+          data-test="dashboard-config-map-roam"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.mapsEnableRoamTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
 
         <OSelect
           v-if="dashboardPanelData.data.type == 'geomap'"
@@ -2495,6 +2668,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border border-t border-solid"
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OSelect
+          v-show="isConfigOptionVisible('gauge', 'gauge-range-mode')"
+          :model-value="
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .range_mode ?? 'fixed'
+          "
+          :options="gaugeRangeModeOptions"
+          :label="t('dashboard.gaugeRangeMode')"
+          :valueKey="'value'"
+          :labelKey="'label'"
+          @update:model-value="
+            (value: unknown) =>
+              (dashboardPanelDataModel.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].config.range_mode = value === 'auto' ? 'auto' : 'fixed')
+          "
+          data-test="dashboard-config-gauge-range-mode"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.gaugeRangeModeTooltip')" max-width="15.625rem" />
+          </template>
+        </OSelect>
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
@@ -2531,6 +2726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('dashboard.gaugeMaxValue')"
           :placeholder="t('dashboard.hundredPlaceholder')"
+          :error-message="gaugeRangeError"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.queries[
@@ -2549,6 +2745,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-config-gauge-max"
+        />
+        <OSwitch
+          v-show="isConfigOptionVisible('gauge', 'gauge-end-labels')"
+          v-model="dashboardPanelDataModel.data.config.show_gauge_end_labels"
+          :label="t('dashboard.showGaugeEndLabels')"
+          data-test="dashboard-config-gauge-end-labels"
+          size="lg"
         />
         <OToggleGroup
           v-show="isConfigOptionVisible('gauge', 'gauge-style')"
@@ -2860,7 +3063,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <ColorPaletteDropDown />
-        <ColorBySeries :colorBySeriesData="panelData" />
+        <ColorBySeries
+          v-if="dashboardPanelData.data.type !== 'sankey'"
+          :colorBySeriesData="panelData"
+        />
       </div>
     </OCollapsible>
 
@@ -3165,7 +3371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Sparkline (metric only) -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type == 'metric'"
+      v-if="dashboardPanelData.data.type === 'metric' && !promqlAllInstant"
       v-show="isSectionVisible('sparkline')"
       :model-value="isExpanded('sparkline')"
       :icon="SECTION_ICONS.sparkline"
@@ -3260,6 +3466,12 @@ import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
 import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { TABLE_DENSITIES } from "@/utils/dashboard/tableOptions";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
+import {
+  DEFAULT_LINE_THICKNESS,
+  MAX_LINE_THICKNESS,
+  isValidLineThickness,
+} from "@/utils/dashboard/promqlChartSeriesProps";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -3304,6 +3516,7 @@ import {
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
+import { isGaugeFixedRangeValid } from "@/utils/dashboard/gaugeDial";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -3343,6 +3556,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 import { useStore } from "vuex";
 
 import {
@@ -3358,6 +3572,7 @@ import {
   shouldShowLegendWidthUnitContainer,
   shouldShowLegendHeightUnitContainer,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
@@ -3366,7 +3581,10 @@ import {
   shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
+  shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
+  shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowStackMode,
@@ -3375,7 +3593,10 @@ import {
   shouldShowScatterEncoding,
   shouldShowConnectNullsThreshold,
   shouldShowCartesianSeriesConfig,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
+import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
+import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 import { resolveTooltipSort } from "@/utils/dashboard/tooltipSort";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
@@ -3672,6 +3893,39 @@ export default defineComponent({
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
+    const legendValuesModel = computed({
+      get: (): string[] => dashboardPanelData.data.config.legend_values ?? [],
+      set: (v: unknown) => {
+        const selected = Array.isArray(v) ? v : [];
+        dashboardPanelData.data.config.legend_values = LEGEND_VALUE_KEYS.filter((key) =>
+          selected.includes(key),
+        );
+      },
+    });
+    const legendValuesOptions = [
+      { label: t("dashboard.legendValueValue"), value: "value" },
+      { label: t("dashboard.legendValuePercent"), value: "percent" },
+    ];
+    const setLineThickness = (value: string | number) => {
+      const parsed = value === "" ? NaN : Number(value);
+      dashboardPanelData.data.config.line_thickness = Number.isFinite(parsed) ? parsed : null;
+    };
+    const lineThicknessError = computed(() =>
+      isValidLineThickness(dashboardPanelData.data.config.line_thickness)
+        ? undefined
+        : t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }),
+    );
+    const setFillOpacity = (value: string | number) => {
+      const parsed = value === "" ? NaN : Number(value);
+      dashboardPanelData.data.config.fill_opacity = Number.isFinite(parsed) ? parsed : null;
+    };
+    // Clamping only on blur keeps the field showing what was typed until it is committed.
+    const clampFillOpacity = () => {
+      const value = dashboardPanelData.data.config.fill_opacity;
+      if (typeof value === "number") {
+        dashboardPanelData.data.config.fill_opacity = Math.min(Math.max(value, 0), 100);
+      }
+    };
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
@@ -3690,6 +3944,16 @@ export default defineComponent({
         value: "world",
       },
     ];
+
+    // Unset keeps each path's old default: PromQL maps pan and zoom, SQL maps do not.
+    const mapsEnableRoam = computed({
+      get: () =>
+        dashboardPanelData.data.config.enable_roam ??
+        dashboardPanelData.data.queryType === "promql",
+      set: (value: boolean) => {
+        dashboardPanelData.data.config.enable_roam = value;
+      },
+    });
     onBeforeMount(() => {
       // Normalize config fields that default to null but may arrive as undefined
       // when loaded from older panels (backend omits null fields in JSON response).
@@ -4167,6 +4431,20 @@ export default defineComponent({
       },
     ];
 
+    const gaugeRangeModeOptions = [
+      { label: t("dashboard.gaugeRangeModeFixed"), value: "fixed" },
+      { label: t("dashboard.gaugeRangeModeAuto"), value: "auto" },
+    ];
+    // Save is blocked on the same rule; this says why beside the field.
+    const gaugeRangeError = computed(() =>
+      dashboardPanelData.data.type === "gauge" &&
+      !isGaugeFixedRangeValid(
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+      )
+        ? t("dashboard.utils.gaugeMinBelowMax")
+        : undefined,
+    );
+
     const showSymbol = [
       {
         label: t("dashboard.no"),
@@ -4324,6 +4602,7 @@ export default defineComponent({
         "funnel",
         "boxplot",
         "node-graph",
+        "sankey",
       ].includes(dashboardPanelData.data.type);
     });
 
@@ -4457,6 +4736,23 @@ export default defineComponent({
     };
 
     const exemplarsSwitchEligible = computed(() => isExemplarEligible(dashboardPanelData.data));
+    const promqlSeriesLimitEligible = computed(() =>
+      PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
+    );
+    const maxDashboardSeries = computed(() => store.state?.zoConfig?.max_dashboard_series ?? 100);
+    const defaultPromqlSeriesLimit = computed(() => Math.min(100, maxDashboardSeries.value));
+    const setPromqlSeriesLimit = (value: string | number) => {
+      const limit = value === "" ? NaN : Math.floor(Number(value));
+      dashboardPanelData.data.config.promql_series_limit = Number.isFinite(limit)
+        ? Math.min(Math.max(limit, 1), maxDashboardSeries.value)
+        : null;
+    };
+    // An instant query returns one sample per series, so a metric has no trend to draw.
+    const promqlAllInstant = computed(
+      () =>
+        dashboardPanelData.data.queryType === "promql" &&
+        allVisibleQueriesInstant(dashboardPanelData),
+    );
 
     const {
       searchQuery,
@@ -4595,13 +4891,22 @@ export default defineComponent({
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,
+      legendValuesModel,
+      legendValuesOptions,
       toggleItemValue,
+      setLineThickness,
+      lineThicknessError,
+      DEFAULT_LINE_THICKNESS,
+      MAX_LINE_THICKNESS,
+      setFillOpacity,
+      clampFillOpacity,
       t,
       dashboardPanelData,
       dashboardPanelDataModel,
       promqlMode,
       basemapTypeOptions,
       mapTypeOptions,
+      mapsEnableRoam,
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
@@ -4686,6 +4991,8 @@ export default defineComponent({
       toNumberOrNull,
       labelPositionOptions,
       showSymbol,
+      gaugeRangeModeOptions,
+      gaugeRangeError,
       lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,
@@ -4712,6 +5019,7 @@ export default defineComponent({
       shouldShowLegendWidthUnitContainer,
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
+      shouldShowLegendValues,
       shouldShowGridlines,
       shouldShowTopResultsConfig,
       shouldShowAreaLineStyleConfig,
@@ -4720,7 +5028,14 @@ export default defineComponent({
       shouldShowAxisBorderConfig,
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
-      shouldShowLineThickness,
+      shouldShowAreaFillConfig,
+      shouldShowScatterPointConfig,
+      isScatterSymbolSizeValid,
+      SYMBOL_SIZE_MAX,
+      shouldShowBarStyleConfig,
+      shouldShowBarWidthConfig,
+      isBarWidthValid,
+      BAR_WIDTH_MAX,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)
@@ -4737,6 +5052,11 @@ export default defineComponent({
       isExpanded,
       isSectionVisible,
       exemplarsSwitchEligible,
+      promqlSeriesLimitEligible,
+      promqlAllInstant,
+      maxDashboardSeries,
+      defaultPromqlSeriesLimit,
+      setPromqlSeriesLimit,
       isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,
