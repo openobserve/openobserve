@@ -69,7 +69,6 @@ pub(super) async fn evaluate(
 pub(super) async fn infer_stream(org: &str, query: &QueryCondition) -> anyhow::Result<String> {
     let names = referenced_streams(query.promql.as_deref().unwrap_or_default())?;
     for name in names {
-        let name = ::promql::utils::resolve_metric_name(org, name).await;
         let schema =
             infra::schema::get(org, &name, config::meta::stream::StreamType::Metrics).await?;
         if !schema.fields().is_empty() {

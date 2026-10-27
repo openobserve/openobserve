@@ -110,7 +110,7 @@ fn normalize_names(expr: &mut Expr) {
     }
 }
 
-// a metric name may name a stream stored as written, so the engine resolves it, not the parser
+// a metric name may name a stream stored as written, so it is left unchanged
 fn normalize_selector(vs: &mut VectorSelector) {
     let or_matchers = vs.matchers.or_matchers.iter_mut().flatten();
     for matcher in vs.matchers.matchers.iter_mut().chain(or_matchers) {

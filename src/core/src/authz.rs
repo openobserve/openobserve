@@ -927,19 +927,8 @@ fn resolve_promql(resolved: &mut ResolvedSources, org_id: &str, query: &str) {
         resolved.push_unparseable(org_id, query, e, false);
         return;
     }
-    // the engine reads the formatted stream when none is stored as written, so both need a grant
-    let mut names: Vec<String> = visitor
-        .into_names()
-        .into_iter()
-        .flat_map(|name| {
-            [
-                config::utils::schema::format_stream_name(name.clone()),
-                name,
-            ]
-        })
-        .collect();
+    let mut names: Vec<String> = visitor.into_names().into_iter().collect();
     names.sort_unstable();
-    names.dedup();
     for name in names {
         resolved.resource_texts.push(name.clone());
         resolved.push_stream(TypedStream {
@@ -1131,16 +1120,6 @@ mod tests {
                 "metrics/mem_used",
                 "metrics/req_errors",
                 "metrics/req_total"
-            ]
-        );
-
-        // the engine may read either stream, so both are checked
-        let written = resolve_query_sources(&[promql("o1", "DCGM_FI_DEV_GPU_TEMP")]);
-        assert_eq!(
-            names(&written),
-            vec![
-                "metrics/DCGM_FI_DEV_GPU_TEMP",
-                "metrics/dcgm_fi_dev_gpu_temp"
             ]
         );
     }

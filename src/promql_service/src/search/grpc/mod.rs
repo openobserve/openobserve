@@ -39,7 +39,7 @@ use promql::{
     },
     exec::PromqlContext,
     micros,
-    utils::{absent_label_rejects_all, resolve_metric_name},
+    utils::absent_label_rejects_all,
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -473,15 +473,13 @@ async fn get_max_file_list(
     let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let names = visitor.into_names();
-    let mut metrics_name = std::collections::HashSet::with_capacity(names.len());
-    for name in names {
-        let name = resolve_metric_name(org_id, name).await;
-        metrics_name.insert(if query_exemplars {
-            promql::utils::exemplars_stream_for(org_id, &name).await
-        } else {
-            name
-        });
+    let mut metrics_name = visitor.into_names();
+    if query_exemplars {
+        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
+        for name in &metrics_name {
+            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+        }
+        metrics_name = mapped;
     }
     let window = selector_window(&ast);
 

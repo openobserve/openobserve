@@ -35,7 +35,7 @@ use crate::{
     ast::rewrite::remove_filter_all,
     functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
-    utils::{exemplars_stream_for, metric_name, offset_micros, resolve_metric_name},
+    utils::{exemplars_stream_for, metric_name, offset_micros},
 };
 
 pub(super) type SelectorContexts = Vec<ScanContext>;
@@ -111,19 +111,6 @@ impl Engine {
             .await
     }
 
-    /// `named_selector` with the metric name resolved to the stream it reads.
-    pub(super) async fn stream_selector(
-        &self,
-        selector: VectorSelector,
-        kind: &str,
-    ) -> Result<VectorSelector> {
-        let mut selector = named_selector(selector, kind)?;
-        if let Some(name) = selector.name.take() {
-            selector.name = Some(resolve_metric_name(&self.ctx.query_ctx.org_id, name).await);
-        }
-        Ok(selector)
-    }
-
     /// An instant selector, streamed when the layout allows it; `None` when nothing is selected.
     pub(super) async fn exec_vector_selector(
         &mut self,
@@ -158,9 +145,7 @@ impl Engine {
             self.result_type = Some("vector".to_string());
         }
 
-        let selector = self
-            .stream_selector(selector.clone(), "VectorSelector")
-            .await?;
+        let selector = named_selector(selector.clone(), "VectorSelector")?;
 
         let metrics_cache = self.selector_load_data_owned(&selector, None, ctxs).await?;
         if metrics_cache.is_empty() {
@@ -250,9 +235,7 @@ impl Engine {
             self.result_type = Some("matrix".to_string());
         }
 
-        let selector = self
-            .stream_selector(selector.clone(), "MatrixSelector")
-            .await?;
+        let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
         let mut values = self
             .selector_load_data_owned(&selector, Some(range), ctxs)
