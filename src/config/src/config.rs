@@ -6761,7 +6761,7 @@ mod tests {
         assert_eq!(select_ext_auth_salt("env", "stored"), "env");
         assert_eq!(select_ext_auth_salt("", "stored"), "stored");
         assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
-  }
+    }
 
     #[test]
     fn test_chrome_semaphore_never_exceeds_cpu_limit() {
