@@ -936,7 +936,7 @@ export const usePanelDataLoader = (
         cachedWindowDiffers(
           cache?.cacheTimeRange,
           selectedTimeObj?.value,
-          refreshAfterRestore.isCalendarRange(),
+          refreshAfterRestore.isCalendarRange(selectedTimeObj?.value),
         )
       ) {
         state.isCachedDataDifferWithCurrentTimeRange = true;

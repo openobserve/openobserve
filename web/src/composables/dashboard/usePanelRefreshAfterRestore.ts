@@ -23,6 +23,7 @@ import {
   type WritableComputedRef,
 } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "./dashboardFreshOnOpen";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 
 // Result fields a refresh after a cache restore keeps showing from the cache until its run settles.
 const HELD_RESULT_KEYS = [
@@ -45,12 +46,20 @@ type PanelLoaderState = Record<HeldKey, any> & {
   isOperationCancelled: boolean;
 };
 
-type TimeWindow = { start_time?: unknown; end_time?: unknown } | null | undefined;
+type TimeWindow =
+  | { start_time?: unknown; end_time?: unknown; relativeTimePeriod?: string | null }
+  | null
+  | undefined;
 
 const toMs = (time: unknown) => (time instanceof Date ? time.getTime() : Number(time));
 
 const isSameWindow = (a: TimeWindow, b: TimeWindow) =>
   toMs(a?.start_time) === toMs(b?.start_time) && toMs(a?.end_time) === toMs(b?.end_time);
+
+// Without a host-provided check, read calendar-ness off the window itself so a host with no
+// DASHBOARD_FRESH_ON_OPEN provider still rejects a differently-dated same-span calendar period.
+const isCalendarWindow = (window: TimeWindow) =>
+  parseCalendarToken(window?.relativeTimePeriod) !== null;
 
 /** Whether restored data covers another range than the one selected; a calendar period so far keeps its start while it grows. */
 export const cachedWindowDiffers = (
@@ -81,14 +90,17 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   const heldResult = ref<Pick<S, HeldKey> | null>(null);
 
   // The cache key has no time range, so another absolute window of the same length would pass for this one.
-  const isCalendarRange = () => !!freshOnOpen?.isCalendarRange?.(panelSchema.value);
+  const isCalendarRange = (selectedWindow?: TimeWindow) =>
+    freshOnOpen?.isCalendarRange
+      ? !!freshOnOpen.isCalendarRange(panelSchema.value)
+      : isCalendarWindow(selectedWindow);
 
   const acceptsCachedWindow = (cachedWindow: TimeWindow, selectedWindow: TimeWindow) => {
     if (freshOnOpen?.isRelativeRange(panelSchema.value) === false) {
       return isSameWindow(cachedWindow, selectedWindow);
     }
     // A calendar period has fixed bounds, so data from any other window is not that period's data.
-    if (isCalendarRange()) {
+    if (isCalendarRange(selectedWindow)) {
       return toMs(cachedWindow?.start_time) === toMs(selectedWindow?.start_time);
     }
     return true;

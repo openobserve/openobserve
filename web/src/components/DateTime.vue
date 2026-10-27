@@ -90,13 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
         @keydown.capture="onPickerKeydown"
       >
-        <!--
-          Desktop: a 2x2 grid places the rail (col 1) beside the picker (col 2), header row above
-          body row, so each pane's own border-b/border-e falls on the shared row/column edge and
-          reads as one continuous line. Narrow: the same cells become a flex column, reordered so
-          the whole rail block (heading + rows + calendar) precedes the whole picker block, instead
-          of the grid's row-major order splitting the rail across the top and bottom of the stack.
-        -->
         <div
           class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
           :class="
@@ -349,7 +342,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <!-- Timezone (and Apply, when not auto-applying) sits right under this pane's own content; no top border, so it never doubles with the preset grid's own bottom line. -->
             <div
               v-if="!hideRelativeTimezone || !autoApply"
               class="flex shrink-0 items-center gap-3 px-3 py-2"
@@ -461,7 +453,6 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { fromZonedTime } from "date-fns-tz";
 
 const MICROS_PER_SECOND = 1_000_000;
-// Keeps a flipped-to-top popover clear of the app's fixed h-10 (2.5rem) header instead of painting over it.
 const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
 // Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
 const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
@@ -1651,8 +1642,7 @@ export default defineComponent({
       return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
     };
 
-    // The calendar section is a 2-column grid of this/last pairs; everything else in
-    // the rail is one column, so each recent row and the toggle are their own 1-item row.
+    // Only the calendar section is a 2-column grid of this/last pairs; every other row is 1-item.
     const railRows = (panel: HTMLElement): HTMLButtonElement[][] => {
       const recentRows = Array.from(
         panel.querySelectorAll<HTMLButtonElement>("[data-date-time-rail-recent]"),
@@ -1963,8 +1953,7 @@ export default defineComponent({
       }
     };
 
-    // The rail sits after the header band in DOM order (for visual/focus-order reasons), so
-    // reka's default "focus the first tabbable descendant" would land on a tab button instead.
+    // The rail sits after the header band in DOM order, so reka's default autofocus would land on a tab button.
     const onPopoverOpenAutoFocus = (event: Event) => {
       if (!showRail.value) return;
       event.preventDefault();

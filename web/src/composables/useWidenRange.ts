@@ -16,7 +16,7 @@
 import { computed } from "vue";
 import { gt, type I18nKey } from "@/types/i18n";
 import { getIntlLocale } from "@/locales";
-import { formatCalendarLabel, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import { formatCalendarLabel } from "@/utils/dashboard/calendarPeriods";
 
 /**
  * `gt()` rather than a threaded `t`: this is a module-scope pure helper that
@@ -43,7 +43,7 @@ export function periodToLabel(period: string): string {
   return gt(units[unit] ?? "common.pastUnit", { count: value });
 }
 
-/** A rolling period that contains `period`, or "" for a calendar period older than every suggestion. */
+/** A rolling period that contains `period`. */
 export function nextWiderPeriod(period: string): string {
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
@@ -55,14 +55,6 @@ export function nextWiderPeriod(period: string): string {
     w: 10080,
     M: 43200,
   };
-  const calendar = resolveCalendarPeriod(period);
-  if (calendar) {
-    // Suggestions are windows ending now, so the smallest one reaching back to the period's start covers it.
-    const sinceStart = (Date.now() * 1000 - calendar.startTime) / 60_000_000;
-    if (sinceStart <= 1440) return "1d";
-    if (sinceStart <= 10080) return "7d";
-    return sinceStart <= 43200 ? "30d" : "";
-  }
   const mins = value * (toMins[unit] ?? 1);
   if (mins <= 60) return "1d";
   if (mins <= 1440) return "7d";

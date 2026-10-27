@@ -249,7 +249,9 @@ export const isUsablePickerValue = (value: any): boolean => {
 };
 
 /** Resolves a picker value to the time object panels load with; a relative range resolves from now. */
-export const pickerValueToTimeObj = (value: any): { start_time: Date; end_time: Date } | null => {
+export const pickerValueToTimeObj = (
+  value: any,
+): { start_time: Date; end_time: Date; relativeTimePeriod?: string | null } | null => {
   if (!value) return null;
 
   if (pickerValueType(value) === "relative") {
@@ -257,7 +259,12 @@ export const pickerValueToTimeObj = (value: any): { start_time: Date; end_time: 
       ? getConsumableRelativeTime(value.relativeTimePeriod)
       : undefined;
     return window
-      ? { start_time: new Date(window.startTime), end_time: new Date(window.endTime) }
+      ? {
+          start_time: new Date(window.startTime),
+          end_time: new Date(window.endTime),
+          // Kept alongside the resolved window so a cache-restore check can tell a calendar period apart from a rolling one without re-deriving it.
+          relativeTimePeriod: value.relativeTimePeriod,
+        }
       : null;
   }
 

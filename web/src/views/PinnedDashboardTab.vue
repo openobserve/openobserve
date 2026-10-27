@@ -118,7 +118,9 @@ const dashboardData = ref<any>(null);
 // RenderDashboardCharts expects currentTimeObj keyed per-panel, falling back
 // to the "__global" key when no panel-specific override exists. We only
 // ever set the global time here (read-only embedded view, no per-panel UI).
-const currentTimeObj = ref<Record<string, { start_time?: Date; end_time?: Date }>>({});
+const currentTimeObj = ref<
+  Record<string, { start_time?: Date; end_time?: Date; relativeTimePeriod?: string | null }>
+>({});
 const refreshInterval = ref(0);
 const dateTimePicker = ref<any>(null);
 const renderRef = ref<any>(null);
@@ -188,6 +190,7 @@ const setTime = () => {
       __global: {
         start_time: new Date(win.startTime),
         end_time: new Date(win.endTime),
+        relativeTimePeriod: selectedDate.value?.relativeTimePeriod,
       },
     };
   }

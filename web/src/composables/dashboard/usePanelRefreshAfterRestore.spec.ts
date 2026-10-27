@@ -179,6 +179,28 @@ describe("usePanelRefreshAfterRestore", () => {
     ).toBe(false);
   });
 
+  it("without a DASHBOARD_FRESH_ON_OPEN provider, still rejects a same-length calendar cache from another period", () => {
+    const outside = usePanelRefreshAfterRestore({
+      state: restoredState(),
+      panelSchema: ref({ id: "P1" }),
+    });
+    const lastWeek = {
+      start_time: WINDOW.start_time.getTime(),
+      end_time: WINDOW.end_time.getTime(),
+      relativeTimePeriod: "calendar:week:-1",
+    };
+    const priorWeek = {
+      start_time: lastWeek.start_time - 7 * 24 * 60 * 60 * 1000,
+      end_time: lastWeek.end_time - 7 * 24 * 60 * 60 * 1000,
+    };
+
+    expect(outside.acceptsCachedWindow(priorWeek, lastWeek)).toBe(false);
+    expect(outside.acceptsCachedWindow(lastWeek, lastWeek)).toBe(true);
+
+    const rolling = { ...lastWeek, relativeTimePeriod: "7d" };
+    expect(outside.acceptsCachedWindow(priorWeek, rolling)).toBe(true);
+  });
+
   it("marks only a complete, error-free result as refreshed", () => {
     const { state, visit, refresh } = setup();
 

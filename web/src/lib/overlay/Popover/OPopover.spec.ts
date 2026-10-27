@@ -130,8 +130,7 @@ describe("OPopover", () => {
         default: '<div data-testid="content">Body</div>',
       },
     });
-    // The mock renders PopoverPortal AS PopoverContent (to skip the real portal), so the
-    // actual content node — the one carrying our props — is the last/innermost match.
+    // The mock renders PopoverPortal as PopoverContent, so the real content is the last match.
     const content = wrapper.findAllComponents(PopoverContent).at(-1)!;
     expect(content.props("collisionPadding")).toEqual({
       top: 48,

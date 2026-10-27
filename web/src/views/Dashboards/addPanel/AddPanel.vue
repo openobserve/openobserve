@@ -1487,11 +1487,16 @@ export default defineComponent({
         const effectiveTime = {
           start_time: new Date(date.startTime),
           end_time: new Date(date.endTime),
+          relativeTimePeriod: date.relativeTimePeriod,
         };
 
         // Set the effective time for chart rendering
         dashboardPanelData.meta.dateTime = effectiveTime;
-        appliedDateKey.value = dateSelectionKey(selectedDate.value);
+        // Keyed from the resolved window: selectedDate.value only gets its startTime backfilled after this call.
+        appliedDateKey.value = dateSelectionKey({
+          ...selectedDate.value,
+          startTime: date.startTime,
+        });
 
         // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -2382,6 +2387,8 @@ export default defineComponent({
       chartData,
       editMode,
       selectedDate,
+      appliedDateKey,
+      isTimeChangePending,
       errorData,
       handleChartApiError,
       variablesDataUpdated,
