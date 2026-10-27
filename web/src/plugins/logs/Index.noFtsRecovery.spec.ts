@@ -110,6 +110,32 @@ afterEach(() => {
   resetFreeTextSchemasForTests();
 });
 
+describe("Index SQL toggle before the stream fields load (#15549)", { timeout: 30000 }, () => {
+  it("refuses a bare word on a no-FTS stream instead of running it as raw SQL", async () => {
+    streams.push({
+      name: "plain",
+      schema: [
+        { name: "_timestamp", type: "Int64" },
+        { name: "msg_text", type: "Utf8" },
+      ],
+      settings: {},
+    });
+    const state = wrapper.vm.searchObj;
+    state.data.stream.selectedStream = ["plain"];
+    state.data.streamResults = { list: [{ name: "plain" }] };
+    state.data.stream.selectedStreamFields = [];
+    state.data.freeTextBlocked = null;
+    resetFreeTextSchemasForTests();
+
+    state.meta.sqlMode = true;
+    await flushPromises();
+
+    await vi.waitFor(() => expect(state.data.freeTextBlocked?.streams).toEqual(["plain"]));
+    expect(state.meta.sqlMode).toBe(false);
+    expect(state.data.query).toBe("timeout");
+  });
+});
+
 describe("Index no-FTS recovery requests", { timeout: 30000 }, () => {
   it.each([
     ["-refused", ""],

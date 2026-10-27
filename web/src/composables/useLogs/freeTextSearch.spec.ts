@@ -23,6 +23,7 @@ import {
   crossLinkQueryText,
   freeTextWhereByStream,
   isFilterHeld,
+  loadPendingFreeTextSchemas,
   noFtsStreams,
   noFtsRecoveryTerm,
   noFtsRecoveryStreams,
@@ -433,6 +434,59 @@ describe("refreshFreeTextSchemas (spec 6.3 residual risk)", () => {
     sqlMode.meta.sqlMode = true;
     await refreshFreeTextSchemas(sqlMode, zoConfig, fetchStream);
     expect(fetchStream).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadPendingFreeTextSchemas (toggling SQL before the fields load)", () => {
+  const unloaded = (query: string, names: string[]) => {
+    const obj = makeSearchObj(query, []);
+    obj.data.stream.selectedStream = names;
+    return obj;
+  };
+
+  it("plans a bare word as raw SQL while the schema is missing, and as blocked once loaded", async () => {
+    const obj = unloaded("timeout", ["plain"]);
+    const before = buildFilterContext(obj, zoConfig);
+    expect(planStreamsFilter("timeout", ["plain"], before)).toEqual({
+      kind: "sql",
+      filter: "timeout",
+    });
+
+    await loadPendingFreeTextSchemas(obj, async () => noFts("plain"));
+
+    const after = buildFilterContext(obj, zoConfig);
+    expect(after.textEnabled).toBe(true);
+    expect(after.targets.plain.mode).toBe("blocked");
+    expect(planStreamsFilter("timeout", ["plain"], after).kind).toBe("freeText");
+  });
+
+  it("fetches only streams whose schema is missing", async () => {
+    const obj = makeSearchObj("timeout", [fts("loaded")]);
+    obj.data.stream.selectedStream = ["loaded", "pending"];
+    const fetchStream = vi.fn(async (name: string) => noFts(name));
+
+    await loadPendingFreeTextSchemas(obj, fetchStream);
+
+    expect(fetchStream).toHaveBeenCalledTimes(1);
+    expect(fetchStream).toHaveBeenCalledWith("pending");
+  });
+
+  it("does not fetch when every schema is already known", async () => {
+    const fetchStream = vi.fn();
+    await loadPendingFreeTextSchemas(makeSearchObj("timeout", [fts("app")]), fetchStream);
+    expect(fetchStream).not.toHaveBeenCalled();
+  });
+
+  it("keeps the raw filter when the schema cannot be loaded", async () => {
+    const obj = unloaded("timeout", ["plain"]);
+    await loadPendingFreeTextSchemas(obj, async () => {
+      throw new Error("403");
+    });
+    const ctx = buildFilterContext(obj, zoConfig);
+    expect(planStreamsFilter("timeout", ["plain"], ctx)).toEqual({
+      kind: "sql",
+      filter: "timeout",
+    });
   });
 });
 
