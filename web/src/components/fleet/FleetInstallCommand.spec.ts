@@ -124,7 +124,7 @@ describe("FleetInstallCommand", () => {
     expect(code(w)).toContain("--transport http");
     w.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
     await w.vm.$nextTick();
-    expect(code(w)).not.toContain("--transport");
+    expect(code(w)).toContain("--transport ws");
   });
 
   it("shows Helm on Kubernetes with the same transport choice, HTTP polling by default", async () => {
