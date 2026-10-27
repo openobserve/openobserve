@@ -604,6 +604,10 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
     // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
     reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
+    // A public link must not outlive its dashboard; a failure shows it as "dashboard deleted".
+    if let Err(e) = crate::public_dashboards::revoke_all_for_dashboard(org_id, dashboard_id).await {
+        log::error!("[Dashboard] error revoking public links of {dashboard_id}: {e}");
+    }
     if let Err(e) = infra::coordinator::dashboards::emit_delete_event(org_id, dashboard_id).await {
         log::error!("[Dashboard] error emitting coordinator delete event for {dashboard_id}: {e}");
     }
@@ -820,6 +824,8 @@ async fn put(
     prune_annotation_source_panels(&mut dashboard);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
+    // Public links detect edits by this stamp, so every writer gets it, not only the UI.
+    dashboard.set_updated_at();
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
     if let Some(id) = dash.dashboard_id() {
         if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
