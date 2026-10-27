@@ -22,7 +22,7 @@ test.describe("IAM Users edit dialog cancel Regression", () => {
     await expect(iam.getUpdateRoleDialogLocator()).toBeHidden();
     await expect(page).not.toHaveURL(iam.getUrlWithUserActionPattern());
 
-    // The reopen used to land about a second after Cancel.
+    // The dialog opens on a 100ms timer after the deferred page-init URL read.
     await page.waitForTimeout(2000);
     await expect(iam.getUpdateRoleDialogLocator()).toBeHidden();
     testLogger.info('Edit dialog stayed closed and URL is clean after Cancel');
@@ -30,7 +30,7 @@ test.describe("IAM Users edit dialog cancel Regression", () => {
 
   test("edit dialog cancelled during a slow roles load does not reopen @bug-15546 @P3 @regression @iamUsers", async ({ page }) => {
     const iam = pm.iamFormValidation;
-    await page.route(/\/api\/[^/]+\/roles(\?.*)?$/, async (route) => {
+    await page.route(/\/api\/[^/]+\/users\/roles(\?.*)?$/, async (route) => {
       await new Promise((r) => setTimeout(r, 3000));
       await route.continue();
     });

@@ -1118,6 +1118,8 @@ export default defineComponent({
       showUpdateUserDialog.value = true;
     };
 
+    let openAddUserTimer: ReturnType<typeof setTimeout> | undefined;
+
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       selectedUser.value.organization = store.state.selectedOrganization.identifier;
@@ -1134,7 +1136,8 @@ export default defineComponent({
       } else {
         selectedUser.value = {};
       }
-      setTimeout(() => {
+      clearTimeout(openAddUserTimer);
+      openAddUserTimer = setTimeout(() => {
         showAddUserDialog.value = true;
       }, 100);
     };
@@ -1228,6 +1231,7 @@ export default defineComponent({
     };
 
     const hideForm = () => {
+      clearTimeout(openAddUserTimer);
       showAddUserDialog.value = false;
       router.replace({
         name: "users",

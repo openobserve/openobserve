@@ -1070,6 +1070,7 @@ describe("User Component", () => {
 
     it("does not reopen the edit dialog when it was cancelled while the page was still loading", async () => {
       sharedUsersState.users = [];
+      queryClient.clear();
       let resolveRoles: (v: any) => void = () => {};
       mockUsersService.getRoles.mockReturnValue(new Promise((r) => (resolveRoles = r)) as any);
       await router.push({
