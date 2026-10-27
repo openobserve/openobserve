@@ -48,13 +48,18 @@ impl MigrationTrait for Migration {
                 continue;
             }
             let completed_at = completed_at_of(db, &incidents).await?;
-            for incident in &incidents {
-                let key = (incident.org_id.clone(), incident.id.clone());
-                let times = completed_at.get(&key).map_or(&[][..], Vec::as_slice);
-                if let Some(at) = incident.newest_report_at(times) {
-                    db.execute(backend.build(&set_pointer(&incident.id, at)))
-                        .await?;
-                }
+            let pointers: Vec<(&str, i64)> = incidents
+                .iter()
+                .filter_map(|incident| {
+                    let key = (incident.org_id.clone(), incident.id.clone());
+                    let times = completed_at.get(&key).map_or(&[][..], Vec::as_slice);
+                    incident
+                        .newest_report_at(times)
+                        .map(|at| (incident.id.as_str(), at))
+                })
+                .collect();
+            if let Some(stmt) = set_pointers(&pointers) {
+                db.execute(backend.build(&stmt)).await?;
             }
         }
         Ok(())
@@ -175,8 +180,15 @@ async fn completed_at_of<C: ConnectionTrait>(
         ])
         .from(IncidentEvents::Table)
         .and_where(
-            Expr::col(IncidentEvents::IncidentId)
-                .is_in(incidents.iter().map(|incident| incident.id.as_str())),
+            Expr::tuple([
+                Expr::col(IncidentEvents::OrgId).into(),
+                Expr::col(IncidentEvents::IncidentId).into(),
+            ])
+            .in_tuples(
+                incidents
+                    .iter()
+                    .map(|incident| (incident.org_id.as_str(), incident.id.as_str())),
+            ),
         )
         .to_owned();
     let mut times = HashMap::new();
@@ -208,22 +220,31 @@ fn completed_times(events: &serde_json::Value) -> Vec<i64> {
         .collect()
 }
 
-/// Never overwrites a real run pointer written since the page was read.
-fn set_pointer(incident_id: &str, at: i64) -> UpdateStatement {
-    Query::update()
-        .table(AlertIncidents::Table)
-        .values([
-            (AlertIncidents::RcaRunId, V1_POINTER.into()),
-            (AlertIncidents::RcaState, COMPLETED.into()),
-            (AlertIncidents::RcaStartedAt, at.into()),
-            (AlertIncidents::RcaUpdatedAt, at.into()),
-            (AlertIncidents::RcaOutcome, Option::<String>::None.into()),
-            (AlertIncidents::RcaConfidence, Option::<String>::None.into()),
-            (AlertIncidents::RcaSummary, Option::<String>::None.into()),
-        ])
-        .and_where(Expr::col(AlertIncidents::Id).eq(incident_id))
-        .and_where(Expr::col(AlertIncidents::RcaRunId).is_null())
-        .to_owned()
+/// One statement per page: each `(incident_id, at)` pair; never overwrites a real run pointer
+/// written since the page was read.
+fn set_pointers(pointers: &[(&str, i64)]) -> Option<UpdateStatement> {
+    let ((first_id, first_at), rest) = pointers.split_first()?;
+    let case = rest.iter().fold(
+        Expr::case(Expr::col(AlertIncidents::Id).eq(*first_id), *first_at),
+        |case, (id, at)| case.case(Expr::col(AlertIncidents::Id).eq(*id), *at),
+    );
+    let at: SimpleExpr = case.into();
+    Some(
+        Query::update()
+            .table(AlertIncidents::Table)
+            .values([
+                (AlertIncidents::RcaRunId, V1_POINTER.into()),
+                (AlertIncidents::RcaState, COMPLETED.into()),
+                (AlertIncidents::RcaStartedAt, at.clone()),
+                (AlertIncidents::RcaUpdatedAt, at),
+                (AlertIncidents::RcaOutcome, Option::<String>::None.into()),
+                (AlertIncidents::RcaConfidence, Option::<String>::None.into()),
+                (AlertIncidents::RcaSummary, Option::<String>::None.into()),
+            ])
+            .and_where(Expr::col(AlertIncidents::Id).is_in(pointers.iter().map(|(id, _)| *id)))
+            .and_where(Expr::col(AlertIncidents::RcaRunId).is_null())
+            .to_owned(),
+    )
 }
 
 #[cfg(test)]
