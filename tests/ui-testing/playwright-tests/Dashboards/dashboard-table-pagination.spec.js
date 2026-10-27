@@ -1115,7 +1115,8 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     // Fill the Monaco input directly; typing lets autocomplete corrupt the query
     await queryEditor.getByRole('code').click();
-    await queryEditor.locator('.inputarea').fill('cpu_usage{}');
+    // vector(1) has a point at every step; a seeded cpu_usage series has one sample, so seconds after seeding it has only a few rows.
+    await queryEditor.locator('.inputarea').fill('vector(1)');
 
     // Apply
     await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
@@ -1139,7 +1140,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     // Rows render directly in tbody, keyed data-test="o2-table-row-<index>"; data is required for pagination to render
     const tableRows = tablePanel.locator('tbody tr[data-test^="o2-table-row-"]');
-    await expect(tableRows.first(), 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBeVisible({ timeout: 15000 });
+    await expect(tableRows.first(), 'PromQL query "vector(1)" must return data rows for pagination test').toBeVisible({ timeout: 15000 });
 
     // Wait for the table bottom container which holds all pagination controls
     // (PromQL with legend uses a custom bottom slot that also has this data-test)
