@@ -1,10 +1,14 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { isCloudEnvironment, getOrgIdentifier } = require('../utils/cloud-auth.js');
+
+const ORG_SEARCH_INPUT = '[data-test="org-management-search-input-field"]';
 
 test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
-    test.describe.configure({ mode: 'parallel' });
+    // Serial: every case reads the same shared _meta org list and one case writes a
+    // usage limit, so under fullyParallel they would race each other.
+    test.describe.configure({ mode: 'serial' });
 
     test.skip(!isCloudEnvironment(), 'Organization Management page and status-steps pool are cloud-only (meta-org admin)');
 
@@ -37,7 +41,14 @@ test.describe("Synthetics Status Steps Quota (Organization Management)", () => {
     }, async ({ page }) => {
         testLogger.info('Testing Status Steps allowance write path');
 
-        const org = await pm.organizationManagementPage.getFirstOrg();
+        // The only case that writes, so it targets the org this run signed in to, never
+        // the first row of the shared _meta list (another tenant's org).
+        const identifier = getOrgIdentifier();
+        expect(identifier, 'org identifier for this run').toBeTruthy();
+        await page.locator(ORG_SEARCH_INPUT).fill(identifier);
+        const org = { identifier };
+        await expect(pm.organizationManagementPage.getStatusStepsTotalCell(identifier)).toBeVisible({ timeout: 10000 });
+
         const currentTotalText = await pm.organizationManagementPage.getStatusStepsTotalText(org.identifier);
         const originalLimit = Number(currentTotalText.replace(/[^\d-]/g, ''));
         const newLimit = originalLimit + 1000;

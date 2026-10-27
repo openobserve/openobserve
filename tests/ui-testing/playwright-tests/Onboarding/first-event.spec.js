@@ -1,8 +1,9 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
-const { getAuthHeaders, getOrgIdentifier, authedRequest, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { getAuthHeaders, authedRequest, isCloudEnvironment } = require('../utils/cloud-auth.js');
 const { ingestBase } = require('../utils/ingest-url.js');
+const { withFreshOrg } = require('../utils/first-event-helpers.js');
 
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
 const HOUR_US = 3600 * 1000 * 1000;
@@ -16,49 +17,12 @@ async function ingest(request, orgId, stream, records) {
     expect(res.ok()).toBeTruthy();
 }
 
-// Fluent Bit's snippet writes to the default stream, so its bar watches only that stream: a fresh org keeps it new.
-async function withFreshOrg(page, tag, fn) {
-    const created = await authedRequest(page, 'post', `${base()}/api/organizations`, { data: { name: `e2e_${tag}_${Date.now()}` } });
-    test.skip(isCloudEnvironment() && !created.ok(), 'Cloud creates orgs only through signup');
-    expect(created.ok()).toBeTruthy();
-    const body = await created.json();
-    const orgId = body.identifier || (body.data && body.data.identifier);
-    try {
-        await fn(orgId);
-    } finally {
-        await authedRequest(page, 'delete', `${base()}/api/organizations/${orgId}`).catch(() => {});
-    }
-}
-
 // The bar's first probe for the guide's own stream, so an ingest never lands before the watch has looked.
 const targetProbe = (page, type, stream) =>
     page.waitForResponse((r) => r.url().includes(`/streams?type=${type}&offset=0&limit=20&keyword=${stream}`), { timeout: 20000 });
 
 test.describe('First event bar', () => {
     test.describe.configure({ mode: 'serial' });
-
-    test('turns green within one poll of an API ingest with zero clicks', {
-        tag: ['@onboarding', '@ingestion', '@all', '@P1'],
-    }, async ({ page, request }, testInfo) => {
-        testLogger.testStart(testInfo.title, testInfo.file);
-        const stream = 'default';
-        await navigateToBase(page);
-        await withFreshOrg(page, 'fe', async (orgId) => {
-            const fe = new FirstEventPage(page);
-            const baseline = targetProbe(page, 'logs', stream);
-            await fe.openGuide('/ingestion/custom/logs/fluentbit', orgId);
-            await fe.expectState('waiting');
-            await expect(fe.troubleshootBtn).toBeVisible();
-            await baseline;
-
-            await ingest(request, orgId, stream, [{ level: 'info', log: 'first event e2e' }]);
-            await fe.expectState('received', 6000);
-            await expect(fe.summary).toContainText(stream);
-            await expect(fe.firstRecord).toContainText('first event e2e');
-            await expect(fe.openBtn).toHaveText(/Open in Logs/);
-            testLogger.info('First event bar turned green', { stream });
-        });
-    });
 
     test('opens Logs on a record back-dated one hour, with the range around it', {
         tag: ['@onboarding', '@ingestion', '@all', '@P1'],
@@ -95,34 +59,35 @@ test.describe('First event bar', () => {
         tag: ['@onboarding', '@ingestion', '@all', '@P2'],
     }, async ({ page, request }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        const orgId = getOrgIdentifier();
         const metric = `e2e_fe_metric_${Date.now()}`;
         await navigateToBase(page);
-        const fe = new FirstEventPage(page);
-        const baseline = fe.firstProbe('metrics');
-        await fe.openGuide('/ingestion/custom/metrics/prometheus', orgId);
-        await fe.expectState('waiting');
-        await baseline;
+        await withFreshOrg(page, 'fe_metric', async (orgId) => {
+            const fe = new FirstEventPage(page);
+            const baseline = fe.firstProbe('metrics');
+            await fe.openGuide('/ingestion/custom/metrics/prometheus', orgId);
+            await fe.expectState('waiting');
+            await baseline;
 
-        const sentUs = Date.now() * 1000;
-        const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/ingest/metrics/_json`, {
-            headers: getAuthHeaders(),
-            data: [{ __name__: metric, __type__: 'gauge', _timestamp: sentUs, value: 1, host: 'e2e' }],
+            const sentUs = Date.now() * 1000;
+            const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/ingest/metrics/_json`, {
+                headers: getAuthHeaders(),
+                data: [{ __name__: metric, __type__: 'gauge', _timestamp: sentUs, value: 1, host: 'e2e' }],
+            });
+            expect(res.ok()).toBeTruthy();
+            await fe.expectState('received', 15000);
+            await expect(fe.openBtn).toHaveText(/Open in Metrics/);
+            await fe.clickOpen();
+            await expect(page).toHaveURL(/\/metrics\?/);
+            const url = new URL(page.url());
+            expect(url.searchParams.get('metric')).toBe(metric);
+            // The bar links in ms; the explorer rewrites its URL state in µs once loaded, so either unit is the same 30 min.
+            const from = Number(url.searchParams.get('from'));
+            const to = Number(url.searchParams.get('to'));
+            const perMs = to - from === 30 * 60 * 1000 ? 1 : 1000;
+            expect(to - from).toBe(30 * 60 * 1000 * perMs);
+            expect(from).toBeLessThanOrEqual((sentUs / 1000) * perMs);
+            expect(to).toBeGreaterThanOrEqual((sentUs / 1000) * perMs);
         });
-        expect(res.ok()).toBeTruthy();
-        await fe.expectState('received', 15000);
-        await expect(fe.openBtn).toHaveText(/Open in Metrics/);
-        await fe.clickOpen();
-        await expect(page).toHaveURL(/\/metrics\?/);
-        const url = new URL(page.url());
-        expect(url.searchParams.get('metric')).toBe(metric);
-        // The bar links in ms; the explorer rewrites its URL state in µs once loaded, so either unit is the same 30 min.
-        const from = Number(url.searchParams.get('from'));
-        const to = Number(url.searchParams.get('to'));
-        const perMs = to - from === 30 * 60 * 1000 ? 1 : 1000;
-        expect(to - from).toBe(30 * 60 * 1000 * perMs);
-        expect(from).toBeLessThanOrEqual((sentUs / 1000) * perMs);
-        expect(to).toBeGreaterThanOrEqual((sentUs / 1000) * perMs);
     });
 });
 
