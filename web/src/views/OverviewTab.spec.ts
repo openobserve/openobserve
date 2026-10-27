@@ -1011,13 +1011,14 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="first-data-panel"]').exists()).toBe(false);
     });
 
-    it("should drop the refresh and time row beside the hero, with nothing to refresh or scope", async () => {
+    // Refresh is the hero's way to check again once data was sent
+    it("should keep the toolbar with a fresh refresh run beside the hero", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
       expect(wrapper.find(HERO).exists()).toBe(true);
-      expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
-      expect(wrapper.find('[data-test="overview-date-time-stub"]').exists()).toBe(false);
+      expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
+      expect(refreshLastRun()).not.toBeNull();
     });
 
     it("should ask nothing when the first-data notice already probed every type empty", async () => {
@@ -1055,8 +1056,7 @@ describe("OverviewTab", () => {
       const first = vi.mocked(streamService.nameList).mock.calls.length;
       expect(first).toBeGreaterThan(0);
 
-      // the no-data state has no time picker, so call its handler as a date change would
-      (wrapper.vm as unknown as { onDateChange: (v: object) => void }).onDateChange({
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
         startTime: 1,
         endTime: 2,
         relativeTimePeriod: "1h",
@@ -1081,13 +1081,13 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(false);
     });
 
-    it("should re-read the lists on a forced load and show all clear once a user stream arrived", async () => {
+    it("should re-read the lists on Refresh and show all clear once a user stream arrived", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
       expect(wrapper.find(HERO).exists()).toBe(true);
       givenStreams({ ...internalOnly, traces: [{ name: "default", stream_type: "traces" }] });
 
-      await (wrapper.vm as unknown as { loadAll: (force: boolean) => Promise<void> }).loadAll(true);
+      await wrapper.find(REFRESH_BTN).trigger("click");
       await flushPromises();
 
       expect(wrapper.find(HERO).exists()).toBe(false);
@@ -1182,6 +1182,7 @@ describe("OverviewTab", () => {
       expect(vi.mocked(streamService.nameList).mock.calls.length).toBeGreaterThan(before);
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
       expect(wrapper.find(HERO).exists()).toBe(true);
+      expect(refreshLastRun()).not.toBeNull();
     });
 
     it("should re-run the probes on Retry and show all clear once a user stream is found", async () => {

@@ -503,7 +503,7 @@ export function buildChoices(
         : []),
     ]),
 
-    // All four open the same guide for now; phase 2 can preselect the platform tab.
+    // All four open the RUM guide, each on its own platform tab (the row id).
     choice("frontend", "devices", ["sessions", "errors", "webVitals", "replays"], (row) => [
       row("browser", "web", rum),
       row("react-native", "devices", {

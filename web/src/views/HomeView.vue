@@ -373,7 +373,7 @@ export default defineComponent({
         : tabOrder.value[0].id,
     );
 
-    // An org with no data opens on Overview's setup state, not the assistant; that choice
+    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
     // is the app's, so it is not saved as the user's tab.
     let skipSave = false;
     watch(activeHomeTab, (val) => {
@@ -383,12 +383,12 @@ export default defineComponent({
       }
       localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
     });
-    const { hasUserData, isFetching } = useOrgHasUserData(
+    const { hasAnyStream, isFetching } = useOrgHasUserData(
       () => store.state.selectedOrganization?.identifier ?? "",
     );
-    // a stale cached "no data" that is refetching may be out of date
+    // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
     watch(
-      [hasUserData, isFetching],
+      [hasAnyStream, isFetching],
       ([has, fetching]) => {
         if (has !== false || fetching || activeHomeTab.value !== "ai") return;
         skipSave = true;

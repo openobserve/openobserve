@@ -29,6 +29,20 @@ export const ONBOARDING_SKIP: InjectionKey<() => void> = Symbol("onboarding-skip
 const pendingStartKey = (email: string | undefined) =>
   `o2.onboarding.pendingStart.${email || "anonymous"}`;
 
+const FIRST_LOGIN_KEY = "isFirstTimeLogin";
+
+/** Whether the first-login flag is this user's; a legacy "true" from before it held the email is taken as theirs once. */
+export function isFirstLoginOf(email: string | undefined): boolean {
+  if (!email) return false;
+  try {
+    const flag = window.localStorage.getItem(FIRST_LOGIN_KEY);
+    if (flag === "true") window.localStorage.setItem(FIRST_LOGIN_KEY, email);
+    return flag === "true" || flag === email;
+  } catch {
+    return false;
+  }
+}
+
 /** Set on a first login; only a user with this marker records a start. */
 export function markStartPending(email: string | undefined): void {
   try {

@@ -266,7 +266,7 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
   },
 }));
 
-// whether the org holds any user data; true keeps the query UI the rest of this file tests.
+// whether the org has a logs stream (and user data); true keeps the query UI the rest of this file tests.
 // One ref per call: a test flips the ones made since its mount (`orgData.flip`), never pages earlier tests left mounted
 const orgData = vi.hoisted(() => ({
   initial: true as boolean | undefined,
@@ -281,7 +281,12 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
     useOrgHasUserData: () => {
       const hasUserData = ref(orgData.initial);
       orgData.refs.push(hasUserData);
-      return { hasUserData, isFetching: ref(false) };
+      return {
+        hasUserData,
+        isFetching: ref(false),
+        hasAnyStream: hasUserData,
+        hasLogsStream: hasUserData,
+      };
     },
     refreshUserStreamLists: async () => {},
   };
@@ -1954,6 +1959,16 @@ describe("Logs Index", async () => {
 
       expect(has("no-data-intro")).toBe(false);
       expect(has("logs-search-bar")).toBe(true);
+    });
+
+    // the stream selector was filled while the org had no logs stream
+    it("with the flag off, reloads the stream list when the intro ends", async () => {
+      await remount(false);
+      loaderCalls.length = 0;
+      orgData.flip(true);
+      await flushPromises();
+
+      expect(loaderCalls).toEqual(["logs"]);
     });
 
     it("re-applies a search-history link without the search bar mounted", async () => {

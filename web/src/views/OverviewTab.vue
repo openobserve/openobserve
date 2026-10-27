@@ -14,8 +14,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
-    <!-- Header: refresh + time picker; an org with no data has nothing to refresh or scope -->
-    <div v-if="pageState !== 'forbidden' && pageState !== 'no-data'" class="mb-4 flex justify-end">
+    <!-- Header: refresh + time picker -->
+    <div v-if="pageState !== 'forbidden'" class="mb-4 flex justify-end">
       <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"

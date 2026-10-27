@@ -73,10 +73,12 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
   default: { name: "HomeViewSkeleton", template: '<div data-test="home-skeleton-stub" />' },
 }));
 
-// whether the org holds any user data; true keeps the saved tab the rest of this file tests.
+// whether the org holds any stream; true keeps the saved tab the rest of this file tests.
 // One ref per call: a test flips the ones made since its mount (`orgData.flip`).
 const orgData = vi.hoisted(() => ({
   initial: true as boolean | undefined,
+  // the _meta org: no user data, but O2's own streams to ask the assistant about
+  ownStreamsOnly: false,
   refs: [] as { value: boolean | undefined }[],
   flip(value: boolean | undefined) {
     this.refs.forEach((r) => (r.value = value));
@@ -88,7 +90,8 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
     useOrgHasUserData: () => {
       const hasUserData = ref(orgData.initial);
       orgData.refs.push(hasUserData);
-      return { hasUserData, isFetching: ref(false) };
+      const hasAnyStream = orgData.ownStreamsOnly ? ref(true) : hasUserData;
+      return { hasUserData, isFetching: ref(false), hasAnyStream };
     },
   };
 });
@@ -311,6 +314,7 @@ describe("HomeView", () => {
     });
     afterEach(() => {
       orgData.initial = true;
+      orgData.ownStreamsOnly = false;
     });
     const savedTab = () => localStorage.getItem("o2_home_active_tab");
     const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
@@ -355,6 +359,16 @@ describe("HomeView", () => {
 
       expect(has("ai-chat-stub")).toBe(true);
       expect(savedTab()).toBe("ai");
+    });
+
+    it("keeps the assistant for an org with only O2's own streams, such as _meta", async () => {
+      orgData.initial = false;
+      orgData.ownStreamsOnly = true;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(activeTab()).toBe("ai");
+      expect(has("ai-chat-stub")).toBe(true);
     });
 
     it("leaves a saved Usage tab alone", async () => {

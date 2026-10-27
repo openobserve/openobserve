@@ -22,7 +22,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import stream from "@/services/stream";
 import { streamNameListQuery } from "@/services/stream.queries";
 
-import { refreshUserStreamLists, useOrgHasUserData } from "./useOrgHasUserData";
+import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
+
+import { orgHasUserData, refreshUserStreamLists, useOrgHasUserData } from "./useOrgHasUserData";
 
 type Lists = Record<string, string[]>;
 
@@ -79,7 +81,10 @@ async function run(byType: Lists) {
 }
 
 describe("useOrgHasUserData", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
 
   it("is undefined while loading, then true for a user stream", async () => {
     expect(await run({ logs: ["default"] })).toEqual({ before: undefined, after: true });
@@ -133,7 +138,8 @@ describe("useOrgHasUserData", () => {
     wrapper.unmount();
   });
 
-  it("asks again on every mount while the org has no data", async () => {
+  // a page and the intro inside it mount together; data can still arrive with nothing watching
+  it("shares one read between mounts while the org has no data, and asks again once it is old", async () => {
     const spy = listsFor({ org1: { logs: ["usage"] } });
     const first = setup("org1");
     await flushPromises();
@@ -141,9 +147,47 @@ describe("useOrgHasUserData", () => {
     expect(spy).toHaveBeenCalledTimes(3);
     const second = setup("org1", { keepCache: true });
     await flushPromises();
+    expect(spy).toHaveBeenCalledTimes(3);
+    vi.setSystemTime(Date.now() + EMPTY_LIST_STALE_TIME + 1);
+    const third = setup("org1", { keepCache: true });
+    await flushPromises();
     expect(spy).toHaveBeenCalledTimes(6);
     first.wrapper.unmount();
     second.wrapper.unmount();
+    third.wrapper.unmount();
+  });
+
+  it.each([
+    [
+      "only O2's own and synthetics streams",
+      { logs: ["usage"], metrics: ["synthetics_x"] },
+      true,
+      true,
+    ],
+    ["only metrics", { metrics: ["up"] }, true, false],
+    ["no stream", {}, false, false],
+  ])(
+    "with %s, tells whether the org has any stream and any logs stream",
+    async (_, byType, any, logs) => {
+      listsFor({ org1: byType as Lists });
+      const { result, wrapper } = setup("org1");
+      expect(result.hasAnyStream.value).toBeUndefined();
+      await flushPromises();
+      expect(result.hasAnyStream.value).toBe(any);
+      expect(result.hasLogsStream.value).toBe(logs);
+      wrapper.unmount();
+    },
+  );
+
+  it("reads the same answer once, outside a component, for a first login", async () => {
+    listsFor({ org1: { logs: ["default"] }, org2: { logs: ["usage"] } });
+    queryClient.clear();
+    expect(await orgHasUserData("org1")).toBe(true);
+    expect(await orgHasUserData("org2")).toBe(false);
+    expect(await orgHasUserData("")).toBeUndefined();
+    vi.spyOn(stream, "nameList").mockRejectedValue(new Error("down"));
+    queryClient.clear();
+    expect(await orgHasUserData("org1")).toBeUndefined();
   });
 
   it("keeps the cached lists for their usual time once the org has data", async () => {

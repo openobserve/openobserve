@@ -17,31 +17,30 @@ import { computed, type MaybeRefOrGetter, onScopeDispose, ref, toValue, watch } 
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { cadenceAt } from "@/composables/firstEvent/firstEventBudget";
-import { refreshUserStreamLists, useOrgHasUserData } from "@/composables/useOrgHasUserData";
+import { queryClient } from "@/composables/query/queryClient";
+import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
+import { streamKeys } from "@/services/stream.querykeys";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
 
 /**
- * Whether a data page shows its no-data intro: set by the first settled answer and only ever
- * turned off for the mount (the content area remounts on an org switch). With the
- * restricted-routes flag on, FirstDataPanel's watcher refreshes the stream lists a moment before
- * it reports the record, so following `hasUserData` live would unmount it mid-confirmation; the
- * page sets it to false itself once the watcher reports. With the flag off nothing watches, so
- * this reads the lists again on the first-event budget and ends the intro once a stream shows.
- * A stale cached "no data" is not settled while it refetches, or an org whose data arrived
- * since would keep the intro for the whole visit.
+ * Whether the Logs page shows its intro: only while the org has no logs stream of any kind, so an
+ * org with only O2's own or synthetics streams can still search. Only ever turned off for the mount.
+ * With the restricted-routes flag on, the page ends it when FirstDataPanel reports; with it off this
+ * re-reads the logs list on the first-event budget, paused while the tab is hidden.
  */
 export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
   const store = useStore();
-  const { hasUserData, isFetching } = useOrgHasUserData(org);
+  const { hasLogsStream, isFetching } = useOrgHasUserData(org);
   const showIntro = ref<boolean>();
   const pageWatches = () => store.state.zoConfig?.restricted_routes_on_empty_data === true;
   watch(
-    [hasUserData, isFetching],
+    [hasLogsStream, isFetching],
     ([has, fetching]) => {
       if (fetching) return;
       if (showIntro.value === undefined) {
         if (has !== undefined) showIntro.value = !has;
-      } else if (showIntro.value && has !== false && !pageWatches()) {
+        // only a list that shows a stream ends it: a failed read (a 401 at session expiry) is not data
+      } else if (showIntro.value && has === true && !pageWatches()) {
         showIntro.value = false;
       }
     },
@@ -50,23 +49,43 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
 
   const startedAt = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let polling = false;
+  const hidden = () => document.visibilityState === "hidden";
+  const refresh = () =>
+    void queryClient.invalidateQueries({
+      queryKey: streamKeys.nameList(toValue(org), "logs"),
+      exact: true,
+    });
   const poll = () => {
+    clearTimeout(timer);
+    timer = undefined;
     const next = cadenceAt(Date.now() - startedAt);
-    if (next === null) return;
+    if (!polling || next === null || hidden()) return;
     timer = setTimeout(() => {
-      void refreshUserStreamLists(toValue(org));
+      if (!hidden()) refresh();
       poll();
     }, next);
   };
+  // back from the terminal the user sent data from: read at once, then resume the cadence
+  const onVisibilityChange = () => {
+    if (hidden() || !polling || timer !== undefined) return;
+    refresh();
+    poll();
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
   watch(
     () => showIntro.value === true && !pageWatches(),
-    (polling) => {
-      clearTimeout(timer);
-      if (polling) poll();
+    (on) => {
+      polling = on;
+      poll();
     },
     { immediate: true },
   );
-  onScopeDispose(() => clearTimeout(timer));
+  onScopeDispose(() => {
+    polling = false;
+    clearTimeout(timer);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  });
   return showIntro;
 }
 

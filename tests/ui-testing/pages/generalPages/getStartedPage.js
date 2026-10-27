@@ -56,15 +56,20 @@ class OnboardingPage {
         });
     }
 
+    // The signed-in user: the first-login flag holds their email, as Login sets it.
+    static get USER_EMAIL() {
+        return process.env.ZO_ROOT_USER_EMAIL;
+    }
+
     // Puts this browser into the first-login state MainLayout sends to /onboarding (cloud, org with no data).
     async openAsFirstLogin(path, { orgId, prefill } = {}) {
         await this.page.goto(path);
-        await this.page.evaluate(({ org, pre }) => {
-            localStorage.setItem('isFirstTimeLogin', 'true');
+        await this.page.evaluate(({ org, pre, email }) => {
+            localStorage.setItem('isFirstTimeLogin', email);
             localStorage.removeItem(`o2.onboarding.firstSource.${org}`);
             if (pre) sessionStorage.setItem('o2.onboarding.prefill', JSON.stringify(pre));
             else sessionStorage.removeItem('o2.onboarding.prefill');
-        }, { org: orgId, pre: prefill ?? null });
+        }, { org: orgId, pre: prefill ?? null, email: OnboardingPage.USER_EMAIL });
         await this.page.reload();
     }
 

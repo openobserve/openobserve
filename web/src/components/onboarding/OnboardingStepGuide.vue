@@ -203,9 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </DataSourceSetupCard>
           <template v-else>
+            <!-- A RUM row's id is its platform tab on the RUM page. -->
             <OnboardingEmbeddedGuide
-              :key="guide.route"
+              :key="`${guide.route}/${guide.id}`"
               :route="guide.route"
+              :query="guide.route === 'frontendMonitoring' ? { platform: guide.id } : undefined"
               @received="result = $event"
               @state="onState"
               @status="pageHasStatus = $event"

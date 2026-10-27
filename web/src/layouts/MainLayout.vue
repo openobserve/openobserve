@@ -296,7 +296,12 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
-import { markStartPending, redirectPending } from "@/components/onboarding/onboardingFlow";
+import {
+  isFirstLoginOf,
+  markStartPending,
+  redirectPending,
+} from "@/components/onboarding/onboardingFlow";
+import { orgHasUserData } from "@/composables/useOrgHasUserData";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -443,14 +448,7 @@ export default defineComponent({
     // A first cloud login may be sent to onboarding: show no page until that is decided, so the
     // user never sees Home for a moment before onboarding replaces it.
     const holdForOnboarding = ref(
-      config.isCloud === "true" &&
-        (() => {
-          try {
-            return localStorage.getItem("isFirstTimeLogin") === store.state.userInfo?.email;
-          } catch {
-            return false;
-          }
-        })(),
+      config.isCloud === "true" && isFirstLoginOf(store.state.userInfo?.email),
     );
     const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
@@ -765,7 +763,7 @@ export default defineComponent({
 
     // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
     const firstLoginRedirect = async () => {
-      if (localStorage.getItem("isFirstTimeLogin") !== store.state.userInfo?.email) return;
+      if (!isFirstLoginOf(store.state.userInfo?.email)) return;
       await router.isReady();
       // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
       if (
@@ -776,8 +774,9 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
       if (
         config.isCloud !== "true" ||
-        // Defense in depth: OnboardingView reads the stream lists itself, as this flag can be unset.
-        store.state.organizationData.isDataIngested === true
+        store.state.organizationData.isDataIngested === true ||
+        // the store flag is still false at mount, so an org with data shows only in its stream lists
+        (await orgHasUserData(store.state.selectedOrganization?.identifier)) === true
       )
         return;
       markStartPending(store.state.userInfo?.email);
@@ -786,13 +785,27 @@ export default defineComponent({
         query: { org_identifier: store.state.selectedOrganization?.identifier },
       });
     };
-    onMounted(async () => {
+    let deciding = false;
+    const onboardFirstLogin = async () => {
+      if (deciding) return;
+      deciding = true;
       try {
         await firstLoginRedirect();
       } finally {
+        deciding = false;
         holdForOnboarding.value = false;
       }
-    });
+    };
+    onMounted(onboardFirstLogin);
+    // A first login a pending redirect deferred onboards on the next Home visit, remount or not.
+    watch(
+      () => router.currentRoute.value.name,
+      (name) => {
+        if (name !== "home" || deciding || !isFirstLoginOf(store.state.userInfo?.email)) return;
+        holdForOnboarding.value = config.isCloud === "true";
+        void onboardFirstLogin();
+      },
+    );
 
     onMounted(() => {
       setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);

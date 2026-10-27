@@ -28,7 +28,12 @@ import { queryClient } from "@/composables/query/queryClient";
 import analytics from "@/services/product_analytics";
 import store from "@/test/unit/helpers/store";
 
+import FrontendRumConfig from "@/components/ingestion/recommended/FrontendRumConfig.vue";
+import { gt } from "@/types/i18n";
+
 import OnboardingEmbeddedGuide from "./OnboardingEmbeddedGuide.vue";
+import OnboardingStepGuide from "./OnboardingStepGuide.vue";
+import { buildChoices, resolvePath } from "./onboardingChoices";
 
 // The real curl page polls through this watch; it records what the page asked to watch.
 const watchArgs = vi.fn();
@@ -275,6 +280,30 @@ describe("OnboardingEmbeddedGuide", () => {
     expect(wrapper.emitted("status")).toEqual([[true]]);
   });
 
+  // the store holds one token, and the header's org switch stays open in onboarding
+  it("keeps the new org's RUM token when the old org's read lands after a switch", async () => {
+    let answerOld!: (res: unknown) => void;
+    const read = vi
+      .spyOn(queryClient, "fetchQuery")
+      .mockReturnValueOnce(new Promise((resolve) => (answerOld = resolve)) as never);
+    const before = store.state.selectedOrganization;
+    try {
+      store.state.selectedOrganization = { ...before, identifier: "org-a" };
+      const { wrapper } = await mountGuide("frontendMonitoring");
+      wrapper.unmount();
+      store.state.selectedOrganization = { ...before, identifier: "org-b" };
+      store.state.organizationData.rumToken = { rum_token: "org-b-token" };
+
+      answerOld({ data: { rum_token: "org-a-token" } });
+      await flushPromises();
+
+      expect(store.state.organizationData.rumToken.rum_token).toBe("org-b-token");
+    } finally {
+      store.state.selectedOrganization = before;
+      read.mockRestore();
+    }
+  });
+
   it("passes the org and email only to a page that declares them", async () => {
     const { wrapper } = await mountGuide("ai-plain");
     const root = wrapper.find('[data-test="plain-page"]');
@@ -290,5 +319,49 @@ describe("OnboardingEmbeddedGuide", () => {
       wrapper.find('[data-test="onboarding-embedded-guide-open-app"]').attributes("href"),
     ).toBe(router.resolve({ name: "broken", query: { org_identifier: "default" } }).href);
     expect(wrapper.emitted("status")).toEqual([[false]]);
+  });
+});
+
+describe("a RUM row inside onboarding", () => {
+  const Renderer = defineComponent({
+    name: "SetupCardRenderer",
+    props: ["content", "subs"],
+    setup:
+      (_, { slots }) =>
+      () =>
+        h("div", slots["hero-under-title"]?.()),
+  });
+
+  afterEach(() => {
+    store.state.organizationData.rumToken = { rum_token: "" };
+    queryClient.clear();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["android", "rumAndroid"],
+    ["ios", "rumIOS"],
+    ["react-native", "rumReactNative"],
+    ["browser", "rum"],
+  ])("opens the RUM guide on the %s tab", async (rowId, providerId) => {
+    vi.spyOn(queryClient, "fetchQuery").mockResolvedValue({ data: { rum_token: "rum-key" } });
+    const step = resolvePath(buildChoices(gt), ["frontend", rowId]);
+    if (step.step !== "guide") throw new Error("expected a guide");
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/onboarding/:path*", name: "onboarding", component: Chrome },
+        { path: "/ingestion/rum", name: "frontendMonitoring", component: FrontendRumConfig },
+      ],
+    });
+    await router.push(`/onboarding/frontend/${rowId}`);
+    const wrapper = mount(OnboardingStepGuide, {
+      props: { choice: step.choice, row: step.row, guide: step.guide },
+      global: { plugins: [store, router], stubs: { SetupCardRenderer: Renderer } },
+    });
+    await flushPromises();
+
+    expect(wrapper.findComponent(Renderer).props("content").provider.id).toBe(providerId);
+    wrapper.unmount();
   });
 });

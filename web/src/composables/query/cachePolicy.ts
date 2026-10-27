@@ -30,6 +30,9 @@ export const LIVE_STALE_TIME = 60_000;
 /** Logs, streams, traces, service correlation, AI observability, online evals. */
 export const MEDIUM_STALE_TIME = 5 * 60_000;
 
+/** A stream list that shows no data yet: short, so a page opened after data arrives asks again. */
+export const EMPTY_LIST_STALE_TIME = 10_000;
+
 /** Dashboards, pipelines, functions, workflows, reports, IAM, settings. */
 export const NORMAL_STALE_TIME = 60 * 60_000;
 

@@ -94,6 +94,24 @@ pub async fn handle_new_attribution_event(
     MetaHttpResponse::ok("Success")
 }
 
+// Sign-ups through Google or GitHub carry these; their domain names no company.
+const FREE_MAIL_DOMAINS: [&str; 14] = [
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "yahoo.com",
+    "icloud.com",
+    "me.com",
+    "proton.me",
+    "protonmail.com",
+    "aol.com",
+    "gmx.com",
+    "zoho.com",
+    "yandex.com",
+];
+
 fn attribution_event_data(
     attribution: NewUserAttribution,
     email: &str,
@@ -101,10 +119,15 @@ fn attribution_event_data(
 ) -> HashMap<String, json::Value> {
     // Email signup asks for a work email, so the domain usually names the company.
     let company = if attribution.company.trim().is_empty() {
-        email
-            .rsplit_once('@')
-            .map_or("", |(_, domain)| domain)
-            .to_string()
+        let domain = email.rsplit_once('@').map_or("", |(_, domain)| domain);
+        if FREE_MAIL_DOMAINS
+            .iter()
+            .any(|free| free.eq_ignore_ascii_case(domain))
+        {
+            String::new()
+        } else {
+            domain.to_string()
+        }
     } else {
         attribution.company
     };
@@ -168,5 +191,15 @@ mod tests {
             json::from_str(r#"{"from":"","company":""}"#).unwrap();
         let data = attribution_event_data(attribution, "not-an-email", "2026-10-22");
         assert_eq!(data["company"], json::json!(""));
+    }
+
+    #[test]
+    fn test_attribution_company_skips_free_mail_domains() {
+        for email in ["jane@gmail.com", "jane@Outlook.COM", "jane@proton.me"] {
+            let attribution: NewUserAttribution =
+                json::from_str(r#"{"from":"","company":""}"#).unwrap();
+            let data = attribution_event_data(attribution, email, "2026-10-22");
+            assert_eq!(data["company"], json::json!(""), "{email}");
+        }
     }
 }

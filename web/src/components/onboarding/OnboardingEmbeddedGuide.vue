@@ -89,6 +89,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 const props = defineProps<{
   /** The guide's Data sources route; the host keys this component by it. */
   route: string;
+  /** Added to that route's query, as a link to the page would carry it (RUM's `platform`). */
+  query?: Record<string, string>;
 }>();
 const emit = defineEmits<{
   state: [state: FirstEventState];
@@ -106,7 +108,10 @@ const email = computed<string>(() => store.state.userInfo?.email ?? "");
 
 // The page reads its own route (its signal, its test stream, a search), so it gets the guide's
 // route, not onboarding's.
-const resolved = router.resolve({ name: props.route, query: { org_identifier: org.value } });
+const resolved = router.resolve({
+  name: props.route,
+  query: { ...props.query, org_identifier: org.value },
+});
 const target = resolved as RouteLocationNormalizedLoaded;
 provide(routeLocationKey, target);
 
@@ -146,9 +151,14 @@ const isRum = props.route === "frontendMonitoring";
 const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
 const rumRead = ref(!isRum);
 if (isRum) {
+  const asked = org.value;
   void queryClient
-    .fetchQuery(rumTokensQuery(org.value))
-    .then((res: { data?: unknown }) => store.dispatch("setRUMToken", res.data))
+    .fetchQuery(rumTokensQuery(asked))
+    // the store holds one token: a reply that lands after an org switch belongs to the old org
+    .then((res: { data?: unknown }) => {
+      if (store.state.selectedOrganization?.identifier === asked)
+        void store.dispatch("setRUMToken", res.data);
+    })
     .catch(() => {})
     .finally(() => (rumRead.value = true));
 }

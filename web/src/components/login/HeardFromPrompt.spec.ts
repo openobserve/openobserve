@@ -163,6 +163,33 @@ describe("HeardFromPrompt.vue", () => {
     expect(track).toHaveBeenCalledWith("onboarding_heard_from_dismissed");
   });
 
+  // the start record that marks the question can land after first data put the prompt on screen
+  it("asks once the question is marked pending after it mounted", async () => {
+    await mountIt();
+    expect(byTest("heard-from-prompt").exists()).toBe(false);
+
+    markHeardFromPending(EMAIL);
+    await flushPromises();
+
+    expect(byTest("heard-from-prompt").exists()).toBe(true);
+  });
+
+  it("sends once when a second prompt is clicked while the first answer is on its way", async () => {
+    let finish!: (res: { status: number }) => void;
+    submitNewUserInfo.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    markHeardFromPending(EMAIL);
+    const first = await mountIt();
+    const second = await mountIt();
+
+    await first.find('[data-test="heard-from-prompt-option-github"]').trigger("click");
+    await second.find('[data-test="heard-from-prompt-option-reddit"]').trigger("click");
+    finish({ status: 200 });
+    await flushPromises();
+
+    expect(submitNewUserInfo).toHaveBeenCalledTimes(1);
+    first.unmount();
+  });
+
   it.each([
     ["answers", (w: VueWrapper) => w.find('[data-test="heard-from-prompt-option-github"]')],
     ["skips", (w: VueWrapper) => w.find('[data-test="heard-from-prompt-dismiss-btn"]')],

@@ -218,9 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ enterpriseButtonText }}
         </OButton>
 
-        <!-- A focus-mode page (onboarding) puts its own header buttons here with <Teleport defer>. -->
-        <div id="o2-header-actions" class="contents" />
-
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
         <OrganizationSelector
           :organizations="organizations"

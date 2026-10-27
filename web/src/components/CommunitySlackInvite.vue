@@ -25,9 +25,11 @@ import {
   connectDataPromptSessionKey,
   getCommunitySlackUrl,
   markSlackInviteDismissed,
+  markSlackInviteOffered,
   markSlackInviteResolved,
   shouldShowStandaloneSlackInvite,
 } from "@/utils/slackCommunityInvite";
+import { isFirstLoginOf } from "@/components/onboarding/onboardingFlow";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -36,7 +38,7 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 
-// Day-2 follow-up after the session onboarding starts the clock in — clock is shared via utils/slackCommunityInvite.ts.
+// Day-2 follow-up; its clock starts in onboarding or in any later cloud session — shared via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
 const userEmail = store.state.userInfo?.email ?? "anonymous";
@@ -72,9 +74,11 @@ onMounted(() => {
 
   // Never compete with onboarding during the user's
   // first-login session — the day-2 clock only starts once that session ends.
-  if (localStorage.getItem("isFirstTimeLogin") === userEmail) return;
+  if (isFirstLoginOf(store.state.userInfo?.email)) return;
 
   maybeShowStandaloneInvite();
+  // every cloud session starts the clock, so users onboarding never reaches (invited, a new browser) get the invite too
+  markSlackInviteOffered(userEmail);
 });
 
 // Real member count, sourced from the backend `/config` response

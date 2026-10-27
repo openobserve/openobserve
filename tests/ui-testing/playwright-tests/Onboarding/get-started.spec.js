@@ -131,6 +131,6 @@ test.describe('Onboarding on first login', () => {
         await page.waitForLoadState('domcontentloaded');
         await expect(ob.view).toHaveCount(0);
         expect(new URL(page.url()).pathname).toMatch(/\/web\/logs/);
-        expect(await ob.firstLoginFlag()).toBe('true');
+        expect(await ob.firstLoginFlag()).toBe(OnboardingPage.USER_EMAIL);
     });
 });

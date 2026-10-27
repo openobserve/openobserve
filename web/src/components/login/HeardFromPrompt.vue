@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -58,6 +58,7 @@ import {
   HEARD_FROM_VALUES,
   clearHeardFromPending,
   useHeardFromPending,
+  useHeardFromSending,
   type HeardFromValue,
 } from "./heardFrom";
 
@@ -68,7 +69,7 @@ const store = useStore();
 const email = (): string | undefined => store.state.userInfo?.email;
 
 const visible = useHeardFromPending(email);
-const sending = ref(false);
+const sending = useHeardFromSending(email);
 
 const labels = computed<Record<HeardFromValue, I18nText>>(() => ({
   search_engine: t("login.heardFrom.searchEngine"),

@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import { getIngestionURL, maskText } from "@/utils/zincutils";
 import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
@@ -138,8 +139,10 @@ const PLATFORMS: {
   },
 ];
 
+// A link may name the platform: onboarding's React Native, Android and iOS rows do.
+const linked = String(useRoute()?.query.platform ?? "");
 /** Which platform's setup guide is shown. */
-const platform = ref<string>(PLATFORMS[0].id);
+const platform = ref<string>(PLATFORMS.some((p) => p.id === linked) ? linked : PLATFORMS[0].id);
 
 const content = computed<RichCardContent>(() =>
   (PLATFORMS.find((p) => p.id === platform.value) ?? PLATFORMS[0]).build(),

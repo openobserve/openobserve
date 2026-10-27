@@ -27,6 +27,7 @@ import MainLayout from "./MainLayout.vue";
 import * as cookies from "@/utils/cookies";
 import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
+import stream from "@/services/stream";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
@@ -2066,6 +2067,7 @@ describe("MainLayout — first-time cloud login", () => {
       routes: [
         { path: "/", name: "home", component: StubDiv },
         { path: "/onboarding", name: "onboarding", component: StubDiv },
+        { path: "/logs", name: "logs", component: StubDiv },
       ],
     });
     // The org rides in the URL, as after a real login; without it the layout clears the selection.
@@ -2092,10 +2094,24 @@ describe("MainLayout — first-time cloud login", () => {
       },
     });
     await flushPromises();
-    return { wrapper, replace };
+    return { wrapper, replace, router };
   };
+  // The org's stream lists: `logs` names a logs stream holding records.
+  const streams = (logs: string[] = []) =>
+    vi.spyOn(stream, "nameList").mockImplementation((async (_org: string, type: string) => ({
+      data: {
+        list: (type === "logs" ? logs : []).map((name) => ({
+          name,
+          stream_type: type,
+          stats: { doc_num: 3, doc_time_min: 1, doc_time_max: 2 },
+        })),
+      },
+    })) as never);
 
   beforeEach(() => {
+    streams();
+    // the org list holds org1, as the API's does after a real login; without it the layout picks another
+    store.state.organizations = [{ id: 1, name: "org1", identifier: "org1" }];
     global.window = realWindow;
     (config as any).isCloud = "true";
     store.state.organizationData.isDataIngested = false;
@@ -2109,6 +2125,7 @@ describe("MainLayout — first-time cloud login", () => {
     localStorage.clear();
     sessionStorage.clear();
     (config as any).isCloud = "false";
+    vi.mocked(stream.nameList).mockRestore();
   });
 
   it("sends a first-time cloud user to onboarding and marks the start as pending", async () => {
@@ -2157,6 +2174,41 @@ describe("MainLayout — first-time cloud login", () => {
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     // A flag left behind would mute the day-two Slack invite for good.
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  // the store flag is still false at mount: weeks after a deep-link sign-up the org has data
+  it("reads the org's stream lists, and leaves an org with data on Home with nothing sent", async () => {
+    streams(["default"]);
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("onboards on the next Home visit in the session after a pending redirect, without a remount", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper, router } = await mountAtHome();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    sessionStorage.removeItem("redirectURI");
+
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  // a flag set before it held the email, by a login just before the deploy
+  it("takes a legacy 'true' flag as this user's first login, once", async () => {
+    localStorage.setItem("isFirstTimeLogin", "true");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).toHaveBeenCalledWith({ name: "onboarding", query: { org_identifier: "org1" } });
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     wrapper.unmount();
   });

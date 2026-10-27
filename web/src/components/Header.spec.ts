@@ -442,7 +442,7 @@ describe("Header Component", () => {
   });
 
   describe("Focus-mode route", () => {
-    it("drops the menu and AI buttons and offers a slot for the page's own buttons", async () => {
+    it("drops the menu and AI buttons", async () => {
       const focusWrapper = createWrapper({
         mountType: "mount",
         storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
@@ -456,7 +456,8 @@ describe("Header Component", () => {
 
       expect(focusWrapper.find('[data-test="header-mobile-nav-toggle"]').exists()).toBe(false);
       expect(focusWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
-      expect(focusWrapper.find("#o2-header-actions").exists()).toBe(true);
+      // nothing teleports into the old header slot any more
+      expect(focusWrapper.find("#o2-header-actions").exists()).toBe(false);
 
       focusWrapper.unmount();
     });

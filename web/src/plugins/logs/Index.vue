@@ -2017,6 +2017,10 @@ export default defineComponent({
     // undefined while the stream lists load keeps the query UI, as before
     const showIntro = useNoDataIntro(() => store.state.selectedOrganization?.identifier ?? "");
     const firstDataArrival = ref<FirstEventResult | null>(null);
+    // the stream selector was filled while the org was empty; a first-data report reloads it itself
+    watch(showIntro, (now, before) => {
+      if (before === true && now === false && !firstDataArrival.value) void loadLogsData();
+    });
     // query_on_stream_selection leaves the selection empty, so the arrival names the stream and its range itself
     const onFirstDataDetected = async (result: FirstEventResult) => {
       showIntro.value = false;

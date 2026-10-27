@@ -16,6 +16,7 @@
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 
+import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
@@ -29,6 +30,12 @@ const userStreams = (list: ListedStream[] | undefined, type: string) =>
   );
 const hasRecords = (s: ListedStream) =>
   Number(s.stats?.doc_num ?? 0) > 0 || Number(s.stats?.doc_time_max ?? 0) > 0;
+const userDataIn = (lists: (ListedStream[] | undefined)[], settled: boolean) => {
+  const users = lists.map((list, i) => userStreams(list, USER_DATA_STREAM_TYPES[i]));
+  if (users.some((list) => list.some(hasRecords))) return true;
+  if (users.some((list) => list.length > 0)) return undefined;
+  return settled ? false : undefined;
+};
 
 /**
  * Whether the org holds data the user sent: a logs, metrics or traces stream that O2 does not
@@ -47,22 +54,46 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
     useQuery(() => {
       const options = streamNameListQuery(toValue(org), type);
       const usual = options.staleTime as number;
-      // While the org has no data, every mount asks again: data can arrive with nothing in the app watching.
+      // While the org has no data a later mount asks again, as data can arrive with nothing watching.
       return Object.assign(options, {
         enabled: !!toValue(org),
-        staleTime: () => (cachedData() ? usual : 0),
+        staleTime: () => (cachedData() ? usual : EMPTY_LIST_STALE_TIME),
       });
     }),
   );
-  const hasUserData = computed<boolean | undefined>(() => {
-    const lists = queries.map((q, i) => userStreams(q.data.value, USER_DATA_STREAM_TYPES[i]));
-    if (lists.some((list) => list.some(hasRecords))) return true;
-    if (lists.some((list) => list.length > 0)) return undefined;
-    return queries.every((q) => q.isSuccess.value) ? false : undefined;
-  });
+  const hasUserData = computed<boolean | undefined>(() =>
+    userDataIn(
+      queries.map((q) => q.data.value),
+      queries.every((q) => q.isSuccess.value),
+    ),
+  );
+  // Any stream at all, O2's own and synthetics included: an org with one has something to search.
+  const hasStreams = (picked: typeof queries) =>
+    computed<boolean | undefined>(() => {
+      if (picked.some((q) => (q.data.value ?? []).length > 0)) return true;
+      return picked.every((q) => q.isSuccess.value) ? false : undefined;
+    });
   // a stale cached answer shows while it refetches; callers that decide once wait for this to clear
   const isFetching = computed(() => queries.some((q) => q.isFetching.value));
-  return { hasUserData, isFetching };
+  return {
+    hasUserData,
+    isFetching,
+    hasAnyStream: hasStreams(queries),
+    hasLogsStream: hasStreams([queries[USER_DATA_STREAM_TYPES.indexOf("logs")]]),
+  };
+}
+
+/** `useOrgHasUserData`'s answer, read once outside a component; undefined when a list fails. */
+export async function orgHasUserData(org: string | undefined): Promise<boolean | undefined> {
+  if (!org) return undefined;
+  try {
+    const lists = await Promise.all(
+      USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(streamNameListQuery(org, type))),
+    );
+    return userDataIn(lists, true);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
