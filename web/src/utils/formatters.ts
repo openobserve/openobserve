@@ -361,8 +361,8 @@ export function utcMinuteToTzHhmm(minute: number, timeZone: string): string {
   return formatter.format(d);
 }
 
-/** Short display name for an IANA timezone, e.g. "GMT+5:30" or "PST". */
-export function timezoneAbbr(timeZone: string): string {
+/** Short display name for an IANA timezone at `at` (default now), e.g. "GMT+5:30" or "PST". */
+export function timezoneAbbr(timeZone: string, at: Date = new Date()): string {
   const formatter = cachedFormatter(
     abbrFormatters,
     timeZone,
@@ -373,7 +373,7 @@ export function timezoneAbbr(timeZone: string): string {
       }),
   );
   if (!formatter) return timeZone;
-  const parts = formatter.formatToParts(new Date());
+  const parts = formatter.formatToParts(at);
   return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
 }
 

@@ -85,7 +85,7 @@ pub struct RetrieveQuery {
 #[utoipa::path(
     get,
     path = "/{org_id}/short/{short_id}",
-    context_path = "/short",
+    context_path = "/api",
     operation_id = "resolveShortUrl",
     summary = "Resolve short URL",
     description = "Resolves a shortened URL back to its original destination. By default, this endpoint redirects the user to the original URL. When the 'type=ui' query parameter is provided, it returns the original URL as JSON instead of performing a redirect. This is useful for applications that need to inspect or validate URLs before navigation.",

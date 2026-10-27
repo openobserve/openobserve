@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · Medium",
       "severityLow": "P4 · Laag",
       "moreDimensions": "+{count} meer",
+      "moreAlertGroups": "+{count} meer",
+      "alertGroupTooltip": "{name}: {count} keer afgegaan | {name}: {count} keer afgegaan",
       "filterAll": "Alles",
       "filterActive": "Actief",
       "alertCount": "Alarmen",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "Opnieuw analyseren vanaf nul…",
         "reanalyzingBuildOnPrevious": "Voortbouwen op het vorige rapport…",
+        "resumingFrom": "Hervatten vanaf “{step}”…",
         "showDetails": "Details tonen",
         "hideDetails": "Details verbergen",
         "stale": "Deze analyse loopt ongewoon lang en is mogelijk gestopt. Geen nieuwe berichten sinds {time} UTC. Annuleer en probeer opnieuw.",

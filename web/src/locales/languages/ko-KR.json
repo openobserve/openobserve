@@ -10115,6 +10115,8 @@
       "severityMedium": "P3 · 중간",
       "severityLow": "P4 · 낮음",
       "moreDimensions": "+{count}개 더",
+      "moreAlertGroups": "+{count}개 더",
+      "alertGroupTooltip": "{name}: {count}회 발생 | {name}: {count}회 발생",
       "filterAll": "전체",
       "filterActive": "활성",
       "alertCount": "알림",
@@ -10276,6 +10278,7 @@
       "rcaRun": {
         "reanalyzingFresh": "처음부터 재분석하는 중…",
         "reanalyzingBuildOnPrevious": "이전 보고서를 기반으로 작성하는 중…",
+        "resumingFrom": "“{step}”부터 재개 중…",
         "showDetails": "상세 정보 표시",
         "hideDetails": "상세 정보 숨기기",
         "stale": "이 분석이 비정상적으로 오래 실행되어 중단되었을 수 있습니다. {time} UTC 이후 새 메시지가 없습니다. 취소하고 다시 시도하세요.",
