@@ -1281,6 +1281,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
+      <OButton
+        v-if="!searchObj.meta.sqlMode && searchObj.meta.logsVisualizeToggle === 'logs'"
+        :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+        data-test="logs-search-bar-filter-builder-toggle"
+        :aria-pressed="filterBuilderOn"
+        variant="ghost"
+        size="icon-toolbar"
+        @click="toggleFilterBuilder"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 right-9.5 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+      >
+        <OTooltip
+          :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
+        />
+      </OButton>
       <div class="flex h-full w-full min-w-0 flex-col">
         <OSplitter
           class="h-full!"
@@ -1298,9 +1312,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'fn-editor-open': showFunctionEditor,
               }"
             >
+              <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-18">
+                <SqlFilterBuilder
+                  :query="searchObj.data.query"
+                  :fields="filterBuilderFields"
+                  :load-values="loadFilterBuilderValues"
+                  :fields-loading="searchObj.loadingStream"
+                  mode-storage-key="o2.logs.filterBuilderMode"
+                  data-test="logs-search-bar-filter-builder"
+                  @update:query="onFilterBuilderQuery"
+                  @submit="handleRunQueryFn()"
+                  @exit="toggleFilterBuilder"
+                />
+              </div>
               <!-- Unified Query Editor (with built-in AI bar) -->
               <UnifiedQueryEditor
                 v-if="router.currentRoute.value.name === 'logs'"
+                v-show="!showFilterBuilder"
                 ref="queryEditorRef"
                 :query="searchObj.data.query"
                 :keywords="effectiveKeywords"
@@ -1343,7 +1371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="
                   searchObj.data.editorValue == '' &&
                   searchObj.meta.queryEditorPlaceholderFlag &&
-                  !searchObj.meta.nlpMode
+                  !searchObj.meta.nlpMode &&
+                  !showFilterBuilder
                 "
                 class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
               >
@@ -1743,6 +1772,9 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
+import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { toFilterFields } from "@/utils/query/filterBar";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
@@ -1897,6 +1929,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     CreateAlertAction,
+    SqlFilterBuilder,
     OSeparator,
     OSplitter,
     OButtonGroup,
@@ -2199,6 +2232,27 @@ export default defineComponent({
 
     const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
+
+    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
+      useFilterBuilderPreference("o2.logs.queryInput");
+    // SQL mode and the visualize/build views keep the editor: the builder writes filter-mode WHERE text only.
+    const showFilterBuilder = computed(
+      () =>
+        filterBuilderOn.value &&
+        !searchObj.meta.sqlMode &&
+        searchObj.meta.logsVisualizeToggle === "logs",
+    );
+    const filterBuilderFields = computed(() =>
+      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+    );
+    const loadFilterBuilderValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search });
+    const onFilterBuilderQuery = (sql: string) => {
+      searchObj.data.query = sql;
+      searchObj.data.editorValue = sql;
+      (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
+      autoRun.request("filter");
+    };
     const syntaxGuideRef = ref(null);
 
     const {
@@ -4997,6 +5051,12 @@ export default defineComponent({
       effectiveKeywords,
       resolveFieldValues,
       effectiveSuggestions,
+      filterBuilderOn,
+      toggleFilterBuilder,
+      showFilterBuilder,
+      filterBuilderFields,
+      loadFilterBuilderValues,
+      onFilterBuilderQuery,
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,
