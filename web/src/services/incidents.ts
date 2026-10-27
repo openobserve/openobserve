@@ -54,6 +54,8 @@ export interface Incident {
   rca: RcaSummary | null;
   /** Why no automatic run started for this incident (e.g. "l0_off"), or null. */
   rca_off_reason?: string | null;
+  /** List only: every alert that fired into the incident and how often, most-fired first. */
+  alert_groups?: { alert_id: string; alert_name: string; count: number }[];
 }
 
 export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";

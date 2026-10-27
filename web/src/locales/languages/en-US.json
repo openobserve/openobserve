@@ -10113,6 +10113,8 @@
       "severityMedium": "P3 · Medium",
       "severityLow": "P4 · Low",
       "moreDimensions": "+{count} more",
+      "moreAlertGroups": "+{count} more",
+      "alertGroupTooltip": "{name}: fired {count} time | {name}: fired {count} times",
       "filterAll": "All",
       "filterActive": "Active",
       "alertCount": "Alerts",

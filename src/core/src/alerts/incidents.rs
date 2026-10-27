@@ -2080,7 +2080,6 @@ async fn incident_with_alerts(
         incident_data.alert_count = actual_count;
     }
 
-
     // Convert incident_alerts to triggers
     let mut triggers: Vec<IncidentAlert> = incident_alerts
         .iter()
@@ -2217,25 +2216,29 @@ pub async fn list_incidents(
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
-    let actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
+    let mut actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
 
     let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            let mut incident = model_to_incident_with_topology(i.clone(), None);
+            let counts = actual_counts.remove(&i.id);
+            let mut incident = model_to_incident_with_topology(i, None);
+            let Some(counts) = counts else {
+                incident.alert_groups = Some(Vec::new());
+                return incident;
+            };
 
             // Fix alert_count from actual triggers (self-healing for corrupted data)
-            if let Some(&actual_count) = actual_counts.get(&i.id)
-                && incident.alert_count != actual_count
-            {
+            if incident.alert_count != counts.total {
                 log::debug!(
                     "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
-                    i.id,
+                    incident.id,
                     incident.alert_count,
-                    actual_count
+                    counts.total
                 );
-                incident.alert_count = actual_count;
+                incident.alert_count = counts.total;
             }
+            incident.alert_groups = Some(counts.groups);
 
             incident
         })
@@ -3015,6 +3018,7 @@ fn model_to_incident_with_topology(
         muted_by_downtime_id: db_model.muted_by_downtime_id,
         rca,
         rca_off_reason: db_model.rca_off_reason,
+        alert_groups: None,
     }
 }
 
@@ -4210,6 +4214,54 @@ mod tests {
         assert!(json_of(&never)["rca"].is_null());
         assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
         assert_eq!(json_of(&archived)["rca"]["report_format"], "v1");
+    }
+
+    /// Each listed incident names the alerts that fired into it and how often; an incident
+    /// with no links lists none, and `alert_count` heals to the junction's firing total.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_carries_each_incidents_alert_groups() {
+        use config::meta::alerts::incidents::IncidentAlertGroup;
+        use infra::table::alert_incidents::add_alert_to_incident;
+
+        use crate::alerts::rca_runs::tests::{add_incident, db, new_incident};
+
+        let _db = db().await;
+        let (org, repeat) = new_incident(None).await;
+        let unlinked = add_incident(&org, None).await;
+        for (alert, fired_at) in [("a", 1), ("b", 2), ("a", 3), ("a", 4)] {
+            add_alert_to_incident(
+                &repeat,
+                alert,
+                &format!("{alert}-name"),
+                "alert",
+                fired_at,
+                "manual",
+            )
+            .await
+            .unwrap();
+        }
+
+        let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
+
+        let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
+        let group = |id: &str, count| IncidentAlertGroup {
+            alert_id: id.to_string(),
+            alert_name: format!("{id}-name"),
+            count,
+        };
+        let listed = by_id(&repeat);
+        assert_eq!(
+            listed.alert_groups.as_deref(),
+            Some(&[group("a", 3), group("b", 1)][..])
+        );
+        // Seeded at 1 and incremented per link, so stored is 5: the list heals it to 4.
+        assert_eq!(listed.alert_count, 4);
+        let none = by_id(&unlinked);
+        assert_eq!(none.alert_groups.as_deref(), Some(&[][..]));
+
+        let json = serde_json::to_value(listed).unwrap();
+        assert_eq!(json["alert_groups"][0]["count"], 3);
     }
 
     /// A turn that could not start fails its run with the turn's code and an actionable reason.
