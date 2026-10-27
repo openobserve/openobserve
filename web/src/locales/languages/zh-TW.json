@@ -8291,6 +8291,7 @@
     "movePanelMessage": "選擇目標分頁",
     "noQueriesToCreateAlert": "此面板沒有可建立警示的查詢",
     "panelQueryMustHaveStream": "面板查詢必須設定串流",
+    "enrichmentTableAlertUnsupported": "無法在擴充表上執行警示",
     "unsupportedPanelTypeAlert": "從 {type} 面板建立警示可能無法如預期運作",
     "panelDuplicatedSuccessfully": "面板複製成功",
     "panelDuplicationFailed": "面板複製失敗",

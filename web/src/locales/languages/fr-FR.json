@@ -8296,6 +8296,7 @@
     "movePanelMessage": "Sélectionnez l'onglet de destination",
     "noQueriesToCreateAlert": "Ce panneau ne contient aucune requête à partir de laquelle créer une alerte",
     "panelQueryMustHaveStream": "La requête du panneau doit avoir un flux configuré",
+    "enrichmentTableAlertUnsupported": "Les alertes ne peuvent pas s'exécuter sur les tables d'enrichissement",
     "unsupportedPanelTypeAlert": "La création d'alertes à partir des panneaux {type} peut ne pas fonctionner comme prévu",
     "panelDuplicatedSuccessfully": "Panneau dupliqué avec succès",
     "panelDuplicationFailed": "La duplication du panneau a échoué",

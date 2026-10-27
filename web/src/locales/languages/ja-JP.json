@@ -8296,6 +8296,7 @@
     "movePanelMessage": "宛先タブを選択",
     "noQueriesToCreateAlert": "このパネルには、アラートを作成するクエリはありません",
     "panelQueryMustHaveStream": "パネルクエリにはストリームが設定されている必要があります",
+    "enrichmentTableAlertUnsupported": "エンリッチメントテーブルではアラートを実行できません",
     "unsupportedPanelTypeAlert": "{type} パネルからアラートを作成すると、期待どおりに動作しない場合があります",
     "panelDuplicatedSuccessfully": "パネルは正常に複製されました",
     "panelDuplicationFailed": "パネルを複製できませんでした",

@@ -8296,6 +8296,7 @@
     "movePanelMessage": "Seleziona la scheda di destinazione",
     "noQueriesToCreateAlert": "Questo pannello non ha domande da cui creare un avviso",
     "panelQueryMustHaveStream": "La query del pannello deve avere uno stream configurato",
+    "enrichmentTableAlertUnsupported": "Gli avvisi non possono essere eseguiti sulle tabelle di arricchimento",
     "unsupportedPanelTypeAlert": "La creazione di avvisi dai pannelli {type} potrebbe non funzionare come previsto",
     "panelDuplicatedSuccessfully": "Pannello duplicato con successo",
     "panelDuplicationFailed": "Duplicazione del pannello non riuscita",

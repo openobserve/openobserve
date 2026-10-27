@@ -8296,6 +8296,7 @@
     "movePanelMessage": "Selecteer doel-tabblad",
     "noQueriesToCreateAlert": "Dit paneel bevat geen vragen om een alarm te maken van",
     "panelQueryMustHaveStream": "Paneelquery moet een stream hebben geconfigureerd",
+    "enrichmentTableAlertUnsupported": "Waarschuwingen kunnen niet worden uitgevoerd op verrijkingstabellen",
     "unsupportedPanelTypeAlert": "Het aanmaken van meldingen vanuit {type} panels werkt mogelijk niet zoals verwacht",
     "panelDuplicatedSuccessfully": "Paneel met succes gedupliceerd",
     "panelDuplicationFailed": "Het dupliceren van het paneel is mislukt",

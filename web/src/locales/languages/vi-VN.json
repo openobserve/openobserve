@@ -8296,6 +8296,7 @@
     "movePanelMessage": "Chọn tab đích",
     "noQueriesToCreateAlert": "Panel này không có truy vấn nào để tạo cảnh báo",
     "panelQueryMustHaveStream": "Truy vấn Panel phải có một stream được cấu hình",
+    "enrichmentTableAlertUnsupported": "Không thể chạy cảnh báo trên bảng làm giàu dữ liệu",
     "unsupportedPanelTypeAlert": "Tạo cảnh báo từ panel {type} có thể không hoạt động như mong đợi",
     "panelDuplicatedSuccessfully": "Panel đã được nhân bản thành công",
     "panelDuplicationFailed": "Nhân bản Panel thất bại",

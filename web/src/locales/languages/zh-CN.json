@@ -8296,6 +8296,7 @@
     "movePanelMessage": "选择目标选项卡",
     "noQueriesToCreateAlert": "此面板没有可从中创建告警的查询",
     "panelQueryMustHaveStream": "面板查询必须配置数据流",
+    "enrichmentTableAlertUnsupported": "无法在富化表上运行告警",
     "unsupportedPanelTypeAlert": "从 {type} 面板创建告警可能无法按预期运行",
     "panelDuplicatedSuccessfully": "面板已成功复制",
     "panelDuplicationFailed": "面板复制失败",

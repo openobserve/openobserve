@@ -8294,6 +8294,7 @@
     "movePanelMessage": "Select destination tab",
     "noQueriesToCreateAlert": "This panel has no queries to create an alert from",
     "panelQueryMustHaveStream": "Panel query must have a stream configured",
+    "enrichmentTableAlertUnsupported": "Alerts can't run on enrichment tables",
     "unsupportedPanelTypeAlert": "Creating alerts from {type} panels may not work as expected",
     "panelDuplicatedSuccessfully": "Panel Duplicated Successfully",
     "panelDuplicationFailed": "Panel duplication failed",

@@ -84,6 +84,7 @@
       "dashboard-html-chart.spec.js",
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
+      "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
       "dashboard-zoom-brush.spec.js"

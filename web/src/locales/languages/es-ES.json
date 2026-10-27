@@ -8296,6 +8296,7 @@
     "movePanelMessage": "Selecciona la pestaña de destino",
     "noQueriesToCreateAlert": "Este panel no tiene consultas desde las que crear una alerta",
     "panelQueryMustHaveStream": "La consulta del panel debe tener un stream configurado",
+    "enrichmentTableAlertUnsupported": "Las alertas no se pueden ejecutar en tablas de enriquecimiento",
     "unsupportedPanelTypeAlert": "Es posible que la creación de alertas desde los paneles de {type} no funcione como se esperaba",
     "panelDuplicatedSuccessfully": "El panel se duplicó correctamente",
     "panelDuplicationFailed": "Falló la duplicación del panel",
