@@ -66,3 +66,7 @@ pub async fn update_status(
 ) -> Result<(), anyhow::Error> {
     Ok(org_domain_requests::update_status(id, user, new_status, reason).await?)
 }
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    org_domain_requests::delete_by_org(org_id).await
+}

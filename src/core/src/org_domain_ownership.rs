@@ -188,6 +188,14 @@ pub async fn link_from_meta(org_id: &str, domain: &str) -> Result<(), anyhow::Er
     Ok(())
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let domains = infra::table::org_domain_ownership::get_domains_for_org(org_id).await?;
+    for domain in domains {
+        delete_linked_domain(domain).await?;
+    }
+    Ok(())
+}
+
 async fn emit_sync_event(org_id: &str, domain: &str) {
     let cluster_coordinator = get_coordinator().await;
     if let Err(e) = cluster_coordinator

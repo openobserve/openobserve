@@ -96,3 +96,12 @@ pub async fn get_by_org_domain(org_id: &str, domain: &str) -> Result<Option<Mode
         .await?;
     Ok(res)
 }
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    OrgDomainRequests::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}

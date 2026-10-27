@@ -81,8 +81,23 @@ pub async fn link_domain(
         }
     };
     if existing.is_some() {
+        return MetaHttpResponse::bad_request(
+            "there is already a request open for this domain by this org",
+        );
+    }
+
+    let attempt = match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
+        Ok(v) => v,
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!(
+                "error getting org domain requests : {e}"
+            ));
+        }
+    };
+
+    if attempt.is_some() {
         return MetaHttpResponse::bad_request(format!(
-            "there is already a request open for this domain by this org"
+            "there is already a linking created for this domain by this org"
         ));
     }
 

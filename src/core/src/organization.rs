@@ -25,6 +25,8 @@ use config::{
     },
     utils::{json, rand::generate_random_string, time},
 };
+#[cfg(feature = "cloud")]
+use db::organization::get_org_setting;
 use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -1107,10 +1109,13 @@ pub async fn generate_invitation(
         };
 
         if let Some(linked_org) = get_cached_org_for_domain(domain).await {
-            if linked_org == org_id {
-                return Err(anyhow::anyhow!(
-                    "invitee '{invitee}' domain is already mapped to org {org_id} so cannot send invite"
-                ));
+            let settings = get_org_setting(&linked_org).await?;
+            for mapping in settings.domain_org_mappings {
+                if mapping.domain == domain && mapping.org_id == org_id {
+                    return Err(anyhow::anyhow!(
+                        "invitee '{invitee}' domain is already mapped to org {org_id} so cannot send invite"
+                    ));
+                }
             }
         }
 
