@@ -462,10 +462,14 @@ const useHttpStreaming = () => {
         sessionStorage.clear();
         window.location.reload();
       } else {
-        // A Response keeps status on its prototype, which the error spread would drop.
+        // Status and message live on prototypes of a Response or Error, which the error spread would drop.
         onError(
           traceId,
-          error instanceof Response ? { status: error.status, message: error.statusText } : error,
+          error instanceof Response
+            ? { status: error.status, message: error.statusText || `HTTP ${error.status}` }
+            : error instanceof Error
+              ? { message: error.message }
+              : error,
         );
       }
     }

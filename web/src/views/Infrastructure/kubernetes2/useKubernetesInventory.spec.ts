@@ -620,6 +620,34 @@ describe("useKubernetesInventory", () => {
       expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
     });
 
+    it.each([
+      ["W", "body_object_type = 'Warning'"],
+      ["O", "k8s_resource_name"],
+    ])(
+      "banners a partial failure, not a page error, when the early %s query rejects",
+      async (name, marker) => {
+        fixture = { ...CL(), P1: [ksm({ namespace: "a", pod: "p", uid: "u", phase: "Running" })] };
+        search.mockImplementation((async (args: any) => {
+          if (args.query.query.sql.includes(marker)) throw new Error(`sql ${name} down`);
+          return { data: { hits: [] } };
+        }) as any);
+        const { inv } = await setup({ view: "pods", cluster: "prod" });
+        await inv.load();
+        expect(inv.pageError.value).toBeNull();
+        expect([...inv.failed.value.keys()].some((k) => k.startsWith(`${name}:`))).toBe(true);
+        expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
+      },
+    );
+
+    it("shows a non-empty page error when every query rejects with an empty message", async () => {
+      metricsQuery.mockRejectedValue(new Error(""));
+      search.mockRejectedValue(new Error(""));
+      const { inv } = await setup({ view: "pods", cluster: "prod" });
+      await inv.load();
+      expect(typeof inv.pageError.value).toBe("string");
+      expect(inv.pageError.value).not.toBe("");
+    });
+
     it("shows one page error when every query is rejected", async () => {
       metricsQuery.mockRejectedValue(new Error("all down"));
       search.mockRejectedValue(new Error("all down"));

@@ -28,7 +28,7 @@ const timeKey = (startUs: number, endUs: number, relative: boolean) =>
 
 // The stream reports errors as { content }; callers read status and message off the error itself.
 const streamError = (res: any) =>
-  Object.assign(new Error(res?.content?.message ?? res?.content?.error ?? "search stream failed"), {
+  Object.assign(new Error(res?.content?.message || res?.content?.error || "search stream failed"), {
     status: res?.content?.status ?? res?.content?.code ?? null,
   });
 

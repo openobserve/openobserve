@@ -302,7 +302,7 @@ export function useKubernetesInventory(
       const name = i < send.length ? send[i] : requests[i - send.length].name;
       if (outcome.status === "rejected") {
         out.failed.set(name, statusOf(outcome.reason));
-        out.firstError ??= outcome.reason?.message ?? String(outcome.reason);
+        out.firstError ||= outcome.reason?.message || String(outcome.reason);
       } else if (i < send.length) out.results.set(send[i], outcome.value as Series[]);
       else out.sql.set(name, outcome.value as any[]);
     });
@@ -446,7 +446,8 @@ export function useKubernetesInventory(
     ]);
     pendingObjects.value = objectsKey;
     // SQL needs only the cluster name, so a cluster already in the URL lets it overlap the cluster queries.
-    const early = s.cluster ? settle(org, t, [], null, earlyRequests(s, t, s.cluster)) : null;
+    const planned = s.cluster ? sqlRequests(s, t, s.cluster) : null;
+    const early = planned ? settle(org, t, [], null, planned.filter(notCounts)) : null;
     // Kept out of the page batch so a drawer read cannot mask every list query failing.
     const earlyObject =
       s.cluster && s.details && s.details.kind !== "pod"
@@ -477,8 +478,8 @@ export function useKubernetesInventory(
       ].sort((a, b) => a.localeCompare(b));
     }
     const cluster = s.cluster ?? clusters.value[0] ?? null;
-    const requests = sqlRequests(s, t, cluster);
-    const blocking = requests.filter((r) => r.name !== "EC");
+    const requests = planned ?? sqlRequests(s, t, cluster);
+    const blocking = requests.filter(notCounts);
     // Same cluster as the early batch, so its SQL is already in flight and only the PromQL is left.
     const main = early
       ? mergeSettled(
@@ -532,10 +533,6 @@ export function useKubernetesInventory(
       if (events.failed.size) failed.value = new Map([...failed.value, ...events.failed]);
     }
     detailLoading.value = false;
-  };
-
-  const earlyRequests = (s: K8sUrlState, t: K8sTime, cluster: string): SqlRequest[] => {
-    return sqlRequests(s, t, cluster).filter((r) => r.name !== "EC");
   };
 
   const fail = (error: string | null) => {
@@ -755,6 +752,8 @@ function viewKeyOf(s: K8sUrlState) {
   const byNode = s.view === "map" && groupsPodsByNode(s.entity, s.group);
   return JSON.stringify([s.view, s.cluster, s.namespaces, s.entity, byNode]);
 }
+
+const notCounts = (r: SqlRequest) => r.name !== "EC";
 
 function mergeSettled(a: Settled, b: Settled): Settled {
   return {

@@ -299,19 +299,42 @@ describe("useHttpStreaming", () => {
       expect(mockHandlers.error).toHaveBeenCalledTimes(2);
 
       expect(mockHandlers.error).toHaveBeenCalledWith(mockData, {
-        content: { trace_id: mockData.traceId },
+        content: { trace_id: mockData.traceId, message: "Network failure" },
         type: "error",
       });
     });
 
-    it("passes the status of a non-OK, non-JSON response to the error handler", async () => {
+    it.each([
+      [502, "<html>bad gateway</html>", "HTTP 502"],
+      [403, "<html>forbidden</html>", "HTTP 403"],
+    ])(
+      "passes status %i and a non-empty message of a non-JSON Response to the error handler",
+      async (status, body, message) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        mockFetch.mockResolvedValueOnce(new Response(body, { status }));
+        httpStreaming.traceMap.value[mockData.traceId] = {
+          data: [],
+          error: [mockHandlers.error],
+          complete: [],
+          abortController: new AbortController(),
+        };
+
+        await httpStreaming.fetchQueryDataWithHttpStream(mockData, mockHandlers);
+        await flushPromises();
+
+        expect(mockHandlers.error).toHaveBeenCalledWith(
+          mockData,
+          expect.objectContaining({
+            type: "error",
+            content: expect.objectContaining({ status, message }),
+          }),
+        );
+      },
+    );
+
+    it("passes the message of a rejected fetch to the error handler", async () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        statusText: "Forbidden",
-        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
-      });
+      mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
       httpStreaming.traceMap.value[mockData.traceId] = {
         data: [],
         error: [mockHandlers.error],
@@ -326,7 +349,7 @@ describe("useHttpStreaming", () => {
         mockData,
         expect.objectContaining({
           type: "error",
-          content: expect.objectContaining({ status: 403 }),
+          content: expect.objectContaining({ message: "Failed to fetch" }),
         }),
       );
     });

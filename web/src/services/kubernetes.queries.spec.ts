@@ -125,6 +125,15 @@ describe("kubernetes queries", () => {
       expect(err.status).toBe(403);
     });
 
+    it("falls back to a non-empty message when the error payload message is empty", async () => {
+      stream.fetch.mockImplementation(async (req: any, handlers: any) =>
+        handlers.error(req, { content: { message: "", status: 502 } }),
+      );
+      const err: any = await run().catch((e) => e);
+      expect(err.message).toBe("search stream failed");
+      expect(err.status).toBe(502);
+    });
+
     it("reads the status from content.code when content.status is absent", async () => {
       stream.fetch.mockImplementation(async (req: any, handlers: any) =>
         handlers.error(req, { content: { message: "denied", code: 403 } }),
