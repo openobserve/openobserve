@@ -34,6 +34,7 @@ const props = withDefaults(defineProps<ChipInputProps>(), {
   emptyText: undefined,
   loading: false,
   autoHighlight: true,
+  multiple: false,
   disabled: false,
   size: "md",
   ariaLabel: undefined,
@@ -209,14 +210,14 @@ function onFieldPointerDown(event: PointerEvent) {
         :disable-outside-pointer-events="false"
         :collision-padding="8"
         :data-test="testId('suggest')"
-        class="rounded-default bg-select-content-bg border-select-content-border z-10001 flex w-80 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden border shadow-md"
-        :style="{ maxHeight: 'min(22rem, var(--reka-popover-content-available-height, 22rem))' }"
+        class="rounded-default bg-select-content-bg border-select-content-border z-10001 flex w-max max-w-[min(20rem,calc(100vw-1.5rem))] min-w-52 flex-col overflow-hidden border shadow-md"
+        :style="{ maxHeight: 'min(20rem, var(--reka-popover-content-available-height, 20rem))' }"
         @open-auto-focus.prevent
         @close-auto-focus.prevent
         @interact-outside="onInteractOutside"
         @escape-key-down.prevent
       >
-        <div class="border-select-content-border flex items-center gap-2 border-b px-3">
+        <div class="border-select-content-border flex items-center gap-2 border-b px-2.5">
           <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
           <input
             ref="inputRef"
@@ -231,7 +232,7 @@ function onFieldPointerDown(event: PointerEvent) {
             :aria-label="searchPlaceholder ?? ariaLabel"
             :placeholder="searchPlaceholder"
             :data-test="testId('input')"
-            class="text-text-body placeholder:text-text-secondary min-w-0 flex-1 border-0 bg-transparent py-2 text-xs outline-none"
+            class="text-text-body placeholder:text-text-secondary min-w-0 flex-1 border-0 bg-transparent py-1.5 text-xs outline-none"
             @input="onInput"
             @keydown="onKeydown"
           />
@@ -241,6 +242,7 @@ function onFieldPointerDown(event: PointerEvent) {
           :id="listId"
           ref="listRef"
           role="listbox"
+          :aria-multiselectable="multiple || undefined"
           :aria-label="searchPlaceholder ?? ariaLabel"
           class="min-h-0 flex-1 overflow-y-auto p-1"
         >
@@ -249,16 +251,28 @@ function onFieldPointerDown(event: PointerEvent) {
             :id="`${listId}-${index}`"
             :key="suggestion.key"
             role="option"
-            :aria-selected="index === highlighted"
+            :aria-selected="multiple ? Boolean(suggestion.selected) : index === highlighted"
             :data-index="index"
             :data-active="index === highlighted ? '' : undefined"
             :data-test="testId(`suggest-item-${suggestion.key}`)"
-            class="rounded-default text-select-item-text data-active:bg-select-item-hover-bg flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs select-none"
+            class="rounded-default text-select-item-text data-active:bg-select-item-hover-bg flex cursor-pointer items-center gap-2 px-2 py-1 text-xs select-none"
             @mousedown.prevent
             @pointermove="highlighted = index"
             @click="emit('select', suggestion.key)"
           >
             <slot name="suggestion" :suggestion="suggestion" :active="index === highlighted">
+              <span
+                v-if="multiple"
+                aria-hidden="true"
+                :class="[
+                  'rounded-checkbox flex size-3.5 shrink-0 items-center justify-center border transition-colors',
+                  suggestion.selected
+                    ? 'bg-checkbox-checked-bg border-checkbox-checked-border text-checkbox-checked-fg'
+                    : 'bg-checkbox-bg border-checkbox-border',
+                ]"
+              >
+                <OIcon v-if="suggestion.selected" name="check" size="xs" class="size-3!" />
+              </span>
               <OIcon
                 v-if="suggestion.icon"
                 :name="suggestion.icon"
@@ -266,11 +280,11 @@ function onFieldPointerDown(event: PointerEvent) {
                 class="text-text-secondary shrink-0"
               />
               <OTruncatedText class="min-w-0 flex-1">{{ suggestion.label }}</OTruncatedText>
-              <span v-if="suggestion.detail" class="text-text-secondary shrink-0">{{
+              <span v-if="suggestion.detail" class="text-text-secondary ms-3 shrink-0">{{
                 suggestion.detail
               }}</span>
               <OIcon
-                v-if="suggestion.selected"
+                v-if="suggestion.selected && !multiple"
                 name="check"
                 size="xs"
                 class="text-theme-accent shrink-0"
@@ -279,14 +293,14 @@ function onFieldPointerDown(event: PointerEvent) {
           </div>
           <div
             v-if="!suggestions.length && !loading && emptyText"
-            class="text-text-secondary px-2 py-1.5 text-xs"
+            class="text-text-secondary w-0 min-w-full px-2 py-1 text-xs"
           >
             {{ emptyText }}
           </div>
         </div>
         <div
           v-if="$slots.footer"
-          class="text-text-secondary border-select-content-border text-2xs border-t px-3 py-1.5"
+          class="text-text-secondary border-select-content-border text-2xs w-0 min-w-full border-t px-2.5 py-1.5"
         >
           <slot name="footer" />
         </div>

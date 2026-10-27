@@ -42,7 +42,7 @@ const SEGMENT =
 
 const TONES: Record<FilterTokenPart, string> = {
   field: "bg-badge-default-soft-bg text-badge-default-soft-text font-medium",
-  operator: "bg-input-bg text-text-secondary font-mono",
+  operator: "bg-input-bg text-text-secondary",
   value: "bg-badge-primary-soft-bg text-badge-primary-soft-text font-medium",
 };
 

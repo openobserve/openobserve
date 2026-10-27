@@ -23,7 +23,7 @@ export interface ChipInputSuggestion {
   /** Secondary text on the end edge (a type, a count, a description). */
   detail?: I18nText;
   icon?: IconName;
-  /** Draws a check mark, for multi-value pickers. */
+  /** Marks the current choice, or a checked row when `multiple`. */
   selected?: boolean;
 }
 
@@ -44,6 +44,8 @@ export interface ChipInputProps {
   loading?: boolean;
   /** Highlight the first row so Enter picks it; off when Enter should fall through to `enter`. */
   autoHighlight?: boolean;
+  /** Rows toggle a checkbox and the popover stays open, for picking several values. */
+  multiple?: boolean;
   disabled?: boolean;
   size?: "sm" | "md";
   ariaLabel?: I18nText;
