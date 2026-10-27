@@ -17188,7 +17188,7 @@
           "count": "Scores"
         },
         "legendAvg": "Gem",
-        "legendThreshold": "drempelwaarde {direction} {value}",
+        "legendThreshold": "drempel {direction} {value}",
         "markLineHealthy": "gezond {direction} {value}",
         "filterRange": "{from} tot {to}",
         "filterBelow": "Onder {to}",

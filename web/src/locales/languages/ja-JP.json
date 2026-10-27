@@ -20489,7 +20489,7 @@
         "attention": "要注意",
         "healthy": "正常",
         "unset": "しきい値が未設定",
-        "nodata": "スコアデータがありません"
+        "nodata": "スコアデータなし"
       },
       "rumEventType": {
         "longtask": "長時間タスク",

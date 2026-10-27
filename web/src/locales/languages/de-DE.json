@@ -20489,7 +20489,7 @@
         "attention": "Erfordert Aufmerksamkeit",
         "healthy": "Gesund",
         "unset": "Schwellenwert nicht festgelegt",
-        "nodata": "Keine Bewertungsdaten"
+        "nodata": "Keine Score-Daten"
       },
       "rumEventType": {
         "longtask": "Lange Aufgabe",

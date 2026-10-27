@@ -17171,8 +17171,8 @@
         "distributionNumeric": "Rozkład ocen",
         "distributionValues": "Rozkład wartości",
         "averageValue": "średnia {value}",
-        "legendHealthy": "Zdrowe",
-        "legendUnhealthy": "Niezdrowe",
+        "legendHealthy": "Prawidłowy",
+        "legendUnhealthy": "Nieprawidłowy",
         "legendScores": "Oceny",
         "chartTooltip": "{count} ocena, {unhealthy} niezdrowych | {count} ocen, {unhealthy} niezdrowych",
         "chartTooltipCount": "{count} ocena | {count} ocen",
@@ -20489,7 +20489,7 @@
         "attention": "Wymaga uwagi",
         "healthy": "Zdrowy",
         "unset": "Nie ustawiono progu",
-        "nodata": "Brak danych o ocenach"
+        "nodata": "Brak danych oceny"
       },
       "rumEventType": {
         "longtask": "Długie zadanie",

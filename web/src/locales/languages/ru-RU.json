@@ -17172,7 +17172,7 @@
         "distributionValues": "Распределение значений",
         "averageValue": "среднее {value}",
         "legendHealthy": "В норме",
-        "legendUnhealthy": "Вне нормы",
+        "legendUnhealthy": "Не в норме",
         "legendScores": "Оценки",
         "chartTooltip": "{count} оценок, {unhealthy} вне нормы | {count} оценок, {unhealthy} вне нормы",
         "chartTooltipCount": "{count} оценка | {count} оценок",
@@ -17188,7 +17188,7 @@
           "count": "Оценки"
         },
         "legendAvg": "Сред",
-        "legendThreshold": "Порог {direction} {value}",
+        "legendThreshold": "порог {direction} {value}",
         "markLineHealthy": "здоров {direction} {value}",
         "filterRange": "от {from} до {to}",
         "filterBelow": "Ниже {to}",
@@ -20489,7 +20489,7 @@
         "attention": "Требует внимания",
         "healthy": "Исправен",
         "unset": "Порог не задан",
-        "nodata": "Нет данных об оценках"
+        "nodata": "Нет данных об оценке"
       },
       "rumEventType": {
         "longtask": "Долгая задача",

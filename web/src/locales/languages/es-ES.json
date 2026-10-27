@@ -17171,8 +17171,8 @@
         "distributionNumeric": "Distribución de puntuaciones",
         "distributionValues": "Distribución de valores",
         "averageValue": "promedio {value}",
-        "legendHealthy": "Saludables",
-        "legendUnhealthy": "No saludables",
+        "legendHealthy": "Correcto",
+        "legendUnhealthy": "Incorrecto",
         "legendScores": "Puntuaciones",
         "chartTooltip": "{count} puntuación, {unhealthy} no saludable | {count} puntuaciones, {unhealthy} no saludables",
         "chartTooltipCount": "{count} puntuación | {count} puntuaciones",
@@ -20489,7 +20489,7 @@
         "attention": "Requiere atención",
         "healthy": "Saludable",
         "unset": "Umbral no establecido",
-        "nodata": "Sin datos de puntuaciones"
+        "nodata": "Sin datos de puntuación"
       },
       "rumEventType": {
         "longtask": "Tarea larga",

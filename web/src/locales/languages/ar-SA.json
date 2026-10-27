@@ -17171,8 +17171,8 @@
         "distributionNumeric": "توزيع الدرجات",
         "distributionValues": "توزيع القيم",
         "averageValue": "المتوسط {value}",
-        "legendHealthy": "سليمة",
-        "legendUnhealthy": "غير سليمة",
+        "legendHealthy": "سليم",
+        "legendUnhealthy": "غير سليم",
         "legendScores": "الدرجات",
         "chartTooltip": "{count} درجة، {unhealthy} غير سليمة | {count} درجة، {unhealthy} غير سليمة",
         "chartTooltipCount": "{count} درجة | {count} درجات",
@@ -20489,7 +20489,7 @@
         "attention": "يحتاج إلى انتباه",
         "healthy": "سليم",
         "unset": "لم يتم تعيين العتبة",
-        "nodata": "لا توجد بيانات للدرجات"
+        "nodata": "لا توجد بيانات تقييم"
       },
       "rumEventType": {
         "longtask": "مهمة طويلة",

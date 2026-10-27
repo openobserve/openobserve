@@ -17171,8 +17171,8 @@
         "distributionNumeric": "Phân bố điểm",
         "distributionValues": "Phân bố giá trị",
         "averageValue": "trung bình {value}",
-        "legendHealthy": "Đạt",
-        "legendUnhealthy": "Không đạt",
+        "legendHealthy": "Bình thường",
+        "legendUnhealthy": "Bất thường",
         "legendScores": "Điểm",
         "chartTooltip": "{count} điểm, {unhealthy} không đạt | {count} điểm, {unhealthy} không đạt",
         "chartTooltipCount": "{count} điểm | {count} điểm",
@@ -20489,7 +20489,7 @@
         "attention": "Cần chú ý",
         "healthy": "Khỏe mạnh",
         "unset": "Chưa đặt ngưỡng",
-        "nodata": "Không có dữ liệu điểm"
+        "nodata": "Không có dữ liệu điểm số"
       },
       "rumEventType": {
         "longtask": "Tác vụ dài",
