@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  LibraryInstallDialog — the five answers an install needs, in the order the
-  answer stops being obvious: Destination -> Alerts -> Folder -> Tune -> Install.
+  LibraryInstallDialog — the answers an install needs: Folder -> Tune -> Add.
 
-  Destination is optional: alerts installed without one evaluate and record their history.
+  The page already chose the alerts, so every one passed in is added. They are
+  added with no destination: they evaluate and record their history, and notify
+  once someone attaches a destination in the alert editor.
 
-  The batch arrives as `seed` from one alert's drawer or `preselect` from the
-  gallery's selection. The seed wins.
+  The batch arrives as `seed` from one alert's drawer or card, or `preselect`
+  from the gallery's selection. The seed wins.
 
   Installs run SEQUENTIALLY and one failure never stops the rest — a duplicate
   name in the middle of a batch of twelve must not cost the other eleven. Each
@@ -51,164 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OStep
         :name="1"
-        :title="t('alert_library.install.stepDestination')"
-        icon="send"
-        :done="step > 1"
-      >
-        <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-destination-step">
-          <p class="text-text-secondary text-sm">
-            {{ t("alert_library.install.destinationIntro") }}
-          </p>
-
-          <OBanner
-            v-if="destinationsFailed"
-            variant="warning"
-            dense
-            icon="warning"
-            data-test="alert-library-install-destinations-failed"
-          >
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-sm">{{ t("alert_library.install.destinationsLoadFailed") }}</span>
-              <OButton
-                variant="outline"
-                size="sm"
-                icon-left="refresh"
-                :loading="isLoadingDestinations"
-                data-test="alert-library-install-destinations-retry"
-                @click="loadDestinations()"
-              >
-                {{ t("alert_library.install.retry") }}
-              </OButton>
-            </div>
-          </OBanner>
-
-          <!-- No destinations yet. Not an error: the alerts install without one. -->
-          <template v-if="!isLoadingDestinations && !destinationsFailed && !hasDestinations">
-            <OBanner
-              variant="info"
-              icon="info"
-              data-test="alert-library-install-destinations-empty"
-            >
-              <div class="flex flex-col gap-2">
-                <span class="text-sm">{{ t("alert_library.install.destinationsNoneBody") }}</span>
-                <div>
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="open-in-new"
-                    data-test="alert-library-install-open-destinations"
-                    @click="openDestinationsPage"
-                  >
-                    {{ t("alert_library.install.openDestinations") }}
-                  </OButton>
-                </div>
-              </div>
-            </OBanner>
-          </template>
-
-          <template v-else>
-            <OSelect
-              :model-value="chosenDestination"
-              :options="destinationOptions"
-              size="sm"
-              :label="t('alert_library.install.destinationLabel')"
-              :placeholder="t('alerts.summary.noDestination')"
-              clearable
-              data-test="alert-library-install-destination"
-              @update:model-value="onDestinationPicked"
-            />
-            <div>
-              <OButton
-                variant="ghost"
-                size="sm"
-                icon-left="open-in-new"
-                data-test="alert-library-install-open-destinations"
-                @click="openDestinationsPage"
-              >
-                {{ t("alert_library.install.openDestinations") }}
-              </OButton>
-            </div>
-          </template>
-        </div>
-      </OStep>
-
-      <OStep
-        :name="2"
-        :title="t('alert_library.install.stepAlerts')"
-        icon="checklist"
-        :done="step > 2"
-      >
-        <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-alerts-step">
-          <div class="flex items-center justify-between gap-2">
-            <span
-              class="text-text-secondary text-sm"
-              data-test="alert-library-install-count"
-              :data-selected="selectedIds.length"
-              :data-total="candidates.length"
-            >
-              {{
-                t("alert_library.install.selectedCount", {
-                  count: selectedIds.length,
-                  total: candidates.length,
-                })
-              }}
-            </span>
-            <div class="flex items-center gap-1">
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="alert-library-install-select-all"
-                @click="selectAll"
-              >
-                {{ t("alert_library.install.selectAll") }}
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="alert-library-install-clear"
-                @click="clearSelection"
-              >
-                {{ t("alert_library.install.clear") }}
-              </OButton>
-            </div>
-          </div>
-
-          <ul
-            class="border-border-default rounded-default divide-border-default max-h-80 divide-y overflow-y-auto border"
-          >
-            <li
-              v-for="entry in candidates"
-              :key="entry.id"
-              class="flex items-center gap-3 px-3 py-2"
-            >
-              <OCheckbox
-                :model-value="isSelected(entry.id)"
-                size="sm"
-                :label="raw(entry.title)"
-                class="min-w-0 flex-1"
-                :data-test="`alert-library-install-alert-${entry.id}`"
-                @update:model-value="toggleEntry(entry.id, $event)"
-              />
-              <span class="text-text-secondary hidden shrink-0 truncate text-xs sm:inline">{{
-                entry.id
-              }}</span>
-              <OTag
-                type="severity"
-                size="xs"
-                :value="severityBadgeValue(entry.severity)"
-                :label="severityLabel(t, entry.severity)"
-                class="shrink-0"
-              />
-            </li>
-          </ul>
-        </div>
-      </OStep>
-
-      <OStep
-        :name="3"
         :title="t('alert_library.install.stepFolder')"
         icon="folder"
-        :done="step > 3"
+        :done="step > 1"
       >
         <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-folder-step">
           <p class="text-text-secondary text-sm">{{ t("alert_library.install.folderIntro") }}</p>
@@ -230,10 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Frequency and silence are scheduled-alert fields; an anomaly-only batch skips the step. -->
       <OStep
         v-if="batchHasScheduled"
-        :name="4"
+        :name="2"
         :title="t('alert_library.install.stepTune')"
         icon="tune"
-        :done="step > 4"
+        :done="step > 2"
       >
         <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-tune-step">
           <p
@@ -283,20 +129,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OStep>
 
-      <OStep :name="5" :title="t('alert_library.install.stepInstall')" icon="download">
+      <OStep :name="3" :title="t('alert_library.install.stepInstall')" icon="download">
         <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-review-step">
           <dl
             class="border-border-default rounded-default grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border p-3 text-sm"
             data-test="alert-library-install-summary"
           >
-            <dt class="text-text-secondary">{{ t("alert_library.install.stepDestination") }}</dt>
-            <dd class="text-text-heading">
-              {{ chosenDestination || t("common.none") }}
-            </dd>
             <dt class="text-text-secondary">{{ t("alert_library.install.stepFolder") }}</dt>
             <dd class="text-text-heading">{{ folderLabel }}</dd>
             <dt class="text-text-secondary">{{ t("alert_library.install.stepAlerts") }}</dt>
-            <dd class="text-text-heading">{{ selectedIds.length }}</dd>
+            <dd class="text-text-heading">{{ candidates.length }}</dd>
             <template v-if="batchHasScheduled">
               <dt class="text-text-secondary">{{ t("alert_library.install.stepTune") }}</dt>
               <dd class="text-text-heading">{{ tuningSummary }}</dd>
@@ -380,28 +222,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alert_library.install.back") }}
         </OButton>
         <OButton
-          v-if="step < 5"
+          v-if="step < 3"
           variant="primary"
           size="sm-action"
-          :disabled="!canAdvance"
           data-test="alert-library-install-next"
           @click="goNext"
         >
           {{ t("alert_library.install.next") }}
         </OButton>
         <OButton
-          v-if="step === 5 && !hasRun"
+          v-if="step === 3 && !hasRun"
           variant="primary"
           size="sm-action"
           :loading="isInstalling"
-          :disabled="selectedIds.length === 0 || (needsLargeBatchConfirm && !largeBatchConfirmed)"
+          :disabled="candidates.length === 0 || (needsLargeBatchConfirm && !largeBatchConfirmed)"
           data-test="alert-library-install-run"
-          @click="install(selectedIds)"
+          @click="install(candidates.map((entry) => entry.id))"
         >
-          {{ t("alert_library.install.run", { count: selectedIds.length }, selectedIds.length) }}
+          {{ t("alert_library.install.run", { count: candidates.length }, candidates.length) }}
         </OButton>
         <OButton
-          v-if="step === 5 && hasRun && failedIds.length > 0"
+          v-if="step === 3 && hasRun && failedIds.length > 0"
           variant="primary"
           size="sm-action"
           :loading="isInstalling"
@@ -414,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OButton>
         <OButton
-          v-if="step === 5 && hasRun"
+          v-if="step === 3 && hasRun"
           :variant="failedIds.length > 0 ? 'outline' : 'primary'"
           size="sm-action"
           :disabled="isInstalling"
@@ -430,12 +271,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import { useAlertLibrary, useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -444,7 +283,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -452,13 +290,12 @@ import { saveAlertMutation } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
-import destinationService from "@/services/alert_destination";
 import analytics from "@/services/product_analytics";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getFoldersListByType } from "@/utils/commons";
 
-import { alertTypeOf, severityBadgeValue, severityLabel } from "./libraryFacets";
+import { alertTypeOf } from "./libraryFacets";
 import {
   buildAnomalyInstallPayload,
   buildInstallPayload,
@@ -469,11 +306,9 @@ import { coerceTunable, readTunables, DEFAULT_TUNABLES } from "./libraryTunables
 
 const props = defineProps<{
   open: boolean;
-  /** What the Alerts step offers — the gallery's current, filtered view. */
-  entries: AlertLibraryEntry[];
-  /** The drawer's alert and the file it already tuned. */
+  /** The drawer's or card's alert and the file it already tuned. */
   seed: { entry: AlertLibraryEntry; file: AlertLibraryFile } | null;
-  /** The gallery's frozen batch — entries, not ids, since it may hold alerts `entries` excludes. */
+  /** The gallery's frozen batch — entries, not ids, since it may hold alerts the filters now hide. */
   preselect: AlertLibraryEntry[];
 }>();
 
@@ -495,7 +330,6 @@ const LARGE_BATCH = 50;
 
 const { t } = useI18nTyped();
 const store = useStore();
-const router = useRouter();
 const { loadAlertFile } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
 
@@ -514,14 +348,7 @@ interface InstallResult {
 
 const step = ref(1);
 
-// ── destination ────────────────────────────────────────────────────────────
-const existingDestinations = ref<string[]>([]);
-const destinationsFailed = ref(false);
-const chosenDestination = ref("");
-const isLoadingDestinations = ref(false);
-
-// ── selection, folder, tuning ──────────────────────────────────────────────
-const selectedIds = ref<string[]>([]);
+// ── folder, tuning ─────────────────────────────────────────────────────────
 const folderId = ref("default");
 const folderName = ref("");
 const foldersLoading = ref(false);
@@ -534,9 +361,9 @@ const tuneSilence = ref(DEFAULT_TUNABLES.silence);
 /**
  * The alert set this run reports on, frozen when it starts.
  *
- * `candidates` derives from `props.entries`, which the gallery recomputes as
- * its async stream load settles. Rebuilding the result rows from it mid-run
- * would drop rows the user has not read yet.
+ * `candidates` derives from props the gallery can rewrite mid-run (its catalog
+ * refresh prunes `preselect`). Rebuilding the result rows from it would drop
+ * rows the user has not read yet.
  */
 const roster = ref<AlertLibraryEntry[]>([]);
 const results = ref<InstallResult[]>([]);
@@ -544,29 +371,16 @@ const isInstalling = ref(false);
 const hasRun = ref(false);
 const anomalyInstalled = ref(false);
 
-// Locked anomaly cards reach `entries` too, since the gallery shows them; this keeps them out of the batch.
+// A locked anomaly alert stays out of the batch even if a caller hands one in.
 const canInstallKind = (entry: AlertLibraryEntry): boolean =>
   alertTypeOf(entry) !== "anomaly" || anomalyAccess.value === "enabled";
 
 const minutesSuffix = computed(() => t("alert_library.install.minutes"));
 
-/**
- * What the Alerts step offers, and the only list install ever walks.
- *
- * `entries` is the gallery's FILTERED view, so the alert the drawer was opened
- * on may not be in it — the user can narrow the filters after opening the
- * drawer. Dropping the seed there would install nothing while showing a
- * selected count of one.
- */
+/** Every alert this open adds, and the only list install ever walks. */
 const candidates = computed<AlertLibraryEntry[]>(() => {
-  const seedEntry = props.seed?.entry;
-  const visible = new Set(props.entries.map((entry) => entry.id));
-  // The batch outlives the filters, so dropping these would count alerts the list cannot offer.
-  const offView = props.preselect.filter((entry) => !visible.has(entry.id));
-  // Seed, then the batch the filters hide, then the visible set; the dedupe drops the repeat.
-  const offered = [...(seedEntry ? [seedEntry] : []), ...offView, ...props.entries];
-
-  // Deduped by id: the install walks this list, so a manifest that repeats an
+  const offered = props.seed ? [props.seed.entry] : props.preselect;
+  // Deduped by id: the install walks this list, so a batch that repeats an
   // entry would create that alert twice.
   const seen = new Set<string>();
   return offered.filter((entry) => {
@@ -577,29 +391,12 @@ const candidates = computed<AlertLibraryEntry[]>(() => {
   });
 });
 
-// Anomaly access can turn off while the dialog is open; a selection it no longer offers must not be counted.
-watch(candidates, (offered) => {
-  const eligible = new Set(offered.map((entry) => entry.id));
-  if (selectedIds.value.some((id) => !eligible.has(id))) {
-    selectedIds.value = selectedIds.value.filter((id) => eligible.has(id));
-  }
-});
-
-const selectedEntries = computed(() =>
-  candidates.value.filter((entry) => selectedIds.value.includes(entry.id)),
-);
 const batchHasScheduled = computed(() =>
-  selectedEntries.value.some((entry) => alertTypeOf(entry) === "scheduled"),
+  candidates.value.some((entry) => alertTypeOf(entry) === "scheduled"),
 );
 const batchHasAnomaly = computed(() =>
-  selectedEntries.value.some((entry) => alertTypeOf(entry) === "anomaly"),
+  candidates.value.some((entry) => alertTypeOf(entry) === "anomaly"),
 );
-
-const destinationOptions = computed(() =>
-  existingDestinations.value.map((name) => ({ label: raw(name), value: name })),
-);
-
-const hasDestinations = computed(() => existingDestinations.value.length > 0);
 
 const folderLabel = computed<I18nText>(() => raw(folderName.value || folderId.value));
 
@@ -612,24 +409,17 @@ const tuningSummary = computed<I18nText>(() =>
     : t("alert_library.install.summaryTuningNone"),
 );
 
-const needsLargeBatchConfirm = computed(() => selectedIds.value.length > LARGE_BATCH);
+const needsLargeBatchConfirm = computed(() => candidates.value.length > LARGE_BATCH);
 
 const largeBatchPrompt = computed(() =>
-  chosenDestination.value
-    ? t("alert_library.install.confirmLarge", {
-        count: selectedIds.value.length,
-        folder: folderLabel.value,
-        destination: chosenDestination.value,
-      })
-    : t("alert_library.install.confirmLargeNoDestination", {
-        count: selectedIds.value.length,
-        folder: folderLabel.value,
-      }),
+  t("alert_library.install.confirmLargeNoDestination", {
+    count: candidates.value.length,
+    folder: folderLabel.value,
+  }),
 );
 
-// The tick is a statement about THIS batch, folder and destination; any of the three changing
-// makes it an acknowledgement of a run that is no longer the one about to happen.
-watch([selectedIds, folderId, chosenDestination], () => {
+// The tick acknowledges THIS batch in THIS folder; a change to either re-arms it.
+watch([candidates, folderId], () => {
   largeBatchConfirmed.value = false;
 });
 
@@ -637,20 +427,11 @@ const failedIds = computed(() =>
   results.value.filter((result) => result.status === "failed").map((result) => result.id),
 );
 
-const canAdvance = computed(() => {
-  if (step.value === 2) return selectedIds.value.length > 0;
-  return true;
-});
-
 // ── lifecycle ──────────────────────────────────────────────────────────────
 const reset = () => {
   sessionToken += 1;
   step.value = 1;
-  isLoadingDestinations.value = false;
   foldersLoading.value = false;
-  existingDestinations.value = [];
-  destinationsFailed.value = false;
-  chosenDestination.value = "";
   folderId.value = "default";
   folderName.value = "";
   tuneEnabled.value = false;
@@ -659,9 +440,6 @@ const reset = () => {
   hasRun.value = false;
   isInstalling.value = false;
   anomalyInstalled.value = false;
-
-  const opened = props.seed ? [props.seed.entry] : props.preselect;
-  selectedIds.value = opened.filter(canInstallKind).map((entry) => entry.id);
   largeBatchConfirmed.value = false;
   // Seed the bulk pair from the alert the user was just looking at, so the
   // fields open on values that mean something rather than on a global default.
@@ -671,64 +449,14 @@ const reset = () => {
 };
 
 /**
- * Only the newest open may write the destination state.
- *
- * Close-and-reopen is fast, the list request is not, and a reply from the
- * previous open landing after `reset()` would repopulate the picker — or flip
- * it into create mode — behind the current one. Same guard the drawer uses.
- */
-let destinationsToken = 0;
-
-/**
  * Bumped by every `reset()`. Anything that awaits must re-check it afterwards:
- * a create started before a close-and-reopen would otherwise finish against the
- * NEW session, writing a destination name the user never chose.
+ * a folder fetch started before a close-and-reopen would otherwise clear the
+ * NEW session's loading state.
  */
 let sessionToken = 0;
 
-const loadDestinations = async () => {
-  const token = ++destinationsToken;
-  isLoadingDestinations.value = true;
-  let names: string[] = [];
-  let failed = false;
-  try {
-    const response = await destinationService.list({
-      org_identifier: orgIdentifier(),
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    });
-    const list = Array.isArray(response?.data) ? response.data : [];
-    names = list
-      .map((destination: { name?: string }) => destination?.name)
-      .filter((name: unknown): name is string => typeof name === "string" && name !== "");
-  } catch {
-    failed = true;
-  }
-
-  if (token !== destinationsToken) return;
-
-  destinationsFailed.value = failed;
-  existingDestinations.value = names;
-  isLoadingDestinations.value = false;
-};
-
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) return;
-    reset();
-    void loadDestinations();
-  },
-  { immediate: true },
-);
-
-// The folder picker reads the store and only refreshes itself on `onActivated`,
-// which a dialog never fires. Fetch when the step is reached.
-watch(step, (value) => {
-  if (value !== 3) return;
+// The folder picker refreshes itself only on `onActivated`, which a dialog never fires.
+const loadFolders = () => {
   const token = sessionToken;
   foldersLoading.value = true;
   void getFoldersListByType(store, "alerts")
@@ -738,16 +466,21 @@ watch(step, (value) => {
     .finally(() => {
       if (token === sessionToken) foldersLoading.value = false;
     });
-});
+};
+
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) return;
+    reset();
+    loadFolders();
+  },
+  { immediate: true },
+);
 
 const onOpenChange = (value: boolean) => {
   if (!value && isInstalling.value) return;
   emit("update:open", value);
-};
-
-// ── destination step ───────────────────────────────────────────────────────
-const onDestinationPicked = (value: unknown) => {
-  chosenDestination.value = typeof value === "string" ? value : "";
 };
 
 const errorText = (error: unknown): I18nText => {
@@ -767,42 +500,13 @@ const errorText = (error: unknown): I18nText => {
   );
 };
 
-const openDestinationsPage = () => {
-  const url = router.resolve({
-    name: "alertDestinations",
-    query: {
-      action: "add",
-      org_identifier: orgIdentifier(),
-    },
-  }).href;
-  window.open(url, "_blank", "noopener");
-};
-
+// Tune exists only for scheduled alerts, so an anomaly-only batch steps over it.
 const goNext = () => {
-  step.value = step.value === 3 && !batchHasScheduled.value ? 5 : step.value + 1;
+  step.value = step.value === 1 && !batchHasScheduled.value ? 3 : step.value + 1;
 };
 
 const goBack = () => {
-  step.value = step.value === 5 && !batchHasScheduled.value ? 3 : step.value - 1;
-};
-
-// ── alerts step ────────────────────────────────────────────────────────────
-const isSelected = (id: string) => selectedIds.value.includes(id);
-
-const toggleEntry = (id: string, checked: unknown) => {
-  if (checked === true) {
-    if (!isSelected(id)) selectedIds.value = [...selectedIds.value, id];
-  } else {
-    selectedIds.value = selectedIds.value.filter((selected) => selected !== id);
-  }
-};
-
-const selectAll = () => {
-  selectedIds.value = candidates.value.map((entry) => entry.id);
-};
-
-const clearSelection = () => {
-  selectedIds.value = [];
+  step.value = step.value === 3 && !batchHasScheduled.value ? 1 : step.value - 1;
 };
 
 // ── folder step ────────────────────────────────────────────────────────────
@@ -859,7 +563,6 @@ const installOne = async (
       entry,
       file,
       folderId: folderId.value,
-      destination: chosenDestination.value,
     });
     await installAnomaly.mutateAsync({ payload, folderId: folderId.value });
     return true;
@@ -869,7 +572,6 @@ const installOne = async (
     entry,
     file,
     folderId: folderId.value,
-    destination: chosenDestination.value,
     owner: store.state.userInfo?.email ?? "",
     timezone: store.state.timezone,
     overrides,
@@ -883,7 +585,7 @@ const install = async (ids: string[]) => {
 
   // Freeze the roster on the FIRST run; a retry reports on the same set.
   if (!hasRun.value) {
-    roster.value = candidates.value.filter((entry) => selectedIds.value.includes(entry.id));
+    roster.value = [...candidates.value];
   }
 
   const batch = roster.value.filter((entry) => ids.includes(entry.id));

@@ -23,9 +23,10 @@
 //   1. The same normalization ImportAlert does (`createAlert`, ImportAlert.vue)
 //      — that is the only place in the app that has ever turned a stored alert
 //      document back into a create, and divergence here is a bug by definition.
-//   2. Three things only the library needs: the org's destination (or none)
-//      replaces the author's, provenance is stamped so Phase 5 can recognise the alert
-//      later, and the library's severity becomes the product's priority.
+//   2. Three things only the library needs: the author's destinations are
+//      dropped (none of them exist here), provenance is stamped so Phase 5 can
+//      recognise the alert later, and the library's severity becomes the
+//      product's priority.
 //
 // Pure and file-in/payload-out, so the wizard stays markup and this stays
 // tested — same split as libraryTunables.ts.
@@ -55,8 +56,6 @@ export interface InstallPayloadInput {
   /** The tuned file, straight from the drawer, or freshly fetched. */
   file: AlertLibraryFile;
   folderId: string;
-  /** A destination NAME that exists in this org, or "" to install with none. */
-  destination: string;
   /** Installing user's email — becomes owner and last editor. */
   owner: string;
   /** Org timezone, used only when the file carries none. */
@@ -68,8 +67,6 @@ export interface AnomalyInstallPayloadInput {
   entry: AlertLibraryEntry;
   file: AlertLibraryFile;
   folderId: string;
-  /** A destination NAME that exists in this org, or "" to install with none. */
-  destination: string;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -162,7 +159,7 @@ const withPackTag = (tags: unknown, pack: string): unknown[] => {
 };
 
 export function buildInstallPayload(input: InstallPayloadInput): Record<string, unknown> {
-  const { entry, file, folderId, destination, owner, timezone, overrides } = input;
+  const { entry, file, folderId, owner, timezone, overrides } = input;
 
   // A library file is JSON by construction, so a JSON round-trip is a complete
   // clone. The drawer keeps rendering the object it handed us, and install
@@ -191,9 +188,8 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
   }
 
   // ── library-specific ─────────────────────────────────────────────────────
-  // Overwrite, never merge: the packs hardcode "k8s_alert"/"o2_to_slack",
-  // which no customer org has, and the alert API rejects an unknown name.
-  payload.destinations = destination ? [destination] : [];
+  // Cleared: the packs hardcode "k8s_alert"/"o2_to_slack", which the alert API rejects here.
+  payload.destinations = [];
 
   // Phase 5 input, recorded here because this is where the promise is made:
   // `context_attributes` is USER-EDITABLE — the alert form renders it as
@@ -224,7 +220,7 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
 export function buildAnomalyInstallPayload(
   input: AnomalyInstallPayloadInput,
 ): Record<string, unknown> {
-  const { entry, file, folderId, destination } = input;
+  const { entry, file, folderId } = input;
   const payload = JSON.parse(JSON.stringify(file)) as Record<string, unknown>;
 
   if (typeof payload.name !== "string" || payload.name === "") {
@@ -234,7 +230,7 @@ export function buildAnomalyInstallPayload(
 
   // The backend routes on this field; without it the body becomes a scheduled alert.
   payload.alert_type = "anomaly_detection";
-  payload.destinations = destination ? [destination] : [];
+  payload.destinations = [];
   // The backend 400s when this disagrees with ?folder=.
   payload.folder_id = folderId;
   // Absent means disabled, and a disabled config never trains.

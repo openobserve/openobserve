@@ -27,28 +27,16 @@ import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
 
 const mocks = vi.hoisted(() => ({
   loadAlertFile: vi.fn(),
-  listDestinations: vi.fn(),
   createAlert: vi.fn(),
   createAnomaly: vi.fn(),
   getFoldersListByType: vi.fn(),
-  validateCredentials: vi.fn(() => ({ isValid: true, errors: {} })),
-  testDestination: vi.fn(),
-  createDestination: vi.fn(),
-  updateDestination: vi.fn(),
-  fetchSystemTemplates: vi.fn(),
   toast: vi.fn(),
-  resolveRoute: vi.fn(),
 }));
 
 // Every partial mock below spreads the REAL module and overrides only what the
 // test drives. A hand-listed subset silently removes the other members, so an
 // implementation that touches one dies at mount and reads as a component bug
 // rather than as the missing test double it is.
-vi.mock("vue-router", async () => {
-  const actual = await vi.importActual<Record<string, unknown>>("vue-router");
-  return { ...actual, useRouter: () => ({ resolve: mocks.resolveRoute }) };
-});
-
 vi.mock("@/composables/alerts/useAlertLibrary", async () => {
   const actual = await vi.importActual<Record<string, unknown>>(
     "@/composables/alerts/useAlertLibrary",
@@ -60,13 +48,6 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
       loadAlertFile: mocks.loadAlertFile,
     }),
   };
-});
-
-vi.mock("@/services/alert_destination", async () => {
-  const actual = await vi.importActual<{ default: Record<string, unknown> }>(
-    "@/services/alert_destination",
-  );
-  return { ...actual, default: { ...actual.default, list: mocks.listDestinations } };
 });
 
 vi.mock("@/services/alerts", async () => {
@@ -86,26 +67,6 @@ vi.mock("@/utils/commons", async () => {
   return { ...actual, getFoldersListByType: mocks.getFoldersListByType };
 });
 
-// Safe to call the real factory: `fetchSystemTemplates` is only ever invoked
-// from inside the other methods, never at construction, so nothing reaches the
-// network just by building the composable.
-vi.mock("@/composables/usePrebuiltDestinations", async () => {
-  const actual = await vi.importActual<Record<string, unknown>>(
-    "@/composables/usePrebuiltDestinations",
-  );
-  return {
-    ...actual,
-    usePrebuiltDestinations: () => ({
-      ...(actual.usePrebuiltDestinations as () => Record<string, unknown>)(),
-      fetchSystemTemplates: mocks.fetchSystemTemplates,
-      validateCredentials: mocks.validateCredentials,
-      testDestination: mocks.testDestination,
-      createDestination: mocks.createDestination,
-      updateDestination: mocks.updateDestination,
-    }),
-  };
-});
-
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mocks.toast }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -119,18 +80,6 @@ const ODialogStub = {
   props: ["open", "title", "subTitle", "size", "persistent"],
   emits: ["update:open"],
   template: '<div data-test="o-dialog"><slot /><slot name="footer" /></div>',
-};
-
-const OSelectStub = {
-  name: "OSelect",
-  props: ["modelValue", "options", "label", "size", "placeholder", "errorMessage"],
-  emits: ["update:modelValue"],
-  template:
-    '<select :data-test="$attrs[\'data-test\']" :data-value="modelValue" ' +
-    ":data-options=\"(options || []).map((o) => o.value ?? o).join(',')\" " +
-    "@change=\"$emit('update:modelValue', $event.target.value)\">" +
-    '<option v-for="o in options || []" :key="o.value ?? o" :value="o.value ?? o" />' +
-    "</select>",
 };
 
 const OInputStub = {
@@ -170,20 +119,11 @@ const SelectFolderStub = {
   template: '<div data-test="folder-picker" :data-type="type" :data-active="activeFolderId" />',
 };
 
-const PrebuiltSelectorStub = {
-  name: "PrebuiltDestinationSelector",
-  props: ["modelValue"],
-  emits: ["update:modelValue", "select"],
-  template: '<div data-test="prebuilt-selector" :data-value="modelValue" />',
-};
-
 const stubs = {
   ODialog: ODialogStub,
-  OSelect: OSelectStub,
   OInput: OInputStub,
   OCheckbox: OCheckboxStub,
   SelectFolderDropDown: SelectFolderStub,
-  PrebuiltDestinationSelector: PrebuiltSelectorStub,
 };
 
 // ── fixtures ───────────────────────────────────────────────────────────────
@@ -241,7 +181,6 @@ const mountDialog = async (props: Record<string, unknown> = {}) => {
   const wrapper = mount(LibraryInstallDialog, {
     props: {
       open: true,
-      entries: entries(),
       preselect: [],
       seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
       ...props,
@@ -257,26 +196,21 @@ const click = async (wrapper: any, test: string) => {
   await flushPromises();
 };
 
-/** Walk Destination → Alerts → Folder → Tune → Install with the defaults. */
+/** The gallery's three-alert selection, with no drawer seed — the batch cases. */
+const mountBatch = (props: Record<string, unknown> = {}) =>
+  mountDialog({ seed: null, preselect: entries(), ...props });
+
+/** Walk Folder → Tune → Add with the defaults; an anomaly-only batch has no Tune. */
 const advanceToInstall = async (wrapper: any) => {
-  await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-  await flushPromises();
-  await click(wrapper, "alert-library-install-next");
-  await click(wrapper, "alert-library-install-next");
-  await click(wrapper, "alert-library-install-next");
-  await click(wrapper, "alert-library-install-next");
+  for (let guard = 0; guard < 3; guard += 1) {
+    if (wrapper.find('[data-test="alert-library-install-run"]').exists()) return;
+    await click(wrapper, "alert-library-install-next");
+  }
 };
 
-/** Same walk, but installing all three — the batch cases. */
-const advanceAllToInstall = async (wrapper: any) => {
-  await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-  await flushPromises();
-  await click(wrapper, "alert-library-install-next");
-  await click(wrapper, "alert-library-install-select-all");
-  await click(wrapper, "alert-library-install-next");
-  await click(wrapper, "alert-library-install-next");
-  await click(wrapper, "alert-library-install-next");
-};
+/** Step titles as the stepper shows them, in order. */
+const stepTitles = (wrapper: any): string[] =>
+  wrapper.findAllComponents({ name: "OStep" }).map((step: any) => String(step.props("title")));
 
 /** Per-alert outcome as the results list reports it. */
 const statusOf = (wrapper: any, id: string) =>
@@ -301,8 +235,6 @@ const drain = async (releases: Array<(value: unknown) => void>) => {
 const payloadFor = (name: string) =>
   mocks.createAlert.mock.calls.find((call) => call[1].name === name)?.[1] as Record<string, any>;
 
-let windowOpen: ReturnType<typeof vi.spyOn>;
-
 describe("LibraryInstallDialog", () => {
   beforeEach(() => {
     // Reset OUR mocks only. `clearAllMocks` cannot drain an unconsumed `…Once`
@@ -313,290 +245,108 @@ describe("LibraryInstallDialog", () => {
     // strips their implementations for the rest of the file.
     Object.values(mocks).forEach((mock) => mock.mockReset());
     vi.mocked(analytics.track).mockClear();
-    mocks.listDestinations.mockResolvedValue({
-      data: [{ name: "ops-slack" }, { name: "oncall-pagerduty" }],
-    });
     mocks.loadAlertFile.mockImplementation((e: AlertLibraryEntry) =>
       Promise.resolve(libraryFile(e.name)),
     );
     mocks.createAlert.mockResolvedValue({ data: {} });
     mocks.getFoldersListByType.mockResolvedValue([]);
-    mocks.validateCredentials.mockReturnValue({ isValid: true, errors: {} });
-    mocks.createDestination.mockResolvedValue(undefined);
-    mocks.testDestination.mockResolvedValue({ success: true });
-    mocks.resolveRoute.mockReturnValue({ href: "/web/alerts/destinations?action=add" });
-    windowOpen = vi.spyOn(window, "open").mockReturnValue(null);
   });
 
-  afterEach(() => {
-    windowOpen.mockRestore();
-  });
-
-  describe("destination step", () => {
-    it("offers the destinations this org actually has", async () => {
+  describe("steps", () => {
+    it("asks only Folder, Tune and Add for a batch with a threshold alert", async () => {
       const wrapper = await mountDialog();
-      expect(mocks.listDestinations).toHaveBeenCalledWith(
-        expect.objectContaining({ org_identifier: "default", module: "alert" }),
-      );
-      // Membership, not order: sorting or grouping the picker is a display
-      // choice, and pinning the API's order forbids it for no reason.
-      const options = wrapper
-        .find('[data-test="alert-library-install-destination"]')
-        .attributes("data-options")
-        ?.split(",");
-      expect(options).toHaveLength(2);
-      expect(options).toEqual(expect.arrayContaining(["ops-slack", "oncall-pagerduty"]));
+      expect(stepTitles(wrapper)).toEqual(["Folder", "Tune", "Add"]);
+      expect(wrapper.find('[data-test="alert-library-install-folder-step"]').exists()).toBe(true);
     });
 
-    it("advances without a destination, which is optional", async () => {
+    it("never asks for a destination", async () => {
       const wrapper = await mountDialog();
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeUndefined();
+      expect(wrapper.text()).not.toContain("Destination");
+      expect(wrapper.find('[data-test="alert-library-install-destination"]').exists()).toBe(false);
+      await advanceToInstall(wrapper);
+      expect(wrapper.find('[data-test="alert-library-install-summary"]').text()).not.toContain(
+        "Destination",
+      );
     });
 
-    it("installs with no destination when none is chosen", async () => {
-      const wrapper = await mountDialog();
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+    it("offers no per-alert checklist — the page already chose the alerts", async () => {
+      const wrapper = await mountBatch();
+      expect(wrapper.find('[data-test^="alert-library-install-alert-"]').exists()).toBe(false);
+      await advanceToInstall(wrapper);
+      expect(wrapper.find('[data-test="alert-library-install-run"]').text()).toContain("3");
+    });
 
-      expect(wrapper.find('[data-test="alert-library-install-summary"]').text()).toContain(
-        (i18n.global.t as any)("common.none"),
-      );
+    it("installs every alert passed in, with no destination", async () => {
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
-      expect(mocks.createAlert).toHaveBeenCalledWith(
-        "default",
-        expect.objectContaining({ destinations: [] }),
-        "default",
-      );
+      expect(mocks.createAlert.mock.calls.map((call) => call[1].name)).toEqual([
+        "pod-oom-killed",
+        "node-disk-pressure",
+        "cert-expiring",
+      ]);
+      for (const call of mocks.createAlert.mock.calls) expect(call[1].destinations).toEqual([]);
     });
 
-    it("does not mistake a failed request for an org with no destinations", async () => {
-      // A transient GET failure says nothing about how many destinations exist.
-      // Forcing create mode on it TRAPS the user: the way back out is hidden
-      // exactly when the list is empty, and Back is hidden on step 1 — so an
-      // org with fifty destinations could only create a duplicate or quit.
-      mocks.listDestinations.mockRejectedValue({ response: { status: 500 } });
-      const wrapper = await mountDialog();
-
-      expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="alert-library-install-destination"]').exists()).toBe(true);
-      // NOT the empty-org state: the list is unknown, not known to be empty.
-      expect(wrapper.find('[data-test="alert-library-install-destinations-empty"]').exists()).toBe(
-        false,
-      );
-      // And a way forward either way.
-      expect(wrapper.find('[data-test="alert-library-install-destinations-retry"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="alert-library-install-open-destinations"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("says so plainly when the org genuinely has no destinations", async () => {
-      // A legitimate first-run condition, not an error — and no longer
-      // something this dialog can fix, so it has to point somewhere real.
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      const wrapper = await mountDialog();
-
-      expect(wrapper.find('[data-test="alert-library-install-destinations-empty"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
-        false,
-      );
-      expect(wrapper.find('[data-test="alert-library-install-open-destinations"]').exists()).toBe(
-        true,
-      );
-      // The alerts install without one, so the wizard still moves on.
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeUndefined();
-    });
-
-    it("routes to the Destinations page for every type, not just a custom one", async () => {
-      const wrapper = await mountDialog();
-      await click(wrapper, "alert-library-install-open-destinations");
-
-      expect(mocks.resolveRoute).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "alertDestinations" }),
-      );
-      expect(windowOpen).toHaveBeenCalledWith(
-        "/web/alerts/destinations?action=add",
-        "_blank",
-        expect.stringContaining("noopener"),
-      );
-    });
-
-    it("offers a retry that recovers the list", async () => {
-      mocks.listDestinations.mockRejectedValue({ response: { status: 500 } });
-      const wrapper = await mountDialog();
-
-      mocks.listDestinations.mockResolvedValue({ data: [{ name: "ops-slack" }] });
-      await click(wrapper, "alert-library-install-destinations-retry");
-
-      expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
-        false,
-      );
-      expect(
-        wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-options"),
-      ).toBe("ops-slack");
-    });
-  });
-
-  describe("alerts step", () => {
-    it("arrives with the drawer's alert already chosen and the rest offered", async () => {
-      const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      const checked = (id: string) =>
-        (
-          wrapper.find(`[data-test="alert-library-install-alert-${id}"]`)
-            .element as HTMLInputElement
-        ).checked;
-      expect(checked("k8s/pod-oom-killed")).toBe(true);
-      expect(checked("k8s/node-disk-pressure")).toBe(false);
-      expect(checked("k8s/cert-expiring")).toBe(false);
-    });
-
-    it("cannot continue with nothing selected", async () => {
-      const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      await wrapper
-        .find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]')
-        .setValue(false);
-      await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
-    });
-
-    it("survives an empty candidate list without offering a dead Next", async () => {
-      const wrapper = await mountDialog({ entries: [], seed: null });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
-    });
-
-    it("offers the seeded alert even when the gallery filter excludes it", async () => {
-      // Real: `entries` is the gallery's FILTERED view, and the user may have
-      // narrowed it after opening the drawer. Dropping the seed would silently
-      // install nothing, or install the wrong alert.
-      const wrapper = await mountDialog({
-        entries: [secondEntry(), thirdEntry()],
-        seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
-      });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      const seedRow = wrapper.find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]');
-      expect(seedRow.exists()).toBe(true);
-      expect((seedRow.element as HTMLInputElement).checked).toBe(true);
-
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+    it("installs the drawer's single alert, whatever else the gallery had selected", async () => {
+      const wrapper = await mountDialog({ preselect: [secondEntry(), thirdEntry()] });
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(mocks.createAlert).toHaveBeenCalledTimes(1);
       expect(mocks.createAlert.mock.calls[0][1].name).toBe("pod-oom-killed");
     });
 
-    it("goes back to the destination step without losing the choice", async () => {
-      const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-back");
-
-      expect(wrapper.find('[data-test="alert-library-install-destination-step"]').exists()).toBe(
-        true,
-      );
+    it("offers no run for an empty batch", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: [] });
+      await advanceToInstall(wrapper);
       expect(
-        wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-value"),
-      ).toBe("ops-slack");
+        wrapper.find('[data-test="alert-library-install-run"]').attributes("disabled"),
+      ).toBeDefined();
     });
 
-    it("selects and clears every offered alert in one click", async () => {
+    it("goes back from Add to Tune to Folder", async () => {
       const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      // Read the numbers as data, not as prose. `toContain("3")` was worse than
-      // useless — "0 of 3 selected" contains "3" — but exact text couples the
-      // test to the copy AND to source formatting, since VTU's `text()` trims
-      // the ends without collapsing interior whitespace, so a Prettier rewrap
-      // of the template would fail a correct component.
-      const count = () => wrapper.find('[data-test="alert-library-install-count"]');
-
-      await click(wrapper, "alert-library-install-select-all");
-      expect(count().attributes("data-selected")).toBe("3");
-      expect(count().attributes("data-total")).toBe("3");
-
-      await click(wrapper, "alert-library-install-clear");
-      expect(count().attributes("data-selected")).toBe("0");
-      expect(count().attributes("data-total")).toBe("3");
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-back");
+      expect(wrapper.find('[data-test="alert-library-install-tune-step"]').exists()).toBe(true);
+      await click(wrapper, "alert-library-install-back");
+      expect(wrapper.find('[data-test="alert-library-install-folder-step"]').exists()).toBe(true);
     });
   });
 
   describe("folder step", () => {
-    it("refreshes the alert folder list on reaching the step, not before", async () => {
-      const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      // WHEN is the whole claim: SelectFolderDropDown refreshes itself only on
-      // `onActivated`, which a dialog never fires. Asserting only that it was
-      // called eventually would pass on a fetch at mount, which is the bug.
+    it("refreshes the alert folder list when the dialog opens, since Folder is the first step", async () => {
+      // SelectFolderDropDown refreshes itself only on `onActivated`, which a dialog never fires.
+      await mountDialog({ open: false });
       expect(mocks.getFoldersListByType).not.toHaveBeenCalled();
 
-      await click(wrapper, "alert-library-install-next");
+      const wrapper = await mountDialog();
       expect(mocks.getFoldersListByType).toHaveBeenCalledWith(expect.anything(), "alerts");
       expect(wrapper.find('[data-test="folder-picker"]').attributes("data-type")).toBe("alerts");
     });
 
     it("installs into the folder the picker reports", async () => {
       const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-
       wrapper
         .findComponent({ name: "SelectFolderDropDown" })
         .vm.$emit("folder-selected", { label: "Kubernetes", value: "folder-42" });
       await flushPromises();
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(mocks.createAlert).toHaveBeenCalledWith("default", expect.anything(), "folder-42");
     });
 
     it("still lets the batch install when the folder list cannot be read", async () => {
-      // As plausible as the destination 403 already covered. "default" always
-      // exists, so a failed refresh must degrade to it rather than trap the run.
+      // "default" always exists, so a failed refresh must degrade to it rather than trap the run.
       mocks.getFoldersListByType.mockRejectedValue({ response: { status: 403 } });
 
       const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-
       expect(wrapper.find('[data-test="alert-library-install-folder-step"]').exists()).toBe(true);
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+      expect(wrapper.find('[data-test="folder-picker"]').exists()).toBe(true);
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(mocks.createAlert).toHaveBeenCalledWith("default", expect.anything(), "default");
@@ -615,10 +365,10 @@ describe("LibraryInstallDialog", () => {
       await click(wrapper, "alert-library-install-run");
 
       const payload = mocks.createAlert.mock.calls[0][1] as Record<string, any>;
-      // Wizard-supplied: the chosen destination, the folder, and the store
-      // identity/timezone. `owner: undefined` serialises away silently, so
-      // nothing else in either spec would notice these were never read.
-      expect(payload.destinations).toEqual(["ops-slack"]);
+      // Wizard-supplied: the folder and the store identity/timezone. `owner:
+      // undefined` serialises away silently, so nothing else in either spec
+      // would notice these were never read. Destinations are always cleared.
+      expect(payload.destinations).toEqual([]);
       expect(payload.folder_id).toBe("default");
       expect(mocks.createAlert.mock.calls[0][2]).toBe("default");
       expect(payload.owner).toBe("example@gmail.com");
@@ -629,8 +379,8 @@ describe("LibraryInstallDialog", () => {
     });
 
     it("builds each alert from its own entry, not from the seed's", async () => {
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(payloadFor("pod-oom-killed").context_attributes).toMatchObject({
@@ -658,13 +408,13 @@ describe("LibraryInstallDialog", () => {
       expect(payload.trigger_condition.silence).toBe(45);
     });
 
-    it("fetches the file for an alert the drawer never opened, and only those", async () => {
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+    it("fetches the file of every alert in a gallery batch, which no drawer opened", async () => {
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
-      expect(mocks.loadAlertFile).toHaveBeenCalledTimes(2);
       expect(mocks.loadAlertFile.mock.calls.map((call) => call[0].id)).toEqual([
+        "k8s/pod-oom-killed",
         "k8s/node-disk-pressure",
         "k8s/cert-expiring",
       ]);
@@ -672,11 +422,7 @@ describe("LibraryInstallDialog", () => {
     });
 
     it("applies the bulk-tuned pair to every alert in the batch", async () => {
-      const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-select-all");
-      await click(wrapper, "alert-library-install-next");
+      const wrapper = await mountBatch();
       await click(wrapper, "alert-library-install-next");
 
       await wrapper.find('[data-test="alert-library-install-tune-toggle"]').setValue(true);
@@ -712,9 +458,6 @@ describe("LibraryInstallDialog", () => {
         // `Number("")` is 0, which silently turns "run every N minutes" into an
         // evaluation that never comes round. The drawer already solved this.
         const wrapper = await mountDialog();
-        await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-        await click(wrapper, "alert-library-install-next");
-        await click(wrapper, "alert-library-install-next");
         await click(wrapper, "alert-library-install-next");
 
         await wrapper.find('[data-test="alert-library-install-tune-toggle"]').setValue(true);
@@ -734,9 +477,6 @@ describe("LibraryInstallDialog", () => {
 
     it("keeps a silence of zero, which means 'never suppress'", async () => {
       const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-next");
 
       await wrapper.find('[data-test="alert-library-install-tune-toggle"]').setValue(true);
@@ -769,8 +509,8 @@ describe("LibraryInstallDialog", () => {
       const releases: Array<(value: unknown) => void> = [];
       mocks.createAlert.mockImplementation(() => new Promise((resolve) => releases.push(resolve)));
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(mocks.createAlert).toHaveBeenCalledTimes(1);
@@ -803,8 +543,8 @@ describe("LibraryInstallDialog", () => {
       const releases: Array<(value: unknown) => void> = [];
       mocks.createAlert.mockImplementation(() => new Promise((resolve) => releases.push(resolve)));
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
       expect(mocks.createAlert).toHaveBeenCalledTimes(1);
 
@@ -827,8 +567,8 @@ describe("LibraryInstallDialog", () => {
         .mockRejectedValueOnce({ response: { data: { message: "alert name already exists" } } })
         .mockResolvedValueOnce({ data: {} });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       // The third create is the whole point: it only happens if the second
@@ -853,8 +593,8 @@ describe("LibraryInstallDialog", () => {
         .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
         .mockResolvedValueOnce({ data: {} });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       // Times(1) matters: `toHaveBeenCalledWith` scans EVERY call, so an
@@ -865,18 +605,23 @@ describe("LibraryInstallDialog", () => {
     });
 
     it("reports a file that could not be fetched as that alert's failure only", async () => {
-      mocks.loadAlertFile.mockRejectedValue(new Error("network down"));
+      mocks.loadAlertFile.mockImplementation((e: AlertLibraryEntry) =>
+        e.name === "node-disk-pressure"
+          ? Promise.reject(new Error("network down"))
+          : Promise.resolve(libraryFile(e.name)),
+      );
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
-      // The seeded alert still installs; the two that needed a fetch do not.
-      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
-      expect(mocks.createAlert.mock.calls[0][1].name).toBe("pod-oom-killed");
+      expect(mocks.createAlert.mock.calls.map((call) => call[1].name)).toEqual([
+        "pod-oom-killed",
+        "cert-expiring",
+      ]);
       expect(statusOf(wrapper, "k8s/pod-oom-killed")).toBe("installed");
       expect(statusOf(wrapper, "k8s/node-disk-pressure")).toBe("failed");
-      expect(statusOf(wrapper, "k8s/cert-expiring")).toBe("failed");
+      expect(statusOf(wrapper, "k8s/cert-expiring")).toBe("installed");
     });
 
     it("retries only what failed, and keeps the successes reported", async () => {
@@ -885,8 +630,8 @@ describe("LibraryInstallDialog", () => {
         .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
         .mockResolvedValueOnce({ data: {} });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       mocks.createAlert.mockClear();
@@ -908,8 +653,8 @@ describe("LibraryInstallDialog", () => {
         .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
         .mockResolvedValueOnce({ data: {} });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       const releases: Array<(value: unknown) => void> = [];
@@ -937,8 +682,8 @@ describe("LibraryInstallDialog", () => {
         .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
         .mockResolvedValueOnce({ data: {} });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       const installed = wrapper.emitted("installed");
@@ -954,8 +699,8 @@ describe("LibraryInstallDialog", () => {
         .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
         .mockResolvedValueOnce({ data: {} });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(analytics.track).toHaveBeenCalledTimes(1);
@@ -968,8 +713,8 @@ describe("LibraryInstallDialog", () => {
     it("does not track library_alert_installed when every install fails", async () => {
       mocks.createAlert.mockRejectedValue({ response: { data: { message: "boom" } } });
 
-      const wrapper = await mountDialog();
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(analytics.track).not.toHaveBeenCalled();
@@ -1034,18 +779,9 @@ describe("LibraryInstallDialog", () => {
   it("installs a repeated manifest id exactly once", async () => {
     // The manifest is fetched content; a duplicated entry would otherwise be
     // walked twice and create the alert twice.
-    const wrapper = await mountDialog({ entries: [seedEntry(), seedEntry(), secondEntry()] });
-    await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-    await click(wrapper, "alert-library-install-next");
-    await click(wrapper, "alert-library-install-select-all");
-
-    expect(wrapper.find('[data-test="alert-library-install-count"]').attributes("data-total")).toBe(
-      "2",
-    );
-
-    await click(wrapper, "alert-library-install-next");
-    await click(wrapper, "alert-library-install-next");
-    await click(wrapper, "alert-library-install-next");
+    const wrapper = await mountBatch({ preselect: [seedEntry(), seedEntry(), secondEntry()] });
+    await advanceToInstall(wrapper);
+    expect(wrapper.find('[data-test="alert-library-install-run"]').text()).toContain("2");
     await click(wrapper, "alert-library-install-run");
 
     expect(mocks.createAlert).toHaveBeenCalledTimes(2);
@@ -1065,11 +801,7 @@ describe("LibraryInstallDialog", () => {
       return Promise.resolve(file);
     });
 
-    const wrapper = await mountDialog();
-    await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-    await click(wrapper, "alert-library-install-next");
-    await click(wrapper, "alert-library-install-select-all");
-    await click(wrapper, "alert-library-install-next");
+    const wrapper = await mountBatch();
     await click(wrapper, "alert-library-install-next");
     await click(wrapper, "alert-library-install-next");
     await click(wrapper, "alert-library-install-run");
@@ -1093,8 +825,8 @@ describe("LibraryInstallDialog", () => {
       .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
       .mockResolvedValueOnce({ data: {} });
 
-    const wrapper = await mountDialog();
-    await advanceAllToInstall(wrapper);
+    const wrapper = await mountBatch();
+    await advanceToInstall(wrapper);
     await click(wrapper, "alert-library-install-run");
 
     mocks.createAlert.mockResolvedValue({ data: {} });
@@ -1108,17 +840,14 @@ describe("LibraryInstallDialog", () => {
 
   it("starts from the first step again when reopened", async () => {
     const wrapper = await mountDialog();
-    await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
     await click(wrapper, "alert-library-install-next");
-    expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-install-tune-step"]').exists()).toBe(true);
 
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="alert-library-install-destination-step"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="alert-library-install-folder-step"]').exists()).toBe(true);
   });
 
   it("forgets the previous run when reopened", async () => {
@@ -1134,27 +863,16 @@ describe("LibraryInstallDialog", () => {
     expect(wrapper.findAll('[data-test^="alert-library-install-result-"]')).toHaveLength(0);
   });
 
-  it("reseeds the selection from the alert the drawer handed over", async () => {
+  it("installs the alert the drawer handed over on the latest open", async () => {
     const wrapper = await mountDialog();
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ seed: { entry: thirdEntry(), file: libraryFile("cert-expiring") } });
     await wrapper.setProps({ open: true });
     await flushPromises();
 
-    await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-    await click(wrapper, "alert-library-install-next");
-    expect(
-      (
-        wrapper.find('[data-test="alert-library-install-alert-k8s/cert-expiring"]')
-          .element as HTMLInputElement
-      ).checked,
-    ).toBe(true);
-    expect(
-      (
-        wrapper.find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]')
-          .element as HTMLInputElement
-      ).checked,
-    ).toBe(false);
+    await advanceToInstall(wrapper);
+    await click(wrapper, "alert-library-install-run");
+    expect(mocks.createAlert.mock.calls.map((call) => call[1].name)).toEqual(["cert-expiring"]);
   });
 
   // The stub above renders the panel inline and has no close button, which makes
@@ -1182,35 +900,6 @@ describe("LibraryInstallDialog", () => {
       document.body.innerHTML = "";
     });
 
-    it("gives every alert checkbox an accessible name", async () => {
-      // OCheckbox names itself from `label` alone. Without it a screen-reader
-      // user hears "checkbox, unchecked" once per alert with no way to tell
-      // which one they are about to install.
-      const checkboxStubs = { ...realStubs } as Record<string, unknown>;
-      checkboxStubs.ODialog = ODialogStub;
-      delete checkboxStubs.OCheckbox;
-
-      wrapper = mount(LibraryInstallDialog, {
-        props: {
-          open: true,
-          entries: entries(),
-          preselect: [],
-          seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
-        },
-        global: { plugins: [i18n, store], stubs: checkboxStubs },
-      });
-      await flushPromises();
-
-      const select = wrapper.find('[data-test="alert-library-install-destination"]');
-      await select.setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      const row = wrapper.find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]');
-      expect(row.exists()).toBe(true);
-      expect(row.text()).toContain("Pod OOM Killed");
-      expect(row.find('[role="checkbox"]').exists()).toBe(true);
-    });
-
     it("takes the close button away while creates are in flight", async () => {
       let release: (value: unknown) => void = () => {};
       mocks.createAlert.mockReturnValue(
@@ -1222,7 +911,6 @@ describe("LibraryInstallDialog", () => {
       wrapper = mount(LibraryInstallDialog, {
         props: {
           open: true,
-          entries: entries(),
           preselect: [],
           seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
         },
@@ -1233,13 +921,6 @@ describe("LibraryInstallDialog", () => {
 
       expect(inBody("o-dialog-close-btn")).not.toBeNull();
 
-      const select = inBody("alert-library-install-destination") as HTMLSelectElement;
-      select.value = "ops-slack";
-      select.dispatchEvent(new Event("change"));
-      await flushPromises();
-
-      await clickInBody("alert-library-install-next");
-      await clickInBody("alert-library-install-next");
       await clickInBody("alert-library-install-next");
       await clickInBody("alert-library-install-next");
       await clickInBody("alert-library-install-run");
@@ -1255,18 +936,14 @@ describe("LibraryInstallDialog", () => {
     });
   });
 
-  it("loads no destinations while closed", async () => {
+  it("loads nothing while closed", async () => {
     await mountDialog({ open: false });
-    expect(mocks.listDestinations).not.toHaveBeenCalled();
     expect(mocks.loadAlertFile).not.toHaveBeenCalled();
     expect(mocks.getFoldersListByType).not.toHaveBeenCalled();
   });
   describe("the tune step's hint", () => {
     const hintOf = async () => {
       const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-next");
       return wrapper.get('[data-test="alert-library-install-tune-hint"]').text();
     };
@@ -1281,9 +958,6 @@ describe("LibraryInstallDialog", () => {
 
     it("takes those names from the field labels, so they cannot drift apart", async () => {
       const wrapper = await mountDialog();
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-next");
       await wrapper.find('[data-test="alert-library-install-tune-toggle"]').setValue(true);
       await flushPromises();
@@ -1301,132 +975,42 @@ describe("LibraryInstallDialog", () => {
 
   // ── preselection from the gallery ─────────────────────────────────────────
   describe("preselect", () => {
-    const ticked = (wrapper: any) =>
-      wrapper
-        .findAll('[data-test^="alert-library-install-alert-"]')
-        .filter((box: any) => box.element.checked)
-        .map((box: any) =>
-          box.attributes("data-test")!.replace("alert-library-install-alert-", ""),
-        );
-
-    it("ticks exactly the alerts the gallery handed over", async () => {
-      const wrapper = await mountDialog({
-        seed: null,
-        preselect: [seedEntry(), thirdEntry()],
-      });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      expect(ticked(wrapper).sort()).toEqual(["k8s/cert-expiring", "k8s/pod-oom-killed"]);
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("2");
-    });
-
-    it("offers a preselected alert the current filters exclude", async () => {
-      // `entries` is the gallery's FILTERED view. A batch built before the user
-      // narrowed it would otherwise report a count for alerts not in the list.
-      const offView = entry({
+    const offView = () =>
+      entry({
         id: "kafka/consumer-lag",
         name: "consumer-lag",
         pack: "kafka",
         title: "Consumer Lag Growing",
         content_hash: "hash-9",
       });
-      const wrapper = await mountDialog({ seed: null, preselect: [offView] });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
 
-      expect(
-        wrapper.find('[data-test="alert-library-install-alert-kafka/consumer-lag"]').exists(),
-      ).toBe(true);
-      expect(ticked(wrapper)).toEqual(["kafka/consumer-lag"]);
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-total"),
-      ).toBe("4");
-    });
-
-    it("creates the off-view alert, not just lists it", async () => {
-      const offView = entry({
-        id: "kafka/consumer-lag",
-        name: "consumer-lag",
-        pack: "kafka",
-        title: "Consumer Lag Growing",
-        content_hash: "hash-9",
-      });
-      mocks.loadAlertFile.mockResolvedValue(libraryFile("consumer-lag"));
-      mocks.createAlert.mockResolvedValue({ data: {} });
-
-      const wrapper = await mountDialog({ seed: null, preselect: [offView] });
+    it("installs exactly the alerts the gallery handed over", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: [seedEntry(), thirdEntry()] });
       await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
-      await flushPromises();
+
+      expect(mocks.createAlert.mock.calls.map((call) => call[1].name)).toEqual([
+        "pod-oom-killed",
+        "cert-expiring",
+      ]);
+    });
+
+    it("creates an alert the gallery's current filters hide", async () => {
+      // The batch outlives the filters: it was frozen when the user pressed Add.
+      mocks.loadAlertFile.mockResolvedValue(libraryFile("consumer-lag"));
+      const wrapper = await mountDialog({ seed: null, preselect: [offView()] });
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
 
       expect(statusOf(wrapper, "kafka/consumer-lag")).toBe("installed");
     });
 
-    it("lists the seed first, then the off-view batch, then the visible set", async () => {
-      const offView = entry({ id: "kafka/consumer-lag", name: "consumer-lag", pack: "kafka" });
-      const wrapper = await mountDialog({ preselect: [offView] });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      const order = wrapper
-        .findAll('[data-test^="alert-library-install-alert-"]')
-        .map((b: any) => b.attributes("data-test")!.replace("alert-library-install-alert-", ""));
-      expect(order[0]).toBe("k8s/pod-oom-killed");
-      expect(order[1]).toBe("kafka/consumer-lag");
-    });
-
-    it("lets the drawer's seed win — one alert, whatever the gallery had selected", async () => {
-      const wrapper = await mountDialog({ preselect: [secondEntry(), thirdEntry()] });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      expect(ticked(wrapper)).toEqual(["k8s/pod-oom-killed"]);
-    });
-
-    it("scopes an untick to this run — it tells the gallery nothing", async () => {
-      // The gallery selection is the user's shelf; only a successful add takes
-      // an alert off it. A modal editing that state behind its own backdrop is
-      // the two-selection-models failure this design exists to avoid.
+    it("tells the gallery nothing until an alert is actually added", async () => {
       const wrapper = await mountDialog({ seed: null, preselect: [seedEntry(), secondEntry()] });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      await wrapper
-        .find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]')
-        .setValue(false);
-      await flushPromises();
+      await advanceToInstall(wrapper);
 
       expect(Object.keys(wrapper.emitted())).not.toContain("installed");
       expect(Object.keys(wrapper.emitted())).not.toContain("update:preselect");
-      // The row is off for this run, and the dialog said nothing to anyone.
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("1");
-    });
-
-    it("still widens a preselected batch from step 2", async () => {
-      const wrapper = await mountDialog({ seed: null, preselect: [seedEntry()] });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-select-all");
-
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("3");
-    });
-
-    it("never lists an alert twice when the gallery preselects a visible one", async () => {
-      const wrapper = await mountDialog({ seed: null, preselect: [secondEntry()] });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      const rows = wrapper.findAll(
-        '[data-test="alert-library-install-alert-k8s/node-disk-pressure"]',
-      );
-      expect(rows).toHaveLength(1);
     });
   });
 
@@ -1447,7 +1031,7 @@ describe("LibraryInstallDialog", () => {
     it("asks before a run big enough to reshape the org's alerting", async () => {
       // The catalog is ~1,242 alerts and select-all-in-view is one click, so
       // the largest batches must be deliberate rather than merely reachable.
-      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      const wrapper = await mountDialog({ seed: null, preselect: many(51) });
       await advanceToInstall(wrapper);
 
       const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
@@ -1463,7 +1047,7 @@ describe("LibraryInstallDialog", () => {
     });
 
     it("stays out of the way for an ordinary batch", async () => {
-      const wrapper = await mountDialog({ seed: null, entries: many(50), preselect: many(50) });
+      const wrapper = await mountDialog({ seed: null, preselect: many(50) });
       await advanceToInstall(wrapper);
 
       expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(
@@ -1472,102 +1056,35 @@ describe("LibraryInstallDialog", () => {
       expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
     });
 
-    it("re-arms the confirmation when a narrowed batch is widened again", async () => {
-      // An acknowledgement given at 51, kept through a dip to 50 and a climb
-      // back to 51, would let the largest run through unacknowledged.
-      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
-      const row = '[data-test="alert-library-install-alert-k8s/bulk-0"]';
-      const backToAlerts = async () => {
-        await click(wrapper, "alert-library-install-back");
-        await click(wrapper, "alert-library-install-back");
-        await click(wrapper, "alert-library-install-back");
-      };
-      const forwardToRun = async () => {
-        await click(wrapper, "alert-library-install-next");
-        await click(wrapper, "alert-library-install-next");
-        await click(wrapper, "alert-library-install-next");
-      };
-
+    it("drops the acknowledgement when the batch changes under it", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: many(51) });
       await advanceToInstall(wrapper);
       await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
       await flushPromises();
       expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
 
-      await backToAlerts();
-      await wrapper.find(row).setValue(false);
+      await wrapper.setProps({ preselect: many(52) });
       await flushPromises();
-      await forwardToRun();
-      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(
-        false,
-      );
-
-      await backToAlerts();
-      await wrapper.find(row).setValue(true);
-      await flushPromises();
-      await forwardToRun();
-
-      const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
-      expect(confirm.exists()).toBe(true);
-      expect((confirm.element as HTMLInputElement).checked).toBe(false);
-      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
-    });
-
-    it("drops the acknowledgement when the batch grows instead of shrinking", async () => {
-      // The dangerous path: acknowledge 51, go back, Select all — which is what
-      // B14 exists to stop — and return to a run button that never re-armed.
-      const wrapper = await mountDialog({ seed: null, entries: many(80), preselect: many(51) });
-      await advanceToInstall(wrapper);
-      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
-      await flushPromises();
-      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
-
-      await click(wrapper, "alert-library-install-back");
-      await click(wrapper, "alert-library-install-back");
-      await click(wrapper, "alert-library-install-back");
-      await click(wrapper, "alert-library-install-select-all");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-
-      const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
-      expect((confirm.element as HTMLInputElement).checked).toBe(false);
-      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
-    });
-
-    it("states the folder and destination it is asking about", async () => {
-      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
-      await advanceToInstall(wrapper);
-
-      const label = wrapper
-        .find('[data-test="alert-library-install-confirm-large"]')
-        .attributes("data-label");
-      expect(label).toContain("51");
-      expect(label).toContain("ops-slack");
-    });
-
-    it("drops the acknowledgement when the destination changes under it", async () => {
-      // The tick is a statement about a specific folder and destination — the
-      // two parameters that decide who gets paged 51 times.
-      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
-      await advanceToInstall(wrapper);
-      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
-      await flushPromises();
-      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
-
-      for (let back = 0; back < 4; back += 1) await click(wrapper, "alert-library-install-back");
-      await wrapper
-        .get('[data-test="alert-library-install-destination"]')
-        .setValue("oncall-pagerduty");
-      await flushPromises();
-      for (let next = 0; next < 4; next += 1) await click(wrapper, "alert-library-install-next");
 
       const confirm = wrapper.get('[data-test="alert-library-install-confirm-large"]');
       expect((confirm.element as HTMLInputElement).checked).toBe(false);
       expect(runButton(wrapper).attributes("disabled")).toBeDefined();
     });
 
+    it("states the count and folder it is asking about, and that none notify yet", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: many(51) });
+      await advanceToInstall(wrapper);
+
+      const label = wrapper
+        .find('[data-test="alert-library-install-confirm-large"]')
+        .attributes("data-label");
+      expect(label).toContain("51");
+      expect(label).toContain("default");
+      expect(label).toContain("none of which notify");
+    });
+
     it("drops the acknowledgement when the folder changes under it", async () => {
-      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      const wrapper = await mountDialog({ seed: null, preselect: many(51) });
       await advanceToInstall(wrapper);
       await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
       await flushPromises();
@@ -1587,7 +1104,7 @@ describe("LibraryInstallDialog", () => {
     });
 
     it("forgets the acknowledgement when the dialog is reopened", async () => {
-      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      const wrapper = await mountDialog({ seed: null, preselect: many(51) });
       await advanceToInstall(wrapper);
       await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
       await flushPromises();
@@ -1602,15 +1119,11 @@ describe("LibraryInstallDialog", () => {
       expect(runButton(wrapper).attributes("disabled")).toBeDefined();
     });
 
-    it("lists every alert in a large batch — the count is not capped", async () => {
-      const wrapper = await mountDialog({ seed: null, entries: many(100), preselect: many(100) });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
+    it("counts every alert in a large batch — the count is not capped", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: many(100) });
+      await advanceToInstall(wrapper);
 
-      expect(wrapper.findAll('[data-test^="alert-library-install-alert-"]')).toHaveLength(100);
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("100");
+      expect(runButton(wrapper).text()).toContain("100");
     });
   });
 
@@ -1686,7 +1199,6 @@ describe("LibraryInstallDialog", () => {
     it("sends each kind of a mixed batch through its own create", async () => {
       const wrapper = await mountDialog({
         seed: null,
-        entries: [seedEntry(), anomalyEntry()],
         preselect: [seedEntry(), anomalyEntry()],
       });
       await advanceToInstall(wrapper);
@@ -1699,7 +1211,7 @@ describe("LibraryInstallDialog", () => {
       expect(anomalyPayload()).toMatchObject({
         alert_type: "anomaly_detection",
         enabled: true,
-        destinations: ["ops-slack"],
+        destinations: [],
         folder_id: "default",
         priority: 3,
       });
@@ -1717,11 +1229,8 @@ describe("LibraryInstallDialog", () => {
       const invalidate = vi.spyOn(queryClient, "invalidateQueries");
       const wrapper = await mountDialog({
         seed: { entry: anomalyEntry(), file: anomalyFile() },
-        entries: [anomalyEntry()],
       });
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(invalidate).toHaveBeenCalledWith({ queryKey: anomalyKeys.all("default") });
@@ -1732,22 +1241,16 @@ describe("LibraryInstallDialog", () => {
     it("drops anomaly alerts from the batch when the feature turns off mid-dialog", async () => {
       const wrapper = await mountDialog({
         seed: null,
-        entries: [seedEntry(), anomalyEntry()],
         preselect: [seedEntry(), anomalyEntry()],
       });
-      const count = () =>
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected");
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      expect(count()).toBe("2");
+      const runLabel = () => wrapper.find('[data-test="alert-library-install-run"]').text();
+      await advanceToInstall(wrapper);
+      expect(runLabel()).toContain("2");
 
       setAccess("true", false);
       await flushPromises();
-      expect(count()).toBe("1");
+      expect(runLabel()).toContain("1");
 
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-run");
       expect(mocks.createAnomaly).not.toHaveBeenCalled();
       expect(mocks.createAlert).toHaveBeenCalledTimes(1);
@@ -1756,11 +1259,8 @@ describe("LibraryInstallDialog", () => {
     it("disables Run when the feature turns off under an anomaly-only batch", async () => {
       const wrapper = await mountDialog({
         seed: { entry: anomalyEntry(), file: anomalyFile() },
-        entries: [anomalyEntry()],
       });
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+      await advanceToInstall(wrapper);
 
       setAccess("true", false);
       await flushPromises();
@@ -1775,11 +1275,8 @@ describe("LibraryInstallDialog", () => {
     it("says the Tune step applies to threshold alerts only in a mixed batch", async () => {
       const wrapper = await mountDialog({
         seed: null,
-        entries: [seedEntry(), anomalyEntry()],
         preselect: [seedEntry(), anomalyEntry()],
       });
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-next");
 
       expect(wrapper.find('[data-test="alert-library-install-tune-threshold-only"]').exists()).toBe(
@@ -1790,12 +1287,10 @@ describe("LibraryInstallDialog", () => {
     it("skips the Tune step for an anomaly-only batch, both ways", async () => {
       const wrapper = await mountDialog({
         seed: { entry: anomalyEntry(), file: anomalyFile() },
-        entries: [anomalyEntry()],
       });
       expect(wrapper.find('[data-test="alert-library-install-tune-step"]').exists()).toBe(false);
+      expect(stepTitles(wrapper)).toEqual(["Folder", "Add"]);
 
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-next");
       expect(wrapper.find('[data-test="alert-library-install-run"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="alert-library-install-summary"]').text()).not.toContain(
@@ -1803,7 +1298,7 @@ describe("LibraryInstallDialog", () => {
       );
 
       await click(wrapper, "alert-library-install-back");
-      expect(wrapper.find('[data-test="alert-library-install-next"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-library-install-folder-step"]').exists()).toBe(true);
       await click(wrapper, "alert-library-install-next");
       expect(wrapper.find('[data-test="alert-library-install-run"]').exists()).toBe(true);
     });
@@ -1811,12 +1306,9 @@ describe("LibraryInstallDialog", () => {
     it("notes after the run that anomaly alerts wait for training", async () => {
       const wrapper = await mountDialog({
         seed: { entry: anomalyEntry(), file: anomalyFile() },
-        entries: [anomalyEntry()],
       });
       expect(wrapper.find('[data-test="alert-library-install-anomaly-note"]').exists()).toBe(false);
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(wrapper.find('[data-test="alert-library-install-anomaly-note"]').exists()).toBe(true);
@@ -1826,27 +1318,25 @@ describe("LibraryInstallDialog", () => {
       setAccess("false", true);
       const wrapper = await mountDialog({
         seed: null,
-        entries: [seedEntry(), anomalyEntry()],
         preselect: [seedEntry(), anomalyEntry()],
       });
-      await click(wrapper, "alert-library-install-next");
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
 
+      expect(mocks.createAnomaly).not.toHaveBeenCalled();
+      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
       expect(
         wrapper
-          .find('[data-test="alert-library-install-alert-apm/traces_server_error_ratio_anomaly"]')
+          .find('[data-test="alert-library-install-result-apm/traces_server_error_ratio_anomaly"]')
           .exists(),
       ).toBe(false);
-      await click(wrapper, "alert-library-install-select-all");
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("1");
     });
 
     it("refuses to send a file declaring an anomaly alert when the feature is off", async () => {
       setAccess("true", false);
       mocks.loadAlertFile.mockResolvedValue(anomalyFile());
-      const wrapper = await mountDialog({ seed: null, entries: [secondEntry()] });
-      await advanceAllToInstall(wrapper);
+      const wrapper = await mountDialog({ seed: null, preselect: [secondEntry()] });
+      await advanceToInstall(wrapper);
       await click(wrapper, "alert-library-install-run");
 
       expect(mocks.createAnomaly).not.toHaveBeenCalled();

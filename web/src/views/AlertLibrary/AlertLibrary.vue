@@ -328,6 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :locked="isLocked(entry)"
                       @open="openEntry(entry)"
                       @update:selected="onCardSelected(entry, $event)"
+                      @install="addEntry(entry)"
+                      @customize="customizeInEditor(entry)"
                     />
                   </div>
                 </section>
@@ -350,7 +352,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- `installed` fires mid-run, so its handler must not touch `pendingBatch`. -->
     <LibraryInstallDialog
       :open="installOpen"
-      :entries="visibleEntries"
       :seed="installSeed"
       :preselect="pendingBatch"
       @update:open="onInstallOpenChange"
@@ -380,8 +381,11 @@ import {
   severityLabel,
   severityRank,
   SEVERITY_ORDER,
+  type LibraryCategoryFacet,
   type LibraryFacet,
 } from "@/components/alertLibrary/libraryFacets";
+import { fileForInstall } from "@/components/alertLibrary/libraryTunables";
+import { useLibraryCustomize } from "@/components/alertLibrary/useLibraryCustomize";
 import {
   useAlertLibrary,
   useAnomalyLibraryAccess,
@@ -402,6 +406,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -415,10 +420,11 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
-const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
+const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const { getStreams } = useStreams(t);
+const { customizeInEditor } = useLibraryCustomize();
 
 /** Empty = every category. The rail narrows, it does not gate. */
 const selectedCategories = ref<string[]>([]);
@@ -429,7 +435,9 @@ const mobileFiltersOpen = ref(false);
 const severity = ref("all");
 const alertType = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
-const facet = ref<"ready" | "missing" | null>(null);
+const facet = ref<"ready" | "missing" | null>("ready");
+/** Set once the user picks a tile, so the first-load fallback never overrides a choice. */
+let facetChosen = false;
 const search = ref("");
 
 /** Kept after close so the drawer can animate out with its content intact. */
@@ -601,6 +609,21 @@ const showCollectorBanner = computed(
 // ── facets ─────────────────────────────────────────────────────────────────
 const availableEntries = computed(() => scopedEntries.value.filter(matchesFacet));
 
+/** Rail heading per category: one per id, since selection is by id, under the first pack label. */
+const packOfCategory = computed(() => {
+  const packs = new Map<string, string>();
+  for (const entry of entries.value) {
+    const current = packs.get(entry.category);
+    if (
+      current === undefined ||
+      String(packLabel(entry.pack)).localeCompare(String(packLabel(current))) < 0
+    ) {
+      packs.set(entry.category, entry.pack);
+    }
+  }
+  return packs;
+});
+
 /**
  * Counted against every OTHER active filter, never against the category
  * selection itself — the metrics explorer's rule, where the comment reads
@@ -615,8 +638,9 @@ const availableEntries = computed(() => scopedEntries.value.filter(matchesFacet)
  * filters leave it with nothing — otherwise the rail would hide the row you
  * need in order to untick it. That is what the rail's dead-end rule is for.
  */
-const categoryFacets = computed<LibraryFacet[]>(() => {
+const categoryFacets = computed<LibraryCategoryFacet[]>(() => {
   const needle = search.value.trim().toLowerCase();
+  const packs = packOfCategory.value;
   const counts = new Map<string, number>();
   for (const id of selectedCategories.value) counts.set(id, 0);
   for (const entry of entries.value) {
@@ -632,7 +656,12 @@ const categoryFacets = computed<LibraryFacet[]>(() => {
   }
   return [...counts.keys()]
     .sort((a, b) => text(a).localeCompare(text(b)))
-    .map((id) => ({ id, label: categoryLabel(id), count: counts.get(id) ?? 0 }));
+    .map((id) => ({
+      id,
+      label: categoryLabel(id),
+      count: counts.get(id) ?? 0,
+      pack: packs.get(id) ?? "",
+    }));
 });
 
 /**
@@ -869,6 +898,7 @@ const onAlertTypeChange = (value: AcceptableValue | AcceptableValue[] | boolean)
 };
 
 const onStatSelect = (key: string) => {
+  facetChosen = true;
   if (key === "all") {
     facet.value = null;
     return;
@@ -878,6 +908,7 @@ const onStatSelect = (key: string) => {
 };
 
 const clearFilters = () => {
+  facetChosen = true;
   selectedCategories.value = [];
   railSearch.value = "";
   severity.value = "all";
@@ -905,6 +936,20 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
   installSeed.value = payload;
   drawerOpen.value = false;
   installOpen.value = true;
+};
+
+/** The card's Add: the same single-alert hand-off the drawer makes, minus the drawer. */
+const addEntry = async (entry: AlertLibraryEntry) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
+  try {
+    const file = await loadAlertFile(entry);
+    onInstall({ entry, file: fileForInstall(entry, file) });
+  } catch {
+    toast({ variant: "error", message: t("alert_library.drawer.loadFailed") });
+  }
 };
 
 const onInstallOpenChange = (open: boolean) => {
@@ -955,6 +1000,17 @@ const refresh = () => {
   });
   void loadStreams();
 };
+
+// Settles once per mount: streamsPending starts true and a refresh sets it again only after this stops.
+const stopFacetFallback = watch(
+  () => !!manifest.value && !streamsPending.value,
+  (settled) => {
+    if (!settled) return;
+    stopFacetFallback();
+    // "Ready to use" must never open on an empty page or on a readiness nobody could check.
+    if (!facetChosen && (!readinessKnown.value || readyCount.value === 0)) facet.value = null;
+  },
+);
 
 onMounted(() => {
   void loadManifest().catch(() => {

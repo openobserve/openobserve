@@ -62,7 +62,6 @@ const build = (over: Record<string, unknown> = {}) =>
     entry: entry(),
     file: file(),
     folderId: "folder-7",
-    destination: "ops-slack",
     owner: "someone@example.com",
     timezone: "Asia/Kolkata",
     ...over,
@@ -70,24 +69,20 @@ const build = (over: Record<string, unknown> = {}) =>
 
 describe("buildInstallPayload", () => {
   describe("library-specific steps", () => {
-    it("overwrites the library's destinations — the author's never exist in this org", () => {
+    it("clears the library's destinations — the author's never exist in this org", () => {
       // "k8s_alert" is hardcoded in every k8s pack file and would be rejected.
-      expect(build().destinations).toEqual(["ops-slack"]);
+      expect(build().destinations).toEqual([]);
     });
 
-    it("overwrites even when the file names several destinations", () => {
+    it("clears them even when the file names several destinations", () => {
       const payload = build({ file: file({ destinations: ["k8s_alert", "o2_to_slack"] }) });
-      expect(payload.destinations).toEqual(["ops-slack"]);
+      expect(payload.destinations).toEqual([]);
     });
 
-    it("gives a destination to a file that carries none", () => {
+    it("sends an empty list for a file that carries none, never omitting the field", () => {
       const bare = file();
       delete bare.destinations;
-      expect(build({ file: bare }).destinations).toEqual(["ops-slack"]);
-    });
-
-    it("installs with no destination when none is chosen, never the author's", () => {
-      expect(build({ destination: "" }).destinations).toEqual([]);
+      expect(build({ file: bare }).destinations).toEqual([]);
     });
 
     it("stamps the library id and content hash without dropping the file's own attributes", () => {
@@ -555,7 +550,6 @@ describe("buildAnomalyInstallPayload", () => {
       entry: anomalyEntry(),
       file: anomalyFile(),
       folderId: "folder-7",
-      destination: "ops-slack",
       ...over,
     });
 
@@ -582,9 +576,10 @@ describe("buildAnomalyInstallPayload", () => {
     expect(buildAnomaly({ file: unnamed }).name).toBe("Server error ratio is unusually high");
   });
 
-  it("sends the chosen destination, or none", () => {
-    expect(buildAnomaly().destinations).toEqual(["ops-slack"]);
-    expect(buildAnomaly({ destination: "" }).destinations).toEqual([]);
+  it("sends no destination, whatever the file names", () => {
+    expect(
+      buildAnomaly({ file: { ...anomalyFile(), destinations: ["o2_to_slack"] } }).destinations,
+    ).toEqual([]);
   });
 
   it("files the alert in the chosen folder, matching ?folder=", () => {
