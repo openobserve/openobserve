@@ -21,11 +21,13 @@ export const DRAFT_DEBOUNCE_MS = 250;
 
 const DRAFT_PREFIX = "o2.assistant.draft:";
 
-/** What survives a reload; images stay in memory only (`00` §10.4). */
+/** What survives a reload; images stay in memory, only their count is kept for the notice (`00` §10.4). */
 export type DraftPayload = Pick<
   ComposerState,
   "text" | "chips" | "timeOverride" | "removedPageKeys"
->;
+> & {
+  imageCount?: number;
+};
 
 export interface DraftStoreOptions {
   /** Defaults to `window.sessionStorage`; a throwing getter models a blocked store. */
@@ -153,6 +155,8 @@ function toPayload(draft: DraftPayload): DraftPayload {
     chips: Array.isArray(draft.chips) ? draft.chips.map((chip) => ({ ...chip })) : [],
     timeOverride: draft.timeOverride ? { ...draft.timeOverride } : null,
     removedPageKeys: Array.isArray(draft.removedPageKeys) ? [...draft.removedPageKeys] : [],
+    ...(typeof draft.imageCount === "number" &&
+      draft.imageCount > 0 && { imageCount: draft.imageCount }),
   };
 }
 
@@ -161,6 +165,7 @@ function isEmpty(draft: DraftPayload): boolean {
     !draft.text &&
     draft.chips.length === 0 &&
     !draft.timeOverride &&
-    draft.removedPageKeys.length === 0
+    draft.removedPageKeys.length === 0 &&
+    !draft.imageCount
   );
 }

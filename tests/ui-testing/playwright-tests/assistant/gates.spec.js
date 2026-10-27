@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// WP-04 gate flows with the flag on (GATE-01…05, 11–13); the send halves land with the composer in WP-05.
+// Gate flows with the flag on (GATE-01…06, 11–13); WP-05 adds the send halves through the composer.
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
@@ -237,6 +237,10 @@ test.describe("assistant gates", () => {
     await expect(
       page.locator('[data-test="assistant-gate-unknown-notice"]'),
     ).toHaveCount(0);
+    await assistant.send("hello", "complete");
+    await expect
+      .poll(() => page.evaluate(() => window.__o2mock.requests.length))
+      .toBe(1);
   });
 
   test("GATE-12 with RBAC off everyone chats and nothing is probed", async ({
@@ -271,11 +275,28 @@ test.describe("assistant gates", () => {
       timeout: 30_000,
     });
     await assistant.open("header");
-    await expect(
-      page.locator('[data-test="assistant-gate-unknown-notice"]'),
-    ).toHaveText(
+    const notice = page.locator('[data-test="assistant-gate-unknown-notice"]');
+    await expect(notice).toHaveText(
       "Your role may not include O2 Assistant. If sending fails, ask an admin.",
     );
+    // The first admitted send settles the role, so the notice goes (WP-05 send half).
+    await assistant.send("hello", "complete");
+    await expect(notice).toHaveCount(0);
+  });
+
+  test("GATE-06 a 403 mid-session swaps the container to the G2 gate", async ({
+    context,
+    page,
+  }) => {
+    await start(context, page);
+    await page.goto(url("/logs"), { waitUntil: "domcontentloaded" });
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", {
+      timeout: 30_000,
+    });
+    await assistant.open("header");
+    await assistant.send("can I chat?", "forbidden_403");
+    await expect(assistant.gate()).toBeVisible();
+    await expect(assistant.container().locator('[data-test="assistant-composer"]')).toHaveCount(0);
   });
 
   test("GATE-05 B-06 overrides the heuristic", async ({ context, page }) => {

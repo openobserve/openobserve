@@ -139,6 +139,8 @@ const completeFrameSchema = z.looseObject({
   usage: usageCountersSchema.optional(),
   trace_id: z.string().optional(),
   persisted: z.boolean().optional(),
+  /** B-09: the context keys the agent used for this turn (CT-12). */
+  context_used: z.array(z.string()).optional(),
 });
 
 const cancelledFrameSchema = z.looseObject({ type: z.literal("cancelled") });

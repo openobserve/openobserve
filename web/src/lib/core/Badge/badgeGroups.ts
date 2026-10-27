@@ -70,6 +70,8 @@ export interface BadgeValueConfig {
   /** Per-value size override (wins over the group `size`). For groups whose
    *  values legitimately render at different sizes (e.g. a sm chip vs an md one). */
   size?: BadgeSize;
+  /** Extra utility classes for this value only, merged after the group `class`. */
+  class?: string;
 }
 
 export interface BadgeGroupConfig {
@@ -2033,6 +2035,29 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+  // O2 Assistant context chips, keyed by chip state; the kind passes `label` and `icon` (`40` §2.2).
+  assistantContext: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      sent: { variant: "default-soft" },
+      notread: {
+        variant: "default-outline",
+        class: "ring-0 border border-dotted border-badge-default-ol-border",
+      },
+      custom: { variant: "default-soft" },
+      truncated: { variant: "default-soft" },
+      ghost: {
+        variant: "default-outline",
+        class: "ring-0 border border-dashed border-badge-default-ol-border",
+      },
+      inchat: { variant: "default-soft" },
+      used: { variant: "default-outline" },
+      hidden: { variant: "default-outline" },
+    },
+    fallback: { variant: "default-soft" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;
@@ -2097,7 +2122,7 @@ export function resolveBadge(
     // Per-value size wins over group size; both may be undefined → caller default.
     size: entry.size ?? cfg.size,
     shape: cfg.shape,
-    class: cfg.class,
+    class: [cfg.class, entry.class].filter(Boolean).join(" ") || undefined,
   };
 }
 

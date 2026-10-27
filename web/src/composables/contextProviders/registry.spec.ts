@@ -179,4 +179,55 @@ describe("ContextRegistry", () => {
       expect(context).toBeNull();
     });
   });
+  describe("push and pop", () => {
+    const provider = (page: string): ContextProvider => ({
+      getContext: () => ({ currentPage: page }),
+    });
+
+    it("reads the top of the stack before the active provider", async () => {
+      contextRegistry.register("pipeline", provider("pipeline"));
+      contextRegistry.setActive("pipeline");
+      contextRegistry.push("query_node", provider("query_node"));
+
+      expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "query_node" });
+    });
+
+    it("pops only its own entry, so the parent survives a nested editor's unmount", async () => {
+      contextRegistry.register("pipeline", provider("pipeline"));
+      contextRegistry.setActive("pipeline");
+      contextRegistry.push("query_node", provider("query_node"));
+      contextRegistry.push("function_node", provider("function_node"));
+
+      contextRegistry.pop("query_node");
+      expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "function_node" });
+      contextRegistry.pop("function_node");
+      expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "pipeline" });
+    });
+
+    it("re-pushing a key moves it to the top without a second entry", async () => {
+      contextRegistry.push("a", provider("a"));
+      contextRegistry.push("b", provider("b"));
+      contextRegistry.push("a", provider("a2"));
+      expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "a2" });
+      contextRegistry.pop("a");
+      expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "b" });
+    });
+
+    it("falls back to the default provider once the stack is empty", async () => {
+      contextRegistry.register("default", provider("default"));
+      contextRegistry.push("node", provider("node"));
+      contextRegistry.pop("node");
+      expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "default" });
+    });
+
+    it("bumps the version on every change", () => {
+      const start = contextRegistry.version.value;
+      contextRegistry.register("x", provider("x"));
+      contextRegistry.setActive("x");
+      contextRegistry.push("y", provider("y"));
+      contextRegistry.pop("y");
+      contextRegistry.unregister("x");
+      expect(contextRegistry.version.value).toBe(start + 5);
+    });
+  });
 });

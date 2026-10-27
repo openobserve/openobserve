@@ -176,6 +176,28 @@ describe("badgeGroups", () => {
     }
   });
 
+  it("resolves assistantContext by chip state, with no icon of its own (rounded, sm)", () => {
+    const sent = resolveBadge("assistantContext", "sent");
+    expect(sent).toMatchObject({
+      variant: "default-soft",
+      shape: "rounded",
+      size: "sm",
+      mode: "plain",
+    });
+    expect(sent.icon).toBeUndefined();
+    expect(sent.class).toBeUndefined();
+    for (const state of ["custom", "truncated", "in_chat"]) {
+      expect(resolveBadge("assistantContext", state).variant).toBe("default-soft");
+    }
+    expect(resolveBadge("assistantContext", "not_read")).toMatchObject({
+      variant: "default-outline",
+      class: expect.stringContaining("border-dotted"),
+    });
+    expect(resolveBadge("assistantContext", "ghost").class).toContain("border-dashed");
+    expect(resolveBadge("assistantContext", "used").variant).toBe("default-outline");
+    expect(resolveBadge("assistantContext", "hidden").variant).toBe("default-outline");
+  });
+
   it("falls back to generic engine for unknown value in a known group", () => {
     const r = resolveBadge("alertStatus", "weird");
     expect(r.mode).toBe("dot");

@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <router-view v-slot="{ Component }">
                 <keep-alive :include="KEPT_ALIVE_VIEWS">
-                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                  <component :is="Component" class="h-full" @sendToAiChat="sendToAssistant" />
                 </keep-alive>
               </router-view>
             </div>
@@ -1729,6 +1729,12 @@ export default defineComponent({
       });
     };
 
+    // Flag on: a legacy page's payload goes through the one door as chips and text (deleted in WP-15).
+    const sendToAssistant = (value: unknown, _append = true, autoSend = false) =>
+      void import("@/composables/assistant").then((m) =>
+        m.openAssistant(m.legacyRelayArgs(value, autoSend)),
+      );
+
     const openPredefinedThemes = () => {
       toggleThemes();
     };
@@ -1819,6 +1825,7 @@ export default defineComponent({
       showGetStarted,
       removeFirstTimeLogin,
       sendToAiChat,
+      sendToAssistant,
       aiChatInputContext,
       aiChatAppendMode,
       aiChatPayload,

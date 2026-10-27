@@ -467,7 +467,8 @@ export function uiIntlLocale(): string {
 export function formatOrgTime(
   ts: number,
   opts: {
-    precision?: "minute";
+    /** `second` is for row timestamps, where two rows in one minute must still differ. */
+    precision?: "minute" | "second";
     showZone?: boolean;
     timeZone?: string;
     absolute?: boolean;
@@ -478,7 +479,11 @@ export function formatOrgTime(
   const tz = opts.timeZone ?? orgTimeZone();
   if (opts.absolute) return absoluteOrgTime(ts, tz, locale);
   const now = opts.now ?? Date.now();
-  const time = orgParts(ts, tz, locale, { hour: "2-digit", minute: "2-digit" });
+  const time = orgParts(ts, tz, locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(opts.precision === "second" && { second: "2-digit" }),
+  });
   const day = dayDistance(ts, now, tz);
   const zone = opts.showZone ? ` ${zoneName(ts, tz, locale)}` : "";
   if (day === 0) return `${time}${zone}`;

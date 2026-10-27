@@ -319,3 +319,118 @@ describe("AssistantShell chrome and focus", () => {
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe("Done");
   });
 });
+
+describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
+  function live(props: Partial<AssistantShellProps> = {}) {
+    fake.current = fakeAssistant();
+    const wrapper = mount(AssistantShell, {
+      props: { placement: "sidebar", ...props },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+      attachTo: document.body,
+    });
+    return { wrapper, store: fake.current.store };
+  }
+
+  it("fills the tray, the composer and the disclosure line in their rows", async () => {
+    const { wrapper } = live();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-composer-root"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-context-disclosure"]').text()).toBe(
+      "Sends the chips and this page's time range",
+    );
+  });
+
+  it("puts focus in the composer textbox at the end on an explicit open", async () => {
+    const { wrapper, store } = live();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.setDraft(sid, { text: "half" });
+    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "composer" });
+    await flushPromises();
+    const textarea = wrapper.get<HTMLTextAreaElement>(
+      '[data-test="assistant-composer-field"]',
+    ).element;
+    expect(document.activeElement).toBe(textarea);
+    expect(textarea.selectionStart).toBe(4);
+  });
+
+  it("offers the first starter as the composer's ghost", async () => {
+    const { wrapper, store } = live();
+    store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-ghost"]').text()).toBe(
+      'Try: "Why did errors spike?"',
+    );
+  });
+
+  it("keeps chat A's draft on New chat, says so, and moves it only on Bring it here (CT-06 AC 5, S7, V6)", async () => {
+    const { wrapper, store } = live();
+    const first = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.setDraft(first, { text: "keep me" });
+    const vm = wrapper.vm as unknown as { $: { setupState: { newChat(): void } } };
+    vm.$.setupState.newChat();
+    await flushPromises();
+    const next = store.state.shell.activeSid;
+    expect(next).not.toBe(first);
+    expect(wrapper.get('[data-test="assistant-composer-cleared"]').text()).toContain(
+      "New chat. Your draft stayed in the previous chat",
+    );
+    expect(store.state.sessions[first].composer.text).toBe("keep me");
+    expect(store.state.sessions[next].composer.text).toBe("");
+    const bring = wrapper.get('[data-test="assistant-composer-undo"]');
+    expect(bring.text()).toBe("Bring it here");
+    await bring.trigger("click");
+    expect(store.state.sessions[next].composer.text).toBe("keep me");
+    expect(store.state.sessions[first].composer.text).toBe("");
+  });
+
+  it("ends the Bring it here offer on any edit in the new chat, so it never overwrites a choice (V6)", async () => {
+    const { wrapper, store } = live();
+    const first = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.setDraft(first, { text: "keep me", timeOverride: { from: 0, to: 1, period: "7d" } });
+    const vm = wrapper.vm as unknown as { $: { setupState: { newChat(): void } } };
+    vm.$.setupState.newChat();
+    await flushPromises();
+    const next = store.state.shell.activeSid!;
+    expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(true);
+    store.setTimeOverride(next, { from: 0, to: 1, period: "1h" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(false);
+    expect(store.state.sessions[next].composer.timeOverride?.period).toBe("1h");
+  });
+
+  it("shows the fuller disclosure once on the first attachment, with a named dismiss (CT-04 AC 5)", async () => {
+    const { wrapper, store } = live();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.addChip(sid, {
+      id: "r1",
+      kind: "log_row",
+      label: raw("Log row"),
+      sizeBytes: 3,
+      provenance: "door",
+      sent: "serialized",
+    });
+    await flushPromises();
+    const banner = wrapper.get('[data-test="assistant-context-disclosure-banner"]');
+    expect(banner.text()).toContain(
+      "Attached data is sent to the assistant and saved with this chat.",
+    );
+    const dismiss = wrapper.get('[data-test="assistant-context-disclosure-dismiss"]');
+    expect(dismiss.attributes("aria-label")).toBe("Dismiss the data notice");
+    await dismiss.trigger("click");
+    expect(wrapper.find('[data-test="assistant-context-disclosure-banner"]').exists()).toBe(false);
+    expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1") ?? "{}")).toEqual({
+      disclosure: true,
+    });
+  });
+});

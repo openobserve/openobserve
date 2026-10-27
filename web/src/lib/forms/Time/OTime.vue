@@ -30,10 +30,14 @@ const props = withDefaults(defineProps<TimeProps>(), {
 });
 
 const emit = defineEmits<TimeEmits>();
-defineSlots<TimeSlots>();
+const slots = defineSlots<TimeSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+// The label's `for` names the field group, which a text input cannot take its name from.
+const labelledBy = computed(() =>
+  slots.label || props.label || slots.tooltip ? `${inputId.value}-label` : undefined,
+);
 
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
@@ -297,6 +301,7 @@ const fieldClasses = computed(() => [
   <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
       v-if="$slots.label || label || $slots.tooltip"
+      :id="`${inputId}-label`"
       :for="inputId"
       class="o-input-label flex items-center gap-1 text-sm leading-tight font-semibold"
     >
@@ -344,6 +349,7 @@ const fieldClasses = computed(() => [
           :tabindex="inputTabindex"
           :placeholder="placeholder ?? raw('HH:MM')"
           :maxlength="withSeconds ? 8 : 5"
+          :aria-labelledby="labelledBy"
           :disabled="disabled || undefined"
           :readonly="readonly || undefined"
           :class="[
@@ -360,6 +366,7 @@ const fieldClasses = computed(() => [
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
           :step="withSeconds ? 1 : 60"
+          :aria-labelledby="labelledBy"
           :disabled="disabled || undefined"
           :readonly="readonly || undefined"
           :class="[

@@ -980,3 +980,67 @@ describe("lifecycle seams", () => {
     expect(store.state.shell.sidebarMode).toBe("floating");
   });
 });
+
+describe("draft restore after a reload (WP-05)", () => {
+  it("brings a selected chat back with its stored draft when history cannot re-read it (CT-06 AC 3)", async () => {
+    const sid = "0190f3a0-0000-7000-8000-000000000099";
+    sessionStorage.setItem("o2.assistant.selected:k1", sid);
+    sessionStorage.setItem(
+      `o2.assistant.draft:k1:${sid}`,
+      JSON.stringify({ text: "half a thought", chips: [chip("c1")], imageCount: 1 }),
+    );
+    const { store } = makeStore();
+    await flushPromises();
+    expect(store.state.shell.activeSid).toBe(sid);
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      text: "half a thought",
+      images: [],
+    });
+    expect(store.state.sessions[sid].composer.chips.map((c) => c.id)).toEqual(["c1"]);
+    expect(store.takeRestoredDraft(sid)).toEqual({ imageCount: 1 });
+    expect(store.takeRestoredDraft(sid)).toBeNull();
+  });
+
+  it.each([
+    [{ status: 404 }, false],
+    [{ response: { status: 403 } }, false],
+    [{ status: 503 }, true],
+    [new TypeError("Failed to fetch"), true],
+  ])(
+    "keeps the stored draft unless history says the chat is gone or forbidden (S9): %o",
+    async (error, kept) => {
+      const sid = "0190f3a0-0000-7000-8000-000000000097";
+      sessionStorage.setItem("o2.assistant.selected:k1", sid);
+      sessionStorage.setItem(`o2.assistant.draft:k1:${sid}`, JSON.stringify({ text: "draft" }));
+      const { store } = makeStore({
+        history: {
+          ...inertAssistantDeps().history,
+          canReload: computed(() => true),
+          open: () => Promise.reject(error),
+        },
+      });
+      await flushPromises();
+      expect(store.state.sessions[sid]).toBeUndefined();
+      expect(sessionStorage.getItem(`o2.assistant.draft:k1:${sid}`) !== null).toBe(kept);
+    },
+  );
+
+  it("starts empty when the selected chat left no draft", async () => {
+    sessionStorage.setItem("o2.assistant.selected:k1", "0190f3a0-0000-7000-8000-000000000098");
+    const { store } = makeStore();
+    await flushPromises();
+    expect(Object.keys(store.state.sessions)).toEqual([]);
+  });
+
+  it("keeps the image count with the draft so the reload notice can name it", () => {
+    const { store, drafts } = makeStore();
+    const sid = newSession(store);
+    store.addImage(sid, image("shot.png"));
+    drafts.flush();
+    expect(drafts.read("k1", sid)).toMatchObject({ imageCount: 1 });
+    store.removeImage(sid, store.state.sessions[sid].composer.images[0].id!);
+    drafts.flush();
+    expect(drafts.read("k1", sid)?.imageCount).toBeUndefined();
+    expect(sessionStorage.getItem(`o2.assistant.draft:k1:${sid}`)).toBeNull();
+  });
+});

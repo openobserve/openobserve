@@ -48,6 +48,7 @@ import type {
   HostRegistry,
   OpenAssistantResult,
 } from "./assistantStore.types";
+import { serialize } from "./context/serialize";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
 import { createTurnEngine, type TurnEngineDeps } from "./turnEngine";
 import {
@@ -149,6 +150,8 @@ function buildRuntime(): AssistantRuntime {
       ),
     );
 
+    deps.engine.setRequestBuilder(serialize);
+
     const store = createAssistantStore(deps, { signOutKeys: () => orgKeysOf(context.value) });
     flushDraftsOnLeave(store);
     const capability = createAssistantCapability(capabilityDeps(context));
@@ -194,6 +197,7 @@ function engineDeps(
         noteAgentUnavailable: handle.noteAgentUnavailable,
         noteAdmitted: handle.noteAdmitted,
         persistence: () => handle.capability.value.persistence,
+        attachments: () => handle.capability.value.attachments === true,
       };
     },
     history: () => deps.history,

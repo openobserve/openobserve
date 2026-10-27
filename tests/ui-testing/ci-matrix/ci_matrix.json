@@ -626,7 +626,8 @@
     "run_files": [
       "legacy-smoke.spec.js",
       "shell.spec.js",
-      "gates.spec.js"
+      "gates.spec.js",
+      "context.spec.js"
     ],
     "disabled": []
   }

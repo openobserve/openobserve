@@ -117,7 +117,7 @@ describe("AssistantWelcome", () => {
     expect(buttons).toHaveLength(3);
     expect(buttons[0].classes()).toContain("whitespace-normal!");
     expect(buttons[0].classes()).toContain("max-md:min-h-11");
-    expect(wrapper.html()).not.toMatch(/truncate|line-clamp/);
+    expect(wrapper.get("ul").html()).not.toMatch(/truncate|line-clamp/);
   });
 
   it("renders neutral cards in the roomy variant", () => {
@@ -152,5 +152,50 @@ describe("AssistantWelcome", () => {
       ["ai_welcome_shown", { fresh_org: false, starter_kinds: ["page", "page", "recent"] }],
       ["ai_welcome_shown", { fresh_org: false, starter_kinds: ["page", "page", "recent"] }],
     ]);
+  });
+
+  it("renders the scope tags as read-only tray chips that open What the assistant sees (`70` §8)", async () => {
+    const wrapper = mount(AssistantWelcome, {
+      props: { variant: "compact", scope: SCOPE, starters: STARTERS, loading: false },
+      attachTo: document.body,
+    });
+    const tag = wrapper.get('[data-test="assistant-welcome-scope-org"]');
+    expect(tag.attributes("data-assistant-chip")).toBe("");
+    expect(tag.find('[data-test="assistant-context-chip-remove"]').exists()).toBe(false);
+    await tag.get('[data-test="assistant-context-chip-button"]').trigger("click");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      document.body.querySelector('[data-test="assistant-context-sees-popover"]'),
+    ).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("marks and hands focus back to the scope chip that opened What the assistant sees (U2, V7)", async () => {
+    const wrapper = mount(AssistantWelcome, {
+      props: { variant: "compact", scope: SCOPE, starters: STARTERS, loading: false },
+      attachTo: document.body,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const button = wrapper
+      .get('[data-test="assistant-welcome-scope-time"]')
+      .get('[data-test="assistant-context-chip-button"]');
+    (button.element as HTMLElement).focus();
+    await button.trigger("click");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      document.body.querySelector('[data-test="assistant-context-sees-popover"]'),
+    ).not.toBeNull();
+    expect(button.attributes("aria-expanded")).toBe("true");
+    expect(
+      wrapper
+        .get('[data-test="assistant-welcome-scope-org"]')
+        .get('[data-test="assistant-context-chip-button"]')
+        .attributes("aria-expanded"),
+    ).toBe("false");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.body.querySelector('[data-test="assistant-context-sees-popover"]')).toBeNull();
+    expect(document.activeElement).toBe(button.element);
+    wrapper.unmount();
   });
 });

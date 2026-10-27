@@ -1,7 +1,12 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
+import type {
+  TextareaProps,
+  TextareaEmits,
+  TextareaSlots,
+  TextareaExposed,
+} from "./OTextarea.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -38,6 +43,13 @@ const _fallbackId = useId();
 const textareaId = computed(() => props.id ?? _fallbackId);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
+defineExpose<TextareaExposed>({
+  focus: (options?: FocusOptions) => textareaRef.value?.focus(options),
+  get textarea() {
+    return textareaRef.value;
+  },
+});
+
 // ── Error state ────────────────────────────────────────────────────────────
 // Error is only shown when `props.error` is true. A static `errorMessage`
 // string alone must not surface the error — otherwise any field with a
@@ -54,7 +66,8 @@ function resizeTextarea() {
   const el = textareaRef.value;
   if (!el) return;
   el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  // A hidden field (a `v-show` panel) measures 0; leave it to `rows` until it is shown and edited.
+  el.style.height = el.scrollHeight ? `${el.scrollHeight}px` : "";
 }
 
 // `maxRows` caps the grown height in CSS rather than in the resize handler:
@@ -163,10 +176,14 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
+        v-bind="inputAttrs"
         :style="autogrowStyle"
         :class="[
           'min-w-0 flex-1 bg-transparent outline-none',
-          'text-input-text placeholder:text-input-placeholder',
+          'text-input-text',
+          placeholderTone === 'strong'
+            ? 'placeholder:text-text-secondary'
+            : 'placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
           'px-3 py-2 text-sm',
           fill ? 'h-full min-h-0 resize-none' : autogrow && maxRows ? 'min-h-0' : 'min-h-20',
