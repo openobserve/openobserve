@@ -99,9 +99,15 @@ type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 
+/// A search response with its result column names, empty when the search produced no batches.
+#[derive(Debug)]
+pub struct SchemaResponse {
+    pub response: search::Response,
+    pub columns: Vec<String>,
+}
+
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search
-#[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -109,6 +115,19 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
+    search_with_schema(trace_id, org_id, stream_type, user_id, in_req)
+        .await
+        .map(|res| res.response)
+}
+
+#[tracing::instrument(name = "service:search:enter", skip_all)]
+pub async fn search_with_schema(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    in_req: &search::Request,
+) -> Result<SchemaResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = now_micros();
 
@@ -221,7 +240,10 @@ pub async fn search(
     let _work_group = registration.finish();
 
     match res {
-        Ok(mut res) => {
+        Ok(SchemaResponse {
+            response: mut res,
+            columns,
+        }) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
                 res = crate::streaming::order_search_results(res, None);
             }
@@ -298,7 +320,10 @@ pub async fn search(
                 )
                 .await;
             }
-            Ok(res)
+            Ok(SchemaResponse {
+                response: res,
+                columns,
+            })
         }
         Err(e) => {
             if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
