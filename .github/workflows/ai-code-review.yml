@@ -60,7 +60,7 @@ jobs:
         provider:
           - name: deepseek
             provider_id: deepseek-review
-            model_id: deepseek-v4-pro
+            model_id: deepseek-flash
             model_variant: ""
             api_key_env: DEEPSEEK_API_KEY
             marker: "<!-- ai-code-review -->"

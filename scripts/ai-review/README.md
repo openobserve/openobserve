@@ -1,7 +1,7 @@
 # AI Code Review (`scripts/ai-review`)
 
 Automated PR review that posts a single consolidated comment on every pull request. Driven by
-`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using DeepSeek-V4-Pro via `opencode`.
+`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using DeepSeek-V4.1-Flash at max reasoning effort via `opencode`.
 
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.

@@ -39,7 +39,7 @@ const PAIRED = {
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the same script
 // can be launched once per provider (see .github/workflows/ai-code-review.yml, whose matrix
-// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4-Pro setup, so an
+// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4.1-Flash (max effort) setup, so an
 // invocation with no REVIEW_* env set still works. The model is named freely here and in CI logs;
 // what must never name it is the posted PR comment — see redactProviderIdentity.
 //
@@ -50,7 +50,7 @@ const PAIRED = {
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   providers post/update independent comments and never clobber each other.
 const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
-const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-flash";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
 const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME
   || (PROVIDER_ID.toLowerCase().includes("deepseek") ? "deepseek" : PROVIDER_ID);
