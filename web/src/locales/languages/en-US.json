@@ -12470,7 +12470,6 @@
     "selectionOffscreen": "{count} not in view | {count} not in view",
     "clearSelection": "Clear selection",
     "addSelected": "Add {count} alert | Add {count} alerts",
-    "addAlert": "Add alert",
     "alertType": "Alert type",
     "alertTypeAll": "All",
     "alertTypeThreshold": "Threshold",
