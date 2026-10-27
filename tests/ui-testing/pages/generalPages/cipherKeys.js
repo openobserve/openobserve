@@ -1,5 +1,6 @@
 // cipher keys.js
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from './draftSignOut.js';
 
 
 export class CipherKeys {
@@ -244,6 +245,7 @@ export class CipherKeys {
       async signOut() {
         await this.profileButton.click();
         await this.signOutButton.click();
+        await confirmDraftSignOut(this.page);
       }
 
 
