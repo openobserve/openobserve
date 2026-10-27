@@ -162,4 +162,18 @@ describe("HeardFromPrompt.vue", () => {
     expect(submitNewUserInfo).not.toHaveBeenCalled();
     expect(track).toHaveBeenCalledWith("onboarding_heard_from_dismissed");
   });
+
+  it.each([
+    ["answers", (w: VueWrapper) => w.find('[data-test="heard-from-prompt-option-github"]')],
+    ["skips", (w: VueWrapper) => w.find('[data-test="heard-from-prompt-dismiss-btn"]')],
+  ])("hides every other prompt on the page once one %s, so none can send again", async (_, btn) => {
+    markHeardFromPending(EMAIL);
+    const first = await mountIt();
+    const second = await mountIt();
+    await btn(first).trigger("click");
+    await flushPromises();
+    expect(second.find('[data-test="heard-from-prompt"]').exists()).toBe(false);
+    expect(submitNewUserInfo.mock.calls.length).toBeLessThanOrEqual(1);
+    first.unmount();
+  });
 });

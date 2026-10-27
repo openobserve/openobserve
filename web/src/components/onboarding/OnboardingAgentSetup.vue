@@ -375,12 +375,14 @@ const statusEl = ref<HTMLElement | null>(null);
 // The watch starts on mount, so the bar starts waiting.
 const state = ref<FirstEventState>("waiting");
 const result = ref<FirstEventResult>();
-// Another setup waits for other data, so an earlier success no longer applies.
-watch(focus, () => (result.value = undefined));
-
 // A copy restarts the watch's fast checks, as a copy on a setup card does.
 const tokenCopied = ref(false);
 const promptCopied = ref(false);
+// Another setup waits for other data and needs its own prompt, so an earlier success and copy no longer apply.
+watch(focus, () => {
+  result.value = undefined;
+  promptCopied.value = false;
+});
 const restartWatch = () => status.value?.start("copy");
 provide(FIRST_EVENT_SNIPPET_COPIED, () => {
   tokenCopied.value = true;

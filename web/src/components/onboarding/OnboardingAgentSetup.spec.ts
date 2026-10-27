@@ -182,6 +182,17 @@ describe("OnboardingAgentSetup", () => {
     expect(start).toHaveBeenCalledWith("copy", "logs");
   });
 
+  it("unticks the prompt step when the setup changes, as that prompt was never copied", async () => {
+    const w = await mountPage();
+    const promptStep = () =>
+      w.findAllComponents({ name: "OnboardingSetupStep" }).find((s) => s.props("n") === 2)!;
+    await byTest(w, "onboarding-agent-setup-copy").trigger("click");
+    await flushPromises();
+    expect(promptStep().props("done")).toBe(true);
+    await chooseFocus(w, "frontend");
+    expect(promptStep().props("done")).toBe(false);
+  });
+
   it("downloads the file as openobserve-setup.md", async () => {
     const createObjectURL = vi.fn((_: Blob) => "blob:setup");
     Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });

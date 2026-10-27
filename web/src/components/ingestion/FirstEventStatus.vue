@@ -37,6 +37,7 @@ import {
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
+import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
 
 const props = withDefaults(
@@ -89,6 +90,7 @@ const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const askAiFn = inject(FIRST_EVENT_ASK_AI, null);
+const hostAsksHeardFrom = inject(HEARD_FROM_ASKED_BY_HOST, false);
 // Attached in setup, not on mount: a keyed swap then never leaves the host counting zero statuses.
 const reporter = inject(FIRST_EVENT_REPORTER, null);
 const detach = reporter?.attach();
@@ -722,7 +724,10 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
       <span class="min-w-0 truncate">{{ firstRecordJson }}</span>
     </div>
 
-    <HeardFromPrompt v-if="state === 'received' && kind === 'standard'" :org="org" />
+    <HeardFromPrompt
+      v-if="state === 'received' && kind === 'standard' && !hostAsksHeardFrom"
+      :org="org"
+    />
 
     <div
       v-if="showDiagnosis && diagnosis"

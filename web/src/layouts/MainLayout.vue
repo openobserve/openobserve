@@ -397,6 +397,8 @@ export default defineComponent({
       // 401 errors on the next login attempt (see #10900)
       invalidateLoginData();
 
+      // A deep-link first login keeps the flag for a later Home visit; it must not pass to the next user.
+      localStorage.removeItem("isFirstTimeLogin");
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
@@ -444,7 +446,7 @@ export default defineComponent({
       config.isCloud === "true" &&
         (() => {
           try {
-            return localStorage.getItem("isFirstTimeLogin") === "true";
+            return localStorage.getItem("isFirstTimeLogin") === store.state.userInfo?.email;
           } catch {
             return false;
           }
@@ -763,7 +765,7 @@ export default defineComponent({
 
     // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
     const firstLoginRedirect = async () => {
-      if (localStorage.getItem("isFirstTimeLogin") !== "true") return;
+      if (localStorage.getItem("isFirstTimeLogin") !== store.state.userInfo?.email) return;
       await router.isReady();
       // A pending redirect (a marketplace or deep link) keeps the flag, so a later visit still onboards.
       if (

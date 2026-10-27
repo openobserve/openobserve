@@ -36,7 +36,7 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 
-// Day-2 follow-up after the session ConnectDataSourcePopup starts the clock in — clock is shared via utils/slackCommunityInvite.ts.
+// Day-2 follow-up after the session onboarding starts the clock in — clock is shared via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
 const userEmail = store.state.userInfo?.email ?? "anonymous";
@@ -72,7 +72,7 @@ onMounted(() => {
 
   // Never compete with onboarding during the user's
   // first-login session — the day-2 clock only starts once that session ends.
-  if (localStorage.getItem("isFirstTimeLogin") === "true") return;
+  if (localStorage.getItem("isFirstTimeLogin") === userEmail) return;
 
   maybeShowStandaloneInvite();
 });

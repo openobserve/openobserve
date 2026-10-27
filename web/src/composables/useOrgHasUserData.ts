@@ -21,20 +21,27 @@ import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { USER_DATA_STREAM_TYPES, isUserDataStream } from "@/utils/internalStreams";
 
-const hasUserStream = (list: { name?: string }[] | undefined, type: string) =>
-  (list ?? []).some(
+type ListedStream = { name?: string; stats?: { doc_num?: number; doc_time_max?: number } };
+
+const userStreams = (list: ListedStream[] | undefined, type: string) =>
+  (list ?? []).filter(
     (s) => isUserDataStream(s?.name ?? "", type) && !(s?.name ?? "").startsWith("synthetics_"),
   );
+const hasRecords = (s: ListedStream) =>
+  Number(s.stats?.doc_num ?? 0) > 0 || Number(s.stats?.doc_time_max ?? 0) > 0;
 
 /**
  * Whether the org holds data the user sent: a logs, metrics or traces stream that O2 does not
- * write itself and that is not a synthetic-check result. `undefined` while the lists load.
+ * write itself, that is not a synthetic-check result, and whose stats show records. `undefined`
+ * while the lists load, or while its streams have no stats yet (stats count flushed files only).
  */
 export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
   const client = useQueryClient();
   const cachedData = () =>
     USER_DATA_STREAM_TYPES.some((type) =>
-      hasUserStream(client.getQueryData(streamKeys.nameList(toValue(org), type)), type),
+      userStreams(client.getQueryData(streamKeys.nameList(toValue(org), type)), type).some(
+        hasRecords,
+      ),
     );
   const queries = USER_DATA_STREAM_TYPES.map((type) =>
     useQuery(() => {
@@ -48,8 +55,9 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
     }),
   );
   const hasUserData = computed<boolean | undefined>(() => {
-    const found = queries.some((q, i) => hasUserStream(q.data.value, USER_DATA_STREAM_TYPES[i]));
-    if (found) return true;
+    const lists = queries.map((q, i) => userStreams(q.data.value, USER_DATA_STREAM_TYPES[i]));
+    if (lists.some((list) => list.some(hasRecords))) return true;
+    if (lists.some((list) => list.length > 0)) return undefined;
     return queries.every((q) => q.isSuccess.value) ? false : undefined;
   });
   // a stale cached answer shows while it refetches; callers that decide once wait for this to clear

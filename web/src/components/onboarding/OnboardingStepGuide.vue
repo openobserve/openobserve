@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="guide.cardSlug"
             :slug="slug"
             @received="result = $event"
-            @state="state = $event"
+            @state="onState"
           >
             <!-- A language tile opens the generic OTLP card; this says what to add for that language. -->
             <template v-if="guide.otelDocs" #hero-under-title>
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="guide.route"
               :route="guide.route"
               @received="result = $event"
-              @state="state = $event"
+              @state="onState"
               @status="pageHasStatus = $event"
             />
             <!-- A page with no check of its own: watch the org for any new stream, as the coding agent page does. -->
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="orgStatus"
               :org="org"
               @detected="result = $event"
-              @state="state = $event"
+              @state="onState"
             />
           </template>
         </div>
@@ -247,6 +247,7 @@ import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 import { SETUP_STEPS_HOST, type SetupStepInfo } from "@/components/ingestion/setupCard/stepsHost";
 import { SETUP_CARD_ONBOARDING } from "@/components/ingestion/setupCard/types";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
+import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { provideSnippetCopied } from "@/composables/firstEvent/firstEventCopied";
 import type {
   FirstEventResult,
@@ -332,7 +333,14 @@ const hasOwnTitle = computed(() =>
 // The card's watch starts on mount, so the nav starts waiting.
 const state = ref<FirstEventState>("waiting");
 const result = ref<FirstEventResult>();
+// A check waits again only for a new target, so the old result no longer applies.
+const onState = (next: FirstEventState) => {
+  state.value = next;
+  if (next === "waiting") result.value = undefined;
+};
 const successTitle = computed(() => t("onboarding.firstData.title"));
+// The question sits under Explore, so the card's or page's own status does not ask it too.
+provide(HEARD_FROM_ASKED_BY_HOST, true);
 
 // A setup card reports its steps; a Data sources page has none to report, so the nav uses a
 // generic pair for it. Either way "Explore Your Data" ends the list.

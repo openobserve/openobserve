@@ -239,13 +239,25 @@ describe("CommunitySlackInvite", () => {
   // first-login session — the day-2 clock only starts once that session ends.
 
   describe("first-login gate", () => {
-    it("does not open during first-time login even with an elapsed day-2 record", () => {
-      localStorage.setItem("isFirstTimeLogin", "true");
+    it("does not open during first-time login even with an elapsed day-2 record", async () => {
+      localStorage.setItem("isFirstTimeLogin", USER_EMAIL);
       setPendingDay2(25);
 
       wrapper = buildWrapper();
+      await nextTick();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
+
+    it("opens for a user whose browser holds another user's first-login flag", async () => {
+      localStorage.setItem("isFirstTimeLogin", "someone-else@example.com");
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      localStorage.removeItem("isFirstTimeLogin");
     });
 
     it("opens normally once isFirstTimeLogin is cleared (returning session)", async () => {

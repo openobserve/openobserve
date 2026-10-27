@@ -20,7 +20,7 @@ import {
 } from "@/components/login/firstSourceOptions";
 import { markHeardFromPending } from "@/components/login/heardFrom";
 import billings from "@/services/billings";
-import { connectDataPromptSessionKey } from "@/utils/slackCommunityInvite";
+import { connectDataPromptSessionKey, markSlackInviteOffered } from "@/utils/slackCommunityInvite";
 import type { InjectionKey } from "vue";
 
 /** The page's Skip to app, provided to the footer every step renders. */
@@ -59,13 +59,14 @@ export function redirectPending(routeName: string | undefined): boolean {
   return document.cookie.split("; ").some((c) => c.startsWith("aws_marketplace_token="));
 }
 
-// Onboarding counts as this session's connect prompt, so the Slack invite waits for a later session.
+// Onboarding counts as this session's connect prompt: the Slack invite waits for a later session and its day-2 clock starts.
 export function suppressConnectPrompt(email: string | undefined): void {
   try {
     window.sessionStorage.setItem(connectDataPromptSessionKey(email ?? "anonymous"), "true");
   } catch {
     // Without storage the Slack invite may come a session early; routing goes ahead.
   }
+  markSlackInviteOffered(email ?? "anonymous");
 }
 
 /** Records the start of a first-login user; a failed call is silent, and the marker is put back for the next exit. */
@@ -76,6 +77,7 @@ export async function recordStart(
   skipped: boolean,
 ): Promise<void> {
   if (firstSource) writeFirstSource(org, firstSource);
+  suppressConnectPrompt(email);
   const key = pendingStartKey(email);
   try {
     if (!window.localStorage.getItem(key)) return;

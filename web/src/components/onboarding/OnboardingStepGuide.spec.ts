@@ -20,6 +20,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
+import { markHeardFromPending } from "@/components/login/heardFrom";
 import { SETUP_STEPS_HOST, type SetupStepInfo } from "@/components/ingestion/setupCard/stepsHost";
 import type {
   FirstEventDiagnosis,
@@ -326,6 +327,33 @@ describe("OnboardingStepGuide", () => {
       expect(w.find('[data-test="onboarding-first-data-open"]').text()).toBe(
         "Explore Your Metrics",
       );
+    });
+
+    it("asks how the user heard of us once, under Explore, not again in the card's status", async () => {
+      markHeardFromPending(store.state.userInfo.email);
+      const w = await mountGuide(false, undefined, undefined, true);
+      watch.result.value = metrics;
+      watch.state.value = "received";
+      await flushPromises();
+      expect(w.findAll('[data-test="heard-from-prompt"]')).toHaveLength(1);
+      expect(
+        w
+          .find('[data-test="onboarding-step-guide-explore"] [data-test="heard-from-prompt"]')
+          .exists(),
+      ).toBe(true);
+      localStorage.clear();
+      watch.result.value = undefined;
+    });
+
+    it("drops the old result when the card's check starts waiting again", async () => {
+      const w = await mountGuide();
+      card(w).vm.$emit("received", metrics);
+      card(w).vm.$emit("state", "received");
+      await flushPromises();
+      card(w).vm.$emit("state", "waiting");
+      await flushPromises();
+      expect(navStatus(w, "check").text()).toBe("Waiting for data");
+      expect(w.find('[data-test="onboarding-step-guide-explore"]').exists()).toBe(false);
     });
   });
 

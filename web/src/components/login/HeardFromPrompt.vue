@@ -57,7 +57,7 @@ import { readFirstSource } from "./firstSourceOptions";
 import {
   HEARD_FROM_VALUES,
   clearHeardFromPending,
-  isHeardFromPending,
+  useHeardFromPending,
   type HeardFromValue,
 } from "./heardFrom";
 
@@ -67,7 +67,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const email = (): string | undefined => store.state.userInfo?.email;
 
-const visible = ref(isHeardFromPending(email()));
+const visible = useHeardFromPending(email);
 const sending = ref(false);
 
 const labels = computed<Record<HeardFromValue, I18nText>>(() => ({
@@ -86,7 +86,7 @@ const options = computed(() =>
 
 const answer = async (value: unknown) => {
   const from = HEARD_FROM_VALUES.find((v) => v === value);
-  if (!from || sending.value) return;
+  if (!from || sending.value || !visible.value) return;
   sending.value = true;
   try {
     const res = await billings.submit_new_user_info(props.org, {
@@ -97,7 +97,6 @@ const answer = async (value: unknown) => {
     });
     if (res.status === 200) {
       clearHeardFromPending(email());
-      visible.value = false;
       toast({ message: t("login.heardFrom.thanks"), variant: "success" });
       analytics.track("onboarding_heard_from_answered", { from });
       return;
@@ -112,7 +111,6 @@ const answer = async (value: unknown) => {
 
 const dismiss = () => {
   clearHeardFromPending(email());
-  visible.value = false;
   analytics.track("onboarding_heard_from_dismissed");
 };
 </script>

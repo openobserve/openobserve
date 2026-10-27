@@ -34,12 +34,21 @@ vi.mock("@/services/billings", () => ({
 
 const empty = { render: () => null };
 
+// A listed stream as the endpoint returns it; stats count flushed files only.
+const listed = (name: string, docNum = 3) => ({
+  name,
+  stream_type: "logs",
+  stats: { doc_num: docNum, doc_time_min: docNum ? 1 : 0, doc_time_max: docNum ? 2 : 0 },
+});
+
 // Serves the stream lists: `logs` for the logs type, none for the others.
-const serveLogStreams = (logs: string[]) =>
+const serveLogStreams = (logs: string[], docNum = 3) =>
   global.server.use(
     http.get(`${store.state.API_ENDPOINT}/api/:org/streams`, ({ request }) => {
       const type = new URL(request.url).searchParams.get("type");
-      return HttpResponse.json({ list: type === "logs" ? logs.map((name) => ({ name })) : [] });
+      return HttpResponse.json({
+        list: type === "logs" ? logs.map((name) => listed(name, docNum)) : [],
+      });
     }),
   );
 
@@ -129,6 +138,13 @@ describe("OnboardingView", () => {
     store.state.organizationData.isDataIngested = true;
     serveLogStreams(["synthetics_results"]);
     const { router } = await mountAt("/onboarding");
+    expect(router.currentRoute.value.name).toBe("onboarding");
+  });
+
+  it("keeps a user on onboarding when the org's only stream is empty", async () => {
+    serveLogStreams(["default"], 0);
+    const { router } = await mountAt("/onboarding");
+    await flushPromises();
     expect(router.currentRoute.value.name).toBe("onboarding");
   });
 
@@ -483,7 +499,7 @@ describe("OnboardingView", () => {
       http.get(`${store.state.API_ENDPOINT}/api/:org/streams`, ({ request }) => {
         const type = new URL(request.url).searchParams.get("type");
         return HttpResponse.json({
-          list: type === "logs" ? [{ name: "default" }, { name: "synthetics_results" }] : [],
+          list: type === "logs" ? [listed("default"), listed("synthetics_results")] : [],
         });
       }),
     );

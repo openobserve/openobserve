@@ -283,6 +283,7 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
       orgData.refs.push(hasUserData);
       return { hasUserData, isFetching: ref(false) };
     },
+    refreshUserStreamLists: async () => {},
   };
 });
 
@@ -1895,6 +1896,7 @@ describe("Logs Index", async () => {
     });
     afterEach(() => {
       orgData.initial = true;
+      store.state.zoConfig.restricted_routes_on_empty_data = false;
     });
 
     it("shows the intro and none of the query UI when the org has no data", async () => {
@@ -1921,7 +1923,8 @@ describe("Logs Index", async () => {
     });
 
     // the watcher refreshes the stream lists before it reports, so the intro must outlast that refresh
-    it("keeps the intro until the first-data watcher reports, then opens the query UI", async () => {
+    it("with the flag on, keeps the intro until the first-data watcher reports, then opens the query UI", async () => {
+      store.state.zoConfig.restricted_routes_on_empty_data = true;
       await remount(false);
       orgData.flip(true);
       await flushPromises();
@@ -1941,6 +1944,16 @@ describe("Logs Index", async () => {
       expect(has("no-data-intro")).toBe(false);
       expect(has("logs-search-bar")).toBe(true);
       expect(wrapper.vm.firstDataArrival?.streamName).toBe("default");
+    });
+
+    // nothing watches with the flag off, so the intro follows the org's data itself
+    it("with the flag off, opens the query UI once the org's data appears", async () => {
+      await remount(false);
+      orgData.flip(true);
+      await flushPromises();
+
+      expect(has("no-data-intro")).toBe(false);
+      expect(has("logs-search-bar")).toBe(true);
     });
 
     it("re-applies a search-history link without the search bar mounted", async () => {

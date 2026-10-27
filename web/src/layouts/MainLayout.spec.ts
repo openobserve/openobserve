@@ -2100,7 +2100,7 @@ describe("MainLayout — first-time cloud login", () => {
     (config as any).isCloud = "true";
     store.state.organizationData.isDataIngested = false;
     store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "org1" };
-    localStorage.setItem("isFirstTimeLogin", "true");
+    localStorage.setItem("isFirstTimeLogin", store.state.userInfo.email);
   });
 
   afterEach(() => {
@@ -2128,8 +2128,28 @@ describe("MainLayout — first-time cloud login", () => {
     sessionStorage.setItem("redirectURI", "/logs");
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
-    expect(localStorage.getItem("isFirstTimeLogin")).toBe("true");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
     wrapper.unmount();
+  });
+
+  it("never onboards a user the flag was set for someone else", async () => {
+    localStorage.setItem("isFirstTimeLogin", "someone-else@example.com");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("clears the flag on sign out, so the next user on this browser is not onboarded", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper } = await mountAtHome();
+    const { userInfo, loggedIn } = store.state;
+    (wrapper.vm as any).signout();
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+    Object.assign(store.state, { userInfo, loggedIn });
   });
 
   it("does not redirect an org that already has data, and clears the flag", async () => {

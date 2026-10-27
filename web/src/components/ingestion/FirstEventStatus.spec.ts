@@ -24,6 +24,7 @@ import type {
   FirstEventState,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "./FirstEventStatus.vue";
+import { markHeardFromPending } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
 import {
   FIRST_EVENT_REPORTER,
@@ -344,6 +345,16 @@ describe("FirstEventStatus — received", () => {
       from: String(result.rangeStart),
       to: String(result.rangeEnd),
     });
+  });
+
+  it("asks how the user heard of us on a Data sources page once data arrives", async () => {
+    markHeardFromPending(undefined);
+    mountBar();
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("heard-from-prompt").exists()).toBe(true);
+    localStorage.clear();
   });
 
   it("reads Test event received with Connect your real source primary on a test guide", async () => {

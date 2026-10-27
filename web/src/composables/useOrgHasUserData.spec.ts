@@ -26,9 +26,30 @@ import { refreshUserStreamLists, useOrgHasUserData } from "./useOrgHasUserData";
 
 type Lists = Record<string, string[]>;
 
-const listsFor = (byOrg: Record<string, Lists>) =>
+// The list endpoint's shape: stats come from flushed files, so a stream with none yet reads zero.
+const listed = (name: string, type: string, docNum = 3) => ({
+  name,
+  storage_type: "s3",
+  stream_type: type,
+  stats: {
+    created_at: 1_700_000_000_000_000,
+    doc_time_min: docNum ? 1_700_000_000_000_000 : 0,
+    doc_time_max: docNum ? 1_700_000_060_000_000 : 0,
+    doc_num: docNum,
+    file_num: docNum ? 1 : 0,
+    storage_size: 0,
+    compressed_size: 0,
+    index_size: 0,
+    mindex_size: 0,
+  },
+  schema: [],
+  settings: {},
+  total_fields: 0,
+});
+
+const listsFor = (byOrg: Record<string, Lists>, docNum = 3) =>
   vi.spyOn(stream, "nameList").mockImplementation((async (org: string, type: string) => ({
-    data: { list: (byOrg[org]?.[type] ?? []).map((name) => ({ name })) },
+    data: { list: (byOrg[org]?.[type] ?? []).map((name) => listed(name, type, docNum)) },
   })) as never);
 
 function setup(org: string, { keepCache = false } = {}) {
@@ -70,6 +91,15 @@ describe("useOrgHasUserData", () => {
       metrics: ["synthetics_step_results"],
     });
     expect(after).toBe(false);
+  });
+
+  it("does not count an empty, pre-created stream as data", async () => {
+    listsFor({ org1: { logs: ["default"] } }, 0);
+    const { result, wrapper } = setup("org1");
+    await flushPromises();
+    // Its stats cannot tell it from a stream whose first records are not flushed yet, so the answer waits.
+    expect(result.hasUserData.value).toBeUndefined();
+    wrapper.unmount();
   });
 
   it("counts a traces stream", async () => {

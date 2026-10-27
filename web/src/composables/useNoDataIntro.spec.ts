@@ -18,9 +18,11 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import { defineComponent, h, watch } from "vue";
 
+import { FIRST_EVENT_BUDGET } from "@/composables/firstEvent/firstEventBudget";
 import { queryClient } from "@/composables/query/queryClient";
 import stream from "@/services/stream";
 import { streamNameListQuery } from "@/services/stream.queries";
+import store from "@/test/unit/helpers/store";
 import { USER_DATA_STREAM_TYPES } from "@/utils/internalStreams";
 
 import { useNoDataIntro } from "./useNoDataIntro";
@@ -28,7 +30,13 @@ import { useNoDataIntro } from "./useNoDataIntro";
 const ORG = "org1";
 const lists = (logs: string[]) =>
   vi.spyOn(stream, "nameList").mockImplementation((async (_org: string, type: string) => ({
-    data: { list: (type === "logs" ? logs : []).map((name) => ({ name })) },
+    data: {
+      list: (type === "logs" ? logs : []).map((name) => ({
+        name,
+        stream_type: type,
+        stats: { doc_num: 3, doc_time_min: 1, doc_time_max: 2 },
+      })),
+    },
   })) as never);
 
 /** Mounts the composable and records every value it takes. */
@@ -43,7 +51,7 @@ function setup() {
         return () => h("div");
       },
     }),
-    { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
+    { global: { plugins: [[VueQueryPlugin, { queryClient }], store] } },
   );
   return { showIntro, seen, wrapper };
 }
@@ -51,10 +59,13 @@ function setup() {
 describe("useNoDataIntro", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
     queryClient.clear();
+    store.state.zoConfig.restricted_routes_on_empty_data = false;
   });
 
-  it("shows the intro for an org with no data and keeps it when the lists later show data", async () => {
+  it("with the flag on, keeps the intro when the lists later show data, for FirstDataPanel's report", async () => {
+    store.state.zoConfig.restricted_routes_on_empty_data = true;
     queryClient.clear();
     lists([]);
     const { showIntro, wrapper } = setup();
@@ -83,6 +94,25 @@ describe("useNoDataIntro", () => {
 
     expect(showIntro.value).toBe(false);
     expect(seen).not.toContain(true);
+    wrapper.unmount();
+  });
+
+  it("with the flag off, reads the lists again, leaves once data appears, and never comes back", async () => {
+    vi.useFakeTimers();
+    queryClient.clear();
+    lists([]);
+    const { showIntro, seen, wrapper } = setup();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(showIntro.value).toBe(true);
+
+    lists(["default"]);
+    await vi.advanceTimersByTimeAsync(FIRST_EVENT_BUDGET.fastMs);
+    expect(showIntro.value).toBe(false);
+
+    lists([]);
+    void queryClient.refetchQueries();
+    await vi.advanceTimersByTimeAsync(FIRST_EVENT_BUDGET.fastMs);
+    expect(seen).toEqual([undefined, true, false]);
     wrapper.unmount();
   });
 });

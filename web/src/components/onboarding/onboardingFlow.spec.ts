@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isHeardFromPending } from "@/components/login/heardFrom";
 import billings from "@/services/billings";
+import { shouldShowStandaloneSlackInvite } from "@/utils/slackCommunityInvite";
 
 import {
   markStartPending,
@@ -82,6 +83,40 @@ describe("recordStart", () => {
     await recordStart(ORG, EMAIL, undefined, true);
     expect(isHeardFromPending(EMAIL)).toBe(true);
     expect(submit.mock.calls[0][1]).toMatchObject({ skipped: true, first_source: undefined });
+  });
+});
+
+describe("the Slack invite's day-two clock", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const status = () =>
+    JSON.parse(localStorage.getItem(`slackCommunityInvite:${EMAIL}`) ?? "{}").status;
+
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    submit.mockResolvedValue({ status: 200 } as never);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("starts when onboarding records a first login's start, and the invite waits a day and a new session", async () => {
+    vi.useFakeTimers();
+    markStartPending(EMAIL);
+    await recordStart(ORG, EMAIL, undefined, true);
+    expect(status()).toBe("pending_day2");
+    expect(sessionStorage.getItem(`connectDataSourcePromptShown:${EMAIL}`)).toBe("true");
+    expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
+    vi.setSystemTime(Date.now() + DAY_MS);
+    expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(true);
+  });
+
+  it("starts when a user leaves onboarding without a pending start", async () => {
+    await recordStart(ORG, EMAIL, undefined, true);
+    expect(status()).toBe("pending_day2");
+  });
+
+  it("starts when a guide claims the session", () => {
+    suppressConnectPrompt(EMAIL);
+    expect(status()).toBe("pending_day2");
   });
 });
 
