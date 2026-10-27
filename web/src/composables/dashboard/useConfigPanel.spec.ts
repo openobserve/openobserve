@@ -222,6 +222,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "metric",
     "background",
     "sparkline",
+    "alertList",
   ];
 
   it("lists each section once", () => {
@@ -1045,6 +1046,35 @@ describe("useConfigPanel – gauge section", () => {
     expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
+  });
+});
+
+describe("useConfigPanel – alert list section", () => {
+  it("shows the alert list only its own section and general", () => {
+    const c = makeComposable(makePanelData("alert-list"));
+    expect(ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id))).toEqual([
+      "general",
+      "alertList",
+    ]);
+  });
+
+  it("hides the panel time option for the alert list, which reads no time range", () => {
+    expect(
+      makeComposable(makePanelData("alert-list")).isConfigOptionVisible(
+        "general",
+        "panel-default-time",
+      ),
+    ).toBe(false);
+    expect(
+      makeComposable(makePanelData("bar")).isConfigOptionVisible("general", "panel-default-time"),
+    ).toBe(true);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("alertList")).toBe(false);
   });
 });
 

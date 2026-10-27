@@ -128,7 +128,9 @@ export const shouldShowHeatmapYBucket = (dashboardPanelData: any, promqlMode: bo
 };
 
 /** The only sections an HTML panel shows; every other section configures an ECharts option it never builds. */
-export const HTML_PANEL_SECTIONS: Record<string, readonly SectionId[]> = {};
+export const HTML_PANEL_SECTIONS: Record<string, readonly SectionId[]> = {
+  "alert-list": ["general", "alertList"],
+};
 
 export const isSectionAllowedForType = (sectionId: SectionId, type: unknown): boolean =>
   !isHtmlPanel(type) || (HTML_PANEL_SECTIONS[type as string] ?? []).includes(sectionId);
@@ -224,7 +226,10 @@ export function useConfigPanel(
         label: t("dashboard.showExemplarsLabel"),
         visible: !!promqlMode.value && isExemplarEligible(dashboardPanelData.data),
       },
-      "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
+      "panel-default-time": {
+        label: t("dashboard.panelTimeEnabled"),
+        visible: dashboardPanelData.data.type !== "alert-list",
+      },
       "promql-chart-config": {
         label: t("dashboard.promqlChartConfig"),
         visible:
@@ -911,6 +916,24 @@ export function useConfigPanel(
             dashboardPanelData.data.queryType === "promql" &&
             allVisibleQueriesInstant(dashboardPanelData)
           ),
+      },
+    },
+    alertList: {
+      "alert-list-folder": {
+        label: t("dashboard.alertListFolder"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-state": {
+        label: t("dashboard.alertListState"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-sort": {
+        label: t("dashboard.alertListSort"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-max": {
+        label: t("dashboard.alertListMax"),
+        visible: dashboardPanelData.data.type === "alert-list",
       },
     },
   }));

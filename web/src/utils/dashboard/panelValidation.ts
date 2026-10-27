@@ -33,6 +33,11 @@ import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/conve
 import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
 import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
 import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
+import {
+  ALERT_LIST_MAX_LIMIT,
+  ALERT_LIST_SORTS,
+  ALERT_LIST_STATES,
+} from "@/utils/dashboard/alertListPanel";
 import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 import { STATE_TIMELINE_DISPLAYS } from "@/utils/dashboard/convertStateTimelineData";
 import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
@@ -1030,6 +1035,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "custom_chart",
     "html",
     "markdown",
+    "alert-list",
   ];
 
   if (!allowedTypes.includes(panel?.type)) {
@@ -1212,11 +1218,13 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["funnel_sort", ["funnel"], FUNNEL_SORTS],
   ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
   ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],
+  ["alert_list_sort", ["alert-list"], ALERT_LIST_SORTS],
 ];
 
 const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
   ["pie_label_content", ["pie", "donut"], PIE_LABEL_CONTENTS],
   ["table_footer_calcs", ["table"], TABLE_FOOTER_CALCS],
+  ["alert_list_state", ["alert-list"], ALERT_LIST_STATES],
 ];
 
 // [key, chart types, lowest allowed, highest allowed, lowest is exclusive]
@@ -1229,6 +1237,7 @@ const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, bo
   ["map_cluster_radius", ["geomap"], 0, Infinity, true],
   ["distribution_bucket_count", ["distribution"], 1, DISTRIBUTION_MAX_BUCKETS, false],
   ["distribution_bucket_size", ["distribution"], 0, Infinity, true],
+  ["alert_list_max", ["alert-list"], 1, ALERT_LIST_MAX_LIMIT, false],
 ];
 
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {

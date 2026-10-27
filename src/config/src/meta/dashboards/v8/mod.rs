@@ -797,6 +797,15 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     node_graph_show_edge_labels: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    alert_list_state: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    alert_list_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alert_list_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alert_list_folder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_entity_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostmap_group_by: Option<Vec<String>>,
@@ -3001,7 +3010,11 @@ mod tests {
             "funnel_orient": "horizontal",
             "funnel_show_percent": true,
             "node_graph_layout": "circular",
-            "node_graph_show_edge_labels": true
+            "node_graph_show_edge_labels": true,
+            "alert_list_state": ["firing", "silenced"],
+            "alert_list_max": 20.0,
+            "alert_list_sort": "state",
+            "alert_list_folder": "default"
         });
         for part in [rest, rest2, rest3] {
             fields

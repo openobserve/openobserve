@@ -62,7 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
               >
               <OButton
-                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                v-if="
+                  !['html', 'markdown', 'custom_chart', 'alert-list'].includes(
+                    dashboardPanelData.data.type,
+                  )
+                "
                 variant="outline"
                 size="icon-sm"
                 @click="showViewPanel = true"
@@ -216,7 +220,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
               >
               <OButton
-                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                v-if="
+                  !['html', 'markdown', 'custom_chart', 'alert-list'].includes(
+                    dashboardPanelData.data.type,
+                  )
+                "
                 variant="outline"
                 size="sm"
                 icon-left="info-outline"
@@ -2109,6 +2117,8 @@ export default defineComponent({
     const collectBuilderTabErrors = (): string[] => {
       const errors: string[] = [];
       const panel = dashboardPanelData.data;
+      // An alert list reads the alerts API, so its empty builder query is not a missing query.
+      if (panel.type === "alert-list") return errors;
       panel.queries.forEach((query: any, index: number) => {
         if (query?.customQuery) return;
         validateSQLPanelFields(
