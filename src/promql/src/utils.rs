@@ -19,8 +19,9 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         promql::{
-            BUCKET_LABEL, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL,
-            exemplars_stream_name, histogram_family, value::Sample,
+            BUCKET_LABEL, BUCKET_STREAM_SUFFIX, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS,
+            VALUE_LABEL, exemplars_stream_name, histogram_family, histogram_series_family,
+            value::Sample,
         },
         stream::StreamType,
     },
@@ -111,18 +112,28 @@ pub fn apply_label_selector(
     Some(df)
 }
 
-/// The stream an exemplar query reads for `selector_name`: a histogram's bucket stream (named
-/// `_bucket` and carrying `le`) reads the family's, where every protocol writes a histogram's
-/// exemplars; any other metric reads its own. The schema comes from the in-memory cache only.
+/// The exemplar stream for `selector_name`, from cached schemas only: a histogram family's series
+/// read the family's (where its exemplars are written) unless a `_count`/`_sum` one has its own.
 pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
-    if let Some(family) = histogram_family(selector_name)
-        && infra::schema::get_stream_schema_from_cache(org_id, selector_name, StreamType::Metrics)
-            .await
-            .is_some_and(|schema| schema.field_with_name(BUCKET_LABEL).is_ok())
-    {
-        return exemplars_stream_name(family);
+    let own = exemplars_stream_name(selector_name);
+    let Some(family) = histogram_series_family(selector_name) else {
+        return own;
+    };
+    let cached = |stream: String| async move {
+        infra::schema::get_stream_schema_from_cache(org_id, &stream, StreamType::Metrics).await
+    };
+    // remote write keeps exemplars sent on a `_count`/`_sum` series in that series' own stream
+    if histogram_family(selector_name).is_none() && cached(own.clone()).await.is_some() {
+        return own;
     }
-    exemplars_stream_name(selector_name)
+    let is_family = cached(format!("{family}{BUCKET_STREAM_SUFFIX}"))
+        .await
+        .is_some_and(|schema| schema.field_with_name(BUCKET_LABEL).is_ok());
+    if is_family {
+        exemplars_stream_name(family)
+    } else {
+        own
+    }
 }
 
 /// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
@@ -285,12 +296,30 @@ mod tests {
         seed("rpc_latency_bucket", vec![label("le"), label("job")]).await;
         seed("queue_count", vec![label("job")]).await;
         seed("plain_bucket", vec![label("job")]).await;
+        seed("plain_count", vec![label("job")]).await;
+        seed("rw_latency_bucket", vec![label("le"), label("job")]).await;
+        seed("rw_latency_sum_exemplars", vec![label("job")]).await;
 
+        for name in ["rpc_latency_bucket", "rpc_latency_count", "rpc_latency_sum"] {
+            assert_eq!(
+                exemplars_stream_for("exemplar_org", name).await,
+                "rpc_latency_exemplars",
+                "{name}"
+            );
+        }
         assert_eq!(
-            exemplars_stream_for("exemplar_org", "rpc_latency_bucket").await,
-            "rpc_latency_exemplars"
+            exemplars_stream_for("exemplar_org", "rw_latency_count").await,
+            "rw_latency_exemplars"
         );
-        for name in ["queue_count", "plain_bucket", "unknown_bucket", "up"] {
+        for name in [
+            "queue_count",
+            "plain_bucket",
+            "plain_count",
+            "unknown_bucket",
+            "unknown_sum",
+            "up",
+            "rw_latency_sum",
+        ] {
             assert_eq!(
                 exemplars_stream_for("exemplar_org", name).await,
                 format!("{name}_exemplars"),

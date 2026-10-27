@@ -88,6 +88,8 @@ pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 pub const EXEMPLARS_STREAM_SUFFIX: &str = "_exemplars";
 /// The stream a histogram's buckets degrade into; `le` on it is what marks a histogram family.
 pub const BUCKET_STREAM_SUFFIX: &str = "_bucket";
+/// The classic series a histogram family is stored as.
+pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = [BUCKET_STREAM_SUFFIX, "_count", "_sum"];
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///
@@ -118,6 +120,15 @@ pub fn exemplars_stream_name(metric: &str) -> String {
 pub fn histogram_family(bucket_stream: &str) -> Option<&str> {
     bucket_stream
         .strip_suffix(BUCKET_STREAM_SUFFIX)
+        .filter(|family| !family.is_empty())
+}
+
+/// The histogram family a `_bucket`, `_count` or `_sum` stream name would belong to; the caller
+/// checks the family's bucket stream for `le`.
+pub fn histogram_series_family(stream: &str) -> Option<&str> {
+    CLASSIC_HISTOGRAM_SUFFIXES
+        .iter()
+        .find_map(|suffix| stream.strip_suffix(suffix))
         .filter(|family| !family.is_empty())
 }
 
@@ -538,6 +549,16 @@ mod tests {
             "queue_count",
         ] {
             assert_eq!(histogram_family(name), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn test_histogram_series_family_strips_any_classic_suffix() {
+        for name in ["rpc_latency_bucket", "rpc_latency_count", "rpc_latency_sum"] {
+            assert_eq!(histogram_series_family(name), Some("rpc_latency"), "{name}");
+        }
+        for name in ["_count", "_sum", "_bucket", "up", "rpc_latency_total"] {
+            assert_eq!(histogram_series_family(name), None, "{name}");
         }
     }
 
