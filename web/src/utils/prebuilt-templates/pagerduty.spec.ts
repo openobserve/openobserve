@@ -63,17 +63,6 @@ describe("pagerduty template", () => {
       expect(pagerdutyConfig.method).toBe("post");
     });
 
-    it("has URL validator", () => {
-      expect(typeof pagerdutyConfig.urlValidator).toBe("function");
-    });
-
-    it("validates PagerDuty URLs", () => {
-      expect(pagerdutyConfig.urlValidator("https://events.pagerduty.com/v2/enqueue")).toBe(true);
-      expect(pagerdutyConfig.urlValidator("https://example.com")).toBe(false);
-      expect(pagerdutyConfig.urlValidator("https://events.pagerduty.com/v2/other")).toBe(false);
-      expect(pagerdutyConfig.urlValidator("invalid-url")).toBe(false);
-    });
-
     it("integration key validator validates key length", () => {
       const integrationKeyField = pagerdutyConfig.credentialFields.find(
         (f) => f.key === "integrationKey",

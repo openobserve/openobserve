@@ -87,6 +87,11 @@ describe("FleetAudit", () => {
     await mountAudit();
     expect(auditText(wrapper)).toContain("O2_AUDIT_ENABLED");
   });
+  it("says entries arrive with the audit publish interval when the trail is empty", async () => {
+    vi.mocked(fleet.listAudit).mockResolvedValue({ data: { items: [] } } as any);
+    await mountAudit();
+    expect(auditText(wrapper)).toContain("O2_AUDIT_PUBLISH_INTERVAL");
+  });
   it("files each row under its object and filters by it", async () => {
     wrapper = await mountAudit();
     expect(wrapper.find('[data-test="fleet-audit-kind-a1"]').text()).toBe("Configuration");

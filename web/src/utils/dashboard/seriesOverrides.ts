@@ -15,12 +15,36 @@
 
 import type { RE2JS } from "re2js";
 import { escapeHtml } from "@/utils/html";
-import { getAreaStyleOverride } from "./colorPalette";
+import { getAreaStyleOverride, type AreaFillConfig } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { tryCompileLinearRegex } from "./tableConfigUtils";
 import type { ThresholdMode, ThresholdShowAs } from "./thresholds";
 
 export type SeriesOverrideMatchBy = "name" | "regex";
+
+export type SeriesLineStyle = "solid" | "dashed" | "dotted";
+export type SeriesDrawStyle = "line" | "bars" | "points";
+export type SeriesYAxisSide = "left" | "right";
+
+/** Where a series is left out; an unset or false flag keeps it. */
+export interface SeriesHideFrom {
+  chart?: boolean;
+  legend?: boolean;
+  tooltip?: boolean;
+}
+
+/** Visual settings of one series on a line, area or bar chart; unset keeps the panel default. */
+export interface SeriesStyle {
+  lineStyle?: SeriesLineStyle;
+  lineWidth?: number;
+  /** Percent, 0 to 100. */
+  fillOpacity?: number;
+  showPoints?: boolean;
+  drawStyle?: SeriesDrawStyle;
+  stackGroup?: string;
+  yAxis?: SeriesYAxisSide;
+  hideFrom?: SeriesHideFrom;
+}
 
 /** Thresholds as stored inside an override; every field may be missing. */
 export interface SeriesOverrideThresholds {
@@ -40,6 +64,9 @@ export interface SeriesOverride {
   decimals?: number;
   color?: string;
   thresholds?: SeriesOverrideThresholds;
+  /** Value mappings for this series only, in `config.mappings` form; the state timeline reads them per row. */
+  valueMappings?: any[];
+  style?: SeriesStyle;
 }
 
 /** The settings of every override matching one series, merged in list order. */
@@ -50,6 +77,8 @@ export interface ResolvedSeriesOverride {
   decimals?: number;
   color?: string;
   thresholds?: SeriesOverrideThresholds;
+  valueMappings?: any[];
+  style?: SeriesStyle;
 }
 
 /** Arguments for `getUnitValue`, the override's unit settings merged over the panel's. */
@@ -89,6 +118,11 @@ export const SERIES_OVERRIDE_MATCH_BY = { EXACT: "series", REGEX: "series_regex"
 
 const MAX_COMPILED_PATTERNS = 500;
 
+const LINE_STYLES: ReadonlySet<string> = new Set(["solid", "dashed", "dotted"]);
+const DRAW_STYLES: ReadonlySet<string> = new Set(["line", "bars", "points"]);
+const Y_AXIS_SIDES: ReadonlySet<string> = new Set(["left", "right"]);
+const HIDE_FROM_KEYS = ["chart", "legend", "tooltip"] as const;
+
 const LEGEND_RICH_PREFIXES = ["{a|", "{b|"];
 
 const compiledPatterns = new Map<string, RE2JS | null>();
@@ -122,6 +156,78 @@ const hasThresholdSteps = (thresholds: unknown): thresholds is SeriesOverrideThr
   );
 };
 
+const hasValueMappings = (mappings: unknown): mappings is any[] =>
+  Array.isArray(mappings) && mappings.length > 0;
+
+const toNonNegative = (value: unknown, max = Infinity): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, max) : null;
+};
+
+const toHideFrom = (value: unknown): SeriesHideFrom | null => {
+  if (!value || typeof value !== "object") return null;
+  const out: SeriesHideFrom = {};
+  for (const key of HIDE_FROM_KEYS) {
+    if ((value as SeriesHideFrom)[key] === true) out[key] = true;
+  }
+  return Object.keys(out).length ? out : null;
+};
+
+/** The valid settings of a stored or drafted style, dropping unset and malformed ones. */
+export const normalizeSeriesStyle = (style: unknown): SeriesStyle => {
+  const raw = (style ?? {}) as Record<string, unknown>;
+  const out: SeriesStyle = {};
+  if (typeof raw.lineStyle === "string" && LINE_STYLES.has(raw.lineStyle)) {
+    out.lineStyle = raw.lineStyle as SeriesLineStyle;
+  }
+  const lineWidth = toNonNegative(raw.lineWidth);
+  if (lineWidth !== null) out.lineWidth = lineWidth;
+  const fillOpacity = toNonNegative(raw.fillOpacity, 100);
+  if (fillOpacity !== null) out.fillOpacity = fillOpacity;
+  if (typeof raw.showPoints === "boolean") out.showPoints = raw.showPoints;
+  if (typeof raw.drawStyle === "string" && DRAW_STYLES.has(raw.drawStyle)) {
+    out.drawStyle = raw.drawStyle as SeriesDrawStyle;
+  }
+  if (isSetText(raw.stackGroup)) out.stackGroup = raw.stackGroup.trim();
+  if (typeof raw.yAxis === "string" && Y_AXIS_SIDES.has(raw.yAxis)) {
+    out.yAxis = raw.yAxis as SeriesYAxisSide;
+  }
+  const hideFrom = toHideFrom(raw.hideFrom);
+  if (hideFrom) out.hideFrom = hideFrom;
+  return out;
+};
+
+/** The stored `override_config` items for a style, in a fixed order. */
+export const seriesStyleConfigItems = (style: unknown): Array<{ type: string; value: unknown }> => {
+  const s = normalizeSeriesStyle(style);
+  const items: Array<{ type: string; value: unknown }> = [];
+  if (s.lineStyle) items.push({ type: "line_style", value: s.lineStyle });
+  if (s.lineWidth !== undefined) items.push({ type: "line_width", value: s.lineWidth });
+  if (s.fillOpacity !== undefined) items.push({ type: "fill_opacity", value: s.fillOpacity });
+  if (s.showPoints !== undefined) items.push({ type: "show_points", value: s.showPoints });
+  if (s.drawStyle) items.push({ type: "draw_style", value: s.drawStyle });
+  if (s.stackGroup) items.push({ type: "stack_group", value: s.stackGroup });
+  if (s.yAxis) items.push({ type: "y_axis", value: s.yAxis });
+  if (s.hideFrom) items.push({ type: "hide_from", value: s.hideFrom });
+  return items;
+};
+
+const STYLE_ITEM_KEYS: Record<string, keyof SeriesStyle> = {
+  line_style: "lineStyle",
+  line_width: "lineWidth",
+  fill_opacity: "fillOpacity",
+  show_points: "showPoints",
+  draw_style: "drawStyle",
+  stack_group: "stackGroup",
+  y_axis: "yAxis",
+  hide_from: "hideFrom",
+};
+
+/** The style key a stored `override_config` item sets, or undefined for a non-style item. */
+export const seriesStyleKeyOf = (type: unknown): keyof SeriesStyle | undefined =>
+  typeof type === "string" ? STYLE_ITEM_KEYS[type] : undefined;
+
 const hasUnitSetting = (resolved: ResolvedSeriesOverride): boolean =>
   resolved.unit !== undefined ||
   resolved.unitCustom !== undefined ||
@@ -133,7 +239,13 @@ const isNamedSeries = (series: any): boolean =>
 // Time-series points are [time, value]; category points are the value itself.
 const pointValue = (value: unknown): unknown => (Array.isArray(value) ? value[1] : value);
 
-const recolourSeries = (series: any, color: string, panelType: string, theme: string) => {
+const recolourSeries = (
+  series: any,
+  color: string,
+  panelType: string,
+  theme: string,
+  config: AreaFillConfig | null | undefined,
+) => {
   if (series.itemStyle) series.itemStyle = { ...series.itemStyle, color };
   if (!series.itemStyle || "color" in series) series.color = color;
   if (series.lineStyle?.color !== undefined) series.lineStyle = { ...series.lineStyle, color };
@@ -141,7 +253,7 @@ const recolourSeries = (series: any, color: string, panelType: string, theme: st
   if (series.areaStyle) {
     Object.assign(
       series,
-      getAreaStyleOverride(panelType, series.areaStyle, color, series.name, theme),
+      getAreaStyleOverride(panelType, series.areaStyle, color, series.name, theme, config),
     );
   }
 };
@@ -151,47 +263,81 @@ const applyAxisSeriesOverride = (
   lookup: SeriesOverrideLookup,
   panelType: string,
   theme: string,
+  config: AreaFillConfig | null | undefined,
 ) => {
   const resolved = lookup.get(series.name);
   if (!resolved) return;
-  if (resolved.color) recolourSeries(series, resolved.color, panelType, theme);
-  if (hasUnitSetting(resolved)) {
-    const name = series.name;
-    series.label = {
-      ...series.label,
-      formatter: (params: any) => lookup.formatValue(pointValue(params?.value), name),
-    };
-  }
+  if (resolved.color) recolourSeries(series, resolved.color, panelType, theme, config);
 };
 
-const percentText = (value: unknown, total: number, decimals: number): string => {
+// Value labels take the panel unit and decimals, or the series override's.
+const formatValueLabels = (series: any, lookup: SeriesOverrideLookup) => {
+  if (!series.label) return;
+  const name = series.name;
+  series.label = {
+    ...series.label,
+    formatter: (params: any) => {
+      const value = pointValue(params?.value);
+      return value === null || value === undefined || value === "-"
+        ? ""
+        : lookup.formatValue(value, name);
+    },
+  };
+};
+
+const sharePercent = (value: unknown, total: number): number => {
   const numeric = Number(value);
-  const percent = total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
-  return `${percent.toFixed(decimals)}%`;
+  return total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
 };
 
-const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup) => {
+const applyPieOverrides = (
+  series: any,
+  lookup: SeriesOverrideLookup,
+  options: { legend?: { selected?: Record<string, boolean> } },
+) => {
   if (!Array.isArray(series?.data)) return;
-  // Only the `{d}%` label is unit-free; a custom label already reads the lookup itself.
+  // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
   const percentLabel = series.label?.formatter === "{d}%";
-  const total = series.data.reduce((sum: number, item: any) => {
-    const numeric = Number(item?.value);
-    return Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
-  }, 0);
-  series.data = series.data.map((item: any) => {
+  const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
+  const items = series.data;
+  // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
+  let totalFor: { selected: unknown } | null = null;
+  let total = 0;
+  const visibleTotal = () => {
+    const selected = options.legend?.selected;
+    if (totalFor && totalFor.selected === selected) return total;
+    totalFor = { selected };
+    total = items.reduce((sum: number, item: { name?: string; value?: unknown } | null) => {
+      const numeric = Number(item?.value);
+      const shown = selected?.[item?.name ?? ""] !== false;
+      return shown && Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
+    }, 0);
+    return total;
+  };
+  let labelOverridden = false;
+  series.data = items.map((item: any) => {
     const resolved = lookup.get(item?.name);
     if (!resolved) return item;
     let next = item;
     if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
     const decimals = resolved.decimals;
-    if (percentLabel && decimals !== undefined) {
+    if ((percentLabel || customLabel) && decimals !== undefined) {
+      labelOverridden = true;
+      const share = () => sharePercent(item.value, visibleTotal());
       next = {
         ...next,
-        label: { ...next.label, formatter: () => percentText(item.value, total, decimals) },
+        label: {
+          ...next.label,
+          formatter: customLabel
+            ? (params: Record<string, unknown>) => customLabel({ ...params, percent: share() })
+            : () => `${share().toFixed(decimals)}%`,
+        },
       };
     }
     return next;
   });
+  // A selection map is what makes ChartRenderer track legend clicks on a pie.
+  if (labelOverridden && options.legend && !options.legend.selected) options.legend.selected = {};
 };
 
 // A silent gauge drawn on top that shows only the title, so the real data item keeps its original name.
@@ -289,6 +435,10 @@ export const parseSeriesOverrideEntry = (entry: any): SeriesOverride | null => {
     else if (item?.type === "display_name") override.displayName = value;
     else if (item?.type === "series_color") override.color = value;
     else if (item?.type === "thresholds") override.thresholds = value;
+    else if (item?.type === "value_mappings") override.valueMappings = value;
+    else if (seriesStyleKeyOf(item?.type)) {
+      override.style = { ...override.style, [seriesStyleKeyOf(item.type)!]: value };
+    }
   }
   return override;
 };
@@ -311,6 +461,10 @@ export const toSeriesOverrideEntry = (override: SeriesOverride): Record<string, 
   if (hasThresholdSteps(override.thresholds)) {
     config.push({ type: "thresholds", value: override.thresholds });
   }
+  if (hasValueMappings(override.valueMappings)) {
+    config.push({ type: "value_mappings", value: override.valueMappings });
+  }
+  config.push(...seriesStyleConfigItems(override.style));
   if (config.length === 0) return null;
   const matchBy =
     override.matchBy === "regex" ? SERIES_OVERRIDE_MATCH_BY.REGEX : SERIES_OVERRIDE_MATCH_BY.EXACT;
@@ -341,7 +495,13 @@ export const matchesSeriesOverride = (seriesName: string, override: SeriesOverri
   return override.value === name;
 };
 
-/** Merges every override matching the series, later wins per setting; null when none matches or none sets anything. */
+// A name rule outranks a regex rule wherever it sits in the list, so regex rules are merged first.
+const byPrecedence = (overrides: SeriesOverride[]): SeriesOverride[] => [
+  ...overrides.filter((o) => o.matchBy === "regex"),
+  ...overrides.filter((o) => o.matchBy !== "regex"),
+];
+
+/** Merges every override matching the series: name rules beat regex rules, and within a kind the later wins per setting; null when none matches or none sets anything. */
 export const resolveSeriesOverride = (
   config: any,
   seriesName: string,
@@ -349,7 +509,7 @@ export const resolveSeriesOverride = (
   const overrides = getSeriesOverrides(config);
   if (overrides.length === 0) return null;
   const resolved: ResolvedSeriesOverride = {};
-  for (const override of overrides) {
+  for (const override of byPrecedence(overrides)) {
     if (!matchesSeriesOverride(seriesName, override)) continue;
     if (isSetText(override.displayName)) resolved.displayName = override.displayName;
     if (isSetText(override.unit)) resolved.unit = override.unit;
@@ -358,6 +518,16 @@ export const resolveSeriesOverride = (
     if (decimals !== null) resolved.decimals = decimals;
     if (isSetText(override.color)) resolved.color = override.color.trim();
     if (hasThresholdSteps(override.thresholds)) resolved.thresholds = override.thresholds;
+    if (hasValueMappings(override.valueMappings)) resolved.valueMappings = override.valueMappings;
+    const style = normalizeSeriesStyle(override.style);
+    if (Object.keys(style).length) {
+      // Hide flags merge per target, so one override can hide the legend and a later one the tooltip.
+      const hideFrom =
+        resolved.style?.hideFrom || style.hideFrom
+          ? { ...resolved.style?.hideFrom, ...style.hideFrom }
+          : undefined;
+      resolved.style = { ...resolved.style, ...style, ...(hideFrom ? { hideFrom } : {}) };
+    }
   }
   return Object.keys(resolved).length > 0 ? resolved : null;
 };
@@ -418,12 +588,17 @@ export const gaugeOverrideTooltip = (
   };
 };
 
-/** Applies override colour, data-label unit, legend and title display names to the final options; matching uses the original names, which stay on the series. */
+/** Applies data-label units, then override colour, legend and title display names to the final options; matching uses the original names, which stay on the series. */
 export const applySeriesOverrides = (options: any, panelSchema: any, theme: string): void => {
   const panelType = panelSchema?.type;
   if (!SERIES_OVERRIDE_CHART_TYPES.has(panelType) || panelType === "metric") return;
   if (!Array.isArray(options?.series)) return;
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
+  if (panelType !== "gauge" && panelType !== "pie" && panelType !== "donut") {
+    for (const series of options.series) {
+      if (isNamedSeries(series)) formatValueLabels(series, lookup);
+    }
+  }
   if (!lookup.active) return;
 
   if (panelType === "gauge") {
@@ -433,11 +608,11 @@ export const applySeriesOverrides = (options: any, panelSchema: any, theme: stri
   const displayNames = new Map<string, string>();
   for (const series of options.series) {
     if (panelType === "pie" || panelType === "donut") {
-      applyPieOverrides(series, lookup);
+      applyPieOverrides(series, lookup, options);
       continue;
     }
     if (!isNamedSeries(series)) continue;
-    applyAxisSeriesOverride(series, lookup, panelType, theme);
+    applyAxisSeriesOverride(series, lookup, panelType, theme, panelSchema?.config);
     const display = lookup.get(series.name)?.displayName;
     if (display !== undefined) displayNames.set(String(series.name), display);
   }

@@ -167,7 +167,8 @@ pub async fn backfill_org_default_templates() -> Result<(), anyhow::Error> {
     let lock_key = "/system/templates/org_default_backfill";
     let locker = dist_lock::lock(lock_key, 0).await?;
 
-    let orgs = crate::organization::list_all_orgs(None)
+    // A blocked org's rows are deleted by its cleanup, which a restart must not undo.
+    let orgs = crate::db::organization::list_unblocked()
         .await
         .unwrap_or_default();
     let mut backfilled = 0;

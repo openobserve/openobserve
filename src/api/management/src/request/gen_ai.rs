@@ -103,6 +103,7 @@ pub struct ClearAgentRegistryResponse {
 #[utoipa::path(
     get,
     path = "/{org_id}/settings/gen_ai/agent_mapping",
+    context_path = "/api",
     tag = "GenAI Settings",
     operation_id = "GetGenAiAgentMapping",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -151,6 +152,7 @@ pub async fn get_agent_mapping(
 #[utoipa::path(
     put,
     path = "/{org_id}/settings/gen_ai/agent_mapping",
+    context_path = "/api",
     tag = "GenAI Settings",
     operation_id = "SaveGenAiAgentMapping",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -213,6 +215,7 @@ pub async fn save_agent_mapping(
 #[utoipa::path(
     get,
     path = "/{org_id}/gen_ai/agents",
+    context_path = "/api",
     tag = "GenAI Settings",
     operation_id = "ListGenAiAgents",
     params(
@@ -270,6 +273,7 @@ pub async fn list_scored_agents(
 #[utoipa::path(
     delete,
     path = "/{org_id}/settings/gen_ai/agent_registry",
+    context_path = "/api",
     tag = "GenAI Settings",
     operation_id = "ClearGenAiAgentRegistry",
     params(

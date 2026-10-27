@@ -179,7 +179,7 @@ export class AlertsPage {
             alertUpdatedMessage: 'Alert updated successfully.',
             alertClonedMessage: 'Alert Cloned Successfully',
             alertDeletedMessage: 'Alert deleted',
-            deleteConfirmText: 'Are you sure you want to delete this alert?',
+            deleteConfirmText: /Are you sure you want to delete the .+ alert\?/,
             deleteButtonText: 'Delete',
             containsOperatorText: 'Contains',
             arrowDropDownText: 'arrow_drop_down',
@@ -4899,5 +4899,62 @@ export class AlertsPage {
     /** "Alert deleted" toast text */
     getAlertDeletedText() {
         return this.page.getByText(this.locators.alertDeletedMessage);
+    }
+
+    // ===== DOWNTIMES: row mute, Muted chip and last outcome =====
+
+    /** A fresh load, which the Muted chip needs after a mute. */
+    async gotoAlertListFolder(folderId, { tab = null } = {}) {
+        const org = process.env.ORGNAME || 'default';
+        const tabQuery = tab ? `&tab=${tab}` : '';
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=${folderId}${tabQuery}`);
+        await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    _alertRowByName(name) {
+        return this.page.locator('[data-test^="o2-table-row-"]').filter({ has: this.page.locator(`[data-test="alert-list-${name}-name-cell"]`) });
+    }
+
+    async muteAlertPreset(name, preset) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-${preset}"]`).click();
+    }
+
+    async openMuteUntil(name) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-until"]`).click();
+    }
+
+    async bulkMute(names, preset) {
+        for (const name of names) {
+            const box = this._alertRowByName(name).locator(this.locators.tableCheckbox);
+            await box.click();
+            await expect(box).toHaveAttribute('data-state', 'checked');
+        }
+        await this.page.locator('[data-test="alert-list-mute-alerts-btn"]').click();
+        await this.page.locator(`[data-test="alert-list-bulk-mute-${preset}"]`).click();
+    }
+
+    async expectMutedChip(name, visible = true, pattern = /^Muted · ends in /) {
+        const chip = this.page.locator(`[data-test="alert-list-${name}-muted"]`);
+        if (visible) await expect(chip).toHaveText(pattern, { timeout: 20000 });
+        else {
+            // Absence only means something once the row itself has rendered.
+            await expect(this.page.locator(`[data-test="alert-list-${name}-name-cell"]`)).toBeVisible({ timeout: 20000 });
+            await expect(chip).toHaveCount(0, { timeout: 20000 });
+        }
+    }
+
+    async expectLastOutcome(name, text) {
+        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+    }
+
+    /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */
+    async isAlertNameClipped(name) {
+        return this.page.locator(`[data-test="alert-list-${name}-name-cell"]`).evaluate((cell, n) => {
+            const el = [...cell.querySelectorAll('*')].find((e) => e.textContent.trim() === n && [...e.children].every((c) => c.textContent.trim() !== n));
+            if (!el) throw new Error(`no element in the name cell of "${n}" renders its full name`);
+            return el.scrollWidth > el.clientWidth;
+        }, name);
     }
 }

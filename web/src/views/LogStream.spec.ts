@@ -538,15 +538,21 @@ describe("LogStream Component", () => {
   });
 
   describe("explore a profiles stream", () => {
-    it("opens the Profiles page on that stream, not Logs", async () => {
+    it("opens the Logs search on that stream, like metrics and traces", async () => {
       const routerPushSpy = vi.spyOn(router, "push");
 
       await wrapper.vm.exploreStream({ row: { name: "prof_stream", stream_type: "profiles" } });
 
-      expect(routerPushSpy).toHaveBeenCalledWith({
-        name: "profiles",
-        query: { org_identifier: "default", stream: "prof_stream", period: "15m" },
-      });
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "logs",
+          query: expect.objectContaining({
+            stream_type: "profiles",
+            stream: "prof_stream",
+            org_identifier: "default",
+          }),
+        }),
+      );
     });
   });
 
@@ -670,6 +676,27 @@ describe("LogStream Component", () => {
       expect(dialog).toBeTruthy();
       expect(dialog.props("title")).toBe("Delete Streams");
       expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    });
+
+    it("shows the number of selected streams in the message", () => {
+      const message = wrapper.find('[data-test="log-stream-batch-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete 2 streams?");
+    });
+
+    it("uses the singular form for one selected stream", async () => {
+      wrapper.vm.confirmBatchDelete = false;
+      wrapper.vm.selectedIds = ["stream1-logs"];
+      await wrapper.vm.confirmBatchDeleteAction();
+      await wrapper.vm.$nextTick();
+      const message = wrapper.find('[data-test="log-stream-batch-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete 1 stream?");
+    });
+
+    it("keeps the count while the selection is cleared after confirming", async () => {
+      wrapper.vm.selectedIds = [];
+      await wrapper.vm.$nextTick();
+      const message = wrapper.find('[data-test="log-stream-batch-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete 2 streams?");
     });
 
     it("should close batch-delete ODialog without deleting when secondary is emitted", async () => {

@@ -2376,7 +2376,10 @@ export class LogsPage {
     }
 
     async displayTwoStreams() {
-        await this.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'");
+        const unionQuery = "SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'";
+        await this.clearAndFillQueryEditor(unionQuery);
+        // Typed while the stream picks still load, the edit never reaches searchObj, so Run sends it as a non-SQL filter.
+        await this.waitForSearchQueryCommitted(unionQuery);
 
         // Ensure query editor is ready
         await this.ensureQueryEditorReady();
@@ -8303,8 +8306,7 @@ export class LogsPage {
         const relativeBtn = this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
         await relativeBtn.waitFor({ state: 'visible', timeout: 5000 });
         await relativeBtn.click();
-        // Wait for the date-time button to remain visible (popup closed); selection complete
-        await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible' });
+        await this.closeDateTimePickerIfOpen();
         testLogger.info(`Relative time range set: ${suffix}`);
     }
 
@@ -11695,6 +11697,17 @@ export class LogsPage {
     }
 
     /**
+     * Wait until the open suggestion widget lists a row; value suggestions load from the server, so it first opens empty on "Loading...".
+     * @param {number} timeout - Timeout in ms (default: 10000)
+     */
+    async waitForSuggestionRows(timeout = 10000) {
+        await expect.poll(
+            () => this.page.locator('.suggest-widget.visible .monaco-list-row').count(),
+            { timeout, message: 'Suggestion widget never listed any rows' },
+        ).toBeGreaterThan(0);
+    }
+
+    /**
      * Get all suggestion label texts from the suggestion widget.
      * @returns {Promise<string[]>} Array of label text content
      */
@@ -13382,7 +13395,10 @@ export class LogsPage {
             ),
             this.page.locator(this.searchBarRefreshButton).click(),
         ]);
-        await response.finished();
+        // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
+        if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
+            await response.finished();
+        }
         await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }

@@ -136,7 +136,8 @@ export const useSearchStream = (t: TranslateFn) => {
     autoRun.onPayloadComplete(payload);
 
     if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
-      analytics.track("logs_search_completed");
+      const hits = searchObj.data.queryResults?.hits?.length ?? 0;
+      analytics.track("logs_search_completed", { hits, empty: hits === 0 });
       flushEditorSuggestSummary();
     }
 

@@ -231,9 +231,41 @@ mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261021_000001_create_public_dashboards;
 mod m20261021_000001_status_pages_add_favicon_img;
+mod m20261021_000002_add_search_type_to_search_queue;
+mod m20261024_000001_add_lease_to_org_cleanup_tasks;
+mod m20261026_000001_backfill_v1_rca_pointer;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_public_dashboards_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261021_000001_create_public_dashboards::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// The search queue as migrations 109 and earlier leave it.
+#[cfg(test)]
+pub(crate) async fn create_search_queue_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20241204_143100_create_table_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20251219_000001_add_org_id_to_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20261021_000002_add_search_type_to_search_queue::Migration
+        .up(&manager)
+        .await
+}
 
 #[cfg(any(test, feature = "test-utils"))]
 pub async fn create_fleet_collectors_for_test(
@@ -398,6 +430,14 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
     m20261018_000001_create_slack_tables::create_all(db).await
+}
+
+/// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    m20261026_000001_backfill_v1_rca_pointer::Migration
+        .up(&SchemaManager::new(db))
+        .await
 }
 
 pub struct Migrator;
@@ -620,6 +660,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20261018_000001_create_rca_steering::Migration),
             Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
             Box::new(m20261005_000001_create_fleet::Migration),
+            Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
+            Box::new(m20261021_000001_create_public_dashboards::Migration),
+            Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
+            Box::new(m20261026_000001_backfill_v1_rca_pointer::Migration),
         ]
     }
 }
@@ -696,6 +740,10 @@ mod tests {
         (115, "m20261018_000001_create_rca_steering"),
         (116, "m20261021_000001_status_pages_add_favicon_img"),
         (117, "m20261005_000001_create_fleet"),
+        (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (119, "m20261021_000001_create_public_dashboards"),
+        (120, "m20261021_000002_add_search_type_to_search_queue"),
+        (121, "m20261026_000001_backfill_v1_rca_pointer"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

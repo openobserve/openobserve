@@ -164,10 +164,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('invitation.confirmRejectHead')"
       :secondary-button-label="t('invitation.cancel')"
       :primary-button-label="t('invitation.reject')"
+      primary-button-variant="destructive"
       @click:secondary="confirmReject = false"
       @click:primary="confirmRejectInvitation"
     >
-      <p>{{ t("invitation.confirmRejectMsg", { org: selectedInvitation?.org_name }) }}</p>
+      <i18n-t
+        keypath="invitation.confirmRejectMsg"
+        tag="p"
+        data-test="invitation-list-reject-message"
+      >
+        <template #org
+          ><span class="text-text-heading font-semibold break-all">{{
+            selectedInvitation?.org_name
+          }}</span></template
+        >
+      </i18n-t>
     </ODialog>
   </OPageLayout>
 </template>

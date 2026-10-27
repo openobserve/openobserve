@@ -48,6 +48,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ homeDashboard.label }}</span>
       </OButton>
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
+      <OButton
+        v-if="publicLinksEnabled"
+        variant="outline"
+        size="sm"
+        icon-left="public"
+        data-test="dashboard-public-links"
+        @click="openPublicLinks"
+      >
+        {{ t("dashboard.publicLinks.pageTitle") }}
+        <BetaBadge size="xs" class="ms-1.5 max-md:hidden" />
+      </OButton>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
@@ -414,6 +425,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="sm"
+                icon-left="tv"
+                data-test="dashboard-list-tv-playlist-btn"
+                @click="openPlaylistDialog"
+              >
+                {{ t("dashboard.playlist.action") }}
+                <OTooltip :content="t('dashboard.playlist.actionTooltip')" />
+              </OButton>
+              <OButton
+                variant="outline"
+                size="sm"
                 data-test="dashboard-list-move-across-folders-btn"
                 @click="moveMultipleDashboards"
                 icon-left="drive-file-move"
@@ -499,7 +520,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardConfirmTitle')"
       data-test="dashboard-confirm-dialog"
-      :message="t('dashboard.deleteDashboardConfirmMsg')"
+      :message-keypath="
+        publicLinksEnabled
+          ? 'dashboard.deleteDashboardConfirmMsgPublicLinks'
+          : 'dashboard.deleteDashboardConfirmMsg'
+      "
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
@@ -519,10 +546,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardsConfirmTitle')"
       data-test="dashboard-confirm-bulk-delete-dialog"
-      :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      :message="
+        t(
+          publicLinksEnabled
+            ? 'dashboard.deleteDashboardsConfirmMsgPublicLinks'
+            : 'dashboard.deleteDashboardsConfirmMsg',
+          { count: selectedIds.length },
+          selectedIds.length,
+        )
+      "
+      ok-variant="destructive"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
+    />
+
+    <PlaylistDialog
+      v-model:open="showPlaylistDialog"
+      :entries="playlistEntries"
+      @open="openPlaylist"
     />
   </OPageLayout>
 </template>
@@ -530,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -598,6 +641,13 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import PlaylistDialog from "@/components/dashboards/kiosk/PlaylistDialog.vue";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  type PlaylistConfig,
+  type PlaylistDialogEntry,
+} from "@/utils/dashboard/playlist";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -644,6 +694,7 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    BetaBadge,
     FirstDataPanel,
     OTruncatedText,
     OUserCell,
@@ -669,6 +720,7 @@ export default defineComponent({
     FolderList,
     OToggleGroup,
     OToggleGroupItem,
+    PlaylistDialog,
   },
   setup() {
     const store = useStore();
@@ -756,6 +808,15 @@ export default defineComponent({
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
     const showFavoritesOnly = computed(() => activeFolderId.value === FAVORITES_FOLDER_ID);
+    const publicLinksEnabled = computed(
+      () => store.state.zoConfig?.public_dashboards_enabled === true,
+    );
+    const openPublicLinks = () => {
+      router.push({
+        name: "publicDashboardLinks",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
@@ -1663,6 +1724,51 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
 
+    const showPlaylistDialog = ref(false);
+    const playlistEntries = ref<PlaylistDialogEntry[]>([]);
+
+    // The table reports selection in row order; a playlist follows the order rows were ticked in.
+    const selectionOrder = ref<string[]>([]);
+    watch(
+      selectedIds,
+      (ids) => {
+        const selected = new Set(ids);
+        const kept = selectionOrder.value.filter((id) => selected.has(id));
+        const known = new Set(kept);
+        selectionOrder.value = [...kept, ...ids.filter((id) => !known.has(id))];
+      },
+      { flush: "sync" },
+    );
+
+    const openPlaylistDialog = () => {
+      const folderNames = new Map<string, string>(
+        (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
+      );
+      const rows = new Map<string, any>(dashboards.value.map((row: any) => [row.id, row]));
+      playlistEntries.value = selectionOrder.value
+        .filter((id) => rows.has(id))
+        .map((id) => {
+          const row = rows.get(id);
+          const folderId = row.folder_id || activeFolderId.value || "default";
+          return {
+            dashboardId: row.id,
+            folderId,
+            title: row.name,
+            folderName: row.folder || folderNames.get(folderId) || null,
+          };
+        });
+      showPlaylistDialog.value = true;
+    };
+
+    // A new tab keeps the list where it was; the TV tab is the one that goes full screen.
+    const openPlaylist = (config: PlaylistConfig) => {
+      const href = router.resolve({
+        path: PLAYLIST_TV_PATH,
+        query: buildPlaylistQuery(config),
+      }).href;
+      window.open(href, "_blank", "noopener");
+    };
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -1854,6 +1960,7 @@ export default defineComponent({
     return {
       t,
       oTableRef,
+      selectedDelete,
       store,
       orgData,
       router,
@@ -1921,6 +2028,10 @@ export default defineComponent({
       moveMultipleDashboards,
       openBulkDeleteDialog,
       bulkDeleteDashboards,
+      showPlaylistDialog,
+      playlistEntries,
+      openPlaylistDialog,
+      openPlaylist,
       confirmBulkDelete,
       bulkDeleteLoading,
       isHome,
@@ -1930,6 +2041,8 @@ export default defineComponent({
       isFavorite,
       toggleFavorite,
       showFavoritesOnly,
+      publicLinksEnabled,
+      openPublicLinks,
     };
   },
   methods: {

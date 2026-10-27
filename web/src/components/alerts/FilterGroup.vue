@@ -44,7 +44,8 @@
 
     <!-- Group content -->
 
-    <div v-if="isOpen" class="group-container overflow-x-auto">
+    <!-- -m-1 p-1: padding so a row's focus ring isn't clipped by this scroll container, margin keeps alignment -->
+    <div v-if="isOpen" class="group-container -m-1 overflow-x-auto p-1">
       <!-- Items in group (V2 uses 'conditions' array) -->
       <div
         class="ms-2 whitespace-nowrap"

@@ -18,18 +18,16 @@ import { flushPromises, shallowMount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 
-const { listEnvironments, listGlobalVariables, toastMock } = vi.hoisted(() => ({
+const { listEnvironments, listGlobalVariables, deleteEnvironment, toastMock } = vi.hoisted(() => ({
   listEnvironments: vi.fn(),
   listGlobalVariables: vi.fn(),
+  deleteEnvironment: vi.fn(),
   toastMock: vi.fn(),
 }));
 vi.mock("@/services/synthetics", () => ({
-  default: { listEnvironments, listGlobalVariables },
+  default: { listEnvironments, listGlobalVariables, deleteEnvironment },
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
-vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
-}));
 
 import SyntheticsVariablesTab from "./SyntheticsVariablesTab.vue";
 import SyntheticsScopeRail from "./SyntheticsScopeRail.vue";
@@ -53,11 +51,18 @@ function env(name: string, over: Partial<SyntheticsEnvironment> = {}): Synthetic
 const GLOBAL = env("global", { id: "global_default", is_global: true });
 const BASE_URL = { name: "BASE_URL", kind: "plain", has_value: true } as SyntheticsVariable;
 
+const ODialogStub = {
+  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant"],
+  emits: ["click:primary", "click:secondary", "update:open"],
+  template: '<div v-if="open"><slot /></div>',
+};
+
 async function mountTab() {
   const wrapper = shallowMount(SyntheticsVariablesTab, {
     global: {
       plugins: [i18n],
       provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
+      stubs: { ODialog: ODialogStub, "i18n-t": false },
     },
   }) as VueWrapper;
   await flushPromises();
@@ -130,5 +135,60 @@ describe("SyntheticsVariablesTab — landing on a new environment", () => {
     expect(listEnvironments).toHaveBeenCalledTimes(2);
     expect(wrapper.findComponent(SyntheticsScopeRail).props("modelValue")).toBe("prod");
     expect(wrapper.findComponent(SyntheticsVariablesList).props("environment")).toBe("prod");
+  });
+});
+
+describe("SyntheticsVariablesTab — deleting an environment", () => {
+  let wrapper: VueWrapper;
+  const staging = env("staging", { variables: [BASE_URL] });
+
+  beforeEach(() => {
+    listEnvironments.mockResolvedValue({ data: [GLOBAL, staging] });
+    listGlobalVariables.mockResolvedValue({ data: [] });
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  const dialog = () => wrapper.findComponent(ODialogStub);
+
+  it("names the environment in bold, counts its variables, and confirms in red", async () => {
+    wrapper = await mountTab();
+    wrapper.findComponent(SyntheticsScopeRail).vm.$emit("delete", staging);
+    await flushPromises();
+
+    expect(dialog().props("open")).toBe(true);
+    expect(dialog().props("primaryButtonVariant")).toBe("destructive");
+    const name = wrapper.find('[data-test="synthetics-environment-delete-name"]');
+    expect(name.text()).toBe("staging");
+    expect(name.classes()).toContain("font-semibold");
+    expect(dialog().text()).toBe("Delete the staging environment and its 1 variable?");
+    expect(deleteEnvironment).not.toHaveBeenCalled();
+  });
+
+  it("deletes the environment and its variables only after the confirm", async () => {
+    deleteEnvironment.mockResolvedValue({});
+    wrapper = await mountTab();
+    wrapper.findComponent(SyntheticsScopeRail).vm.$emit("delete", staging);
+    await flushPromises();
+    dialog().vm.$emit("click:primary");
+    await flushPromises();
+
+    expect(deleteEnvironment).toHaveBeenCalledWith("default", "staging", true);
+    expect(dialog().props("open")).toBe(false);
+  });
+
+  it("closes without deleting on cancel", async () => {
+    wrapper = await mountTab();
+    wrapper.findComponent(SyntheticsScopeRail).vm.$emit("delete", env("empty"));
+    await flushPromises();
+    expect(dialog().text()).toBe("Delete the empty environment?");
+    dialog().vm.$emit("click:secondary");
+    await flushPromises();
+
+    expect(dialog().props("open")).toBe(false);
+    expect(deleteEnvironment).not.toHaveBeenCalled();
   });
 });

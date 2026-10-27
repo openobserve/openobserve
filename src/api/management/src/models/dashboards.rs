@@ -349,6 +349,41 @@ mod tests {
     }
 
     #[test]
+    fn test_v8_default_refresh_interval_survives_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        value["defaultRefreshInterval"] = serde_json::json!(60);
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        assert_eq!(stored["defaultRefreshInterval"], 60);
+        let reloaded: v8::Dashboard = serde_json::from_value(stored).unwrap();
+        assert_eq!(reloaded.default_refresh_interval, Some(60));
+    }
+
+    #[test]
+    fn test_v8_default_refresh_interval_omitted_when_unset() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        assert!(
+            !stored
+                .as_object()
+                .unwrap()
+                .contains_key("defaultRefreshInterval")
+        );
+    }
+
+    #[test]
     fn test_deserialize_unsupported_version_returns_err() {
         let json = serde_json::json!({
             "version": 99,
@@ -435,7 +470,16 @@ mod tests {
         let fields = serde_json::json!({
             "heatmap_mode": "prometheus_histogram",
             "bucket_unit": "seconds",
-            "bucket_unit_custom": "req"
+            "bucket_unit_custom": "req",
+            "heatmap_color_min": 1.5,
+            "heatmap_color_max": 40.0,
+            "heatmap_palette": "magma",
+            "heatmap_palette_reverse": true,
+            "heatmap_color_scale": "linear",
+            "heatmap_y_sort": "asc",
+            "heatmap_y_bucket": { "mode": "log", "base": 2.0 },
+            "heatmap_y_min": 1.0,
+            "heatmap_y_max": 4096.0
         });
         let config = value["tabs"][0]["panels"][0]["config"]
             .as_object_mut()

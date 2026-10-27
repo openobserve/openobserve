@@ -30,8 +30,9 @@ use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
-    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
+    rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status, status_pages,
+    stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -80,8 +81,8 @@ use crate::{
             validator_proxy_url, validator_rum,
         },
         router::middlewares::{
-            blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
-            root_only_middleware,
+            blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
+            password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -128,7 +129,11 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
             X_O2_ASSISTANT_TURN_ID,
+            // The public dashboard viewer polls conditionally.
+            header::IF_NONE_MATCH,
         ])
+        // Its validator, poll hint and clock source, unreadable cross-origin unless exposed.
+        .expose_headers([header::ETAG, header::RETRY_AFTER, header::DATE])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
@@ -265,21 +270,24 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
-/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
-async fn routed_org_differs(parts: &mut Parts) -> bool {
+/// Rejects missing organizations and disagreements between routing and auth.
+async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
-        return false;
+        return Ok(());
     };
     let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
-        return false;
+        return Ok(());
     };
-    // The nest strip drops an empty `{org_id}` segment from the URI: nothing to compare.
+    // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
-        return false;
+        return Err(AuthError::NotFound("Organization not found".to_string()));
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
-    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+        return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
+    }
+    Ok(())
 }
 
 /// Authentication middleware for API routes.
@@ -299,8 +307,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
     // The auth layers check one org, so the handler must serve that same org.
-    if routed_org_differs(&mut parts).await {
-        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    if let Err(error) = validate_routed_org(&mut parts).await {
+        return error.into_response();
     }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
@@ -494,6 +502,19 @@ fn audited_path(uri: &Uri) -> String {
     path.strip_prefix('/').unwrap_or(path).to_string()
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
+    let org = org_from_path(path_columns);
+    // Pointer equality finds the org's own slot even when an earlier segment has the same text.
+    let next = path_columns
+        .iter()
+        .position(|column| std::ptr::eq(*column, org))
+        .and_then(|at| path_columns.get(at + 1))
+        .copied()
+        .unwrap_or("");
+    (org, next)
+}
+
 /// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
 #[cfg(feature = "enterprise")]
 fn delegated_chat_audit_body(
@@ -605,6 +626,18 @@ fn is_secret_field(name: &str) -> bool {
             .any(|word| name.contains(word))
 }
 
+/// A fleet change is published at once, so the Audit tab shows it before the periodic publish.
+#[cfg(feature = "enterprise")]
+fn fleet_mutation(method: &Method, path: &str) -> bool {
+    if matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS) {
+        return false;
+    }
+    let segments: Vec<&str> = path.split('/').collect();
+    let org_at = usize::from(segments.first() == Some(&"api"));
+    let module = segments.get(org_at + 1).copied();
+    module == Some("fleet") || (segments.get(org_at) == Some(&"v2") && module == Some("fleets"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -620,23 +653,18 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         &path
     };
 
+    let (audit_org, after_org) = audit_org_and_next(&path_columns);
+
     if get_o2_config().common.audit_enabled
-        && !(path_columns
-            .get(1)
-            .unwrap_or(&"")
-            .to_string()
-            .ends_with("_stream")
+        && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
-        let org_id = {
-            let org = path_columns.first().unwrap_or(&"");
-            if org.eq(&"organizations") {
-                "".to_string()
-            } else {
-                org.to_string()
-            }
+        let org_id = if audit_org == "organizations" {
+            String::new()
+        } else {
+            audit_org.to_string()
         };
 
         let user_email = request
@@ -725,6 +753,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 delegated,
             })
             .await;
+            if fleet_mutation(&http_method, &path) {
+                tokio::spawn(audit::flush());
+            }
         }
         response
     } else {
@@ -803,6 +834,53 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
 }
 
 /// Create proxy routes
+/// Public dashboard links admin CRUD; handlers 404 when the feature is off.
+fn public_dashboard_admin_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/public_dashboards",
+            get(public_dashboards::admin::list_org),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links",
+            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+            get(public_dashboards::admin::get)
+                .put(public_dashboards::admin::update)
+                .delete(public_dashboards::admin::delete),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+            post(public_dashboards::admin::pause),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+            post(public_dashboards::admin::resume),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/take_over",
+            post(public_dashboards::admin::take_over),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
+            post(public_dashboards::admin::refresh),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status",
+            get(public_dashboards::status::link),
+        )
+        .route(
+            "/{org_id}/public_dashboards/status",
+            get(public_dashboards::status::batch),
+        )
+        .route(
+            "/{org_id}/settings/public_dashboards",
+            get(public_dashboards::settings::get).put(public_dashboards::settings::put),
+        )
+}
+
 pub fn proxy_routes(enable_auth: bool) -> Router {
     let mut router = Router::new().route("/proxy/{org_id}/{*target_url}", get(proxy));
 
@@ -980,6 +1058,19 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
+    // Not on routers: they have no result files, so these paths fall to the slug-keyed proxy.
+    if !config::cluster::LOCAL_NODE.is_router() {
+        router = router
+            .route(
+                "/api/public_dashboards/{slug}",
+                get(public_dashboards::public::config),
+            )
+            .route(
+                "/api/public_dashboards/{slug}/data",
+                get(public_dashboards::public::data),
+            );
+    }
+
     // Unauthenticated like status pages: the share token is checked in the handler.
     #[cfg(feature = "enterprise")]
     if get_config().public_ai_chat.enabled {
@@ -1071,6 +1162,7 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
 }
 
+#[rustfmt::skip]
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -1085,7 +1177,8 @@ pub fn service_routes() -> Router {
     let server = cfg.common.instance_name_short.to_string();
 
     // Downtimes and Slack live in their own tables to keep this function under the line limit.
-    let mut router = Router::new().merge(downtime_routes()).merge(slack_routes());
+    let mut router =
+        public_dashboard_admin_routes(Router::new().merge(downtime_routes()).merge(slack_routes()));
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1122,6 +1215,7 @@ pub fn service_routes() -> Router {
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}/retry", post(organization::org::retry_org_cleanup))
         .route(
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
@@ -2531,6 +2625,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2539,6 +2634,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2546,6 +2642,7 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2591,7 +2688,9 @@ pub fn splunk_collector_routes() -> Router {
         .layer(RequestDecompressionLayer::new())
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
-        .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
+        .layer(middleware::from_fn(
+            hec_collector::wire_body_limit_middleware,
+        ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 
@@ -2628,14 +2727,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             .merge(crate::router::http::create_splunk_collector_proxy_routes())
             .merge(router_routes)
     } else {
-        // Non-router node: use direct service routes
-        Router::new()
-            .merge(basic_routes())
-            .merge(splunk_collector_routes())
-            .nest("/config", config_routes())
-            .nest("/api", service_routes())
-            .merge(other_service_routes())
-            .merge(proxy_routes(true))
+        local_routes()
     };
 
     // Ensure redirect takes into account base_uri
@@ -2687,6 +2779,17 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         ));
     }
     outer
+}
+
+/// Every route a non-router node serves itself, without the UI.
+fn local_routes() -> Router {
+    Router::new()
+        .merge(basic_routes())
+        .merge(splunk_collector_routes())
+        .nest("/config", config_routes())
+        .nest("/api", service_routes())
+        .merge(other_service_routes())
+        .merge(proxy_routes(true))
 }
 
 /// Root-only node management routes, before the authentication layers `basic_routes` adds.
@@ -3220,8 +3323,8 @@ mod tests {
     async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
         async fn guard(request: axum::extract::Request, next: Next) -> Response {
             let (mut parts, body) = request.into_parts();
-            if routed_org_differs(&mut parts).await {
-                return StatusCode::FORBIDDEN.into_response();
+            if let Err(error) = validate_routed_org(&mut parts).await {
+                return error.into_response();
             }
             next.run(Request::from_parts(parts, body)).await
         }
@@ -3249,12 +3352,27 @@ mod tests {
                 .layer(middleware::from_fn(guard)),
         );
         for (uri, expected) in [
-            ("/api//kv/note", StatusCode::OK),
+            ("/api//kv/note", StatusCode::NOT_FOUND),
             ("/api/acme/kv/note", StatusCode::OK),
         ] {
             let request = Request::get(uri).body(Body::empty()).unwrap();
             let status = nested.clone().oneshot(request).await.unwrap().status();
             assert_eq!(status, expected, "{uri}");
+        }
+    }
+
+    #[test]
+    fn a_v2_request_is_audited_under_the_org_it_serves() {
+        for (path, org, next) in [
+            ("v2/acme/alerts/a1", "acme", "alerts"),
+            ("v2/v2/folders/alerts", "v2", "folders"),
+            ("v2/acme/_search_stream", "v2", "acme"),
+            ("acme/_search_stream", "acme", "_search_stream"),
+            ("organizations", "organizations", ""),
+            ("", "", ""),
+        ] {
+            let columns: Vec<&str> = path.split('/').collect();
+            assert_eq!(audit_org_and_next(&columns), (org, next), "{path}");
         }
     }
 
@@ -4273,6 +4391,40 @@ mod tests {
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────
 
+    #[tokio::test]
+    async fn public_dashboard_polls_pass_cors_and_read_their_headers() {
+        let app = Router::new()
+            .route("/x", get(|| async { "ok" }))
+            .layer(cors_layer());
+        let preflight = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/x")
+            .header(header::ORIGIN, "http://localhost:5080")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            .header(header::ACCESS_CONTROL_REQUEST_HEADERS, "if-none-match")
+            .body(Body::empty())
+            .unwrap();
+        let get_req = Request::builder()
+            .uri("/x")
+            .header(header::ORIGIN, "http://localhost:5080")
+            .body(Body::empty())
+            .unwrap();
+        let preflight = app.clone().oneshot(preflight).await.unwrap();
+        let get_resp = app.oneshot(get_req).await.unwrap();
+        let allowed = preflight.headers()[header::ACCESS_CONTROL_ALLOW_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        assert!(allowed.contains("if-none-match"), "{allowed}");
+        let exposed = get_resp.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        for name in ["etag", "retry-after", "date"] {
+            assert!(exposed.contains(name), "{exposed}");
+        }
+    }
+
     #[test]
     fn test_cors_exact_match_allowed() {
         assert!(is_origin_allowed(
@@ -4970,5 +5122,115 @@ mod tests {
             .unwrap();
         let status = app.oneshot(req).await.unwrap().status();
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn the_public_link_take_over_route_is_mounted_for_post_only() {
+        let app = public_dashboard_admin_routes(Router::new());
+        let request = |method: &str, path: &str| {
+            Request::builder()
+                .method(method)
+                .uri(format!("/o1/dashboards/d1/public_links/l1/{path}"))
+                .body(Body::empty())
+                .unwrap()
+        };
+        let status = |req: Request<Body>| {
+            let app = app.clone();
+            async move { app.oneshot(req).await.unwrap().status() }
+        };
+        assert_eq!(
+            status(request("GET", "take_over")).await,
+            StatusCode::METHOD_NOT_ALLOWED
+        );
+        // No user header: the handler's own extractor answers, so the route reached take_over.
+        assert_eq!(
+            status(request("POST", "take_over")).await,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(request("POST", "take_overs")).await,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    // OSS documents enterprise-only operations without routing them, so this holds only there.
+    #[cfg(feature = "enterprise")]
+    /// `METHOD /path` OpenAPI operations a non-router node does not route.
+    const UNROUTED_OPENAPI_OPERATIONS: &[&str] = &[
+        // The deprecated v1 folder API is still documented; only `/v2/{org_id}/folders` is routed.
+        "DELETE /api/{org_id}/folders/{folder_id}",
+        "GET /api/{org_id}/folders",
+        "GET /api/{org_id}/folders/name/{folder_name}",
+        "GET /api/{org_id}/folders/{folder_id}",
+        "POST /api/{org_id}/folders",
+        "PUT /api/{org_id}/folders/{folder_id}",
+        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
+        "POST /{org_id}/service_streams/_correlate",
+    ];
+
+    #[cfg(feature = "enterprise")]
+    fn any_param(template: &str) -> String {
+        template
+            .split('/')
+            .map(|s| if is_param(s) { "{}" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
+    #[tokio::test]
+    async fn every_openapi_operation_reaches_the_route_it_documents() {
+        let app = local_routes().route_layer(middleware::from_fn(
+            |req: Request<Body>, _next: Next| async move {
+                let matched = req
+                    .extensions()
+                    .get::<axum::extract::MatchedPath>()
+                    .map(|p| p.as_str().to_string())
+                    .unwrap_or_default();
+                (StatusCode::IM_A_TEAPOT, matched).into_response()
+            },
+        ));
+        let spec = super::openapi::ApiDoc::openapi();
+        let mut unrouted = Vec::new();
+        for (template, item) in &spec.paths.paths {
+            let operations = [
+                (Method::GET, item.get.is_some()),
+                (Method::PUT, item.put.is_some()),
+                (Method::POST, item.post.is_some()),
+                (Method::DELETE, item.delete.is_some()),
+                (Method::PATCH, item.patch.is_some()),
+                (Method::HEAD, item.head.is_some()),
+            ];
+            let uri = template
+                .split('/')
+                .map(|s| if is_param(s) { "zz" } else { s })
+                .collect::<Vec<_>>()
+                .join("/");
+            for (method, _) in operations.into_iter().filter(|(_, documented)| *documented) {
+                let req = Request::builder()
+                    .method(method.clone())
+                    .uri(&uri)
+                    .body(Body::empty())
+                    .unwrap();
+                let resp = app.clone().oneshot(req).await.unwrap();
+                let status = resp.status();
+                let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                let matched = String::from_utf8_lossy(&bytes);
+                if status != StatusCode::IM_A_TEAPOT || any_param(&matched) != any_param(template) {
+                    unrouted.push(format!("{method} {template}"));
+                }
+            }
+        }
+        unrouted.sort();
+        let mut allowed = UNROUTED_OPENAPI_OPERATIONS.to_vec();
+        allowed.sort_unstable();
+        assert_eq!(
+            unrouted, allowed,
+            "each documented operation must resolve to the route of the same template; fix the \
+             utoipa `path`, or list a path no local route serves in UNROUTED_OPENAPI_OPERATIONS"
+        );
     }
 }

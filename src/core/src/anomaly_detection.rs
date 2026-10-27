@@ -127,6 +127,7 @@ const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
 
 /// The trainer fetches at least 21 days; 28 adds a spare week.
 const DEFAULT_TRAINING_WINDOW_DAYS: i32 = 28;
+const RECOVERY_RETRY_DELAY: Duration = Duration::from_secs(60);
 
 /// Stored only because the `rcf_*` columns are NOT NULL; nothing reads them since the band model.
 const LEGACY_RCF_NUM_TREES: i32 = 100;
@@ -1566,13 +1567,64 @@ pub async fn recover_detection_triggers_on_startup() {
             return;
         }
     };
+    // A re-created trigger would bring detection back for a pending or deleting org.
+    let (configs, unresolved) = configs_of_active_orgs(configs, |org_id| async move {
+        db::org_status::read_active(&org_id).await
+    })
+    .await;
 
     log::info!(
         "[anomaly_detection] Startup trigger recovery: checking {} enabled config(s)",
         configs.len()
     );
+    recreate_missing_triggers(&configs).await;
+    if !unresolved.is_empty() {
+        tokio::spawn(retry_unresolved_recovery(unresolved));
+    }
+}
 
-    for config in &configs {
+/// Re-checks configs whose org status could not be read, until every one has a verdict.
+async fn retry_unresolved_recovery(
+    mut pending: Vec<infra::table::entity::anomaly_detection_config::Model>,
+) {
+    while !pending.is_empty() {
+        tokio::time::sleep(RECOVERY_RETRY_DELAY).await;
+        let enabled = match anomaly_config_table::list_all_enabled(get_orm_client_ro().await).await
+        {
+            Ok(enabled) => enabled,
+            Err(e) => {
+                log::warn!("[anomaly_detection] Trigger recovery retry cannot list configs: {e}");
+                continue;
+            }
+        };
+        // A config deleted or disabled since startup must not get its trigger back.
+        pending = still_enabled(&pending, enabled);
+        let (active, unresolved) = configs_of_active_orgs(pending, |org_id| async move {
+            db::org_status::read_active(&org_id).await
+        })
+        .await;
+        recreate_missing_triggers(&active).await;
+        pending = unresolved;
+    }
+}
+
+/// The current rows of the `pending` configs, among the configs enabled now.
+fn still_enabled(
+    pending: &[infra::table::entity::anomaly_detection_config::Model],
+    enabled: Vec<infra::table::entity::anomaly_detection_config::Model>,
+) -> Vec<infra::table::entity::anomaly_detection_config::Model> {
+    let ids: std::collections::HashSet<&str> =
+        pending.iter().map(|c| c.anomaly_id.as_str()).collect();
+    enabled
+        .into_iter()
+        .filter(|c| ids.contains(c.anomaly_id.as_str()))
+        .collect()
+}
+
+async fn recreate_missing_triggers(
+    configs: &[infra::table::entity::anomaly_detection_config::Model],
+) {
+    for config in configs {
         let org = &config.org_id;
         let key = &config.anomaly_id;
 
@@ -1599,6 +1651,53 @@ pub async fn recover_detection_triggers_on_startup() {
             }
         }
     }
+}
+
+/// Splits configs into those of active orgs and those whose org status could not be read.
+async fn configs_of_active_orgs<F, Fut, E>(
+    configs: Vec<infra::table::entity::anomaly_detection_config::Model>,
+    read_active: F,
+) -> (
+    Vec<infra::table::entity::anomaly_detection_config::Model>,
+    Vec<infra::table::entity::anomaly_detection_config::Model>,
+)
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<bool, E>>,
+    E: std::fmt::Display,
+{
+    let mut verdicts: HashMap<String, Option<bool>> = HashMap::new();
+    let (mut kept, mut unresolved) = (Vec::with_capacity(configs.len()), Vec::new());
+    for config in configs {
+        let verdict = match verdicts.get(&config.org_id) {
+            Some(verdict) => *verdict,
+            None => {
+                let verdict = match read_active(config.org_id.clone()).await {
+                    Ok(active) => Some(active),
+                    Err(e) => {
+                        log::warn!(
+                            "[anomaly_detection] Cannot read the status of org {}, retrying \
+                             its trigger recovery later: {e}",
+                            config.org_id
+                        );
+                        None
+                    }
+                };
+                verdicts.insert(config.org_id.clone(), verdict);
+                verdict
+            }
+        };
+        match verdict {
+            Some(true) => kept.push(config),
+            Some(false) => log::info!(
+                "[anomaly_detection] Skipping trigger recovery for {}: org {} is not active",
+                config.anomaly_id,
+                config.org_id
+            ),
+            None => unresolved.push(config),
+        }
+    }
+    (kept, unresolved)
 }
 
 /// History row only: `scheduled_jobs` belongs to the scheduler, and a write here races its pull.
@@ -4461,6 +4560,95 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn test_recovery_skips_inactive_orgs() {
+        let of_org = |anomaly_id: &str, org_id: &str| {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: anomaly_id.to_string(),
+                org_id: org_id.to_string(),
+                ..update_interval_validation::stored_config()
+            }
+        };
+        let configs = vec![
+            of_org("a1", "acme"),
+            of_org("g1", "gone"),
+            of_org("a2", "acme"),
+            of_org("g2", "gone"),
+        ];
+        let lookups = std::sync::Mutex::new(Vec::new());
+        let (kept, unresolved) = configs_of_active_orgs(configs, |org_id| {
+            lookups.lock().unwrap().push(org_id.clone());
+            async move { Ok::<_, String>(org_id != "gone") }
+        })
+        .await;
+        let ids: Vec<&str> = kept.iter().map(|c| c.anomaly_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["a1", "a2"],
+            "an inactive org's trigger must not be re-created"
+        );
+        assert!(unresolved.is_empty());
+        assert_eq!(
+            *lookups.lock().unwrap(),
+            ["acme", "gone"],
+            "one lookup per org"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_recovery_keeps_configs_of_an_unreadable_org_for_a_retry() {
+        let of_org = |anomaly_id: &str, org_id: &str| {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: anomaly_id.to_string(),
+                org_id: org_id.to_string(),
+                ..update_interval_validation::stored_config()
+            }
+        };
+        let configs = vec![
+            of_org("a1", "acme"),
+            of_org("u1", "unreadable"),
+            of_org("u2", "unreadable"),
+        ];
+        let (kept, unresolved) = configs_of_active_orgs(configs, |org_id| async move {
+            if org_id == "unreadable" {
+                Err("db down".to_string())
+            } else {
+                Ok(true)
+            }
+        })
+        .await;
+        let ids = |c: &[infra::table::entity::anomaly_detection_config::Model]| {
+            c.iter().map(|c| c.anomaly_id.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(ids(&kept), ["a1"]);
+        assert_eq!(
+            ids(&unresolved),
+            ["u1", "u2"],
+            "a failed status read must neither drop nor recover the trigger"
+        );
+    }
+
+    #[test]
+    fn test_recovery_retry_drops_configs_deleted_or_disabled_since_startup() {
+        let config = |anomaly_id: &str, org_id: &str| {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: anomaly_id.to_string(),
+                org_id: org_id.to_string(),
+                ..update_interval_validation::stored_config()
+            }
+        };
+        let pending = vec![config("kept", "acme"), config("gone", "acme")];
+        let enabled_now = vec![config("kept", "acme-renamed"), config("other", "acme")];
+
+        let retried = still_enabled(&pending, enabled_now);
+
+        let rows: Vec<(String, String)> = retried
+            .into_iter()
+            .map(|c| (c.anomaly_id, c.org_id))
+            .collect();
+        assert_eq!(rows, [("kept".to_string(), "acme-renamed".to_string())]);
     }
 
     /// The key names here are a cross-crate contract:

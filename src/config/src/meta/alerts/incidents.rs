@@ -113,10 +113,10 @@ impl std::fmt::Display for CorrelationReason {
     }
 }
 
-impl TryFrom<&str> for CorrelationReason {
-    type Error = String;
+impl std::str::FromStr for CorrelationReason {
+    type Err = String;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
             "primary_match" => Ok(Self::PrimaryMatch),
@@ -348,6 +348,19 @@ pub struct Incident {
     /// Why automatic analysis runs never start for this incident (`l0_off`).
     #[serde(default)]
     pub rca_off_reason: Option<String>,
+
+    /// Every alert that fired into the incident and how often, most-fired first; list only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<IncidentAlertGroup>>,
+}
+
+/// One alert's firings within an incident, for the list row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct IncidentAlertGroup {
+    pub alert_id: String,
+    pub alert_name: String,
+    /// Times this alert fired into the incident
+    pub count: i32,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -1710,14 +1723,14 @@ mod tests {
     #[test]
     fn test_correlation_reason_try_from() {
         assert_eq!(
-            CorrelationReason::try_from("service_discovery").unwrap(),
+            "service_discovery".parse::<CorrelationReason>().unwrap(),
             CorrelationReason::ServiceDiscovery
         );
         assert_eq!(
-            CorrelationReason::try_from("PRIMARY_MATCH").unwrap(),
+            "PRIMARY_MATCH".parse::<CorrelationReason>().unwrap(),
             CorrelationReason::PrimaryMatch
         );
-        assert!(CorrelationReason::try_from("bad_value").is_err());
+        assert!("bad_value".parse::<CorrelationReason>().is_err());
     }
 
     // ── KeyType ───────────────────────────────────────────────────────────────
@@ -1805,6 +1818,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: None,
+            alert_groups: None,
         }
     }
 

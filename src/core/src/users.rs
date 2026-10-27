@@ -714,7 +714,9 @@ pub async fn add_user_to_org(
         let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
-            let _ = organization::check_and_create_org(&local_org).await;
+            if let Err(error) = organization::check_and_create_org(&local_org).await {
+                log::warn!("Failed to auto-create organization '{local_org}': {error}");
+            }
             root_user.get("root").unwrap().clone()
         } else {
             match db::user::get(Some(org_id), initiator_id).await {
@@ -728,6 +730,21 @@ pub async fn add_user_to_org(
                 }
             }
         };
+        // Checked after the root branch above may have created a missing org.
+        match db::org_status::read_active(org_id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "organization is not active",
+                ));
+            }
+            Err(e) => {
+                return Err(Error::other(format!(
+                    "cannot read the status of organization {org_id}: {e}"
+                )));
+            }
+        }
         let base_role = get_role(&role);
         let is_allowed =
             initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
@@ -1140,6 +1157,8 @@ pub async fn remove_user_from_org(
             ),
         }
     }
+    // After the membership is gone: their links ran with their stream access.
+    crate::public_dashboards::pause_departed_publisher_links(org_id, email_id).await;
     if let Err(e) = infra::table::query_history::delete_by_user(org_id, email_id).await {
         log::error!("error deleting query history of {email_id} in {org_id}: {e}");
     }
@@ -1393,12 +1412,19 @@ async fn remove_user_with_last_membership(user: &DBUser, membership: &UserOrg) -
     if get_openfga_config().enabled {
         let fga_role = fga_member_role(&membership.role);
         log::debug!("delete user single org, role: {fga_role}");
-        o2_openfga::authorizer::authz::delete_user_from_org(
+        if let Err(e) = o2_openfga::authorizer::authz::delete_user_from_org(
             &membership.name,
             &user.email,
             &fga_role,
         )
-        .await;
+        .await
+        {
+            log::error!(
+                "error deleting openfga tuples of {} in {} : {e}",
+                user.email,
+                membership.name
+            );
+        }
         if membership.role.eq(&UserRole::ServiceAccount) {
             delete_service_account_from_org(&membership.name, &user.email).await;
         }
@@ -1428,12 +1454,19 @@ async fn remove_one_membership(user: &DBUser, membership: &UserOrg) -> Option<Re
     if get_openfga_config().enabled {
         let fga_role = fga_member_role(&membership.role);
         log::debug!("user_fga_role, multi org: {fga_role}");
-        o2_openfga::authorizer::authz::delete_user_from_org(
+        if let Err(e) = o2_openfga::authorizer::authz::delete_user_from_org(
             &membership.name,
             &user.email,
             &fga_role,
         )
-        .await;
+        .await
+        {
+            log::error!(
+                "error deleting openfga tuples of {} in {} : {e}",
+                user.email,
+                membership.name
+            );
+        }
         if membership.role.eq(&UserRole::ServiceAccount) {
             delete_service_account_from_org(&membership.name, &user.email).await;
         }
@@ -1866,6 +1899,62 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
         assert_eq!(history_count("dummy", email).await, 0);
         assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn gate14_removing_a_publisher_pauses_their_public_links_after_the_membership_delete() {
+        use infra::table::{entity::public_dashboards::Model as Link, public_dashboards as links};
+
+        let _guard = set_up().await;
+        links::create_tables_for_tests(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        // The test database outlives the run, so nothing here may collide with an earlier run.
+        let id = config::ider::uuid();
+        let email = format!("publisher-{id}@example.com");
+        let email = email.as_str();
+        create_user_with_history(email).await;
+        let link = Link {
+            id: id.clone(),
+            org_id: "dummy".to_string(),
+            folder_id: "default".to_string(),
+            dashboard_id: id.clone(),
+            slug: config::utils::rand::generate_random_string(22),
+            name: "Exec view".to_string(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: email.to_string(),
+            enabled: true,
+            expires_at: None,
+            created_by: email.to_string(),
+            updated_by: None,
+            created_at: 1,
+            updated_at: 1,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        let created = links::insert_capped(get_orm_client_rw().await, &link, u32::MAX, 1, false)
+            .await
+            .unwrap();
+        assert_eq!(created, links::CreateOutcome::Created);
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        let row = links::get(get_orm_client_rw().await, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!row.enabled, "the departed publisher's link is paused");
+        assert!(row.rev > link.rev, "the pause bumped the revision");
     }
 
     #[tokio::test]
@@ -2536,6 +2625,55 @@ mod tests {
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_org_refuses_blocked_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let _guard = set_up().await;
+        let org = "blockedaddorg";
+        organization::check_and_create_org_without_ofga(org)
+            .await
+            .unwrap();
+        create_new_user(DBUser {
+            email: "joiner@example.com".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            first_name: "Joiner".to_string(),
+            last_name: String::new(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "dummy".to_string(),
+                token: String::new(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        })
+        .await
+        .unwrap();
+        let mut admin = ORG_USERS.get("dummy/admin@zo.dev").unwrap().clone();
+        admin.org_id = org.to_string();
+        ORG_USERS.insert(format!("{org}/admin@zo.dev"), admin);
+        let role = || UserOrgRole {
+            base_role: UserRole::User,
+            custom_role: None,
+        };
+
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+        let blocked = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev").await;
+        ORG_STATUS_CACHE.remove(org);
+        assert_eq!(
+            blocked.map(|r| r.status()).unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied,
+            "a deleting org must refuse new members as a client error"
+        );
+        let active = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(active.status(), 200);
     }
 
     #[cfg(feature = "enterprise")]

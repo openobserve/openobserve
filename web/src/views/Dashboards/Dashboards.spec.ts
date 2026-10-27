@@ -758,6 +758,69 @@ describe("Dashboards.vue", () => {
       expect(columnIds).toContain("folder");
     });
 
+    it("TV playlist takes the selected favorites from several folders, in the order they were ticked", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "remote1", folderId: "folder1", label: "Remote Dash" },
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper.vm.updateActiveFolderId("__favorites__");
+      await nextTick();
+      wrapper.vm.selectedIds = ["dash1"];
+      wrapper.vm.selectedIds = ["remote1", "dash1"];
+
+      const button = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.vm.$attrs["data-test"] === "dashboard-list-tv-playlist-btn");
+      button.vm.$emit("click");
+      await nextTick();
+
+      const dialog = wrapper.findComponent({ name: "PlaylistDialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("entries")).toEqual([
+        { dashboardId: "dash1", folderId: "default", title: "Dashboard 1", folderName: "Default" },
+        {
+          dashboardId: "remote1",
+          folderId: "folder1",
+          title: "Remote Dash",
+          folderName: "Folder 1",
+        },
+      ]);
+      // Opening the dialog leaves the bulk selection as it was.
+      expect(wrapper.vm.selectedIds).toEqual(["remote1", "dash1"]);
+
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const push = vi.spyOn(router, "push");
+      dialog.vm.$emit("open", {
+        org: "default",
+        entries: [{ dashboardId: "remote1", folderId: "folder1" }],
+        intervalSeconds: 60,
+        slideIndex: 0,
+        period: "1h",
+        theme: "current",
+        fit: true,
+        timezone: null,
+      });
+      const [href, target] = open.mock.calls[0];
+      expect(target).toBe("_blank");
+      const url = new URL(String(href), window.location.origin);
+      expect(url.pathname).toBe("/dashboards/tv");
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        org_identifier: "default",
+        playlist: "remote1:folder1",
+        interval: "1m",
+        slide: "1",
+        period: "1h",
+        fit: "true",
+      });
+      expect(push).not.toHaveBeenCalled();
+      open.mockRestore();
+    });
+
     it("selecting a folder exits the favorites view and shows that folder", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(storeWithTwo(), router, i18n),
@@ -1060,6 +1123,33 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.vm.showDeleteDialogFn).toBeDefined();
       expect(typeof wrapper.vm.showDeleteDialogFn).toBe("function");
+    });
+
+    it("names the dashboard in the delete dialog with a destructive button", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await nextTick();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-dialog");
+      expect(dialog.props()).toMatchObject({
+        messageKeypath: "dashboard.deleteDashboardConfirmMsg",
+        messageName: "cpu-overview",
+        okVariant: "destructive",
+      });
+    });
+
+    it("uses a destructive button in the bulk delete dialog", () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-bulk-delete-dialog");
+      expect(dialog.props("okVariant")).toBe("destructive");
     });
 
     it("should handle editFolder method", async () => {

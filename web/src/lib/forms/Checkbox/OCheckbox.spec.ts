@@ -16,6 +16,17 @@ describe("OCheckbox", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  // The label re-clicks the box when a click's target leaves the page mid-click, re-checking it.
+  it.each([
+    [true, "checked"],
+    ["indeterminate", "indeterminate"],
+  ] as const)("lets a click on the %s mark reach the box itself", (modelValue) => {
+    wrapper = mount(OCheckbox, { props: { modelValue } });
+    const mark = wrapper.find('[role="checkbox"] > span');
+    expect(mark.exists()).toBe(true);
+    expect(mark.classes()).toContain("pointer-events-none");
+  });
+
   it("renders a label when provided via prop", () => {
     wrapper = mount(OCheckbox, { props: { label: "Accept terms" } });
     expect(wrapper.text()).toContain("Accept terms");

@@ -302,6 +302,7 @@ vi.mock("@/composables/useTraces", () => ({
 // Import the component AFTER all vi.mock declarations.
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import analytics from "@/services/product_analytics";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 
@@ -318,14 +319,15 @@ document.body.appendChild(appNode);
 const sharedStubs = {
   DateTime: {
     template: '<div data-test="logs-search-bar-date-time-dropdown" />',
-    props: [
-      "autoApply",
-      "defaultType",
-      "defaultAbsoluteTime",
-      "defaultRelativeTime",
-      "queryRangeRestrictionInHour",
-      "queryRangeRestrictionMsg",
-    ],
+    props: {
+      autoApply: null,
+      defaultType: null,
+      defaultAbsoluteTime: null,
+      defaultRelativeTime: null,
+      queryRangeRestrictionInHour: null,
+      queryRangeRestrictionMsg: null,
+      calendarPresets: Boolean,
+    },
     emits: ["on:date-change", "on:timezone-change"],
     setup() {
       return {
@@ -630,6 +632,18 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(false);
     });
+
+    it.each(["service-graph", "services-catalog"])(
+      "keeps a shared calendar range on the %s picker by offering calendar presets",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        const picker = wrapper.findComponent(`[data-test="${mode}-date-time-picker"]`);
+        expect(picker.props("calendarPresets")).toBe(true);
+      },
+    );
 
     it("should emit service-graph-refresh when the graph refresh button is clicked", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
@@ -1502,6 +1516,55 @@ describe("SearchBar", () => {
 
       expect(wrapper.emitted("searchdata")).toBeFalsy();
     });
+
+    it("tracks a user relative change as traces_time_range_changed without the raw value", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: true,
+      });
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_time_range_changed", {
+        stream_name: "default",
+        value_type: "relative",
+        relative_period: "1h",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
+    });
+
+    it("tracks a debounced user absolute change in live mode as traces_time_range_changed", async () => {
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      vi.useFakeTimers();
+      try {
+        await (wrapper.vm as any).updateDateTime({
+          startTime: 1_000,
+          endTime: 2_000,
+          relativeTimePeriod: null,
+          valueType: "absolute",
+          userChangedValue: true,
+        });
+        await vi.advanceTimersByTimeAsync(2600);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_time_range_changed", {
+        stream_name: "default",
+        value_type: "absolute",
+        relative_period: null,
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -2225,7 +2288,9 @@ describe("SearchBar", () => {
         expect(dialog().props("open")).toBe(false);
         expect(mockConfirm).toHaveBeenCalledWith({
           title: "search.deleteSavedView",
-          message: "search.deleteSavedViewConfirm",
+          messageKeypath: "search.deleteSavedViewConfirm",
+          messageName: tracesView.view_name,
+          confirmVariant: "destructive",
         });
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
         expect(dialog().props("favoriteIds")).toEqual([]);

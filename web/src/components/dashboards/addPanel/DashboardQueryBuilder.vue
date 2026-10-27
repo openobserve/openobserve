@@ -176,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'h-stacked' ||
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
-          dashboardPanelData.data.type == 'stacked'
+          dashboardPanelData.data.type == 'stacked' ||
+          dashboardPanelData.data.type == 'state-timeline'
         "
       >
         <div
@@ -206,6 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
                 >
+                <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
+                  t("panel.breakdownTooltipStateTimeline")
+                }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
             </OTooltip>
@@ -637,6 +641,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <PromQLBuilderOptions :dashboardPanelData="dashboardPanelData" />
   </div>
+  <PromQLBuilderOptions
+    v-else-if="promqlMode && shouldShowPromQLQueryType(dashboardPanelData)"
+    :dashboardPanelData="dashboardPanelData"
+    query-type-only
+  />
 
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardMapsQueryBuilder :dashboardData="dashboardData" />
@@ -663,6 +672,7 @@ import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
+import { shouldShowPromQLQueryType } from "@/utils/dashboard/configUtils";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import {
   applyPromqlSeed,
@@ -1144,6 +1154,7 @@ export default defineComponent({
         case "scatter":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
+        case "state-timeline":
           return t("dashboard.oneFieldMessage");
         case "gauge":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
@@ -1172,6 +1183,7 @@ export default defineComponent({
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
+        case "state-timeline":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1520,6 +1532,7 @@ export default defineComponent({
     );
 
     return {
+      shouldShowPromQLQueryType,
       showXAxis,
       t,
       FIELD_FUNCTION_MENU_WIDTH,

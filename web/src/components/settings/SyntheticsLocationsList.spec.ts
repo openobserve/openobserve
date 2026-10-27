@@ -907,7 +907,9 @@ describe("SyntheticsLocationsList", () => {
 
       expect(mockConfirm).toHaveBeenCalledWith({
         title: "Delete Location",
-        message: "Are you sure you want to delete this location?",
+        messageKeypath: "synthetics.locations.deleteConfirmMessage",
+        messageName: row.label,
+        confirmVariant: "destructive",
       });
       expect(mockDeleteLocation).toHaveBeenCalledWith("test-org", "loc-1");
     });
@@ -1041,6 +1043,7 @@ describe("SyntheticsLocationsList", () => {
       expect(mockConfirm).toHaveBeenCalledWith({
         title: "Delete Locations",
         message: "Are you sure you want to delete 2 locations?",
+        confirmVariant: "destructive",
       });
     });
 

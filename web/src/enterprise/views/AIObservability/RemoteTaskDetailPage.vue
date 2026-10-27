@@ -694,9 +694,11 @@ const discardDraftWrite = useMutation(() => discardRemoteTaskDraftMutation(orgId
 async function discardDraft() {
   const ok = await confirm({
     title: t("aiObservability.remoteTasks.detail.discardDraftTitle"),
-    message: t("aiObservability.remoteTasks.detail.discardDraftMessage"),
+    messageKeypath: "aiObservability.remoteTasks.detail.discardDraftMessage",
+    messageName: task.value?.name ?? "",
     confirmLabel: t("aiObservability.remoteTasks.detail.discardDraft"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   try {

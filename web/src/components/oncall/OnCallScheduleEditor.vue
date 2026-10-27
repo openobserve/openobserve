@@ -379,8 +379,10 @@
       v-model="confirmRemove"
       data-test="oncall-rotation-remove-confirm"
       :title="t('oncall.removeRotationTitle', { name: raw(active?.name ?? '') })"
-      :message="t('oncall.removeRotationMessage')"
+      message-keypath="oncall.removeRotationMessage"
+      :message-name="active?.name"
       :ok-label="t('oncall.removeRotation')"
+      ok-variant="destructive"
       focus-cancel
       @update:ok="deleteActive"
     />

@@ -15,6 +15,7 @@
 
 import type { LocationQuery } from "vue-router";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
 const RELATIVE_PERIOD_PATTERN = /^[1-9]\d*[smhdwM]$/;
@@ -215,7 +216,18 @@ export const arePickerValuesEqual = (first: any, second: any): boolean => {
 
   const type = pickerValueType(first);
   if (type !== pickerValueType(second)) return false;
-  if (type === "relative") return first.relativeTimePeriod === second.relativeTimePeriod;
+  if (type === "relative") {
+    if (first.relativeTimePeriod !== second.relativeTimePeriod) return false;
+    // A calendar period's start moves with the timezone, so the same token can name another window.
+    const bothResolved =
+      Number.isFinite(Number(first.startTime ?? NaN)) &&
+      Number.isFinite(Number(second.startTime ?? NaN));
+    return (
+      !bothResolved ||
+      parseCalendarToken(first.relativeTimePeriod) === null ||
+      Number(first.startTime) === Number(second.startTime)
+    );
+  }
 
   return (
     Number(first.startTime) === Number(second.startTime) &&
@@ -227,7 +239,8 @@ export const arePickerValuesEqual = (first: any, second: any): boolean => {
 export const isUsablePickerValue = (value: any): boolean => {
   if (!value) return false;
   if (pickerValueType(value) === "relative") {
-    return RELATIVE_PERIOD_PATTERN.test(String(value.relativeTimePeriod ?? ""));
+    const period = String(value.relativeTimePeriod ?? "");
+    return RELATIVE_PERIOD_PATTERN.test(period) || parseCalendarToken(period) !== null;
   }
 
   const start = Number(value.startTime);
@@ -236,7 +249,9 @@ export const isUsablePickerValue = (value: any): boolean => {
 };
 
 /** Resolves a picker value to the time object panels load with; a relative range resolves from now. */
-export const pickerValueToTimeObj = (value: any): { start_time: Date; end_time: Date } | null => {
+export const pickerValueToTimeObj = (
+  value: any,
+): { start_time: Date; end_time: Date; relativeTimePeriod?: string | null } | null => {
   if (!value) return null;
 
   if (pickerValueType(value) === "relative") {
@@ -244,7 +259,12 @@ export const pickerValueToTimeObj = (value: any): { start_time: Date; end_time: 
       ? getConsumableRelativeTime(value.relativeTimePeriod)
       : undefined;
     return window
-      ? { start_time: new Date(window.startTime), end_time: new Date(window.endTime) }
+      ? {
+          start_time: new Date(window.startTime),
+          end_time: new Date(window.endTime),
+          // Kept alongside the resolved window so a cache-restore check can tell a calendar period apart from a rolling one without re-deriving it.
+          relativeTimePeriod: value.relativeTimePeriod,
+        }
       : null;
   }
 
@@ -288,6 +308,27 @@ export const isEffectivePanelTimeRelative = (
       convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
     : null;
   return (ownTime?.valueType ?? globalTime?.valueType) === "relative";
+};
+
+/** The fields of a panel that decide which time range it loads with. */
+export interface PanelTimeSource {
+  id?: string;
+  config?: { panel_time_enabled?: boolean; panel_time_range?: PanelTimeRange | null };
+}
+
+/** Whether the range a panel loads with is a calendar period, by the same precedence as isEffectivePanelTimeRelative. */
+export const isEffectivePanelTimeCalendar = (
+  panel: PanelTimeSource | null | undefined,
+  query: LocationQuery | undefined,
+  globalTime: { valueType?: string; relativeTimePeriod?: string } | null | undefined,
+): boolean => {
+  const ownTime =
+    panel && hasPanelTime(panel)
+      ? (getPanelTimeFromURL(panel.id ?? "", query) ??
+        convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
+      : null;
+  const time = ownTime ?? globalTime;
+  return time?.valueType === "relative" && parseCalendarToken(time.relativeTimePeriod) !== null;
 };
 
 /** Whether a dashboard URL change can move any panel's time; var-, pt- and cell_ params cannot. */

@@ -16,11 +16,9 @@
 use std::sync::LazyLock as Lazy;
 
 use hashbrown::HashMap;
+pub use infra::table::org_storage_providers::OSP_PREFIX;
 use infra::{coordinator::get_coordinator, table::org_storage_providers::OrgStorageProvider};
 use tokio::sync::RwLock;
-
-// DBKey to set sourcemaps keys
-pub const OSP_PREFIX: &str = "/org_storage_providers/";
 
 static CACHE: Lazy<RwLock<HashMap<String, Option<OrgStorageProvider>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -77,6 +75,10 @@ pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, any
 pub async fn list_all() -> Result<Vec<OrgStorageProvider>, anyhow::Error> {
     let ret = infra::table::org_storage_providers::list_all().await?;
     Ok(ret)
+}
+
+pub async fn remove_cached_entry(org_id: &str) {
+    CACHE.write().await.remove(org_id);
 }
 
 pub async fn update_cached_entry(entry: OrgStorageProvider) {

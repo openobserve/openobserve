@@ -570,6 +570,12 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.toBeDeletedJob).toEqual(mockJob);
     });
 
+    it("gives the delete confirm a destructive button and leaves cancel-job plain", () => {
+      const [deleteDialog, cancelDialog] = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      expect(deleteDialog.props("okVariant")).toBe("destructive");
+      expect(cancelDialog.props("okVariant")).not.toBe("destructive");
+    });
+
     it("should set up cancel confirmation", () => {
       wrapper.vm.confirmCancelJob(mockJob);
 
