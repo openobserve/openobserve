@@ -2,6 +2,7 @@ import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
 import { DISTRIBUTION_ROW_LIMIT, isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
+import { BOXPLOT_STATS, boxplotStatAlias } from "@/utils/dashboard/boxplotStats";
 import {
   heatmapYBucketError,
   heatmapYBucketing,
@@ -363,6 +364,8 @@ export function buildSQLChartQuery(config: {
     return "";
   }
 
+  if (chartType === "boxplot") return buildBoxplotStatsQuery(queryData, dashboardPanelData);
+
   const stream = queryData.fields.stream;
   const streamAlias = queryData?.joins?.length ? stream : "";
 
@@ -501,6 +504,30 @@ export function buildSQLChartQuery(config: {
     query += ` LIMIT ${queryLimit}`;
   }
 
+  return query;
+}
+
+/** A box plot's builder query: the y field's five-number summary per x category, over every matching row. */
+function buildBoxplotStatsQuery(queryData: any, dashboardPanelData: any): string {
+  const stream = queryData.fields.stream;
+  const streamAlias = queryData?.joins?.length ? stream : "";
+  const valueField = queryData.fields.y.find((field: any) => !field?.isDerived);
+  const value = valueField ? buildSQLQueryFromInput(valueField, streamAlias) : "";
+  if (!value) return "";
+  const category = queryData.fields.x.find((field: any) => !field?.isDerived);
+  const categoryExpr = category ? buildFieldExpression(category, streamAlias) : "";
+  const stats = BOXPLOT_STATS.map(
+    (stat) => `${stat.sql(value)} as "${boxplotStatAlias(valueField.alias, stat.column)}"`,
+  );
+
+  let query = `SELECT ${[categoryExpr, ...stats].filter(Boolean).join(", ")}`;
+  query += ` FROM "${stream}" ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
+  query += buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
+  if (categoryExpr) {
+    query += ` GROUP BY ${category.alias}`;
+    if (category.sortBy) query += ` ORDER BY ${category.alias} ${category.sortBy}`;
+  }
+  if (queryData.config.limit > 0) query += ` LIMIT ${queryData.config.limit}`;
   return query;
 }
 

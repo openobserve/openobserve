@@ -1697,6 +1697,21 @@ describe("useConfigPanel – node graph options", () => {
   });
 });
 
+describe("useConfigPanel – box plot options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the whisker option on a box plot only", () => {
+    expect(visible("boxplot", "data", "boxplot-whisker")).toBe(true);
+    expect(visible("bar", "data", "boxplot-whisker")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on a box plot", () => {
+    expect(shouldShowThresholds({ data: { type: "boxplot", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "boxplot" } })).toBe(false);
+  });
+});
+
 describe("useConfigPanel – sparkline search visibility", () => {
   it("drops the sparkline option for an all-instant PromQL metric only", async () => {
     const { allVisibleQueriesInstant } = await import("@/utils/dashboard/configUtils");

@@ -42,6 +42,7 @@ import {
   stateTimelineSourceRecord,
 } from "@/utils/dashboard/convertStateTimelineData";
 import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { boxplotDrilldownSeries } from "@/utils/dashboard/convertBoxplotData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
@@ -245,6 +246,9 @@ export function usePanelDrilldown({
     if (panelSchema.value.type === "heatmap") {
       const { column, row } = heatmapCellValues(params);
       return { __name: row ?? params?.name, __value: value, __axisValue: column };
+    }
+    if (panelSchema.value.type === "boxplot") {
+      return boxplotDrilldownSeries(panelData?.value?.options, params);
     }
     return {
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,

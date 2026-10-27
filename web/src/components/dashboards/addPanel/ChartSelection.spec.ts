@@ -294,4 +294,22 @@ describe("ChartSelection", () => {
     expect(li.className.includes("cursor-not-allowed")).toBe(true);
     dashboardPanelData.data.queryType = previous;
   });
+
+  it("lists box plot with its own icon", async () => {
+    const item = wrapper.find("[data-test='selected-chart-boxplot-item']");
+    expect(item.exists()).toBe(true);
+    expect(item.find("img").attributes("src")).toContain("charts/boxplot.svg");
+    await item.trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["boxplot"]);
+  });
+
+  it("in PromQL mode disables box plot", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const li = wrapper.find("[data-test='selected-chart-boxplot-item']").element.closest("li");
+    expect(li.className.includes("cursor-not-allowed")).toBe(true);
+    dashboardPanelData.data.queryType = previous;
+  });
 });

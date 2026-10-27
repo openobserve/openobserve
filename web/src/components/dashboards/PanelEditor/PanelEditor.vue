@@ -211,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'funnel',
                           'node-graph',
                           'flame-graph',
+                          'boxplot',
                           'geomap',
                           'maps',
                         ].includes(dashboardPanelData.data.type)
