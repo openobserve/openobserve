@@ -272,7 +272,7 @@ jobs:
           # Empty under the github.token fallback: any workflow a same-repo PR adds can also post as github-actions[bot].
           REVIEW_BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
           # Review-only key held in the ai-review environment (the org-wide key is readable by any same-repo PR workflow).
-          DEEPSEEK_API_KEY: ${{ secrets.AI_REVIEW_DEEPSEEK_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}

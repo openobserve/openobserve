@@ -69,18 +69,19 @@ branches → `main`**, in both repos, then:
 
 - Move `OO_REVIEWER_APP_PRIVATE_KEY` into it and delete the repo-level copy (only this workflow
   uses it).
-- Add an `AI_REVIEW_DEEPSEEK_API_KEY` environment secret holding a key used by nothing else. The
-  org-level `DEEPSEEK_API_KEY` stays for the other workflows; any same-repo PR can add a workflow
-  that reads it, which is why the review does not use it.
+- The model key is the existing organization secret `DEEPSEEK_API_KEY`, shared with the other AI
+  workflows. Any same-repo PR can add a workflow that reads it, so a dedicated key in this
+  environment is the stronger setup; switching is a one-line change in the workflow.
 - Rotate `O2_TRACE_*` to an ingest-only credential; they stay at repo level because other AI
   workflows export to the same stream.
 - Give the reviewer app *Actions: write* and *Pull requests: read* on o2-enterprise and
-  *Issues: write* on openobserve, installed on both repos, for paired PRs (below). A new
+  *Pull requests: write* on openobserve (it already has this), installed on both repos, for paired PRs (below). A new
   permission waits for an org owner to accept it on the installation; until then the token cannot
   be minted and paired OSS PRs are reviewed on their own as well.
 
-Without `AI_REVIEW_DEEPSEEK_API_KEY` the job posts a "not reviewed: key not set" comment, so create
-the environment before merging. Set the **organization** variable `AI_REVIEW_ENABLED` to `false`
+Without `DEEPSEEK_API_KEY` the job posts a "not reviewed: key not set" comment. If the `ai-review`
+environment does not exist, GitHub creates it on the first run with no branch restriction, so
+create it with the `main` policy before merging. Set the **organization** variable `AI_REVIEW_ENABLED` to `false`
 to stop every review run in both repos (the job never starts, so no secret is read); unset or any
 other value runs. Set it on one repo only and paired OSS PRs still defer to an ENT review that
 never runs.
