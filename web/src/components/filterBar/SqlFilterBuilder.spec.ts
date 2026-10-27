@@ -39,7 +39,7 @@ const mountBuilder = (query: string) => {
   return wrapper;
 };
 
-const chips = () => wrapper!.findAll('[data-test^="b-bar-chip-"]');
+const chips = () => wrapper!.findAll('[data-test^="b-bar-chip-"][data-test$="-field"]');
 
 describe("SqlFilterBuilder", () => {
   it("draws a filter-mode query as chips with a WHERE preview", () => {
@@ -58,9 +58,7 @@ describe("SqlFilterBuilder", () => {
 
   it("writes the compiled query back when a chip is removed", async () => {
     mountBuilder("level = 'error' AND status = 1");
-    await wrapper!
-      .find('[data-test="b-bar-chip-status"] [data-test="o2-badge-remove"]')
-      .trigger("click");
+    await wrapper!.find('[data-test="b-bar-chip-status-remove"]').trigger("click");
     expect(wrapper!.emitted("update:query")).toEqual([["level = 'error'"]]);
   });
 
@@ -72,10 +70,10 @@ describe("SqlFilterBuilder", () => {
     await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
     await flushPromises();
     expect(wrapper!.emitted("update:query")).toEqual([[""]]);
-    expect(wrapper!.find('[data-test="b-bar-input"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="b-bar-add"]').exists()).toBe(true);
   });
 
-  it("opens in advanced mode when the query already uses OR", () => {
+  it("draws an OR query with its connector", () => {
     mountBuilder("level = 'a' OR level = 'b'");
     expect(wrapper!.find('[data-test="b-bar-connector-1"]').exists()).toBe(true);
   });

@@ -20,40 +20,23 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  emptyFilterGroup,
-  filterTreeToSql,
-  needsAdvancedMode,
-  type FilterGroup,
-} from "@/utils/query/filterBar";
+import { emptyFilterGroup, filterTreeToSql, type FilterGroup } from "@/utils/query/filterBar";
 import { parseSqlFilter } from "@/utils/query/filterBarParser";
 import QueryFilterBar from "./QueryFilterBar.vue";
-import type { FilterBarMode } from "./useFilterBarEditor";
 import type { SqlFilterBuilderEmits, SqlFilterBuilderProps } from "./SqlFilterBuilder.types";
 
 const props = withDefaults(defineProps<SqlFilterBuilderProps>(), {
   loadValues: undefined,
   fieldsLoading: false,
   freeText: true,
-  modeStorageKey: undefined,
   dataTest: "sql-filter-builder",
 });
 const emit = defineEmits<SqlFilterBuilderEmits>();
 
 const { t } = useI18nTyped();
 
-const readStoredMode = (): FilterBarMode => {
-  if (!props.modeStorageKey) return "basic";
-  try {
-    return localStorage.getItem(props.modeStorageKey) === "advanced" ? "advanced" : "basic";
-  } catch {
-    return "basic";
-  }
-};
-
 const tree = ref<FilterGroup>(emptyFilterGroup());
 const unparsable = ref(false);
-const mode = ref<FilterBarMode>(readStoredMode());
 let lastEmitted: string | null = null;
 
 const preview = computed(() => filterTreeToSql(tree.value, props.fields));
@@ -67,7 +50,6 @@ watch(
     unparsable.value = !parsed;
     if (!parsed) return;
     tree.value = parsed;
-    if (needsAdvancedMode(parsed)) mode.value = "advanced";
   },
   { immediate: true },
 );
@@ -78,16 +60,6 @@ function onTreeChange(next: FilterGroup) {
   if (sql === (props.query ?? "").trim()) return;
   lastEmitted = sql;
   emit("update:query", sql);
-}
-
-function onModeChange(next: FilterBarMode) {
-  mode.value = next;
-  if (!props.modeStorageKey) return;
-  try {
-    localStorage.setItem(props.modeStorageKey, next);
-  } catch {
-    // Storage blocked: the mode simply is not remembered.
-  }
 }
 
 function clearAndBuild() {
@@ -128,14 +100,12 @@ function clearAndBuild() {
       <QueryFilterBar
         :model-value="tree"
         :fields="fields"
-        :mode="mode"
         :free-text="freeText"
         :load-values="loadValues"
         :fields-loading="fieldsLoading"
         size="sm"
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
-        @update:mode="onModeChange"
         @submit="emit('submit')"
       />
       <OTruncatedText

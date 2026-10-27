@@ -23,8 +23,6 @@ export interface SqlFilterBuilderProps {
   fieldsLoading?: boolean;
   /** Offer `match_all` full-text search for typed words. */
   freeText?: boolean;
-  /** localStorage key remembering basic/advanced per page. */
-  modeStorageKey?: string;
   dataTest?: string;
 }
 

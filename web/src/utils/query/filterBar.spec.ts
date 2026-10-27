@@ -18,8 +18,6 @@ import {
   applyPromMatchers,
   filterTreeToPromMatchers,
   filterTreeToSql,
-  flattenToBasic,
-  needsAdvancedMode,
   operatorsFor,
   toFilterFieldType,
   type FilterCondition,
@@ -175,15 +173,5 @@ describe("PromQL", () => {
     expect(applyPromMatchers('up{env="p"}', ['job="api"'])).toBe('up{env="p", job="api"}');
     expect(applyPromMatchers("up{}", ['job="api"'])).toBe('up{job="api"}');
     expect(applyPromMatchers("up", [])).toBe("up");
-  });
-});
-
-describe("basic / advanced", () => {
-  it("detects advanced-only trees and flattens them", () => {
-    const tree = root(cond("a", "eq", ["1"]), cond("b", "eq", ["2"], "OR"));
-    expect(needsAdvancedMode(tree)).toBe(true);
-    const basic = flattenToBasic(tree);
-    expect(needsAdvancedMode(basic)).toBe(false);
-    expect(basic.items.map((item) => item.connector)).toEqual(["AND", "AND"]);
   });
 });

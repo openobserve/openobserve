@@ -14,20 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
+import type { FilterTokenPart } from "@/lib/core/Badge/OFilterToken.types";
 import type { FilterDialect, FilterField, FilterGroup, FilterNode } from "@/utils/query/filterBar";
-import type { FilterBarMode } from "./useFilterBarEditor";
-
-export type { FilterBarMode };
 
 export interface QueryFilterBarProps {
   modelValue: FilterGroup;
   fields: FilterField[];
-  /** `promql` limits operators to label matchers and turns off advanced mode. */
+  /** `sql` joins chips with AND/OR and groups; `promql` ANDs label matchers only. */
   dialect?: FilterDialect;
-  /** Basic ANDs every chip; advanced adds AND/OR connectors and parenthesised groups. */
-  mode?: FilterBarMode;
-  /** Hide the basic/advanced switch, for pages that only support one. */
-  showModeToggle?: boolean;
   /** Offer a "search all text" row for typed words that match no field. */
   freeText?: boolean;
   /** Let the user name a field that is not in `fields` (labels not loaded yet). */
@@ -43,7 +37,6 @@ export interface QueryFilterBarProps {
 
 export interface QueryFilterBarEmits {
   (_e: "update:modelValue", _value: FilterGroup): void;
-  (_e: "update:mode", _value: FilterBarMode): void;
   /** Enter on an empty bar: run the query. */
   (_e: "submit"): void;
   /** The field list is about to be shown; lazy pages load fields here. */
@@ -56,17 +49,17 @@ export interface QueryFilterBarExpose {
 
 export interface FilterBarNodesProps {
   items: FilterNode[];
-  advanced: boolean;
-  /** Index of `items[0]` within its group, so the first rendered node still gets its connector. */
-  offset?: number;
+  /** Draw the AND/OR connector between nodes. */
+  connectors: boolean;
   editingId?: string | null;
+  editPart?: FilterTokenPart | null;
   armedId?: string | null;
   openGroupId?: string | null;
   dataTest: string;
 }
 
 export interface FilterBarNodesEmits {
-  (_e: "edit", _id: string): void;
+  (_e: "edit", _id: string, _part: FilterTokenPart, _element: HTMLElement): void;
   (_e: "remove", _id: string): void;
   (_e: "toggle-connector", _id: string): void;
 }

@@ -346,16 +346,6 @@ export const applyPromMatchers = (metric: string, matchers: string[]): string =>
   return `${metric.slice(0, open)}{${merged.join(", ")}}${metric.slice(close + 1)}`;
 };
 
-/** Removes every connector except AND and every group, so a tree built in advanced mode fits basic mode. */
-export const flattenToBasic = (root: FilterGroup): FilterGroup => ({
-  ...root,
-  items: flattenConditions(root).map((condition) => ({ ...condition, connector: "AND" })),
-});
-
-/** True when the tree uses anything basic mode cannot draw (an OR or a nested group). */
-export const needsAdvancedMode = (root: FilterGroup): boolean =>
-  root.items.some((item, index) => item.kind === "group" || (index > 0 && item.connector === "OR"));
-
 const mapGroup = (group: FilterGroup, fn: (items: FilterNode[]) => FilterNode[]): FilterGroup => ({
   ...group,
   items: fn(group.items).map((item) => (item.kind === "group" ? mapGroup(item, fn) : item)),

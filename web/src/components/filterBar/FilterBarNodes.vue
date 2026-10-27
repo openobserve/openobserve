@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { conditionValueLabel, OPERATORS, type FilterCondition } from "@/utils/query/filterBar";
 import type { FilterBarNodesEmits, FilterBarNodesProps } from "./QueryFilterBar.types";
 
 defineOptions({ name: "FilterBarNodes" });
 
-const props = withDefaults(defineProps<FilterBarNodesProps>(), {
-  offset: 0,
+withDefaults(defineProps<FilterBarNodesProps>(), {
   editingId: null,
+  editPart: null,
   armedId: null,
   openGroupId: null,
 });
@@ -35,55 +35,56 @@ const { t } = useI18nTyped();
 
 const testKey = (condition: FilterCondition) => condition.field || "text";
 
-const showConnector = (index: number) => props.advanced && index + props.offset > 0;
+const fieldLabel = (condition: FilterCondition): I18nText =>
+  condition.field ? raw(condition.field) : t("filterBar.textField");
+
+// Symbols read the same in every language; word operators show their translated label.
+const operatorLabel = (condition: FilterCondition): I18nText | undefined => {
+  if (!condition.field) return undefined;
+  const op = OPERATORS[condition.operator];
+  return /^[a-z ]+$/.test(op.symbol) ? t(op.labelKey) : raw(op.symbol);
+};
+
+const valueLabel = (condition: FilterCondition): I18nText | undefined =>
+  OPERATORS[condition.operator].arity === "none" ? undefined : raw(conditionValueLabel(condition));
 </script>
 
 <template>
   <template v-for="(item, index) in items" :key="item.id">
     <OTag
-      v-if="showConnector(index) && item.id !== editingId"
+      v-if="connectors && index > 0"
       clickable
       size="sm"
       variant="default-outline"
       :label="raw(item.connector)"
       :aria-label="t('filterBar.toggleConnector')"
-      :data-test="`${dataTest}-connector-${index + offset}`"
+      :data-test="`${dataTest}-connector-${index}`"
       @click.stop="emit('toggle-connector', item.id)"
     />
-    <template v-if="item.kind === 'condition'">
-      <OTag
-        v-if="item.id !== editingId"
-        clickable
-        removable
-        size="sm"
-        :variant="item.id === armedId ? 'primary' : 'primary-soft'"
-        :remove-label="t('filterBar.removeFilter')"
-        :data-test="`${dataTest}-chip-${testKey(item)}`"
-        :data-filter-id="item.id"
-        class="max-w-full"
-        @click.stop="emit('edit', item.id)"
-        @remove="emit('remove', item.id)"
-      >
-        <template v-if="item.field">
-          <span class="font-medium">{{ raw(item.field) }}</span>
-          <span class="opacity-75">{{ raw(OPERATORS[item.operator].symbol) }}</span>
-          <OTruncatedText class="max-w-60">{{ raw(conditionValueLabel(item)) }}</OTruncatedText>
-        </template>
-        <OTruncatedText v-else class="max-w-60">{{
-          t("filterBar.textChip", { text: item.values[0] ?? "" })
-        }}</OTruncatedText>
-      </OTag>
-    </template>
+    <OFilterToken
+      v-if="item.kind === 'condition'"
+      :field="fieldLabel(item)"
+      :operator="operatorLabel(item)"
+      :value="valueLabel(item)"
+      :active-part="item.id === editingId ? (editPart ?? 'value') : null"
+      :armed="item.id === armedId"
+      removable
+      :remove-label="t('filterBar.removeFilter')"
+      :data-test="`${dataTest}-chip-${testKey(item)}`"
+      @select="(part, element) => emit('edit', item.id, part, element)"
+      @remove="emit('remove', item.id)"
+    />
     <template v-else>
       <span class="text-text-secondary font-mono text-sm" aria-hidden="true">{{ raw("(") }}</span>
       <FilterBarNodes
         :items="item.items"
-        :advanced="advanced"
+        :connectors="connectors"
         :editing-id="editingId"
+        :edit-part="editPart"
         :armed-id="armedId"
         :open-group-id="openGroupId"
         :data-test="dataTest"
-        @edit="emit('edit', $event)"
+        @edit="(id, part, element) => emit('edit', id, part, element)"
         @remove="emit('remove', $event)"
         @toggle-connector="emit('toggle-connector', $event)"
       />

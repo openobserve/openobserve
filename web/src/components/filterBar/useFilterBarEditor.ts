@@ -37,7 +37,6 @@ import {
 import { parseShorthand } from "@/utils/query/filterBarParser";
 
 export type FilterBarStep = "field" | "operator" | "value";
-export type FilterBarMode = "basic" | "advanced";
 
 export interface FilterBarDraft {
   field: string;
@@ -49,7 +48,6 @@ export interface FilterBarEditorOptions {
   tree: Ref<FilterGroup>;
   fields: Ref<FilterField[]>;
   dialect: Ref<FilterDialect>;
-  mode: Ref<FilterBarMode>;
   freeText: Ref<boolean>;
   allowCustomFields: Ref<boolean>;
   loadValues: Ref<((field: string, search: string) => Promise<string[]>) | undefined>;
@@ -86,13 +84,15 @@ const rankByMatch = (names: string[], needle: string): string[] => {
 };
 
 export function useFilterBarEditor(options: FilterBarEditorOptions) {
-  const { tree, fields, dialect, mode, t } = options;
+  const { tree, fields, dialect, t } = options;
 
   const text = ref("");
   const open = ref(false);
   const step = ref<FilterBarStep>("field");
   const draft = ref<FilterBarDraft | null>(null);
   const editingId = ref<string | null>(null);
+  // The one part of an existing chip being changed; null while a whole condition is built.
+  const editPart = ref<FilterBarStep | null>(null);
   const pendingConnector = ref<FilterConnector>("AND");
   const openGroupId = ref<string | null>(null);
   const armedId = ref<string | null>(null);
@@ -105,7 +105,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   let valueTimer: ReturnType<typeof setTimeout> | undefined;
   let valueRequest = 0;
 
-  const advanced = computed(() => mode.value === "advanced" && dialect.value === "sql");
+  const advanced = computed(() => dialect.value === "sql");
   const fieldMap = computed(() => new Map(fields.value.map((field) => [field.name, field])));
   const draftType = computed<FilterFieldType>(
     () => fieldMap.value.get(draft.value?.field ?? "")?.type ?? "string",
@@ -126,8 +126,14 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     step.value = "field";
     draft.value = null;
     editingId.value = null;
+    editPart.value = null;
     armedId.value = null;
   }
+
+  const editedNode = computed(() => {
+    const node = editingId.value ? findNode(tree.value, editingId.value) : undefined;
+    return node?.kind === "condition" ? node : undefined;
+  });
 
   const fieldSuggestions = computed<ChipInputSuggestion[]>(() => {
     const needle = text.value.trim();
@@ -152,6 +158,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         label: raw(name),
         detail: t(`filterBar.types.${type}`),
         icon: TYPE_ICONS[type],
+        selected: editPart.value === "field" && editedNode.value?.field === name,
       });
     }
     if (
@@ -197,6 +204,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
           key: op.id,
           label,
           detail: /^[a-z ]+$/.test(op.symbol) ? undefined : raw(op.symbol),
+          selected: editPart.value === "operator" && editedNode.value?.operator === op.id,
         };
       });
   });
@@ -242,13 +250,13 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return true;
   });
 
-  const header = computed<I18nText>(() => {
+  const searchPlaceholder = computed<I18nText>(() => {
     if (step.value === "operator")
-      return t("filterBar.pickOperator", { field: draft.value!.field });
+      return t("filterBar.searchOperators", { field: draft.value!.field });
     if (step.value === "value") {
-      return multiValue.value ? t("filterBar.pickValues") : t("filterBar.pickValue");
+      return multiValue.value ? t("filterBar.searchValues") : t("filterBar.searchValue");
     }
-    return t(dialect.value === "promql" ? "filterBar.pickLabel" : "filterBar.pickField");
+    return t(dialect.value === "promql" ? "filterBar.searchLabels" : "filterBar.searchFields");
   });
 
   async function fetchValues(field: string, search: string) {
@@ -310,14 +318,42 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         openGroupId.value,
       );
     }
+    const wasEditing = Boolean(editingId.value);
     pendingConnector.value = "AND";
     reset();
     options.commit(next);
-    open.value = true;
+    open.value = !wasEditing;
+  }
+
+  // A new condition keeps the chip's value when it still takes one.
+  function changeOperator(id: FilterOperatorId) {
+    const kept = draft.value!.values;
+    const arity = OPERATORS[id].arity;
+    const values = arity === "none" ? [] : arity === "one" ? kept.slice(0, 1) : kept;
+    draft.value = { ...draft.value!, operator: id, values };
+    text.value = "";
+    if (arity === "none" || values.length) return commitDraft();
+    editPart.value = null;
+    step.value = "value";
+  }
+
+  // A new field keeps the condition and value when the condition still fits its type.
+  function changeField(field: string) {
+    const current = draft.value!;
+    const fits = operatorsFor(fieldMap.value.get(field)?.type ?? "string", dialect.value).some(
+      (op) => op.id === current.operator,
+    );
+    if (fits) {
+      draft.value = { ...current, field };
+      return commitDraft();
+    }
+    editPart.value = null;
+    startDraft(field);
   }
 
   function pickOperator(id: FilterOperatorId) {
     if (!draft.value) return;
+    if (editPart.value === "operator") return changeOperator(id);
     draft.value = { ...draft.value, operator: id, values: [] };
     text.value = "";
     if (OPERATORS[id].arity === "none") commitDraft();
@@ -362,7 +398,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       draft.value = { field: "", operator: "match_all", values: [text.value.trim()] };
       return commitDraft();
     }
-    startDraft(key === CUSTOM_FIELD_KEY ? text.value.trim() : key);
+    const field = key === CUSTOM_FIELD_KEY ? text.value.trim() : key;
+    if (editPart.value === "field" && draft.value) return changeField(field);
+    startDraft(field);
   }
 
   function select(key: string) {
@@ -471,31 +509,39 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     if (draft.value) reset();
   }
 
-  function editCondition(id: string) {
+  function editCondition(id: string, part: FilterBarStep) {
     const node = findNode(tree.value, id);
     if (node?.kind !== "condition") return;
+    reset();
     editingId.value = id;
-    armedId.value = null;
+    values.value = [];
+    open.value = true;
     if (node.operator === "match_all") {
-      draft.value = null;
       step.value = "field";
       text.value = node.values[0] ?? "";
-      options.commit(removeNode(tree.value, id, openGroupId.value));
-      editingId.value = null;
-      open.value = true;
       return;
     }
     const arity = OPERATORS[node.operator].arity;
-    values.value = [];
+    const target: FilterBarStep = part === "value" && arity === "none" ? "operator" : part;
+    editPart.value = target;
+    step.value = target;
+    if (target !== "value") {
+      draft.value = {
+        field: node.field,
+        operator: target === "field" ? node.operator : null,
+        values: [...node.values],
+      };
+      return;
+    }
     draft.value = {
       field: node.field,
-      operator: arity === "none" ? null : node.operator,
+      operator: node.operator,
       values: arity === "many" ? [...node.values] : [],
     };
-    text.value = arity === "one" ? (node.values[0] ?? "") : "";
-    editedValue.value = arity === "one" ? (node.values[0] ?? "") : null;
-    step.value = arity === "none" ? "operator" : "value";
-    open.value = true;
+    if (arity === "one") {
+      text.value = node.values[0] ?? "";
+      editedValue.value = text.value;
+    }
   }
 
   function removeCondition(id: string) {
@@ -513,6 +559,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     step,
     draft,
     editingId,
+    editPart,
     pendingConnector,
     openGroupId,
     armedId,
@@ -520,7 +567,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     multiValue,
     suggestions,
     autoHighlight,
-    header,
+    searchPlaceholder,
     valuesLoading,
     targetGroup,
     select,

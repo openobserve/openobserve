@@ -15,23 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, nextTick, ref, toRef } from "vue";
+import { computed, ref, toRef, watch, type ComponentPublicInstance } from "vue";
 import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type { FilterTokenPart } from "@/lib/core/Badge/OFilterToken.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   countConditions,
   emptyFilterGroup,
-  needsAdvancedMode,
   OPERATORS,
   toggleConnector,
   type FilterGroup,
 } from "@/utils/query/filterBar";
 import FilterBarNodes from "./FilterBarNodes.vue";
-import { useFilterBarEditor, type FilterBarMode } from "./useFilterBarEditor";
+import { useFilterBarEditor } from "./useFilterBarEditor";
 import type {
   QueryFilterBarEmits,
   QueryFilterBarExpose,
@@ -40,8 +39,6 @@ import type {
 
 const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   dialect: "sql",
-  mode: "basic",
-  showModeToggle: true,
   freeText: false,
   allowCustomFields: false,
   loadValues: undefined,
@@ -55,12 +52,13 @@ const emit = defineEmits<QueryFilterBarEmits>();
 
 const { t } = useI18nTyped();
 const inputRef = ref<InstanceType<typeof OChipInput> | null>(null);
+const draftRef = ref<ComponentPublicInstance | null>(null);
+const editAnchor = ref<HTMLElement | null>(null);
 
 const editor = useFilterBarEditor({
   tree: toRef(props, "modelValue"),
   fields: toRef(props, "fields"),
   dialect: toRef(props, "dialect"),
-  mode: toRef(props, "mode"),
   freeText: toRef(props, "freeText"),
   allowCustomFields: toRef(props, "allowCustomFields"),
   loadValues: toRef(props, "loadValues"),
@@ -75,38 +73,32 @@ const {
   step,
   draft,
   editingId,
+  editPart,
   pendingConnector,
   openGroupId,
   armedId,
   advanced,
   suggestions,
   autoHighlight,
-  header,
+  searchPlaceholder,
   valuesLoading,
   targetGroup,
 } = editor;
 
-const editIndex = computed(() =>
-  editingId.value ? props.modelValue.items.findIndex((item) => item.id === editingId.value) : -1,
-);
-const itemsBefore = computed(() =>
-  editIndex.value >= 0 ? props.modelValue.items.slice(0, editIndex.value) : props.modelValue.items,
-);
-const itemsAfter = computed(() =>
-  editIndex.value >= 0 ? props.modelValue.items.slice(editIndex.value + 1) : [],
-);
-
 const hasFilters = computed(() => countConditions(props.modelValue) > 0);
-const basicBlocked = computed(() => needsAdvancedMode(props.modelValue));
+const newDraft = computed(() => (editingId.value ? null : draft.value));
 const showPendingConnector = computed(
   () => advanced.value && open.value && !editingId.value && targetGroup.value.items.length > 0,
 );
-const editedConnector = computed(() =>
-  advanced.value && editIndex.value > 0 ? props.modelValue.items[editIndex.value].connector : null,
-);
+
+// The picker opens under the part being changed, or under the half-built chip at the end of the bar.
+const anchor = computed<HTMLElement | null>(() => {
+  if (editingId.value) return editAnchor.value;
+  return (draftRef.value?.$el as HTMLElement | undefined) ?? null;
+});
 
 const placeholderText = computed(() => {
-  if (draft.value || props.modelValue.items.length) return undefined;
+  if (newDraft.value || props.modelValue.items.length) return undefined;
   return props.placeholder ?? t("filterBar.placeholder");
 });
 
@@ -124,28 +116,37 @@ const hint = computed(() => {
   return advanced.value ? t("filterBar.hintAdvanced") : t("filterBar.hintBasic");
 });
 
+watch(editingId, (id) => {
+  if (!id) editAnchor.value = null;
+});
+
 function focus() {
   inputRef.value?.focus();
 }
 
 defineExpose<QueryFilterBarExpose>({ focus });
 
-function onFocus() {
+function onActivate(typed: string) {
+  if (props.disabled) return;
+  if (editingId.value) editor.reset();
+  armedId.value = null;
   open.value = true;
   emit("focus");
+  if (typed) editor.onTextChange(typed);
 }
 
-function onBlur() {
+function close() {
   open.value = false;
   armedId.value = null;
-  // A half-built chip would otherwise linger looking applied, and an edited chip would stay hidden.
+  // A half-built chip would otherwise linger looking applied.
   editor.onEscape();
 }
 
-async function onEdit(id: string) {
-  editor.editCondition(id);
-  await nextTick();
-  inputRef.value?.focusSelect();
+function onEdit(id: string, part: FilterTokenPart, element: HTMLElement) {
+  if (props.disabled) return;
+  editAnchor.value = element;
+  editor.editCondition(id, part);
+  emit("focus");
 }
 
 function onRemove(id: string) {
@@ -159,7 +160,6 @@ function onToggleConnector(id: string) {
 
 function onTogglePending() {
   editor.setPendingConnector(pendingConnector.value === "AND" ? "OR" : "AND");
-  focus();
 }
 
 function clearAll() {
@@ -169,11 +169,10 @@ function clearAll() {
   focus();
 }
 
-function onModeChange(value: unknown) {
-  if (value !== "basic" && value !== "advanced") return;
-  if (value === "basic") openGroupId.value = null;
-  emit("update:mode", value as FilterBarMode);
-}
+const draftOperator = computed(() => {
+  const op = newDraft.value?.operator;
+  return op ? raw(OPERATORS[op].symbol) : undefined;
+});
 </script>
 
 <template>
@@ -182,14 +181,14 @@ function onModeChange(value: unknown) {
     :model-value="text"
     :open="open"
     :suggestions="suggestions"
-    :header="header"
+    :search-placeholder="searchPlaceholder"
+    :anchor="anchor"
     :empty-text="emptyText"
     :loading="step === 'value' ? valuesLoading : step === 'field' && fieldsLoading"
     :auto-highlight="autoHighlight"
     :placeholder="placeholderText"
     :aria-label="t('filterBar.ariaLabel')"
     :disabled="disabled"
-    :input-grow="editIndex < 0"
     :size="size"
     :data-test="dataTest"
     @update:model-value="editor.onTextChange"
@@ -197,27 +196,21 @@ function onModeChange(value: unknown) {
     @enter="editor.onEnter"
     @separator="editor.onSeparator"
     @backspace-empty="editor.onBackspace"
-    @escape="editor.onEscape"
-    @close="open = false"
-    @focus="onFocus"
-    @blur="onBlur"
+    @escape="close"
+    @close="close"
+    @activate="onActivate"
   >
     <FilterBarNodes
-      :items="itemsBefore"
-      :advanced="advanced"
+      :items="modelValue.items"
+      :connectors="advanced"
       :editing-id="editingId"
+      :edit-part="editPart"
       :armed-id="armedId"
       :open-group-id="openGroupId"
       :data-test="dataTest"
       @edit="onEdit"
       @remove="onRemove"
       @toggle-connector="onToggleConnector"
-    />
-    <OTag
-      v-if="editedConnector"
-      size="sm"
-      variant="default-outline"
-      :label="raw(editedConnector)"
     />
     <OTag
       v-if="showPendingConnector"
@@ -230,42 +223,16 @@ function onModeChange(value: unknown) {
       @mousedown.prevent
       @click.stop="onTogglePending"
     />
-    <template v-if="draft">
-      <OTag
-        v-if="draft.field"
-        size="sm"
-        variant="primary-outline"
-        :label="raw(draft.field)"
-        :data-test="`${dataTest}-draft-field`"
-      />
-      <OTag
-        v-if="draft.operator"
-        size="sm"
-        variant="primary-outline"
-        :label="raw(OPERATORS[draft.operator].symbol)"
-        :data-test="`${dataTest}-draft-operator`"
-      />
-      <OTag
-        v-for="value in draft.values"
-        :key="value"
-        size="sm"
-        variant="primary-soft"
-        :label="raw(value)"
-      />
-    </template>
-    <template #after>
-      <FilterBarNodes
-        :items="itemsAfter"
-        :advanced="advanced"
-        :offset="editIndex + 1"
-        :armed-id="armedId"
-        :open-group-id="openGroupId"
-        :data-test="dataTest"
-        @edit="onEdit"
-        @remove="onRemove"
-        @toggle-connector="onToggleConnector"
-      />
-    </template>
+    <OFilterToken
+      v-if="newDraft?.field"
+      ref="draftRef"
+      :field="raw(newDraft.field)"
+      :operator="draftOperator"
+      :value="newDraft.values.length ? raw(newDraft.values.join(', ')) : undefined"
+      :active-part="step"
+      :editable="false"
+      :data-test="`${dataTest}-draft`"
+    />
     <template #trailing>
       <OButton
         v-if="hasFilters"
@@ -277,29 +244,6 @@ function onModeChange(value: unknown) {
         @mousedown.prevent
         @click.stop="clearAll"
       />
-      <OToggleGroup
-        v-if="showModeToggle && dialect === 'sql'"
-        type="single"
-        :model-value="mode"
-        :data-test="`${dataTest}-mode`"
-        @update:model-value="onModeChange"
-      >
-        <OToggleGroupItem
-          value="basic"
-          size="xs"
-          :disabled="basicBlocked && mode === 'advanced'"
-          :tooltip="basicBlocked ? t('filterBar.basicBlocked') : t('filterBar.basicTooltip')"
-          :data-test="`${dataTest}-mode-basic`"
-          >{{ t("filterBar.basic") }}</OToggleGroupItem
-        >
-        <OToggleGroupItem
-          value="advanced"
-          size="xs"
-          :tooltip="t('filterBar.advancedTooltip')"
-          :data-test="`${dataTest}-mode-advanced`"
-          >{{ t("filterBar.advanced") }}</OToggleGroupItem
-        >
-      </OToggleGroup>
     </template>
     <template #footer>{{ hint }}</template>
   </OChipInput>
