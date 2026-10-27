@@ -8254,6 +8254,17 @@
     "exampleCharts": "Exemples de graphiques",
     "namePlaceholder": "Panneau sans titre",
     "renameHint": "Cliquez pour renommer ce panneau",
+    "variableSuggestion": {
+      "queryValues": "Valeurs de requête",
+      "constant": "Constante",
+      "textbox": "Zone de texte",
+      "custom": "Personnalisé",
+      "list": "{type} · {example}",
+      "csv": "Virgules : {example}",
+      "pipe": "Barres verticales : {example}",
+      "doublequote": "Guillemets doubles : {example}",
+      "singlequote": "Guillemets simples : {example}"
+    },
     "add": "Ajouter un panneau",
     "save": "Sauver",
     "cancel": "Annuler",

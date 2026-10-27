@@ -8254,6 +8254,17 @@
     "exampleCharts": "サンプルチャート",
     "namePlaceholder": "無題のパネル",
     "renameHint": "クリックしてこのパネルの名前を変更",
+    "variableSuggestion": {
+      "queryValues": "クエリ値",
+      "constant": "定数",
+      "textbox": "テキストボックス",
+      "custom": "カスタム",
+      "list": "{type} · {example}",
+      "csv": "カンマ区切り: {example}",
+      "pipe": "パイプ区切り: {example}",
+      "doublequote": "二重引用符: {example}",
+      "singlequote": "単一引用符: {example}"
+    },
     "add": "パネルを追加",
     "save": "保存",
     "cancel": "キャンセル",
