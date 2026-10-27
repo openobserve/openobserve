@@ -236,6 +236,16 @@ describe("TelephonySettings", () => {
       expect(document.body.textContent).toContain("Disconnect Twilio?");
       expect(document.body.textContent).toContain(expected);
     });
+
+    it("names the account in bold and uses a red Disconnect button", async () => {
+      await render(CONNECTED);
+      await click("disconnect");
+      const name = document.querySelector('[data-test="confirm-dialog-name"]');
+      expect(name?.textContent).toBe("ACte…0001");
+      expect(document.body.textContent).toContain("This disconnects the ACte…0001 account.");
+      const ok = document.querySelector('[data-test="o-dialog-primary-btn"]');
+      expect(ok?.className).toContain("bg-button-destructive");
+    });
   });
 
   describe("A10: the server is the only gate", () => {

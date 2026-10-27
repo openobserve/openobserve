@@ -16,6 +16,11 @@
 import { computed } from "vue";
 import { generateLabelFromName } from "@/utils/dashboard/fieldLabel";
 import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+import {
+  HOSTMAP_MAX_GROUP_LEVELS,
+  HOSTMAP_NUMERIC_Y_FUNCTION,
+} from "@/utils/dashboard/convertHostmapData";
+import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 
 const colors = [
   "#5960b2",
@@ -61,6 +66,7 @@ export const usePanelFields = ({
       case "heatmap":
       case "gauge":
       case "state-timeline":
+      case "hostmap":
       case "area":
       case "bar":
       case "h-bar":
@@ -103,6 +109,11 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
         );
+      case "hostmap":
+        return (
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= HOSTMAP_MAX_GROUP_LEVELS
+        );
       case "table":
         // Allow up to 3 breakdown fields for table charts
         return (
@@ -131,6 +142,7 @@ export const usePanelFields = ({
       case "area-stacked":
       case "heatmap":
       case "state-timeline":
+      case "hostmap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -306,6 +318,12 @@ export const usePanelFields = ({
     updateArrayAlias();
   };
 
+  const isNumericStreamField = (row: { name: string; streamAlias?: string }) =>
+    isNumericYField(
+      { args: [{ type: "field", value: { field: row.name, streamAlias: row.streamAlias } }] },
+      dashboardPanelData,
+    );
+
   const addYAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y) {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
@@ -335,7 +353,9 @@ export const usePanelFields = ({
           ? null
           : dashboardPanelData.data.type == "state-timeline"
             ? STATE_TIMELINE_Y_FUNCTION
-            : "count",
+            : dashboardPanelData.data.type == "hostmap" && isNumericStreamField(row)
+              ? HOSTMAP_NUMERIC_Y_FUNCTION
+              : "count",
       args: [
         {
           type: "field",

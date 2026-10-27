@@ -366,6 +366,12 @@ describe("ExternalAlertSourcesList", () => {
     (wrapper.vm as any).confirmDelete(target);
     expect((wrapper.vm as any).deleteTarget).toEqual(target);
     expect((wrapper.vm as any).deleteDialogVisible).toBe(true);
+    await flushPromises();
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("messageKeypath") === "alert_sources.deleteConfirmMessage");
+    expect(dialog!.props("messageName")).toBe("grafana-staging");
+    expect(dialog!.props("okVariant")).toBe("destructive");
   });
 
   it("doDelete calls alertSources.delete with the target id and refreshes the list", async () => {

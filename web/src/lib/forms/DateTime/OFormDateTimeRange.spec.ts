@@ -17,7 +17,12 @@ import OFormDateTimeRange from "./OFormDateTimeRange.vue";
 // an on:date-change with a controllable payload.
 const DateTimeStub = defineComponent({
   name: "DateTime",
-  props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
+  props: {
+    defaultType: String,
+    defaultAbsoluteTime: Object,
+    defaultRelativeTime: String,
+    calendarPresets: { type: Boolean, default: false },
+  },
   emits: ["on:date-change"],
   setup(props, { emit }) {
     // captured ONCE — does not react to later prop changes (only a remount updates it)
@@ -58,6 +63,13 @@ describe("OFormDateTimeRange", () => {
       timerange: { type: "relative", period: "1h", from: 0, to: 0 },
     });
     expect(wrapper.find('[data-test="dt-stub"]').text()).toBe("relative|1h");
+  });
+
+  it("keeps the report picker free of calendar presets", () => {
+    wrapper = mountForm({
+      timerange: { type: "relative", period: "1h", from: 0, to: 0 },
+    });
+    expect(wrapper.findComponent(DateTimeStub).props("calendarPresets")).toBe(false);
   });
 
   it("translates on:date-change into the form's timerange object", async () => {

@@ -663,6 +663,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   isSimpleSelectAllQuery,
@@ -2111,7 +2112,7 @@ export default defineComponent({
       emit(
         "sendToAiChat",
         raw(
-          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod ? describePeriod(searchObj.data.datetime.relativeTimePeriod) : "custom"}. Can you help me adjust the filter to get results?`,
         ),
         false,
       );

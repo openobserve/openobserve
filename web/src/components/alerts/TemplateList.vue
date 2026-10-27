@@ -316,7 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_templates.deleteTemplateTitle')"
-      :message="t('alert_templates.deleteTemplateMessage')"
+      message-keypath="alert_templates.deleteTemplateMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
@@ -325,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_templates.deleteTemplatesTitle')"
       :message="t('alerts.confirmDeleteTemplates', { count: selectedTemplates.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteTemplates"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

@@ -86,6 +86,13 @@ const i18n = createI18n({
 // without coupling the low-level OTag component to this module graph.
 setBadgeTranslator((key: string) => i18n.global.t(key as never));
 
+/** BCP 47 tag of the active UI language, for Intl date formatting outside a component. */
+export const getIntlLocale = (): string => {
+  const active: unknown = i18n.global.locale;
+  const code = typeof active === "string" ? active : (active as { value?: unknown } | null)?.value;
+  return localeFileMap[String(code)] ?? "en-US";
+};
+
 type LocaleMessageSchema = Parameters<typeof i18n.global.setLocaleMessage>[1];
 
 const localeLoaders = import.meta.glob<{ default: LocaleMessageSchema }>("./languages/*.json");

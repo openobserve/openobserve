@@ -398,6 +398,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
+    :message-keypath="confirmDialogMeta.messageKeypath"
+    :message-name="confirmDialogMeta.messageName"
+    :ok-variant="confirmDialogMeta.okVariant"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
@@ -694,6 +697,9 @@ const confirmDialogMeta: any = ref({
   show: false,
   title: "",
   message: "",
+  messageKeypath: undefined,
+  messageName: "",
+  okVariant: undefined,
   data: null,
   onConfirm: () => {},
 });
@@ -1134,7 +1140,10 @@ const editPipeline = (pipeline: any) => {
 const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = t("pipeline.deletePipelineConfirm");
+  confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.messageKeypath = "pipeline.deletePipelineConfirm";
+  confirmDialogMeta.value.messageName = pipeline.name;
+  confirmDialogMeta.value.okVariant = "destructive";
   confirmDialogMeta.value.onConfirm = deletePipeline;
   confirmDialogMeta.value.data = pipeline;
 };
@@ -1217,6 +1226,9 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
   confirmDialogMeta.value.title = "";
   confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.messageKeypath = undefined;
+  confirmDialogMeta.value.messageName = "";
+  confirmDialogMeta.value.okVariant = undefined;
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
@@ -1438,6 +1450,8 @@ const openBulkDeleteDialog = () => {
   confirmDialogMeta.value.message = t("pipeline.confirmBulkDeleteMsg", {
     count: selectedPipelines.value.length,
   });
+  confirmDialogMeta.value.messageKeypath = undefined;
+  confirmDialogMeta.value.okVariant = "destructive";
   confirmDialogMeta.value.onConfirm = bulkDeletePipelines;
   confirmDialogMeta.value.data = null;
 };

@@ -179,7 +179,7 @@ export class AlertsPage {
             alertUpdatedMessage: 'Alert updated successfully.',
             alertClonedMessage: 'Alert Cloned Successfully',
             alertDeletedMessage: 'Alert deleted',
-            deleteConfirmText: 'Are you sure you want to delete this alert?',
+            deleteConfirmText: /Are you sure you want to delete the .+ alert\?/,
             deleteButtonText: 'Delete',
             containsOperatorText: 'Contains',
             arrowDropDownText: 'arrow_drop_down',
