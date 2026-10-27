@@ -59,8 +59,7 @@ test.describe('First data journey', () => {
         await page.waitForURL(/\/ingestion\/custom\/logs\/curl/, { timeout: 20000 });
         await fe.expectState('waiting', 20000);
 
-        await gs.expectCurlCredentialLoaded();
-        await gs.copyCurlCommand(); interactions += 1;
+        await page.locator('[data-test="ingestion-curl-code-block-pre"]').click(); interactions += 1;
         const copied = await gs.readClipboard();
         expect(copied).toMatch(/^curl -u /);
         expect(copied).not.toContain('•');

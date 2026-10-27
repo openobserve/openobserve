@@ -115,13 +115,6 @@
       "web/src/services/query_functions.*",
       "tests/ui-testing/pages/functionsPages/**"
     ],
-    "Onboarding": [
-      "web/src/components/login/GetStarted*",
-      "web/src/components/login/firstSourceOptions*",
-      "web/src/components/ingestion/**",
-      "web/src/lib/core/Code/**",
-      "tests/ui-testing/pages/generalPages/**"
-    ],
     "GeneralTests": [
       "web/src/components/login/**",
       "web/src/components/about/**",

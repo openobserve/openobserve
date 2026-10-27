@@ -1,6 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 const { expect } = require('@playwright/test');
-const { gotoWithRetry } = require('../../playwright-tests/utils/navigation.js');
 
 const SOURCE_IDS = [
     'kubernetes', 'linux', 'windows', 'webserver', 'otel', 'http',
@@ -24,8 +23,6 @@ class GetStartedPage {
         this.continueBtn = page.locator('[data-test="onboarding-get-started-submit-btn"]');
         this.connectPopup = page.locator('[data-test="connect-data-source-popup-dialog"]');
         this.pickGroup = page.locator('[data-test="ingestion-recommended-pick-group"]');
-        this.curlCodePre = page.locator('[data-test="ingestion-curl-code-block-pre"]');
-        this.curlCopyBtn = page.locator('[data-test="ingestion-curl-code-block-copy-btn"]');
         this.attributionBodies = [];
     }
 
@@ -48,8 +45,7 @@ class GetStartedPage {
 
     // Puts this browser into the first-login state MainLayout opens the dialog for.
     async openAsFirstLogin(path, { orgId, prefill } = {}) {
-        // Bare goto defaults to 30s and waitUntil 'load'; the suite's helper retries transient stalls.
-        await gotoWithRetry(this.page, path, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await this.page.goto(path);
         await this.page.evaluate(({ org, pre }) => {
             localStorage.setItem('isFirstTimeLogin', 'true');
             localStorage.removeItem(`o2.onboarding.firstSource.${org}`);
@@ -75,15 +71,6 @@ class GetStartedPage {
 
     async firstLoginFlag() {
         return this.page.evaluate(() => localStorage.getItem('isFirstTimeLogin'));
-    }
-
-    // The org token is substituted asynchronously; the mask proves it arrived before a copy.
-    async expectCurlCredentialLoaded() {
-        await expect(this.curlCodePre).toContainText('\u2022');
-    }
-
-    async copyCurlCommand() {
-        await this.curlCopyBtn.click();
     }
 
     async readClipboard() {

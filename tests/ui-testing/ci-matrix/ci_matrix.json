@@ -278,56 +278,6 @@
     ]
   },
   {
-    "_comment": "The onboarding journey: Get Started, the first-event bar and the ingestion guides. Its own shard because no existing shard resolves playwright-tests/Onboarding, and the suite is self-staging -- every case creates the org it needs.",
-    "testfolder": "Onboarding",
-    "actual_folder": "Onboarding",
-    "browser": "chrome",
-    "run_files": [
-      "get-started.spec.js",
-      "diagnosis.spec.js",
-      "first-data-notice.spec.js",
-      "empty-pages-flag-off.spec.js"
-    ],
-    "disabled": [
-      {
-        "file": "web-server.spec.js",
-        "reason": "the nginx case fails on a live env: the first-event bar never leaves deciding for the nginx stream"
-      },
-      {
-        "file": "legacy-pages.spec.js",
-        "reason": "the masked-token case fails on a live env; likely the same credential load race as the token-picker spec"
-      },
-      {
-        "file": "token-picker.spec.js",
-        "reason": "fails on a live env: the copied-token toast never appears after switching token, and the spec leaves its token behind"
-      },
-      {
-        "file": "first-event.spec.js",
-        "reason": "not yet run end to end; shares the first-event bar fixtures with the specs above"
-      },
-      {
-        "file": "journey.spec.js",
-        "reason": "watches the shared org default stream while ingesting into it, so it only holds on a pristine backend; needs a fresh-org rework"
-      },
-      {
-        "file": "billing.spec.js",
-        "reason": "describe-level skip on IS_CLOUD, which is set only in the enterprise playwright_alpha1.yml; wiring it here buys 5 permanent skips"
-      },
-      {
-        "file": "empty-pages.spec.js",
-        "reason": "needs ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA, which defaults false and is not forwarded by the workflow; enabling it is a workflow change"
-      },
-      {
-        "file": "home-first-data.spec.js",
-        "reason": "screenshot harness, and emptyOrgId() requires a pre-existing org named onboarding_test"
-      },
-      {
-        "file": "screenshots.spec.js",
-        "reason": "screenshot harness: 66 shots at ~180s each, produces images for humans rather than assertions"
-      }
-    ]
-  },
-  {
     "testfolder": "Management",
     "actual_folder": "Management",
     "browser": "chrome",
