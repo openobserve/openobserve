@@ -615,3 +615,5 @@ zstd = "0.13"
 [patch.crates-io]
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
 sqlparser = { git = "https://github.com/openobserve/sqlparser-rs", branch = "0.62.0-patch" }
+# crates.io 3.5.0 reads past short inputs via _mm_loadu_si128 and trips debug UB checks on x86; 3.5.0-fix adds ogxd/gxhash#118 with unchanged hashes
+gxhash = { git = "https://github.com/openobserve/gxhash", branch = "3.5.0-fix" }
