@@ -424,6 +424,7 @@ import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
+import { isFlowChart, isHtmlPanel } from "@/utils/dashboard/chartTypeGroups";
 
 const props = defineProps<{
   editMode?: boolean;
@@ -1028,7 +1029,8 @@ function showStandardActions(row: FieldItem): boolean {
     chartType === "geomap" ||
     chartType === "maps" ||
     chartType === "custom_chart" ||
-    chartType === "sankey"
+    isFlowChart(chartType) ||
+    isHtmlPanel(chartType)
   ) {
     return false;
   }
@@ -1072,7 +1074,7 @@ function showSankeyActions(row: FieldItem): boolean {
     return false;
   }
 
-  return dashboardPanelData.data.type === "sankey";
+  return isFlowChart(dashboardPanelData.data.type);
 }
 
 // ── Stream list fetch ──────────────────────────────────────────────────

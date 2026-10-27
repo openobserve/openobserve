@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-              .stream_type == 'metrics'
+              .stream_type == 'metrics' && !isCustomSqlPanel(dashboardPanelData.data.type)
           "
           value="promql"
           size="sm"
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem
           v-if="
             dashboardPanelData.data.type != 'custom_chart' &&
+            !isCustomSqlPanel(dashboardPanelData.data.type) &&
             !isFormulaQuery(
               dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex],
             )
@@ -88,6 +89,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
 import { promqlToBuilder } from "@/components/promql/astToBuilder";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import { normalizeSteps } from "@/components/promql/types";
@@ -136,7 +138,10 @@ export default defineComponent({
         ? "custom"
         : "builder";
 
-      if (dashboardPanelData.data.type == "custom_chart") {
+      if (
+        dashboardPanelData.data.type == "custom_chart" ||
+        isCustomSqlPanel(dashboardPanelData.data.type)
+      ) {
         // For custom_chart, check the actual query type and customQuery flag
         selectedButtonType.value = "custom";
         await nextTick();
@@ -158,6 +163,15 @@ export default defineComponent({
     onMounted(async () => {
       initializeSelectedButtonType();
     });
+
+    // The editor stays mounted across these type switches, so the toggles follow the reset query.
+    watch(
+      () => dashboardPanelData.data.type,
+      (type, oldType) => {
+        if (isCustomSqlPanel(type) || isCustomSqlPanel(oldType)) initializeSelectedButtonType();
+      },
+      { flush: "post" },
+    );
 
     // onActivated(async () => {
     //     initializeSelectedButtonType()
@@ -381,6 +395,7 @@ export default defineComponent({
         if (streamType !== "metrics") return;
         if (dashboardPanelData.data.queryType === "promql") return;
         if (dashboardPanelData.data.type === "custom_chart") return;
+        if (isCustomSqlPanel(dashboardPanelData.data.type)) return;
 
         const query = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
         if (!query) return;
@@ -497,6 +512,7 @@ export default defineComponent({
       store,
       selectedButtonQueryType,
       isFormulaQuery,
+      isCustomSqlPanel,
     };
   },
   components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, OIcon },

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
+  <div v-if="!promqlMode && isFlowChart(dashboardPanelData.data.type)">
     <!-- source container -->
     <div class="flex flex-row ps-3">
       <div class="layout-name flex min-w-20 items-center whitespace-nowrap">
@@ -425,6 +425,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
@@ -678,6 +679,7 @@ export default defineComponent({
     });
 
     return {
+      isFlowChart,
       t,
       dashboardPanelData,
       showJoinsAndFilters,
