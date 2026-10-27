@@ -80,9 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-heatmap-no-position"
           />
           <div class="flex p-4">
-            <div class="mx-auto shrink-0">
+            <div ref="fitRef" class="mx-auto shrink-0 overflow-hidden">
               <OSpinner v-if="snapshotLoading" size="lg" data-test="rum-heatmap-snapshot-loading" />
-              <div v-show="snapshotReady" ref="stageRef" data-test="rum-heatmap-stage" />
+              <div
+                v-show="snapshotReady"
+                ref="stageRef"
+                class="origin-top-left [&_.replayer-mouse]:hidden [&_.replayer-mouse-tail]:hidden"
+                data-test="rum-heatmap-stage"
+              />
             </div>
           </div>
         </div>
@@ -205,6 +210,8 @@ const UNUSED_LABEL_MAX = 40;
 const INTERACTIVE_SELECTOR =
   'button, a[href], input:not([type="hidden"]), select, textarea, [role="button"]';
 const SNAPSHOT_WAIT_MS = 8000;
+const MAX_REPLAY_SEGMENTS = 80;
+const MAX_SNAPSHOT_LOOKUP_ROWS = 500;
 const SETTLE_MS = 400;
 const FULL_SNAPSHOT = 2;
 const META = 4;
@@ -227,6 +234,10 @@ const snapshotError = ref<I18nText | null>(null);
 const loadError = ref<I18nText | null>(null);
 const stageRef = ref<HTMLElement | null>(null);
 const scrollerRef = ref<HTMLElement | null>(null);
+const fitRef = ref<HTMLElement | null>(null);
+let stageScale = 1;
+let pageSize = { width: 0, height: 0 };
+let resizeObserver: ResizeObserver | null = null;
 const selectedSelector = ref("");
 const capped = ref(false);
 
@@ -466,32 +477,35 @@ async function loadClicks(token: number) {
 
 const isSnapshotFlag = (v: unknown) => v === true || v === "true" || Number(v) === 1;
 
-async function findSnapshotSegment(): Promise<any | null> {
+interface SnapshotSource {
+  events: any[];
+  seekMs: number;
+}
+
+async function pickReplayView(): Promise<string | null> {
+  const stream = await getStream("_rumdata", "logs", true);
+  const hasActions = (stream?.schema ?? []).some((f: any) => f?.name === "view_action_count");
   const views = await runSql(
-    `SELECT view_id, max(${tsField()}) AS t FROM "_rumdata" WHERE type = 'view' AND view_url = '${sqlText(pageUrl.value)}'${await viewportClause()} GROUP BY view_id ORDER BY t DESC LIMIT 30`,
+    `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE type = 'view' AND view_url = '${sqlText(pageUrl.value)}'${await viewportClause()} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
     30,
     SNAPSHOT_LOOKBACK_HOURS,
   );
   if (!views.length) return null;
   const ids = views.map((v) => `'${sqlText(String(v.view_id))}'`).join(",");
   const rows = await runSql(
-    `SELECT start, has_full_snapshot, view_id FROM "_sessionreplay" WHERE view_id IN (${ids}) ORDER BY start DESC`,
-    500,
+    `SELECT has_full_snapshot, view_id FROM "_sessionreplay" WHERE view_id IN (${ids})`,
+    MAX_SNAPSHOT_LOOKUP_ROWS,
     SNAPSHOT_LOOKBACK_HOURS,
   );
-  const row = rows.find((r) => isSnapshotFlag(r.has_full_snapshot));
-  if (!row) return null;
-  const [body] = await runSql(
-    `SELECT segment FROM "_sessionreplay" WHERE view_id = '${sqlText(String(row.view_id))}' AND start = ${Number(row.start)} LIMIT 1`,
-    1,
-    SNAPSHOT_LOOKBACK_HOURS,
+  const withSnapshot = new Set(
+    rows.filter((r) => isSnapshotFlag(r.has_full_snapshot)).map((r) => String(r.view_id)),
   );
-  return body ?? null;
+  const best = views.find((v) => withSnapshot.has(String(v.view_id)));
+  return best ? String(best.view_id) : null;
 }
 
-function snapshotEvents(hit: any): any[] {
-  const body = JSON.parse(hit.segment);
-  const { events } = createMultiViewDecoder().push([body], Infinity);
+function decodeReplayEvents(bodies: any[]): any[] {
+  const { events } = createMultiViewDecoder().push(bodies, Infinity);
   let href: unknown;
   return events.map((e: any) => {
     if (e.type === 8) return { ...e, type: 5, data: { payload: { ...e.data }, tag: "viewport" } };
@@ -501,22 +515,51 @@ function snapshotEvents(hit: any): any[] {
   });
 }
 
+// The first snapshot is taken at page load, before an app has drawn its content, so play on to when people clicked.
+async function loadSnapshotSource(): Promise<SnapshotSource | null> {
+  const viewId = await pickReplayView();
+  if (!viewId) return null;
+  const segments = await runSql(
+    `SELECT start, segment FROM "_sessionreplay" WHERE view_id = '${sqlText(viewId)}' ORDER BY start ASC`,
+    MAX_REPLAY_SEGMENTS,
+    SNAPSHOT_LOOKBACK_HOURS,
+  );
+  const bodies = segments.flatMap((r) => {
+    try {
+      return [JSON.parse(r.segment)];
+    } catch {
+      return [];
+    }
+  });
+  const events = decodeReplayEvents(bodies);
+  if (!events.length) return null;
+  const first = Number(events[0].timestamp);
+  const last = Number(events[events.length - 1].timestamp);
+  const [lastClick] = await runSql(
+    `SELECT max(date) AS d FROM "_rumdata" WHERE type = 'action' AND view_id = '${sqlText(viewId)}'`,
+    1,
+    SNAPSHOT_LOOKBACK_HOURS,
+  );
+  const clickAt = Number(lastClick?.d);
+  const target = Number.isFinite(clickAt) && clickAt > first ? clickAt : last;
+  return { events, seekMs: Math.min(Math.max(target - first, 0), Math.max(last - first, 0)) };
+}
+
 async function loadSnapshot(token: number) {
   snapshotLoading.value = true;
   snapshotReady.value = false;
   try {
-    const hit = await findSnapshotSegment();
+    const source = await loadSnapshotSource();
     if (token !== loadToken) return;
-    const events = hit ? snapshotEvents(hit) : [];
-    const meta = events.find((e) => e.type === META);
-    if (!events.some((e) => e.type === FULL_SNAPSHOT) || !meta) {
+    const meta = source?.events.find((e) => e.type === META);
+    if (!source || !source.events.some((e) => e.type === FULL_SNAPSHOT) || !meta) {
       snapshotError.value = t("rum.heatmap.noReplay");
       return;
     }
     snapshotReady.value = true;
     await nextTick();
     if (token !== loadToken || !stageRef.value) return;
-    await mountPlayer(events, meta.data.width, meta.data.height, token);
+    await mountPlayer(source, meta.data.width, meta.data.height, token);
   } catch (error) {
     if (token !== loadToken) return;
     console.error("Click heatmap: snapshot failed", error);
@@ -527,7 +570,7 @@ async function loadSnapshot(token: number) {
   }
 }
 
-async function mountPlayer(events: any[], width: number, height: number, token: number) {
+async function mountPlayer(source: SnapshotSource, width: number, height: number, token: number) {
   const module: any = await import("@openobserve/rrweb-player");
   await import("@openobserve/rrweb-player/dist/style.css");
   if (token !== loadToken || !stageRef.value) return;
@@ -536,7 +579,7 @@ async function mountPlayer(events: any[], width: number, height: number, token: 
     new Player({
       target: stageRef.value as HTMLElement,
       props: {
-        events,
+        events: source.events,
         autoPlay: false,
         showController: false,
         mouseTail: false,
@@ -548,6 +591,9 @@ async function mountPlayer(events: any[], width: number, height: number, token: 
     }),
   );
   await waitForSnapshotDom(token);
+  if (token !== loadToken) return;
+  player.goto(source.seekMs, false);
+  await new Promise((r) => setTimeout(r, SETTLE_MS));
 }
 
 // The replayer rebuilds the first snapshot on a timer after construction, so the iframe is empty until then.
@@ -555,10 +601,7 @@ async function waitForSnapshotDom(token: number) {
   const deadline = performance.now() + SNAPSHOT_WAIT_MS;
   while (token === loadToken && performance.now() < deadline) {
     const body = frameDoc()?.doc.body;
-    if (body && body.childElementCount > 0) {
-      await new Promise((r) => setTimeout(r, SETTLE_MS));
-      return;
-    }
+    if (body && body.childElementCount > 0) return;
     await new Promise((r) => setTimeout(r, 50));
   }
   if (token === loadToken) throw new Error("snapshot did not render");
@@ -597,7 +640,25 @@ function growToFullPage(frame: { doc: Document; wrapper: HTMLElement; iframe: HT
     // Must match the iframe's px height attribute exactly.
     box?.style.setProperty("height", `${full}px`);
   }
+  pageSize = {
+    width: Number(frame.iframe.width) || frame.doc.documentElement.scrollWidth,
+    height: full,
+  };
+  fitStage();
   return full;
+}
+
+// Shrinks a wide page to the pane so the whole width is visible without sideways scrolling.
+function fitStage() {
+  const scroller = scrollerRef.value;
+  const fit = fitRef.value;
+  const stage = stageRef.value;
+  if (!scroller || !fit || !stage || !pageSize.width) return;
+  const gutter = 2 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+  stageScale = Math.min(1, (scroller.clientWidth - gutter) / pageSize.width);
+  stage.style.setProperty("transform", `scale(${stageScale})`);
+  fit.style.setProperty("width", `${pageSize.width * stageScale}px`);
+  fit.style.setProperty("height", `${pageSize.height * stageScale}px`);
 }
 
 function ensureOverlay(frame: { wrapper: HTMLElement }, width: number, height: number) {
@@ -703,9 +764,21 @@ function onRowClick(row: ElementRow) {
     stageRef.value.getBoundingClientRect().top -
     scroller.getBoundingClientRect().top +
     scroller.scrollTop;
-  scroller.scrollTo({ top: stageTop + rect.y - OUTLINE_SCROLL_MARGIN, behavior: "smooth" });
+  scroller.scrollTo({
+    top: stageTop + rect.y * stageScale - OUTLINE_SCROLL_MARGIN,
+    behavior: "smooth",
+  });
 }
 
-onMounted(loadPages);
-onBeforeUnmount(destroyPlayer);
+onMounted(() => {
+  loadPages();
+  if (scrollerRef.value) {
+    resizeObserver = new ResizeObserver(fitStage);
+    resizeObserver.observe(scrollerRef.value);
+  }
+});
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  destroyPlayer();
+});
 </script>
