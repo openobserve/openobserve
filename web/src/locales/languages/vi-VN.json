@@ -8254,6 +8254,17 @@
     "exampleCharts": "Biểu đồ mẫu",
     "namePlaceholder": "Panel không có tiêu đề",
     "renameHint": "Nhấp để đổi tên panel này",
+    "variableSuggestion": {
+      "queryValues": "Giá trị truy vấn",
+      "constant": "Hằng số",
+      "textbox": "Hộp văn bản",
+      "custom": "Tùy chỉnh",
+      "list": "{type} · {example}",
+      "csv": "Dấu phẩy: {example}",
+      "pipe": "Dấu gạch đứng: {example}",
+      "doublequote": "Dấu nháy kép: {example}",
+      "singlequote": "Dấu nháy đơn: {example}"
+    },
     "add": "Thêm Panel",
     "save": "Lưu",
     "cancel": "Hủy",

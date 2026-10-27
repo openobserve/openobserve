@@ -8254,6 +8254,17 @@
     "exampleCharts": "Exemplos de gráficos",
     "namePlaceholder": "Painel sem título",
     "renameHint": "Clique para renomear este painel",
+    "variableSuggestion": {
+      "queryValues": "Valores de consulta",
+      "constant": "Constante",
+      "textbox": "Caixa de texto",
+      "custom": "Personalizado",
+      "list": "{type} · {example}",
+      "csv": "Vírgulas: {example}",
+      "pipe": "Barras verticais: {example}",
+      "doublequote": "Aspas duplas: {example}",
+      "singlequote": "Aspas simples: {example}"
+    },
     "add": "Adicionar painel",
     "save": "Guardar",
     "cancel": "Cancelar",

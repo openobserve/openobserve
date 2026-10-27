@@ -8254,6 +8254,17 @@
     "exampleCharts": "Beispieldiagramme",
     "namePlaceholder": "Unbenanntes Panel",
     "renameHint": "Klicken, um dieses Panel umzubenennen",
+    "variableSuggestion": {
+      "queryValues": "Abfragewerte",
+      "constant": "Konstante",
+      "textbox": "Textfeld",
+      "custom": "Benutzerdefiniert",
+      "list": "{type} · {example}",
+      "csv": "Kommas: {example}",
+      "pipe": "Pipes: {example}",
+      "doublequote": "Doppelte Anführungszeichen: {example}",
+      "singlequote": "Einfache Anführungszeichen: {example}"
+    },
     "add": "Panel hinzufügen",
     "save": "Speichern",
     "cancel": "Abbrechen",

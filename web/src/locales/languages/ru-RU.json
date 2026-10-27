@@ -8254,6 +8254,17 @@
     "exampleCharts": "Примеры графиков",
     "namePlaceholder": "Панель без названия",
     "renameHint": "Нажмите, чтобы переименовать эту панель",
+    "variableSuggestion": {
+      "queryValues": "Значения запроса",
+      "constant": "Константа",
+      "textbox": "Текстовое поле",
+      "custom": "Пользовательский",
+      "list": "{type} · {example}",
+      "csv": "Запятые: {example}",
+      "pipe": "Вертикальные черты: {example}",
+      "doublequote": "Двойные кавычки: {example}",
+      "singlequote": "Одинарные кавычки: {example}"
+    },
     "add": "Добавить панель",
     "save": "Сохранить",
     "cancel": "Отмена",
