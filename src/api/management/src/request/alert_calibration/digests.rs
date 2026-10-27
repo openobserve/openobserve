@@ -371,8 +371,7 @@ mod tests {
 
     #[test]
     fn digests_stay_gated_while_search_is_blocked() {
-        // OTLP log ingest accepts customer writes into this name, so it must never join the
-        // allowlist
+        // OTLP ingest accepts customer writes here, so it must never join the allowlist
         assert!(!search_service::is_operational_stream(DIGEST_STREAM));
     }
 }

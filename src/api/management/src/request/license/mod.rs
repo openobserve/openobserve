@@ -704,6 +704,7 @@ mod tests {
     const INSTANCE_ID: &str = "license-instance-7f3a";
     const VALIDATOR_AUTH: &str = "dmFsaWRhdG9yOnMzY3JldA-auth";
     const OTHER_INSTANCE_ID: &str = "license-instance-other-9c1d";
+    const STORE_ROOT: &str = "lw-store-root@store.test";
 
     fn scoped_waiver_json(id: &str, installation_id: &str) -> json::Value {
         json::json!({
@@ -1273,8 +1274,6 @@ mod tests {
         assert!(query("http://o2/api/license?dry_run=true"));
         assert!(!StoreLicenseQuery::default().dry_run);
     }
-
-    const STORE_ROOT: &str = "lw-store-root@store.test";
 
     // store tests share the meta DB and its license keys, and the hooks share the license statics
     async fn store_setup() -> tokio::sync::MutexGuard<'static, ()> {
