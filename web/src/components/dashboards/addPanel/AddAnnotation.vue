@@ -71,7 +71,19 @@
       @click:secondary="showDeleteConfirm = false"
       @click:primary="deleteAnnotation.execute()"
     >
-      <p>{{ t("dashboard.addAnnotation.deleteConfirmMessage") }}</p>
+      <i18n-t
+        keypath="dashboard.addAnnotation.deleteConfirmMessage"
+        tag="p"
+        data-test="add-annotation-delete-confirm-message"
+      >
+        <template #name
+          ><span
+            data-test="add-annotation-delete-confirm-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ annotationData.title }}</span
+          ></template
+        >
+      </i18n-t>
     </ODialog>
   </ODialog>
 </template>

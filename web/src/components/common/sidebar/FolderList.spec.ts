@@ -46,7 +46,9 @@ const ConfirmDialogStub = {
   props: {
     modelValue: { type: Boolean, default: false },
     title: { type: String, default: "" },
-    message: { type: String, default: "" },
+    message: { type: String },
+    messageKeypath: { type: String },
+    messageName: { type: String },
     confirmText: { type: String },
     okLabel: { type: String },
     okVariant: { type: String },
@@ -866,7 +868,7 @@ describe("FolderList.vue", () => {
       expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
         confirmText: undefined,
         okLabel: undefined,
-        okVariant: undefined,
+        okVariant: "destructive",
         focusCancel: false,
       });
     });
@@ -1267,6 +1269,61 @@ describe("FolderList.vue", () => {
       await wrapper.vm.updateFolderList([]);
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
       expect(wrapper.vm.isFolderEditMode).toBe(false);
+    });
+  });
+
+  describe("delete dialog names the folder", () => {
+    it("passes the folder name and the named keypath to the dialog", async () => {
+      wrapper.vm.showDeleteFolderDialogFn("folder1", "Test Folder 1");
+      await nextTick();
+      expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
+        messageKeypath: "dashboard.deleteFolderMessage",
+        messageName: "Test Folder 1",
+        message: undefined,
+        okVariant: "destructive",
+      });
+    });
+
+    it("keeps the fleet message without a keypath", async () => {
+      const fleets = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "fleets" },
+      });
+      (fleets.vm as any).showDeleteFolderDialogFn("f9", "test1");
+      await nextTick();
+      const props = fleets.findComponent(ConfirmDialogStub).props();
+      expect(props.messageKeypath).toBeUndefined();
+      expect(props.message).toBeTruthy();
+      fleets.unmount();
+    });
+
+    it("renders the name in bold inside the real ConfirmDialog", async () => {
+      const real = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ODialog: { template: '<div data-test="o-dialog-stub"><slot /></div>' },
+          },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "alerts" },
+      });
+      (real.vm as any).showDeleteFolderDialogFn("folder1", "Test Folder 1");
+      await nextTick();
+      const name = real.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("Test Folder 1");
+      expect(name.classes()).toContain("font-semibold");
+      expect(real.find('[data-test="dialog-box"]').text()).toContain(
+        "Are you sure you want to delete the Test Folder 1 folder?",
+      );
+      real.unmount();
     });
   });
 });

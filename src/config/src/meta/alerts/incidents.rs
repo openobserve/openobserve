@@ -348,6 +348,19 @@ pub struct Incident {
     /// Why automatic analysis runs never start for this incident (`l0_off`).
     #[serde(default)]
     pub rca_off_reason: Option<String>,
+
+    /// Every alert that fired into the incident and how often, most-fired first; list only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<IncidentAlertGroup>>,
+}
+
+/// One alert's firings within an incident, for the list row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct IncidentAlertGroup {
+    pub alert_id: String,
+    pub alert_name: String,
+    /// Times this alert fired into the incident
+    pub count: i32,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -1805,6 +1818,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: None,
+            alert_groups: None,
         }
     }
 

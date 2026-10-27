@@ -392,7 +392,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('function.deleteEnrichmentTableTitle')"
-      :message="t('function.deleteEnrichmentTableConfirm')"
+      message-keypath="function.deleteEnrichmentTableConfirm"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -402,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="
         t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
       "
+      ok-variant="destructive"
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

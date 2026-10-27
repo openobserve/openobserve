@@ -371,6 +371,10 @@ export default defineComponent({
         if (series?._legendFollows !== undefined) {
           params.selected[series.name] = params.selected[series._legendFollows] !== false;
         }
+        // A series an override hides from the chart shows only while it is the one clicked.
+        if (series?._hiddenFromChart && params.name !== series.name) {
+          params.selected[series.name] = false;
+        }
       }
 
       syncPieLegendSelection({ ...params.selected });

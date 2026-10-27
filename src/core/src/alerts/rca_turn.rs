@@ -86,6 +86,7 @@ use crate::ai_chat::{
     StreamChatStore,
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
+    fork,
     rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
     rca_thread::{
         SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
@@ -647,6 +648,7 @@ async fn finalize(
         thread: events
             .as_deref()
             .map(|events| project_rca_thread(events, &turns, false, false).stats),
+        reusable_steps: events.as_deref().and_then(fork::reusable_steps),
         transcript: events.as_deref().map(decode_run),
         turn_error: turns
             .iter()
@@ -713,6 +715,8 @@ struct RunEnd {
     item: RcaRunItem,
     thread: Option<ThreadStats>,
     transcript: Option<RunTranscript>,
+    /// Finished steps a Resume of this run keeps, read from the same transcript.
+    reusable_steps: Option<u32>,
     turn_error: Option<String>,
     /// The message of the turn's last error, when the turn ended on this node.
     turn_message: Option<String>,
@@ -932,6 +936,7 @@ impl RunEnd {
             summary: Some(RunSummaryPatch {
                 steps: Some(thread.steps),
                 tool_calls: Some(thread.tool_calls),
+                reusable_steps: self.reusable_steps,
                 ..Default::default()
             }),
             ..Default::default()
@@ -2028,6 +2033,7 @@ async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
         org_id: org_id.to_string(),
         thread: Some(project_rca_thread(&events, &turns, false, false).stats),
         transcript: Some(decode_run(&events)),
+        reusable_steps: fork::reusable_steps(&events),
         turn_error: None,
         turn_message: None,
         run,
@@ -2101,6 +2107,7 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
         item,
         thread: None,
         transcript: None,
+        reusable_steps: None,
         turn_error: None,
         turn_message: None,
     };
@@ -2365,6 +2372,7 @@ mod tests {
             run,
             thread: Some(project_rca_thread(events, &[], false, false).stats),
             transcript: Some(decode_run(events)),
+            reusable_steps: fork::reusable_steps(events),
             turn_error: None,
             turn_message: None,
         }
@@ -2998,6 +3006,27 @@ mod tests {
         assert_eq!(again.state, RunState::Cancelled);
         assert_eq!((again.outcome, again.confidence), (None, None));
         assert_eq!(record_counts(&org), (0, 0, 0, 0));
+    }
+
+    /// The list's "Cancelled after N checks" reads the count the drawer and Resume use.
+    #[tokio::test]
+    async fn a_cancelled_run_stores_the_steps_a_resume_keeps_in_the_list_summary() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        cancel_write(&org, &run_id).await;
+        let events = crate::ai_chat::fork::tests::three_steps();
+        let kept = crate::ai_chat::fork::plan_resume(&events)
+            .unwrap()
+            .reused_steps;
+
+        assert!(!end(&org, &run_id, &events, TurnResult::Cancelled).await);
+
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(&org, &inc).await.rca_summary.as_deref(),
+        )
+        .unwrap();
+        assert_eq!(summary["reusable_steps"], kept);
     }
 
     #[tokio::test]

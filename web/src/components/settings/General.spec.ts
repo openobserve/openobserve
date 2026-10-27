@@ -859,6 +859,18 @@ describe("General", () => {
       expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
     });
 
+    it("names the logo theme in bold and uses a destructive OK button", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.confirmDeleteLogo("dark");
+      await nextTick();
+      const dialog = wrapper.findAllComponents({ name: "ODialog" })[0];
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const message = wrapper.find('[data-test="general-delete-image-message"]');
+      const name = message.find("span.font-semibold");
+      expect(name.text()).toBe("Dark Mode");
+      expect(message.text()).toContain("Dark Mode");
+    });
+
     it("forwards title and size to the color picker ODialog", () => {
       const wrapper = createWrapper();
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');

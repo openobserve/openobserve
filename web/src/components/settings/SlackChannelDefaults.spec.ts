@@ -165,8 +165,11 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const w = await mountDefaults();
     await w.find('[data-test="slack-channel-remove-C1"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-title"]').text()).toContain("#sre-prod");
-    expect(w.find('[data-test-stub="confirm-message"]').text()).toContain(
-      "each person's default org",
+    const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
+    expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.channels.removeMessage");
+    expect(confirmDialog.attributes("message-name")).toBe("#sre-prod");
+    expect(i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod" })).toBe(
+      "Questions in #sre-prod then go to each person's default org (they can change it with /o2 org).",
     );
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();

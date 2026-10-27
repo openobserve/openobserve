@@ -235,6 +235,9 @@ pub struct RcaThread {
     /// With `truncated`: the last seq that was saved (-1: none).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub saved_through_seq: Option<i64>,
+    /// Finished steps a Resume of this ended run keeps; `None` while live or once reported.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reusable_steps: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -366,6 +369,7 @@ impl RcaThread {
             stats: ThreadStats::default(),
             truncated: false,
             saved_through_seq: None,
+            reusable_steps: None,
         }
     }
 }
@@ -731,6 +735,7 @@ impl Builder {
             steps,
             truncated: false,
             saved_through_seq: None,
+            reusable_steps: None,
         }
     }
 }

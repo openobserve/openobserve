@@ -370,6 +370,9 @@ the Free Software Foundation, either version 3 of the License, or
         v-model="confirmDeleteOpen"
         :title="deleteDialogTitle"
         :message="deleteDialogMessage"
+        :message-keypath="isBulkDelete ? undefined : 'onlineEvals.deleteConfirmMessage'"
+        :message-name="pendingDeleteRow?.name ?? ''"
+        ok-variant="destructive"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -881,9 +884,7 @@ const deleteDialogMessage = computed(() =>
     ? t("onlineEvals.job.deleteBulkConfirm", {
         count: pendingBulkDeleteIds.value.length,
       })
-    : t("onlineEvals.deleteConfirmMessage", {
-        name: pendingDeleteRow.value?.name ?? "",
-      }),
+    : undefined,
 );
 
 watch(activeTab, (next) => {

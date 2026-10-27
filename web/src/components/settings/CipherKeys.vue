@@ -159,7 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeyTitle')"
-    :message="t('settings.cipherKeysPage.deleteCipherKeyMessage')"
+    message-keypath="settings.cipherKeysPage.deleteCipherKeyMessage"
+    :message-name="confirmDelete.data?.name"
+    ok-variant="destructive"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
@@ -168,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeysTitle')"
     :message="t('settings.cipherKeysPage.deleteCipherKeysMessage', { count: selectedKeys.length })"
+    ok-variant="destructive"
     @update:ok="bulkDeleteCipherKeys"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"

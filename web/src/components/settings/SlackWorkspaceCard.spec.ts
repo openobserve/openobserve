@@ -15,11 +15,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent } from "vue";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 import {
-  ConfirmDialogStub,
   OTableStub,
   axiosError,
   fakePopup,
@@ -62,6 +62,27 @@ const CredentialsStub = {
 
 const errorHandler = vi.fn();
 
+// Adds the named-message props the shared stub does not declare.
+const NamedConfirmDialogStub = defineComponent({
+  name: "ConfirmDialog",
+  props: {
+    modelValue: { type: Boolean, default: false },
+    title: { type: String, default: "" },
+    message: { type: String, default: "" },
+    messageKeypath: { type: String, default: "" },
+    messageName: { type: String, default: "" },
+    okLabel: { type: String, default: "" },
+    okVariant: { type: String, default: "primary" },
+  },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  template: `
+    <div v-if="modelValue" data-test-stub="confirm-dialog">
+      <span data-test-stub="confirm-message">{{ message }}</span>
+      <span data-test-stub="confirm-name">{{ messageName }}</span>
+      <button data-test-stub="confirm-ok" @click="$emit('update:modelValue', false); $emit('update:ok')">{{ okLabel }}</button>
+    </div>`,
+});
+
 const mountCard = (installation: InstallationView = installationView(), isCloud = false) =>
   mount(SlackWorkspaceCard, {
     props: { installation, isCloud },
@@ -71,7 +92,7 @@ const mountCard = (installation: InstallationView = installationView(), isCloud 
       config: { errorHandler },
       stubs: {
         OTable: OTableStub,
-        ConfirmDialog: ConfirmDialogStub,
+        ConfirmDialog: NamedConfirmDialogStub,
         SlackCredentialsDialog: CredentialsStub,
       },
     },
@@ -217,9 +238,10 @@ describe("SlackWorkspaceCard (A3)", () => {
       "Configuration refresh token kept",
     );
     await w.find('[data-test="slack-forget-token"]').trigger("click");
-    expect(w.find('[data-test-stub="confirm-message"]').text()).toContain(
-      "Slack does not revoke the token",
-    );
+    expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("Acme Corp");
+    const dialog = w.findComponent(NamedConfirmDialogStub);
+    expect(dialog.props("messageKeypath")).toBe("slackApp.card.forgetMessage");
+    expect(dialog.props("okVariant")).toBe("destructive");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.updateCredentials).toHaveBeenCalledWith("acme", "inst-1", {

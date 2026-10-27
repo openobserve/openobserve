@@ -1235,7 +1235,8 @@ const nextBlocked = computed(() => {
     <ConfirmDialog
       v-model="startOverOpen"
       :title="t('slackApp.wizard.install.startOverTitle')"
-      :message="t('slackApp.wizard.install.startOverMessage', { appId: current?.app_id ?? '' })"
+      message-keypath="slackApp.wizard.install.startOverMessage"
+      :message-name="current?.app_id"
       :ok-label="t('slackApp.wizard.install.startOver')"
       ok-variant="destructive"
       focus-cancel

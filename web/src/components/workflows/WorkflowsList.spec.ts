@@ -82,6 +82,7 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowsList from "./WorkflowsList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import workflowService from "@/services/workflows";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
@@ -174,7 +175,7 @@ const globalStubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "title", "message"],
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
@@ -888,8 +889,34 @@ describe("WorkflowsList", () => {
 
       expect(confirm(wrapper).props("modelValue")).toBe(true);
       expect(confirm(wrapper).props("title")).toBe(t("workflow.deleteTitle"));
-      expect(confirm(wrapper).props("message")).toBe(t("workflow.deleteMessage"));
+      expect(confirm(wrapper).props("messageKeypath")).toBe("workflow.deleteMessage");
+      expect(confirm(wrapper).props("messageName")).toBe("workflow-1");
+      expect(confirm(wrapper).props("okVariant")).toBe("destructive");
       expect(deleteWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("names the workflow in bold in the real ConfirmDialog", async () => {
+      const ODialogStub = {
+        name: "ODialog",
+        props: ["open", "primaryButtonLabel", "primaryButtonVariant"],
+        template: '<div v-if="open" data-test="o-dialog-stub"><slot /></div>',
+      };
+      wrapper = mount(WorkflowsList, {
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...globalStubs, ConfirmDialog, ODialog: ODialogStub },
+        },
+      });
+      await flushPromises();
+      await openDelete(wrapper, "workflow-2");
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("workflow-2");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("Are you sure you want to delete the workflow-2 workflow?");
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primaryButtonLabel")).toBe(t("confirmDialog.ok"));
     });
 
     it("deletes on confirm, toasts and refetches", async () => {

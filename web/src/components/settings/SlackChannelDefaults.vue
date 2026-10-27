@@ -385,7 +385,8 @@ const save = async (value: DefaultForm): Promise<void> => {
     <ConfirmDialog
       v-model="removeOpen"
       :title="t('slackApp.channels.removeTitle', { channel: removing?.channel_name ?? '' })"
-      :message="t('slackApp.channels.removeMessage', { channel: removing?.channel_name ?? '' })"
+      message-keypath="slackApp.channels.removeMessage"
+      :message-name="removing ? `#${removing.channel_name}` : ''"
       :ok-label="t('slackApp.channels.remove')"
       ok-variant="destructive"
       focus-cancel

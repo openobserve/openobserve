@@ -850,7 +850,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alerts.deleteAlertTitle')"
-      :message="t('alerts.deleteAlertMessage')"
+      message-keypath="alerts.deleteAlertMessage"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -859,6 +861,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alerts.deleteAlertsTitle')"
       :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
