@@ -172,23 +172,11 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      // Use .last() to target the most recently opened portal — when a filter
-      // condition is re-edited, the tab from the previous popover may still
-      // exist in the DOM mid-transition.
-      const conditionLocator = this.page
-        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
-        .last();
-      await conditionLocator.waitFor({ state: "visible", timeout: 10000 });
-      // Reka UI tabs may re-mount during portal transition; retry click with force
-      // to bypass detached-element instability.
-      await conditionLocator.click({ force: true, timeout: 10000 });
-      // Wait deterministically for the operator dropdown (Step 4's target) to
-      // appear instead of a fixed-ms buffer.
-      await this.page
-        .locator('[data-test="dashboard-add-condition-operator"]')
-        .first()
-        .waitFor({ state: "visible", timeout: 10000 })
-        .catch(() => {});
+      // The label text changes once a field/operator is set, so reopen by index prefix.
+      const labelLocator = this.page
+        .locator(`[data-test^="dashboard-add-condition-label-${idx}-"]`)
+        .first();
+      await this.openConditionTab(labelLocator, idx);
     }
 
     // Step 4: Operator dropdown
