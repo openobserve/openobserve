@@ -18,16 +18,19 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import { defineComponent, h, watch } from "vue";
 
+import config from "@/aws-exports";
 import { FIRST_EVENT_BUDGET } from "@/composables/firstEvent/firstEventBudget";
 import { queryClient } from "@/composables/query/queryClient";
 import stream from "@/services/stream";
 import { streamNameListQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
 import store from "@/test/unit/helpers/store";
 import { USER_DATA_STREAM_TYPES } from "@/utils/internalStreams";
 
-import { useNoDataIntro } from "./useNoDataIntro";
+import { useNoDataIntro, useSetupTarget } from "./useNoDataIntro";
 
 const ORG = "org1";
+const CLOUD = config.isCloud;
 const lists = (logs: string[], { docNum = 3, metrics = [] as string[] } = {}) =>
   vi.spyOn(stream, "nameList").mockImplementation((async (_org: string, type: string) => ({
     data: {
@@ -67,6 +70,7 @@ describe("useNoDataIntro", () => {
     queryClient.clear();
     store.state.zoConfig.restricted_routes_on_empty_data = false;
     setVisibility("visible");
+    config.isCloud = CLOUD;
   });
 
   // the _meta org, an org O2 writes triggers or usage into, a synthetics-only org
@@ -209,6 +213,38 @@ describe("useNoDataIntro", () => {
 
     expect(showIntro.value).toBe(false);
     expect(seen).not.toContain(true);
+    wrapper.unmount();
+  });
+
+  // the intro re-reads the logs list on a timer, so a card clicked mid-read must still open onboarding
+  it("on cloud, keeps the onboarding target while a re-read is in flight, then follows its answer", async () => {
+    config.isCloud = "true";
+    queryClient.clear();
+    lists([]);
+    let target!: ReturnType<typeof useSetupTarget>["target"];
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          ({ target } = useSetupTarget(ORG));
+          return () => h("div");
+        },
+      }),
+      { global: { plugins: [[VueQueryPlugin, { queryClient }], store] } },
+    );
+    const opens = () => target("logs", "curl", "over-http-with-curl").name;
+    await flushPromises();
+    expect(opens()).toBe("onboarding");
+
+    let answer!: (v: unknown) => void;
+    vi.spyOn(stream, "nameList").mockReturnValue(new Promise((r) => (answer = r)) as never);
+    void queryClient.invalidateQueries({ queryKey: streamKeys.nameList(ORG, "logs"), exact: true });
+    await flushPromises();
+    expect(queryClient.isFetching()).toBe(1);
+    expect(opens()).toBe("onboarding");
+
+    answer({ data: { list: [{ name: "default", stream_type: "logs", stats: { doc_num: 1 } }] } });
+    await flushPromises();
+    expect(opens()).toBe("curl");
     wrapper.unmount();
   });
 

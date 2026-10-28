@@ -81,11 +81,21 @@ export function writeFirstDataRecord(org: string, record: FirstDataRecord): void
   }
 }
 
+// localStorage is not reactive: a detection bumps this, so an answer that read the mark reads it again
+const detections = ref(0);
+
 /** Called when the setup page's bar turned green, so the next visit never repeats the news. */
 export function markDetectionSeen(org: string): void {
   if (!org) return;
   const record = readFirstDataRecord(org) ?? { lastVisit: Date.now(), hadData: false };
   writeFirstDataRecord(org, { ...record, seenDetection: true });
+  detections.value++;
+}
+
+/** Whether a setup page in this browser saw the org's first record arrive. */
+export function detectionSeen(org: string): boolean {
+  void detections.value;
+  return !!readFirstDataRecord(org)?.seenDetection;
 }
 
 /** Whether the org holds a user stream, read with the notice's own bounded probes; null when a read fails. */

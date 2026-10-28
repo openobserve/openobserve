@@ -16,6 +16,7 @@
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 
+import { detectionSeen } from "@/composables/firstEvent/useFirstDataNotice";
 import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
@@ -30,17 +31,19 @@ const userStreams = (list: ListedStream[] | undefined, type: string) =>
   );
 const hasRecords = (s: ListedStream) =>
   Number(s.stats?.doc_num ?? 0) > 0 || Number(s.stats?.doc_time_max ?? 0) > 0;
-const userDataIn = (lists: (ListedStream[] | undefined)[], settled: boolean) => {
+const userDataIn = (lists: (ListedStream[] | undefined)[], settled: boolean, org: string) => {
   const users = lists.map((list, i) => userStreams(list, USER_DATA_STREAM_TYPES[i]));
   if (users.some((list) => list.some(hasRecords))) return true;
-  if (users.some((list) => list.length > 0)) return undefined;
+  // stats wait for the first flush, so only a first record a setup page saw arrive settles it sooner
+  if (users.some((list) => list.length > 0)) return detectionSeen(org) || undefined;
   return settled ? false : undefined;
 };
 
 /**
  * Whether the org holds data the user sent: a logs, metrics or traces stream that O2 does not
- * write itself, that is not a synthetic-check result, and whose stats show records. `undefined`
- * while the lists load, or while its streams have no stats yet (stats count flushed files only).
+ * write itself, that is not a synthetic-check result, and whose stats show records, or whose first
+ * record a setup page saw arrive. `undefined` while the lists load, or while its streams have no
+ * stats yet (stats count flushed files only).
  */
 export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
   const client = useQueryClient();
@@ -65,6 +68,7 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
     userDataIn(
       queries.map((q) => q.data.value),
       queries.every((q) => q.isSuccess.value),
+      toValue(org),
     ),
   );
   // Any stream at all, O2's own and synthetics included: an org with one has something to search.
@@ -90,7 +94,7 @@ export async function orgHasUserData(org: string | undefined): Promise<boolean |
     const lists = await Promise.all(
       USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(streamNameListQuery(org, type))),
     );
-    return userDataIn(lists, true);
+    return userDataIn(lists, true, org);
   } catch {
     return undefined;
   }

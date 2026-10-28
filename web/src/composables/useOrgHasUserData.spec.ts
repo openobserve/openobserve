@@ -23,6 +23,7 @@ import stream from "@/services/stream";
 import { streamNameListQuery } from "@/services/stream.queries";
 
 import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
+import { markDetectionSeen } from "@/composables/firstEvent/useFirstDataNotice";
 
 import { orgHasUserData, refreshUserStreamLists, useOrgHasUserData } from "./useOrgHasUserData";
 
@@ -104,6 +105,21 @@ describe("useOrgHasUserData", () => {
     await flushPromises();
     // Its stats cannot tell it from a stream whose first records are not flushed yet, so the answer waits.
     expect(result.hasUserData.value).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  // the guide turned green on records still in the WAL; onboarding opened next must send the user Home
+  it("counts a stream with no stats yet once a setup page saw its first record arrive", async () => {
+    listsFor({ seen: { logs: ["default"] } }, 0);
+    const { result, wrapper } = setup("seen");
+    await flushPromises();
+    expect(result.hasUserData.value).toBeUndefined();
+
+    markDetectionSeen("seen");
+
+    expect(result.hasUserData.value).toBe(true);
+    queryClient.clear();
+    expect(await orgHasUserData("seen")).toBe(true);
     wrapper.unmount();
   });
 

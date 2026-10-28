@@ -17,6 +17,7 @@ import { CancelledError } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
@@ -152,10 +153,17 @@ const useStreams = (t: TranslateFn) => {
                 reject(toStreamError(e));
               });
           } else {
+            const options = streamNameListQuery(
+              store.state.selectedOrganization.identifier,
+              _streamName,
+            );
+            const usual = options.staleTime as number;
             queryClient
-              .fetchQuery(
-                streamNameListQuery(store.state.selectedOrganization.identifier, _streamName),
-              )
+              .fetchQuery({
+                ...options,
+                // an empty list can predate the first record, as the one cached at sign-in does
+                staleTime: (q) => (q.state.data?.length ? usual : EMPTY_LIST_STALE_TIME),
+              })
               .then((list: any) => {
                 setStreams(streamName, list);
                 const streamData = {

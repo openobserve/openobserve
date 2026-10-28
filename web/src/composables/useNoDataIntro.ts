@@ -110,9 +110,13 @@ export function useSetupTarget(orgSource?: MaybeRefOrGetter<string>) {
       ? (store.state.selectedOrganization?.identifier ?? "")
       : toValue(orgSource);
   const { hasUserData, isFetching } = useOrgHasUserData(org);
-  const onboarding = computed(
-    () => config.isCloud === "true" && hasUserData.value === false && !isFetching.value,
-  );
+  // A cached answer may be stale while it refetches, so it counts only once settled; the last settled
+  // answer holds through the intro's timed re-reads, so a card clicked mid-read still opens onboarding.
+  let settled = false;
+  const onboarding = computed(() => {
+    if (!isFetching.value) settled = config.isCloud === "true" && hasUserData.value === false;
+    return settled;
+  });
   // A null choice opens onboarding's first step; a row opens that row of the choice.
   const target = (choice: OnboardingChoiceId | "agent" | null, route: string, row?: string) =>
     onboarding.value

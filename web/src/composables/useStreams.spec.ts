@@ -18,6 +18,7 @@ import { CancelledError } from "@tanstack/vue-query";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
+import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
@@ -249,6 +250,22 @@ describe("useStreams Composable", () => {
 
       expect(StreamService.nameList).not.toHaveBeenCalled();
       expect(result.list).toEqual([{ name: "from-query" }]);
+    });
+
+    // the empty list cached at sign-in must not hide the stream a first record created since
+    it("reads an empty list again once it is a few seconds old, and keeps a listed one", async () => {
+      queryClient.clear();
+      const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
+      const updatedAt = Date.now() - EMPTY_LIST_STALE_TIME - 1;
+      queryClient.setQueryData(key("logs"), [], { updatedAt });
+      queryClient.setQueryData(key("metrics"), [{ name: "up" }], { updatedAt });
+
+      const logs: any = await streamsInstance.getStreams("logs", false, false);
+      const metrics: any = await streamsInstance.getStreams("metrics", false, false);
+
+      expect(logs.list).toEqual([{ name: "test-stream", stream_type: "logs" }]);
+      expect(metrics.list).toEqual([{ name: "up" }]);
+      expect(StreamService.nameList).toHaveBeenCalledTimes(1);
     });
 
     it("rejects with the CancelledError itself when the fetch is cancelled", async () => {
