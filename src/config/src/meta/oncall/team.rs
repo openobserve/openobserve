@@ -19,9 +19,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::rotation::{
-    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, OnCallPosition,
-    Rotation, ScheduleOverride, ShiftRule, Unavailability, away_assignments, colliding_rotations,
-    everyone_on_call, resolve_on_call, resolve_window,
+    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, MINUTES_PER_DAY,
+    OnCallPosition, Rotation, ScheduleOverride, ShiftRule, Unavailability, away_assignments,
+    colliding_rotations, everyone_on_call, resolve_on_call, resolve_window,
 };
 
 /// A group of people who can be paged together.
@@ -210,9 +210,12 @@ impl MemberRemoval {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TeamError {
     EmptyName,
-    /// Two rotations equally in force at the same instant; neither is more
-    /// specific, so which one wins would be arbitrary.
-    AmbiguousRotations,
+    /// Two shift rules of one rotation in force at once that the precedence cannot order.
+    AmbiguousRotations {
+        rotation: String,
+        first: String,
+        second: String,
+    },
     InvalidRotation(super::rotation::RotationError),
     /// Two rotations sharing an id. A level points at one, so the policy would
     /// be ambiguous about which position it pages.
@@ -388,8 +391,8 @@ impl Schedule {
     /// The first instant in `[from, from + horizon)` at which this schedule
     /// pages nobody, or `None` when the window is covered (02 §8).
     ///
-    /// Walked in shift-sized steps: coverage can only change at handovers and
-    /// override edges, so stepping to the next handover finds every gap a fixed
+    /// Walked in shift-sized steps: a gap can only open at handovers, absence
+    /// starts and cover ends, so stepping to the next one finds every gap a fixed
     /// cadence would while asking far fewer questions. `max_step` bounds the
     /// stride, because a rotation with no handover ahead would otherwise be
     /// sampled once and declared covered for a week.
@@ -408,10 +411,14 @@ impl Schedule {
                 return Some(at);
             }
             let capped = at.saturating_add(step);
-            at = match self.next_handover(at) {
-                Some(next) if next > at => next.min(capped),
-                _ => capped,
-            };
+            let edge = next_gap_edge(&self.overrides, &self.unavailability, at);
+            at = self
+                .next_handover(at)
+                .into_iter()
+                .chain(edge)
+                .filter(|&next| next > at)
+                .min()
+                .map_or(capped, |next| next.min(capped));
         }
         None
     }
@@ -499,12 +506,17 @@ impl Schedule {
             if !seen_ids.insert(rotation.id.trim().to_ascii_lowercase()) {
                 return Err(TeamError::DuplicateRotationId(rotation.id.clone()));
             }
-            // Same priority and restrictions have no winner; different rotations never compete.
-            let mut seen = std::collections::HashSet::new();
-            for rule in &rotation.shift_rules {
-                let key = (rule.priority, rule.restrictions.clone());
-                if !seen.insert(key) {
-                    return Err(TeamError::AmbiguousRotations);
+            // Different rotations never compete, so only rules inside one can tie.
+            for (i, first) in rotation.shift_rules.iter().enumerate() {
+                if let Some(second) = rotation.shift_rules[i + 1..]
+                    .iter()
+                    .find(|second| rules_tie(first, second))
+                {
+                    return Err(TeamError::AmbiguousRotations {
+                        rotation: rotation.name.clone(),
+                        first: first.name.clone(),
+                        second: second.name.clone(),
+                    });
                 }
             }
         }
@@ -525,8 +537,13 @@ impl std::fmt::Display for TeamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyName => f.write_str("team name cannot be empty"),
-            Self::AmbiguousRotations => f.write_str(
-                "two rotations apply at the same time with equal priority and restrictions",
+            Self::AmbiguousRotations {
+                rotation,
+                first,
+                second,
+            } => write!(
+                f,
+                "in rotation `{rotation}`, the shift rules `{first}` and `{second}` can apply at the same time and neither outranks the other; give one a higher priority"
             ),
             Self::InvalidRotation(e) => write!(f, "invalid rotation: {e}"),
             Self::DuplicateRotationId(id) => write!(
@@ -538,6 +555,44 @@ impl std::fmt::Display for TeamError {
 }
 
 impl std::error::Error for TeamError {}
+
+/// The next absence start or cover end after `at`: the edges where a gap can open. [pure]
+fn next_gap_edge(
+    overrides: &[ScheduleOverride],
+    unavailability: &[Unavailability],
+    at: i64,
+) -> Option<i64> {
+    let absence_starts = unavailability.iter().map(|u| u.start_at);
+    let cover_ends = overrides.iter().map(|o| o.end_at);
+    absence_starts.chain(cover_ends).filter(|&t| t > at).min()
+}
+
+/// Whether two rules of one rotation can both be in force with no winner (spec S3). [pure]
+fn rules_tie(a: &ShiftRule, b: &ShiftRule) -> bool {
+    if a.priority == b.priority && a.restrictions == b.restrictions {
+        return true;
+    }
+    a.priority == b.priority
+        && a.restrictions.len() == b.restrictions.len()
+        && a.anchor_micros == b.anchor_micros
+        && validity_overlaps(a, b)
+        && share_a_minute(a, b)
+}
+
+/// Whether the two rules' validity windows intersect; an open bound is unbounded. [pure]
+fn validity_overlaps(a: &ShiftRule, b: &ShiftRule) -> bool {
+    let start = [a.starts_at, b.starts_at].into_iter().flatten().max();
+    let end = [a.ends_at, b.ends_at].into_iter().flatten().min();
+    start.unwrap_or(i64::MIN) < end.unwrap_or(i64::MAX)
+}
+
+/// Whether some minute of the local week falls inside both rules' restrictions. [pure]
+fn share_a_minute(a: &ShiftRule, b: &ShiftRule) -> bool {
+    let covers = |r: &ShiftRule, day: u8, minute: u32| {
+        r.restrictions.is_empty() || r.restrictions.iter().any(|w| w.covers_local(day, minute))
+    };
+    (0..7u8).any(|day| (0..MINUTES_PER_DAY).any(|m| covers(a, day, m) && covers(b, day, m)))
+}
 
 #[cfg(test)]
 mod tests {
@@ -662,7 +717,84 @@ mod tests {
             "Primary",
             vec![rule("Day", &["ana@o2.ai"]), rule("Night", &["bob@o2.ai"])],
         )]);
-        assert_eq!(s.validate(), Err(TeamError::AmbiguousRotations));
+        assert_eq!(
+            s.validate(),
+            Err(TeamError::AmbiguousRotations {
+                rotation: "Primary".into(),
+                first: "Day".into(),
+                second: "Night".into(),
+            })
+        );
+    }
+
+    /// Spec S3: rules tied on priority, window count and anchor are refused only if they overlap.
+    #[test]
+    fn test_validate_rejects_tied_rules_that_overlap() {
+        let window = |start_minute, end_minute| {
+            vec![TimeWindow {
+                days: Vec::new(),
+                start_minute,
+                end_minute,
+            }]
+        };
+        let mut all_day = rule("All day", &["ana@o2.ai"]);
+        all_day.restrictions = window(0, 1440);
+        let mut early = rule("Early", &["bob@o2.ai"]);
+        early.restrictions = window(180, 300);
+        let mut early_later = early.clone();
+        early_later.starts_at = Some(ANCHOR + MICROS_PER_WEEK);
+        let mut all_day_earlier = all_day.clone();
+        all_day_earlier.ends_at = Some(ANCHOR + MICROS_PER_WEEK);
+        let mut late = rule("Late", &["bob@o2.ai"]);
+        late.restrictions = window(300, 1440);
+        let mut dawn = rule("Dawn", &["bob@o2.ai"]);
+        dawn.restrictions = window(0, 300);
+        let mut early_moved = early.clone();
+        early_moved.anchor_micros += 1;
+
+        let refused = Err(TeamError::AmbiguousRotations {
+            rotation: "Primary".into(),
+            first: "All day".into(),
+            second: "Early".into(),
+        });
+        let cases = [
+            ("overlapping windows", vec![all_day.clone(), early], refused),
+            ("disjoint windows", vec![dawn, late], Ok(())),
+            (
+                "disjoint validity",
+                vec![all_day_earlier, early_later],
+                Ok(()),
+            ),
+            ("different anchor", vec![all_day, early_moved], Ok(())),
+        ];
+        for (name, rules, expected) in cases {
+            let s = schedule(vec![layered("Primary", rules)]);
+            assert_eq!(s.validate(), expected, "{name}");
+        }
+    }
+
+    /// Follow-the-sun regions tie on every key but never share a minute.
+    #[test]
+    fn test_validate_accepts_a_follow_the_sun_preset() {
+        let region = |name: &str, member: &str, start_minute, end_minute| {
+            super::super::preset::RegionGroup {
+                name: name.into(),
+                members: vec![member.into()],
+                start_minute,
+                end_minute,
+            }
+        };
+        let spec = super::super::preset::PresetSpec::FollowTheSun {
+            groups: vec![
+                region("APAC", "naoto@o2.ai", 0, 8 * 60),
+                region("EMEA", "lars@o2.ai", 8 * 60, 16 * 60),
+                region("AMER", "john@o2.ai", 16 * 60, 1440),
+            ],
+            catch_all: None,
+        };
+        let rules =
+            super::super::preset::build(&spec, chrono_tz::UTC, ANCHOR, MICROS_PER_WEEK).unwrap();
+        assert_eq!(schedule(vec![layered("Primary", rules)]).validate(), Ok(()));
     }
 
     /// The same two rules in two rotations are not ambiguous — they are two
@@ -1110,6 +1242,34 @@ mod tests {
         assert_eq!(s.first_coverage_gap(ANCHOR, 10, 0), None);
         // A window that is over before it starts asks nothing.
         assert_eq!(s.first_coverage_gap(ANCHOR, 0, HOUR), None);
+    }
+
+    /// A gap shorter than the stride opens at an absence start or a cover end.
+    #[test]
+    fn test_a_gap_shorter_than_the_stride_is_found() {
+        let minute = HOUR / 60;
+        let gone = ANCHOR + 5 * HOUR + 5 * minute;
+        let back = gone + 50 * minute;
+        let cases = [
+            ("absence start", Vec::new(), gone),
+            (
+                "cover end",
+                vec![a_cover("sam@o2.ai", ANCHOR + 4 * HOUR, gone + 15 * minute)],
+                gone + 15 * minute,
+            ),
+        ];
+        for (name, overrides, expected) in cases {
+            let s = Schedule {
+                overrides,
+                unavailability: vec![an_absence("ana@o2.ai", gone, back)],
+                ..schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])])
+            };
+            assert_eq!(
+                s.first_coverage_gap(ANCHOR, WEEK, HOUR),
+                Some(expected),
+                "{name}"
+            );
+        }
     }
 
     // ── Slots and unavailability on the schedule ────────────────────────────

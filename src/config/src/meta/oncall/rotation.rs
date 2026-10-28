@@ -844,6 +844,7 @@ impl Rotation {
     /// off from a shift, an absence is not being there at all. When that empties
     /// the level the ladder advances, and `WholeTeam` below it ignores absence,
     /// so a page still has somewhere to go.
+    /// The cover holder is never removed: a cover outranks an absence, as in [`Rotation::on_call`].
     pub fn everyone(
         &self,
         overrides: &[ScheduleOverride],
@@ -855,12 +856,12 @@ impl Rotation {
             .winning_rule(at, tz)
             .map(|r| r.members.clone())
             .unwrap_or_default();
+        out.retain(|m| !is_unavailable(unavailability, m, at));
         if let Some(ov) = covering_override_for(overrides, &self.id, at)
             && !out.iter().any(|m| m.eq_ignore_ascii_case(&ov.user_email))
         {
             out.push(ov.user_email.clone());
         }
-        out.retain(|m| !is_unavailable(unavailability, m, at));
         out
     }
 
@@ -3319,6 +3320,41 @@ mod tests {
             on_call_now(&rotations, &overrides, &unavailability, after, TZ).as_deref(),
             Some("bob@o2.ai")
         );
+    }
+
+    /// The cover holder is paged despite their absence; an absent roster member is not.
+    #[test]
+    fn test_everyone_keeps_an_absent_cover_holder() {
+        let rotation = of(&[ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )]);
+        let end = ANCHOR + MICROS_PER_DAY;
+        let cases: [(&str, &[Unavailability], &[&str]); 3] = [
+            (
+                "sam@o2.ai",
+                &[
+                    away("sam@o2.ai", ANCHOR, end),
+                    away("bob@o2.ai", ANCHOR, end),
+                ],
+                &["ana@o2.ai", "sam@o2.ai"],
+            ),
+            (
+                "ana@o2.ai",
+                &[away("ana@o2.ai", ANCHOR, end)],
+                &["bob@o2.ai", "ana@o2.ai"],
+            ),
+            ("ana@o2.ai", &[], &["ana@o2.ai", "bob@o2.ai"]),
+        ];
+        for (holder, unavailability, expected) in cases {
+            let overrides = vec![cover("ov_1", holder, ANCHOR, end, 1)];
+            assert_eq!(
+                rotation.everyone(&overrides, unavailability, ANCHOR, TZ),
+                expected,
+                "{holder} covering, away: {unavailability:?}"
+            );
+        }
     }
 
     /// Determinism, which the whole skip rule stands on. Two properties.
