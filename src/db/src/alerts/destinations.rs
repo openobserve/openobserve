@@ -266,18 +266,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                let item_value: Destination = match table::destinations::get(org_id, name).await {
-                    Ok(Some(dest)) => dest,
-                    Ok(None) => {
-                        log::error!("Destination not found in db, org_id: {org_id}");
-                        continue;
-                    }
+                match table::destinations::get(org_id, name).await {
+                    Ok(read) => cache_put(org_id, name, read),
                     Err(e) => {
                         log::error!("Error getting from db: org_id: {org_id}, error: {e}");
-                        continue;
                     }
-                };
-                DESTINATIONS.insert(format!("{org_id}/{name}"), item_value);
+                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
@@ -287,6 +281,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+/// Caches the row a Put event names; a row this node cannot read drops the stale copy, so a save
+/// here reaches the database's newer-row guard.
+fn cache_put(org_id: &str, name: &str, read: Option<Destination>) {
+    match read {
+        Some(dest) => {
+            DESTINATIONS.insert(format!("{org_id}/{name}"), dest);
+        }
+        None => {
+            log::error!("Destination {org_id}/{name} not readable here; dropping the cached copy");
+            DESTINATIONS.remove(&format!("{org_id}/{name}"));
+        }
+    }
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
@@ -361,6 +369,22 @@ mod tests {
         let (org, name) = result.unwrap();
         assert_eq!(org, "myorg");
         assert_eq!(name, "");
+    }
+
+    #[test]
+    fn a_put_this_node_cannot_read_drops_the_stale_cached_copy() {
+        let org = format!("stale_{}", config::ider::uuid());
+        let key = format!("{org}/d");
+        DESTINATIONS.insert(
+            key.clone(),
+            Destination {
+                org_id: org.clone(),
+                name: "d".to_string(),
+                ..Default::default()
+            },
+        );
+        cache_put(&org, "d", None);
+        assert!(!DESTINATIONS.contains_key(&key));
     }
 
     #[test]
