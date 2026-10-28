@@ -645,6 +645,7 @@ export const usePanelSQLExecutor = (ctx: {
                 error: handleSearchError,
                 complete: async () => {
                   state.loading = false;
+                  state.isPartialData = false;
                   saveCurrentStateToCache();
                   removeTraceId(traceId);
                 },
@@ -1244,6 +1245,7 @@ export const usePanelSQLExecutor = (ctx: {
         error: handleSearchError,
         complete: async () => {
           state.loading = false;
+          state.isPartialData = false;
           saveCurrentStateToCache();
           removeTraceId(traceId);
         },
