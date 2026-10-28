@@ -738,6 +738,20 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     );
   });
 
+  it("keeps counting from the firing's start when a send fails mid-firing", async () => {
+    const started = (Date.now() - 150_000) * 1000;
+    withListRow({
+      last_outcome: "notify_failed",
+      last_outcome_since: Date.now() * 1000,
+      firing_started_at: started,
+      level: "critical",
+    });
+    wrapper = await mountView();
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').text()).toBe(
+      "firing for 2 min",
+    );
+  });
+
   it("adds the Incident tile when the firing has one, and the tile opens the incident (MK-1)", async () => {
     withListRow({
       last_outcome: "firing",

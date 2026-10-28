@@ -654,6 +654,7 @@ interface AlertListRow {
   enabled?: boolean;
   last_outcome?: string | null;
   last_outcome_since?: number | null;
+  firing_started_at?: number | null;
   level?: string | null;
   ack?: AlertListAck | null;
   active_downtime?: (ActiveDowntime & { version?: number }) | null;
@@ -713,7 +714,8 @@ const nowMicros = useNowMicros();
 const viewerZone = useViewerTimezone();
 
 const firingSince = computed<number | null>(() => {
-  const since = listRow.value?.last_outcome_since;
+  // A failed send moves the outcome, and with it last_outcome_since, but not the firing's start.
+  const since = listRow.value?.firing_started_at ?? listRow.value?.last_outcome_since;
   return isSingleRow.value && isFiringNow.value && since ? since : null;
 });
 
