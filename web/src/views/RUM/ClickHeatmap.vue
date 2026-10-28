@@ -244,11 +244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="flex p-4">
                 <div ref="fitRef" class="mx-auto shrink-0 overflow-hidden">
-                  <OSpinner
-                    v-if="snapshotLoading"
-                    size="lg"
-                    data-test="rum-heatmap-snapshot-loading"
-                  />
                   <div
                     v-show="snapshotReady"
                     ref="stageRef"
@@ -259,6 +254,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
+            </div>
+            <div
+              v-if="snapshotLoading"
+              class="pointer-events-none absolute inset-0 flex items-center justify-center"
+            >
+              <OSpinner size="lg" data-test="rum-heatmap-snapshot-loading" />
             </div>
             <div
               v-if="snapshotReady"
