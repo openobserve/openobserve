@@ -288,7 +288,7 @@ pub async fn ingest(
                     written_any = true;
                 }
                 for status in v.status {
-                    bulk_res.items.extend(status.items);
+                    merge_stream_items(&mut bulk_res, status.items);
                 }
             }
             Err(e) => {
@@ -496,6 +496,15 @@ pub(super) fn resolve_bulk_timestamp(
     Ok((timestamp, has_valid_timestamp))
 }
 
+/// Appends a stream's items, flagging the response when any carries an error.
+fn merge_stream_items(bulk_res: &mut BulkResponse, items: Vec<HashMap<String, BulkResponseItem>>) {
+    bulk_res.errors |= items
+        .iter()
+        .flat_map(|item| item.values())
+        .any(|item| item.error.is_some());
+    bulk_res.items.extend(items);
+}
+
 /// The stream's columnar rows, planned on its first data line of the request.
 async fn stream_columnar<'a>(
     plans: &'a mut HashMap<String, Option<BulkPlan>>,
@@ -533,6 +542,28 @@ mod tests {
             None,
         );
         assert!(bulk_res.items.len() == 1);
+    }
+
+    #[test]
+    fn test_merge_stream_items_flags_error_items() {
+        let mut bulk_res = BulkResponse::default();
+        let ok = success_item("index".to_string(), "s", "1".to_string());
+        merge_stream_items(&mut bulk_res, vec![ok]);
+        assert!(!bulk_res.errors);
+
+        let mut failed = BulkResponse::default();
+        add_record_status(
+            "s".to_string(),
+            None,
+            "index".to_string(),
+            None,
+            &mut failed,
+            Some(STREAM_NAME_TOO_LONG.to_string()),
+            Some("too long".to_string()),
+        );
+        merge_stream_items(&mut bulk_res, failed.items);
+        assert!(bulk_res.errors);
+        assert_eq!(bulk_res.items.len(), 2);
     }
 
     #[test]

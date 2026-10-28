@@ -1792,8 +1792,7 @@ async fn write_traces_by_stream(
     partial_success: &mut ExportTracePartialSuccess,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        // a pipeline destination is rejected alone, so the request's other streams are still
-        // written
+        // a too-long destination is skipped alone, so the other streams are still written
         if let Err(e) = check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name) {
             log::debug!("[TRACES] {e}");
             partial_success.rejected_spans += json_data.len() as i64;
