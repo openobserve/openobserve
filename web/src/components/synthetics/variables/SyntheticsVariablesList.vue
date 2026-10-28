@@ -217,6 +217,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :other-tier-names="otherTierNames"
       @update:list="$emit('refresh')"
     />
+
+    <ODialog
+      :open="pendingDelete !== null"
+      size="sm"
+      persistent
+      :title="t('synthetics.variables.deleteTitle')"
+      :primary-button-label="t('common.ok')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('common.cancel')"
+      data-test="synthetics-variable-delete-dialog"
+      @update:open="(open: boolean) => !open && (pendingDelete = null)"
+      @click:primary="confirmRemoveVariable"
+      @click:secondary="pendingDelete = null"
+    >
+      <p>
+        <i18n-t
+          v-if="deleteShown.usedBy > 0"
+          keypath="synthetics.variables.deleteUsed"
+          :plural="deleteShown.usedBy"
+        >
+          <template #name>
+            <span
+              data-test="synthetics-variable-delete-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ deleteShown.name }}</span
+            >
+          </template>
+        </i18n-t>
+        <i18n-t v-else keypath="synthetics.variables.deleteConfirm">
+          <template #name>
+            <span
+              data-test="synthetics-variable-delete-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ deleteShown.name }}</span
+            >
+          </template>
+        </i18n-t>
+        {{ deleteShown.fallback }}
+      </p>
+    </ODialog>
   </div>
 </template>
 
@@ -233,7 +273,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsVariable } from "@/types/synthetics";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -254,6 +294,7 @@ export default defineComponent({
     OEmptyState,
     OSearchInput,
     OTooltip,
+    ODialog,
     SyntheticsVariableForm,
     SyntheticsSplitVariableDialog,
     SyntheticsDuplicateVariableDialog,
@@ -275,7 +316,6 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { confirm } = useConfirmDialog();
     const filterQuery = ref("");
 
     const otherTierNames = computed<Record<string, string[]>>(() => {
@@ -437,22 +477,24 @@ export default defineComponent({
           });
     }
 
-    async function removeVariable(row: SyntheticsVariable) {
-      const base =
-        row.used_by_checks > 0
-          ? t(
-              "synthetics.variables.deleteUsed",
-              { name: row.name, n: row.used_by_checks },
-              row.used_by_checks,
-            )
-          : t("synthetics.variables.deleteConfirm", { name: row.name });
-      const fallback = deleteFallbackNote(row);
-      const ok = await confirm({
-        title: t("synthetics.variables.deleteTitle"),
-        // Name the blast radius before asking, not after.
-        message: fallback ? raw(`${base} ${fallback}`) : base,
-      });
-      if (!ok) return;
+    const pendingDelete = ref<{ row: SyntheticsVariable; fallback: string } | null>(null);
+    // Set on open only, so the message stays put while the dialog fades out.
+    const deleteShown = ref({ name: "", usedBy: 0, fallback: "" });
+
+    function removeVariable(row: SyntheticsVariable) {
+      // Name the blast radius before asking, not after.
+      pendingDelete.value = { row, fallback: deleteFallbackNote(row) };
+      deleteShown.value = {
+        name: row.name,
+        usedBy: row.used_by_checks,
+        fallback: pendingDelete.value.fallback,
+      };
+    }
+
+    async function confirmRemoveVariable() {
+      const row = pendingDelete.value?.row;
+      pendingDelete.value = null;
+      if (!row) return;
 
       const org = store.state.selectedOrganization.identifier;
       try {
@@ -490,6 +532,9 @@ export default defineComponent({
       openCreate,
       openEdit,
       removeVariable,
+      pendingDelete,
+      deleteShown,
+      confirmRemoveVariable,
     };
   },
 });

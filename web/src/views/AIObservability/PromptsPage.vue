@@ -653,10 +653,10 @@ async function archive(prompt: Prompt) {
   if (
     !(await confirm({
       title: t("aiObservability.promptManagement.archivePrompt"),
-      message: t("aiObservability.promptManagement.archivePromptConfirmMessage", {
-        name: raw(prompt.name),
-      }),
+      messageKeypath: "aiObservability.promptManagement.archivePromptConfirmMessage",
+      messageName: prompt.name,
       confirmLabel: t("aiObservability.promptManagement.archive"),
+      confirmVariant: "destructive",
     }))
   )
     return;

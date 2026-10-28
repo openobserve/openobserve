@@ -156,6 +156,12 @@ describe("defaultFields", () => {
       expect(y).toHaveLength(0);
     });
 
+    it("hostmap: seeds the value only, since a time bucket cannot name a cell", () => {
+      const { x, y } = buildDefaultBuilderFields("hostmap", "logs", logsSchema, "logs");
+      expect(x).toHaveLength(0);
+      expect(y).toHaveLength(1);
+    });
+
     it("metric: seeds y only (no x-axis)", () => {
       const { x, y } = buildDefaultBuilderFields("metric", "logs", logsSchema, "logs");
       expect(x).toHaveLength(0);

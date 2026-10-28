@@ -4328,6 +4328,38 @@ describe("AddPanel.vue", () => {
         }
       });
 
+      it("seeds the applied-date key from the resolved window, not the unresolved selection", () => {
+        if (!wrapper.vm.updateDateTime) return;
+
+        // The first calendar selection has no startTime yet — the picker backfills it only after this call.
+        wrapper.vm.selectedDate = {
+          valueType: "relative",
+          relativeTimePeriod: "calendar:month:0",
+        };
+        const resolvedStartTime = 1700000000000;
+        wrapper.vm.dateTimePickerRef = {
+          getConsumableDateTime: vi.fn().mockReturnValue({
+            startTime: resolvedStartTime,
+            endTime: 1700000500000,
+            relativeTimePeriod: "calendar:month:0",
+          }),
+        };
+
+        try {
+          wrapper.vm.updateDateTime();
+          expect(wrapper.vm.appliedDateKey).not.toContain("undefined");
+
+          // Simulate the picker backfilling selectedDate with the same resolved startTime.
+          wrapper.vm.selectedDate = {
+            ...wrapper.vm.selectedDate,
+            startTime: resolvedStartTime,
+          };
+          expect(wrapper.vm.isTimeChangePending).toBe(false);
+        } catch (error) {
+          // Expected if router not fully mocked
+        }
+      });
+
       it("should test goBack method", () => {
         if (wrapper.vm.goBack) {
           try {

@@ -357,6 +357,21 @@ describe("FunctionList", () => {
       expect(vm.selectedDelete.name).toBe("func1");
     });
 
+    it("names the function in the delete dialog with a destructive button", async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      await flushPromises();
+
+      (wrapper.vm as any).showDeleteDialogFn({ row: { name: "func1" } });
+      await flushPromises();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("messageKeypath") === "function.deleteTransformConfirmMessage");
+      expect(dialog?.props()).toMatchObject({ messageName: "func1", okVariant: "destructive" });
+    });
+
     it("should call delete API with correct parameters", async () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
@@ -531,6 +546,12 @@ describe("FunctionList", () => {
       const vm = wrapper.vm as any;
       vm.openBulkDeleteDialog();
       expect(vm.confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("title") === i18n.global.t("function.deleteFunctionsDialogTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("should call bulkDelete API with selected function names", async () => {

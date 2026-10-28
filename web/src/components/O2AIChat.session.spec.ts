@@ -1425,27 +1425,26 @@ describe("O2AIChat session, persistence and lifecycle", () => {
         {},
         {
           ...baseStubs,
-          ConfirmDialog: {
-            name: "ConfirmDialog",
-            template: '<div data-test="confirm-dialog" />',
+          ODialog: {
+            name: "ODialog",
+            template: "<div />",
             props: {
-              modelValue: Boolean,
+              open: Boolean,
               title: String,
-              message: String,
-              okLabel: String,
-              okVariant: String,
-              focusCancel: Boolean,
+              primaryButtonLabel: String,
+              primaryButtonVariant: String,
+              initialFocus: String,
             },
           },
         },
       );
       const dialog = wrapper
-        .findAllComponents({ name: "ConfirmDialog" })
+        .findAllComponents({ name: "ODialog" })
         .find((c) => c.props("title") === "Delete Chat")!;
       expect(dialog.props()).toMatchObject({
-        okLabel: "Delete",
-        okVariant: "destructive",
-        focusCancel: true,
+        primaryButtonLabel: "Delete",
+        primaryButtonVariant: "destructive",
+        initialFocus: "secondary",
       });
     });
   });

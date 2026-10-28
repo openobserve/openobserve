@@ -23,6 +23,7 @@ describe("searchLabelsConfig", () => {
     "legend",
     "data",
     "stateTimeline",
+    "hostmap",
     "axis",
     "labels",
     "lineStyle",
@@ -44,8 +45,8 @@ describe("searchLabelsConfig", () => {
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {
-    it("contains all 24 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(24);
+    it("contains all 25 section IDs", () => {
+      expect(ORDERED_SECTION_IDS).toHaveLength(25);
     });
 
     it("contains every expected section ID", () => {
@@ -77,8 +78,8 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("has exactly 24 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(24);
+    it("has exactly 25 keys", () => {
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(25);
     });
 
     it("has no section set to true", () => {
