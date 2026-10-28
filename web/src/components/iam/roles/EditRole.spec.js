@@ -61,6 +61,8 @@ const ctl = vi.hoisted(() => ({
   streamCalls: [],
   // Set to a pending promise to hold every stream list, so a test can act while a preset is still staging.
   streamGate: null,
+  // Stream types whose list read fails, as a 403 or a dropped request would.
+  failStreamTypes: [],
 }));
 
 // Mock composable useStreams
@@ -69,6 +71,7 @@ vi.mock("@/composables/useStreams", () => ({
     getStreams: vi.fn(async (type) => {
       ctl.streamCalls.push(type);
       await ctl.streamGate;
+      if (ctl.failStreamTypes.includes(type)) throw new Error("403");
       const map = {
         logs: { list: ctl.logStreams ?? [{ name: "app" }, { name: "sys" }] },
         metrics: {
@@ -631,6 +634,7 @@ beforeEach(() => {
   ctl.logStreams = null;
   ctl.streamCalls = [];
   ctl.streamGate = null;
+  ctl.failStreamTypes = [];
   router.currentRoute.value.query = {};
 });
 
@@ -3926,6 +3930,45 @@ describe("EditRole - presets panel stream lists", () => {
 
     expect([...new Set(ctl.streamCalls)].sort()).toEqual(["logs", "metrics"]);
     expect(wrapper.vm.previewPreset("dbm").status).toBe("ready");
+  });
+});
+
+describe("EditRole - preset stream rows follow the latest read", () => {
+  // Called directly: RoleSummary, which relays the panel's request, is hidden while a module is open.
+  const loadStreams = async (wrapper) => {
+    await wrapper.vm.loadPresetStreams();
+    await flushPromises();
+  };
+
+  it("rebuilds the metrics rows when Retry succeeds after a failed refresh", async () => {
+    ctl.metricStreams = [{ name: "cpu" }];
+    const wrapper = await mountEditRole();
+    await loadStreams(wrapper);
+    expect(wrapper.vm.previewPreset("dbm").noMatchingStreams).toBe(true);
+
+    ctl.metricStreams = [{ name: "cpu" }, { name: "postgresql_backends" }];
+    ctl.failStreamTypes = ["metrics"];
+    await loadStreams(wrapper);
+    expect(wrapper.vm.previewPreset("dbm").status).toBe("failed");
+
+    ctl.failStreamTypes = [];
+    await loadStreams(wrapper);
+    expect(wrapper.vm.previewPreset("dbm").adds).toContain("metrics:postgresql_backends:AllowGet");
+  });
+
+  it("rebuilds rows the Metrics module loaded earlier on the first preset lookup", async () => {
+    ctl.metricStreams = [{ name: "cpu" }];
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const metrics = wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics");
+    await wrapper.vm.getResourceEntities(metrics);
+    expect(metrics.entities.map((row) => row.name)).toEqual(["cpu"]);
+
+    ctl.metricStreams = [{ name: "cpu" }, { name: "postgresql_backends" }];
+    await loadStreams(wrapper);
+
+    expect(wrapper.vm.previewPreset("dbm").adds).toContain("metrics:postgresql_backends:AllowGet");
   });
 });
 

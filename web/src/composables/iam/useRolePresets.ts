@@ -458,7 +458,7 @@ export const useRolePresets = (deps: PresetDeps) => {
     ).map((preset) => toInfo(preset, "job")),
   ]);
 
-  const loadStreamType = async (type: string, fresh: boolean) => {
+  const loadStreamType = async (type: string, force: boolean) => {
     streamStatus.value[type] = "loading";
     try {
       const streamResource = resourceMapper.value[STREAM_PARENT_KEY];
@@ -466,11 +466,13 @@ export const useRolePresets = (deps: PresetDeps) => {
         if (!getResourceEntities) throw new Error("No entity loader to read the stream lists");
         await getResourceEntities(streamResource);
         // A cold read toasts "Please wait while loading streams"; a quiet read first lets the loader answer from cache.
-        await getStreams?.(type, false, false, fresh);
+        await getStreams?.(type, false, false, force);
         const typeNode = streamTypeNode(type);
-        // The loader skips a node that already has rows, so a fresh read empties it first.
-        if (typeNode && fresh) typeNode.entities = [];
-        if (typeNode) await getResourceEntities(typeNode);
+        // The loader skips a node that already has rows, so they are emptied to rebuild from this read; checkboxes come from the grant store.
+        if (typeNode) {
+          typeNode.entities = [];
+          await getResourceEntities(typeNode);
+        }
       }
       streamStatus.value[type] = "loaded";
     } catch {
@@ -484,7 +486,7 @@ export const useRolePresets = (deps: PresetDeps) => {
     Date.now() - at >= MEDIUM_STALE_TIME ||
     [...STREAM_TYPE_OF].some(([id, of]) => of === type && !resolvePreset(id)?.matched);
 
-  /** Loads the metrics and logs lists the stream presets match against, without a toast; a failed one loads again, a stale or matchless one reads fresh. */
+  /** Loads the metrics and logs lists the stream presets match against, without a toast; a failed, stale or matchless one reads again past the cache. */
   const loadPresetStreams = async () => {
     await Promise.all(
       [...new Set(STREAM_TYPE_OF.values())].map((type) => {
@@ -495,7 +497,7 @@ export const useRolePresets = (deps: PresetDeps) => {
           (status === "loading" || (status === "loaded" && !needsFreshRead(type, last.at)))
         )
           return last.load;
-        const load = loadStreamType(type, status === "loaded");
+        const load = loadStreamType(type, !!last);
         streamLoads.set(type, { load, at: Date.now() });
         return load;
       }),

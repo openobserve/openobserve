@@ -393,6 +393,22 @@ describe("useRolePresets - stream presets", () => {
     });
   });
 
+  it("rebuilds the rows from the read that follows a failed refresh", async () => {
+    const metrics = ["cpu"];
+    const failTypes: string[] = [];
+    const ctx = setup({ metrics, failTypes });
+    await ctx.loadPresetStreams();
+
+    metrics.push("postgresql_backends");
+    failTypes.push("metrics");
+    await ctx.loadPresetStreams();
+    expect(ctx.previewPreset("dbm").status).toBe("failed");
+
+    failTypes.pop();
+    await ctx.loadPresetStreams();
+    expect(ctx.previewPreset("dbm").adds).toContain("metrics:postgresql_backends:AllowGet");
+  });
+
   it("reads a matched list fresh once it is older than the stream list cache", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(0);
     const ctx = setup();
