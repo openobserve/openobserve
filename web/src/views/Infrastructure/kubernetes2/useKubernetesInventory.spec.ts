@@ -1052,6 +1052,51 @@ describe("useKubernetesInventory", () => {
       expect(inv.eventCounts.value).toBeNull();
     });
 
+    it("keeps an in-flight count across a drawer open and close", async () => {
+      ecTotal = 5;
+      let release!: () => void;
+      ecGate = new Promise<void>((r) => (release = r));
+      const { inv, state } = await setup({ view: "pods", cluster: "prod" });
+      await inv.load();
+      state.value = parseUrlState({ view: "pods", cluster: "prod", details: "pod/prod/a/p" });
+      await inv.load();
+      state.value = parseUrlState({ view: "pods", cluster: "prod" });
+      await inv.load();
+      expect(inv.eventCounts.value).toBeNull();
+      release();
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 5, warnings: 0 }));
+    });
+
+    it("drops a late count from an older full load", async () => {
+      ecTotal = 1;
+      let releaseOld!: () => void;
+      ecGate = new Promise<void>((r) => (releaseOld = r));
+      const { inv, time } = await setup({ view: "pods", cluster: "prod" }, { relative: false });
+      await inv.load();
+      ecTotal = 8;
+      let releaseNew!: () => void;
+      ecGate = new Promise<void>((r) => (releaseNew = r));
+      time.value = later(time.value);
+      await inv.load();
+      releaseOld();
+      await new Promise((r) => setTimeout(r, 10));
+      expect(inv.eventCounts.value).toBeNull();
+      releaseNew();
+      await vi.waitFor(() => expect(inv.eventCounts.value).toEqual({ total: 8, warnings: 0 }));
+    });
+
+    it("drops a late count after reset", async () => {
+      ecTotal = 4;
+      let release!: () => void;
+      ecGate = new Promise<void>((r) => (release = r));
+      const { inv } = await setup({ view: "pods", cluster: "prod" });
+      await inv.load();
+      inv.reset();
+      release();
+      await new Promise((r) => setTimeout(r, 10));
+      expect(inv.eventCounts.value).toBeNull();
+    });
+
     it("records an EC failure and banners it without delaying loading", async () => {
       ecFail = true;
       let release!: () => void;
@@ -1064,6 +1109,347 @@ describe("useKubernetesInventory", () => {
       await vi.waitFor(() => expect(inv.failed.value.get("EC")).toBe(500));
       expect(inv.eventCounts.value).toBeNull();
       expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
+    });
+  });
+
+  describe("drawer open and close skip the page load", () => {
+    const POD = (pod: string, uid: string) => ksm({ namespace: "a", pod, uid, phase: "Running" });
+    const objectFor = (uid: string) => ({
+      uid,
+      event_name: "p",
+      k8s_namespace_name: "a",
+      body_type: "MODIFIED",
+      body_object_metadata: '{"labels":{"app":"x"}}',
+      body_object_spec: "{}",
+      body_object_status: "{}",
+    });
+    const seed = () => {
+      fixture = { ...CL(), P1: [POD("p", "u1"), POD("q", "u2")] };
+      sqlHits = (sql) => {
+        if (sql.endsWith("LIMIT 100")) {
+          return [
+            {
+              event_name: "e",
+              body_object_note: "for drawer",
+              body_object_regarding: '{"kind":"Pod","name":"p"}',
+            },
+          ];
+        }
+        if (sql.endsWith("LIMIT 1")) return [objectFor("u1")];
+        if (sql.includes("'Warning'")) {
+          return [
+            { kind: "Pod", name: "p", namespace: "a", uid: "u1", last_seen: END - 1, reason: "R" },
+          ];
+        }
+        return [];
+      };
+    };
+    const open = (view: string, details: string) => ({ view, details, cluster: "prod" });
+    const podView = { view: "nodes", cluster: "prod" };
+    const loadThenClear = async (query: Record<string, string> = podView) => {
+      seed();
+      const ctx = await setup(query);
+      await ctx.inv.load();
+      metricsQuery.mockClear();
+      search.mockClear();
+      return ctx;
+    };
+
+    it("sends only the missing detail ids and SQL, and never raises loading", async () => {
+      const { inv, state } = await loadThenClear();
+      const seen: boolean[] = [];
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      const done = inv.load();
+      seen.push(inv.loading.value);
+      await done;
+      seen.push(inv.loading.value);
+      expect(seen).toEqual([false, false]);
+      const clusterOrView = sentIds().filter((id) => CLUSTER_QUERIES.includes(id) || id === "NS1");
+      expect(clusterOrView).toEqual([]);
+      expect(sentIds().length).toBeGreaterThan(0);
+      const sqls = sentSql().map((q: any) => q.sql);
+      expect(sqls.some((q: string) => q.includes("'Warning'") && q.includes("'Pod'"))).toBe(true);
+      expect(sqls.some((q: string) => q.includes("'nodes'") && !q.endsWith("LIMIT 1"))).toBe(false);
+      expect(sqls.some((q: string) => q.endsWith("LIMIT 1"))).toBe(true);
+      expect(sqls.some((q: string) => q.endsWith("LIMIT 100"))).toBe(true);
+      expect(inv.detailLoading.value).toBe(false);
+      expect(inv.pageError.value).toBeNull();
+    });
+
+    it("produces the same drawer data as the full path for the same state", async () => {
+      const { inv, state } = await loadThenClear();
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      const full = await setup(open("nodes", "pod/prod/a/p"));
+      await full.inv.load();
+      const shape = (i: typeof inv) =>
+        i.inventory.value.pods.map((p) => [p.name, p.warnings, p.object?.metadata.labels]);
+      expect(shape(inv)).toEqual(shape(full.inv));
+      expect(shape(inv).find((r) => r[0] === "p")?.[2]).toEqual({ app: "x" });
+      expect(inv.detailEvents.value?.map((e) => e.note)).toEqual(["for drawer"]);
+      expect(inv.detailEvents.value).toEqual(full.inv.detailEvents.value);
+      expect(inv.warnings.value.rows).toEqual(full.inv.warnings.value.rows);
+      expect([...inv.sql.value.keys()].sort()).toEqual([...full.inv.sql.value.keys()].sort());
+      expect([...inv.results.value.keys()].sort()).toEqual(
+        [...full.inv.results.value.keys()].sort(),
+      );
+      expect(inv.detailObserved.value).toBe(true);
+    });
+
+    it("closing sends nothing, clears the drawer events and drops drawer-only data", async () => {
+      seed();
+      const { inv, state } = await setup(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.detailEvents.value).not.toBeNull();
+      metricsQuery.mockClear();
+      search.mockClear();
+      state.value = parseUrlState(podView);
+      await inv.load();
+      expect(metricsQuery).not.toHaveBeenCalled();
+      expect(search).not.toHaveBeenCalled();
+      expect(inv.loading.value).toBe(false);
+      expect(inv.detailLoading.value).toBe(false);
+      expect(inv.detailEvents.value).toBeNull();
+      expect(inv.sql.value.has("O1obj")).toBe(false);
+      expect(inv.sql.value.has("W:Pod")).toBe(false);
+      const plain = await setup(podView);
+      await plain.inv.load();
+      expect([...inv.results.value.keys()].sort()).toEqual(
+        [...plain.inv.results.value.keys()].sort(),
+      );
+      expect(inv.warnings.value.rows).toEqual(plain.inv.warnings.value.rows);
+    });
+
+    it("switching A to B fetches only B's object and events", async () => {
+      seed();
+      const { inv, state } = await setup(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      metricsQuery.mockClear();
+      search.mockClear();
+      state.value = parseUrlState(open("nodes", "pod/prod/a/q"));
+      await inv.load();
+      expect(metricsQuery).not.toHaveBeenCalled();
+      const sqls = sentSql().map((q: any) => q.sql);
+      expect(sqls.some((q: string) => q.includes("'Warning'"))).toBe(false);
+      expect(sqls.filter((q: string) => q.endsWith("LIMIT 1"))).toHaveLength(1);
+      expect(sqls.filter((q: string) => q.endsWith("LIMIT 100"))).toHaveLength(1);
+      expect(inv.loading.value).toBe(false);
+    });
+
+    it.each([
+      ["time end", (s: any) => (s.time.value = { start: START, end: END + 1, relative: true })],
+      ["view", (s: any) => (s.state.value = parseUrlState({ view: "pods", cluster: "prod" }))],
+      ["cluster", (s: any) => (s.state.value = parseUrlState({ view: "nodes", cluster: "dev" }))],
+      [
+        "namespaces",
+        (s: any) =>
+          (s.state.value = parseUrlState({ view: "nodes", cluster: "prod", namespace: "a" })),
+      ],
+    ])("falls back to the full path when the %s changes", async (_n, change) => {
+      const ctx = await loadThenClear({ view: "nodes", cluster: "prod", details: "pod/prod/a/p" });
+      queryClient.clear();
+      change(ctx);
+      const done = ctx.inv.load();
+      expect(ctx.inv.loading.value).toBe(true);
+      await done;
+      expect(sentIds().some((id) => CLUSTER_QUERIES.includes(id))).toBe(true);
+    });
+
+    it("falls back to the full path on force and after a page error", async () => {
+      const forced = await loadThenClear();
+      forced.state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      const done = forced.inv.load({ force: true });
+      expect(forced.inv.loading.value).toBe(true);
+      await done;
+      expect(sentIds().some((id) => CLUSTER_QUERIES.includes(id))).toBe(true);
+      queryClient.clear();
+      const failedPage = await setup(podView);
+      reject = [...CLUSTER_QUERIES];
+      await failedPage.inv.load();
+      expect(failedPage.inv.pageError.value).not.toBeNull();
+      reject = [];
+      queryClient.clear();
+      metricsQuery.mockClear();
+      failedPage.state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await failedPage.inv.load();
+      expect(sentIds().some((id) => CLUSTER_QUERIES.includes(id))).toBe(true);
+      expect(failedPage.inv.pageError.value).toBeNull();
+    });
+
+    it("records a drawer fetch failure as a partial failure without a page error", async () => {
+      const { inv, state } = await loadThenClear();
+      search.mockImplementation((async (args: any) => {
+        if (args.query.query.sql.endsWith("LIMIT 100")) {
+          throw Object.assign(new Error("no"), { response: { status: 500 } });
+        }
+        return { data: { hits: sqlHits(args.query.query.sql) } };
+      }) as any);
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.failed.value.get("DE")).toBe(500);
+      expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
+      expect(inv.pageError.value).toBeNull();
+      expect(inv.inventory.value.pods.length).toBeGreaterThan(0);
+    });
+
+    it("clears a detail failure the drawer retry fixes and keeps one that fails again", async () => {
+      seed();
+      const warningFails = { on: true };
+      search.mockImplementation((async (args: any) => {
+        const sql = args.query.query.sql;
+        if (warningFails.on && sql.includes("'Warning'") && sql.includes("'Pod'")) {
+          throw Object.assign(new Error("no"), { response: { status: 500 } });
+        }
+        return { data: { hits: sqlHits(sql) } };
+      }) as any);
+      const { inv, state } = await setup(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.failed.value.get("W:Pod")).toBe(500);
+      expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
+      state.value = parseUrlState(open("nodes", "pod/prod/a/q"));
+      await inv.load();
+      expect(inv.failed.value.get("W:Pod")).toBe(500);
+      warningFails.on = false;
+      state.value = parseUrlState(podView);
+      await inv.load();
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.failed.value.has("W:Pod")).toBe(false);
+      expect(inv.banners.value.map((b) => b.id)).not.toContain("partial-failure");
+    });
+
+    it("drops a superseded drawer load", async () => {
+      const { inv, state } = await loadThenClear();
+      let release!: () => void;
+      const hold = new Promise<void>((r) => (release = r));
+      search.mockImplementation((async (args: any) => {
+        if (args.query.query.sql.endsWith("LIMIT 100")) await hold;
+        return { data: { hits: sqlHits(args.query.query.sql) } };
+      }) as any);
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      const first = inv.load();
+      await vi.waitFor(() =>
+        expect(sentSql().some((q: any) => q.sql.endsWith("LIMIT 100"))).toBe(true),
+      );
+      state.value = parseUrlState(podView);
+      await inv.load();
+      release();
+      await first;
+      expect(inv.detailEvents.value).toBeNull();
+      expect(inv.detailLoading.value).toBe(false);
+    });
+
+    it("treats a close before the first batch lands as a drawer toggle, then reopens fine", async () => {
+      const { inv, state } = await loadThenClear();
+      let release!: () => void;
+      const hold = new Promise<void>((r) => (release = r));
+      search.mockImplementation((async (args: any) => {
+        if (args.query.query.sql.includes("'Warning'")) await hold;
+        return { data: { hits: sqlHits(args.query.query.sql) } };
+      }) as any);
+      const seen: boolean[] = [];
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      const first = inv.load();
+      seen.push(inv.loading.value);
+      await vi.waitFor(() =>
+        expect(sentSql().some((q: any) => q.sql.includes("'Warning'"))).toBe(true),
+      );
+      metricsQuery.mockClear();
+      state.value = parseUrlState(podView);
+      const second = inv.load();
+      seen.push(inv.loading.value);
+      await second;
+      seen.push(inv.loading.value);
+      expect(sentIds().filter((id) => CLUSTER_QUERIES.includes(id) || id === "NS1")).toEqual([]);
+      release();
+      await first;
+      seen.push(inv.loading.value);
+      expect(seen).toEqual([false, false, false, false]);
+      expect(inv.detailLoading.value).toBe(false);
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.loading.value).toBe(false);
+      expect(inv.detailEvents.value?.map((e) => e.note)).toEqual(["for drawer"]);
+      expect(inv.pageError.value).toBeNull();
+    });
+
+    it("reports a page error when every drawer request fails, and force-load recovers", async () => {
+      const { inv, state } = await loadThenClear();
+      reject = ALL_IDS.filter((id) => !CLUSTER_QUERIES.includes(id) && id !== "NS1");
+      search.mockImplementation((async () => {
+        throw Object.assign(new Error("no"), { response: { status: 500 } });
+      }) as any);
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.pageError.value).not.toBeNull();
+      expect(inv.detailLoading.value).toBe(false);
+      reject = [];
+      seed();
+      search.mockImplementation((async (args: any) => ({
+        data: { hits: sqlHits(args.query.query.sql) },
+      })) as any);
+      metricsQuery.mockClear();
+      queryClient.clear();
+      await inv.load({ force: true });
+      expect(sentIds().some((id) => CLUSTER_QUERIES.includes(id))).toBe(true);
+      expect(inv.pageError.value).toBeNull();
+      expect(inv.detailLoading.value).toBe(false);
+      expect(inv.detailEvents.value?.map((e) => e.note)).toEqual(["for drawer"]);
+    });
+
+    it("only banners when the drawer fails partially", async () => {
+      const { inv, state } = await loadThenClear();
+      search.mockImplementation((async (args: any) => {
+        const sql = args.query.query.sql;
+        if (sql.endsWith("LIMIT 1")) {
+          throw Object.assign(new Error("no"), { response: { status: 500 } });
+        }
+        return { data: { hits: sqlHits(sql) } };
+      }) as any);
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(inv.pageError.value).toBeNull();
+      expect(inv.detailLoading.value).toBe(false);
+      expect(inv.banners.value.map((b) => b.id)).toContain("partial-failure");
+    });
+
+    it("takes the full path for a drawer toggle while a full load is in flight", async () => {
+      const { inv, state } = await loadThenClear();
+      let release!: () => void;
+      const hold = new Promise<void>((r) => (release = r));
+      const base = metricsQuery.getMockImplementation()!;
+      metricsQuery.mockImplementation((async (args: any) => {
+        await hold;
+        return base(args);
+      }) as any);
+      queryClient.clear();
+      const forced = inv.load({ force: true });
+      expect(inv.loading.value).toBe(true);
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      const toggled = inv.load();
+      expect(inv.loading.value).toBe(true);
+      release();
+      await Promise.all([forced, toggled]);
+      expect(inv.loading.value).toBe(false);
+      expect(inv.detailLoading.value).toBe(false);
+      expect(inv.pageError.value).toBeNull();
+      expect(inv.detailEvents.value?.map((e) => e.note)).toEqual(["for drawer"]);
+    });
+
+    it("fetches only the missing detail ids when no events SQL is planned", async () => {
+      seed();
+      const { inv, state } = await setup(podView, { logs: [] });
+      await inv.load();
+      metricsQuery.mockClear();
+      search.mockClear();
+      state.value = parseUrlState(open("nodes", "pod/prod/a/p"));
+      await inv.load();
+      expect(search).not.toHaveBeenCalled();
+      expect(sentIds().length).toBeGreaterThan(0);
+      expect(sentIds().filter((id) => CLUSTER_QUERIES.includes(id) || id === "NS1")).toEqual([]);
+      expect(inv.loading.value).toBe(false);
+      expect(inv.detailLoading.value).toBe(false);
+      expect(inv.pageError.value).toBeNull();
     });
   });
 

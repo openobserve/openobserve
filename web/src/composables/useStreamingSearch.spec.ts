@@ -708,6 +708,20 @@ describe("useHttpStreaming", () => {
       const { err } = await failRead(new Error("worker exploded"));
       expect(err).toHaveBeenCalledWith("Error reading stream:", expect.any(Error));
     });
+
+    it("passes the read failure message to the error handler", async () => {
+      handlers.error.mockClear();
+      await failRead(new TypeError("Failed to fetch"));
+      expect(handlers.error.mock.calls[0][1].content.message).toBe("Failed to fetch");
+    });
+
+    it("keeps an own enumerable status on an Error in the error content", async () => {
+      handlers.error.mockClear();
+      await failRead(Object.assign(new Error("denied"), { status: 403 }));
+      const content = handlers.error.mock.calls[0][1].content;
+      expect(content.status).toBe(403);
+      expect(content.message).toBe("denied");
+    });
   });
 
   describe("WebSocket response converters", () => {
