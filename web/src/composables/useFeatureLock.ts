@@ -24,8 +24,6 @@ import {
   type InjectionKey,
   type Ref,
 } from "vue";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
 import { siteURL } from "@/constants/config";
 
 export interface FeatureLock {
@@ -88,18 +86,8 @@ export const isLockedDenialToast = (message: unknown): boolean =>
 
 /** The upsell actions shared by the locked page and the locked-page banner. */
 export const useFeatureLockActions = () => {
-  const router = useRouter();
-  const store = useStore();
-  // The license page only exists on enterprise builds.
-  const hasLicensePage = computed(() => router.hasRoute("license"));
-  const openLicense = () => {
-    router.push({
-      name: "license",
-      query: { org_identifier: store.state.selectedOrganization?.identifier },
-    });
-  };
   const openContactSales = () => {
     window.open(siteURL.contactSales, "_blank", "noopener");
   };
-  return { hasLicensePage, openLicense, openContactSales };
+  return { openContactSales };
 };
