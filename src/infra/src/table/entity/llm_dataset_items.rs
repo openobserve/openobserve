@@ -19,6 +19,12 @@ pub struct Model {
     pub input: Json,
     pub expected_output: Json,
     pub global_version: i64,
+    /// The Dataset version shown for the write request that stored this row; every row of one
+    /// request shares it, while `global_version` stays unique per row. NULL for rows written
+    /// before the column existed or by an older node: such a row is its own write, numbered by
+    /// `global_version`. Display only: two regions can label different writes with one value.
+    #[serde(default)]
+    pub write_version: Option<i64>,
     pub is_deleted: bool,
     pub source: String,
     pub source_ref: Option<String>,
@@ -36,3 +42,32 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replicated_rows_preserve_write_versions_and_accept_older_payloads() {
+        // EvalDatasetMessage carries this row as JSON; old nodes omit the new column.
+        let legacy = serde_json::json!({
+            "row_id": "row-1",
+            "logical_id": "item-1",
+            "org_id": "org-1",
+            "dataset_id": "dataset-1",
+            "input": "question",
+            "expected_output": "answer",
+            "global_version": 59,
+            "is_deleted": false,
+            "source": "manual",
+            "updated_by": "owner@example.com",
+            "updated_at": 100
+        });
+        let mut row: Model = serde_json::from_value(legacy).unwrap();
+        assert_eq!(row.write_version, None);
+        row.write_version = Some(57);
+        let payload = serde_json::to_value(&row).unwrap();
+        assert_eq!(payload["write_version"], 57);
+        assert_eq!(serde_json::from_value::<Model>(payload).unwrap(), row);
+    }
+}

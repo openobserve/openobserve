@@ -113,7 +113,7 @@
               >
                 {{
                   t("aiObservability.experiments.form.datasetPinned", {
-                    version: selectedDatasetVersion,
+                    version: shownDatasetVersion,
                   })
                 }}
                 {{
@@ -927,10 +927,16 @@ const selectedDataset = computed(
 );
 // A clone keeps the version its source pinned. Re-pinning to the dataset's head
 // would compare two runs over different rows and call the difference a result.
+// This is the pin key (a row version); `shownDatasetVersion` is what it reads as.
 const selectedDatasetVersion = computed(() =>
   cloneSource.value
     ? cloneSource.value.datasetVersion
     : (selectedDataset.value?.globalVersion ?? 0),
+);
+const shownDatasetVersion = computed(() =>
+  cloneSource.value
+    ? cloneSource.value.datasetWriteVersion
+    : (selectedDataset.value?.writeVersion ?? 0),
 );
 
 // preview() validates the entire create body, so it can only run once the task
@@ -945,7 +951,7 @@ const previewReady = computed(() => {
   return !!providerId.value && !!String(userPrompt.value ?? "").trim();
 });
 const datasetLabel = computed(() =>
-  selectedDataset.value ? `${selectedDataset.value.name} @ v${selectedDatasetVersion.value}` : "",
+  selectedDataset.value ? `${selectedDataset.value.name} @ v${shownDatasetVersion.value}` : "",
 );
 
 const datasetOptions = computed(() =>

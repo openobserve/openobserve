@@ -597,7 +597,8 @@ const modeExplicit = ref(explicitMode !== null);
 // the panels and the scope bar wait for it.
 const scopeReady = ref(false);
 // Whether an agents list has decided the mode. A failed agents load decides
-// nothing, so the next load after it decides again.
+// nothing, so the next load after it decides again; so does a window the user
+// picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
 // Env/name/version to seed the cascade with once the list loads: the URL
 // deep-link first (any of agent/env/version), else the persisted last
@@ -1141,13 +1142,18 @@ let resolvingScope = 0;
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
 // changes, refresh button, and onMounted all funnel through here. `force`
 // (manual refresh) bypasses the KPI and agents caches and pulls fresh numbers.
-async function loadInsights(startTime?: number, endTime?: number, opts?: { force?: boolean }) {
+// `windowPicked` (a user's date pick) lets the new window's agents decide an
+// auto mode again.
+async function loadInsights(
+  startTime?: number,
+  endTime?: number,
+  opts?: { force?: boolean; windowPicked?: boolean },
+) {
   try {
     const force = opts?.force ?? false;
     const start = startTime ?? props.startTime;
     const end = endTime ?? props.endTime;
     if (!start || !end) return;
-
     // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
     // once the stream list loads — so make sure that's done before we fetch,
     // regardless of whether this call raced ahead of the mount's stream load.
@@ -1164,7 +1170,7 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
     } finally {
       resolvingScope--;
     }
-    if (!modeSettled && !modeExplicit.value) {
+    if ((!modeSettled || opts?.windowPicked) && !modeExplicit.value) {
       filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
     }
     if (!agentsError.value) modeSettled = true;
@@ -1279,9 +1285,11 @@ watch(
 // Parent calls this on Run Query / Refresh / date-range change, passing
 // the freshly computed start/end so we don't have to wait for Vue's
 // next-tick prop propagation. `force` is false for the window DateTime replays
-// on mount, so entering the page does not bypass the caches.
-async function refresh(startTime?: number, endTime?: number, force = true) {
-  await loadInsights(startTime, endTime, { force });
+// on mount, so entering the page does not bypass the caches. `windowPicked` is
+// true only for a user's own date pick: an auto-decided mode is decided again
+// for that window (Agent with no agents → Stream), as Agent Behavior does.
+async function refresh(startTime?: number, endTime?: number, force = true, windowPicked = false) {
+  await loadInsights(startTime, endTime, { force, windowPicked });
 }
 
 // "Last refreshed" timestamp for the whole-page refresh indicator. Stamped when

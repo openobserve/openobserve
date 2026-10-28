@@ -68,7 +68,9 @@ Find and print one line, e.g. `Python 3.12 · openai 1.54 · entry point app/mai
 ### Python, supported SDK — use the OpenObserve installer
 
 Run the installer the integration card uses, pinned to a reviewed commit: download it to a temp
-directory and run it from there, never pipe a URL into a shell. It installs the packages into the
+directory, check its SHA-256 against the one below, and run it from there only if they match;
+never pipe a URL into a shell. A mismatch means the file is not the reviewed one: stop and tell
+the user instead of running it or retrying another way. It installs the packages into the
 interpreter it finds and verifies the imports. It takes the token only as a command-line argument,
 which other local processes can read, so it never gets the real one: the project's `.env` already
 holds the token. Give it a placeholder and point its env file into the temp directory, so it
@@ -82,17 +84,29 @@ for l in open(".env"):
     k, _, v = l.strip().removeprefix("export ").partition("=")
     if k.strip() == sys.argv[1]: print(v.strip().strip("\"'\''")); break' "$1"; }
 O2_INSTALLER_RAW=https://raw.githubusercontent.com/openobserve/o2-datasource/9fdf2ca60b03a43273677a875140cfd19e29262b/ai
+O2_INSTALLER_SHA256=307c0d275c8b91f270d557d41524d438f799934fe8502b513e3a22e6b2fcb0af
 O2_INSTALLER_DIR="$(mktemp -d)"
 mkdir "$O2_INSTALLER_DIR/frameworks"
 curl -fsSL "$O2_INSTALLER_RAW/frameworks/setup.sh" -o "$O2_INSTALLER_DIR/frameworks/setup.sh"
-REPO_RAW="$O2_INSTALLER_RAW" bash "$O2_INSTALLER_DIR/frameworks/setup.sh" \
-  --integration=<integration> \
-  --url="$(env_get OPENOBSERVE_URL)" \
-  --org=<org> \
-  --token="Bearer placeholder" \
-  --env-file="$O2_INSTALLER_DIR/.env" \
-  --quiet
+if command -v sha256sum >/dev/null; then o2_sha256() { sha256sum "$@"; }
+else o2_sha256() { shasum -a 256 "$@"; }; fi
+if echo "$O2_INSTALLER_SHA256  $O2_INSTALLER_DIR/frameworks/setup.sh" | o2_sha256 -c -; then
+  REPO_RAW="$O2_INSTALLER_RAW" bash "$O2_INSTALLER_DIR/frameworks/setup.sh" \
+    --integration=<integration> \
+    --url="$(env_get OPENOBSERVE_URL)" \
+    --org=<org> \
+    --token="Bearer placeholder" \
+    --env-file="$O2_INSTALLER_DIR/.env" \
+    --quiet
+else
+  echo "setup.sh does not match the reviewed SHA-256; not running it" >&2
+fi
 ```
+
+The SHA-256 is that of `ai/frameworks/setup.sh` at the pinned commit. Moving the pin to a newer
+reviewed commit means updating both lines: `O2_INSTALLER_RAW`, and `O2_INSTALLER_SHA256` from
+`gh api -H "Accept: application/vnd.github.raw"
+"repos/openobserve/o2-datasource/contents/ai/frameworks/setup.sh?ref=<commit>" | shasum -a 256`.
 
 `REPO_RAW` makes the installer fetch its helper library and integration list from the same
 commit. `<integration>` is one of `openai`, `anthropic`, `gemini`, `langchain`, `crewai`,
@@ -163,6 +177,7 @@ Put the init lines at the very top of the entry point, **before** any import of 
 import os
 import uuid
 from contextlib import contextmanager
+from typing import Optional  # Python 3.9: no `str | None`
 
 from dotenv import load_dotenv
 load_dotenv()  # openobserve_init() reads OPENOBSERVE_* from the environment
@@ -198,7 +213,7 @@ get_tracer_provider().add_span_processor(ConversationIdProcessor())
 
 
 @contextmanager
-def conversation(conversation_id: str | None = None):
+def conversation(conversation_id: Optional[str] = None):
     """Wrap one request / chat turn: `with conversation(session_id): ...`."""
     token = context.attach(
         baggage.set_baggage("gen_ai.conversation.id", conversation_id or str(uuid.uuid4()))

@@ -126,7 +126,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 126: add held_action to slack_link_requests.
 // 127: add group_label_set to alert_states.
 // 128: widen alert_dedup_state.fingerprint to varchar(256).
-// 129: let the rows of one Dataset write request share one version.
+// 129: add write_version to llm_dataset_items, so one write request is one Dataset version.
 pub const DB_SCHEMA_VERSION: u64 = 129;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

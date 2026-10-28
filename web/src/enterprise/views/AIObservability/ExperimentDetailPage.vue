@@ -679,7 +679,7 @@ const datasetLabel = computed(() => {
   if (!experiment) return raw("");
   return t("aiObservability.experiments.detail.datasetVersion", {
     dataset: experiment.datasetName ?? experiment.datasetId,
-    version: experiment.datasetVersion,
+    version: experiment.datasetWriteVersion,
   });
 });
 

@@ -138,12 +138,14 @@ impl OtelIngestionProcessor {
             resource_attributes,
             scope_name,
             events,
-            org_pricing_entries,
+            Some(org_pricing_entries),
             span_start_nanos,
             &GenAiAgentMappingConfig::default(),
         );
     }
 
+    /// Enriches an LLM span. `org_pricing_entries` is `None` when model pricing is disabled
+    /// (`ZO_MODEL_PRICING_ENABLED=false`): no cost is computed and no cost status is written.
     #[allow(clippy::too_many_arguments)]
     pub fn process_span_with_pricing_and_agent_mapping(
         &self,
@@ -151,7 +153,7 @@ impl OtelIngestionProcessor {
         resource_attributes: &HashMap<String, json::Value>,
         scope_name: Option<&str>,
         events: &[Event],
-        org_pricing_entries: &[CachedModelPricing],
+        org_pricing_entries: Option<&[CachedModelPricing]>,
         span_start_nanos: u64,
         agent_mapping_config: &GenAiAgentMappingConfig,
     ) {
@@ -262,14 +264,16 @@ impl OtelIngestionProcessor {
 
     // ── Phase 2: Compute usage, cost, and defaults ─────────────────────────
 
-    /// Returns token usage, cost components and, for a model priced only approximately or not
-    /// at all, its [`CostStatus`]. An unpriced span gets no cost entries, not a zero total.
+    /// Returns token usage, cost components and, for a model not priced exactly at a non-zero
+    /// cost, its [`CostStatus`]. An unpriced span gets no cost entries, not a zero total.
+    /// `org_pricing_entries` is `None` when model pricing is disabled: nothing is priced and
+    /// no span is marked.
     fn compute_usage_and_cost(
         &self,
         extracted: &SpanExtractions,
         span_attributes: &HashMap<String, json::Value>,
         resource_attributes: &HashMap<String, json::Value>,
-        org_pricing_entries: &[CachedModelPricing],
+        org_pricing_entries: Option<&[CachedModelPricing]>,
         span_start_nanos: u64,
     ) -> (
         HashMap<String, i64>,
@@ -280,6 +284,7 @@ impl OtelIngestionProcessor {
         let mut cost = extracted.cost.clone();
         let mut input_includes_cache = extracted.input_includes_cache;
         let mut cost_status = None;
+        let mut exactly_priced = false;
 
         if is_generation_or_embedding(extracted.op_name) {
             // Zero means the payload carried no start time; treat it as unknown rather
@@ -315,10 +320,16 @@ impl OtelIngestionProcessor {
 
             // Resolve only for spans without a client-reported cost; the lookup runs regexes.
             // A span with tokens but no model name has nothing to price: it is unpriced, not
-            // free. One without tokens stays unmarked.
-            if cost.is_empty() && extracted.model_name.is_none() && usage.values().any(|&v| v > 0) {
+            // free. One without tokens stays unmarked. With pricing disabled nothing is priced
+            // or marked: the span keeps only a reported cost.
+            if cost.is_empty()
+                && org_pricing_entries.is_some()
+                && extracted.model_name.is_none()
+                && usage.values().any(|&v| v > 0)
+            {
                 cost_status = Some(CostStatus::Unpriced);
             } else if cost.is_empty()
+                && let Some(org_pricing_entries) = org_pricing_entries
                 && let Some(model_name) = extracted.model_name.as_deref()
             {
                 let resolved = crate::db::model_pricing::find_pricing_sync_at(
@@ -349,6 +360,7 @@ impl OtelIngestionProcessor {
                     if priced && resolved.match_kind == MatchKind::Approximate {
                         cost_status = Some(CostStatus::Approximate);
                     }
+                    exactly_priced = priced && resolved.match_kind == MatchKind::Exact;
                     if !result.cost.is_empty() {
                         log::debug!(
                             "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
@@ -391,6 +403,11 @@ impl OtelIngestionProcessor {
         if cost_status != Some(CostStatus::Unpriced) && !cost.contains_key("total") {
             let total = actual_cost_total(&cost);
             cost.insert("total".to_string(), total);
+        }
+        // An exact price that costs nothing (a free or muted model) is still a price; mark it so
+        // readers do not take the zero for a legacy unpriced span.
+        if exactly_priced && cost.get("total").copied() == Some(0.0) {
+            cost_status = Some(CostStatus::Free);
         }
 
         (usage, cost, cost_status)
@@ -1047,7 +1064,7 @@ mod tests {
             &HashMap::new(),
             None,
             &[],
-            &[],
+            Some(&[]),
             0,
             &config,
         );
@@ -1702,6 +1719,93 @@ mod tests {
         client_cost.insert("gen_ai.usage.cost".to_string(), json::json!(0.25));
         processor.process_span(&mut client_cost, &HashMap::new(), None, &[]);
         assert_eq!(cost_status(&client_cost), None);
+    }
+
+    fn zero_price_entry(model: &str) -> CachedModelPricing {
+        use config::meta::model_pricing::PricingTierDefinition;
+
+        let pattern = format!("^{model}$");
+        CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: format!("{model} (muted)"),
+                match_pattern: pattern.clone(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([
+                        ("input".to_string(), 0.0),
+                        ("output".to_string(), 0.0),
+                    ]),
+                    utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new(&pattern).unwrap(),
+        }
+    }
+
+    #[test]
+    fn test_exact_zero_price_with_tokens_is_marked_free() {
+        let processor = OtelIngestionProcessor::new();
+        let entries = vec![zero_price_entry("acme-internal-llm")];
+
+        let mut muted = chat_span("acme-internal-llm");
+        processor.process_span_with_pricing(&mut muted, &HashMap::new(), None, &[], &entries, 0);
+        assert_eq!(cost_status(&muted), Some("free"));
+        assert_eq!(
+            muted
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
+            Some(0.0)
+        );
+
+        // An exactly matched zero price is free even when no tokens were used.
+        let mut no_tokens = HashMap::new();
+        no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        no_tokens.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("acme-internal-llm"),
+        );
+        processor.process_span_with_pricing(
+            &mut no_tokens,
+            &HashMap::new(),
+            None,
+            &[],
+            &entries,
+            0,
+        );
+        assert_eq!(cost_status(&no_tokens), Some("free"));
+    }
+
+    #[test]
+    fn test_pricing_disabled_writes_no_marker() {
+        let processor = OtelIngestionProcessor::new();
+        for model in [Some("unknown-model-xyz-2024"), Some("gpt-4o"), None] {
+            let mut span_attrs = chat_span(model.unwrap_or("x"));
+            if model.is_none() {
+                span_attrs.remove("gen_ai.request.model");
+            }
+            processor.process_span_with_pricing_and_agent_mapping(
+                &mut span_attrs,
+                &HashMap::new(),
+                None,
+                &[],
+                None,
+                0,
+                &GenAiAgentMappingConfig::default(),
+            );
+            assert_eq!(cost_status(&span_attrs), None, "{model:?}");
+            assert!(!span_attrs.contains_key(COST_STATUS_COLUMN), "{model:?}");
+            // Tokens are still counted; nothing is priced.
+            assert_eq!(
+                span_attrs.get(GenAiAttributes::USAGE_TOTAL_TOKENS),
+                Some(&json::json!(1500))
+            );
+            assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_INPUT));
+        }
     }
 
     #[test]
