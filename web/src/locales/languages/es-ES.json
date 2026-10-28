@@ -1564,7 +1564,7 @@
     "calls": "Llama a",
     "self": "Propio",
     "total": "Total",
-    "shareOfCaller": "Parte del llamador",
+    "shareOfCaller": "Proporción del llamador",
     "partialResult": "Se muestra el {percent} de las muestras. Las pilas de llamadas menos comunes quedan fuera de esta vista.",
     "otherFrameHint": "Rutas de llamada más pequeñas, agrupadas para que el gráfico sea rápido.",
     "truncatedFrameHint": "Los llamadores que superan los 1000 marcos se han eliminado de esta pila.",
