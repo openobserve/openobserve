@@ -98,6 +98,10 @@ interface ConfigResponse {
 // Only the three dot-separated parts make a token, so a bare eyJ inside a word (surveyJsonBtn) is kept.
 const JWT_PATTERN = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
 
+// Anonymous public-link viewers are not app users, so their sessions stay out of RUM.
+const isPublicDashboard =
+  router.resolve(router.options.history.location).name === "publicDashboard";
+
 const getConfig = async () => {
   // Seeds the shared bootstrap `/config` query — Login and the version checker
   // read the same cached entry instead of each issuing their own request. The
@@ -118,7 +122,7 @@ const getConfig = async () => {
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
-    if (res.data.rum?.enabled) {
+    if (res.data.rum?.enabled && !isPublicDashboard) {
       const options = {
         clientToken: res.data.rum.client_token,
         applicationId: res.data.rum.application_id,

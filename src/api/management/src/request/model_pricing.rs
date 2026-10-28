@@ -25,9 +25,6 @@ use config::meta::model_pricing::{
     BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource, PricingTierDefinition,
 };
 use db::model_pricing::{self, CachedModelPricing};
-use openobserve_core::traces::otel::pricing::{
-    ResolvedPricing, model_canonical_names, resolve_pricing,
-};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 #[cfg(feature = "enterprise")]
@@ -719,8 +716,7 @@ pub struct TestModelMatchRequest {
 /// Response for the test-model-match endpoint.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct TestModelMatchResponse {
-    /// The matched pricing definition, or null if no definition matched. A match from the
-    /// compiled-in fallback table is shown as a built-in definition without an id.
+    /// The matched pricing definition, or null if no definition matched.
     pub matched: Option<ModelPricingDefinition>,
     /// How the matched pattern covers the model name: `exact` when it matches the whole name,
     /// `approximate` when the name continues before or after the match (the price may belong
@@ -742,7 +738,7 @@ pub struct TestModelMatchResponse {
 /// A known model that a previewed rule pattern would price.
 #[derive(Debug, PartialEq, Serialize, utoipa::ToSchema)]
 pub struct CapturedModel {
-    /// A model name some pricing rule or the compiled-in table is written for.
+    /// A model name some pricing rule is written for.
     pub model_name: String,
     /// How the previewed pattern covers this name.
     pub match_kind: MatchKind,
@@ -762,10 +758,10 @@ pub struct PricingRuleRef {
 
 /// The known models `candidate` would price if it were added to `entries`.
 ///
-/// Known models are the names the saved rules and the compiled-in table are written for (see
-/// [`derive_test_string`]), plus the name the candidate itself spells out. A model counts as
-/// captured only when the candidate would actually win it, so a model an equal-or-higher
-/// source prices more precisely is left out. `candidate` must carry an id no entry has.
+/// Known models are the names the saved rules are written for (see [`derive_test_string`]), plus
+/// the name the candidate itself spells out. A model counts as captured only when the candidate
+/// would actually win it, so a model an equal-or-higher source prices more precisely is left out.
+/// `candidate` must carry an id no entry has.
 fn captured_models(
     entries: &[CachedModelPricing],
     candidate: &CachedModelPricing,
@@ -774,7 +770,6 @@ fn captured_models(
     let names: BTreeSet<String> = entries
         .iter()
         .map(|e| derive_test_string(&e.definition.match_pattern))
-        .chain(model_canonical_names().map(|(_, canonical)| canonical.to_string()))
         .chain(std::iter::once(primary.clone()))
         .filter(|name| !name.is_empty())
         .collect();
@@ -787,22 +782,17 @@ fn captured_models(
         .filter_map(|name| {
             let match_kind = MatchKind::of(&candidate.compiled_regex, &name)?;
             let wins = matches!(
-                resolve_pricing(&with_candidate, &name, None),
-                Some(r) if matches!(&r.pricing, ResolvedPricing::Definition(d) if d.id == candidate.definition.id)
+                model_pricing::find_pricing_sync_at(&with_candidate, &name, None),
+                Some(r) if r.definition.id == candidate.definition.id
             );
             if !wins {
                 return None;
             }
-            let replaces = resolve_pricing(entries, &name, None).map(|r| match r.pricing {
-                ResolvedPricing::Definition(d) => PricingRuleRef {
-                    name: d.name,
-                    source: d.source,
-                },
-                ResolvedPricing::Compiled(p) => PricingRuleRef {
-                    name: p.canonical.clone(),
-                    source: PricingSource::BuiltIn,
-                },
-            });
+            let replaces =
+                model_pricing::find_pricing_sync_at(entries, &name, None).map(|r| PricingRuleRef {
+                    name: r.definition.name,
+                    source: r.definition.source,
+                });
             Some(CapturedModel {
                 primary: name == primary,
                 model_name: name,
@@ -899,13 +889,10 @@ pub async fn test_model_match(
     let resolved = if req.model_name.is_empty() {
         None
     } else {
-        resolve_pricing(&saved, &req.model_name, req.timestamp)
+        model_pricing::find_pricing_sync_at(&saved, &req.model_name, req.timestamp)
     };
     let match_kind = resolved.as_ref().map(|r| r.match_kind);
-    let matched = resolved.map(|r| match r.pricing {
-        ResolvedPricing::Definition(definition) => *definition,
-        ResolvedPricing::Compiled(pricing) => pricing.to_definition(),
-    });
+    let matched = resolved.map(|r| r.definition);
 
     let (tier, tier_index, costs, total_cost) = if let Some(def) = &matched {
         let ctx = openobserve_core::traces::otel::processor::pricing_context_for_test_endpoint(

@@ -27024,6 +27024,7 @@
       "lastReported": "Lần báo cáo cuối",
       "noEffectiveConfig": "Collector chưa báo cáo cấu hình hiệu lực của nó",
       "eventAssigned": "Đã gán cấu hình",
+      "eventRunning": "Xác nhận đang chạy gần nhất",
       "assignment": "Gán",
       "assignmentValue": "{config} v{version}, bản sửa đổi {revision}",
       "consistency": "Tính nhất quán",

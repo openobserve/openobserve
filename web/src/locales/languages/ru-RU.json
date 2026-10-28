@@ -27024,6 +27024,7 @@
       "lastReported": "Последний отчёт",
       "noEffectiveConfig": "Коллектор не передал свою действующую конфигурацию",
       "eventAssigned": "Конфигурация назначена",
+      "eventRunning": "Последнее подтверждение работы",
       "assignment": "Назначение",
       "assignmentValue": "{config} v{version}, ревизия {revision}",
       "consistency": "Согласованность",

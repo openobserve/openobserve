@@ -1224,7 +1224,7 @@ pub struct PublicDashboards {
     pub max_links_per_org: u32,
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_MAX_PANELS",
-        default = 10,
+        default = 50,
         help = "Panels a public link can show, counted across every tab (at least 1)."
     )]
     pub max_panels: u32,
@@ -2535,7 +2535,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
-        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, no cost is computed for spans that do not report one."
     )]
     pub model_pricing_enabled: bool,
     #[env_config(
@@ -6797,7 +6797,7 @@ mod tests {
         assert!(pd.enabled && pd.time_shifts);
         assert_eq!(
             (pd.rpm, pd.slug_rpm, pd.max_links_per_org, pd.max_panels),
-            (240, 1200, 50, 10)
+            (240, 1200, 50, 50)
         );
         assert_eq!(
             (

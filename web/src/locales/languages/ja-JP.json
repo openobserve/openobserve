@@ -27024,6 +27024,7 @@
       "lastReported": "最終報告",
       "noEffectiveConfig": "コレクターが有効な構成を報告していません",
       "eventAssigned": "構成を割り当て",
+      "eventRunning": "最終実行確認",
       "assignment": "割り当て",
       "assignmentValue": "{config} v{version}、リビジョン {revision}",
       "consistency": "一貫性",
