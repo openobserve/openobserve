@@ -48,6 +48,7 @@ const makeRouter = () =>
           { path: "sessions/view/:id", name: "SessionViewer", component: Stub },
           { path: "errors", name: "ErrorTracking", component: Stub },
           { path: "source-maps", name: "SourceMaps", component: Stub },
+          { path: "heatmaps", name: "RumClickHeatmap", component: Stub },
           {
             path: "performance",
             name: "RumPerformance",
@@ -96,6 +97,21 @@ describe("RealUserMonitoring tabs", () => {
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
     expect(tabs).toEqual(["Performance", "Sessions", "Heatmaps", "Error Tracking", "Source Maps"]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
+  });
+
+  it("clicking the Heatmaps tab opens the heatmaps route", async () => {
+    await mountAt("/rum/sessions");
+    await wrapper!.find('[data-test="rum-tab-heatmaps"]').trigger("mousedown", { button: 0 });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("RumClickHeatmap");
+    expect(router.currentRoute.value.query.org_identifier).toBe("org1");
+  });
+
+  it("highlights the Heatmaps tab on the heatmaps route", async () => {
+    await mountAt("/rum/heatmaps");
+    expect(router.currentRoute.value.name).toBe("RumClickHeatmap");
+    const tab = wrapper!.find('[data-test="rum-tab-heatmaps"]');
+    expect(tab.attributes("aria-selected")).toBe("true");
   });
 
   it("keeps Performance as the default landing tab", async () => {

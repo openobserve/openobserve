@@ -8,6 +8,33 @@ const h = vi.hoisted(() => ({
   abortAll: vi.fn(),
   getStream: vi.fn(),
   real: false,
+  events: [] as unknown[],
+  dom: "",
+}));
+
+vi.mock("@/utils/rum/sessionReplayViews", () => ({
+  createMultiViewDecoder: () => ({ push: () => ({ events: h.events }) }),
+}));
+vi.mock("@openobserve/rrweb-player/dist/style.css", () => ({}));
+vi.mock("@openobserve/rrweb-player", () => ({
+  default: class {
+    iframe: HTMLIFrameElement;
+    wrapper: HTMLElement;
+    constructor(opts: { target: HTMLElement }) {
+      this.iframe = document.createElement("iframe");
+      opts.target.appendChild(this.iframe);
+      this.iframe.contentDocument!.body.innerHTML = h.dom;
+      const win = this.iframe.contentWindow as unknown as { Element: typeof Element };
+      win.Element.prototype.getBoundingClientRect = () =>
+        ({ left: 0, top: 0, width: 50, height: 20 }) as DOMRect;
+      this.wrapper = document.createElement("div");
+      opts.target.appendChild(this.wrapper);
+    }
+    getReplayer() {
+      return { iframe: this.iframe, wrapper: this.wrapper };
+    }
+    goto() {}
+  },
 }));
 
 vi.mock("@/composables/rum/useAnalyticsSearch", async (importOriginal) => {
@@ -45,6 +72,7 @@ vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => {
 });
 
 import ClickHeatmap from "./ClickHeatmap.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import rumProductAnalytics from "@/services/rumProductAnalytics";
 import searchService from "@/services/search";
@@ -424,5 +452,301 @@ describe("ClickHeatmap", () => {
     expect(list?.textContent).toContain("1,240");
     expect(list?.textContent).toContain("201");
     wrapper.unmount();
+  });
+
+  const rankedRows = (rows: unknown[], clicks: number) => ({
+    totals: () => ok([{ clicks, sessions: 5, frustrated: 3 }]),
+    ranking: () => ok(rows),
+  });
+  const buy = { selector: "#buy", name: "Buy now", clicks: 9, sessions: 3, rage: 2, frustrated: 2 };
+  const gone = { selector: "#gone", name: "Gone", clicks: 1, sessions: 1 };
+
+  const snapshotAnswer = (rows = [buy, gone]) => {
+    h.events = [
+      { type: 4, timestamp: 1, data: { width: 100, height: 100 } },
+      { type: 2, timestamp: 2, data: { node: {} } },
+    ];
+    h.dom = '<button id="buy">Buy now</button><button id="other">Other</button>';
+    answer({
+      ...rankedRows(rows, 10),
+      "replay-views": () => ok([{ view_id: "v1" }]),
+      "replay-flags": () => ok([{ view_id: "v1", has_full_snapshot: true }]),
+      "replay-segments": () => ok([{ start: 1, segment: "{}" }]),
+      "replay-click": () => ok([{ d: 5 }]),
+    });
+  };
+  const mountSnapshot = async () => {
+    const wrapper = mount(ClickHeatmap, {
+      global: { plugins: [store], stubs: { OTable: true } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    return wrapper;
+  };
+  const settle = async () => {
+    await new Promise((r) => setTimeout(r, 700));
+    await flushPromises();
+  };
+  const count = (w: { find: (s: string) => { text: () => string } }) =>
+    w.find('[data-test="rum-heatmap-element-count"]').text();
+
+  describe("with a page snapshot", () => {
+    beforeEach(() => {
+      h.events = [];
+      h.dom = "";
+    });
+
+    it("flags no row as Not on snapshot and shows no drawn text while the snapshot mounts", async () => {
+      snapshotAnswer();
+      const wrapper = await mountSnapshot();
+
+      expect(wrapper.find('[data-test="rum-heatmap-legend"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-placed"]').exists()).toBe(false);
+      const rows = wrapper.findComponent(OTable).props("data") as { missing?: boolean }[];
+      expect(rows.some((r) => r.missing)).toBe(false);
+      await settle();
+      wrapper.unmount();
+    });
+
+    it("reports drawn elements and filters to Not on snapshot rows once placed", async () => {
+      snapshotAnswer();
+      const wrapper = await mountSnapshot();
+      await settle();
+
+      expect(wrapper.find('[data-test="rum-heatmap-placed"]').text()).toBe("1 of 2 drawn");
+      expect(count(wrapper)).toBe("2 elements");
+      await wrapper.find('[data-test="rum-heatmap-chip-missing"]').trigger("click");
+      const rows = wrapper.findComponent(OTable).props("data") as { selector: string }[];
+      expect(rows.map((r) => r.selector)).toEqual(["#gone"]);
+      wrapper.unmount();
+    });
+
+    it("disables the never-clicked chip with a visible reason while the row chips are on", async () => {
+      snapshotAnswer();
+      const wrapper = await mountSnapshot();
+      await settle();
+      const chip = () => wrapper.find('[data-test="rum-heatmap-chip-unused"]');
+      expect(chip().attributes("aria-disabled") ?? chip().attributes("disabled")).toBeUndefined();
+      expect(wrapper.find('[data-test="rum-heatmap-unused-reason"]').exists()).toBe(false);
+
+      await wrapper.find('[data-test="rum-heatmap-chip-frustrated"]').trigger("click");
+
+      expect(chip().attributes("aria-pressed")).toBe("false");
+      expect(wrapper.find('[data-test="rum-heatmap-unused-reason"]').text()).toContain(
+        "Turn off Not on snapshot and Frustrated only",
+      );
+      wrapper.unmount();
+    });
+
+    it("adds never-clicked controls to the list once the chip is enabled", async () => {
+      snapshotAnswer();
+      const wrapper = await mountSnapshot();
+      await settle();
+
+      await wrapper.find('[data-test="rum-heatmap-chip-unused"]').trigger("click");
+
+      const rows = wrapper.findComponent(OTable).props("data") as {
+        selector: string;
+        firstUnused?: boolean;
+      }[];
+      expect(rows.map((r) => r.selector)).toEqual(["#buy", "#gone", "unused-0"]);
+      expect(rows[2].firstUnused).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
+  it("shows an empty state with Clear filters when nothing matches, and clears them", async () => {
+    answer(rankedRows([buy, gone], 10));
+    const wrapper = await mountPage({ OTable: true });
+
+    await wrapper.find('[data-test="rum-heatmap-element-search"] input').setValue("zzz");
+    expect(wrapper.find('[data-test="rum-heatmap-no-match"]').text()).toContain(
+      "No elements match the filters",
+    );
+    await wrapper.find('[data-test="rum-heatmap-no-match"] button').trigger("click");
+
+    expect(wrapper.find('[data-test="rum-heatmap-no-match"]').exists()).toBe(false);
+    expect(count(wrapper)).toBe("2 elements");
+  });
+
+  it("resets the element filters when the device or page changes", async () => {
+    answer({
+      ...rankedRows([buy, gone], 10),
+      pages: () =>
+        ok([
+          { view_url: "https://x.test/home", clicks: 5, sessions: 2 },
+          { view_url: "https://x.test/pricing", clicks: 3, sessions: 1 },
+        ]),
+    });
+    const wrapper = await mountPage({ OTable: true });
+    const search = () => wrapper.find('[data-test="rum-heatmap-element-search"] input');
+    const frustrated = () => wrapper.find('[data-test="rum-heatmap-chip-frustrated"]');
+
+    await search().setValue("buy");
+    await frustrated().trigger("click");
+    wrapper.findComponent(OToggleGroup).vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+    expect((search().element as HTMLInputElement).value).toBe("");
+    expect(frustrated().attributes("aria-pressed")).toBe("false");
+
+    await search().setValue("buy");
+    await frustrated().trigger("click");
+    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+    await flushPromises();
+    (
+      document.body.querySelector(
+        '[data-test="rum-heatmap-page-option-https://x.test/pricing"]',
+      ) as HTMLElement
+    ).click();
+    await flushPromises();
+    expect((search().element as HTMLInputElement).value).toBe("");
+    expect(frustrated().attributes("aria-pressed")).toBe("false");
+    wrapper.unmount();
+  });
+
+  it("searches the page picker, marks the current page and reloads on pick", async () => {
+    answer({
+      pages: () =>
+        ok([
+          { view_url: "https://x.test/home", clicks: 5, sessions: 2 },
+          { view_url: "https://x.test/pricing", clicks: 3, sessions: 1 },
+        ]),
+    });
+    const wrapper = await mountPage({ OTable: true });
+    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+    await flushPromises();
+    const query = (v: string) => {
+      const input = document.body.querySelector(
+        '[data-test="rum-heatmap-page-search"] input',
+      ) as HTMLInputElement;
+      input.value = v;
+      input.dispatchEvent(new Event("input"));
+      return flushPromises();
+    };
+    const option = (u: string) =>
+      document.body.querySelector(
+        `[data-test="rum-heatmap-page-option-${u}"]`,
+      ) as HTMLElement | null;
+
+    expect(option("https://x.test/home")?.getAttribute("aria-current")).toBe("true");
+    expect(option("https://x.test/pricing")?.getAttribute("aria-current")).toBeNull();
+
+    await query("nomatch");
+    expect(
+      document.body.querySelector('[data-test="rum-heatmap-page-none"]')?.textContent,
+    ).toContain("No pages match");
+    await query("pric");
+    h.run.mockClear();
+    option("https://x.test/pricing")!.click();
+    await flushPromises();
+
+    expect(ids()).toContain("totals");
+    expect(wrapper.find('[data-test="rum-heatmap-page-current"]').text()).toBe(
+      "https://x.test/pricing",
+    );
+    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+    await flushPromises();
+    const input = document.body.querySelector(
+      '[data-test="rum-heatmap-page-search"] input',
+    ) as HTMLInputElement;
+    expect(input.value).toBe("");
+    wrapper.unmount();
+  });
+
+  it("notes the top-pages cap inside the page picker", async () => {
+    const pages = Array.from({ length: PAGE_LIST_LIMIT }, (_, i) => ({
+      view_url: `https://x.test/p${i}`,
+    }));
+    answer({ pages: () => ok(pages) });
+    const wrapper = await mountPage({ OTable: true });
+    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+    await flushPromises();
+
+    expect(
+      document.body.querySelector('[data-test="rum-heatmap-page-limited"]')?.textContent,
+    ).toContain(`Top ${PAGE_LIST_LIMIT} pages by clicks`);
+    wrapper.unmount();
+  });
+
+  it("sorts ascending and back to descending when the Clicks header toggles", async () => {
+    answer(rankedRows([buy, gone], 10));
+    const wrapper = await mountPage({ OTable: true });
+    const table = () => wrapper.findComponent(OTable);
+    const order = () => (table().props("data") as { selector: string }[]).map((r) => r.selector);
+    expect(order()).toEqual(["#buy", "#gone"]);
+
+    table().vm.$emit("sort-change");
+    await flushPromises();
+    expect(order()).toEqual(["#gone", "#buy"]);
+    expect(table().props("sortOrder")).toBe("asc");
+
+    table().vm.$emit("sort-change");
+    await flushPromises();
+    expect(order()).toEqual(["#buy", "#gone"]);
+  });
+
+  it("labels the device group 'Device type', keeps 'All', and reloads when returning to All", async () => {
+    answer();
+    const wrapper = await mountPage({ OTable: true });
+
+    expect(wrapper.find('[data-test="rum-heatmap-device-select"]').attributes("aria-label")).toBe(
+      "Device type",
+    );
+    expect(wrapper.find('[data-test="rum-heatmap-device-all"]').text()).toBe("All");
+    const device = wrapper.findComponent(OToggleGroup);
+    device.vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+    h.run.mockClear();
+    device.vm.$emit("update:modelValue", "all");
+    await flushPromises();
+
+    expect(ids().sort()).toEqual(["ranking", "replay-views", "totals"]);
+  });
+
+  it("separates every footer note with the same separator", async () => {
+    const full = Array.from({ length: RANKING_LIMIT }, (_, i) => ({
+      selector: `#b${i}`,
+      clicks: 1,
+      sessions: 1,
+    }));
+    answer({
+      ranking: () => ok(full),
+      devices: () => ok([{ cls: "unknown", clicks: 3 }]),
+    });
+    const wrapper = await mountPage({ OTable: true });
+    const footer = wrapper.find('[data-test="rum-heatmap-footer"]');
+
+    expect(footer.find('[data-test="rum-heatmap-limited"]').exists()).toBe(true);
+    expect(footer.find('[data-test="rum-heatmap-unknown-device"]').text()).toContain("3 clicks");
+    expect(footer.findAll('[aria-hidden="true"]').map((el) => el.text())).toEqual(["·"]);
+  });
+
+  it("pluralizes the frustration split", async () => {
+    answer(
+      rankedRows(
+        [
+          {
+            selector: "#buy",
+            name: "Buy",
+            clicks: 4,
+            sessions: 2,
+            rage: 1,
+            dead: 2,
+            frustrated: 3,
+          },
+        ],
+        4,
+      ),
+    );
+    const rows = {
+      props: ["data"],
+      template:
+        '<div v-for="r in data" :key="r.selector"><slot name="cell-feature" :row="r" /></div>',
+    };
+    const wrapper = await mountPage({ OTable: rows as unknown as boolean });
+
+    expect(wrapper.find('[data-test="rum-heatmap-frustrated-#buy"]').text()).toBe(
+      "· 1 rage click · 2 dead clicks",
+    );
   });
 });

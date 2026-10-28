@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="rangeOptions"
             size="sm"
             data-test="rum-heatmap-range-select"
-            @update:model-value="loadApps"
+            @update:model-value="onRangeChange"
           >
             <template #icon-left><OIcon name="schedule" size="sm" /></template>
           </OSelect>
@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="sm"
                   block
+                  :aria-current="p.url === pageUrl ? 'true' : undefined"
                   :data-test="`rum-heatmap-page-option-${p.url}`"
                   @click="onPagePick(p.url)"
                 >
@@ -125,7 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-compact grid w-full grid-cols-[minmax(0,1fr)_4.5rem_5rem] items-center gap-2 text-left font-normal"
                     :class="p.url === pageUrl ? 'text-accent' : ''"
                   >
-                    <span class="truncate font-mono" :title="p.url">{{ p.url }}</span>
+                    <span class="flex min-w-0 items-center gap-1">
+                      <OIcon v-if="p.url === pageUrl" name="check" size="sm" class="shrink-0" />
+                      <span class="truncate font-mono" :title="p.url">{{ p.url }}</span>
+                    </span>
                     <span class="text-right font-semibold">{{ addCommasToNumber(p.clicks) }}</span>
                     <span class="text-right">{{ addCommasToNumber(p.sessions) }}</span>
                   </span>
@@ -138,6 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("rum.heatmap.pageNone") }}
                 </p>
               </div>
+              <p
+                v-if="pagesLimited"
+                class="border-border-default text-text-secondary border-t px-3 py-2 text-xs"
+                data-test="rum-heatmap-page-limited"
+              >
+                {{ t("rum.heatmap.limitedPages", { count: PAGE_LIST_LIMIT }) }}
+              </p>
             </div>
           </OPopover>
         </div>
@@ -209,11 +220,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <span class="min-w-0 truncate font-bold">
               {{ summary.top.name || summary.top.selector }}
-              <span class="text-text-secondary font-normal">{{
-                t("rum.heatmap.statTopShare", {
-                  pct: sharePercent(summary.top.clicks, summary.clicks),
-                })
-              }}</span>
+              <span class="text-text-secondary font-normal"
+                >{{ separator }}
+                {{
+                  t("rum.heatmap.statTopShare", {
+                    pct: sharePercent(summary.top.clicks, summary.clicks),
+                  })
+                }}</span
+              >
             </span>
           </div>
         </div>
@@ -304,9 +318,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </span>
               </div>
+              <p
+                v-if="unusedReason"
+                class="text-text-secondary text-xs"
+                data-test="rum-heatmap-unused-reason"
+              >
+                {{ unusedReason }}
+              </p>
             </div>
             <div class="min-h-0 flex-1 overflow-auto">
+              <OEmptyState
+                v-if="groups.length && !visibleRows.length"
+                size="block"
+                :title="t('rum.heatmap.noElementMatch')"
+                :action-label="t('rum.heatmap.clearFilters')"
+                data-test="rum-heatmap-no-match"
+                @action="clearElementFilters"
+              />
               <OTable
+                v-else
                 :data="visibleRows"
                 :columns="columns"
                 :default-columns="false"
@@ -370,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text font-semibold"
                         :data-test="`rum-heatmap-not-on-snapshot-${row.selector}`"
                       >
-                        · {{ t("rum.heatmap.chipNotOnSnapshot") }}
+                        {{ separator }} {{ t("rum.heatmap.chipNotOnSnapshot") }}
                       </span>
                     </span>
                   </div>
@@ -397,20 +427,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default text-text-secondary flex flex-wrap gap-x-1 border-t px-3 py-2 text-xs"
               data-test="rum-heatmap-footer"
             >
-              <span v-if="limitedText" data-test="rum-heatmap-limited">{{ limitedText }}</span>
-              <span v-if="limitedText && snapshotReady" aria-hidden="true">·</span>
-              <span v-if="snapshotReady" data-test="rum-heatmap-placed">
-                {{ t("rum.heatmap.drawn", { placed: placedCount, total: groups.length }) }}
-              </span>
-              <span v-if="unknownDeviceClicks" data-test="rum-heatmap-unknown-device">
-                {{
-                  t(
-                    "rum.heatmap.unknownDevice",
-                    { count: addCommasToNumber(unknownDeviceClicks) },
-                    unknownDeviceClicks,
-                  )
-                }}
-              </span>
+              <template v-for="(part, i) in footerParts" :key="part.dataTest">
+                <span v-if="i > 0" aria-hidden="true">{{ separator }}</span>
+                <span :data-test="part.dataTest">{{ part.text }}</span>
+              </template>
             </div>
           </div>
         </div>
@@ -553,6 +573,7 @@ const exclusions = ref<AnalyticsScope["exclusions"]>(undefined);
 const placedSelectors = ref<Set<string>>(new Set());
 const snapshotLoading = ref(false);
 const snapshotReady = ref(false);
+const placementsReady = ref(false);
 const snapshotError = ref<I18nText | null>(null);
 const loadError = ref<I18nText | null>(null);
 const settingsFailed = ref(false);
@@ -606,6 +627,7 @@ const deviceOptions = computed(() => [
   { label: deviceLabel("rum.heatmap.devicePhone", "phone"), value: "phone", icon: "smartphone" },
 ]);
 
+const separator = computed(() => t("rum.heatmap.separator"));
 const unknownDeviceClicks = computed(() => deviceClicks.value.unknown ?? 0);
 const placedCount = computed(() => placedSelectors.value.size);
 const summary = computed<ClickSummary>(() => ({ ...totals.value, top: groups.value[0] ?? null }));
@@ -623,11 +645,17 @@ const clickedRows = computed<ElementRow[]>(() =>
     rage: g.rage,
     dead: g.dead,
     error: g.error,
-    missing: snapshotReady.value && !placedSelectors.value.has(g.selector),
+    missing: placementsReady.value && !placedSelectors.value.has(g.selector),
   })),
 );
 const matchesQuery = (r: ElementRow) =>
   `${r.feature} ${r.selector}`.toLowerCase().includes(elementQuery.value.trim().toLowerCase());
+const rowFilterOn = computed(() => onlyMissing.value || onlyFrustrated.value);
+const unusedReason = computed(() => {
+  if (rowFilterOn.value) return t("rum.heatmap.chipUnusedFiltered");
+  if (!unusedAvailable.value && !snapshotLoading.value) return t("rum.heatmap.chipUnusedDisabled");
+  return undefined;
+});
 const visibleRows = computed<ElementRow[]>(() => {
   const clicked = clickedRows.value.filter(
     (r) =>
@@ -636,9 +664,8 @@ const visibleRows = computed<ElementRow[]>(() => {
       (!onlyFrustrated.value || r.frustrated),
   );
   if (sortOrder.value === "asc") clicked.reverse();
-  const filtered = onlyMissing.value || onlyFrustrated.value;
   const unused =
-    showUnused.value && unusedAvailable.value && !filtered
+    showUnused.value && unusedAvailable.value && !rowFilterOn.value
       ? unusedRows.value.filter(matchesQuery).map((r, i) => ({ ...r, firstUnused: i === 0 }))
       : [];
   return [...clicked, ...unused];
@@ -676,9 +703,9 @@ const chips = computed<FilterChip[]>(() => [
   {
     key: "unused",
     label: t("rum.heatmap.unusedHeading"),
-    active: showUnused.value && unusedAvailable.value,
-    disabled: !unusedAvailable.value,
-    title: unusedAvailable.value ? undefined : t("rum.heatmap.chipUnusedDisabled"),
+    active: showUnused.value && unusedAvailable.value && !rowFilterOn.value,
+    disabled: !unusedAvailable.value || rowFilterOn.value,
+    title: unusedReason.value,
     toggle: () => (showUnused.value = !showUnused.value),
   },
 ]);
@@ -693,6 +720,20 @@ const limitedText = computed(() => {
   if (pages) return t("rum.heatmap.limitedPages", { count: pages });
   if (elements) return t("rum.heatmap.limitedElements", { count: elements });
   return "";
+});
+const footerParts = computed(() => {
+  const parts: { dataTest: string; text: I18nText }[] = [];
+  if (limitedText.value) parts.push({ dataTest: "rum-heatmap-limited", text: limitedText.value });
+  if (placementsReady.value) {
+    const text = t("rum.heatmap.drawn", { placed: placedCount.value, total: groups.value.length });
+    parts.push({ dataTest: "rum-heatmap-placed", text });
+  }
+  if (unknownDeviceClicks.value) {
+    const count = addCommasToNumber(unknownDeviceClicks.value);
+    const text = t("rum.heatmap.unknownDevice", { count }, unknownDeviceClicks.value);
+    parts.push({ dataTest: "rum-heatmap-unknown-device", text });
+  }
+  return parts;
 });
 const statItems = computed<StatCell[]>(() => {
   const { clicks, sessions, frustrated } = summary.value;
@@ -842,7 +883,19 @@ async function loadSettings() {
   }
 }
 
+function clearElementFilters() {
+  elementQuery.value = "";
+  onlyMissing.value = false;
+  onlyFrustrated.value = false;
+}
+
+function onRangeChange() {
+  clearElementFilters();
+  return loadApps();
+}
+
 async function onAppChange() {
+  clearElementFilters();
   startCycle();
   const token = ++loadToken;
   await loadSettings();
@@ -1112,6 +1165,7 @@ async function waitForSnapshotDom(token: number) {
 
 function destroyPlayer() {
   snapshotReady.value = false;
+  placementsReady.value = false;
   overlay = null;
   try {
     player?.getReplayer?.()?.destroy?.();
@@ -1220,6 +1274,7 @@ function drawHeat() {
     placed.add(g.selector);
   }
   placedSelectors.value = placed;
+  placementsReady.value = true;
   unusedAvailable.value = mostlyPlaced(placed);
   unusedRows.value = unusedAvailable.value ? findUnusedControls(frame.doc, clickedEls, rects) : [];
   elementRects = rects;
@@ -1281,16 +1336,21 @@ function findUnusedControls(
 function onDeviceChange(value: unknown) {
   if (typeof value !== "string" || !value || value === deviceClass.value) return;
   deviceClass.value = value as DeviceClass;
+  clearElementFilters();
   loadPage(false);
 }
 
 function onPagePick(url: string) {
   pageOpen.value = false;
-  pageQuery.value = "";
   if (url === pageUrl.value) return;
   pageUrl.value = url;
+  clearElementFilters();
   loadPage();
 }
+
+watch(pageOpen, (open) => {
+  if (!open) pageQuery.value = "";
+});
 
 function onSortChange() {
   sortOrder.value = sortOrder.value === "desc" ? "asc" : "desc";
@@ -1303,11 +1363,11 @@ const barPercent = (clicks: number) => (clicksMax.value > 0 ? (clicks / clicksMa
 
 function frustrationText(row: ElementRow): string {
   const parts = [
-    row.rage && t("rum.heatmap.rageCount", { count: addCommasToNumber(row.rage) }),
-    row.dead && t("rum.heatmap.deadCount", { count: addCommasToNumber(row.dead) }),
-    row.error && t("rum.heatmap.errorCount", { count: addCommasToNumber(row.error) }),
+    row.rage && t("rum.heatmap.rageCount", { count: addCommasToNumber(row.rage) }, row.rage),
+    row.dead && t("rum.heatmap.deadCount", { count: addCommasToNumber(row.dead) }, row.dead),
+    row.error && t("rum.heatmap.errorCount", { count: addCommasToNumber(row.error) }, row.error),
   ].filter(Boolean);
-  return `· ${parts.join(" · ")}`;
+  return `${separator.value} ${parts.join(` ${separator.value} `)}`;
 }
 
 function onRowClick(row: ElementRow) {
