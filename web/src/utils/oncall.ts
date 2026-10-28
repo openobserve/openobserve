@@ -983,6 +983,34 @@ export function turnLine(members: string[], holder: string | null): string[] {
   return at < 0 ? [...members] : [...members.slice(at), ...members.slice(0, at)];
 }
 
+/** The shift `atMicros` falls in, counted in `timezone`'s wall time like `ShiftRule::shift_index`. [pure] */
+function localShiftIndex(rule: ShiftRule, atMicros: number, timezone: string): number {
+  const local = (micros: number) => micros + offsetMicrosAt(micros, timezone);
+  return Math.floor((local(atMicros) - local(rule.anchor_micros)) / rule.shift_micros);
+}
+
+/** `rule`'s roster as `members`, keeping its holder at `nowMicros` and its handovers; mirrors `ShiftRule::with_roster`. [pure] */
+export function withRoster(
+  rule: ShiftRule,
+  members: string[],
+  nowMicros: number,
+  timezone: string,
+): string[] {
+  const key = (m: string) => m.trim().toLowerCase();
+  const wanted = new Set(members.map(key));
+  const len = rule.members.length;
+  const index = len && rule.shift_micros > 0 ? localShiftIndex(rule, nowMicros, timezone) : null;
+  const holder = index === null ? null : rule.members[((index % len) + len) % len];
+  const order = turnLine(rule.members, holder).filter((m) => wanted.has(key(m)));
+  const kept = new Set(order.map(key));
+  order.push(...members.filter((m) => !kept.has(key(m))));
+  // An unresolvable rule has no holder to keep, so the roster is taken as given.
+  if (index === null || !order.length) return order;
+  const start = ((index % order.length) + order.length) % order.length;
+  // Rotated so the anchor's turn arithmetic lands `order[0]` on the shift holding `nowMicros`.
+  return order.map((_, i) => order[(i - start + order.length) % order.length]);
+}
+
 /** The rostered person behind a segment: the server's scheduled holder when someone else stands in. [pure] */
 function turnHolder(segment: ResolvedSegment): string | null {
   return segment.scheduled_email ?? segment.user_email ?? null;
@@ -1516,8 +1544,8 @@ export interface RoutingReasonView {
   mechanism: RoutingMechanism;
   /** The winning ownership rule's dimensions — chips, not a path. */
   dimensions: Record<string, string>;
-  /** The team the sentence names, when it names one. */
-  teamId: string | null;
+  /** The team as the sentence names it: its name, or its id on events written before names. */
+  team: string | null;
 }
 
 /**
@@ -1544,25 +1572,26 @@ export function parseRoutingReason(reason: string | null | undefined): RoutingRe
     notes,
     mechanism,
     dimensions: {},
-    teamId: null,
+    team: null,
     ...rest,
   });
 
-  const ownership = /^routed to (\S+) by ownership rule (.+)$/.exec(decision);
+  // Non-greedy: a team name may hold spaces, and the rule's path follows the fixed marker.
+  const ownership = /^routed to (.+?) by ownership rule (.+)$/.exec(decision);
   if (ownership) {
     return view("ownership", {
-      teamId: ownership[1],
+      team: ownership[1],
       dimensions: dimensionsOfPath(ownership[2]),
     });
   }
 
-  const explicit = /^routed to (\S+) by the alert's own setting$/.exec(decision);
-  if (explicit) return view("explicit", { teamId: explicit[1] });
+  const explicit = /^routed to (.+) by the alert's own setting$/.exec(decision);
+  if (explicit) return view("explicit", { team: explicit[1] });
 
-  const fallback = /^no ownership rule matched, so it went to the default team (\S+)$/.exec(
+  const fallback = /^no ownership rule matched, so it went to the default team (.+)$/.exec(
     decision,
   );
-  if (fallback) return view("default", { teamId: fallback[1] });
+  if (fallback) return view("default", { team: fallback[1] });
 
   if (decision.startsWith("no ownership rule matches this signal and no default team is set")) {
     return view("unrouted");

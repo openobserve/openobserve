@@ -459,6 +459,16 @@ impl IncidentCorrelationOutcome {
             | Self::SeverityEscalated { service_name, .. } => service_name,
         }
     }
+
+    /// The incident a NEW alert just joined; `None` for a new incident or a member firing again.
+    pub fn joined_by_new_alert(&self) -> Option<&str> {
+        match self {
+            Self::NewAlertTypeJoined { incident_id, .. } => Some(incident_id),
+            Self::NewIncidentCreated { .. }
+            | Self::ExistingAlertRepeated { .. }
+            | Self::SeverityEscalated { .. } => None,
+        }
+    }
 }
 
 /// Whether an incident's member alert is an OpenObserve alert or an
@@ -946,6 +956,45 @@ impl IncidentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// B2: only a new alert joining counts; the same alert firing again never re-pages.
+    #[test]
+    fn test_only_a_new_alert_joining_names_the_incident() {
+        let (id, svc) = (|| "inc_1".to_string(), || "checkout".to_string());
+        let cases = [
+            (
+                IncidentCorrelationOutcome::NewAlertTypeJoined {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                Some("inc_1"),
+            ),
+            (
+                IncidentCorrelationOutcome::ExistingAlertRepeated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::SeverityEscalated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+        ];
+        for (outcome, want) in cases {
+            assert_eq!(outcome.joined_by_new_alert(), want, "{outcome:?}");
+        }
+    }
 
     /// A node that predates an event type must still recover the whole timeline.
     ///

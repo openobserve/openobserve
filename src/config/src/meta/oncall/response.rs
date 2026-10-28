@@ -642,6 +642,35 @@ impl Response {
     pub fn is_exhausted(&self) -> bool {
         self.exhausted_at.is_some() && !self.state.is_terminal()
     }
+
+    /// What a new alert joining this page's incident does to it at `now`. [pure] [no-fail]
+    pub fn on_new_alert(&self, now: i64) -> NewAlertEffect {
+        if !self.is_exhausted() {
+            return NewAlertEffect::Nothing;
+        }
+        let quiet = self.state == ResponseState::Acknowledged
+            || self.is_snoozed(now)
+            || now - self.ladder_start() < NEW_ALERT_REPAGE_COOLDOWN_MICROS;
+        if quiet {
+            NewAlertEffect::NoteOnly
+        } else {
+            NewAlertEffect::PageAgain
+        }
+    }
+}
+
+/// How long a page's current run must have been going before a joining alert may page again.
+pub const NEW_ALERT_REPAGE_COOLDOWN_MICROS: i64 = 30 * 60 * 1_000_000;
+
+/// What a new alert joining an incident does to the incident's page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NewAlertEffect {
+    /// The ladder ran out unanswered a while ago: run it again.
+    PageAgain,
+    /// Exhausted but owned, quieted or freshly re-run: say so on the timeline only.
+    NoteOnly,
+    /// The ladder is still climbing or the page is closed.
+    Nothing,
 }
 
 // G16 dampens on the re-fire, not the close, and from `closed_at`: a bug delays, never sticks.
@@ -1004,6 +1033,75 @@ mod tests {
         ResponseEventKind::SeverityPromoted,
         ResponseEventKind::Flapped,
     ];
+
+    /// B2: a new alert re-pages an exhausted page only if unowned and its run is 30 minutes old.
+    #[test]
+    fn test_a_new_alert_pages_again_only_after_the_cooldown() {
+        let opened = 1_700_000_000_000_000;
+        let later = opened + NEW_ALERT_REPAGE_COOLDOWN_MICROS;
+        let open = Response {
+            opened_at: opened,
+            ..sample(None, None)
+        };
+        let exhausted = |state: ResponseState| Response {
+            state,
+            exhausted_at: Some(opened + 1),
+            ..open.clone()
+        };
+        let cases = [
+            (
+                "exhausted, quiet for 30 minutes",
+                exhausted(ResponseState::Triggered),
+                later,
+                NewAlertEffect::PageAgain,
+            ),
+            (
+                "within 30 minutes",
+                exhausted(ResponseState::Triggered),
+                later - 1,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "acknowledged",
+                exhausted(ResponseState::Acknowledged),
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "snoozed",
+                Response {
+                    snoozed_until: Some(later + 1),
+                    ..exhausted(ResponseState::Triggered)
+                },
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "re-run less than 30 minutes ago",
+                Response {
+                    ladder_anchor: Some(later - 1),
+                    ..exhausted(ResponseState::Triggered)
+                },
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "still climbing",
+                open.clone(),
+                later,
+                NewAlertEffect::Nothing,
+            ),
+            (
+                "resolved",
+                exhausted(ResponseState::Resolved),
+                later,
+                NewAlertEffect::Nothing,
+            ),
+        ];
+        for (case, record, now, want) in cases {
+            assert_eq!(record.on_new_alert(now), want, "{case}");
+        }
+    }
 
     #[test]
     fn test_responder_role_ids_are_pinned() {

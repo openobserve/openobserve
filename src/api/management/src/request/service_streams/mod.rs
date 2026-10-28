@@ -26,6 +26,15 @@ use openobserve_core::auth::check_permissions;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+/// One registry row as the service list returns it.
+#[derive(Debug, serde::Serialize)]
+struct ServiceRow {
+    #[serde(flatten)]
+    record: infra::table::service_streams::ServiceRecord,
+    /// Discovery fell back to the stream's name, so the row names no service.
+    named_after_stream: bool,
+}
+
 /// GET /api/{org_id}/service_streams/_analytics
 ///
 /// Get comprehensive dimension analytics including cardinality classification
@@ -150,11 +159,44 @@ pub async fn list_services(
         } else {
             records
         };
-        MetaHttpResponse::json(records)
+        // The same ids correlation asks with, so the list and on-call routing agree on a row.
+        let tracked = &identity_config.tracked_alias_ids;
+        let rows: Vec<ServiceRow> = records
+            .into_iter()
+            .map(|record| {
+                let dimensions: std::collections::HashMap<String, String> = record
+                    .all_dimensions
+                    .as_object()
+                    .map(|m| {
+                        m.iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                ServiceRow {
+                    named_after_stream:
+                        o2_enterprise::enterprise::service_streams::processor::named_after_its_stream(
+                            &dimensions,
+                            tracked,
+                        ),
+                    record,
+                }
+            })
+            .collect();
+        MetaHttpResponse::json(rows)
     }
     #[cfg(not(feature = "enterprise"))]
     match infra::table::service_streams::list(&org_id).await {
-        Ok(records) => MetaHttpResponse::json(records),
+        // Without discovery's identity config there is no stream-name fallback to detect.
+        Ok(records) => MetaHttpResponse::json(
+            records
+                .into_iter()
+                .map(|record| ServiceRow {
+                    record,
+                    named_after_stream: false,
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to list services: {e}")),
     }
 }
@@ -614,7 +656,7 @@ mod tests {
         stream::StreamType,
     };
 
-    use super::CorrelationRequest;
+    use super::{CorrelationRequest, ServiceRow};
 
     // -----------------------------------------------------------------------
     // Group A: CorrelationRequest serialization / deserialization
@@ -988,5 +1030,31 @@ mod tests {
             let deserialized: CardinalityClass = serde_json::from_str(&json).unwrap();
             assert_eq!(class, deserialized);
         }
+    }
+
+    /// B11: the picker reads the flag beside the row's own fields, not nested under it.
+    #[test]
+    fn test_a_service_row_carries_named_after_stream_beside_its_fields() {
+        let record = infra::table::service_streams::ServiceRecord {
+            id: "s1".into(),
+            org_id: "default".into(),
+            service_name: "slo_slices".into(),
+            set_id: "default".into(),
+            disambiguation: serde_json::json!({}),
+            all_dimensions: serde_json::json!({}),
+            logs_streams: serde_json::json!(["slo_slices"]),
+            traces_streams: serde_json::json!([]),
+            metrics_streams: serde_json::json!([]),
+            profiles_streams: serde_json::json!([]),
+            field_name_mapping: None,
+            last_seen: 0,
+        };
+        let row = serde_json::to_value(ServiceRow {
+            record,
+            named_after_stream: true,
+        })
+        .unwrap();
+        assert_eq!(row["service_name"], "slo_slices");
+        assert_eq!(row["named_after_stream"], true);
     }
 }

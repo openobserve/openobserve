@@ -79,6 +79,7 @@ import {
   coversPresetOf,
   COVERS_PRESETS,
   rotateMembersTo,
+  withRoster,
   turnLine,
   ruleHolder,
   anchorAtWeekdayTime,
@@ -1180,8 +1181,19 @@ describe("parseRoutingReason", () => {
       "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
     );
     expect(parsed?.mechanism).toBe("ownership");
-    expect(parsed?.teamId).toBe("tm_9");
+    expect(parsed?.team).toBe("tm_9");
     expect(parsed?.dimensions).toEqual({ "k8s-cluster": "introspection", service: "search" });
+  });
+
+  // F4: the server now names the team, and a name may hold spaces.
+  it.each([
+    ["routed to Platform SRE by ownership rule service=search", "ownership"],
+    ["routed to Platform SRE by the alert's own setting", "explicit"],
+    ["no ownership rule matched, so it went to the default team Platform SRE", "default"],
+  ] as const)("reads a spaced team name out of %s", (sentence, mechanism) => {
+    const parsed = parseRoutingReason(sentence);
+    expect(parsed?.mechanism).toBe(mechanism);
+    expect(parsed?.team).toBe("Platform SRE");
   });
 
   it("keeps a value that contains its own equals sign whole", () => {
@@ -1736,6 +1748,63 @@ describe("rotation drawer, part B", () => {
     [["a", "b"], "z", 0, ["a", "b"]],
   ])("rotateMembersTo(%j, %s, %i)", (members, person, index, expected) => {
     expect(rotateMembersTo(members, person, index)).toEqual(expected);
+  });
+
+  // B1: the draft keeps the holder and the handovers, the same rule as `ShiftRule::with_roster`.
+  it.each([
+    [
+      "add before the first handover",
+      ["a", "b", "c"],
+      -MICROS_PER_DAY,
+      ["a", "b", "c", "d"],
+      ["c", "a", "b", "d"],
+    ],
+    [
+      "add mid-rotation",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "b", "c", "d"],
+      ["b", "c", "a", "d"],
+    ],
+    [
+      "remove the holder",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "c"],
+      ["c", "a"],
+    ],
+    [
+      "remove the next person",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["a", "b"],
+      ["b", "a"],
+    ],
+    [
+      "remove somebody else",
+      ["a", "b", "c"],
+      4 * MICROS_PER_WEEK + MICROS_PER_DAY,
+      ["b", "c"],
+      ["b", "c"],
+    ],
+    ["add to a single person", ["a"], 4 * MICROS_PER_WEEK, ["a", "b"], ["a", "b"]],
+  ])("withRoster: %s", (_case, before, offset, members, expectedOrder) => {
+    const rule = layer("Base", before, 0, []);
+    const now = ANCHOR + offset;
+    const after = { ...rule, members: withRoster(rule, members, now, "UTC") };
+    expect(turnLine(after.members, memberAt(after, now))).toEqual(expectedOrder);
+    expect(nextHandover(after, now)).toBe(nextHandover(rule, now));
+  });
+
+  // F8: shifts are counted in the team's wall time, so a DST change between anchor and now moves no turn.
+  it("withRoster counts shifts in the team's zone across a DST change", () => {
+    // Monday 2026-03-02 09:00 New York (EST); the clocks spring forward on 2026-03-08.
+    const anchor = Date.UTC(2026, 2, 2, 14, 0) * 1000;
+    const rule = { ...layer("Base", ["a", "b", "c"], 0, []), anchor_micros: anchor };
+    // Monday 2026-03-16 09:30 EDT: shift 2 (c) on the wall clock, still shift 1 (b) by UTC arithmetic.
+    const now = Date.UTC(2026, 2, 16, 13, 30) * 1000;
+    const members = withRoster(rule, ["a", "b", "c", "d"], now, "America/New_York");
+    expect(members).toEqual(["b", "d", "c", "a"]);
   });
 
   it.each([
