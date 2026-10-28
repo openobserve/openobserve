@@ -2071,7 +2071,18 @@
       "limitedElements": "Top {count} elements by clicks",
       "drawn": "{placed} of {total} drawn",
       "legendFewer": "Fewer",
-      "legendMore": "More clicks"
+      "legendMore": "More clicks",
+      "modeLabel": "Overlay",
+      "modeHeat": "Heatmap",
+      "modeMarkers": "Markers",
+      "modeBoth": "Both",
+      "hintHeat": "Click density overlay",
+      "hintMarkers": "Numbered elements, hover for details",
+      "hintBoth": "Density with element markers",
+      "hideElements": "Hide elements",
+      "showElements": "Show elements",
+      "markerLabel": "Rank {rank}, {name}, {count} click | Rank {rank}, {name}, {count} clicks",
+      "markerClicks": "{count} click | {count} clicks"
     },
     "analytics": {
       "title": "Product analytics",

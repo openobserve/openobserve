@@ -565,6 +565,167 @@ describe("ClickHeatmap", () => {
     });
   });
 
+  describe("overlay modes and markers", () => {
+    const other = { selector: "#other", name: "Other", clicks: 5, sessions: 2 };
+    const marker = (w: { find: (s: string) => any }, sel: string) =>
+      w.find(`[data-test="rum-heatmap-marker-${sel}"]`);
+    const mountModes = async () => {
+      snapshotAnswer([buy, other, gone]);
+      const wrapper = await mountSnapshot();
+      await settle();
+      return wrapper;
+    };
+    const pickMode = (w: { find: (s: string) => any }, mode: string) =>
+      w.find(`[data-test="rum-heatmap-mode-${mode}"]`).trigger("click");
+
+    beforeEach(() => {
+      h.events = [];
+      h.dom = "";
+    });
+
+    it("defaults to Heatmap with the canvas and legend shown and no markers", async () => {
+      const wrapper = await mountModes();
+
+      expect(wrapper.find('[data-test="rum-heatmap-mode-hint"]').text()).toBe(
+        "Click density overlay",
+      );
+      expect(wrapper.find('[data-test="rum-heatmap-canvas"]').classes()).not.toContain("hidden");
+      expect(wrapper.find('[data-test="rum-heatmap-legend"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-heatmap-markers"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("hides the canvas and legend in Markers mode and numbers placed elements", async () => {
+      const wrapper = await mountModes();
+
+      await pickMode(wrapper, "markers");
+
+      expect(wrapper.find('[data-test="rum-heatmap-canvas"]').classes()).toContain("hidden");
+      expect(wrapper.find('[data-test="rum-heatmap-legend"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-heatmap-mode-hint"]').text()).toBe(
+        "Numbered elements, hover for details",
+      );
+      const badges = wrapper
+        .findAll('[data-test="rum-heatmap-marker-badge"]')
+        .map((b: { text: () => string }) => b.text());
+      expect(badges).toEqual(["1", "2"]);
+      expect(marker(wrapper, "#buy").attributes("aria-label")).toBe("Rank 1, Buy now, 9 clicks");
+      expect(marker(wrapper, "#other").attributes("tabindex")).toBe("0");
+      wrapper.unmount();
+    });
+
+    it("shows heat and markers together in Both mode", async () => {
+      const wrapper = await mountModes();
+
+      await pickMode(wrapper, "both");
+
+      expect(wrapper.find('[data-test="rum-heatmap-canvas"]').classes()).not.toContain("hidden");
+      expect(wrapper.find('[data-test="rum-heatmap-legend"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test="rum-heatmap-marker-badge"]')).toHaveLength(2);
+      expect(wrapper.find('[data-test="rum-heatmap-mode-hint"]').text()).toBe(
+        "Density with element markers",
+      );
+      wrapper.unmount();
+    });
+
+    it("draws no marker for an element that is not on the snapshot", async () => {
+      const wrapper = await mountModes();
+
+      await pickMode(wrapper, "markers");
+
+      expect(marker(wrapper, "#gone").exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("colours markers by their share of the top element's clicks", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+
+      expect(marker(wrapper, "#buy").classes()).toContain("border-status-negative");
+      expect(marker(wrapper, "#other").classes()).toContain("border-warning");
+      wrapper.unmount();
+    });
+
+    it("selects the row when a marker is clicked and clears it on a second click", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+
+      await marker(wrapper, "#other").trigger("click");
+      const rowClass = () =>
+        (wrapper.findComponent(OTable).props("rowClass") as (r: { selector: string }) => string)({
+          selector: "#other",
+        });
+      expect(rowClass()).toBe("bg-surface-tint-accent");
+      expect(marker(wrapper, "#other").attributes("aria-pressed")).toBe("true");
+
+      await marker(wrapper, "#other").trigger("click");
+      expect(rowClass()).toBe("");
+      wrapper.unmount();
+    });
+
+    it("selects with the Enter key on a focused marker", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+
+      await marker(wrapper, "#buy").trigger("keydown", { key: "Enter" });
+
+      expect(marker(wrapper, "#buy").attributes("aria-pressed")).toBe("true");
+      wrapper.unmount();
+    });
+
+    it("highlights the marker while its table row is hovered", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+      expect(marker(wrapper, "#buy").classes()).not.toContain("bg-accent/10");
+
+      wrapper.findComponent(OTable).vm.$emit("row-mouseenter", { selector: "#buy" });
+      await flushPromises();
+      expect(marker(wrapper, "#buy").classes()).toContain("bg-accent/10");
+
+      wrapper.findComponent(OTable).vm.$emit("row-mouseleave", { selector: "#buy" });
+      await flushPromises();
+      expect(marker(wrapper, "#buy").classes()).not.toContain("bg-accent/10");
+      wrapper.unmount();
+    });
+
+    it("shows the tooltip with name, selector, clicks, share and sessions on hover and focus", async () => {
+      const wrapper = await mountModes();
+      await pickMode(wrapper, "markers");
+      expect(wrapper.find('[data-test="rum-heatmap-marker-tip"]').exists()).toBe(false);
+
+      await marker(wrapper, "#buy").trigger("mouseenter");
+
+      expect(wrapper.find('[data-test="rum-heatmap-tip-name"]').text()).toBe("Buy now");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-selector"]').text()).toBe("#buy");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-clicks"]').text()).toBe("9 clicks");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-share"]').text()).toBe("90%");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-sessions"]').text()).toBe("3 sessions");
+
+      await marker(wrapper, "#buy").trigger("mouseleave");
+      expect(wrapper.find('[data-test="rum-heatmap-marker-tip"]').exists()).toBe(false);
+      await marker(wrapper, "#other").trigger("focus");
+      expect(wrapper.find('[data-test="rum-heatmap-tip-name"]').text()).toBe("Other");
+      wrapper.unmount();
+    });
+
+    it("hides and restores the element panel and flips the button label", async () => {
+      const wrapper = await mountModes();
+      const button = () => wrapper.find('[data-test="rum-heatmap-panel-toggle"]');
+      const panel = () => wrapper.find('[data-test="rum-heatmap-panel"]');
+      expect(button().text()).toBe("Hide elements");
+      expect(panel().isVisible()).toBe(true);
+
+      await button().trigger("click");
+      expect(button().text()).toBe("Show elements");
+      expect(panel().isVisible()).toBe(false);
+
+      await button().trigger("click");
+      expect(button().text()).toBe("Hide elements");
+      expect(panel().isVisible()).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
   it("shows an empty state with Clear filters when nothing matches, and clears them", async () => {
     answer(rankedRows([buy, gone], 10));
     const wrapper = await mountPage({ OTable: true });

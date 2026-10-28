@@ -246,64 +246,179 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(20rem,38%)] max-lg:grid-cols-1 max-lg:grid-rows-[minmax(24rem,1fr)_auto]"
+          class="grid min-h-0 flex-1 max-lg:grid-cols-1 max-lg:grid-rows-[minmax(24rem,1fr)_auto]"
+          :class="
+            panelOpen ? 'grid-cols-[minmax(0,1fr)_minmax(20rem,26%)]' : 'grid-cols-[minmax(0,1fr)]'
+          "
         >
-          <div class="relative min-h-0 min-w-0 p-4">
+          <div class="flex min-h-0 min-w-0 flex-col">
             <div
-              ref="scrollerRef"
-              class="rounded-surface border-border-default h-full min-w-0 overflow-auto border"
+              class="border-border-default bg-surface-base flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2"
+              data-test="rum-heatmap-stage-toolbar"
             >
-              <OEmptyState
-                v-if="snapshotError"
-                size="block"
-                :title="snapshotError"
-                data-test="rum-heatmap-snapshot-error"
-              />
-              <OBanner
-                v-if="pageUrl && !loading && !groups.length"
-                variant="warning"
-                dense
-                :content="
-                  totals.clicks > 0
-                    ? t('rum.heatmap.noTargets')
-                    : deviceClass === 'all'
-                      ? t('rum.heatmap.noPosition')
-                      : t('rum.heatmap.noDeviceData')
-                "
-                data-test="rum-heatmap-no-position"
-              />
-              <div class="flex p-4">
-                <div ref="fitRef" class="mx-auto shrink-0 overflow-hidden">
-                  <div
-                    v-show="snapshotReady"
-                    ref="stageRef"
-                    role="img"
-                    :aria-label="t('rum.heatmap.stageLabel')"
-                    class="origin-top-left [&_.replayer-mouse]:hidden [&_.replayer-mouse-tail]:hidden"
-                    data-test="rum-heatmap-stage"
-                  />
+              <OToggleGroup
+                :model-value="viewMode"
+                :aria-label="t('rum.heatmap.modeLabel')"
+                data-test="rum-heatmap-mode"
+                @update:model-value="onModeChange"
+              >
+                <OToggleGroupItem
+                  v-for="opt in modeOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                  :icon-left="opt.icon"
+                  size="sm"
+                  :data-test="`rum-heatmap-mode-${opt.value}`"
+                >
+                  {{ opt.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <span
+                class="text-text-secondary text-xs whitespace-nowrap"
+                data-test="rum-heatmap-mode-hint"
+              >
+                {{ modeHint }}
+              </span>
+              <OButton
+                class="ms-auto"
+                variant="outline"
+                size="sm"
+                :aria-expanded="panelOpen"
+                data-test="rum-heatmap-panel-toggle"
+                @click="panelOpen = !panelOpen"
+              >
+                <template #icon-left>
+                  <OIcon :name="panelOpen ? 'right-panel-close' : 'right-panel-open'" size="sm" />
+                </template>
+                {{ panelOpen ? t("rum.heatmap.hideElements") : t("rum.heatmap.showElements") }}
+              </OButton>
+            </div>
+            <div class="relative min-h-0 flex-1 p-4">
+              <div
+                ref="scrollerRef"
+                class="rounded-surface border-border-default h-full min-w-0 overflow-auto border"
+              >
+                <OEmptyState
+                  v-if="snapshotError"
+                  size="block"
+                  :title="snapshotError"
+                  data-test="rum-heatmap-snapshot-error"
+                />
+                <OBanner
+                  v-if="pageUrl && !loading && !groups.length"
+                  variant="warning"
+                  dense
+                  :content="
+                    totals.clicks > 0
+                      ? t('rum.heatmap.noTargets')
+                      : deviceClass === 'all'
+                        ? t('rum.heatmap.noPosition')
+                        : t('rum.heatmap.noDeviceData')
+                  "
+                  data-test="rum-heatmap-no-position"
+                />
+                <div class="flex p-4">
+                  <div class="relative mx-auto shrink-0">
+                    <div ref="fitRef" class="overflow-hidden">
+                      <div
+                        v-show="snapshotReady"
+                        ref="stageRef"
+                        role="img"
+                        :aria-label="t('rum.heatmap.stageLabel')"
+                        class="origin-top-left [&_.replayer-mouse]:hidden [&_.replayer-mouse-tail]:hidden"
+                        data-test="rum-heatmap-stage"
+                      />
+                    </div>
+                    <div
+                      v-if="markersVisible"
+                      class="pointer-events-none absolute inset-0"
+                      data-test="rum-heatmap-markers"
+                    >
+                      <div
+                        v-for="m in markers"
+                        :key="m.selector"
+                        role="button"
+                        tabindex="0"
+                        :aria-label="m.ariaLabel"
+                        :aria-pressed="m.selected"
+                        class="rounded-default pointer-events-auto absolute cursor-pointer border-2"
+                        :class="[
+                          m.borderClass,
+                          m.active ? 'bg-accent/10 z-20' : 'bg-surface-base/30 z-10',
+                        ]"
+                        :style="m.style"
+                        :data-test="`rum-heatmap-marker-${m.selector}`"
+                        @mouseenter="tipSelector = m.selector"
+                        @mouseleave="tipSelector = ''"
+                        @focus="tipSelector = m.selector"
+                        @blur="tipSelector = ''"
+                        @click="onMarkerSelect(m.selector)"
+                        @keydown.enter.prevent="onMarkerSelect(m.selector)"
+                        @keydown.space.prevent="onMarkerSelect(m.selector)"
+                      >
+                        <span
+                          class="absolute -start-2.5 -top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.6875rem] font-bold text-white"
+                          :class="m.badgeClass"
+                          aria-hidden="true"
+                          data-test="rum-heatmap-marker-badge"
+                        >
+                          {{ m.rank }}
+                        </span>
+                        <div
+                          v-if="m.tip"
+                          class="bg-text-heading text-surface-base rounded-default absolute start-0 top-full z-30 mt-2 w-56 px-3 py-2.5 text-xs leading-normal shadow-lg"
+                          data-test="rum-heatmap-marker-tip"
+                        >
+                          <div class="truncate text-sm font-bold" data-test="rum-heatmap-tip-name">
+                            {{ m.name }}
+                          </div>
+                          <div
+                            v-if="m.hasName"
+                            class="truncate font-mono opacity-70"
+                            data-test="rum-heatmap-tip-selector"
+                          >
+                            {{ m.selector }}
+                          </div>
+                          <div class="mt-1.5 flex flex-wrap gap-x-4">
+                            <span class="font-semibold" data-test="rum-heatmap-tip-clicks">{{
+                              m.clicksText
+                            }}</span>
+                            <span class="font-semibold" data-test="rum-heatmap-tip-share">{{
+                              m.shareText
+                            }}</span>
+                            <span class="font-semibold" data-test="rum-heatmap-tip-sessions">{{
+                              m.sessionsText
+                            }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div
-              v-if="snapshotLoading"
-              class="pointer-events-none absolute inset-0 flex items-center justify-center"
-            >
-              <OSpinner size="lg" data-test="rum-heatmap-snapshot-loading" />
-            </div>
-            <div
-              v-if="snapshotReady"
-              class="border-border-default bg-surface-base rounded-default pointer-events-none absolute bottom-8 left-8 flex items-center gap-2 border px-2.5 py-1.5 text-xs shadow-sm"
-              data-test="rum-heatmap-legend"
-            >
-              {{ t("rum.heatmap.legendFewer") }}
-              <span class="bg-heat-legend h-2 w-24 rounded-full" aria-hidden="true" />
-              {{ t("rum.heatmap.legendMore") }}
+              <div
+                v-if="snapshotLoading"
+                class="pointer-events-none absolute inset-0 flex items-center justify-center"
+              >
+                <OSpinner size="lg" data-test="rum-heatmap-snapshot-loading" />
+              </div>
+              <div
+                v-if="snapshotReady && heatVisible"
+                class="border-border-default bg-surface-base rounded-default pointer-events-none absolute bottom-8 left-8 flex items-center gap-2 border px-2.5 py-1.5 text-xs shadow-sm"
+                data-test="rum-heatmap-legend"
+              >
+                {{ t("rum.heatmap.legendFewer") }}
+                <span class="bg-heat-legend h-2 w-24 rounded-full" aria-hidden="true" />
+                {{ t("rum.heatmap.legendMore") }}
+              </div>
             </div>
           </div>
 
           <div
+            v-show="panelOpen"
+            ref="panelRef"
             class="border-border-default flex min-h-0 flex-col border-s max-lg:border-s-0 max-lg:border-t"
+            data-test="rum-heatmap-panel"
           >
             <div class="border-border-default flex flex-col gap-2 border-b px-3 py-2.5">
               <OSearchInput
@@ -368,6 +483,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loading"
                 data-test="rum-heatmap-elements-table"
                 @row-click="onRowClick"
+                @row-mouseenter="(row: ElementRow) => (rowHover = row.selector)"
+                @row-mouseleave="rowHover = ''"
                 @sort-change="onSortChange"
               >
                 <template #cell-feature="{ row }">
@@ -543,7 +660,28 @@ interface FilterChip {
   toggle: () => void;
 }
 
+interface MarkerView {
+  selector: string;
+  rank: number;
+  name: string;
+  hasName: boolean;
+  ariaLabel: I18nText;
+  clicksText: I18nText;
+  shareText: I18nText;
+  sessionsText: I18nText;
+  borderClass: string;
+  badgeClass: string;
+  style: Record<string, string>;
+  selected: boolean;
+  active: boolean;
+  tip: boolean;
+}
+
+type ViewMode = "heat" | "markers" | "both";
+
 const APP_LIMIT = 100;
+const MARKER_HIGH_SHARE = 0.6;
+const MARKER_MEDIUM_SHARE = 0.4;
 const RANK_PANELS = ["devices", "totals", "ranking"] as const;
 const SNAPSHOT_LOOKBACK_HOURS = 720;
 const OUTLINE_SCROLL_MARGIN = 96;
@@ -559,6 +697,11 @@ const PAGE_SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SEARCH_PANEL = "page-search";
 const FULL_SNAPSHOT = 2;
 const META = 4;
+const MARKER_TONES = {
+  high: { border: "border-status-negative", badge: "bg-status-negative" },
+  medium: { border: "border-warning", badge: "bg-warning" },
+  low: { border: "border-accent", badge: "bg-accent" },
+} as const;
 const RANGE_HOURS: Record<string, number> = { "1h": 1, "24h": 24, "7d": 168, "30d": 720 };
 
 const { t } = useI18nTyped();
@@ -600,7 +743,13 @@ const settingsFailed = ref(false);
 const stageRef = ref<HTMLElement | null>(null);
 const scrollerRef = ref<HTMLElement | null>(null);
 const fitRef = ref<HTMLElement | null>(null);
-let stageScale = 1;
+const panelRef = ref<HTMLElement | null>(null);
+const viewMode = ref<ViewMode>("heat");
+const panelOpen = ref(true);
+const rowHover = ref("");
+const tipSelector = ref("");
+const markerBoxes = ref<Record<string, OutlineRect>>({});
+const stageScale = ref(1);
 let pageSize = { width: 0, height: 0 };
 let resizeObserver: ResizeObserver | null = null;
 const selectedSelector = ref("");
@@ -648,6 +797,23 @@ const deviceOptions = computed(() => [
   { label: deviceLabel("rum.heatmap.deviceTablet", "tablet"), value: "tablet", icon: "tablet" },
   { label: deviceLabel("rum.heatmap.devicePhone", "phone"), value: "phone", icon: "smartphone" },
 ]);
+
+const modeOptions = computed<{ value: ViewMode; label: I18nText; icon: string }[]>(() => [
+  { value: "heat", label: t("rum.heatmap.modeHeat"), icon: "local-fire-department" },
+  { value: "markers", label: t("rum.heatmap.modeMarkers"), icon: "pin-drop" },
+  { value: "both", label: t("rum.heatmap.modeBoth"), icon: "layers" },
+]);
+const modeHint = computed(() =>
+  viewMode.value === "heat"
+    ? t("rum.heatmap.hintHeat")
+    : viewMode.value === "markers"
+      ? t("rum.heatmap.hintMarkers")
+      : t("rum.heatmap.hintBoth"),
+);
+const heatVisible = computed(() => viewMode.value !== "markers");
+const markersVisible = computed(
+  () => viewMode.value !== "heat" && snapshotReady.value && placementsReady.value,
+);
 
 const separator = computed(() => t("rum.heatmap.separator"));
 const unknownDeviceClicks = computed(() => deviceClicks.value.unknown ?? 0);
@@ -791,6 +957,52 @@ const statItems = computed<StatCell[]>(() => {
     },
   ];
 });
+
+const markerTone = (clicks: number) => {
+  const share = clicksMax.value > 0 ? clicks / clicksMax.value : 0;
+  if (share >= MARKER_HIGH_SHARE) return MARKER_TONES.high;
+  return share >= MARKER_MEDIUM_SHARE ? MARKER_TONES.medium : MARKER_TONES.low;
+};
+
+const markers = computed<MarkerView[]>(() =>
+  groups.value.flatMap((g, i) => {
+    const box = markerBoxes.value[g.selector];
+    if (!box || !placedSelectors.value.has(g.selector)) return [];
+    const scale = stageScale.value;
+    const tone = markerTone(g.clicks);
+    const name = g.name || g.selector;
+    const selected = g.selector === selectedSelector.value;
+    const clicks = addCommasToNumber(g.clicks);
+    return [
+      {
+        selector: g.selector,
+        rank: i + 1,
+        name,
+        hasName: !!g.name,
+        ariaLabel: t("rum.heatmap.markerLabel", { rank: i + 1, name, count: clicks }, g.clicks),
+        clicksText: t("rum.heatmap.markerClicks", { count: clicks }, g.clicks),
+        shareText: t("rum.heatmap.sharePct", { pct: sharePercent(g.clicks, summary.value.clicks) }),
+        sessionsText: t(
+          "rum.heatmap.sessionsCount",
+          { count: addCommasToNumber(g.sessions) },
+          g.sessions,
+        ),
+        borderClass: tone.border,
+        badgeClass: tone.badge,
+        // Page coordinates scaled by the stage fit, which only the browser knows at runtime.
+        style: {
+          left: `${box.x * scale}px`,
+          top: `${box.y * scale}px`,
+          width: `${box.width * scale}px`,
+          height: `${box.height * scale}px`,
+        },
+        selected,
+        active: selected || rowHover.value === g.selector || tipSelector.value === g.selector,
+        tip: tipSelector.value === g.selector,
+      },
+    ];
+  }),
+);
 
 const tsField = () => store.state.zoConfig.timestamp_column || "_timestamp";
 const org = () => store.state.selectedOrganization.identifier;
@@ -1244,10 +1456,10 @@ function fitStage() {
   const stage = stageRef.value;
   if (!scroller || !fit || !stage || !pageSize.width) return;
   const gutter = 2 * parseFloat(getComputedStyle(document.documentElement).fontSize);
-  stageScale = Math.min(1, (scroller.clientWidth - gutter) / pageSize.width);
-  stage.style.setProperty("transform", `scale(${stageScale})`);
-  fit.style.setProperty("width", `${pageSize.width * stageScale}px`);
-  fit.style.setProperty("height", `${pageSize.height * stageScale}px`);
+  stageScale.value = Math.min(1, (scroller.clientWidth - gutter) / pageSize.width);
+  stage.style.setProperty("transform", `scale(${stageScale.value})`);
+  fit.style.setProperty("width", `${pageSize.width * stageScale.value}px`);
+  fit.style.setProperty("height", `${pageSize.height * stageScale.value}px`);
 }
 
 // A hand-rolled canvas because it paints over a rebuilt replay DOM, which no chart component can host.
@@ -1259,6 +1471,7 @@ function ensureOverlay(frame: { wrapper: HTMLElement }, width: number, height: n
     overlay.className = "pointer-events-none absolute left-0 top-0 z-10";
     frame.wrapper.appendChild(overlay);
   }
+  overlay.classList.toggle("hidden", !heatVisible.value);
   overlay.width = width;
   overlay.height = height;
   return overlay;
@@ -1306,6 +1519,7 @@ function drawHeat() {
     placed.add(g.selector);
   }
   placedSelectors.value = placed;
+  markerBoxes.value = Object.fromEntries(rects);
   placementsReady.value = true;
   unusedAvailable.value = mostlyPlaced(placed);
   unusedRows.value = unusedAvailable.value ? findUnusedControls(frame.doc, clickedEls, rects) : [];
@@ -1443,8 +1657,28 @@ function frustrationText(row: ElementRow): string {
   return `${separator.value} ${parts.join(` ${separator.value} `)}`;
 }
 
+function onModeChange(value: unknown) {
+  if (value !== "heat" && value !== "markers" && value !== "both") return;
+  viewMode.value = value;
+}
+
+watch(viewMode, () => overlay?.classList.toggle("hidden", !heatVisible.value));
+
 function onRowClick(row: ElementRow) {
-  selectedSelector.value = selectedSelector.value === row.selector ? "" : row.selector;
+  selectSelector(row.selector);
+}
+
+function onMarkerSelect(selector: string) {
+  selectSelector(selector);
+  if (!panelOpen.value || !selectedSelector.value) return;
+  const cell = panelRef.value?.querySelector(
+    `[data-test="rum-heatmap-feature-${CSS.escape(selector)}"]`,
+  );
+  cell?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+}
+
+function selectSelector(selector: string) {
+  selectedSelector.value = selectedSelector.value === selector ? "" : selector;
   drawHeat();
   const rect = elementRects.get(selectedSelector.value);
   if (!rect || !scrollerRef.value || !stageRef.value) return;
@@ -1454,7 +1688,7 @@ function onRowClick(row: ElementRow) {
     scroller.getBoundingClientRect().top +
     scroller.scrollTop;
   scroller.scrollTo({
-    top: stageTop + rect.y * stageScale - OUTLINE_SCROLL_MARGIN,
+    top: stageTop + rect.y * stageScale.value - OUTLINE_SCROLL_MARGIN,
     behavior: "smooth",
   });
 }
