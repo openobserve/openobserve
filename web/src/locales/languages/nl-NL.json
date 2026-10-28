@@ -27024,6 +27024,7 @@
       "lastReported": "Laatst gerapporteerd",
       "noEffectiveConfig": "De collector heeft zijn effectieve configuratie niet gerapporteerd",
       "eventAssigned": "Configuratie toegewezen",
+      "eventRunning": "Laatst bevestigd actief",
       "assignment": "Toewijzing",
       "assignmentValue": "{config} v{version}, revisie {revision}",
       "consistency": "Consistentie",

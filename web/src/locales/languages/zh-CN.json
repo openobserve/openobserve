@@ -27024,6 +27024,7 @@
       "lastReported": "最后上报",
       "noEffectiveConfig": "该 Collector 尚未上报其生效配置",
       "eventAssigned": "已分配配置",
+      "eventRunning": "最近确认运行",
       "assignment": "分配",
       "assignmentValue": "{config} v{version}，修订版 {revision}",
       "consistency": "一致性",

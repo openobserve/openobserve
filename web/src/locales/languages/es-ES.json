@@ -27024,6 +27024,7 @@
       "lastReported": "Último informe",
       "noEffectiveConfig": "El colector no ha informado de su configuración efectiva",
       "eventAssigned": "Configuración asignada",
+      "eventRunning": "Última confirmación en ejecución",
       "assignment": "Asignación",
       "assignmentValue": "{config} v{version}, revisión {revision}",
       "consistency": "Coherencia",

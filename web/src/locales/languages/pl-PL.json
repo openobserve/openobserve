@@ -27024,6 +27024,7 @@
       "lastReported": "Ostatnio zgłoszono",
       "noEffectiveConfig": "Kolektor nie zgłosił swojej obowiązującej konfiguracji",
       "eventAssigned": "Przypisano konfigurację",
+      "eventRunning": "Ostatnio potwierdzono działanie",
       "assignment": "Przypisanie",
       "assignmentValue": "{config} v{version}, rewizja {revision}",
       "consistency": "Spójność",

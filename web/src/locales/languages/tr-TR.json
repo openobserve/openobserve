@@ -27024,6 +27024,7 @@
       "lastReported": "Son bildirim",
       "noEffectiveConfig": "Toplayıcı etkin yapılandırmasını bildirmedi",
       "eventAssigned": "Yapılandırma atandı",
+      "eventRunning": "Son çalışma onayı",
       "assignment": "Atama",
       "assignmentValue": "{config} v{version}, revizyon {revision}",
       "consistency": "Tutarlılık",

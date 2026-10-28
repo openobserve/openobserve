@@ -27024,6 +27024,7 @@
       "lastReported": "آخر إبلاغ",
       "noEffectiveConfig": "لم يُبلِّغ الـ Collector عن تكوينه الفعلي",
       "eventAssigned": "تم تعيين التكوين",
+      "eventRunning": "آخر تأكيد للتشغيل",
       "assignment": "التعيين",
       "assignmentValue": "{config} v{version}، المراجعة {revision}",
       "consistency": "الاتساق",

@@ -27024,6 +27024,7 @@
       "lastReported": "Zuletzt gemeldet",
       "noEffectiveConfig": "Der Collector hat seine wirksame Konfiguration nicht gemeldet",
       "eventAssigned": "Konfiguration zugewiesen",
+      "eventRunning": "Zuletzt als laufend bestätigt",
       "assignment": "Zuweisung",
       "assignmentValue": "{config} v{version}, Revision {revision}",
       "consistency": "Konsistenz",

@@ -27022,6 +27022,7 @@
       "lastReported": "Last reported",
       "noEffectiveConfig": "The collector has not reported its effective config",
       "eventAssigned": "Configuration assigned",
+      "eventRunning": "Last confirmed running",
       "assignment": "Assignment",
       "assignmentValue": "{config} v{version}, revision {revision}",
       "consistency": "Consistency",

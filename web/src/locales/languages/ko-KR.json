@@ -27024,6 +27024,7 @@
       "lastReported": "마지막 보고",
       "noEffectiveConfig": "수집기가 유효 구성을 보고하지 않았습니다",
       "eventAssigned": "구성 할당됨",
+      "eventRunning": "마지막 실행 확인",
       "assignment": "할당",
       "assignmentValue": "{config} v{version}, 리비전 {revision}",
       "consistency": "일관성",
