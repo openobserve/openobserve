@@ -33,11 +33,11 @@ const summary = (gaps: CompanionGap[]) =>
 
 describe("roleCompanions - rules", () => {
   it.each(["AllowAll", "AllowPost", "AllowPut"])(
-    "flags Streams List and Get and Destinations List when Alert Folders has %s",
+    "flags Streams and Destinations List and Get when Alert Folders has %s",
     (action) => {
       expect(summary(gapsFor([`afolder:${ALL}:${action}`]))).toEqual([
         "stream: AllowList, AllowGet",
-        "destination: AllowList",
+        "destination: AllowList, AllowGet",
       ]);
     },
   );
@@ -50,9 +50,11 @@ describe("roleCompanions - rules", () => {
   );
 
   it.each(["AllowAll", "AllowPost", "AllowPut"])(
-    "flags Templates List when Destinations has %s",
+    "flags Templates List and Get when Destinations has %s",
     (action) => {
-      expect(summary(gapsFor([`destination:${ALL}:${action}`]))).toEqual(["template: AllowList"]);
+      expect(summary(gapsFor([`destination:${ALL}:${action}`]))).toEqual([
+        "template: AllowList, AllowGet",
+      ]);
     },
   );
 
@@ -92,7 +94,7 @@ describe("roleCompanions - triggers", () => {
   it("fires on Create on one alert folder", () => {
     expect(summary(gapsFor(["afolder:f1:AllowPost"]))).toEqual([
       "stream: AllowList, AllowGet",
-      "destination: AllowList",
+      "destination: AllowList, AllowGet",
     ]);
   });
 
@@ -143,7 +145,24 @@ describe("roleCompanions - met", () => {
     expect(summary(gapsFor([`destination:${ALL}:AllowPut`, "template:slack:AllowAll"]))).toEqual([
       "template: AllowList",
     ]);
-    expect(gapsFor([`destination:${ALL}:AllowPut`, `template:${ALL}:AllowList`])).toEqual([]);
+    expect(
+      gapsFor([
+        `destination:${ALL}:AllowPut`,
+        `template:${ALL}:AllowList`,
+        "template:slack:AllowGet",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("still flags Destinations Get when only Destinations List is added, as the list keeps only items they can Get", () => {
+    const keys = [
+      `afolder:${ALL}:AllowAll`,
+      `stream:${ALL}:AllowList`,
+      `stream:${ALL}:AllowGet`,
+      `destination:${ALL}:AllowList`,
+    ];
+    expect(summary(gapsFor(keys))).toEqual(["destination: AllowGet"]);
+    expect(gapsFor([...keys, `destination:${ALL}:AllowGet`])).toEqual([]);
   });
 
   it("lets one stream's All meet Streams Get but not Streams List", () => {
@@ -175,7 +194,7 @@ describe("roleCompanions - met", () => {
     expect(gapsFor([`destination:${ALL}:AllowAll`], noTemplates)).toEqual([]);
     expect(
       summary(gapsFor([`afolder:${ALL}:AllowAll`], new Set(["afolder", "destination"]))),
-    ).toEqual(["destination: AllowList"]);
+    ).toEqual(["destination: AllowList, AllowGet"]);
   });
 });
 
@@ -183,10 +202,13 @@ describe("roleCompanions - companionAddKeys", () => {
   it("stages the module-wide grant for each missing action", () => {
     const gap: CompanionGap = {
       module: "destination",
-      actions: ["AllowList"],
+      actions: ["AllowList", "AllowGet"],
       neededBy: [{ module: "afolder", reasonKey: "iam.editRole.companionReasonAlertDestinations" }],
     };
-    expect(companionAddKeys(gap, ORG)).toEqual([`destination:${ALL}:AllowList`]);
+    expect(companionAddKeys(gap, ORG)).toEqual([
+      `destination:${ALL}:AllowList`,
+      `destination:${ALL}:AllowGet`,
+    ]);
   });
 
   it("adds Streams List but never Streams Get", () => {

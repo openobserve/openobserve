@@ -34,7 +34,7 @@ const WRITES: readonly PermissionType[] = ["AllowAll", "AllowPost", "AllowPut"];
 
 const ACTION_ORDER: CompanionAction[] = ["AllowList", "AllowGet"];
 
-// Alert save checks stream access (background_access/mod.rs), the alert form lists destinations, every destination needs a template, and panels query streams.
+// Alert save checks stream access (background_access/mod.rs), the alert form lists destinations, every destination needs a template, and panels query streams; destination and template lists keep only items the user can Get.
 const COMPANION_RULES: CompanionRule[] = [
   {
     trigger: "afolder",
@@ -47,7 +47,7 @@ const COMPANION_RULES: CompanionRule[] = [
       },
       {
         module: "destination",
-        actions: ["AllowList"],
+        actions: ["AllowList", "AllowGet"],
         reasonKey: "iam.editRole.companionReasonAlertDestinations",
       },
     ],
@@ -58,7 +58,7 @@ const COMPANION_RULES: CompanionRule[] = [
     needs: [
       {
         module: "template",
-        actions: ["AllowList"],
+        actions: ["AllowList", "AllowGet"],
         reasonKey: "iam.editRole.companionReasonDestinationTemplates",
       },
     ],

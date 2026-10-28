@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :count="selectedPermissionsHash.size"
                   :loading="isFetchingInitialRoles"
                   :model-value="permissionsUiType"
+                  :disabled="stagingBusy"
                   @update:model-value="switchPermissionsUi"
                 />
               </div>
@@ -121,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :count="selectedPermissionsHash.size"
                       :loading="isFetchingInitialRoles"
                       :model-value="permissionsUiType"
+                      :disabled="stagingBusy"
                       @update:model-value="switchPermissionsUi"
                     />
                   </template>
@@ -132,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="isFetchingInitialRoles"
                   :presets="presets"
                   :preview-preset="previewPreset"
-                  :applying="applyingPreset || isSaving"
+                  :applying="stagingBusy"
                   :module-label="moduleLabel"
                   :entity-label="entityLabel"
                   :summary-actions="summaryActions"
@@ -145,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :count="selectedPermissionsHash.size"
                       :loading="isFetchingInitialRoles"
                       :model-value="permissionsUiType"
+                      :disabled="stagingBusy"
                       @update:model-value="switchPermissionsUi"
                     />
                   </template>
@@ -929,9 +932,11 @@ const grantKeys = (keys: string[]) => {
   if (!isSaving.value) keys.filter((key) => !grants.has(key)).forEach(updatePermissionMappings);
 };
 
-// Leaving JSON stages what was typed, so the view holds still until the PUT settles.
+const stagingBusy = computed(() => applyingPreset.value || isSaving.value);
+
+// Entering JSON snapshots the grants and leaving it stages that snapshot, so a preset or save still staging would be overwritten.
 const switchPermissionsUi = (value: string) => {
-  if (!isSaving.value) updatePermissionsUi(value);
+  if (!stagingBusy.value) updatePermissionsUi(value);
 };
 
 // The drawer would otherwise stay open on the companion list after the save it was opened for.

@@ -59,6 +59,8 @@ const ctl = vi.hoisted(() => ({
   logStreams: null,
   // Every stream list the page reads, in order, so a test can tell an eager load from a lazy one.
   streamCalls: [],
+  // Set to a pending promise to hold every stream list, so a test can act while a preset is still staging.
+  streamGate: null,
 }));
 
 // Mock composable useStreams
@@ -66,6 +68,7 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn(async (type) => {
       ctl.streamCalls.push(type);
+      await ctl.streamGate;
       const map = {
         logs: { list: ctl.logStreams ?? [{ name: "app" }, { name: "sys" }] },
         metrics: {
@@ -627,6 +630,7 @@ beforeEach(() => {
   ctl.metricStreams = null;
   ctl.logStreams = null;
   ctl.streamCalls = [];
+  ctl.streamGate = null;
   router.currentRoute.value.query = {};
 });
 
@@ -3917,6 +3921,37 @@ describe("EditRole - save while a preset is staging", () => {
       expect.arrayContaining([{ object: "metrics:postgresql_backends", permission: "AllowGet" }]),
     );
     expect(wrapper.vm.addedPermissions).toEqual({});
+  });
+
+  // JSON would snapshot the grants before the preset lands, and Save would then stage that stale snapshot over them.
+  it("holds the Table and JSON switch until the preset lands, then saves its grants", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    const viewSwitch = () => wrapper.findComponent({ name: "PermissionsViewSwitch" });
+    let release;
+    ctl.streamGate = new Promise((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(updateRole).mockClear();
+
+    const applying = wrapper.vm.applyPreset("dbm");
+    await flushPromises();
+    expect(wrapper.vm.applyingPreset).toBe(true);
+    expect(viewSwitch().props("disabled")).toBe(true);
+    viewSwitch().vm.$emit("update:modelValue", "json");
+    await flushPromises();
+    expect(wrapper.vm.permissionsUiType).toBe("table");
+
+    const saving = wrapper.vm.saveRole();
+    release();
+    await Promise.all([applying, saving]);
+    await flushPromises();
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual(
+      expect.arrayContaining([{ object: "metrics:postgresql_backends", permission: "AllowGet" }]),
+    );
+    expect(viewSwitch().props("disabled")).toBe(false);
   });
 
   it("holds preset Add off while a save is in flight", async () => {
