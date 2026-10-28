@@ -100,6 +100,12 @@ async function history(page, alertId) {
   return (await okJson(r, `history of ${alertId}`)).hits || [];
 }
 
+/** Whether the server correlates firings into incidents (`incidents_enabled` in /config). */
+async function incidentsEnabled(page) {
+  const r = await api(page, 'get', `${urls().v1}/config`);
+  return (await okJson(r, 'config')).incidents_enabled === true;
+}
+
 async function pollUntil(page, read, test, { timeoutMs = 120_000, everyMs = 4000, onTick } = {}) {
   const deadline = Date.now() + timeoutMs;
   let last;
@@ -172,6 +178,6 @@ async function shoot(page, name) {
 
 module.exports = {
   MICROS, fastSingleAlert, fastMultiAlert, createFiringSingle, createFiringMulti,
-  listItem, waitFiring, waitGroupsFiring, acks, downtime, history, pollUntil,
+  listItem, waitFiring, waitGroupsFiring, acks, downtime, history, incidentsEnabled, pollUntil,
   createUser, deleteUser, ackAs, endMutes, nowMicros, shoot,
 };

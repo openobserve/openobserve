@@ -7,7 +7,7 @@ const PageManager = require('../../pages/page-manager.js');
 const { seedAlertFixtures, deleteAlerts, getAlertGroups, isFiringOutcome } = require('../utils/alerts-api-helpers.js');
 const {
   createFiringSingle, createFiringMulti, waitFiring, waitGroupsFiring, listItem, acks, history,
-  pollUntil, createUser, deleteUser, ackAs, endMutes, downtime, shoot,
+  pollUntil, createUser, deleteUser, ackAs, endMutes, downtime, incidentsEnabled, shoot,
 } = require('../utils/alert-ack-mute-helpers.js');
 
 const ROOT = process.env.ZO_ROOT_USER_EMAIL;
@@ -220,6 +220,7 @@ test.describe('Alert acknowledge and mute — alert screens', { tag: ['@alerts',
   });
 
   test('detail: the Incident tile names the firing incident and opens it (MK-1)', async ({ page }) => {
+    test.skip(!(await incidentsEnabled(page)), 'incidents_enabled is false, so no firing joins an incident');
     const alert = await createFiringSingle(page, 'ack_incident', created, { creates_incident: true });
     names.push(alert.name);
     await waitFiring(page, alert);
