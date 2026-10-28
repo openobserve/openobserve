@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Все агенты",
-      "agentLabel": "Агент",
-      "agentPlaceholder": "Все агенты",
-      "kpisAriaLabel": "КПЭ уровня 1",
-      "dataTypes": {
-        "numericShort": "Число",
-        "categoricalShort": "Категория",
-        "booleanShort": "Булев"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} дн. назад"
+        }
       },
+      "healthyIf": "В норме, если {rule}",
+      "noHealthyValue": "нет",
+      "setThreshold": "Задайте порог нормы",
+      "noScoresInWindow": "Нет оценок в этом окне",
+      "outOf": "{count} из {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Область оценки",
-        "filterHint": "Сравните эту конфигурацию оценок по разным областям оценки.",
         "all": "Все",
         "span": "Спан",
         "trace": "Трейс",
         "session": "Сессия"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Результаты оценок"
-        },
-        "evaluationCost": {
-          "title": "Стоимость оценки"
-        },
-        "scorerSuccess": {
-          "title": "Успешность оценщиков"
-        },
-        "scorerFailures": {
-          "title": "Сбои оценщиков"
-        },
-        "latencyP95": {
-          "title": "Задержка оценщика p95"
-        },
-        "vsPrev": "по сравнению с предыдущим",
-        "noPriorData": "нет предыдущих данных",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "спанов",
+        "trace": "трейсов",
+        "session": "сессий"
       },
-      "detail": {
-        "loading": "Загрузка разбивки по конфигурациям…",
-        "noData": "В этом окне пока нет оценок для этой конфигурации.",
-        "empty": {
-          "title": "Ожидание первых оценок",
-          "titleScoped": "Нет оценок {scope} в этом окне",
-          "description": "В выбранном временном диапазоне для этой конфигурации нет оценок. Они появятся здесь автоматически, как только будет запущен использующий её оценщик.",
-          "descriptionScoped": "Для этой конфигурации в выбранном временном диапазоне нет оценок {scope}. Выберите другую область или расширьте временной диапазон."
-        },
-        "trendTitle": "Тренд",
-        "distributionTitle": "Распределение оценок",
-        "categoryDistributionTitle": "Распределение по категориям",
-        "healthyRateTitle": "Доля здоровых со временем",
-        "trueRateTitle": "Доля истинных со временем",
-        "trueFalseTitle": "Истина / Ложь",
-        "legendAvg": "Сред",
-        "legendThreshold": "порог {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "здоров {direction} {value}",
-        "healthyThreshold": "Здоров {threshold}",
-        "legendHealthy": "здоровый",
-        "legendUnhealthy": "нездоровый",
-        "legendHealthyRate": "Доля здоровых",
-        "legendTrueRate": "Доля истинных",
-        "legendTrueCount": "истина ({count})",
-        "legendFalseCount": "ложь ({count})",
-        "kpis": {
-          "average": "Среднее",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Нездоровый",
-          "healthy": "Здоровый",
-          "trueRate": "Доля истинных",
-          "falseRate": "Доля ложных",
-          "coverage": "Покрытие",
-          "targetsScored": "Оценённые цели"
-        },
-        "health": {
-          "title": "Статус здоровья",
-          "noThreshold": "Порог здоровья не настроен. Оценки пока не могут быть классифицированы как здоровые или ухудшающиеся.",
-          "thresholdOnly": "Здорово, если {threshold}",
-          "summary": "{percent}% ниже порога · Здорово, если {threshold}"
-        },
-        "ofScoreResults": "всего результатов оценки: {count}",
-        "range": "Диапазон {min}–{max}"
+      "tiles": {
+        "attention": "Конфигурации, требующие внимания",
+        "ofTotal": "из {total}",
+        "attentionNote": "Показать их",
+        "attentionTooltip": "Конфигурации, у которых есть хотя бы одна оценка вне нормы",
+        "withoutResult": "Конфигурации без результата",
+        "withoutResultTooltip": "Конфигурации без оценок в этом диапазоне времени или без порога нормы. Нажмите, чтобы показать их.",
+        "noScores": "У {count} нет оценок | У {count} нет оценок",
+        "noThreshold": "У {count} нет порога | У {count} нет порога",
+        "allGiveResult": "Каждая конфигурация даёт результат"
       },
-      "runs": {
-        "title": "Оценки",
-        "hint": "Оценки и обоснование берутся из _llm_scores. Выберите запуск, чтобы открыть его оценочный трейс для дальнейшего исследования.",
-        "filterLabel": "Фильтровать оценки",
-        "noThresholdHint": "Установите порог здоровья в этой конфигурации оценок, чтобы классифицировать и выделять нездоровые оценки.",
-        "noReasoning": "Обоснование не записано",
-        "unknownAgent": "Неизвестный агент",
-        "unknownScope": "Неизвестная область",
-        "queryError": "Не удалось обновить оценки. Показывается последняя успешная страница.",
-        "empty": "Нет оценок в этом временном диапазоне.",
-        "emptyUnhealthy": "Нет нездоровых оценок в этом временном диапазоне.",
-        "filters": {
-          "all": "Все оценки",
-          "unhealthy": "Нездоровый"
-        },
-        "health": {
-          "healthy": "Здоровый",
-          "unhealthy": "Нездоровый"
-        },
-        "columns": {
-          "time": "Оценено",
-          "result": "Оценка",
-          "reasoning": "Обоснование",
-          "target": "Цель",
-          "agent": "Агент"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Фильтр конфигураций…",
-        "relativeTime": {
-          "daysAgo": "{day} дн. назад",
-          "monthsAgo": "{month} мес. назад"
-        },
-        "status": {
-          "healthy": "Здоровый",
-          "unhealthy": "Требует внимания",
-          "noThreshold": "Порог не установлен",
-          "noData": "Нет данных оценки"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% ниже · Здоровый, если {threshold}",
-          "noThresholdHint": "Установить здоровый порог",
-          "noDataHint": "Нет оценок в этом окне"
-        },
+        "openUnhealthy": "Открыть оценки вне нормы",
+        "configLink": "Конфигурация",
+        "averageRange": "среднее, от {min} до {max}",
+        "mostCommon": "чаще всего · {count} из {total}",
         "columns": {
-          "health": "Здоровье",
-          "scoreConfig": "Конфигурация оценки",
-          "type": "Тип",
-          "quality": "Качество",
-          "totalScores": "Всего оценок",
-          "scopeMix": "Состав областей",
-          "volumeTrend": "Тенденция объема",
+          "scoreConfig": "Конфигурация оценок",
+          "health": "Норма",
+          "typicalScore": "Типичная оценка",
+          "unhealthy": "Вне нормы",
+          "scores": "Оценки",
           "updated": "Обновлено"
         }
       },
-      "averageWithHealthyRate": "Среднее · {rate}% здоровых"
+      "detail": {
+        "back": "Все конфигурации",
+        "backToAll": "Назад ко всем конфигурациям",
+        "editConfig": "Редактировать конфигурацию",
+        "notFound": "Конфигурация оценок не найдена",
+        "notFoundDescription": "Возможно, она была удалена или ссылка ведёт на устаревшую конфигурацию.",
+        "emptyTitle": "Ожидание первых оценок",
+        "emptyTitleScoped": "Нет оценок {scope} в этом окне",
+        "emptyDescription": "За выбранный период для этой конфигурации не поступило ни одной оценки. Они появятся здесь, как только запустится использующий её оценщик.",
+        "distributionNumeric": "Распределение оценок",
+        "distributionValues": "Распределение значений",
+        "averageValue": "среднее {value}",
+        "legendHealthy": "В норме",
+        "legendUnhealthy": "Не в норме",
+        "legendScores": "Оценки",
+        "chartTooltip": "{count} оценок, {unhealthy} вне нормы | {count} оценок, {unhealthy} вне нормы",
+        "chartTooltipCount": "{count} оценка | {count} оценок",
+        "trendTitle": {
+          "score": "Тренд",
+          "healthyRate": "Доля в норме во времени",
+          "trueRate": "Доля истинных во времени",
+          "count": "Оценки во времени"
+        },
+        "trendLegend": {
+          "healthyRate": "Доля в норме",
+          "trueRate": "Доля истинных",
+          "count": "Оценки"
+        },
+        "legendAvg": "Сред",
+        "legendThreshold": "порог {direction} {value}",
+        "markLineHealthy": "здоров {direction} {value}",
+        "filterRange": "от {from} до {to}",
+        "filterBelow": "Ниже {to}",
+        "filterAtLeast": "{from} и более",
+        "filterAny": "Любое значение",
+        "filterByBar": "Фильтровать оценки по значению",
+        "barButton": "{label}: {count} оценка | {label}: {count} оценок",
+        "clearFilter": "Сбросить фильтр"
+      },
+      "review": {
+        "title": "Оценки качества",
+        "all": "Все",
+        "unhealthy": "Не в норме",
+        "unhealthyDisabled": "Задайте порог нормы для классификации оценок",
+        "inputNotCaptured": "Входные данные не сохранены",
+        "outputNotCaptured": "Выходные данные не сохранены",
+        "noMatch": "Нет оценок, соответствующих этому фильтру"
+      },
+      "pane": {
+        "noneSelected": "Оценка не выбрана",
+        "healthy": "В норме",
+        "unhealthy": "Не в норме",
+        "noThreshold": "Порог нормы не задан",
+        "previous": "Предыдущая оценка",
+        "next": "Следующая оценка",
+        "reasoning": "Обоснование",
+        "noReasoning": "Обоснование не записано",
+        "fullTextUnavailable": "Показан краткий предпросмотр. Полный трейс не удалось загрузить.",
+        "open": {
+          "span": "Открыть спан",
+          "trace": "Открыть трейс",
+          "session": "Открыть сессию"
+        },
+        "evaluatorTrace": "Трейс оценщика",
+        "addToDataset": "Добавить в датасет",
+        "datasetSession": "В датасет можно добавить один трейс или спан. Откройте сессию, чтобы добавить один из её трейсов.",
+        "datasetNoStream": "У этой оценки нет исходного потока для добавления."
+      }
     },
     "singular": {
       "jobs": "Задача оценки",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Импорт ({count})",
-    "count": "Количество",
     "failedToDeriveSchema": "Не удалось вывести схему",
     "failedToImportScoreConfig": "Не удалось импортировать конфигурацию оценки",
     "failedToImportScorer": "Не удалось импортировать оценщика",
     "failedToFetchCatalog": "Не удалось получить каталог ({status})",
     "failedToLoadCatalog": "Не удалось загрузить каталог",
     "failedToRunScorerTest": "Не удалось выполнить тест оценщика",
-    "healthyRate": "Доля здоровых",
     "invalidJsonFormat": "Неверный формат JSON",
     "jsonIsEmpty": "JSON пуст",
     "scorerTestFailed": "Тест оценщика не пройден",
     "scorerTestSampleContext": "Профиль Франции: Париж — столица.",
     "scorerTestSampleInput": "Столица Франции — Париж, расположенный на реке Сене.",
     "scorerTestSampleOutput": "Париж — столица Франции.",
-    "topCategory": "Основная категория",
-    "trueRate": "Доля истинных",
     "unknownError": "Неизвестная ошибка",
     "import": {
       "createdSuccessfully": "\"{name}\" успешно создан",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Онлайн-оценки — Шаблоны",
       "scorers": "Онлайн-оценки — Оценщики",
       "evalJobs": "Онлайн-оценки — Задания",
+      "quality": "Онлайн-оценки — Качество",
       "scoreConfigs": "Онлайн-оценки — Конфигурации оценок",
       "actions": "Действия",
       "llmProviders": "LLM-провайдеры",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Обновить список",
       "scorersRefresh": "Обновить список",
       "evalJobsRefresh": "Обновить список",
+      "qualityBack": "Назад ко всем конфигурациям",
       "scoreConfigsRefresh": "Обновить список",
       "actionsRefresh": "Обновить список",
       "llmProvidersRefresh": "Обновить список",
@@ -20554,11 +20531,10 @@
         "high": "Высокий"
       },
       "qualityStatus": {
-        "nothreshold": "Без порога",
-        "nodata": "Нет данных",
+        "attention": "Требует внимания",
         "healthy": "Исправен",
-        "warn": "Предупреждение",
-        "unhealthy": "Неисправен"
+        "unset": "Порог не задан",
+        "nodata": "Нет данных об оценке"
       },
       "rumEventType": {
         "longtask": "Долгая задача",

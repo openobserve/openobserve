@@ -87,6 +87,8 @@ export interface UseAgentScopeOptions {
    * requiring an explicit version pick.
    */
   versionAgnostic?: boolean;
+  /** Cascade only (Quality): each level offers and starts on "All"; the unset buckets are left out, as exact-match APIs cannot filter on them. */
+  allOption?: boolean;
   /** Module-scoped agents ref (Sessions/LLM) or created locally (Graph/Behavior). */
   agents?: Ref<GenAiAgentListItem[]>;
   /** Module-scoped agentsLoaded ref, created locally when omitted. */
@@ -200,25 +202,54 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     return out;
   }
 
+  const allOption = cascade && (opts.allOption ?? false);
+  // With allOption, an "All" level matches every agent and the unset bucket is not offered.
+  const levelMatches = (selected: string, value: string) =>
+    (allOption && selected === ALL_AGENTS_VALUE) || selected === value;
+  const withAll = (options: SelectOption[], allKey: string): SelectOption[] =>
+    allOption
+      ? [
+          { label: raw(opts.t(allKey)), value: ALL_AGENTS_VALUE },
+          ...options.filter((o) => o.value !== UNSET),
+        ]
+      : options;
+
   const envs = computed<SelectOption[]>(() =>
-    cascade ? distinctOptions(agents.value.map(agentEnv), opts.t("traces.agentNoEnv")) : [],
+    cascade
+      ? withAll(
+          distinctOptions(agents.value.map(agentEnv), opts.t("traces.agentNoEnv")),
+          "common.all",
+        )
+      : [],
   );
 
   const agentNames = computed<SelectOption[]>(() =>
     cascade
-      ? distinctOptions(
-          agents.value.filter((a) => agentEnv(a) === selectedEnv.value).map((a) => a.name),
+      ? withAll(
+          distinctOptions(
+            agents.value
+              .filter((a) => levelMatches(selectedEnv.value, agentEnv(a)))
+              .map((a) => a.name),
+          ),
+          "traces.allAgents",
         )
       : [],
   );
 
   const versions = computed<SelectOption[]>(() =>
     cascade
-      ? distinctOptions(
-          agents.value
-            .filter((a) => agentEnv(a) === selectedEnv.value && a.name === selectedAgentName.value)
-            .map(agentVersion),
-          opts.t("traces.agentNoVersion"),
+      ? withAll(
+          distinctOptions(
+            agents.value
+              .filter(
+                (a) =>
+                  levelMatches(selectedEnv.value, agentEnv(a)) &&
+                  levelMatches(selectedAgentName.value, a.name),
+              )
+              .map(agentVersion),
+            opts.t("traces.agentNoVersion"),
+          ),
+          "common.all",
         )
       : [],
   );

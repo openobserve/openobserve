@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Wszyscy agenci",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "Wszyscy agenci",
-      "kpisAriaLabel": "KPI poziomu 1",
-      "dataTypes": {
-        "numericShort": "Liczba",
-        "categoricalShort": "Kat.",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} dni temu"
+        }
       },
+      "healthyIf": "Zdrowy, jeśli {rule}",
+      "noHealthyValue": "brak",
+      "setThreshold": "Ustaw próg zdrowia",
+      "noScoresInWindow": "Brak ocen w tym oknie",
+      "outOf": "{count} z {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Zakres oceny",
-        "filterHint": "Porównaj tę konfigurację oceny w różnych zakresach docelowych oceniania.",
         "all": "Wszystkie",
         "span": "Span",
         "trace": "Trace",
         "session": "Sesja"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Wyniki oceny"
-        },
-        "evaluationCost": {
-          "title": "Koszt oceny"
-        },
-        "scorerSuccess": {
-          "title": "Sukcesy ewaluatorów"
-        },
-        "scorerFailures": {
-          "title": "Błędy ewaluatorów"
-        },
-        "latencyP95": {
-          "title": "Opóźnienie ewaluatorów p95"
-        },
-        "vsPrev": "vs poprz",
-        "noPriorData": "brak wcześniejszych danych",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "sesja"
       },
-      "detail": {
-        "loading": "Ładowanie podziału na konfigurację…",
-        "noData": "Brak ocen dla tej konfiguracji w tym oknie.",
-        "empty": {
-          "title": "Oczekiwanie na pierwsze oceny",
-          "titleScoped": "Brak wyników dla {scope} w tym oknie",
-          "description": "Żadne oceny nie trafiły do tej konfiguracji w wybranym zakresie czasu. Pojawią się tutaj automatycznie, gdy uruchomi się ewaluator, który jej używa.",
-          "descriptionScoped": "Żadne wyniki dla {scope} nie trafiły dla tej konfiguracji w wybranym zakresie czasu. Wybierz inny zakres lub poszerz zakres czasu."
-        },
-        "trendTitle": "Trend",
-        "distributionTitle": "Rozkład ocen",
-        "categoryDistributionTitle": "Rozkład kategorii",
-        "healthyRateTitle": "Wskaźnik zdrowia w czasie",
-        "trueRateTitle": "Wskaźnik prawdy w czasie",
-        "trueFalseTitle": "Prawda vs Fałsz",
-        "legendAvg": "Śr",
-        "legendThreshold": "próg {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "zdrowy {direction} {value}",
-        "healthyThreshold": "Zdrowy {threshold}",
-        "legendHealthy": "zdrowy",
-        "legendUnhealthy": "niezdrowy",
-        "legendHealthyRate": "Wskaźnik zdrowia",
-        "legendTrueRate": "Wskaźnik prawdy",
-        "legendTrueCount": "prawda ({count})",
-        "legendFalseCount": "fałsz ({count})",
-        "kpis": {
-          "average": "Średnia",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Niezdrowy",
-          "healthy": "Zdrowy",
-          "trueRate": "Wskaźnik prawdy",
-          "falseRate": "Wskaźnik fałszu",
-          "coverage": "Pokrycie",
-          "targetsScored": "Ocenione cele"
-        },
-        "health": {
-          "title": "Stan zdrowia",
-          "noThreshold": "Nie skonfigurowano progu zdrowia. Wyniki nie mogą być jeszcze klasyfikowane jako zdrowe lub pogarszające się.",
-          "thresholdOnly": "Zdrowy, jeśli {threshold}",
-          "summary": "{percent}% poniżej progu · Zdrowy, jeśli {threshold}"
-        },
-        "ofScoreResults": "z {count} wyników punktacji",
-        "range": "Zakres {min}–{max}"
+      "tiles": {
+        "attention": "Konfiguracje wymagające uwagi",
+        "ofTotal": "z {total}",
+        "attentionNote": "Pokaż je",
+        "attentionTooltip": "Konfiguracje z co najmniej jedną niezdrową oceną",
+        "withoutResult": "Konfiguracje bez wyniku",
+        "withoutResultTooltip": "Konfiguracje bez ocen w tym zakresie czasu lub bez progu zdrowia. Kliknij, aby je pokazać.",
+        "noScores": "{count} nie otrzymała ocen | {count} nie otrzymały ocen",
+        "noThreshold": "{count} nie ma progu | {count} nie mają progu",
+        "allGiveResult": "Każda konfiguracja zwraca wynik"
       },
-      "runs": {
-        "title": "Oceny",
-        "hint": "Wyniki i uzasadnienie pochodzą z _llm_scores. Wybierz uruchomienie, aby otworzyć jego trace ewaluatora w celu dalszego zbadania.",
-        "filterLabel": "Filtruj oceny",
-        "noThresholdHint": "Ustaw próg zdrowia w tej konfiguracji oceny, aby klasyfikować i wyróżniać niezdrowe wyniki.",
-        "noReasoning": "Nie zapisano uzasadnienia",
-        "unknownAgent": "Nieznany agent",
-        "unknownScope": "Nieznany zakres",
-        "queryError": "Nie można odświeżyć wyników oceny. Nadal wyświetlana jest ostatnia pomyślna strona.",
-        "empty": "Brak wyników oceny w tym przedziale czasowym.",
-        "emptyUnhealthy": "Brak niezdrowych wyników w tym przedziale czasowym.",
-        "filters": {
-          "all": "Wszystkie wyniki",
-          "unhealthy": "Niezdrowy"
-        },
-        "health": {
-          "healthy": "Zdrowy",
-          "unhealthy": "Niezdrowy"
-        },
-        "columns": {
-          "time": "Oceniono",
-          "result": "Wynik",
-          "reasoning": "Uzasadnienie",
-          "target": "Cel",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filtruj konfiguracje…",
-        "relativeTime": {
-          "daysAgo": "{day} dni temu",
-          "monthsAgo": "{month} mies. temu"
-        },
-        "status": {
-          "healthy": "Zdrowy",
-          "unhealthy": "Wymaga uwagi",
-          "noThreshold": "Próg nie ustawiony",
-          "noData": "Brak danych wyników"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% poniżej · Zdrowy, jeśli {threshold}",
-          "noThresholdHint": "Ustaw zdrowy próg",
-          "noDataHint": "Brak wyników w tym oknie"
-        },
+        "openUnhealthy": "Otwórz niezdrowe oceny",
+        "configLink": "Konfiguracja",
+        "averageRange": "średnia, od {min} do {max}",
+        "mostCommon": "najczęstsza · {count} z {total}",
         "columns": {
-          "health": "Zdrowie",
-          "scoreConfig": "Konfiguracja oceny",
-          "type": "Typ",
-          "quality": "Jakość",
-          "totalScores": "Łączna liczba ocen",
-          "scopeMix": "Mieszanka zakresów",
-          "volumeTrend": "Trend wolumenu",
+          "scoreConfig": "Konfiguracja ocen",
+          "health": "Stan zdrowia",
+          "typicalScore": "Typowa ocena",
+          "unhealthy": "Niezdrowe",
+          "scores": "Oceny",
           "updated": "Zaktualizowano"
         }
       },
-      "averageWithHealthyRate": "Średnia · {rate}% zdrowych"
+      "detail": {
+        "back": "Wszystkie konfiguracje",
+        "backToAll": "Wróć do wszystkich konfiguracji",
+        "editConfig": "Edytuj konfigurację",
+        "notFound": "Nie znaleziono konfiguracji ocen",
+        "notFoundDescription": "Może została usunięta lub link wskazuje na starą konfigurację.",
+        "emptyTitle": "Oczekiwanie na pierwsze oceny",
+        "emptyTitleScoped": "Brak ocen {scope} w tym oknie",
+        "emptyDescription": "W wybranym zakresie czasu nie napłynęły żadne oceny dla tej konfiguracji. Pojawią się tutaj, gdy uruchomi się ewaluator, który jej używa.",
+        "distributionNumeric": "Rozkład ocen",
+        "distributionValues": "Rozkład wartości",
+        "averageValue": "średnia {value}",
+        "legendHealthy": "Prawidłowy",
+        "legendUnhealthy": "Nieprawidłowy",
+        "legendScores": "Oceny",
+        "chartTooltip": "{count} ocena, {unhealthy} niezdrowych | {count} ocen, {unhealthy} niezdrowych",
+        "chartTooltipCount": "{count} ocena | {count} ocen",
+        "trendTitle": {
+          "score": "Trend",
+          "healthyRate": "Odsetek zdrowych w czasie",
+          "trueRate": "Odsetek wartości prawdziwych w czasie",
+          "count": "Oceny w czasie"
+        },
+        "trendLegend": {
+          "healthyRate": "Odsetek zdrowych",
+          "trueRate": "Odsetek wartości true",
+          "count": "Oceny"
+        },
+        "legendAvg": "Śr",
+        "legendThreshold": "próg {direction} {value}",
+        "markLineHealthy": "zdrowy {direction} {value}",
+        "filterRange": "od {from} do {to}",
+        "filterBelow": "Poniżej {to}",
+        "filterAtLeast": "{from} lub więcej",
+        "filterAny": "Dowolna wartość",
+        "filterByBar": "Filtruj oceny według wartości",
+        "barButton": "{label}: {count} ocena | {label}: {count} ocen",
+        "clearFilter": "Wyczyść filtr"
+      },
+      "review": {
+        "title": "Wyniki ocen",
+        "all": "Wszystkie",
+        "unhealthy": "Niezdrowe",
+        "unhealthyDisabled": "Ustaw próg zdrowia, aby klasyfikować oceny",
+        "inputNotCaptured": "Nie przechwycono danych wejściowych",
+        "outputNotCaptured": "Nie przechwycono danych wyjściowych",
+        "noMatch": "Brak ocen pasujących do tego filtra"
+      },
+      "pane": {
+        "noneSelected": "Nie wybrano oceny",
+        "healthy": "Zdrowe",
+        "unhealthy": "Niezdrowe",
+        "noThreshold": "Nie ustawiono progu zdrowia",
+        "previous": "Poprzednia ocena",
+        "next": "Następna ocena",
+        "reasoning": "Rozumowanie",
+        "noReasoning": "Nie zapisano rozumowania",
+        "fullTextUnavailable": "Wyświetlany jest krótki podgląd. Nie udało się wczytać pełnego trace.",
+        "open": {
+          "span": "Otwórz span",
+          "trace": "Otwórz trace",
+          "session": "Otwórz sesję"
+        },
+        "evaluatorTrace": "Trace ewaluatora",
+        "addToDataset": "Dodaj do zestawu danych",
+        "datasetSession": "Zestawy danych przyjmują pojedynczy trace lub span. Otwórz sesję, aby dodać jeden z jej trace'ów.",
+        "datasetNoStream": "Ta ocena nie ma strumienia źródłowego, z którego można ją dodać."
+      }
     },
     "singular": {
       "jobs": "Zadanie ewaluacji",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Importuj ({count})",
-    "count": "Liczba",
     "failedToDeriveSchema": "Nie udało się wyprowadzić schematu",
     "failedToImportScoreConfig": "Nie udało się zaimportować konfiguracji oceny",
     "failedToImportScorer": "Nie udało się zaimportować ewaluatora",
     "failedToFetchCatalog": "Nie udało się pobrać katalogu ({status})",
     "failedToLoadCatalog": "Nie udało się wczytać katalogu",
     "failedToRunScorerTest": "Nie udało się uruchomić testu ewaluatora",
-    "healthyRate": "Wskaźnik zdrowotności",
     "invalidJsonFormat": "Nieprawidłowy format JSON",
     "jsonIsEmpty": "JSON jest pusty",
     "scorerTestFailed": "Test ewaluatora nie powiódł się",
     "scorerTestSampleContext": "Profil kraju Francji: Paryż jest stolicą.",
     "scorerTestSampleInput": "Stolicą Francji jest Paryż, położony nad Sekwaną.",
     "scorerTestSampleOutput": "Paryż jest stolicą Francji.",
-    "topCategory": "Najwyższa kategoria",
-    "trueRate": "Wskaźnik prawdziwości",
     "unknownError": "Nieznany błąd",
     "import": {
       "createdSuccessfully": "\"{name}\" zostało utworzone pomyślnie",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Ewaluacje online — Szablony",
       "scorers": "Ewaluacje online — Ewaluatory",
       "evalJobs": "Ewaluacje online — Zadania",
+      "quality": "Ewaluacje online — Jakość",
       "scoreConfigs": "Ewaluacje online — Konfiguracje ocen",
       "actions": "Akcje",
       "llmProviders": "Dostawcy LLM",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Odśwież listę",
       "scorersRefresh": "Odśwież listę",
       "evalJobsRefresh": "Odśwież listę",
+      "qualityBack": "Wróć do wszystkich konfiguracji",
       "scoreConfigsRefresh": "Odśwież listę",
       "actionsRefresh": "Odśwież listę",
       "llmProvidersRefresh": "Odśwież listę",
@@ -20554,11 +20531,10 @@
         "high": "Wysoki"
       },
       "qualityStatus": {
-        "nothreshold": "Brak progu",
-        "nodata": "Brak danych",
+        "attention": "Wymaga uwagi",
         "healthy": "Zdrowy",
-        "warn": "Ostrzeżenie",
-        "unhealthy": "Niezdrowy"
+        "unset": "Nie ustawiono progu",
+        "nodata": "Brak danych oceny"
       },
       "rumEventType": {
         "longtask": "Długie zadanie",

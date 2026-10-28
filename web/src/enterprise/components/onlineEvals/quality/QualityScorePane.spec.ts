@@ -1,0 +1,513 @@
+// @vitest-environment jsdom
+import { defineComponent } from "vue";
+import { flushPromises, mount } from "@vue/test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import store from "@/test/unit/helpers/store";
+import { withQueryClient } from "@/test/unit/helpers/queryClient";
+import type { QualityScore } from "@/services/online-evals.service";
+import QualityScorePane from "./QualityScorePane.vue";
+
+const { push, search } = vi.hoisted(() => ({
+  push: vi.fn(() => Promise.resolve()),
+  search: vi.fn(),
+}));
+
+vi.mock("@/services/search", () => ({ default: { search } }));
+
+// The real box renders; only the heavy content renderer is replaced.
+vi.mock("@/plugins/traces/LLMContentRenderer.vue", () => ({
+  default: {
+    name: "LLMContentRenderer",
+    props: ["content"],
+    template: `<div class="llm">{{ content }}</div>`,
+  },
+}));
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ name: "aiEvaluations", query: {} }),
+  useRouter: () => ({ push }),
+}));
+
+const score = (overrides: Partial<QualityScore> = {}): QualityScore => ({
+  id: "s1",
+  timestamp: 1791199632199574,
+  refTimestamp: 1791199600000000,
+  sourceType: "llm_judge",
+  targetScope: "trace",
+  targetId: "70d86ea9c0ffee",
+  spanId: null,
+  traceId: "70d86ea9c0ffee",
+  sessionId: null,
+  sourceStream: "default",
+  sourceStreamType: "traces",
+  value: "medium",
+  unhealthy: true,
+  reasoning: "The answer ignores the format the user asked for.",
+  evaluatorTraceId: "eval-trace-1",
+  taskId: null,
+  inputPreview: "Write VRL to parse JSON from my nginx logs.",
+  outputPreview: null,
+  inputSpanId: "span-in",
+  outputSpanId: "span-out",
+  ...overrides,
+});
+
+const DrawerStub = defineComponent({
+  name: "AddToDatasetDrawer",
+  props: ["open", "orgId", "refType", "refId", "sourceStream", "refTraceStartTime", "inputPreview"],
+  emits: ["update:open"],
+  template: `<div data-test="dataset-drawer-stub" />`,
+});
+
+const hits = (spans: Record<string, unknown>[]) => Promise.resolve({ data: { hits: spans } });
+const span = (id: string, input: string, output: string) => ({
+  span_id: id,
+  gen_ai_input_messages: input,
+  gen_ai_output_messages: output,
+});
+/** The one search request the pane sent: its SQL and window. */
+const sent = (call = 0) => {
+  const [options] = search.mock.calls[call];
+  return {
+    sql: options.query.query.sql,
+    start_time: options.query.query.start_time,
+    end_time: options.query.query.end_time,
+    page_type: options.page_type,
+  };
+};
+// A minute before the target time, up to the score write.
+const WINDOW = { start_time: 1791199600000000 - 60_000_000, end_time: 1791199632199574 };
+const io = (wrapper: ReturnType<typeof mountPane>) =>
+  wrapper.findAll('[data-test="quality-score-pane-io"] .llm').map((box) => box.text());
+const skeletons = (wrapper: ReturnType<typeof mountPane>) =>
+  (["input", "output"] as const).filter((side) =>
+    wrapper.find(`[data-test="ai-review-content-skeleton-${side}"]`).exists(),
+  );
+const unavailable = (wrapper: ReturnType<typeof mountPane>) =>
+  wrapper.find('[data-test="quality-score-pane-full-unavailable"]');
+
+function mountPane(props: Record<string, unknown> = {}) {
+  return mount(QualityScorePane, {
+    props: {
+      score: score(),
+      thresholdLabel: "high",
+      canPrev: false,
+      canNext: true,
+      loading: false,
+      ...props,
+    },
+    global: { plugins: [store, withQueryClient()], stubs: { AddToDatasetDrawer: DrawerStub } },
+  });
+}
+
+describe("QualityScorePane", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "open").mockImplementation(() => null);
+    push.mockClear();
+    search.mockReset().mockImplementation(() => hits([]));
+  });
+
+  it("shows the health and the rule, but no target link, value or time", () => {
+    const header = mountPane().find('[data-test="quality-score-pane-header"]');
+    expect(header.text()).toContain("Unhealthy");
+    expect(header.find('[data-test="quality-score-pane-rule"]').text()).toBe("Healthy if high");
+    expect(header.find('[data-test="quality-score-pane-target"]').exists()).toBe(false);
+    expect(header.text()).not.toContain("70d86ea9");
+    expect(header.text()).not.toContain("Trace");
+    expect(header.text()).not.toContain("medium");
+    expect(header.text()).not.toMatch(/\d{4}-\d{2}-\d{2}|ago/);
+  });
+
+  it("says when no threshold is set, without a health tag", () => {
+    const header = mountPane({
+      score: score({ unhealthy: null }),
+      thresholdLabel: "",
+    }).find('[data-test="quality-score-pane-header"]');
+    expect(header.find('[data-test="quality-score-pane-health"]').exists()).toBe(false);
+    expect(header.text()).toContain("No healthy threshold set");
+  });
+
+  it("shows Input and Output side by side, with the missing output said inside its box", async () => {
+    // A score without span ids keeps its preview.
+    const wrapper = mountPane({
+      score: score({ inputSpanId: null, outputSpanId: null }),
+    });
+    await flushPromises();
+    const io = wrapper.find('[data-test="quality-score-pane-io"]');
+    expect(io.classes()).toEqual(expect.arrayContaining(["flex-1", "md:flex-row"]));
+    expect(io.find(".llm").text()).toBe("Write VRL to parse JSON from my nginx logs.");
+    expect(io.find('[data-test="ai-review-content-empty-output"]').text()).toBe(
+      "Output not captured",
+    );
+    expect(io.find('[data-test="ai-review-content-empty-input"]').exists()).toBe(false);
+  });
+
+  it("shows the reasoning in a bordered collapsible block, open by default", async () => {
+    const wrapper = mountPane();
+    await flushPromises();
+    const block = wrapper.find('[data-test="quality-score-pane-reasoning"]');
+    expect(block.classes()).toEqual(
+      expect.arrayContaining(["border", "border-border-default", "rounded-default"]),
+    );
+    expect(block.find("button").text()).toBe("Reasoning");
+    expect(block.find('[data-test="quality-score-pane-reasoning-text"]').text()).toBe(
+      "The answer ignores the format the user asked for.",
+    );
+  });
+
+  it("scrolls the body between the header and the actions, so the reasoning stays readable on a short window", () => {
+    expect(mountPane().find('[data-test="quality-score-pane-body"]').classes()).toEqual(
+      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto"]),
+    );
+  });
+
+  it("folds and unfolds the reasoning, and keeps it folded across scores", async () => {
+    const wrapper = mountPane();
+    await flushPromises();
+    const toggle = () =>
+      wrapper.find('[data-test="quality-score-pane-reasoning"] button').trigger("click");
+    await toggle();
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').exists()).toBe(false);
+    await wrapper.setProps({ score: score({ id: "s2", reasoning: "Second reasoning." }) });
+    expect(wrapper.text()).not.toContain("Second reasoning.");
+    await toggle();
+    await flushPromises();
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').text()).toBe(
+      "Second reasoning.",
+    );
+  });
+
+  it("says so inside the reasoning block when the judge gave none", async () => {
+    const wrapper = mountPane({ score: score({ reasoning: null }) });
+    await flushPromises();
+    expect(wrapper.find('[data-test="quality-score-pane-no-reasoning"]').text()).toBe(
+      "No reasoning recorded",
+    );
+  });
+
+  it("opens the target and the evaluator trace from the footer in the same tab", async () => {
+    const wrapper = mountPane();
+    const trace = {
+      name: "traceDetails",
+      query: {
+        org_identifier: "default",
+        from: 1791199600000000 - 3_600_000_000,
+        to: 1791199600000000 + 3_600_000_000,
+        stream: "default",
+        trace_id: "70d86ea9c0ffee",
+      },
+    };
+    await wrapper.find('[data-test="quality-score-pane-open-target"]').trigger("click");
+    expect(push).toHaveBeenLastCalledWith(trace);
+    await wrapper.find('[data-test="quality-score-pane-open-evaluator"]').trigger("click");
+    expect(push).toHaveBeenLastCalledWith({
+      name: "traceDetails",
+      query: {
+        org_identifier: "default",
+        stream: "_evaluator",
+        trace_id: "eval-trace-1",
+        from: 1791199632199574 - 3_600_000_000,
+        to: 1791199632199574 + 3_600_000_000,
+      },
+    });
+    expect(window.open).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="quality-score-pane-open-target"]').text()).toBe("Open trace");
+  });
+
+  it("opens a session score on the session page in the same tab", async () => {
+    const wrapper = mountPane({
+      score: score({
+        targetScope: "session",
+        sessionId: "sess-1",
+        traceId: null,
+        targetId: "sess-1",
+      }),
+    });
+    await wrapper.find('[data-test="quality-score-pane-open-target"]').trigger("click");
+    expect(push).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        name: "sessionDetails",
+        query: expect.objectContaining({ session_id: "sess-1" }),
+      }),
+    );
+    expect(wrapper.find('[data-test="quality-score-pane-open-target"]').text()).toBe(
+      "Open session",
+    );
+  });
+
+  it("hides an action whose link cannot be built", () => {
+    const wrapper = mountPane({ score: score({ evaluatorTraceId: null }) });
+    expect(wrapper.find('[data-test="quality-score-pane-open-evaluator"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-score-pane-open-target"]').exists()).toBe(true);
+  });
+
+  it("adds a trace score to a dataset in a drawer on the page, without an expected output", async () => {
+    const wrapper = mountPane();
+    expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
+    const button = wrapper.find('[data-test="quality-score-pane-add-to-dataset"]');
+    expect(button.text()).toBe("Add to dataset");
+    expect(button.attributes("disabled")).toBeUndefined();
+    await button.trigger("click");
+    const drawer = wrapper.findComponent(DrawerStub);
+    expect(drawer.props()).toEqual({
+      open: true,
+      orgId: "default",
+      refType: "trace",
+      refId: "70d86ea9c0ffee",
+      sourceStream: "default",
+      refTraceStartTime: 1791199600000000,
+      inputPreview: undefined,
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(window.open).not.toHaveBeenCalled();
+
+    // A closed drawer unmounts, so the next open starts from the score then selected.
+    drawer.vm.$emit("update:open", false);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
+  });
+
+  it("adds a span score by its span id", async () => {
+    const wrapper = mountPane({
+      score: score({ targetScope: "span", targetId: "span-9", spanId: "span-9" }),
+    });
+    await wrapper.find('[data-test="quality-score-pane-add-to-dataset"]').trigger("click");
+    expect(wrapper.findComponent(DrawerStub).props()).toEqual(
+      expect.objectContaining({
+        refType: "span",
+        refId: "span-9",
+        sourceStream: "default",
+        refTraceStartTime: 1791199600000000,
+      }),
+    );
+  });
+
+  it("shows Add to dataset disabled with the reason for a session score", async () => {
+    const wrapper = mountPane({
+      score: score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" }),
+    });
+    const button = wrapper.find('[data-test="quality-score-pane-add-to-dataset"]');
+    const reason =
+      "Datasets take a single trace or span. Open the session to add one of its traces.";
+    // Focusable while unavailable, so keyboard and screen reader users reach the reason.
+    expect(button.attributes("disabled")).toBeUndefined();
+    expect(button.attributes("aria-disabled")).toBe("true");
+    const describedBy = button.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(wrapper.find(`[id="${describedBy}"]`).text()).toBe(reason);
+    expect(button.findComponent({ name: "OTooltip" }).props("content")).toBe(reason);
+    await button.trigger("click");
+    expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
+  });
+
+  it("disables Add to dataset when the score has no source stream", async () => {
+    const wrapper = mountPane({ score: score({ sourceStream: null }) });
+    const button = wrapper.find('[data-test="quality-score-pane-add-to-dataset"]');
+    expect(button.attributes("aria-disabled")).toBe("true");
+    expect(button.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "This score has no source stream to add from.",
+    );
+    await button.trigger("click");
+    expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
+  });
+
+  it("shows skeletons in both boxes while the span loads, then the span score's full text", async () => {
+    let resolve: (value: unknown) => void = () => {};
+    search.mockReturnValue(new Promise((done) => (resolve = done)));
+    const wrapper = mountPane({
+      score: score({
+        targetScope: "span",
+        spanId: "span-2",
+        targetId: "span-2",
+        inputSpanId: "span-2",
+        outputSpanId: "span-2",
+      }),
+    });
+    await flushPromises();
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual({
+      sql: `SELECT * FROM "default" WHERE span_id IN ('span-2')`,
+      ...WINDOW,
+      page_type: "traces",
+    });
+    // While loading: a skeleton in each box and in the reasoning, the frames kept, no preview and no note.
+    expect(skeletons(wrapper)).toEqual(["input", "output"]);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("The answer ignores the format");
+    expect(io(wrapper)).toEqual([]);
+    expect(wrapper.text()).not.toContain("Write VRL to parse JSON");
+    expect(wrapper.find('[data-test="ai-review-content-copy-input"]').exists()).toBe(true);
+    expect(unavailable(wrapper).exists()).toBe(false);
+
+    resolve({
+      data: {
+        hits: [
+          span(
+            "span-2",
+            "Write VRL to parse JSON from my nginx logs. Full prompt.",
+            "parse_json!(.message)",
+          ),
+        ],
+      },
+    });
+    await flushPromises();
+    expect(io(wrapper)).toEqual([
+      "Write VRL to parse JSON from my nginx logs. Full prompt.",
+      "parse_json!(.message)",
+    ]);
+    expect(unavailable(wrapper).exists()).toBe(false);
+    expect(skeletons(wrapper)).toEqual([]);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').text()).toBe(
+      "The answer ignores the format the user asked for.",
+    );
+  });
+
+  it("reads a session's input and output from the two spans its scorer recorded, in one query", async () => {
+    search.mockImplementation(() =>
+      hits([
+        span("last-turn", "Last question", "Last answer"),
+        span("first-turn", "First question", "First answer"),
+      ]),
+    );
+    const wrapper = mountPane({
+      score: score({
+        targetScope: "session",
+        sessionId: "sess-1",
+        targetId: "sess-1",
+        traceId: null,
+        sourceStream: "agents",
+        inputSpanId: "first-turn",
+        outputSpanId: "last-turn",
+      }),
+    });
+    await flushPromises();
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(sent().sql).toBe(`SELECT * FROM "agents" WHERE span_id IN ('first-turn', 'last-turn')`);
+    expect(io(wrapper)).toEqual(["First question", "Last answer"]);
+    expect(unavailable(wrapper).exists()).toBe(false);
+  });
+
+  it("sends no query and keeps the preview with the note when the score has no span ids", async () => {
+    const wrapper = mountPane({ score: score({ inputSpanId: null, outputSpanId: null }) });
+    await flushPromises();
+    expect(search).not.toHaveBeenCalled();
+    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(skeletons(wrapper)).toEqual([]);
+    expect(unavailable(wrapper).text()).toBe(
+      "Showing a short preview. The full trace could not be loaded.",
+    );
+  });
+
+  it("reads the side with a span id and keeps the preview on the side without one", async () => {
+    search.mockImplementation(() => hits([span("span-in", "Full question", "ignored")]));
+    const wrapper = mountPane({
+      score: score({ outputSpanId: null, outputPreview: "Short answer" }),
+    });
+    await flushPromises();
+    expect(sent().sql).toBe(`SELECT * FROM "default" WHERE span_id IN ('span-in')`);
+    expect(io(wrapper)).toEqual(["Full question", "Short answer"]);
+    expect(unavailable(wrapper).exists()).toBe(true);
+  });
+
+  it("escapes quotes in a span id", async () => {
+    mountPane({ score: score({ inputSpanId: "a'b", outputSpanId: null }) });
+    await flushPromises();
+    expect(sent().sql).toBe(`SELECT * FROM "default" WHERE span_id IN ('a''b')`);
+  });
+
+  it("escapes quotes in the stream name and searches the score's own stream type", async () => {
+    mountPane({
+      score: score({ sourceStream: 'odd"name', sourceStreamType: "logs", outputSpanId: null }),
+    });
+    await flushPromises();
+    expect(sent().sql).toBe(`SELECT * FROM "odd""name" WHERE span_id IN ('span-in')`);
+    expect(sent().page_type).toBe("logs");
+  });
+
+  it("keeps the preview and says the full text is not available when the query fails or finds no span", async () => {
+    search.mockRejectedValue(new Error("boom"));
+    const failed = mountPane();
+    await flushPromises();
+    expect(io(failed)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(failed).text()).toBe(
+      "Showing a short preview. The full trace could not be loaded.",
+    );
+    expect(skeletons(failed)).toEqual([]);
+
+    search.mockReset().mockImplementation(() => hits([]));
+    const empty = mountPane({ score: score({ id: "s2", inputSpanId: "gone" }) });
+    await flushPromises();
+    expect(io(empty)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(empty).exists()).toBe(true);
+  });
+
+  it("does not query without a source stream", async () => {
+    const wrapper = mountPane({ score: score({ sourceStream: null }) });
+    await flushPromises();
+    expect(search).not.toHaveBeenCalled();
+    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(wrapper).exists()).toBe(true);
+  });
+
+  it("reads each score's spans once, coming back included", async () => {
+    search.mockImplementation(() =>
+      hits([span("span-in", "First question", "x"), span("span-2", "Span question", "y")]),
+    );
+    const wrapper = mountPane();
+    await flushPromises();
+    expect(io(wrapper)[0]).toBe("First question");
+    await wrapper.setProps({
+      score: score({ id: "s2", inputSpanId: "span-2", outputSpanId: "span-2" }),
+    });
+    await flushPromises();
+    expect(io(wrapper)[0]).toBe("Span question");
+    await wrapper.setProps({ score: score() });
+    await flushPromises();
+    expect(io(wrapper)[0]).toBe("First question");
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the frame and shows skeletons in the header, both boxes and the reasoning while the scores page loads", async () => {
+    const wrapper = mountPane({ score: null, loading: true, canNext: false });
+    await flushPromises();
+    expect(wrapper.find('[data-test="quality-score-pane-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-score-pane-header-skeleton"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="quality-score-pane-health"]').exists()).toBe(false);
+    expect(skeletons(wrapper)).toEqual(["input", "output"]);
+    const reasoning = wrapper.find('[data-test="quality-score-pane-reasoning"]');
+    expect(reasoning.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(
+      true,
+    );
+    expect(reasoning.text()).not.toContain("No reasoning recorded");
+    expect(wrapper.find('[data-test="quality-score-pane-add-to-dataset"]').exists()).toBe(false);
+    expect(search).not.toHaveBeenCalled();
+
+    // The page lands: the header shows, and the boxes and the reasoning wait for the full text.
+    await wrapper.setProps({ score: score(), loading: false });
+    expect(wrapper.find('[data-test="quality-score-pane-header-skeleton"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(true);
+    expect(skeletons(wrapper)).toEqual(["input", "output"]);
+    await flushPromises();
+    expect(skeletons(wrapper)).toEqual([]);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').exists()).toBe(true);
+  });
+
+  it("emits previous and next, and disables what cannot move", async () => {
+    const wrapper = mountPane();
+    expect(
+      wrapper.find('[data-test="quality-score-pane-prev"]').attributes("disabled"),
+    ).toBeDefined();
+    await wrapper.find('[data-test="quality-score-pane-next"]').trigger("click");
+    expect(wrapper.emitted("next")).toHaveLength(1);
+  });
+
+  it("shows a placeholder without a selected score", () => {
+    const wrapper = mountPane({ score: null });
+    expect(wrapper.find('[data-test="quality-score-pane-empty"]').text()).toContain(
+      "No score selected",
+    );
+  });
+});

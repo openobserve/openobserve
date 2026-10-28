@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Alle Agents",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "Alle Agenten",
-      "kpisAriaLabel": "Tier-1-KPIs",
-      "dataTypes": {
-        "numericShort": "Numerisch",
-        "categoricalShort": "Kategorie",
-        "booleanShort": "Boolesch"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "vor {day}T"
+        }
       },
+      "healthyIf": "Gesund, wenn {rule}",
+      "noHealthyValue": "keine",
+      "setThreshold": "Gesunden Schwellenwert festlegen",
+      "noScoresInWindow": "Keine Scores in diesem Zeitfenster",
+      "outOf": "{count} von {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Bewertungsumfang",
-        "filterHint": "Vergleichen Sie diese Bewertungskonfiguration über die Evaluierungszielbereiche hinweg.",
         "all": "Alle",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Bewertungsergebnisse"
-        },
-        "evaluationCost": {
-          "title": "Kosten der Bewertung"
-        },
-        "scorerSuccess": {
-          "title": "Scorer-Erfolg"
-        },
-        "scorerFailures": {
-          "title": "Scorer-Fehler"
-        },
-        "latencyP95": {
-          "title": "Scorer-Latenz p95"
-        },
-        "vsPrev": "gegen voriges",
-        "noPriorData": "keine vorherigen Daten",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Sitzung"
+      },
+      "tiles": {
+        "attention": "Konfigurationen mit Handlungsbedarf",
+        "ofTotal": "von {total}",
+        "attentionNote": "Anzeigen",
+        "attentionTooltip": "Konfigurationen mit mindestens einem ungesunden Score",
+        "withoutResult": "Konfigurationen ohne Ergebnis",
+        "withoutResultTooltip": "Konfigurationen ohne Scores in diesem Zeitraum oder ohne gesunden Schwellenwert. Klicken, um sie anzuzeigen.",
+        "noScores": "{count} hat keine Scores erhalten | {count} haben keine Scores erhalten",
+        "noThreshold": "{count} hat keinen Schwellenwert | {count} haben keinen Schwellenwert",
+        "allGiveResult": "Jede Konfiguration liefert ein Ergebnis"
+      },
+      "table": {
+        "searchPlaceholder": "Konfigurationen filtern…",
+        "openUnhealthy": "Ungesunde Scores öffnen",
+        "configLink": "Konfiguration",
+        "averageRange": "Durchschnitt, {min} bis {max}",
+        "mostCommon": "am häufigsten · {count} von {total}",
+        "columns": {
+          "scoreConfig": "Score-Konfiguration",
+          "health": "Gesundheit",
+          "typicalScore": "Typischer Score",
+          "unhealthy": "Ungesund",
+          "scores": "Scores",
+          "updated": "Aktualisiert"
+        }
       },
       "detail": {
-        "loading": "Aufschlüsselung pro Konfiguration wird geladen...",
-        "noData": "Noch keine Ergebnisse für diese Konfiguration in diesem Fenster.",
-        "empty": {
-          "title": "Warten auf Ihre ersten Scores",
-          "titleScoped": "Keine {scope}-Bewertungen in diesem Zeitfenster",
-          "description": "Für diese Konfiguration sind im ausgewählten Zeitbereich keine Scores eingegangen. Sie erscheinen hier automatisch, sobald ein Scorer ausgeführt wird, der sie verwendet.",
-          "descriptionScoped": "Für diese Konfiguration sind im ausgewählten Zeitraum keine {scope}-Bewertungen eingegangen. Wählen Sie einen anderen Bereich oder erweitern Sie den Zeitraum."
+        "back": "Alle Konfigurationen",
+        "backToAll": "Zurück zu allen Konfigurationen",
+        "editConfig": "Konfiguration bearbeiten",
+        "notFound": "Score-Konfiguration nicht gefunden",
+        "notFoundDescription": "Möglicherweise wurde sie gelöscht, oder der Link verweist auf eine alte Konfiguration.",
+        "emptyTitle": "Warten auf Ihre ersten Scores",
+        "emptyTitleScoped": "Keine Scores für {scope} in diesem Zeitfenster",
+        "emptyDescription": "Für diese Konfiguration sind im ausgewählten Zeitraum keine Scores eingegangen. Sie erscheinen hier, sobald ein Scorer, der diese Konfiguration verwendet, ausgeführt wird.",
+        "distributionNumeric": "Score-Verteilung",
+        "distributionValues": "Wertverteilung",
+        "averageValue": "Durchschnitt {value}",
+        "legendHealthy": "Gesund",
+        "legendUnhealthy": "Ungesund",
+        "legendScores": "Scores",
+        "chartTooltip": "{count} Score, {unhealthy} ungesund | {count} Scores, {unhealthy} ungesund",
+        "chartTooltipCount": "{count} Score | {count} Scores",
+        "trendTitle": {
+          "score": "Trend",
+          "healthyRate": "Gesundheitsrate im Zeitverlauf",
+          "trueRate": "Anteil wahrer Werte im Zeitverlauf",
+          "count": "Scores im Zeitverlauf"
         },
-        "trendTitle": "Trend",
-        "distributionTitle": "Verteilung der Punktzahlen",
-        "categoryDistributionTitle": "Kategorie Vertrieb",
-        "healthyRateTitle": "Gesundheitsrate im Zeitverlauf",
-        "trueRateTitle": "True-Rate im Zeitverlauf",
-        "trueFalseTitle": "Wahr gegen Falsch",
+        "trendLegend": {
+          "healthyRate": "Gesundheitsrate",
+          "trueRate": "Wahre Rate",
+          "count": "Bewertungen"
+        },
         "legendAvg": "Durchschn.",
-        "legendThreshold": "Schwellenwert {'{'}direction{'}'} {'{'}value{'}'}",
+        "legendThreshold": "Schwellenwert {direction} {value}",
         "markLineHealthy": "gesund {direction} {value}",
-        "healthyThreshold": "Gesund {threshold}",
-        "legendHealthy": "gesund",
-        "legendUnhealthy": "ungesund",
-        "legendHealthyRate": "Gesundheitsrate",
-        "legendTrueRate": "True-Rate",
-        "legendTrueCount": "wahr ({count})",
-        "legendFalseCount": "falsch ({count})",
-        "kpis": {
-          "average": "Durchschnittlich",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Ungesund",
-          "healthy": "Gesund",
-          "trueRate": "True-Rate",
-          "falseRate": "Falsche Rate",
-          "coverage": "Deckung",
-          "targetsScored": "Bewertete Ziele"
-        },
-        "health": {
-          "title": "Gesundheitsstatus",
-          "noThreshold": "Es ist kein gesunder Schwellenwert konfiguriert. Bewertungen können noch nicht als gesund oder verschlechternd klassifiziert werden.",
-          "thresholdOnly": "Gesund wenn {threshold}",
-          "summary": "{percent}% unter Schwellenwert · Gesund wenn {threshold}"
-        },
-        "ofScoreResults": "von {count} Score-Ergebnissen",
-        "range": "Bereich {min}–{max}"
+        "filterRange": "{from} bis {to}",
+        "filterBelow": "Unter {to}",
+        "filterAtLeast": "{from} oder mehr",
+        "filterAny": "Beliebiger Wert",
+        "filterByBar": "Bewertungen nach Wert filtern",
+        "barButton": "{label}: {count} Bewertung | {label}: {count} Bewertungen",
+        "clearFilter": "Filter zurücksetzen"
       },
-      "runs": {
-        "title": "Evaluierungsbewertungen",
-        "hint": "Bewertungen und Begründungen stammen aus _llm_scores. Wählen Sie einen Lauf, um den zugehörigen Evaluator-Trace für weitere Untersuchungen zu öffnen.",
-        "filterLabel": "Evaluierungsbewertungen filtern",
-        "noThresholdHint": "Legen Sie einen gesunden Schwellenwert für diese Bewertungskonfiguration fest, um ungesunde Bewertungen zu klassifizieren und hervorzuheben.",
+      "review": {
+        "title": "Bewertungsergebnisse",
+        "all": "Alle",
+        "unhealthy": "Ungesund",
+        "unhealthyDisabled": "Legen Sie einen Schwellenwert fest, um Bewertungen als gesund einzustufen",
+        "inputNotCaptured": "Eingabe nicht erfasst",
+        "outputNotCaptured": "Ausgabe nicht erfasst",
+        "noMatch": "Keine Bewertungen entsprechen diesem Filter"
+      },
+      "pane": {
+        "noneSelected": "Keine Bewertung ausgewählt",
+        "healthy": "Gesund",
+        "unhealthy": "Ungesund",
+        "noThreshold": "Kein Schwellenwert für gesund festgelegt",
+        "previous": "Vorherige Bewertung",
+        "next": "Nächste Bewertung",
+        "reasoning": "Begründung",
         "noReasoning": "Keine Begründung aufgezeichnet",
-        "unknownAgent": "Unbekannter Agent",
-        "unknownScope": "Unbekannter Bereich",
-        "queryError": "Bewertungsergebnisse konnten nicht aktualisiert werden. Die letzte erfolgreiche Seite wird weiterhin angezeigt.",
-        "empty": "Keine Bewertungsergebnisse in diesem Zeitraum.",
-        "emptyUnhealthy": "Keine ungesunden Ergebnisse in diesem Zeitraum.",
-        "filters": {
-          "all": "Alle Ergebnisse",
-          "unhealthy": "Ungesund"
+        "fullTextUnavailable": "Es wird eine kurze Vorschau angezeigt. Der vollständige Trace konnte nicht geladen werden.",
+        "open": {
+          "span": "Span öffnen",
+          "trace": "Trace öffnen",
+          "session": "Sitzung öffnen"
         },
-        "health": {
-          "healthy": "Gesund",
-          "unhealthy": "Ungesund"
-        },
-        "columns": {
-          "time": "Bewertet",
-          "result": "Ergebnis",
-          "reasoning": "Begründung",
-          "target": "Ziel",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
-        "searchPlaceholder": "Konfigurationen filtern...",
-        "relativeTime": {
-          "daysAgo": "vor {day}T",
-          "monthsAgo": "vor {month}M"
-        },
-        "status": {
-          "healthy": "Gesund",
-          "unhealthy": "Erfordert Aufmerksamkeit",
-          "noThreshold": "Schwellenwert nicht festgelegt",
-          "noData": "Keine Ergebnisdaten"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% darunter · Gesund, wenn {threshold}",
-          "noThresholdHint": "Gesunden Schwellenwert festlegen",
-          "noDataHint": "Keine Ergebnisse in diesem Fenster"
-        },
-        "columns": {
-          "health": "Gesundheit",
-          "scoreConfig": "Score-Konfiguration",
-          "type": "Typ",
-          "quality": "Qualität",
-          "totalScores": "Gesamtpunktzahl",
-          "scopeMix": "Bereichsmix",
-          "volumeTrend": "Volumentrend",
-          "updated": "aktualisiert"
-        }
-      },
-      "averageWithHealthyRate": "Durchschnitt · {rate}% gesund"
+        "evaluatorTrace": "Evaluator-Trace",
+        "addToDataset": "Zum Datensatz hinzufügen",
+        "datasetSession": "Datensätze nehmen einen einzelnen Trace oder Span auf. Öffnen Sie die Sitzung, um einen ihrer Traces hinzuzufügen.",
+        "datasetNoStream": "Diese Bewertung hat keinen Quell-Stream, aus dem hinzugefügt werden kann."
+      }
     },
     "singular": {
       "jobs": "Job evaluieren",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Importieren ({count})",
-    "count": "Anzahl",
     "failedToDeriveSchema": "Schema konnte nicht abgeleitet werden",
     "failedToImportScoreConfig": "Score-Konfiguration konnte nicht importiert werden",
     "failedToImportScorer": "Scorer konnte nicht importiert werden",
     "failedToFetchCatalog": "Katalog konnte nicht abgerufen werden ({status})",
     "failedToLoadCatalog": "Katalog konnte nicht geladen werden",
     "failedToRunScorerTest": "Scorer-Test konnte nicht ausgeführt werden",
-    "healthyRate": "Gesundheitsrate",
     "invalidJsonFormat": "Ungültiges JSON-Format",
     "jsonIsEmpty": "JSON ist leer",
     "scorerTestFailed": "Scorer-Test fehlgeschlagen",
     "scorerTestSampleContext": "Länderprofil Frankreich: Paris ist die Hauptstadt.",
     "scorerTestSampleInput": "Die Hauptstadt Frankreichs ist Paris, das an der Seine liegt.",
     "scorerTestSampleOutput": "Paris ist die Hauptstadt Frankreichs.",
-    "topCategory": "Top-Kategorie",
-    "trueRate": "Tatsächliche Rate",
     "unknownError": "Unbekannter Fehler",
     "import": {
       "createdSuccessfully": "\"{name}\" wurde erfolgreich erstellt.",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Online-Evals — Vorlagen",
       "scorers": "Online-Evals — Scorer",
       "evalJobs": "Online-Evals — Jobs",
+      "quality": "Online Evals — Qualität",
       "scoreConfigs": "Online-Evals — Score-Konfigurationen",
       "actions": "Aktionen",
       "llmProviders": "LLM-Anbieter",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Liste aktualisieren",
       "scorersRefresh": "Liste aktualisieren",
       "evalJobsRefresh": "Liste aktualisieren",
+      "qualityBack": "Zurück zu allen Konfigurationen",
       "scoreConfigsRefresh": "Liste aktualisieren",
       "actionsRefresh": "Liste aktualisieren",
       "llmProvidersRefresh": "Liste aktualisieren",
@@ -20554,11 +20531,10 @@
         "high": "Hoch"
       },
       "qualityStatus": {
-        "nothreshold": "Kein Schwellenwert",
-        "nodata": "Keine Daten",
+        "attention": "Erfordert Aufmerksamkeit",
         "healthy": "Gesund",
-        "warn": "Warn",
-        "unhealthy": "Nicht gesund"
+        "unset": "Schwellenwert nicht festgelegt",
+        "nodata": "Keine Score-Daten"
       },
       "rumEventType": {
         "longtask": "Lange Aufgabe",
