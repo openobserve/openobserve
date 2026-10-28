@@ -395,8 +395,9 @@ fn is_stream_permitted(
         StreamType::EnrichmentTables => "enrichment_table",
         _ => stream_type.as_str(),
     };
+    let grant_name = config::utils::str::into_ofga_supported_format(stream_name);
     permitted.contains(&format!("{s_type}:_all_{org_id}"))
-        || permitted.contains(&format!("{s_type}:{stream_name}"))
+        || permitted.contains(&format!("{s_type}:{grant_name}"))
 }
 
 async fn sync_associated_metadata_stream_retention(
@@ -1260,6 +1261,23 @@ mod tests {
             "o",
             StreamType::Traces,
             "app"
+        ));
+    }
+
+    #[test]
+    fn test_is_stream_permitted_matches_sanitized_grant_names() {
+        let permitted = vec!["logs:app.v2".to_string()];
+        assert!(is_stream_permitted(
+            &permitted,
+            "o",
+            StreamType::Logs,
+            "app:v2"
+        ));
+        assert!(!is_stream_permitted(
+            &permitted,
+            "o",
+            StreamType::Logs,
+            "app_v2"
         ));
     }
 
