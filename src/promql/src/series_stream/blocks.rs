@@ -1910,15 +1910,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn missing_file_label_selects_no_blocks_without_payload_reads() {
+    async fn missing_file_label_rejecting_empty_selects_no_blocks_without_payload_reads() {
         let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
         for matcher in [
             Matcher::new(MatchOp::Equal, "path", "/api/bar"),
-            Matcher::new(MatchOp::Equal, "path", ""),
-            Matcher::new(MatchOp::NotEqual, "path", "/api/bar"),
-            parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
-            parsed_matchers(r#"m{path!~"api.*"}"#).matchers.remove(0),
+            Matcher::new(MatchOp::NotEqual, "path", ""),
+            parsed_matchers(r#"m{path=~"api.*"}"#).matchers.remove(0),
+            parsed_matchers(r#"m{path!~".*"}"#).matchers.remove(0),
         ] {
             let prepared = prepare(
                 &fixture.scan([data.0.clone()]),
@@ -1938,6 +1937,42 @@ mod tests {
             }
         }
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn missing_file_label_accepting_empty_selects_every_block() {
+        let data = file(&[(1, 10, 1.0, Some("x")), (2, 10, 2.0, Some("y"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        for matcher in [
+            Matcher::new(MatchOp::Equal, "path", ""),
+            Matcher::new(MatchOp::NotEqual, "path", "/api/bar"),
+            parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
+            parsed_matchers(r#"m{path!~"api.*"}"#).matchers.remove(0),
+        ] {
+            let case = format!("{matcher:?}");
+            let prepared = prepare(
+                &fixture.scan([data.0.clone()]),
+                &Matchers::new(vec![matcher]),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            )
+            .await
+            .unwrap();
+            let mut values = Vec::new();
+            for partition in prepared {
+                let mut stream = BlockSeriesStream::new(partition);
+                while stream.advance().await.unwrap().is_some() {
+                    let mut samples = Vec::new();
+                    stream.consume(&mut samples).await.unwrap();
+                    values.extend(samples.iter().map(|sample| sample.value));
+                }
+            }
+            values.sort_by(f64::total_cmp);
+            assert_eq!(values, [1.0, 2.0], "{case}");
+        }
     }
 
     #[tokio::test]

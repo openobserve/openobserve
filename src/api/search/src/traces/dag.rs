@@ -170,7 +170,6 @@ pub async fn get_trace_dag(
             start_time,
             end_time,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,

@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Tous les agents",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "Tous les agents",
-      "kpisAriaLabel": "KPI de niveau 1",
-      "dataTypes": {
-        "numericShort": "Num",
-        "categoricalShort": "Cat",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "il y a {day}j"
+        }
       },
+      "healthyIf": "Sain si {rule}",
+      "noHealthyValue": "aucun",
+      "setThreshold": "Définir un seuil de santé",
+      "noScoresInWindow": "Aucun score dans cette fenêtre",
+      "outOf": "{count} sur {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Portée du score",
-        "filterHint": "Comparez cette configuration de score entre les portées des cibles d'évaluation.",
         "all": "Tout",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Résultats des scores"
-        },
-        "evaluationCost": {
-          "title": "Coût de l'évaluation"
-        },
-        "scorerSuccess": {
-          "title": "Succès du scoreur"
-        },
-        "scorerFailures": {
-          "title": "Échecs des évaluateurs"
-        },
-        "latencyP95": {
-          "title": "Latence du scoreur p95"
-        },
-        "vsPrev": "contre le précédent",
-        "noPriorData": "aucune donnée antérieure",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
       },
-      "detail": {
-        "loading": "Répartition du chargement par configuration...",
-        "noData": "Il n'y a pas encore de score pour cette configuration dans cette fenêtre.",
-        "empty": {
-          "title": "En attente de vos premiers scores",
-          "titleScoped": "Aucun score {scope} dans cette fenêtre",
-          "description": "Aucun score n'a été reçu pour cette configuration dans la plage temporelle sélectionnée. Ils apparaîtront ici automatiquement dès qu'un évaluateur l'utilisant s'exécutera.",
-          "descriptionScoped": "Aucun score {scope} n'a été enregistré pour cette configuration dans la plage horaire sélectionnée. Choisissez une autre portée ou élargissez la plage horaire."
-        },
-        "trendTitle": "Tendance",
-        "distributionTitle": "Répartition des scores",
-        "categoryDistributionTitle": "Distribution des catégories",
-        "healthyRateTitle": "Taux de santé dans le temps",
-        "trueRateTitle": "Taux de résultats vrais dans le temps",
-        "trueFalseTitle": "Vrai contre faux",
-        "legendAvg": "Moyenne",
-        "legendThreshold": "seuil {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "sain {direction} {value}",
-        "healthyThreshold": "Sain {threshold}",
-        "legendHealthy": "en bonne santé",
-        "legendUnhealthy": "mauvais pour la santé",
-        "legendHealthyRate": "Taux de santé",
-        "legendTrueRate": "Taux de résultats vrais",
-        "legendTrueCount": "vrai ({count})",
-        "legendFalseCount": "faux ({count})",
-        "kpis": {
-          "average": "Moyenne",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Malsain",
-          "healthy": "En bonne santé",
-          "trueRate": "Taux de résultats vrais",
-          "falseRate": "Taux de faux",
-          "coverage": "Couverture",
-          "targetsScored": "Cibles notées"
-        },
-        "health": {
-          "title": "Statut de santé",
-          "noThreshold": "Aucun seuil de santé n'est configuré. Les scores ne peuvent pas encore être classés comme sains ou en dégradation.",
-          "thresholdOnly": "Sain si {threshold}",
-          "summary": "{percent}% en dessous du seuil · Sain si {threshold}"
-        },
-        "ofScoreResults": "sur {count} résultats de score",
-        "range": "Plage {min}–{max}"
+      "tiles": {
+        "attention": "Configurations à surveiller",
+        "ofTotal": "sur {total}",
+        "attentionNote": "Les afficher",
+        "attentionTooltip": "Configurations avec au moins un score non sain",
+        "withoutResult": "Configurations sans résultat",
+        "withoutResultTooltip": "Configurations sans aucun score sur cette période, ou sans seuil de santé. Cliquez pour les afficher.",
+        "noScores": "{count} n'a obtenu aucun score | {count} n'ont obtenu aucun score",
+        "noThreshold": "{count} n'a pas de seuil | {count} n'ont pas de seuil",
+        "allGiveResult": "Chaque configuration donne un résultat"
       },
-      "runs": {
-        "title": "Scores d'évaluation",
-        "hint": "Les scores et le raisonnement proviennent de _llm_scores. Sélectionnez une exécution pour ouvrir la trace de son évaluateur et approfondir l'investigation.",
-        "filterLabel": "Filtrer les scores d'évaluation",
-        "noThresholdHint": "Définissez un seuil de santé sur cette configuration de score pour classer et mettre en évidence les scores malsains.",
-        "noReasoning": "Aucun raisonnement enregistré",
-        "unknownAgent": "Agent inconnu",
-        "unknownScope": "Portée inconnue",
-        "queryError": "Les scores d'évaluation n'ont pas pu être actualisés. La dernière page réussie est toujours affichée.",
-        "empty": "Aucun score d'évaluation dans cette plage horaire.",
-        "emptyUnhealthy": "Aucun score insatisfaisant dans cette plage horaire.",
-        "filters": {
-          "all": "Tous les scores",
-          "unhealthy": "Insatisfaisant"
-        },
-        "health": {
-          "healthy": "Satisfaisant",
-          "unhealthy": "Insatisfaisant"
-        },
-        "columns": {
-          "time": "Évalué",
-          "result": "Score",
-          "reasoning": "Raisonnement",
-          "target": "Cible",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filtrer les configurations…",
-        "relativeTime": {
-          "daysAgo": "il y a {day}j",
-          "monthsAgo": "il y a {month}mo"
-        },
-        "status": {
-          "healthy": "Satisfaisant",
-          "unhealthy": "Nécessite attention",
-          "noThreshold": "Seuil non défini",
-          "noData": "Aucune donnée de score"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% en dessous · Satisfaisant si {threshold}",
-          "noThresholdHint": "Définir un seuil satisfaisant",
-          "noDataHint": "Aucun score dans cette fenêtre"
-        },
+        "openUnhealthy": "Ouvrir les scores non sains",
+        "configLink": "Configuration",
+        "averageRange": "moyenne, de {min} à {max}",
+        "mostCommon": "le plus fréquent · {count} sur {total}",
         "columns": {
+          "scoreConfig": "Configuration de score",
           "health": "Santé",
-          "scoreConfig": "Configuration du score",
-          "type": "Tapez",
-          "quality": "Qualité",
-          "totalScores": "Total des scores",
-          "scopeMix": "Mix de portées",
-          "volumeTrend": "Tendance du volume",
+          "typicalScore": "Score typique",
+          "unhealthy": "Non sain",
+          "scores": "Scores",
           "updated": "Mis à jour"
         }
       },
-      "averageWithHealthyRate": "Moyenne · {rate}% sain"
+      "detail": {
+        "back": "Toutes les configurations",
+        "backToAll": "Retour à toutes les configurations",
+        "editConfig": "Modifier la configuration",
+        "notFound": "Configuration de score introuvable",
+        "notFoundDescription": "Elle a peut-être été supprimée, ou le lien pointe vers une ancienne configuration.",
+        "emptyTitle": "En attente de vos premiers scores",
+        "emptyTitleScoped": "Aucun score de {scope} dans cette fenêtre",
+        "emptyDescription": "Aucun score n'a été reçu pour cette configuration sur la période sélectionnée. Ils apparaîtront ici dès qu'un évaluateur qui l'utilise s'exécute.",
+        "distributionNumeric": "Distribution des scores",
+        "distributionValues": "Distribution des valeurs",
+        "averageValue": "moyenne {value}",
+        "legendHealthy": "Sain",
+        "legendUnhealthy": "Non sain",
+        "legendScores": "Scores",
+        "chartTooltip": "{count} score, {unhealthy} non sain | {count} scores, {unhealthy} non sains",
+        "chartTooltipCount": "{count} score | {count} scores",
+        "trendTitle": {
+          "score": "Tendance",
+          "healthyRate": "Taux de scores sains au fil du temps",
+          "trueRate": "Taux de valeurs vraies au fil du temps",
+          "count": "Scores au fil du temps"
+        },
+        "trendLegend": {
+          "healthyRate": "Taux de scores sains",
+          "trueRate": "Taux de vrai",
+          "count": "Scores"
+        },
+        "legendAvg": "Moyenne",
+        "legendThreshold": "seuil {direction} {value}",
+        "markLineHealthy": "sain {direction} {value}",
+        "filterRange": "de {from} à {to}",
+        "filterBelow": "Inférieur à {to}",
+        "filterAtLeast": "{from} ou plus",
+        "filterAny": "Toute valeur",
+        "filterByBar": "Filtrer les scores par valeur",
+        "barButton": "{label} : {count} score | {label} : {count} scores",
+        "clearFilter": "Effacer le filtre"
+      },
+      "review": {
+        "title": "Scores d'évaluation",
+        "all": "Tous",
+        "unhealthy": "Non sain",
+        "unhealthyDisabled": "Définissez un seuil de santé pour classer les scores",
+        "inputNotCaptured": "Entrée non capturée",
+        "outputNotCaptured": "Sortie non capturée",
+        "noMatch": "Aucun score ne correspond à ce filtre"
+      },
+      "pane": {
+        "noneSelected": "Aucun score sélectionné",
+        "healthy": "Sain",
+        "unhealthy": "Non sain",
+        "noThreshold": "Aucun seuil de santé défini",
+        "previous": "Score précédent",
+        "next": "Score suivant",
+        "reasoning": "Raisonnement",
+        "noReasoning": "Aucun raisonnement enregistré",
+        "fullTextUnavailable": "Affichage d'un court aperçu. La trace complète n'a pas pu être chargée.",
+        "open": {
+          "span": "Ouvrir le span",
+          "trace": "Ouvrir la trace",
+          "session": "Ouvrir la session"
+        },
+        "evaluatorTrace": "Trace de l'évaluateur",
+        "addToDataset": "Ajouter au jeu de données",
+        "datasetSession": "Les jeux de données acceptent une seule trace ou un seul span. Ouvrez la session pour ajouter l'une de ses traces.",
+        "datasetNoStream": "Ce score n'a pas de flux source à partir duquel effectuer l'ajout."
+      }
     },
     "singular": {
       "jobs": "Emploi Eval",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Importer ({count})",
-    "count": "Nombre",
     "failedToDeriveSchema": "Échec de la dérivation du schéma",
     "failedToImportScoreConfig": "Échec de l'importation de la configuration de score",
     "failedToImportScorer": "Échec de l'importation du scoreur",
     "failedToFetchCatalog": "Échec de la récupération du catalogue ({status})",
     "failedToLoadCatalog": "Échec du chargement du catalogue",
     "failedToRunScorerTest": "Échec de l'exécution du test du scoreur",
-    "healthyRate": "Taux de santé",
     "invalidJsonFormat": "Format JSON invalide",
     "jsonIsEmpty": "JSON vide",
     "scorerTestFailed": "Échec du test du scoreur",
     "scorerTestSampleContext": "Profil du pays France : Paris est la capitale.",
     "scorerTestSampleInput": "La capitale de la France est Paris, située sur la Seine.",
     "scorerTestSampleOutput": "Paris est la capitale de la France.",
-    "topCategory": "Catégorie principale",
-    "trueRate": "Taux réel",
     "unknownError": "Erreur inconnue",
     "import": {
       "createdSuccessfully": "\"{name}\" créé avec succès",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Evaluations en ligne — Modèles",
       "scorers": "Évaluations en ligne — Évaluateurs",
       "evalJobs": "Evals en ligne — Offres d'emploi",
+      "quality": "Evals en ligne — Qualité",
       "scoreConfigs": "Evaluations en ligne — Configurations des scores",
       "actions": "Actions",
       "llmProviders": "Fournisseurs de LLM",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Actualiser la liste",
       "scorersRefresh": "Actualiser la liste",
       "evalJobsRefresh": "Actualiser la liste",
+      "qualityBack": "Retour à toutes les configurations",
       "scoreConfigsRefresh": "Actualiser la liste",
       "actionsRefresh": "Actualiser la liste",
       "llmProvidersRefresh": "Actualiser la liste",
@@ -20352,7 +20329,9 @@
       "loading": "Chargement"
     },
     "stepper": {
-      "steps": "Étapes"
+      "steps": "Étapes",
+      "stepOf": "Étape {current} sur {total}",
+      "swipeHint": "glissez pour voir le reste"
     },
     "attributeValueCell": {
       "addIcon": "Ajouter une icône"
@@ -20552,11 +20531,10 @@
         "high": "Élevé"
       },
       "qualityStatus": {
-        "nothreshold": "Aucun seuil",
-        "nodata": "Aucune donnée",
+        "attention": "Nécessite une attention",
         "healthy": "Sain",
-        "warn": "Avertissement",
-        "unhealthy": "Non sain"
+        "unset": "Seuil non défini",
+        "nodata": "Aucune donnée de score"
       },
       "rumEventType": {
         "longtask": "Tâche longue",
@@ -26472,8 +26450,11 @@
       "columnResult": "Résultat",
       "failedSummary": "{failed} sur {total} en échec · corrigez dans l'environnement serveur, redémarrez, puis cliquez sur Revérifier",
       "allPassed": "Tous les prérequis sont satisfaits",
+      "requiredPass": "Toutes les vérifications requises ont réussi",
+      "warningCount": "{count} avertissement | {count} avertissements",
+      "canContinue": "vous pouvez continuer",
       "recheck": "Revérifier",
-      "helmHint": "Installé sans Helm ? Définissez {variable}, redémarrez, puis cliquez sur Revérifier.",
+      "helmHint": "Installé sans Helm ? Définissez-le dans l'environnement du serveur, redémarrez, puis relancez la vérification.",
       "loadFailed": "Les vérifications des prérequis n'ont pas pu s'exécuter.",
       "names": {
         "master_key": "Clé de chiffrement",
@@ -26489,8 +26470,21 @@
     },
     "connect": {
       "title": "Connecter un espace de travail Slack",
-      "description": "Votre équipe pose des questions à OpenObserve sans quitter Slack",
-      "featureQuestions": "Posez des questions ; les réponses utilisent vos propres autorisations",
+      "description": "Votre équipe pose des questions à OpenObserve depuis Slack et obtient des réponses selon ses propres autorisations.",
+      "descriptionSelfHosted": "Votre équipe pose des questions à OpenObserve depuis Slack et obtient des réponses selon ses propres autorisations. OpenObserve crée et installe votre propre application Slack ; rien n'est partagé avec un tiers.",
+      "nextTitle": "Ce qui se passe ensuite · environ {minutes} minutes",
+      "stepCheckTitle": "Vérifier ce serveur",
+      "stepCheckDetail": "La clé de chiffrement, l'URL web et l'agent IA sont vérifiés avant tout contact avec Slack",
+      "stepCheckDetailShort": "Clé de chiffrement, URL web et agent IA",
+      "stepCreateTitle": "Créer l'application",
+      "stepCreateDetail": "Collez un token de configuration depuis Slack ; OpenObserve construit l'application pour vous",
+      "stepCreateDetailShort": "Collez un token de configuration depuis Slack",
+      "stepInstallTitle": "Installer et associer les personnes",
+      "stepInstallDetail": "Autorisez-la dans Slack, choisissez le canal d'alertes, puis associez les membres Slack aux utilisateurs OpenObserve",
+      "stepInstallDetailShort": "Autorisez-la dans Slack, puis associez les membres",
+      "stepAddTitle": "Ajouter à Slack",
+      "stepLinkTitle": "Associer les personnes",
+      "stepLinkDetail": "Les membres Slack sont associés aux utilisateurs OpenObserve par domaine de messagerie ; tous les autres s'associent en un clic",
       "addToSlack": "Ajouter à Slack",
       "popupHint": "Ouvre Slack dans une fenêtre contextuelle : choisissez un canal pour les alertes, puis cliquez sur Autoriser",
       "permissionHint": "Nécessite l'autorisation Gérer Slack · les administrateurs de l'organisation l'ont par défaut",
@@ -26498,7 +26492,6 @@
       "consentPrivate": "Slack bidirectionnel lit également vos messages directs avec OpenObserve. Il ne lit les messages des canaux que lorsque vous mentionnez {'@'}OpenObserve.",
       "consentPending": "Slack indique ce à quoi {product} peut accéder avant que vous ne l'autorisiez.",
       "setupApp": "Configurer l'application Slack",
-      "selfHostedHint": "OpenObserve crée votre propre application Slack à partir d'un seul jeton de configuration",
       "upgradeTitle": "Vous envoyez déjà des alertes vers Slack ? Passez à Slack bidirectionnel",
       "upgradeDetail": "{team} · aucune destination webhook ne change · ajoute les questions dès maintenant | {team} · {count} destination webhook continue de fonctionner · ajoute les questions dès maintenant | {team} · {count} destinations webhook continuent de fonctionner · ajoutent les questions dès maintenant",
       "upgradeButton": "Passer à Slack bidirectionnel",
@@ -26551,7 +26544,7 @@
         "tokenHelp": "Sur la page Vos applications de Slack, Jetons de configuration de votre application › Générer un jeton affiche un jeton d’accès et un jeton d’actualisation : collez le jeton d’actualisation. OpenObserve le renouvelle et conserve le plus récent chiffré pour mettre à jour l’application ultérieurement.",
         "generateToken": "Générer un jeton",
         "createButton": "Créer l’application",
-        "manual": "Configurer manuellement",
+        "manualLink": "Pas de token de configuration ? Configurez manuellement",
         "manualHelp": "Ouvre la page de création de Slack avec le manifeste prérempli, puis demande les identifiants de l’application depuis sa page Informations de base. L’installation passe toujours par Autoriser, donc le jeton du bot n’est jamais collé.",
         "openManifest": "Ouvrir Slack avec le manifeste",
         "clientId": "ID client",
@@ -26560,6 +26553,9 @@
         "appToken": "Jeton au niveau de l’application (mode Socket)",
         "saveManual": "Enregistrer les identifiants",
         "useToken": "Utiliser plutôt un jeton de configuration",
+        "unreachableTitle": "Impossible de joindre OpenObserve. Rien n'a été créé.",
+        "unreachableDetail": "La requête adressée à ce serveur n'a reçu aucune réponse, donc rien n'a été envoyé à Slack. Vérifiez que l'adresse de cet onglet correspond au serveur (http vs https) et que le serveur est démarré, puis réessayez.",
+        "noResponse": "{request} · aucune réponse",
         "tokenRequired": "Collez le jeton d’actualisation de configuration",
         "clientIdRequired": "Saisissez l’ID client",
         "clientSecretRequired": "Saisissez le secret client",
@@ -26611,6 +26607,8 @@
       "mappedSummary": "Automatique pour {domains} · d'après le mappage de domaines de votre organisation",
       "mappedReadonly": "Les domaines mappés sont en lecture seule ici ; le support OpenObserve modifie le mappage. Désactiver la liaison reste de votre ressort.",
       "manualSummary": "Automatique pour {domains}",
+      "noDomains": "Activé, mais aucun domaine : personne n'est lié automatiquement",
+      "skippedDomain": "{count} membre ignoré : son domaine de messagerie n'est pas répertorié | {count} membres ignorés : leur domaine de messagerie n'est pas répertorié",
       "offSummary": "Désactivé · les personnes se lient en un clic lors de leur première demande",
       "domains": "Domaines",
       "editDomains": "Modifier les domaines",
@@ -26703,18 +26701,18 @@
         "destination": "Depuis une destination d'alerte"
       },
       "empty": "Aucun canal n'a encore d'organisation par défaut",
-      "emptyDescription": "Les questions dans un canal sans valeur par défaut vont à la première organisation connectée.",
+      "emptyDescription": "Les questions dans un canal sans organisation par défaut vont vers l'organisation par défaut de chaque personne (elle peut la modifier avec /o2 org).",
       "channel": "Canal",
       "channelPlaceholder": "Rechercher des canaux",
       "channelRequired": "Choisissez un canal",
-      "privateHint": "Les canaux privés apparaissent après /invite {'@'}OpenObserve",
+      "privateHint": "Les canaux privés apparaissent après /invite {'@'}OpenObserve ; un nouveau canal peut mettre jusqu'à 10 minutes pour s'afficher",
       "loadMore": "Charger plus de canaux",
       "saveFailed": "La valeur par défaut du canal n'a pas pu être enregistrée.",
       "answers": "Réponses",
       "edit": "Modifier",
       "remove": "Supprimer",
       "removeTitle": "Supprimer la valeur par défaut pour #{channel} ?",
-      "removeMessage": "Les questions dans {name} vont ensuite à l'organisation connectée la plus ancienne.",
+      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec /o2 org).",
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",

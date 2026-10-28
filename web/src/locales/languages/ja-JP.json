@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "すべてのエージェント",
-      "agentLabel": "エージェント",
-      "agentPlaceholder": "すべてのエージェント",
-      "kpisAriaLabel": "Tier 1 KPI",
-      "dataTypes": {
-        "numericShort": "数値",
-        "categoricalShort": "カテゴリ",
-        "booleanShort": "ブール"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}日前"
+        }
       },
+      "healthyIf": "{rule} の場合に正常",
+      "noHealthyValue": "なし",
+      "setThreshold": "正常しきい値を設定",
+      "noScoresInWindow": "この期間にスコアはありません",
+      "outOf": "{total} 件中 {count} 件",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "スコア範囲",
-        "filterHint": "このスコア設定を評価ターゲットスコープ間で比較します。",
         "all": "すべて",
         "span": "スパン",
         "trace": "トレース",
         "session": "セッション"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "スコア結果"
-        },
-        "evaluationCost": {
-          "title": "評価コスト"
-        },
-        "scorerSuccess": {
-          "title": "スコアラー成功率"
-        },
-        "scorerFailures": {
-          "title": "スコアラーの失敗"
-        },
-        "latencyP95": {
-          "title": "スコアラーレイテンシ p95"
-        },
-        "vsPrev": "対前へ",
-        "noPriorData": "以前のデータなし",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "スパン",
+        "trace": "トレース",
+        "session": "セッション"
+      },
+      "tiles": {
+        "attention": "注意が必要な設定",
+        "ofTotal": "{total} 中",
+        "attentionNote": "表示する",
+        "attentionTooltip": "異常スコアが 1 件以上ある設定",
+        "withoutResult": "結果のない設定",
+        "withoutResultTooltip": "この期間にスコアがない、または正常しきい値がない設定です。クリックすると表示されます。",
+        "noScores": "{count} 件にスコアがありません | {count} 件にスコアがありません",
+        "noThreshold": "{count} 件にしきい値がありません | {count} 件にしきい値がありません",
+        "allGiveResult": "すべての設定が結果を返します"
+      },
+      "table": {
+        "searchPlaceholder": "設定を絞り込む…",
+        "openUnhealthy": "異常スコアを開く",
+        "configLink": "設定",
+        "averageRange": "平均、{min}〜{max}",
+        "mostCommon": "最多 · {total} 中 {count}",
+        "columns": {
+          "scoreConfig": "スコア設定",
+          "health": "健全性",
+          "typicalScore": "代表スコア",
+          "unhealthy": "異常",
+          "scores": "スコア",
+          "updated": "更新日時"
+        }
       },
       "detail": {
-        "loading": "設定ごとの内訳を読み込んでいます...",
-        "noData": "このウィンドウには、この構成のスコアはまだありません。",
-        "empty": {
-          "title": "最初のスコアを待っています",
-          "titleScoped": "このウィンドウに{scope}のスコアがありません",
-          "description": "選択した時間範囲では、この設定のスコアはまだ取得されていません。この設定を使用するスコアラーが実行されると、ここに自動的に表示されます。",
-          "descriptionScoped": "選択した時間範囲では、この設定に対して{scope}のスコアが届いていません。別のスコープを選択するか、時間範囲を広げてください。"
+        "back": "すべての設定",
+        "backToAll": "すべての設定に戻る",
+        "editConfig": "設定を編集",
+        "notFound": "スコア設定が見つかりません",
+        "notFoundDescription": "削除されたか、リンクが古い設定を指している可能性があります。",
+        "emptyTitle": "最初のスコアを待っています",
+        "emptyTitleScoped": "この期間に{scope}のスコアはありません",
+        "emptyDescription": "選択した期間にこの設定のスコアはありません。この設定を使用するスコアラーが実行されると、ここに表示されます。",
+        "distributionNumeric": "スコア分布",
+        "distributionValues": "値の分布",
+        "averageValue": "平均 {value}",
+        "legendHealthy": "正常",
+        "legendUnhealthy": "異常",
+        "legendScores": "スコア",
+        "chartTooltip": "スコア {count} 件、異常 {unhealthy} 件 | スコア {count} 件、異常 {unhealthy} 件",
+        "chartTooltipCount": "スコア {count} 件 | スコア {count} 件",
+        "trendTitle": {
+          "score": "トレンド",
+          "healthyRate": "正常率の推移",
+          "trueRate": "True 率の推移",
+          "count": "スコアの推移"
         },
-        "trendTitle": "トレンド",
-        "distributionTitle": "スコア分布",
-        "categoryDistributionTitle": "カテゴリ分布",
-        "healthyRateTitle": "経時的な健全率",
-        "trueRateTitle": "経時的な真率",
-        "trueFalseTitle": "真と偽",
+        "trendLegend": {
+          "healthyRate": "正常率",
+          "trueRate": "正解率",
+          "count": "スコア"
+        },
         "legendAvg": "平均",
-        "legendThreshold": "しきい値 {'{'}direction{'}'} {'{'}value{'}'}",
+        "legendThreshold": "しきい値 {direction} {value}",
         "markLineHealthy": "正常 {direction} {value}",
-        "healthyThreshold": "正常 {threshold}",
-        "legendHealthy": "健康",
-        "legendUnhealthy": "不健全です",
-        "legendHealthyRate": "健全率",
-        "legendTrueRate": "真率",
-        "legendTrueCount": "真 ({count})",
-        "legendFalseCount": "偽 ({count})",
-        "kpis": {
-          "average": "アベレージ",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "不健康",
-          "healthy": "ヘルシー",
-          "trueRate": "真率",
-          "falseRate": "偽率",
-          "coverage": "カバレッジ",
-          "targetsScored": "スコアリング対象数"
-        },
-        "health": {
-          "title": "健全性ステータス",
-          "noThreshold": "健全性しきい値が設定されていません。スコアはまだ健全または劣化として分類できません。",
-          "thresholdOnly": "{threshold} の場合健全",
-          "summary": "しきい値を{percent}%下回る · {threshold} の場合健全"
-        },
-        "ofScoreResults": "{count} 件のスコア結果のうち",
-        "range": "範囲 {min}–{max}"
+        "filterRange": "{from} 〜 {to}",
+        "filterBelow": "{to} 未満",
+        "filterAtLeast": "{from} 以上",
+        "filterAny": "すべての値",
+        "filterByBar": "値でスコアをフィルター",
+        "barButton": "{label}: {count} スコア | {label}: {count} スコア",
+        "clearFilter": "フィルターをクリア"
       },
-      "runs": {
+      "review": {
         "title": "評価スコア",
-        "hint": "スコアと推論は _llm_scores から得られます。ランを選択すると、その評価トレースが開き、さらに調査できます。",
-        "filterLabel": "評価スコアをフィルター",
-        "noThresholdHint": "このスコア設定に健全性しきい値を設定して、不健全なスコアを分類および強調表示します。",
-        "noReasoning": "推論が記録されていません",
-        "unknownAgent": "不明なエージェント",
-        "unknownScope": "不明なスコープ",
-        "queryError": "評価スコアを更新できませんでした。最後に成功したページが表示されています。",
-        "empty": "この時間範囲に評価スコアはありません。",
-        "emptyUnhealthy": "この時間範囲に異常スコアはありません。",
-        "filters": {
-          "all": "すべてのスコア",
-          "unhealthy": "異常"
-        },
-        "health": {
-          "healthy": "正常",
-          "unhealthy": "異常"
-        },
-        "columns": {
-          "time": "評価済み",
-          "result": "スコア",
-          "reasoning": "推論",
-          "target": "ターゲット",
-          "agent": "エージェント"
-        }
+        "all": "すべて",
+        "unhealthy": "異常",
+        "unhealthyDisabled": "スコアを分類するには正常なしきい値を設定してください",
+        "inputNotCaptured": "入力がキャプチャされていません",
+        "outputNotCaptured": "出力がキャプチャされていません",
+        "noMatch": "このフィルターに一致するスコアはありません"
       },
-      "overview": {
-        "searchPlaceholder": "フィルター構成...",
-        "relativeTime": {
-          "daysAgo": "{day}日前",
-          "monthsAgo": "{month}ヶ月前"
+      "pane": {
+        "noneSelected": "スコアが選択されていません",
+        "healthy": "正常",
+        "unhealthy": "異常",
+        "noThreshold": "正常なしきい値が設定されていません",
+        "previous": "前のスコア",
+        "next": "次のスコア",
+        "reasoning": "推論",
+        "noReasoning": "推論は記録されていません",
+        "fullTextUnavailable": "短いプレビューを表示しています。完全なトレースを読み込めませんでした。",
+        "open": {
+          "span": "スパンを開く",
+          "trace": "トレースを開く",
+          "session": "セッションを開く"
         },
-        "status": {
-          "healthy": "正常",
-          "unhealthy": "注意が必要",
-          "noThreshold": "しきい値が設定されていません",
-          "noData": "スコアデータがありません"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% 未満 · しきい値 {threshold} で正常",
-          "noThresholdHint": "正常しきい値を設定",
-          "noDataHint": "このウィンドウにスコアはありません"
-        },
-        "columns": {
-          "health": "ヘルス",
-          "scoreConfig": "スコア設定",
-          "type": "タイプ",
-          "quality": "品質",
-          "totalScores": "合計スコア",
-          "scopeMix": "スコープミックス",
-          "volumeTrend": "ボリュームトレンド",
-          "updated": "更新済み"
-        }
-      },
-      "averageWithHealthyRate": "平均 · {rate}% 正常"
+        "evaluatorTrace": "評価者のトレース",
+        "addToDataset": "データセットに追加",
+        "datasetSession": "データセットには 1 つのトレースまたはスパンを指定します。セッションを開いて、その中のトレースを追加してください。",
+        "datasetNoStream": "このスコアには追加元のソースストリームがありません。"
+      }
     },
     "singular": {
       "jobs": "評価ジョブ",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "インポート ({count})",
-    "count": "カウント",
     "failedToDeriveSchema": "スキーマの導出に失敗しました",
     "failedToImportScoreConfig": "スコア設定のインポートに失敗しました",
     "failedToImportScorer": "スコアラーのインポートに失敗しました",
     "failedToFetchCatalog": "カタログの取得に失敗しました ({status})",
     "failedToLoadCatalog": "カタログの読み込みに失敗しました",
     "failedToRunScorerTest": "スコアラーテストの実行に失敗しました",
-    "healthyRate": "正常率",
     "invalidJsonFormat": "JSON 形式が無効です",
     "jsonIsEmpty": "JSON が空です",
     "scorerTestFailed": "スコアラーテストが失敗しました",
     "scorerTestSampleContext": "フランスの国プロフィール: パリは首都です。",
     "scorerTestSampleInput": "フランスの首都はパリで、セーヌ川沿いにあります。",
     "scorerTestSampleOutput": "パリはフランスの首都です。",
-    "topCategory": "トップカテゴリ",
-    "trueRate": "真の率",
     "unknownError": "不明なエラー",
     "import": {
       "createdSuccessfully": "\"{name}\" を正常に作成しました",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "オンライン評価 — テンプレート",
       "scorers": "オンライン評価 — スコアラー",
       "evalJobs": "オンライン評価 — 求人",
+      "quality": "オンライン評価 — 品質",
       "scoreConfigs": "オンライン評価 — スコア構成",
       "actions": "アクション",
       "llmProviders": "LLM プロバイダー",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "リストを更新",
       "scorersRefresh": "リストを更新",
       "evalJobsRefresh": "リストを更新",
+      "qualityBack": "すべての設定に戻る",
       "scoreConfigsRefresh": "リストを更新",
       "actionsRefresh": "リストを更新",
       "llmProvidersRefresh": "リストを更新",
@@ -20352,7 +20329,9 @@
       "loading": "読み込み中"
     },
     "stepper": {
-      "steps": "手順"
+      "steps": "手順",
+      "stepOf": "ステップ {current} / {total}",
+      "swipeHint": "スワイプして残りを表示"
     },
     "attributeValueCell": {
       "addIcon": "アイコンを追加"
@@ -20552,11 +20531,10 @@
         "high": "高"
       },
       "qualityStatus": {
-        "nothreshold": "しきい値なし",
-        "nodata": "データなし",
+        "attention": "要注意",
         "healthy": "正常",
-        "warn": "注意",
-        "unhealthy": "異常"
+        "unset": "しきい値が未設定",
+        "nodata": "スコアデータなし"
       },
       "rumEventType": {
         "longtask": "長時間タスク",
@@ -26472,8 +26450,11 @@
       "columnResult": "結果",
       "failedSummary": "{total} 件中 {failed} 件が失敗 · サーバー環境で修正して再起動し、再チェックしてください",
       "allPassed": "すべての前提条件を満たしています",
+      "requiredPass": "すべての必須チェックに合格",
+      "warningCount": "{count} 件の警告 | {count} 件の警告",
+      "canContinue": "続行できます",
       "recheck": "再チェック",
-      "helmHint": "Helm を使わずにインストールしましたか？{variable} を設定して再起動し、再チェックしてください。",
+      "helmHint": "Helm を使わずにインストールしましたか？サーバー環境で設定し、再起動してから再チェックしてください。",
       "loadFailed": "前提条件のチェックを実行できませんでした。",
       "names": {
         "master_key": "暗号化キー",
@@ -26489,8 +26470,21 @@
     },
     "connect": {
       "title": "Slack ワークスペースを接続",
-      "description": "チームは Slack を離れずに OpenObserve に質問できます",
-      "featureQuestions": "質問すると、自分の権限で回答します",
+      "description": "チームは Slack から OpenObserve に質問し、各自の権限で回答を得られます。",
+      "descriptionSelfHosted": "チームは Slack から OpenObserve に質問し、各自の権限で回答を得られます。OpenObserve が専用の Slack アプリを作成してインストールするため、第三者と共有されるものはありません。",
+      "nextTitle": "次に起こること · 約 {minutes} 分",
+      "stepCheckTitle": "このサーバーをチェック",
+      "stepCheckDetail": "Slack に何かが送信される前に、暗号化キー、Web URL、AI エージェントが検証されます",
+      "stepCheckDetailShort": "暗号化キー、Web URL、AI エージェント",
+      "stepCreateTitle": "アプリを作成",
+      "stepCreateDetail": "Slack から設定トークンを 1 つ貼り付けると、OpenObserve がアプリを構築します",
+      "stepCreateDetailShort": "Slack から設定トークンを 1 つ貼り付け",
+      "stepInstallTitle": "インストールしてメンバーをリンク",
+      "stepInstallDetail": "Slack で許可し、アラート用チャンネルを選択してから、Slack メンバーを OpenObserve ユーザーにリンクします",
+      "stepInstallDetailShort": "Slack で許可し、メンバーをリンク",
+      "stepAddTitle": "Slack に追加",
+      "stepLinkTitle": "メンバーをリンク",
+      "stepLinkDetail": "Slack メンバーはメールドメインで OpenObserve ユーザーにリンクされます。それ以外のメンバーはワンクリックでリンクできます",
       "addToSlack": "Slack に追加",
       "popupHint": "ポップアップで Slack が開きます。アラート用のチャンネルを選び、「許可」をクリックしてください",
       "permissionHint": "Slack の管理権限が必要です · 組織の管理者はデフォルトで持っています",
@@ -26498,7 +26492,6 @@
       "consentPrivate": "双方向 Slack は OpenObserve とのダイレクトメッセージも読み取ります。チャンネルのメッセージは {'@'}OpenObserve にメンションしたときだけ読み取ります。",
       "consentPending": "許可する前に、{product} がアクセスできる内容が Slack に表示されます。",
       "setupApp": "Slack アプリをセットアップ",
-      "selfHostedHint": "OpenObserve は 1 つの設定トークンから独自の Slack アプリを作成します",
       "upgradeTitle": "すでに Slack にアラートを送信していますか？双方向 Slack にアップグレード",
       "upgradeDetail": "{team} · Webhook 宛先は変更なし · 質問機能を追加 | {team} · {count} 件の Webhook 宛先はそのまま動作 · 質問機能を追加 | {team} · {count} 件の Webhook 宛先はそのまま動作 · 質問機能を追加",
       "upgradeButton": "双方向 Slack にアップグレード",
@@ -26551,7 +26544,7 @@
         "tokenHelp": "Slack の Your Apps ページで、Your App Configuration Tokens › Generate Token を開くとアクセストークンとリフレッシュトークンが表示されます。リフレッシュトークンを貼り付けてください。OpenObserve はこれをローテーションし、最新のものを暗号化して保持して、後でアプリを更新できるようにします。",
         "generateToken": "トークンを生成",
         "createButton": "アプリを作成",
-        "manual": "手動で設定",
+        "manualLink": "設定トークンがありませんか？手動でセットアップ",
         "manualHelp": "マニフェストを入力済みの状態で Slack の作成ページを開き、その後 Basic Information ページからアプリの認証情報を入力します。インストールは引き続き許可で行うため、ボットトークンを貼り付ける必要はありません。",
         "openManifest": "マニフェスト付きで Slack を開く",
         "clientId": "Client ID",
@@ -26560,6 +26553,9 @@
         "appToken": "アプリレベルのトークン (Socket Mode)",
         "saveManual": "認証情報を保存",
         "useToken": "代わりに設定トークンを使用",
+        "unreachableTitle": "OpenObserve に接続できませんでした。何も作成されていません。",
+        "unreachableDetail": "このサーバーへのリクエストに応答がなかったため、Slack には何も送信されませんでした。このタブのアドレスがサーバーと一致しているか（http か https か）と、サーバーが稼働しているかを確認してから、もう一度お試しください。",
+        "noResponse": "{request} · 応答なし",
         "tokenRequired": "設定リフレッシュトークンを貼り付けてください",
         "clientIdRequired": "Client ID を入力してください",
         "clientSecretRequired": "クライアントシークレットを入力してください",
@@ -26611,6 +26607,8 @@
       "mappedSummary": "{domains} は自動 · 組織のドメインマッピングによる",
       "mappedReadonly": "マッピングされたドメインはここでは読み取り専用です。マッピングの変更はOpenObserveサポートが行います。リンクをオフにすることは引き続き可能です。",
       "manualSummary": "{domains} は自動",
+      "noDomains": "有効ですが、ドメインがありません: 自動的に連携されるユーザーはいません",
+      "skippedDomain": "メールドメインが一覧にないため、{count} 人のメンバーをスキップしました | メールドメインが一覧にないため、{count} 人のメンバーをスキップしました",
       "offSummary": "オフ · ユーザーは最初に要求したときに1クリックでリンクします",
       "domains": "ドメイン",
       "editDomains": "ドメインを編集",
@@ -26703,18 +26701,18 @@
         "destination": "アラート宛先から"
       },
       "empty": "デフォルト組織が設定されたチャンネルはまだありません",
-      "emptyDescription": "デフォルトがないチャンネルでの質問は、最初に接続された組織に送られます。",
+      "emptyDescription": "デフォルトがないチャネルでの質問は、各人のデフォルト組織に送られます（/o2 org で変更できます）。",
       "channel": "チャンネル",
       "channelPlaceholder": "チャンネルを検索",
       "channelRequired": "チャンネルを選択",
-      "privateHint": "プライベートチャンネルは /invite {'@'}OpenObserve の後に表示されます",
+      "privateHint": "プライベートチャネルは /invite {'@'}OpenObserve の後に表示されます。新しいチャネルが表示されるまで最大 10 分かかることがあります",
       "loadMore": "さらにチャンネルを読み込む",
       "saveFailed": "チャンネルのデフォルトを保存できませんでした。",
       "answers": "回答",
       "edit": "編集",
       "remove": "削除",
       "removeTitle": "#{channel} のデフォルトを削除しますか？",
-      "removeMessage": "{name} での質問は、その後、最も早く接続された組織に送られます。",
+      "removeMessage": "{name} での質問は、その後、各人のデフォルト組織に送られます（/o2 org で変更できます）。",
       "instanceAdminOnly": "インスタンス管理者のみ",
       "ownOrgOnlyHint": "インスタンスワークスペースでは、チャンネルを自身の組織にマッピングします",
       "claimableHint": "未割り当てのチャンネルと {org} が所有するチャンネル",

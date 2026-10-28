@@ -1091,8 +1091,6 @@ pub struct SearchQuery {
     pub end_time: i64,
     #[prost(bool, tag = "9")]
     pub track_total_hits: bool,
-    #[prost(string, tag = "10")]
-    pub query_type: ::prost::alloc::string::String,
     #[prost(bool, tag = "12")]
     pub uses_zo_fn: bool,
     #[prost(string, tag = "13")]
