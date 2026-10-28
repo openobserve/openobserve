@@ -47,10 +47,29 @@ export function unpricedFields(hit: {
   return { unpricedTokens: Number(hit?.gen_ai_unpriced_tokens) || 0, unpricedModels: models };
 }
 
-export interface UnpricedSummary {
+export interface UnpricedTotals {
+  /** Every distinct unpriced model; `models` lists at most 20 of them. */
+  modelCount: number;
+  /** Tokens on every unpriced span. */
   tokens: number;
-  spans: number;
+  /** `models` holds only the models with the most tokens, not all `modelCount`. */
+  truncated: boolean;
   models: DataHealthModelUsage[];
+}
+
+/** The unpriced check's uncapped totals from the server, not the length or sum of its list. */
+export function unpricedTotals(check: DataHealthCheck): UnpricedTotals {
+  const models = check.models ?? [];
+  return {
+    modelCount: check.model_count ?? models.length,
+    tokens: check.unpriced_tokens ?? models.reduce((sum, m) => sum + (Number(m.tokens) || 0), 0),
+    truncated: !!check.models_truncated,
+    models,
+  };
+}
+
+export interface UnpricedSummary extends UnpricedTotals {
+  spans: number;
 }
 
 /** The unpriced-models check as a summary for the cost tile and charts; null when it passes. */
@@ -59,12 +78,7 @@ export function unpricedSummary(
 ): UnpricedSummary | null {
   const check = health?.checks.find((c) => c.id === "unpriced_models");
   if (!check || check.affected <= 0) return null;
-  const models = check.models ?? [];
-  return {
-    tokens: models.reduce((sum, m) => sum + (Number(m.tokens) || 0), 0),
-    spans: check.affected,
-    models,
-  };
+  return { ...unpricedTotals(check), spans: check.affected };
 }
 
 export interface HealthCounts {

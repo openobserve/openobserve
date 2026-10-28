@@ -23,7 +23,9 @@ use std::collections::HashMap;
 use config::{
     meta::{
         gen_ai::GenAiAgentMappingConfig,
-        model_pricing::{CostStatus, MatchKind, ModelPricingDefinition, PricingContext},
+        model_pricing::{
+            COST_STATUS_COLUMN, CostStatus, MatchKind, ModelPricingDefinition, PricingContext,
+        },
     },
     utils::{json, time::parse_timestamp_micro_from_value},
 };
@@ -535,6 +537,10 @@ impl OtelIngestionProcessor {
         if let Some(&v) = cost.get("total") {
             insert_if_absent(span_attributes, GenAiAttributes::USAGE_COST, json::json!(v));
         }
+        // Only ingest sets the marker; a client-sent value in either spelling (both flatten to
+        // the same column) would fake one or collide with the ingest value.
+        span_attributes.remove(GenAiExtensions::USAGE_COST_STATUS);
+        span_attributes.remove(COST_STATUS_COLUMN);
         if let Some(status) = cost_status {
             if status == CostStatus::Unpriced {
                 // A client-sent zero is not a price; leave the cost null.
@@ -544,9 +550,6 @@ impl OtelIngestionProcessor {
                 GenAiExtensions::USAGE_COST_STATUS.to_string(),
                 json::json!(status.as_str()),
             );
-        } else {
-            // Only ingest sets the marker; a client-sent value would fake one.
-            span_attributes.remove(GenAiExtensions::USAGE_COST_STATUS);
         }
 
         if let Some(uid) = &extracted.user_id {
@@ -1658,6 +1661,21 @@ mod tests {
                 .and_then(|v| v.as_f64()),
             Some(0.25)
         );
+
+        // The flattened spelling lands in the same column and must not survive either.
+        let mut flattened = chat_span("gpt-4o");
+        flattened.insert(COST_STATUS_COLUMN.to_string(), json::json!("unpriced"));
+        processor.process_span(&mut flattened, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&flattened), None);
+        assert!(!flattened.contains_key(COST_STATUS_COLUMN));
+        assert!(flattened.contains_key(GenAiAttributes::USAGE_COST));
+
+        // An ingest-set marker replaces a client-sent flattened one instead of colliding.
+        let mut unpriced = chat_span("unknown-model-xyz-2024");
+        unpriced.insert(COST_STATUS_COLUMN.to_string(), json::json!("approximate"));
+        processor.process_span(&mut unpriced, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&unpriced), Some("unpriced"));
+        assert!(!unpriced.contains_key(COST_STATUS_COLUMN));
     }
 
     #[test]

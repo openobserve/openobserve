@@ -123,11 +123,40 @@ pub struct HealthCheck {
     pub affected: i64,
     /// LLM spans checked.
     pub total: i64,
+    /// Unpriced check only: the 20 models with the most unpriced tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<ModelUsage>>,
+    /// Unpriced check only: every distinct model behind the unpriced spans (spans without a
+    /// model name count as one), however many `models` lists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_count: Option<i64>,
+    /// Unpriced check only: tokens on every unpriced span.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unpriced_tokens: Option<i64>,
+    /// Unpriced check only: `models` leaves some of the `model_count` models out.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub models_truncated: Option<bool>,
     /// Up to three recent trace ids with the problem; present only with `include_samples`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub samples: Option<Vec<String>>,
+}
+
+impl HealthCheck {
+    /// A check with no breakdown yet: the unpriced one starts with an empty, complete one.
+    fn new(id: CheckId, affected: i64, total: i64, include_samples: bool) -> Self {
+        let unpriced = id == CheckId::UnpricedModels;
+        Self {
+            id,
+            status: status_for(id, affected),
+            affected,
+            total,
+            models: unpriced.then(Vec::new),
+            model_count: unpriced.then_some(0),
+            unpriced_tokens: unpriced.then_some(0),
+            models_truncated: unpriced.then_some(false),
+            samples: include_samples.then(Vec::new),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -324,6 +353,54 @@ fn unpriced_models_sql(stream: &str, base: &str, pred: &str, cols: &Columns) -> 
     )
 }
 
+/// The uncapped totals behind a capped per-model breakdown of the spans matching `filter`:
+/// distinct model names, spans without one (the breakdown's null-model row), and tokens.
+fn breakdown_totals_sql(stream: &str, filter: &str, cols: &Columns) -> String {
+    let models = match cols.model_column() {
+        Some(m) => format!(
+            "COUNT(DISTINCT {m}) AS distinct_models, \
+             SUM(CASE WHEN {m} IS NULL THEN 1 ELSE 0 END) AS no_model_spans"
+        ),
+        None => "0 AS distinct_models, COUNT(*) AS no_model_spans".to_string(),
+    };
+    format!(
+        "SELECT {models}, {} AS tokens FROM {} WHERE {filter}",
+        cols.tokens_expr(),
+        quote_ident(stream)
+    )
+}
+
+/// Rows the uncapped breakdown has and their tokens, from a [`breakdown_totals_sql`] row.
+fn breakdown_totals(row: Option<&json::Value>) -> (i64, i64) {
+    let int = |key: &str| row.and_then(|r| r.get(key)).map_or(0, json::get_int_value);
+    let models = int("distinct_models") + i64::from(int("no_model_spans") > 0);
+    (models, int("tokens"))
+}
+
+/// Fills the unpriced check from the capped per-model rows and the uncapped totals row, so
+/// the counts stay right when the list is cut at [`MAX_MODELS`].
+fn set_unpriced_breakdown(
+    check: &mut HealthCheck,
+    model_hits: &[json::Value],
+    totals: Option<&json::Value>,
+) {
+    let models: Vec<ModelUsage> = model_hits
+        .iter()
+        .map(|h| ModelUsage {
+            model: model_from(h),
+            spans: h.get("spans").map_or(0, json::get_int_value),
+            tokens: h.get("tokens").map_or(0, json::get_int_value),
+        })
+        .collect();
+    let (model_count, tokens) = breakdown_totals(totals);
+    // Spans ingested between the two queries can only add models, never hide listed ones.
+    let model_count = model_count.max(models.len() as i64);
+    check.models_truncated = Some(model_count > models.len() as i64);
+    check.model_count = Some(model_count);
+    check.unpriced_tokens = Some(tokens);
+    check.models = Some(models);
+}
+
 fn status_for(id: CheckId, affected: i64) -> CheckStatus {
     match (id, affected) {
         (_, 0) => CheckStatus::Pass,
@@ -344,14 +421,7 @@ fn affected_from(pred: &Pred, row: &json::Value, i: usize, total: i64) -> i64 {
 fn all_pass(total: i64, include_samples: bool) -> Vec<HealthCheck> {
     CHECK_IDS
         .iter()
-        .map(|&id| HealthCheck {
-            id,
-            status: CheckStatus::Pass,
-            affected: 0,
-            total,
-            models: (id == CheckId::UnpricedModels).then(Vec::new),
-            samples: include_samples.then(Vec::new),
-        })
+        .map(|&id| HealthCheck::new(id, 0, total, include_samples))
         .collect()
 }
 
@@ -449,6 +519,12 @@ async fn stream_columns(org_id: &str, stream: &str) -> Option<Columns> {
         .map(|s| Columns::from_schema(&s))
 }
 
+/// The SQL of the unpriced model breakdown: the capped per-model rows and their uncapped totals.
+struct UnpricedSql {
+    models: String,
+    totals: String,
+}
+
 /// The queries that follow the counts: sample trace ids per failing check, only when the
 /// caller asked for samples, and the unpriced model breakdown.
 fn follow_up_sql(
@@ -458,7 +534,7 @@ fn follow_up_sql(
     preds: &[Pred],
     checks: &[HealthCheck],
     include_samples: bool,
-) -> (Vec<(usize, String)>, Option<String>) {
+) -> (Vec<(usize, String)>, Option<UnpricedSql>) {
     let samples = if include_samples {
         checks
             .iter()
@@ -470,11 +546,14 @@ fn follow_up_sql(
     } else {
         vec![]
     };
-    let models = match (&preds[0], checks[0].affected > 0) {
-        (Pred::Sql(p), true) => Some(unpriced_models_sql(stream, base, p, cols)),
+    let unpriced = match (&preds[0], checks[0].affected > 0) {
+        (Pred::Sql(p), true) => Some(UnpricedSql {
+            models: unpriced_models_sql(stream, base, p, cols),
+            totals: breakdown_totals_sql(stream, &format!("{base} AND {p}"), cols),
+        }),
         _ => None,
     };
-    (samples, models)
+    (samples, unpriced)
 }
 
 async fn compute_checks(
@@ -509,19 +588,16 @@ async fn compute_checks(
         .zip(&preds)
         .enumerate()
         .map(|(i, (&id, pred))| {
-            let affected = affected_from(pred, &row, i, total);
-            HealthCheck {
+            HealthCheck::new(
                 id,
-                status: status_for(id, affected),
-                affected,
+                affected_from(pred, &row, i, total),
                 total,
-                models: (id == CheckId::UnpricedModels).then(Vec::new),
-                samples: include_samples.then(Vec::new),
-            }
+                include_samples,
+            )
         })
         .collect();
 
-    let (sample_sqls, models_sql) =
+    let (sample_sqls, unpriced_sql) =
         follow_up_sql(stream, &base, &cols, &preds, &checks, include_samples);
     let sample_jobs = sample_sqls
         .into_iter()
@@ -532,29 +608,23 @@ async fn compute_checks(
             )
         })
         .collect::<Vec<_>>();
-    let models_job = async {
-        match models_sql {
-            Some(sql) => run_sql(org_id, user_id, sql, window, MAX_MODELS)
-                .await
-                .map(Some),
-            None => Ok(None),
-        }
+    let unpriced_job = async {
+        let Some(sql) = unpriced_sql else {
+            return Ok(None);
+        };
+        tokio::try_join!(
+            run_sql(org_id, user_id, sql.models, window, MAX_MODELS),
+            run_sql(org_id, user_id, sql.totals, window, 1),
+        )
+        .map(Some)
     };
-    let (samples, models) = tokio::join!(futures::future::join_all(sample_jobs), models_job);
+    let (samples, unpriced) = tokio::join!(futures::future::join_all(sample_jobs), unpriced_job);
 
     for (i, hits) in samples {
         checks[i].samples = Some(distinct_trace_ids(&hits?));
     }
-    if let Some(hits) = models? {
-        checks[0].models = Some(
-            hits.iter()
-                .map(|h| ModelUsage {
-                    model: model_from(h),
-                    spans: h.get("spans").map_or(0, json::get_int_value),
-                    tokens: h.get("tokens").map_or(0, json::get_int_value),
-                })
-                .collect(),
-        );
+    if let Some((model_hits, totals)) = unpriced? {
+        set_unpriced_breakdown(&mut checks[0], &model_hits, totals.first());
     }
 
     // Worst first, so the strip and the skill lead with what matters.
@@ -797,18 +867,54 @@ fn parse_unpriced_row(hit: &json::Value) -> Option<UnpricedModelRow> {
     })
 }
 
+/// The models ingest marked unpriced or approximate in a window: the [`MAX_UNPRICED_ROWS`]
+/// (model, status) rows with the most tokens, and totals over every marked span.
+#[derive(Debug, Default)]
+pub struct UnpricedModels {
+    pub rows: Vec<UnpricedModelRow>,
+    /// Distinct models behind every marked span (spans without a model name count as one).
+    pub model_count: i64,
+    /// Tokens on every marked span.
+    pub tokens: i64,
+    /// `rows` leaves some of the `model_count` models out.
+    pub truncated: bool,
+}
+
+fn unpriced_listing(hits: &[json::Value], totals: Option<&json::Value>) -> UnpricedModels {
+    // The raw value, so a '' model and a missing one stay apart as they do in the totals.
+    let listed = hits
+        .iter()
+        .map(|h| h.get("model").and_then(|v| v.as_str()))
+        .collect::<std::collections::HashSet<_>>()
+        .len() as i64;
+    let (model_count, tokens) = breakdown_totals(totals);
+    // Spans ingested between the two queries can only add models, never hide listed ones.
+    let model_count = model_count.max(listed);
+    UnpricedModels {
+        rows: hits.iter().filter_map(parse_unpriced_row).collect(),
+        model_count,
+        tokens,
+        truncated: model_count > listed,
+    }
+}
+
 /// Models in `stream` that ingest marked unpriced or approximate during the window.
 pub async fn unpriced_models(
     org_id: &str,
     user_id: &str,
     query: &UnpricedModelsQuery,
-) -> Result<Vec<UnpricedModelRow>, anyhow::Error> {
+) -> Result<UnpricedModels, anyhow::Error> {
     let Some(cols) = stream_columns(org_id, &query.stream_name).await else {
-        return Ok(vec![]);
+        return Ok(UnpricedModels::default());
     };
     let Some(sql) = unpriced_list_sql(&query.stream_name, &cols) else {
-        return Ok(vec![]);
+        return Ok(UnpricedModels::default());
     };
+    let totals_sql = breakdown_totals_sql(
+        &query.stream_name,
+        &format!("{COST_STATUS_COLUMN} IS NOT NULL"),
+        &cols,
+    );
     let window = Window::for_stream(
         org_id,
         user_id,
@@ -817,8 +923,11 @@ pub async fn unpriced_models(
         query.end_time,
     )
     .await;
-    let hits = run_sql(org_id, user_id, sql, &window, MAX_UNPRICED_ROWS).await?;
-    Ok(hits.iter().filter_map(parse_unpriced_row).collect())
+    let (hits, totals) = tokio::try_join!(
+        run_sql(org_id, user_id, sql, &window, MAX_UNPRICED_ROWS),
+        run_sql(org_id, user_id, totals_sql, &window, 1),
+    )?;
+    Ok(unpriced_listing(&hits, totals.first()))
 }
 
 /// Validates the window and applies the trace endpoints' search allowance and stream access
@@ -1033,26 +1142,102 @@ mod tests {
         let preds: Vec<Pred> = CHECK_IDS.iter().map(|&id| check_pred(id, cols)).collect();
         let checks = CHECK_IDS
             .iter()
-            .map(|&id| HealthCheck {
-                id,
-                status: status_for(id, 5),
-                affected: 5,
-                total: 10,
-                models: None,
-                samples: None,
-            })
+            .map(|&id| HealthCheck::new(id, 5, 10, false))
             .collect();
         (preds, checks)
+    }
+
+    /// Per-model rows as the engine returns them: most tokens first, at most `limit`.
+    fn top_rows(models: &[(Option<String>, i64)], limit: usize) -> Vec<json::Value> {
+        let mut sorted = models.to_vec();
+        sorted.sort_by_key(|(_, tokens)| std::cmp::Reverse(*tokens));
+        sorted
+            .into_iter()
+            .take(limit)
+            .map(|(model, tokens)| json::json!({ "model": model, "spans": 1, "tokens": tokens }))
+            .collect()
+    }
+
+    #[test]
+    fn unpriced_totals_cover_models_past_the_list_cap() {
+        // 25 unpriced models, one of them spans without a model name.
+        let models: Vec<(Option<String>, i64)> = (1..=25)
+            .map(|i| ((i != 7).then(|| format!("model-{i:02}")), i * 100))
+            .collect();
+        let all_tokens: i64 = models.iter().map(|(_, t)| t).sum();
+        let c = cols(FULL);
+        let (preds, checks) = failing_checks(&c);
+        let sql = follow_up_sql("default", "b", &c, &preds, &checks, false)
+            .1
+            .unwrap();
+        // The list is capped; its totals are one aggregate over the same spans, uncapped.
+        assert!(sql.models.ends_with(&format!("LIMIT {MAX_MODELS}")));
+        assert_eq!(
+            sql.totals,
+            "SELECT COUNT(DISTINCT gen_ai_response_model) AS distinct_models, \
+             SUM(CASE WHEN gen_ai_response_model IS NULL THEN 1 ELSE 0 END) AS no_model_spans, \
+             COALESCE(SUM(gen_ai_usage_total_tokens), 0) AS tokens FROM \"default\" \
+             WHERE b AND gen_ai_usage_cost_status = 'unpriced'"
+        );
+
+        let mut check = HealthCheck::new(CheckId::UnpricedModels, 25, 40, false);
+        let totals =
+            json::json!({ "distinct_models": 24, "no_model_spans": 1, "tokens": all_tokens });
+        set_unpriced_breakdown(&mut check, &top_rows(&models, MAX_MODELS), Some(&totals));
+        assert_eq!(check.models.as_ref().unwrap().len(), MAX_MODELS);
+        assert_eq!(check.model_count, Some(25));
+        assert_eq!(check.unpriced_tokens, Some(all_tokens));
+        assert_eq!(check.models_truncated, Some(true));
+        // Every model fits: nothing is cut.
+        let few = &models[..3];
+        let mut check = HealthCheck::new(CheckId::UnpricedModels, 3, 40, false);
+        let totals = json::json!({ "distinct_models": 3, "no_model_spans": 0, "tokens": 600 });
+        set_unpriced_breakdown(&mut check, &top_rows(few, MAX_MODELS), Some(&totals));
+        assert_eq!(check.model_count, Some(3));
+        assert_eq!(check.models_truncated, Some(false));
+        // The wire form carries the totals on the unpriced check only.
+        let wire = json::to_value(&check).unwrap();
+        assert_eq!(wire["model_count"], 3);
+        assert_eq!(wire["unpriced_tokens"], 600);
+        assert_eq!(wire["models_truncated"], false);
+        let other = json::to_value(HealthCheck::new(CheckId::ZeroDurationSpans, 1, 4, false));
+        assert!(other.unwrap().get("model_count").is_none());
+    }
+
+    #[test]
+    fn unpriced_list_totals_cover_rows_past_the_cap() {
+        let models: Vec<(Option<String>, i64)> = (1..=120)
+            .map(|i| (Some(format!("model-{i:03}")), i))
+            .collect();
+        let mut rows = top_rows(&models, MAX_UNPRICED_ROWS);
+        for row in &mut rows {
+            row["status"] = json::json!("unpriced");
+        }
+        let totals = json::json!({ "distinct_models": 120, "no_model_spans": 0, "tokens": 7260 });
+        let listing = unpriced_listing(&rows, Some(&totals));
+        assert_eq!(listing.rows.len(), MAX_UNPRICED_ROWS);
+        assert_eq!((listing.model_count, listing.tokens), (120, 7260));
+        assert!(listing.truncated);
+        // One model seen both unpriced and approximate is two rows but one model.
+        let rows = vec![
+            json::json!({ "model": "m", "status": "unpriced", "spans": 1, "tokens": 5 }),
+            json::json!({ "model": "m", "status": "approximate", "spans": 1, "tokens": 5 }),
+        ];
+        let totals = json::json!({ "distinct_models": 1, "no_model_spans": 0, "tokens": 10 });
+        assert!(!unpriced_listing(&rows, Some(&totals)).truncated);
+        // A stream without a model column: every marked span is the one null-model row.
+        let sql = breakdown_totals_sql("default", "x", &cols(&["gen_ai_usage_cost_status"]));
+        assert!(sql.starts_with("SELECT 0 AS distinct_models, COUNT(*) AS no_model_spans, 0 AS"));
     }
 
     #[test]
     fn samples_are_queried_only_when_asked_for() {
         let c = cols(FULL);
         let (preds, checks) = failing_checks(&c);
-        let (samples, models) = follow_up_sql("default", "b", &c, &preds, &checks, false);
+        let (samples, unpriced) = follow_up_sql("default", "b", &c, &preds, &checks, false);
         assert!(samples.is_empty());
         // The unpriced model breakdown is part of the strip, so it always runs.
-        assert!(models.is_some());
+        assert!(unpriced.is_some());
         let (samples, _) = follow_up_sql("default", "b", &c, &preds, &checks, true);
         assert_eq!(samples.len(), CHECK_IDS.len());
         // Bounded to the newest spans, not an aggregate over every span in the window.

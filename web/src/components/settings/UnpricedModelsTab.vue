@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="warning-amber"
       dense
       class="mx-page-edge mt-2 shrink-0"
-      :content="t('modelPricing.unpriced.banner', { count: models.length }, models.length)"
+      :content="bannerText"
       data-test="model-pricing-unpriced-banner"
     />
     <div class="min-h-0 flex-1 overflow-hidden">
@@ -232,6 +232,8 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps<{
   models: UnpricedModel[];
+  /** Every model ingest marked in the window when the server listed only the top ones by tokens. */
+  truncatedOf?: number | null;
   /** Cold read with nothing to show yet: the table skeleton. */
   loading: boolean;
   /** Any read in flight: the refresh button's spinner. */
@@ -266,6 +268,15 @@ const noStreams = computed(() => props.streamsLoaded && !props.streams.length);
 // skeleton holds instead of a premature "everything is priced".
 const showSkeleton = computed(
   () => !props.error && !noStreams.value && (props.loading || !props.loaded),
+);
+
+const bannerText = computed(() =>
+  props.truncatedOf
+    ? t("modelPricing.unpriced.bannerTruncated", {
+        shown: props.models.length,
+        total: props.truncatedOf.toLocaleString(),
+      })
+    : t("modelPricing.unpriced.banner", { count: props.models.length }, props.models.length),
 );
 
 const columns: OTableColumnDef<UnpricedModel>[] = [
