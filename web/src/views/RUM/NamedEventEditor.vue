@@ -130,26 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageLayout>
   </OForm>
 
-  <ConfirmDialog
-    v-model="leaveDialog.show"
-    :title="t('rum.analytics.events.discardTitle')"
-    :message="t('rum.analytics.events.discardMessage')"
-    data-test="rum-analytics-event-editor-discard-dialog"
-    @update:ok="leaveDialog.onConfirm"
-    @update:cancel="leaveDialog.show = false"
-  />
+  <EditorDraftDialogs :draft="eventDraft" />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
-import {
-  onBeforeRouteLeave,
-  onBeforeRouteUpdate,
-  useRoute,
-  useRouter,
-  type NavigationGuardWithThis,
-  type RouteLocationRaw,
-} from "vue-router";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
@@ -160,9 +146,14 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import NamedEventRuleRow from "@/components/rum/productAnalytics/NamedEventRuleRow.vue";
-import useNamedEvents, { readNamedEventHandoff } from "@/composables/rum/useNamedEvents";
+import useNamedEvents, {
+  namedEventDraftVariant,
+  readNamedEventHandoff,
+} from "@/composables/rum/useNamedEvents";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -213,10 +204,8 @@ const formFor = ref<string | null>(null);
 const pageOptions = ref<string[]>([]);
 const clickOptions = ref<string[]>([]);
 const previewPanel = runner.panel<Record<string, number>>("preview");
-const leaveDialog = reactive({ show: false, onConfirm: () => {} });
 let previewTimer: ReturnType<typeof setTimeout> | null = null;
 let generation = 0;
-let allowLeave = false;
 let inFlight = false;
 // A submit whose validation was still pending when the save landed must not create again.
 let landed = false;
@@ -334,31 +323,27 @@ const prepareScope = async () => {
   await pa.loadScope();
 };
 
-const leave = (to: RouteLocationRaw) => {
-  allowLeave = true;
-  void router.push(to);
-};
-
 const fillForm = (): boolean => {
   if (!props.id) {
     form.reset(namedEventDefaults(handoff.draft));
+    serverEvent = null;
     return true;
   }
   const ev = ne.events.value.find((e) => e.id === props.id);
   if (!ev) {
     toast({ variant: "error", message: t("rum.analytics.events.notFound") });
-    allowLeave = true;
+    deleteEditorDraftsFor({ kind: "rum_named_event", org: org(), entityId: props.id });
     void router.replace(listLocation());
     return false;
   }
   form.reset(namedEventDefaults(ev));
+  serverEvent = namedEventDefaults(ev);
   openedVersion = ev.version;
   return true;
 };
 
 const open = async () => {
   const gen = ++generation;
-  allowLeave = false;
   landed = false;
   editingId.value = props.id ?? null;
   await prepareScope();
@@ -366,11 +351,13 @@ const open = async () => {
   const ready = await ne.ensure(org(), app.value);
   if (gen !== generation || !alive || ready !== "ready") return;
   const target = props.id ?? NEW;
-  if (formFor.value !== target && fillForm()) {
+  const filled = formFor.value !== target && fillForm();
+  if (filled) {
     formFor.value = target;
     baseline.value = JSON.stringify(form.state.values);
   }
   void loadOptions();
+  if (filled) await eventDraft.start();
 };
 
 const retry = async () => {
@@ -393,7 +380,13 @@ async function submit(value: NamedEventForm) {
     // The refusal was toasted; the draft stays on screen so it is not lost.
     if (res.kind === "forbidden") return;
     landed = true;
-    if (gen === generation && alive) leave(returnLocation());
+    if (gen !== generation || !alive) return;
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    eventDraft.markSaved();
+    void router.push(returnLocation());
   } catch (e) {
     if (gen !== generation || !alive) return;
     const { code } = rumPaError(e);
@@ -407,8 +400,8 @@ async function submit(value: NamedEventForm) {
   }
 }
 
-const goBack = () => {
-  void router.push(returnLocation());
+const goBack = async () => {
+  if (await eventDraft.confirmLeave()) void router.push(returnLocation());
 };
 
 const schedulePreview = () => {
@@ -438,22 +431,32 @@ const schedulePreview = () => {
   }, PREVIEW_DEBOUNCE_MS);
 };
 
-// A save in flight carries the edits with it, so leaving then needs no discard prompt.
-const guardLeave: NavigationGuardWithThis<undefined> = (to, _from, next) => {
-  if (allowLeave || inFlight || !dirty.value) {
-    next();
-    return;
-  }
-  // Cancel and ask in a dialog: browsers suppress confirm() during navigation.
-  next(false);
-  const destination = to.fullPath;
-  leaveDialog.onConfirm = () => {
-    leaveDialog.show = false;
-    allowLeave = true;
-    void router.push(destination);
-  };
-  leaveDialog.show = true;
-};
+// The event as the form shows it after loading; the raw item's version and timestamps move on every save.
+let serverEvent: NamedEventForm | null = null;
+// Set while the leave dialog's Save runs, so a successful save does not go back itself.
+let leaveSave: { saved: boolean } | null = null;
+
+const eventDraft = useEditorDraft<NamedEventForm>({
+  kind: "rum_named_event",
+  entityLabel: () => t("common.editorDraft.entities.rum_named_event"),
+  entityId: () => props.id ?? null,
+  newVariant: () => namedEventDraftVariant(app.value, handoff),
+  snapshot: () => JSON.parse(JSON.stringify(values.value)) as NamedEventForm,
+  apply: (data) => form.reset({ name: data.name, rules: data.rules }),
+  base: () => (props.id ? serverEvent : undefined),
+  // A save in flight carries the edits with it, so leaving then needs no prompt.
+  hasChanges: () => dirty.value && !inFlight,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+});
 
 watch(values, schedulePreview, { deep: true });
 watch(formReady, (ready) => ready && schedulePreview());
@@ -464,9 +467,6 @@ watch(
   () => setServerFieldErrors(form, {}),
 );
 watch(() => props.id, open, { immediate: true });
-
-onBeforeRouteLeave(guardLeave);
-onBeforeRouteUpdate(guardLeave);
 
 onBeforeUnmount(() => {
   alive = false;
