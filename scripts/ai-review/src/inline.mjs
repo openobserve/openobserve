@@ -45,8 +45,15 @@ export function rightSideLines(diff) {
   return files;
 }
 
+// Cut one comment at a time until no opener is left, so nested input like "<!<!---->--" cannot rebuild one;
+// an unterminated opener is dropped and the text after it kept.
 function stripComments(text) {
-  return String(text ?? "").replace(/<!--[\s\S]*?-->/g, "").trim();
+  let out = String(text ?? "");
+  for (let i = out.indexOf("<!--"); i !== -1; i = out.indexOf("<!--")) {
+    const end = out.indexOf("-->", i + 4);
+    out = out.slice(0, i) + (end === -1 ? out.slice(i + 4) : out.slice(end + 3));
+  }
+  return out.trim();
 }
 
 function normalizeFinding(raw) {

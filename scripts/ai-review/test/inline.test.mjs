@@ -70,6 +70,14 @@ test("the inline block is parsed and cut out of the summary, fenced or not", () 
   ]);
 });
 
+test("nested or unterminated comment openers in finding text are stripped", () => {
+  const block = (title, body) => `<!-- ai-review-inline\n${JSON.stringify([{ file: "src/lib.rs", line: 11, severity: "warning", title, body }])}\n-->`;
+  const [f] = extractInlineBlock(block("A <!<!---->-- x --> B", "tail <!-- open")).findings;
+  assert.equal(f.title.includes("<!--"), false);
+  assert.equal(f.body.includes("<!--"), false);
+  assert.equal(f.body, "tail  open");
+});
+
 test("a missing or malformed inline block leaves the summary intact and yields no findings", () => {
   assert.deepEqual(extractInlineBlock("## Review\nok").findings, []);
   const bad = extractInlineBlock("## Review\n<!-- ai-review-inline\n[{oops\n-->");
