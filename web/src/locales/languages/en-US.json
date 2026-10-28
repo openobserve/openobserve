@@ -10486,6 +10486,7 @@
         "leadsNotEvidence": "Leads, not evidence",
         "working": "Working. Messages sent now are read after this turn.",
         "finalNote": "This report is final and won't change. To redirect the agent, Re-analyze. It creates a new version in Report history.",
+        "resumableNote": "This run stopped before it finished. Resume run continues from the last finished step.",
         "copy": "Copy thread",
         "copied": "Thread copied to clipboard",
         "copyFailed": "Failed to copy thread",

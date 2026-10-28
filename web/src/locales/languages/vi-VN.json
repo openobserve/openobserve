@@ -10488,6 +10488,7 @@
         "leadsNotEvidence": "Manh mối, không phải bằng chứng",
         "working": "Đang xử lý. Các tin nhắn gửi bây giờ sẽ được đọc sau lượt này.",
         "finalNote": "Báo cáo này là bản cuối cùng và sẽ không thay đổi. Để chuyển hướng agent, hãy Phân tích lại. Thao tác này tạo một phiên bản mới trong Lịch sử báo cáo.",
+        "resumableNote": "Lần chạy này đã dừng trước khi hoàn tất. Tiếp tục lượt chạy sẽ chạy tiếp từ bước hoàn tất cuối cùng.",
         "copy": "Sao chép luồng",
         "copied": "Đã sao chép luồng vào bộ nhớ tạm",
         "copyFailed": "Không thể sao chép luồng",
