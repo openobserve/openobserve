@@ -124,7 +124,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 124: add alert_groups, end_on_clear and mute_source to downtimes.
 // 125: create slack_alert_messages.
 // 126: add held_action to slack_link_requests.
-pub const DB_SCHEMA_VERSION: u64 = 126;
+// 127: add group_label_set to alert_states.
+pub const DB_SCHEMA_VERSION: u64 = 127;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

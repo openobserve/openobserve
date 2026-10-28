@@ -18,6 +18,8 @@
 //! DELIVERED notification, cleared by the write that emits the recovery, so exactly-once is
 //! structural and a suppressed firing needs no check in any consumer.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::state::{AlertState, apply_outcome};
@@ -47,12 +49,44 @@ pub struct RecoveryEvent {
     /// The firing cycle that ended, the key of its Slack messages.
     #[serde(default)]
     pub firing_started_at: Option<i64>,
+    #[serde(default)]
+    pub reason: RecoveryReason,
+    /// The group's labels for `{group.*}` and the per-group downtime check; `None` on the rollup.
+    #[serde(default)]
+    pub group_label_set: Option<BTreeMap<String, String>>,
+    /// The healthy value an observed clear saw; `None` when the group was not observed.
+    #[serde(default)]
+    pub value: Option<f64>,
 }
 
 impl RecoveryEvent {
     /// How long the episode ran, in microseconds.
     pub fn duration_micros(&self) -> i64 {
         self.recovered_at.saturating_sub(self.opened_at).max(0)
+    }
+
+    pub fn is_group(&self) -> bool {
+        !self.group_key.is_empty()
+    }
+}
+
+/// Why an episode closed, for `{recovery_reason}`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryReason {
+    /// An evaluation observed the condition clear.
+    #[default]
+    Cleared,
+    /// The group stopped being returned for K x frequency (M-7).
+    Disappeared,
+}
+
+impl RecoveryReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cleared => "cleared",
+            Self::Disappeared => "disappeared",
+        }
     }
 }
 
@@ -98,6 +132,72 @@ pub struct FiringCycleClose {
     pub firing_started_at: i64,
     /// When the condition first cleared: a `keep_firing_for` hold's start, else the run's time.
     pub cleared_at: i64,
+}
+
+/// One group episode a plan closes: the writer's guarded close, then the recovery it emits.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClosedGroupEpisode {
+    pub group_key: String,
+    pub episode_id: String,
+    /// The `level_at` the closer read; replicas close by `episode_id` alone.
+    pub prev_level_at: Option<i64>,
+    #[serde(default)]
+    pub incident_id: Option<String>,
+    pub opened_at: i64,
+    pub recovered_at: i64,
+    #[serde(default)]
+    pub reason: RecoveryReason,
+    #[serde(default)]
+    pub value: Option<f64>,
+    #[serde(default)]
+    pub labels: BTreeMap<String, String>,
+    #[serde(default)]
+    pub group_labels: Option<String>,
+    #[serde(default)]
+    pub last_notified_level: Option<AlertLevel>,
+}
+
+impl ClosedGroupEpisode {
+    /// `state` is the row as the closer read it, before the close cleared its episode.
+    pub fn new(
+        state: &AlertState,
+        closed: ClosedEpisode,
+        prev_level_at: Option<i64>,
+        reason: RecoveryReason,
+        value: Option<f64>,
+    ) -> Self {
+        Self {
+            group_key: state.group_key.clone(),
+            episode_id: closed.episode_id,
+            prev_level_at,
+            incident_id: closed.incident_id,
+            opened_at: closed.opened_at,
+            recovered_at: closed.recovered_at,
+            reason,
+            value,
+            labels: state.group_label_set.clone().unwrap_or_default(),
+            group_labels: state.group_labels.clone(),
+            last_notified_level: state.last_notified_level,
+        }
+    }
+
+    pub fn recovery_event(&self, org_id: &str, alert_id: &str, emitted_at: i64) -> RecoveryEvent {
+        RecoveryEvent {
+            org_id: org_id.to_string(),
+            alert_id: alert_id.to_string(),
+            group_key: self.group_key.clone(),
+            episode_id: self.episode_id.clone(),
+            incident_id: self.incident_id.clone(),
+            opened_at: self.opened_at,
+            recovered_at: self.recovered_at,
+            emitted_at,
+            last_notified_level: self.last_notified_level,
+            group_labels: self.group_labels.clone(),
+            reason: self.reason,
+            group_label_set: Some(self.labels.clone()),
+            value: self.value,
+        }
+    }
 }
 
 /// `firing` is the RECORDED level's verdict, not the raw match, so a frozen evaluation stays firing
@@ -171,6 +271,9 @@ pub fn recovery_event(
         last_notified_level: state.last_notified_level,
         group_labels: state.group_labels.clone(),
         firing_started_at: state.firing_started_at,
+        reason: RecoveryReason::Cleared,
+        group_label_set: state.group_label_set.clone(),
+        value: None,
     }
 }
 

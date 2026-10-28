@@ -36,15 +36,26 @@ use config::{
     meta::alerts::{
         alert::Alert,
         grouping::{
-            GroupFate, GroupPageCompleteness, group_fate, may_age_groups, opt_out_evictions,
-            resolve_group_update,
+            GroupFate, GroupPageCompleteness, GroupPlan, SweepPlan, group_fate, may_age_groups,
+            opt_out_evictions, plan_sweep,
         },
+        recovery::ClosedGroupEpisode,
         state::{AlertState, ROLLUP_GROUP_KEY},
     },
     spawn_pausable_job,
     utils::time::now_micros,
 };
+use infra::table::alert_states::{GroupPlanWrite, PlanApply};
 use openobserve_core::alerts::lifecycle::{self, ClearKind};
+
+/// What a sweep's writes committed before they stopped; `error` is the write that stopped them.
+#[derive(Debug, Default)]
+struct SweepWrite<'a> {
+    resolved: Vec<&'a GroupPlan>,
+    reaped: usize,
+    closed: Vec<ClosedGroupEpisode>,
+    error: Option<anyhow::Error>,
+}
 
 /// Start the sweep. Alert-manager nodes only, one leader at a time — the work
 /// is a whole-table scan of group state, and running it on every node would
@@ -240,6 +251,7 @@ async fn sweep_alert(
     // simply stopped being evaluated (D26). This is the backstop for the
     // cleanup that the save path performs directly.
     if !still_multi(alert) {
+        log_orphaned_episodes(alert_id, &groups);
         let tracked: HashMap<String, AlertState> = groups
             .into_iter()
             .map(|s| (s.group_key.clone(), s))
@@ -281,50 +293,107 @@ async fn sweep_alert(
     }
 
     let now = now_micros();
-    let mut resolved = 0usize;
-    let mut to_reap = Vec::new();
-
-    for state in &groups {
+    let rule_mode = alert.query_condition.promql_rule_mode;
+    let plan = plan_sweep(alert_id, &groups, now, rule_mode, |state| {
         // Per row, not per alert: on a cron schedule each group's deadline
         // depends on where its own `last_seen` falls in the schedule.
         let resolve_after = alert
             .trigger_condition
             .group_resolve_threshold_micros(state.last_seen.unwrap_or(now), k);
+        fate_for_alert(alert, state, now, resolve_after, grace)
+    });
 
-        match fate_for_alert(alert, state, now, resolve_after, grace) {
-            GroupFate::Keep => {}
-            GroupFate::Resolve => {
-                let update = resolve_group_update(alert_id, &state.group_key, state, now);
-                // `resolve_group_update` is a full noop for an already-resolved
-                // row; writing anyway would push the reap clock out by one
-                // interval every pass and the row would never be deleted.
-                if !update.is_noop() {
-                    // No ledger write: a resolution is the sweep noticing a
-                    // group stopped being returned, not the alert evaluating.
-                    // Recording it as coverage would credit measured time to a
-                    // pass that measured nothing — and a grouped alert has no
-                    // ledger history at all (D65).
-                    db::alerts::alert_states::persist(&update, None).await?;
-                    resolved += 1;
-                    if let Some(c) = lifecycle::update_clear(
-                        Some(state),
-                        &update,
-                        now,
-                        ClearKind::ReaperResolved,
-                    ) {
-                        lifecycle::on_all_cleared(&alert.org_id, alert_id, &[c]).await;
-                    }
+    // No ledger write: a sweep measures nothing.
+    let write = apply_sweep(&plan, |group_plan, mode| async move {
+        db::alerts::alert_states::persist_group_plan(group_plan, alert_id, mode)
+            .await
+            .map_err(anyhow::Error::from)
+    })
+    .await;
+    let recoveries = write
+        .closed
+        .iter()
+        .map(|close| close.recovery_event(&alert.org_id, alert_id, now))
+        .collect();
+    // Their episodes are already cleared, so a later write's error must not drop them.
+    openobserve_core::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
+    let cleared = resolve_clears(&groups, &write.resolved, now);
+    lifecycle::on_all_cleared(&alert.org_id, alert_id, &cleared).await;
+    if let Some(e) = write.error {
+        return Err(e);
+    }
+    Ok((write.resolved.len(), write.reaped, 0))
+}
+
+/// Commits a sweep's plans in order and stops at the first error, keeping what already committed.
+async fn apply_sweep<'a, F, Fut>(plan: &'a SweepPlan, mut persist: F) -> SweepWrite<'a>
+where
+    F: FnMut(&'a GroupPlan, PlanApply) -> Fut,
+    Fut: std::future::Future<Output = Result<GroupPlanWrite, anyhow::Error>>,
+{
+    // One plan per resolve: a close whose row was observed since abandons only that row's resolve.
+    let rest = (!plan.rest.closed_episodes.is_empty() || !plan.rest.reaped.is_empty())
+        .then_some((&plan.rest, PlanApply::Evaluation));
+    let writes = plan
+        .resolves
+        .iter()
+        .map(|resolve| (resolve, PlanApply::Sweep))
+        .chain(rest);
+
+    let mut out = SweepWrite::default();
+    for (group_plan, mode) in writes {
+        match persist(group_plan, mode).await {
+            Ok(write) => {
+                if mode == PlanApply::Sweep && write.written {
+                    out.resolved.push(group_plan);
                 }
+                out.reaped += write.reaped.len();
+                out.closed.extend(write.closed);
             }
-            GroupFate::Reap => to_reap.push(state.group_key.clone()),
+            Err(e) => {
+                out.error = Some(e);
+                break;
+            }
         }
     }
+    out
+}
 
-    let reaped = to_reap.len();
-    if reaped > 0 {
-        db::alerts::alert_states::delete_groups(alert_id, &to_reap).await?;
+/// The firing cycles the committed M-7 resolves ended, as reaper clears.
+fn resolve_clears(
+    groups: &[AlertState],
+    resolved: &[&GroupPlan],
+    now: i64,
+) -> Vec<lifecycle::ClearedFiring> {
+    let prev: HashMap<&str, &AlertState> =
+        groups.iter().map(|s| (s.group_key.as_str(), s)).collect();
+    resolved
+        .iter()
+        .flat_map(|plan| &plan.updates)
+        .filter_map(|update| {
+            let key = update.state.as_ref()?.group_key.as_str();
+            lifecycle::update_clear(
+                prev.get(key).copied(),
+                update,
+                now,
+                ClearKind::ReaperResolved,
+            )
+        })
+        .collect()
+}
+
+/// Rows deleted without an emit take their open episode's ticket with them (D11).
+fn log_orphaned_episodes(alert_id: &str, groups: &[AlertState]) {
+    for state in groups {
+        if let Some(episode_id) = state.episode_id.as_deref() {
+            log::warn!(
+                "[ALERT_GROUP_REAPER] alert {alert_id} group {} ({}) deleted with open episode \
+                 {episode_id}; its recovery will not be sent",
+                state.group_key,
+                state.group_labels.as_deref().unwrap_or_default()
+            );
+        }
     }
-    Ok((resolved, reaped, 0))
 }
 
 /// Deletes the acks of firings that are no longer current, once the reap grace has passed.
@@ -477,5 +546,87 @@ mod tests {
             fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
             GroupFate::Keep
         );
+    }
+
+    fn close_of(group_key: &str) -> ClosedGroupEpisode {
+        ClosedGroupEpisode {
+            group_key: group_key.to_string(),
+            episode_id: format!("ep-{group_key}"),
+            prev_level_at: Some(1),
+            incident_id: None,
+            opened_at: 0,
+            recovered_at: 1,
+            reason: Default::default(),
+            value: None,
+            labels: Default::default(),
+            group_labels: None,
+            last_notified_level: None,
+        }
+    }
+
+    fn closing(group_key: &str) -> GroupPlan {
+        GroupPlan {
+            closed_episodes: vec![close_of(group_key)],
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_write_keeps_the_recoveries_earlier_writes_committed() {
+        let plan = SweepPlan {
+            resolves: vec![closing("host=a"), closing("host=b"), closing("host=c")],
+            rest: closing("host=d"),
+        };
+        let mut calls = 0usize;
+        let write = apply_sweep(&plan, |group_plan, _mode| {
+            calls += 1;
+            let fail = calls == 2;
+            async move {
+                if fail {
+                    anyhow::bail!("database is gone");
+                }
+                Ok(GroupPlanWrite {
+                    written: true,
+                    closed: group_plan.closed_episodes.clone(),
+                    ..Default::default()
+                })
+            }
+        })
+        .await;
+
+        assert_eq!(calls, 2, "the sweep stops at the failed write");
+        assert_eq!(write.resolved.len(), 1);
+        assert_eq!(write.closed, vec![close_of("host=a")]);
+        assert!(write.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn the_rest_plan_runs_last_and_only_when_it_has_work() {
+        let mut plan = SweepPlan {
+            resolves: vec![closing("host=a")],
+            rest: closing("host=d"),
+        };
+        let mut modes = Vec::new();
+        let echo = |group_plan: &GroupPlan| GroupPlanWrite {
+            written: true,
+            closed: group_plan.closed_episodes.clone(),
+            ..Default::default()
+        };
+        let write = apply_sweep(&plan, |group_plan, mode| {
+            modes.push(mode);
+            std::future::ready(Ok(echo(group_plan)))
+        })
+        .await;
+        assert_eq!(modes, [PlanApply::Sweep, PlanApply::Evaluation]);
+        assert_eq!((write.resolved.len(), write.closed.len()), (1, 2));
+
+        plan.rest = GroupPlan::default();
+        modes.clear();
+        apply_sweep(&plan, |group_plan, mode| {
+            modes.push(mode);
+            std::future::ready(Ok(echo(group_plan)))
+        })
+        .await;
+        assert_eq!(modes, [PlanApply::Sweep]);
     }
 }

@@ -27,6 +27,9 @@ use config::meta::{
 #[cfg(feature = "enterprise")]
 const RECORDED_MUTE_GRACE_MICROS: i64 = 24 * 3_600 * 1_000_000;
 
+/// Group recoveries sent at once: a whole host recovering closes many groups in one write.
+const GROUP_RECOVERY_CONCURRENCY: usize = 8;
+
 /// Which consumers one recovery reaches.
 #[derive(Debug, PartialEq)]
 struct RecoveryRoute {
@@ -59,6 +62,37 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
 
     // A recovery inside a window is dropped, never delayed: the episode is already closed.
     let downtime_id = recovery_downtime(alert, event).await;
+    deliver_recovery(alert, event, downtime_id).await;
+}
+
+/// Sends a write's group recoveries concurrently, uncapped: a dropped resolve strands a ticket.
+pub async fn dispatch_group_recoveries(alert: &Alert, events: Vec<RecoveryEvent>) {
+    use futures::StreamExt;
+
+    if events.is_empty() {
+        return;
+    }
+    let folder_id = group_recovery_folder(alert, &events).await;
+    let folder_id = folder_id.as_deref();
+    futures::stream::iter(events)
+        .for_each_concurrent(GROUP_RECOVERY_CONCURRENCY, |event| async move {
+            log::info!(
+                "[RECOVERY] {}/{} group {} episode {} {} after {}us",
+                event.org_id,
+                event.alert_id,
+                event.group_labels.as_deref().unwrap_or(&event.group_key),
+                event.episode_id,
+                event.reason.as_str(),
+                event.duration_micros()
+            );
+            let downtime_id = group_recovery_downtime(alert, folder_id, &event).await;
+            deliver_recovery(alert, &event, downtime_id).await;
+        })
+        .await;
+}
+
+/// Every consumer of one recovery, given the downtime that mutes it.
+async fn deliver_recovery(alert: &Alert, event: &RecoveryEvent, downtime_id: Option<String>) {
     let route = recovery_route(alert, event, downtime_id.is_some());
     if let Some(downtime_id) = downtime_id.as_deref() {
         log::info!(
@@ -67,10 +101,12 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
             event.alert_id
         );
         // Keeps the per-run on-call recovery withheld through a hold, then lets it close the rest.
+        // A group's mute is its own and must not withhold the alert's on-call recovery.
         #[cfg(feature = "enterprise")]
-        if let Err(e) =
-            infra::table::alert_states::set_last_downtime_id(&event.alert_id, Some(downtime_id))
-                .await
+        if !event.is_group()
+            && let Err(e) =
+                infra::table::alert_states::set_last_downtime_id(&event.alert_id, Some(downtime_id))
+                    .await
         {
             log::warn!(
                 "[RECOVERY] could not record the downtime of {}: {e}",
@@ -210,7 +246,8 @@ async fn send_slack_recovered(alert: &Alert, event: &RecoveryEvent) {
 /// Correlated alerts: the incident owns the resolve because it sent the trigger.
 fn recovery_route(alert: &Alert, event: &RecoveryEvent, muted: bool) -> RecoveryRoute {
     RecoveryRoute {
-        oncall: !muted,
+        // On-call pages per alert; the clear run recovers it once no group fires.
+        oncall: !muted && !event.is_group(),
         destinations: !muted && alert.notify_on_recovery && event.incident_id.is_none(),
         slack: !muted,
     }
@@ -244,19 +281,7 @@ async fn recovery_downtime(alert: &Alert, event: &RecoveryEvent) -> Option<Strin
     {
         return None;
     }
-    let alert_id = alert.id?;
-    let conn = infra::db::get_orm_client_ro().await;
-    let folder_id = match crate::alerts::alert::get_by_id(conn, &event.org_id, alert_id).await {
-        Ok((folder, _)) => folder.folder_id,
-        Err(e) => {
-            log::warn!(
-                "[RECOVERY] folder of {}/{} unreadable for the downtime check: {e}",
-                event.org_id,
-                event.alert_id
-            );
-            return None;
-        }
-    };
+    let folder_id = alert_folder_id(alert).await?;
     let recorded = recorded_downtime(&event.alert_id).await;
     downtime_at(alert, &folder_id, recorded.as_deref(), event.recovered_at).await
 }
@@ -264,6 +289,79 @@ async fn recovery_downtime(alert: &Alert, event: &RecoveryEvent) -> Option<Strin
 #[cfg(not(feature = "enterprise"))]
 async fn recovery_downtime(_alert: &Alert, _event: &RecoveryEvent) -> Option<String> {
     None
+}
+
+/// Read once per batch, and only when some recovery of it can still be inside a window.
+#[cfg(feature = "enterprise")]
+async fn group_recovery_folder(alert: &Alert, events: &[RecoveryEvent]) -> Option<String> {
+    let in_window = events.iter().any(|event| {
+        crate::alerts::downtimes::any_since(&event.org_id, TargetModule::Alerts, event.recovered_at)
+    });
+    if !in_window {
+        return None;
+    }
+    alert_folder_id(alert).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn group_recovery_folder(_alert: &Alert, _events: &[RecoveryEvent]) -> Option<String> {
+    None
+}
+
+/// A group is muted by its own labels at `recovered_at`, never by the rollup's recorded mute.
+#[cfg(feature = "enterprise")]
+async fn group_recovery_downtime(
+    alert: &Alert,
+    folder_id: Option<&str>,
+    event: &RecoveryEvent,
+) -> Option<String> {
+    use config::utils::json::{Map, Value};
+
+    if !crate::alerts::downtimes::any_since(&event.org_id, TargetModule::Alerts, event.recovered_at)
+    {
+        return None;
+    }
+    let row: Map<String, Value> = event
+        .group_label_set
+        .iter()
+        .flatten()
+        .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+        .collect();
+    crate::alerts::scheduler::handlers::group_downtimes(
+        alert,
+        folder_id?,
+        &[row],
+        event.recovered_at,
+    )
+    .await
+    .into_values()
+    .next()
+    .map(|downtime| downtime.id)
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn group_recovery_downtime(
+    _alert: &Alert,
+    _folder_id: Option<&str>,
+    _event: &RecoveryEvent,
+) -> Option<String> {
+    None
+}
+
+#[cfg(feature = "enterprise")]
+async fn alert_folder_id(alert: &Alert) -> Option<String> {
+    let conn = infra::db::get_orm_client_ro().await;
+    match crate::alerts::alert::get_by_id(conn, &alert.org_id, alert.id?).await {
+        Ok((folder, _)) => Some(folder.folder_id),
+        Err(e) => {
+            log::warn!(
+                "[RECOVERY] folder of {}/{} unreadable for the downtime check: {e}",
+                alert.org_id,
+                alert.name
+            );
+            None
+        }
+    }
 }
 
 /// The muted firing's downtime carries its row identity; the clear run has no rows of its own.
@@ -341,6 +439,26 @@ mod tests {
             keep_firing_for_secs: 0,
             episode_id: None,
         }
+    }
+
+    #[test]
+    fn a_group_recovery_reaches_destinations_but_never_on_call() {
+        let mut alert = Alert::default();
+        alert.notify_on_recovery = true;
+        let mut state = AlertState::empty("a1", "host=a");
+        apply_episode(&mut state, true, &delivered(), 10, || "ep_1".into());
+        let closed = apply_episode(&mut state, false, &EpisodeInput::undelivered(0), 20, || {
+            "x".into()
+        })
+        .unwrap();
+        let event = recovery_event("default", &state, closed, 20);
+        assert_eq!(
+            recovery_route(&alert, &event, false),
+            RecoveryRoute {
+                oncall: false,
+                destinations: true
+            }
+        );
     }
 
     #[test]
@@ -511,6 +629,9 @@ mod tests {
             last_notified_level: None,
             group_labels: None,
             firing_started_at: None,
+            reason: Default::default(),
+            group_label_set: None,
+            value: None,
         };
 
         assert!(any_target_since(

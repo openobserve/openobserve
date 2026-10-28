@@ -337,10 +337,6 @@ pub enum AlertError {
         platform: String,
     },
     #[error(
-        "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
-    )]
-    RecoveryOnMultiAlert,
-    #[error(
         "notification grouping batches several alerts into one message, which cannot carry this alert's correlation key — turn off one of grouping or notify_on_recovery"
     )]
     RecoveryWithNotificationGrouping,
@@ -538,11 +534,7 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         }
     }
 
-    // Both keep the alert out of the single-row path that owns the episode, so recovery would be
-    // stored and then silently never sent.
-    if alert.query_condition.multi_alert_enabled() {
-        return Err(AlertError::RecoveryOnMultiAlert);
-    }
+    // A batch carries no single alert's correlation key, so its recovery could close nothing.
     if alert
         .deduplication
         .as_ref()
@@ -3070,12 +3062,13 @@ pub async fn send_recovery_notification(
         Some(event.opened_at),
         event.recovered_at,
         Some(config::meta::alerts::level::AlertLevel::Ok),
-        None,
-        None,
+        event.value,
+        event.group_label_set.as_ref(),
         Some(event.episode_id.clone()),
         true,
     )
     .await;
+    ctx.recovery_reason = event.reason.as_str().to_string();
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
         Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
@@ -4415,6 +4408,7 @@ async fn build_notification_context(
         }
         .to_string(),
         episode_id,
+        recovery_reason: String::new(),
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
         alert_threshold_crit: if alert.query_condition.promql_rule_mode {
@@ -5463,6 +5457,27 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_multi_alert_with_recovery_saves_but_not_with_notification_grouping() {
+        let mut alert = Alert::default();
+        alert.notify_on_recovery = true;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        assert!(validate_recovery_templates("default", &alert).await.is_ok());
+
+        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
+            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
+                enabled: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        assert!(matches!(
+            validate_recovery_templates("default", &alert).await,
+            Err(AlertError::RecoveryWithNotificationGrouping)
+        ));
+    }
 
     #[test]
     fn email_body_is_html_only_without_text() {

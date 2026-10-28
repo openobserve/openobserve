@@ -241,6 +241,7 @@ mod m20261025_000003_add_mute_targets_to_downtimes;
 mod m20261025_000004_create_slack_alert_messages;
 mod m20261025_000005_add_held_action_to_slack_link_requests;
 mod m20261026_000001_backfill_v1_rca_pointer;
+mod m20261028_000001_add_group_label_set_to_alert_states;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -457,6 +458,9 @@ pub(crate) async fn create_alert_states_for_test(
         .up(&manager)
         .await?;
     m20261025_000001_add_firing_started_at_to_alert_states::Migration
+        .up(&manager)
+        .await?;
+    m20261028_000001_add_group_label_set_to_alert_states::Migration
         .up(&manager)
         .await
 }
@@ -725,6 +729,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261025_000003_add_mute_targets_to_downtimes::Migration),
             Box::new(m20261025_000004_create_slack_alert_messages::Migration),
             Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
+            Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
         ]
     }
 }
@@ -816,6 +821,7 @@ mod tests {
             126,
             "m20261025_000005_add_held_action_to_slack_link_requests",
         ),
+        (127, "m20261028_000001_add_group_label_set_to_alert_states"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -913,6 +919,10 @@ mod tests {
             (
                 "m20260725_000001_create_alert_states_tables",
                 "m20260924_000001_add_recovery_episode_columns",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261028_000001_add_group_label_set_to_alert_states",
             ),
             (
                 "m20250109_092400_recreate_tables_with_ksuids",
