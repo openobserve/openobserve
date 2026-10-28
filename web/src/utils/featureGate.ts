@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nKey } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 export type FeatureState = "enabled" | "locked" | "hidden";
@@ -23,13 +22,13 @@ export type FeatureStates = Partial<Record<string, FeatureState>>;
 
 const LICENSE_FEATURE_NOT_ENTITLED = 40001;
 
-// Label and icon mirror each feature's own nav entry.
-export const LOCKED_FEATURES: Partial<Record<string, { labelKey: I18nKey; icon: IconName }>> = {
-  workflows: { labelKey: "menu.workflows", icon: "schema" },
-  oncall: { labelKey: "menu.onCall", icon: "notifications-active" },
-  incidents: { labelKey: "menu.incidents", icon: "notifications-active" },
-  ai_assistant: { labelKey: "menu.aiAssistant", icon: "auto-awesome" },
-  ai_observability: { labelKey: "aiObservability.title", icon: "auto-awesome" },
+// Icon mirrors each feature's own nav entry.
+export const LOCKED_FEATURES: Partial<Record<string, { icon: IconName }>> = {
+  workflows: { icon: "schema" },
+  oncall: { icon: "notifications-active" },
+  incidents: { icon: "notifications-active" },
+  ai_assistant: { icon: "auto-awesome" },
+  ai_observability: { icon: "auto-awesome" },
 };
 
 interface RejectedResponse {

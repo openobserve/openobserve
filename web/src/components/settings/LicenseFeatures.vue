@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <div class="flex flex-wrap gap-1.5" data-test="settings-license-features-unlocked">
           <OBadge v-for="key in split.unlocked" :key="key" variant="success-soft" icon="check">
-            {{ raw(key) }}
+            {{ raw(name(key)) }}
           </OBadge>
         </div>
       </div>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="settings-license-features-missing"
         >
           <OBadge v-for="key in split.missing" :key="key" variant="default-outline" icon="lock">
-            {{ raw(key) }}
+            {{ raw(name(key)) }}
           </OBadge>
           <OButton
             variant="ghost-primary"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :icon="split.addedLocked.includes(key) ? 'lock' : undefined"
             :dot="!split.addedLocked.includes(key)"
           >
-            {{ raw(key) }}
+            {{ raw(name(key)) }}
           </OBadge>
           <OButton
             v-if="split.addedLocked.length"
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary shrink-0"
             />
             <span v-else class="bg-border-strong size-1.5 shrink-0 rounded-full" />
-            <span class="min-w-0 truncate" :title="raw(key)">{{ raw(key) }}</span>
+            <span class="min-w-0 truncate" :title="raw(name(key))">{{ raw(name(key)) }}</span>
           </li>
         </ul>
       </div>
@@ -228,6 +228,7 @@ type GroupId = "unlocked" | "missing" | "free" | "new";
 type FilterId = "all" | GroupId;
 
 interface FeatureDefinition {
+  display_name?: string;
   gate?: boolean;
   plumbing?: boolean;
 }
@@ -246,6 +247,12 @@ const store = useStore();
 const expanded = ref(false);
 const search = ref("");
 const filter = ref<FilterId>("all");
+
+// A key this build has no name for may still be named in the definition the license was issued with.
+const name = (key: string): string =>
+  store.state.zoConfig?.feature_names?.[key] ??
+  props.license?.feature_definition?.features?.[key]?.display_name ??
+  key;
 
 const split = computed(() => {
   const license = props.license;
@@ -321,7 +328,9 @@ const visibleGroups = computed(() => {
     .filter((group) => filter.value === "all" || filter.value === group.id)
     .map((group) => ({
       ...group,
-      items: group.items.filter((key) => key.toLowerCase().includes(query)),
+      items: group.items.filter(
+        (key) => key.toLowerCase().includes(query) || name(key).toLowerCase().includes(query),
+      ),
     }))
     .filter((group) => group.items.length);
 });
