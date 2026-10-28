@@ -14,15 +14,39 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import modelPricing from "./model_pricing";
+import modelPricing, { type BuiltInPricingResponse, type UnpricedModel } from "./model_pricing";
 import { modelPricingKeys } from "./model_pricing.querykeys";
-import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const modelPricingQuery = (org: string) =>
   queryOptions({
     queryKey: modelPricingKeys.list(org),
     queryFn: async (): Promise<any[]> => (await modelPricing.list(org)).data ?? [],
     staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The built-in price list with its seed date and last online sync time. */
+export const builtInPricingQuery = (org: string) =>
+  queryOptions({
+    queryKey: modelPricingKeys.builtIn(org),
+    queryFn: async (): Promise<BuiltInPricingResponse | null> =>
+      (await modelPricing.getBuiltIn(org))?.data ?? null,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Models in a stream's spans between the µs bounds that have no price or an approximate one. */
+export const unpricedModelsQuery = (org: string, stream: string, start: number, end: number) =>
+  queryOptions({
+    queryKey: modelPricingKeys.unpriced(org, stream, start, end),
+    queryFn: async (): Promise<UnpricedModel[]> =>
+      (
+        await modelPricing.listUnpriced(org, {
+          stream_name: stream,
+          start_time: start,
+          end_time: end,
+        })
+      )?.data?.models ?? [],
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

@@ -90,10 +90,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
       </template>
+      <template v-if="builtInStatus" #subnav>
+        <div
+          class="px-page-edge text-text-secondary flex items-center gap-1.5 py-1.5 text-xs"
+          data-test="model-pricing-built-in-status"
+        >
+          <OIcon name="info-outline" size="xs" class="shrink-0" />
+          <span>{{ builtInStatus }}</span>
+        </div>
+      </template>
 
       <!-- List Table -->
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+        <UnpricedModelsTab
+          v-if="selectedTab === 'unpriced'"
+          v-model:stream="unpricedStream"
+          :models="unpricedModels"
+          :loading="unpricedQuery.isLoading.value"
+          :fetching="unpricedQuery.isFetching.value"
+          :last-run-at="unpricedQuery.dataUpdatedAt.value"
+          :streams="unpricedStreams"
+          :streams-loaded="unpricedStreamsLoaded"
+          @refresh="refreshUnpriced"
+        >
+          <template #tabs>
+            <AppTabs
+              class="tabs-selection-container"
+              mobile-dropdown
+              :tabs="tabOptions"
+              v-model:active-tab="selectedTab"
+              @update:active-tab="onTabChange"
+            />
+          </template>
+        </UnpricedModelsTab>
         <OTable
+          v-else
           ref="qTableRef"
           :frame="false"
           data-test="model-pricing-list-table"
@@ -693,7 +724,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { useQuery } from "@tanstack/vue-query";
-import { modelPricingQuery } from "@/services/model_pricing.queries";
+import {
+  builtInPricingQuery,
+  modelPricingQuery,
+  unpricedModelsQuery,
+} from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
@@ -723,6 +758,9 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
+import UnpricedModelsTab from "@/components/settings/UnpricedModelsTab.vue";
+import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -764,6 +802,84 @@ const dropPricingDrafts = (ids: string[]) => {
     deleteEditorDraftsFor({ kind: "model_pricing", org, entityId: id, variant: `duplicate:${id}` });
   }
 };
+
+// ── Built-in price list status (header note) ────────────────────────────────
+const builtInQuery = useQuery(() =>
+  Object.assign(builtInPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
+);
+
+/** How old the built-in prices are, and whether this server has synced them online. */
+const builtInStatus = computed(() => {
+  const info = builtInQuery.data.value;
+  if (!info?.seed_date) return "";
+  const seed = t("modelPricing.builtInStatus.seed", { date: info.seed_date });
+  const sync = info.last_updated
+    ? t("modelPricing.builtInStatus.lastSynced", {
+        time: timestampToTimezoneDate(
+          info.last_updated * 1000,
+          store.state.timezone || "UTC",
+          "yyyy-MM-dd HH:mm ZZZZ",
+        ),
+      })
+    : t("modelPricing.builtInStatus.neverSynced");
+  return raw(`${seed} ${sync}`);
+});
+
+// ── Unpriced / approximate tab ──────────────────────────────────────────────
+// Read here, not in the tab, because the tab label carries the row count.
+const UNPRICED_WINDOW_US = 24 * 60 * 60 * 1_000_000;
+const lastDayWindow = () => {
+  const end = Date.now() * 1000;
+  return { start: end - UNPRICED_WINDOW_US, end };
+};
+const unpricedStream = ref("");
+// Fixed when set, so the query key stays stable until a refresh moves it.
+const unpricedWindow = ref(lastDayWindow());
+const {
+  availableStreams: unpricedStreams,
+  streamsLoaded: unpricedStreamsLoaded,
+  ensureStreamsLoaded,
+  loadTraceStreams,
+} = useLlmTraceStreams(unpricedStream, t);
+// The kept-alive page outlives an org switch; the stream names belong to the old org.
+watch(orgIdentifier, () => loadTraceStreams());
+
+const unpricedQuery = useQuery(() =>
+  Object.assign(
+    unpricedModelsQuery(
+      orgIdentifier.value,
+      unpricedStream.value,
+      unpricedWindow.value.start,
+      unpricedWindow.value.end,
+    ),
+    { enabled: !!orgIdentifier.value && !!unpricedStream.value },
+  ),
+);
+const unpricedModels = computed(() => unpricedQuery.data.value ?? []);
+
+function refreshUnpriced() {
+  unpricedWindow.value = lastDayWindow();
+}
+
+watch(unpricedQuery.error, (e) => {
+  if (e) notifyError(t("modelPricing.unpriced.errLoad"), e);
+});
+
+/** `?tab=unpriced[&stream=<name>]` opens the tab, as Insights and data-health links do. */
+function applyRouteTab() {
+  const { tab, stream } = router.currentRoute.value.query;
+  if (tab !== "unpriced") return;
+  selectedTab.value = "unpriced";
+  if (typeof stream === "string" && stream) {
+    // Before the list loads, the loader keeps a valid name and clamps an unknown one.
+    if (!unpricedStreamsLoaded.value || unpricedStreams.value.includes(stream)) {
+      unpricedStream.value = stream;
+    }
+  }
+  // A link back into a kept-alive page should show the last 24 h from now; mount
+  // and its first activation both land here, so only a stale window moves.
+  if (Date.now() * 1000 - unpricedWindow.value.end > 60_000_000) refreshUnpriced();
+}
 
 const modelsQuery = useQuery(() =>
   Object.assign(modelPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
@@ -860,6 +976,14 @@ const tabOptions = computed(() => [
   { label: t("modelPricing.tabAll"), value: "all", icon: "format-list-bulleted" },
   { label: t("modelPricing.tabCustom"), value: "org", icon: "tune" },
   { label: t("modelPricing.tabSystem"), value: "inherited", icon: "business" },
+  {
+    // The count waits for the first read, so the label never shows a guessed 0.
+    label: unpricedQuery.data.value
+      ? t("modelPricing.unpriced.tabWithCount", { count: unpricedModels.value.length })
+      : t("modelPricing.unpriced.tab"),
+    value: "unpriced",
+    icon: "attach-money",
+  },
 ]);
 
 function onTabChange() {
@@ -1196,7 +1320,7 @@ async function refreshBuiltIn() {
       variant: "success",
       message: t("modelPricing.builtInPricesSynced"),
     });
-    await fetchModels(true);
+    await Promise.all([fetchModels(true), builtInQuery.refetch()]);
   } catch (e: any) {
     notifyError(t("modelPricing.errSync"), e);
   } finally {
@@ -1277,6 +1401,8 @@ onBeforeMount(() => {
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }
+  applyRouteTab();
+  ensureStreamsLoaded();
 });
 
 onActivated(() => {
@@ -1284,6 +1410,7 @@ onActivated(() => {
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }
+  applyRouteTab();
 });
 
 useShortcuts([

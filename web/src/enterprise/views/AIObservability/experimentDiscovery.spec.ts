@@ -124,6 +124,7 @@ describe("experiment discovery", () => {
       completedSlots: 1,
       totalSlots: 2,
       cost: null,
+      costIncomplete: false,
       scores: [
         { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
         { name: "approved", kind: "boolean", trueCount: 1, falseCount: 1, sampleCount: 2 },

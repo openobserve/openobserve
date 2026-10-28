@@ -879,7 +879,17 @@ const headerTitle = computed(() =>
   isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
 );
 
-const model = ref<any>(createEmptyModel());
+/** A new model can open prefilled through `?name=&match_pattern=`, as the Unpriced tab's Create price does. */
+function prefilledNewModel() {
+  const empty = createEmptyModel();
+  if (route.query.id) return empty;
+  const { name, match_pattern } = route.query;
+  if (typeof name === "string") empty.name = name;
+  if (typeof match_pattern === "string") empty.match_pattern = match_pattern;
+  return empty;
+}
+
+const model = ref<any>(prefilledNewModel());
 
 // Dynamic defaults (edit-prefill projects the working model) → a typed computed.
 // `model.value` holds the API-shaped record (per-token price MAP); the form holds

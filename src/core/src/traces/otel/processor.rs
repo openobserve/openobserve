@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use config::{
     meta::{
         gen_ai::GenAiAgentMappingConfig,
-        model_pricing::{ModelPricingDefinition, PricingContext},
+        model_pricing::{CostStatus, MatchKind, ModelPricingDefinition, PricingContext},
     },
     utils::{json, time::parse_timestamp_micro_from_value},
 };
@@ -167,7 +167,7 @@ impl OtelIngestionProcessor {
             .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
 
         // Phase 2: Compute derived values — token counts, cost estimates, defaults.
-        let (usage, cost) = self.compute_usage_and_cost(
+        let (usage, cost, cost_status) = self.compute_usage_and_cost(
             &extracted,
             span_attributes,
             resource_attributes,
@@ -176,7 +176,7 @@ impl OtelIngestionProcessor {
         );
 
         // Phase 3: Write enriched attributes back to the span.
-        self.emit_enriched_attributes(span_attributes, &extracted, &usage, &cost);
+        self.emit_enriched_attributes(span_attributes, &extracted, &usage, &cost, cost_status);
     }
 
     // ── Phase 1: Extract raw data ──────────────────────────────────────────
@@ -260,6 +260,8 @@ impl OtelIngestionProcessor {
 
     // ── Phase 2: Compute usage, cost, and defaults ─────────────────────────
 
+    /// Returns token usage, cost components and, for a model priced only approximately or not
+    /// at all, its [`CostStatus`]. An unpriced span gets no cost entries, not a zero total.
     fn compute_usage_and_cost(
         &self,
         extracted: &SpanExtractions,
@@ -267,10 +269,15 @@ impl OtelIngestionProcessor {
         resource_attributes: &HashMap<String, json::Value>,
         org_pricing_entries: &[CachedModelPricing],
         span_start_nanos: u64,
-    ) -> (HashMap<String, i64>, HashMap<String, f64>) {
+    ) -> (
+        HashMap<String, i64>,
+        HashMap<String, f64>,
+        Option<CostStatus>,
+    ) {
         let mut usage = extracted.usage.clone();
         let mut cost = extracted.cost.clone();
         let mut input_includes_cache = extracted.input_includes_cache;
+        let mut cost_status = None;
 
         if is_generation_or_embedding(extracted.op_name) {
             // Zero means the payload carried no start time; treat it as unknown rather
@@ -306,41 +313,52 @@ impl OtelIngestionProcessor {
 
             // Resolve only for spans without a client-reported cost; the lookup runs regexes.
             if cost.is_empty()
-                && let Some(resolved) = extracted.model_name.as_ref().and_then(|mn| {
-                    crate::db::model_pricing::find_pricing_sync_at(
-                        org_pricing_entries,
-                        mn,
-                        span_ts_micros,
-                    )
-                })
+                && let Some(model_name) = extracted.model_name.as_deref()
             {
-                let pricing_def = &resolved.definition;
-                let ctx = pricing_context(
-                    pricing_def,
-                    span_attributes,
-                    resource_attributes,
-                    &extracted.model_params,
+                let resolved = crate::db::model_pricing::find_pricing_sync_at(
+                    org_pricing_entries,
+                    model_name,
+                    span_ts_micros,
                 );
-                let result =
-                    crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                let mut priced = false;
+                if let Some(resolved) = resolved {
+                    let pricing_def = &resolved.definition;
+                    let ctx = pricing_context(
                         pricing_def,
-                        &billable_usage,
-                        &tier_usage,
-                        span_ts_micros,
-                        &ctx,
+                        span_attributes,
+                        resource_attributes,
+                        &extracted.model_params,
                     );
-                if !result.cost.is_empty() {
-                    log::debug!(
-                        "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
-                        extracted.model_name.as_deref().unwrap_or(""),
-                        pricing_def.match_pattern,
-                        resolved.match_kind,
-                        result.tier_name,
-                        result.cost.get("total").copied().unwrap_or(0.0),
-                    );
-                    cost = result.cost;
-                    add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
-                    cost.values_mut().for_each(|v| *v = round_cost(*v));
+                    let result =
+                        crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                            pricing_def,
+                            &billable_usage,
+                            &tier_usage,
+                            span_ts_micros,
+                            &ctx,
+                        );
+                    // A selected tier prices the span even when its cost is zero (no tokens,
+                    // or a free model); only "no definition / no tier" is unpriced.
+                    priced = result.tier_index.is_some();
+                    if priced && resolved.match_kind == MatchKind::Approximate {
+                        cost_status = Some(CostStatus::Approximate);
+                    }
+                    if !result.cost.is_empty() {
+                        log::debug!(
+                            "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
+                            model_name,
+                            pricing_def.match_pattern,
+                            resolved.match_kind,
+                            result.tier_name,
+                            result.cost.get("total").copied().unwrap_or(0.0),
+                        );
+                        cost = result.cost;
+                        add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                        cost.values_mut().for_each(|v| *v = round_cost(*v));
+                    }
+                }
+                if !priced {
+                    cost_status = Some(CostStatus::Unpriced);
                 }
             }
         }
@@ -363,13 +381,14 @@ impl OtelIngestionProcessor {
             usage.insert("total".to_string(), input + cache_input + output);
         }
 
-        // Ensure cost total (sum all components, not just input+output).
-        if !cost.contains_key("total") {
+        // Ensure cost total (sum all components, not just input+output). An unpriced span keeps
+        // no cost at all so readers can tell "no price" from "free".
+        if cost_status != Some(CostStatus::Unpriced) && !cost.contains_key("total") {
             let total = actual_cost_total(&cost);
             cost.insert("total".to_string(), total);
         }
 
-        (usage, cost)
+        (usage, cost, cost_status)
     }
 
     // ── Phase 3: Emit enriched attributes ──────────────────────────────────
@@ -380,6 +399,7 @@ impl OtelIngestionProcessor {
         extracted: &SpanExtractions,
         usage: &HashMap<String, i64>,
         cost: &HashMap<String, f64>,
+        cost_status: Option<CostStatus>,
     ) {
         span_attributes.insert(
             GenAiAttributes::OPERATION_NAME.to_string(),
@@ -512,6 +532,19 @@ impl OtelIngestionProcessor {
         if let Some(&v) = cost.get("total") {
             insert_if_absent(span_attributes, GenAiAttributes::USAGE_COST, json::json!(v));
         }
+        if let Some(status) = cost_status {
+            if status == CostStatus::Unpriced {
+                // A client-sent zero is not a price; leave the cost null.
+                span_attributes.remove(GenAiAttributes::USAGE_COST);
+            }
+            span_attributes.insert(
+                GenAiExtensions::USAGE_COST_STATUS.to_string(),
+                json::json!(status.as_str()),
+            );
+        } else {
+            // Only ingest sets the marker; a client-sent value would fake one.
+            span_attributes.remove(GenAiExtensions::USAGE_COST_STATUS);
+        }
 
         if let Some(uid) = &extracted.user_id {
             span_attributes.insert(OtelAttributes::USER_ID.to_string(), json::json!(uid));
@@ -524,20 +557,27 @@ impl OtelIngestionProcessor {
             );
         }
 
-        if let Some(pname) = &extracted.prompt_name {
-            span_attributes.insert(GenAiAttributes::PROMPT_NAME.to_string(), json::json!(pname));
-        }
-        if let Some(version) = extracted.prompt_version {
-            span_attributes.insert(
-                GenAiAttributes::PROMPT_VERSION.to_string(),
-                json::json!(version),
-            );
-        }
-        if let Some(label) = &extracted.prompt_label {
-            span_attributes.insert(
-                GenAiAttributes::PROMPT_LABEL.to_string(),
-                json::json!(label),
-            );
+        // The raw prompt reference survives extraction; replace it with the normalised value,
+        // or drop it when the extractor rejected it (a non-string name, a version that is not a
+        // positive integer), so `gen_ai_prompt_version` stays an Int64 column.
+        for (key, value) in [
+            (
+                GenAiAttributes::PROMPT_NAME,
+                extracted.prompt_name.as_deref().map(|v| json::json!(v)),
+            ),
+            (
+                GenAiAttributes::PROMPT_VERSION,
+                extracted.prompt_version.map(|v| json::json!(v)),
+            ),
+            (
+                GenAiAttributes::PROMPT_LABEL,
+                extracted.prompt_label.as_deref().map(|v| json::json!(v)),
+            ),
+        ] {
+            match value {
+                Some(value) => span_attributes.insert(key.to_string(), value),
+                None => span_attributes.remove(key),
+            };
         }
 
         // TTFT: convert microseconds → Float64 seconds.
@@ -1234,6 +1274,51 @@ mod tests {
     }
 
     #[test]
+    fn process_span_replaces_or_drops_raw_prompt_reference() {
+        let processor = OtelIngestionProcessor::new();
+        // Rejected by the extractor: a non-numeric version and a non-string name.
+        let mut rejected = HashMap::from([
+            (GenAiAttributes::PROMPT_NAME.to_string(), json::json!(42)),
+            (
+                GenAiAttributes::PROMPT_VERSION.to_string(),
+                json::json!("latest"),
+            ),
+            (
+                GenAiAttributes::PROMPT_LABEL.to_string(),
+                json::json!("production"),
+            ),
+        ]);
+        processor.process_span(&mut rejected, &HashMap::new(), None, &[]);
+        assert!(!rejected.contains_key(GenAiAttributes::PROMPT_VERSION));
+        assert!(!rejected.contains_key(GenAiAttributes::PROMPT_NAME));
+        assert_eq!(
+            rejected.get(GenAiAttributes::PROMPT_LABEL),
+            Some(&json::json!("production"))
+        );
+
+        // A numeric string version is stored as the integer it names.
+        let mut accepted = HashMap::from([
+            (
+                GenAiAttributes::PROMPT_NAME.to_string(),
+                json::json!("support-answer"),
+            ),
+            (
+                GenAiAttributes::PROMPT_VERSION.to_string(),
+                json::json!("3"),
+            ),
+        ]);
+        processor.process_span(&mut accepted, &HashMap::new(), None, &[]);
+        assert_eq!(
+            accepted.get(GenAiAttributes::PROMPT_VERSION),
+            Some(&json::json!(3))
+        );
+        assert_eq!(
+            accepted.get(GenAiAttributes::PROMPT_NAME),
+            Some(&json::json!("support-answer"))
+        );
+    }
+
+    #[test]
     fn test_process_span_calculates_cost_from_tokens() {
         let processor = OtelIngestionProcessor::new();
 
@@ -1508,38 +1593,77 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_process_span_no_cost_calculation_for_unknown_model() {
-        let processor = OtelIngestionProcessor::new();
-
+    fn chat_span(model: &str) -> HashMap<String, json::Value> {
         let mut span_attrs = HashMap::new();
         span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
-        span_attrs.insert(
-            "gen_ai.request.model".to_string(),
-            json::json!("unknown-model-xyz-2024"),
-        );
-        span_attrs.insert(
-            "gen_ai.input.messages".to_string(),
-            json::json!("[{\"role\":\"user\"}]"),
-        );
-        span_attrs.insert(
-            "gen_ai.output.messages".to_string(),
-            json::json!("[{\"role\":\"assistant\"}]"),
-        );
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!(model));
         span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
         span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+        span_attrs
+    }
 
-        let resource_attrs = HashMap::new();
-        let events = vec![];
+    fn cost_status(span_attrs: &HashMap<String, json::Value>) -> Option<&str> {
+        span_attrs
+            .get(GenAiExtensions::USAGE_COST_STATUS)
+            .and_then(|v| v.as_str())
+    }
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+    #[test]
+    fn test_unpriced_model_keeps_tokens_and_has_no_cost() {
+        let processor = OtelIngestionProcessor::new();
+        let mut span_attrs = chat_span("unknown-model-xyz-2024");
+        // A client-sent zero is not a price either.
+        span_attrs.insert("gen_ai.usage.cost".to_string(), json::json!(0));
 
-        // No pricing definition matched for unknown model — total cost should be zero.
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(cost_status(&span_attrs), Some("unpriced"));
+        assert!(!span_attrs.contains_key(GenAiAttributes::USAGE_COST));
+        assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_INPUT));
+        assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_OUTPUT));
         assert_eq!(
-            span_attrs
+            span_attrs.get(GenAiAttributes::USAGE_TOTAL_TOKENS),
+            Some(&json::json!(1500))
+        );
+    }
+
+    #[test]
+    fn test_approximate_match_keeps_cost_and_is_marked() {
+        let processor = OtelIngestionProcessor::new();
+        // `(?i)claude-sonnet-4-6` covers only the start of the dated name.
+        let mut span_attrs = chat_span("claude-sonnet-4-6-20260101");
+
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(cost_status(&span_attrs), Some("approximate"));
+        let total = span_attrs
+            .get(GenAiAttributes::USAGE_COST)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        assert!((total - (1000.0 * 3e-06 + 500.0 * 1.5e-05)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_exact_match_and_client_cost_write_no_marker() {
+        let processor = OtelIngestionProcessor::new();
+        let mut exact = chat_span("gpt-4o");
+        exact.insert(
+            "gen_ai.usage.cost_status".to_string(),
+            json::json!("unpriced"),
+        );
+        processor.process_span(&mut exact, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&exact), None);
+        assert!(exact.contains_key(GenAiAttributes::USAGE_COST));
+
+        let mut client_cost = chat_span("unknown-model-xyz-2024");
+        client_cost.insert("gen_ai.usage.cost".to_string(), json::json!(0.25));
+        processor.process_span(&mut client_cost, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&client_cost), None);
+        assert_eq!(
+            client_cost
                 .get(GenAiAttributes::USAGE_COST)
                 .and_then(|v| v.as_f64()),
-            Some(0.0)
+            Some(0.25)
         );
     }
 

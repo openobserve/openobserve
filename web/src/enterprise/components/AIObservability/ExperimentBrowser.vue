@@ -334,6 +334,7 @@ import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
+  experimentCostDisplay,
   experimentEvidence,
   groupExperiments,
   type ComparisonIneligibilityReason,
@@ -627,8 +628,20 @@ function translateComparisonReason(reason: ComparisonIneligibilityReason) {
 }
 
 function costLabel(experiment: LlmExperiment) {
-  const cost = evidence(experiment).cost;
-  return cost === null ? raw("—") : raw(`$${cost.toFixed(4)}`);
+  const { cost, costIncomplete } = evidence(experiment);
+  const display = experimentCostDisplay(cost, costIncomplete);
+  switch (display.kind) {
+    case "none":
+      return raw("—");
+    case "exact":
+      return raw(`$${display.value.toFixed(4)}`);
+    case "atLeast":
+      return t("aiObservability.experiments.costAtLeast", {
+        cost: `$${display.value.toFixed(4)}`,
+      });
+    case "unknown":
+      return t("aiObservability.experiments.costUnknown");
+  }
 }
 
 function isBaseline(experiment: LlmExperiment) {

@@ -36,7 +36,8 @@ export interface LlmDataset {
   orgId?: string;
   name: string;
   description: string | null;
-  /** Dataset-wide MVCC sequence — bumped on every item insert/edit/delete. */
+  /** Dataset-wide MVCC sequence — bumped once per write request (a batch
+   *  upsert or import is one bump, whatever its item count). */
   globalVersion: number;
   /** Count of live (non-deleted) items. Derived server-side per read; the
    *  Dataset row stores no counter, so this cannot drift. */

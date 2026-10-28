@@ -30,7 +30,7 @@ vi.mock("@/services/gen-ai-agent-mapping.service", async (importOriginal) => {
   };
 });
 
-import { useAgentScope, UNSET } from "./useAgentScope";
+import { useAgentScope, resolveScopeMode, UNSET } from "./useAgentScope";
 
 const t = (k: string) => k;
 
@@ -187,6 +187,57 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     expect(agents.value).toEqual([]);
     expect(scope.activeAgent.value).toBe(ALL_AGENTS_VALUE);
     expect(scope.agentsLoaded.value).toBe(true);
+  });
+
+  it("a failed load is an error, not 'no agents': no empty state, no identity banner", async () => {
+    const filterMode = ref<"stream" | "agent">("stream");
+    const scope = useAgentScope({
+      filterMode,
+      activeStream: ref("stream_a"),
+      availableStreams: ref(["stream_a"]),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      allAgents: true,
+      t,
+    });
+    listAgents.mockRejectedValue(
+      Object.assign(new Error("boom"), { isAxiosError: true, response: { status: 500 } }),
+    );
+    await scope.loadAgents();
+    expect(scope.agentsError.value).toBe("failed");
+    expect(scope.noAgentIdentity.value).toBe(false);
+    filterMode.value = "agent";
+    expect(scope.agentEmpty.value).toBe(false);
+    expect(scope.agentsLoadFailed.value).toBe(true);
+
+    // A load that succeeds clears the error; an empty list is then "no agents".
+    listAgents.mockResolvedValue({ agents: [] });
+    await scope.loadAgents(undefined, undefined, true);
+    expect(scope.agentsError.value).toBeNull();
+    expect(scope.agentsLoadFailed.value).toBe(false);
+    expect(scope.agentEmpty.value).toBe(true);
+    filterMode.value = "stream";
+    expect(scope.noAgentIdentity.value).toBe(true);
+  });
+
+  it("a 403 is reported as forbidden", async () => {
+    const { scope } = makeScope(ref("agent"), ref(""));
+    listAgents.mockRejectedValue(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+    await scope.loadAgents();
+    expect(scope.agentsError.value).toBe("forbidden");
+  });
+});
+
+describe("resolveScopeMode", () => {
+  it("an explicit choice wins; else agents decide; a failed load never picks Stream", () => {
+    expect(resolveScopeMode("stream", 3)).toBe("stream");
+    expect(resolveScopeMode(null, 3)).toBe("agent");
+    expect(resolveScopeMode(null, 0)).toBe("stream");
+    expect(resolveScopeMode(null, 0, "failed")).toBe("agent");
+    expect(resolveScopeMode(null, 0, "forbidden")).toBe("agent");
+    expect(resolveScopeMode("stream", 0, "failed")).toBe("stream");
   });
 });
 

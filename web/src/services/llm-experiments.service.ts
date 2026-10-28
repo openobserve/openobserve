@@ -262,6 +262,8 @@ export interface ExperimentResultRow {
   output: unknown | null;
   scoreSummaries: ExperimentScoreSummary[];
   p50LatencyMs: number | null;
+  /** First line of the most common error across the row's failed trials. */
+  errorMessage: string | null;
   dispersion: ExperimentRowDispersion | null;
 }
 
@@ -350,6 +352,18 @@ export interface ExperimentAggregateSummary {
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
   errorTaskSlots: number;
+  /** Errored slots grouped by error kind + first message line, largest first (top 3). */
+  failureCauses: ExperimentFailureCause[];
+  /** Distinct causes across every errored slot, including those beyond the top 3. */
+  failureCauseCount: number;
+}
+
+export interface ExperimentFailureCause {
+  /** Shared failure taxonomy (`provider_auth`, `timeout`, …); null on older records. */
+  kind: string | null;
+  /** First line of the error message. */
+  message: string;
+  slotCount: number;
 }
 
 export interface ExperimentProgress {
@@ -760,6 +774,16 @@ function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSu
       value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
     ),
     errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
+    failureCauses: (
+      value<any[]>(aggregateSummary, "failureCauses", "failure_causes", []) ?? []
+    ).map((cause) => ({
+      kind: value<string | null>(cause, "kind", "kind", null),
+      message: String(value(cause, "message", "message", "")),
+      slotCount: Number(value(cause, "slotCount", "slot_count", 0)),
+    })),
+    failureCauseCount: Number(
+      value(aggregateSummary, "failureCauseCount", "failure_cause_count", 0),
+    ),
   };
 }
 
@@ -951,6 +975,7 @@ export function normalizeExperimentResultRowPage(input: any): ExperimentResultRo
         normalizeScoreSummary,
       ),
       p50LatencyMs: numberOrNull(value(row, "p50LatencyMs", "p50_latency_ms", null)),
+      errorMessage: value<string | null>(row, "errorMessage", "error_message", null),
       dispersion: row?.dispersion ? normalizeRowDispersion(row.dispersion) : null,
     })),
     pagination: {

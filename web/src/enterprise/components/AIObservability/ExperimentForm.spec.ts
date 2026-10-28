@@ -51,7 +51,10 @@ vi.mock("@/services/llm-datasets.service", async () => ({
   default: { list: vi.fn(), listItems: vi.fn() },
 }));
 vi.mock("@/services/online-evals.service", () => ({
-  default: { scorers: { list: vi.fn() }, providers: { list: vi.fn() } },
+  default: {
+    scorers: { list: vi.fn() },
+    providers: { list: vi.fn(), testConfig: vi.fn().mockResolvedValue("ok") },
+  },
 }));
 vi.mock("@/services/llm-prompts.service", () => ({
   default: { list: vi.fn(), resolve: vi.fn() },

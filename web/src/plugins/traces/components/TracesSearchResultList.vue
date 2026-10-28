@@ -180,11 +180,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-cost="{ row }">
                   <span class="text-text-body font-mono text-xs" data-test="trace-row-cost">
-                    {{
-                      isLLMTrace(row)
-                        ? `$${formatCost(extractLLMData(row)?.cost?.total ?? 0)}`
-                        : "-"
-                    }}
+                    <LLMCostCell
+                      v-if="isLLMTrace(row)"
+                      scope="trace"
+                      :cost="extractLLMData(row)?.cost?.total ?? 0"
+                      :tokens="extractLLMData(row)?.usage?.total ?? 0"
+                      :unpriced-tokens="unpricedFields(row).unpricedTokens"
+                      :unpriced-models="unpricedFields(row).unpricedModels"
+                      :stream="searchObj.data.stream.selectedStream?.value ?? ''"
+                      :format="(c: number) => `$${formatCost(c)}`"
+                    />
+                    <template v-else>-</template>
                   </span>
                 </template>
 
@@ -298,6 +304,8 @@ import SpanErrorCell from "./SpanErrorCell.vue";
 import SpanEventsCell from "./SpanEventsCell.vue";
 import { SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID } from "./spanResultCells";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
+import LLMCostCell from "../LLMCostCell.vue";
+import { unpricedFields } from "../llmDataTrust.utils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { escapeSingleQuotes } from "../../../utils/queryUtils";
 import { severityIndicatorColor } from "@/utils/logs/statusParser";

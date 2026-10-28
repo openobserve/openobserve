@@ -25,4 +25,7 @@ import { orgKey } from "@/composables/query/keys";
 export const modelPricingKeys = {
   all: (org: string) => orgKey(org, "settings", "modelPricing"),
   list: (org: string) => orgKey(org, "settings", "modelPricing"),
+  builtIn: (org: string) => orgKey(org, "settings", "modelPricing", "builtIn"),
+  unpriced: (org: string, stream: string, start: number, end: number) =>
+    orgKey(org, "settings", "modelPricing", "unpriced", stream, start, end),
 };
