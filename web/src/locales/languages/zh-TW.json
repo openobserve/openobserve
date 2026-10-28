@@ -5754,6 +5754,7 @@
       "providerNameRum": "真實使用者監控",
       "quickInstallDesc": "使用**單一命令**安裝 OpenObserve collector — 只要設定您的叢集名稱並執行即可。此名稱會為每筆記錄加上標籤，讓您在多個叢集回報時能區分它們。",
       "quickInstallTitle": "快速安裝（建議）",
+      "dbInstallerMetricsOnlyNote": "此指令僅收集指標。下方的 **資料庫監控** 步驟僅適用於「指標 + 資料庫監控」指令；若要套用這些步驟，請先切換至該指令。",
       "dbInstallerDbmNote": "在執行此命令之前，請先完成下方的 **資料庫監控** 步驟：收集器從首次啟動起就需要這些步驟所設定的存取權限與日誌記錄。已經執行過了嗎？請完成那些步驟，然後使用相同的服務名稱再次執行此命令；這會就地更新已安裝的收集器。",
       "dbInstallerDbmVariant": "指標 + 資料庫監控",
       "dbInstallerMysqlLogPathHelp": "收集器必須能夠讀取此檔案。通常是 `/var/log/mysql/error.log`，在 RHEL 上則是 `/var/log/mariadb/mariadb.log`。可用下列方式找到它：SHOW VARIABLES LIKE 'log_error';",
