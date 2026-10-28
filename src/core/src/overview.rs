@@ -247,8 +247,7 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
     })
 }
 
-/// Overview when grants cannot be resolved; alerts still load because they check their own
-/// permissions.
+/// Overview when grants cannot be resolved; alerts still load on their own permission check.
 pub async fn scope_unavailable(org_id: &str, user_id: &str) -> Overview {
     Overview {
         streams: Section::error("failed to resolve permissions"),
@@ -499,7 +498,7 @@ fn build_pipelines_data(pipelines: &[Pipeline], errored: &HashSet<String>) -> Pi
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 async fn limits_section() -> Section<LimitsData> {
     use o2_enterprise::enterprise::license::{
         ingestion_limit_exceeded_count, ingestion_used, license_expired,
@@ -513,7 +512,7 @@ async fn limits_section() -> Section<LimitsData> {
     })
 }
 
-#[cfg(not(feature = "enterprise"))]
+#[cfg(any(not(feature = "enterprise"), feature = "cloud"))]
 async fn limits_section() -> Section<LimitsData> {
     Section::locked("not available in this edition")
 }
@@ -655,7 +654,7 @@ mod tests {
         assert_eq!(err, serde_json::json!({"status": "error", "error": "boom"}));
     }
 
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(any(not(feature = "enterprise"), feature = "cloud"))]
     #[tokio::test]
     async fn test_limits_locked_without_enterprise() {
         let limits = limits_section().await;

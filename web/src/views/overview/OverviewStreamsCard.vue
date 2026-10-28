@@ -44,10 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4">
       <ul class="flex flex-col" data-test="overview-streams-types">
         <li v-for="type in byType" :key="type.stream_type">
-          <OButton
-            variant="ghost"
-            block
-            class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
+          <OverviewRowButton
             :data-test="`overview-streams-type-${type.stream_type}`"
             @click="emit('open')"
           >
@@ -57,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw("·") }}
               {{ raw(formatSizeFromMB(type.storage_size_mb)) }}
             </span>
-          </OButton>
+          </OverviewRowButton>
         </li>
       </ul>
       <div v-if="topRows.length > 0" data-test="overview-streams-top">
@@ -66,10 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <ul class="flex flex-col">
           <li v-for="row in topRows" :key="`${row.stream_type}-${row.name}`">
-            <OButton
-              variant="ghost"
-              block
-              class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
+            <OverviewRowButton
               :data-test="`overview-streams-top-${row.stream_type}-${row.name}`"
               @click="emit('open')"
             >
@@ -85,9 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     raw(formatSizeFromMB(row.storage_size_mb))
                   }}</span>
                 </span>
-                <OProgressBar :value="sizeShare(row.storage_size_mb, topRows)" size="xs" />
+                <OProgressBar
+                  :value="sizeShare(row.storage_size_mb, topRows)"
+                  size="xs"
+                  :aria-label="row.name"
+                />
               </span>
-            </OButton>
+            </OverviewRowButton>
           </li>
         </ul>
       </div>
@@ -105,6 +103,7 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewSection, OverviewStreamsData } from "@/ts/interfaces/overview";
+import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import { mergeTopStreams, sectionView, sizeShare } from "./overviewFormat";
 
@@ -112,6 +111,7 @@ const props = defineProps<{
   section?: OverviewSection<OverviewStreamsData>;
   pending: boolean;
   failed: boolean;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{ retry: []; open: []; startIngesting: [] }>();

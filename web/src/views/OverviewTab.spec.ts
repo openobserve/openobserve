@@ -155,7 +155,7 @@ const internals = (w: VueWrapper) =>
 const internalsOverview = (w: VueWrapper) =>
   w.vm as unknown as {
     overviewPending: boolean;
-    overviewState: { loading: boolean; loaded: boolean };
+    overviewState: { loading: boolean };
   };
 
 describe("OverviewTab", () => {
@@ -1023,6 +1023,20 @@ describe("OverviewTab", () => {
       expect(refreshLastRun()).not.toBeNull();
     });
 
+    it("should not render the headline strip or the overview cards on the first-run hero", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(HERO).exists()).toBe(true);
+      for (const id of [
+        "overview-headline-strip",
+        "overview-alerts-card",
+        "overview-streams-card",
+      ]) {
+        expect(wrapper.find(`[data-test="${id}"]`).exists()).toBe(false);
+      }
+    });
+
     it("should ask nothing when the first-data notice already probed every type empty", async () => {
       const org = store.state.selectedOrganization.identifier;
       for (const type of ["logs", "metrics", "traces"]) {
@@ -1376,7 +1390,7 @@ describe("OverviewTab", () => {
 
       const note = wrapper.get('[data-test="overview-freshness-note"]').text();
       expect(note).toContain("current state");
-      expect(note).toMatch(/Updated \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+      expect(note).toMatch(/Updated \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(/);
     });
 
     it("should hide the freshness note when /overview failed", async () => {
@@ -1397,6 +1411,7 @@ describe("OverviewTab", () => {
     it.each([
       ["firing alerts", { alerts: { by_state: { firing: 1 }, failed_evaluation: 0 } }],
       ["failing rules", { alerts: { by_state: { firing: 0 }, failed_evaluation: 2 } }],
+      ["notify-failed rules", { alerts: { by_state: { firing: 0, notify_failed: 1 } } }],
       ["pipeline errors", { pipelines: { errored: 1 } }],
     ])("should not render the all-clear hero while %s are reported", async (_n, patch) => {
       const base = buildHealthyOverview();
@@ -1429,22 +1444,111 @@ describe("OverviewTab", () => {
       expect(alertsService.getHistory).toHaveBeenCalledTimes(alertCalls);
     });
 
-    it("should keep loading until the latest overlapping /overview call settles", async () => {
+    it("should send refresh=true for a forced refresh even while a load is in flight", async () => {
       const first = deferred<{ data: unknown }>();
-      vi.mocked(overviewService.getOrgOverview).mockReturnValue(first.promise as never);
+      vi.mocked(overviewService.getOrgOverview)
+        .mockReturnValueOnce(first.promise as never)
+        .mockResolvedValue({ data: buildOverview() } as never);
 
       wrapper = mountOverviewTab();
       await flushPromises();
-      await wrapper.get(REFRESH_BTN).trigger("click");
-      await flushPromises();
-      expect(internalsOverview(wrapper).overviewState.loading).toBe(true);
       expect(internalsOverview(wrapper).overviewPending).toBe(true);
 
-      first.resolve({ data: buildOverview() });
+      await wrapper.get(REFRESH_BTN).trigger("click");
       await flushPromises();
-      expect(internalsOverview(wrapper).overviewState.loading).toBe(false);
-      expect(internalsOverview(wrapper).overviewPending).toBe(false);
+
+      const calls = vi.mocked(overviewService.getOrgOverview).mock.calls;
+      expect(calls.at(-1)?.[1]).toMatchObject({ refresh: true });
       expect(wrapper.get(tile("firing")).text()).toContain("3");
+      expect(internalsOverview(wrapper).overviewState.loading).toBe(false);
+
+      first.resolve({ data: buildHealthyOverview() });
+      await flushPromises();
+      expect(wrapper.get(tile("firing")).text()).toContain("3");
+    });
+
+    it("should pass the overview load to the refresh button", async () => {
+      const pending = deferred<{ data: unknown }>();
+      vi.mocked(overviewService.getOrgOverview).mockReturnValue(pending.promise as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("loading")).toBe(true);
+    });
+
+    it("should map a 403 to the forbidden state on every overview card without Retry", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(
+        Object.assign(new Error("denied"), { response: { status: 403 } }),
+      );
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      for (const section of ["alerts", "data-health", "streams", "limit"]) {
+        expect(wrapper.find(`[data-test="overview-${section}-forbidden"]`).exists()).toBe(true);
+        expect(wrapper.find(`[data-test="overview-${section}-retry-btn"]`).exists()).toBe(false);
+      }
+      expect(wrapper.get(tile("firing")).text()).toContain("No access");
+    });
+
+    it("should hold the all-clear hero back while the overview is pending", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockReturnValue(
+        deferred<{ data: unknown }>().promise as never,
+      );
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should hold the all-clear hero back when the overview request failed", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should hold the all-clear hero back when the alerts section errored", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildHealthyOverview(),
+      } as never);
+      const base = buildHealthyOverview();
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: { ...base, alerts: { status: "error" } },
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should clear the previous org's overview when the org changes", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(tile("streams")).exists()).toBe(true);
+
+      const pending = deferred<{ data: unknown }>();
+      vi.mocked(overviewService.getOrgOverview).mockReturnValue(pending.promise as never);
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        identifier: `overview-org-switched-${++orgSeq}`,
+      });
+      await flushPromises();
+
+      expect(internalsOverview(wrapper).overviewPending).toBe(true);
+      expect(wrapper.find('[data-test="overview-freshness-note"]').exists()).toBe(false);
+    });
+
+    it("should name the timezone in the freshness note", async () => {
+      store.commit("setTimezone", "UTC");
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.get('[data-test="overview-freshness-note"]').text()).toMatch(
+        /Updated \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(UTC\)\. Incidents and recent events follow their own scope\./,
+      );
     });
 
     it("should lock the incidents tile on a build without the incidents license", async () => {

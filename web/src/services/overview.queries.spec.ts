@@ -24,12 +24,11 @@ vi.mock("./overview", () => ({ default: { getOrgOverview: vi.fn() } }));
 const BODY = { streams: { status: "ok" }, generated_at: 1, cached: false };
 
 describe("orgOverviewQuery", () => {
-  it("keys per org and top, never by refresh", () => {
+  it("keys per org, never by refresh", () => {
     const normal = orgOverviewQuery("acme");
     const forced = orgOverviewQuery("acme", { refresh: true });
     expect(normal.queryKey).toEqual(overviewKeys.data("acme", OVERVIEW_TOP));
     expect(forced.queryKey).toEqual(normal.queryKey);
-    expect(orgOverviewQuery("acme", { top: 10 }).queryKey).not.toEqual(normal.queryKey);
     expect(orgOverviewQuery("other").queryKey).not.toEqual(normal.queryKey);
   });
 

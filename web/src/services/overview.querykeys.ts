@@ -16,6 +16,5 @@
 import { orgKey } from "@/composables/query/keys";
 
 export const overviewKeys = {
-  all: (org: string) => orgKey(org, "overview"),
   data: (org: string, top: number) => orgKey(org, "overview", "data", top),
 };

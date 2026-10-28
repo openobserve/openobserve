@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
-          :loading="isLoading"
-          :disabled="isLoading"
+          :loading="isLoading || overviewState.loading"
+          :disabled="isLoading || overviewState.loading"
           @click="() => loadAll(true)"
         />
         <DateTime
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Sections rendered top-to-bottom; each collapses when empty -->
 
     <p
-      v-if="pageState !== 'forbidden' && overview"
+      v-if="showOverviewCards && overview"
       class="text-text-secondary mb-2 text-xs"
       data-test="overview-freshness-note"
     >
@@ -49,18 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
 
     <OverviewHeadlineStrip
-      v-if="pageState !== 'forbidden'"
+      v-if="showOverviewCards"
       class="mb-5"
       :overview="overview"
       :pending="overviewPending"
       :failed="overviewFailed"
+      :forbidden="overviewForbidden"
       :incidents-state="incidentsTile"
       :incidents-total="incidentsTotal"
       @select="onHeadlineSelect"
     />
 
     <div
-      v-if="pageState !== 'forbidden'"
+      v-if="showOverviewCards"
       class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
       data-test="overview-alerts-health-grid"
     >
@@ -68,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.alerts"
         :pending="overviewPending"
         :failed="overviewFailed"
+        :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @open="goToAlertList"
       />
@@ -76,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.pipelines"
         :pending="overviewPending"
         :failed="overviewFailed"
+        :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @open="goToPipelines"
       />
@@ -493,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div
-      v-if="pageState !== 'forbidden'"
+      v-if="showOverviewCards"
       class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
       data-test="overview-streams-limit-grid"
     >
@@ -501,6 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.streams"
         :pending="overviewPending"
         :failed="overviewFailed"
+        :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @open="goToStreams"
         @start-ingesting="goToIngestion"
@@ -510,6 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.limits"
         :pending="overviewPending"
         :failed="overviewFailed"
+        :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @unlock="openUpgradeDialog"
       />
@@ -578,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty state — everything is healthy or no data yet -->
     <OEmptyState
-      v-else-if="pageState === 'all-clear' && !overviewShowsProblem"
+      v-else-if="pageState === 'all-clear' && overviewAllClear"
       illustration="check"
       size="hero"
       :hide-action="true"
@@ -724,7 +729,8 @@ import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
-import { formatTimestamp } from "@/utils/date";
+import { formatTimestampInTimezone } from "@/utils/date";
+import { overviewHasProblem } from "./overview/overviewFormat";
 import { overviewKeys } from "@/services/overview.querykeys";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -861,22 +867,29 @@ const sectionFailure = reactive<Record<SectionKey, unknown>>({
 });
 const overview = ref<OrgOverview | null>(null);
 const overviewFailed = ref(false);
-const overviewState = reactive({ loading: false, loaded: false });
+const overviewState = reactive({ loading: false });
 let overviewSeq = 0;
-const generatedAtLabel = computed(() =>
-  overview.value ? formatTimestamp(overview.value.generated_at, "YYYY-MM-DD HH:mm") : "",
-);
-// the all-clear hero must not contradict a problem the cards report
-const overviewShowsProblem = computed(() => {
-  const o = overview.value;
-  if (!o) return false;
-  return (
-    (o.alerts.data?.by_state.firing ?? 0) > 0 ||
-    (o.alerts.data?.failed_evaluation ?? 0) > 0 ||
-    (o.pipelines.data?.errored ?? 0) > 0
-  );
+let overviewOrg = "";
+const overviewForbidden = ref(false);
+const generatedAtLabel = computed(() => {
+  if (!overview.value) return "";
+  const zone = store.state.timezone || "UTC";
+  const time = formatTimestampInTimezone(overview.value.generated_at, "YYYY-MM-DD HH:mm", zone);
+  return `${time} (${zone})`;
 });
-const overviewPending = computed(() => overviewState.loading && !overviewState.loaded);
+// the all-clear hero may only show once the cards loaded and found nothing wrong
+const overviewAllClear = computed(() => {
+  const o = overview.value;
+  if (!o || overviewFailed.value || overviewState.loading) return false;
+  if (o.alerts.status === "error" || o.pipelines.status === "error") return false;
+  return !overviewHasProblem(o);
+});
+const showOverviewCards = computed(
+  () => !["forbidden", "no-data", "not-monitored"].includes(pageState.value),
+);
+const overviewPending = computed(
+  () => overviewState.loading && (!overview.value || overviewFailed.value),
+);
 const alertCount = ref<number | null>(null);
 const summaryFailed = ref(false);
 const anomalyConfigCount = ref<number | null>(null);
@@ -990,27 +1003,33 @@ const loadAll = async (force = false) => {
 const loadOverview = async (force = false) => {
   const org = orgId.value;
   const seq = ++overviewSeq;
+  if (org !== overviewOrg) {
+    overviewOrg = org;
+    overview.value = null;
+    overviewFailed.value = false;
+    overviewForbidden.value = false;
+  }
   overviewState.loading = true;
   try {
+    const key = overviewKeys.data(org, OVERVIEW_TOP);
     if (force) {
-      await queryClient.invalidateQueries({
-        queryKey: overviewKeys.data(org, OVERVIEW_TOP),
-        exact: true,
-        refetchType: "none",
-      });
+      // an in-flight read would be shared and never send refresh=true
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      await queryClient.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
     }
     const res = await queryClient.fetchQuery(orgOverviewQuery(org, { refresh: force }));
     if (seq !== overviewSeq) return;
     overview.value = res;
     overviewFailed.value = false;
-  } catch {
+    overviewForbidden.value = false;
+  } catch (err) {
     if (seq !== overviewSeq) return;
     overview.value = null;
-    overviewFailed.value = true;
+    overviewForbidden.value = isForbidden(err);
+    overviewFailed.value = !overviewForbidden.value;
   } finally {
     if (seq === overviewSeq) {
       overviewState.loading = false;
-      overviewState.loaded = true;
     }
   }
 };

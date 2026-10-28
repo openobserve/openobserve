@@ -9209,30 +9209,31 @@
       "failingRules": "Failing rules",
       "openIncidents": "Open incidents",
       "pipelineErrors": "Pipeline errors",
-      "pipelinesOf": "of {total}",
+      "pipelinesOf": "of {enabled} enabled",
       "streams": "Streams"
     },
     "state": {
       "tileForbidden": "No access",
       "tileLocked": "Locked",
-      "tileError": "Unavailable",
-      "lockedMessage": "Available with an enterprise license. Select to learn more."
+      "tileError": "Unavailable"
     },
     "sections": {
       "alerts": "Alerts",
       "dataHealth": "Data health",
       "streams": "Streams",
-      "topStreams": "Largest streams by stored size",
+      "topStreams": "Largest streams by ingested data",
       "ingestLimit": "Ingest limit"
     },
     "alerts": {
       "firing": "Firing",
       "pending": "Pending",
-      "failing": "Failing rules"
+      "failing": "Failing rules",
+      "emptyTitle": "No alert rules yet",
+      "emptyAction": "Open alerts"
     },
     "dataHealth": {
       "pipelinesErrored": "Pipelines with errors",
-      "errorCount": "{errored} of {total}",
+      "errorCount": "{errored} of {enabled} enabled",
       "allHealthy": "No errors",
       "noPipelines": "No pipelines yet."
     },
@@ -9244,17 +9245,19 @@
       "typeSummary": "{count} stream | {count} streams"
     },
     "limit": {
-      "used": "Ingestion used",
+      "used": "Ingested today (UTC)",
       "scope": "Across the whole deployment, not just this organization.",
-      "daysOver": "Days over the limit",
+      "daysOver": "Days over the limit this month",
       "license": "License",
       "expired": "Expired",
       "valid": "Valid",
+      "approachingLimit": "Approaching limit",
       "nearLimit": "Near limit",
+      "blockNote": "Search is blocked once the days over the limit pass the number your license allows.",
       "overLimit": "Over limit",
       "lockedMessage": "Track ingestion against your license limit with an enterprise license."
     },
-    "freshness": "Alerts, pipelines, streams and limits show the current state, not the selected time range. Updated {time}."
+    "freshness": "Alerts, pipelines, streams and limits show the current state, not the selected time range. Updated {time}. Incidents and recent events follow their own scope."
   },
   "chatHistory": {
     "title": "Chats",

@@ -95,7 +95,7 @@ const onCardClick = (item: StatItem) => {
       :tone="item.tone"
       :trend="item.trend"
       :max="item.max"
-      :loading="showSkeleton"
+      :loading="showSkeleton || item.loading === true"
       :clickable="selectable && item.selectable !== false"
       :selected="item.selectable !== false && activeKey === item.key"
       :data-test="item.dataTest"

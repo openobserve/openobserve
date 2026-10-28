@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OCard :data-test="`overview-${section}-card`">
     <OCardSection role="header" dense>
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex w-full items-center justify-between gap-2">
         <h2 class="text-text-heading text-sm font-medium">{{ title }}</h2>
         <OButton
           v-if="linkLabel && view === 'ok'"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`overview-${section}-locked`"
         @click="emit('unlock')"
       >
-        {{ lockedMessage ?? t("overview.state.lockedMessage") }}
+        {{ lockedMessage }}
       </OButton>
       <slot v-else-if="view === 'empty'" name="empty" />
       <slot v-else />
