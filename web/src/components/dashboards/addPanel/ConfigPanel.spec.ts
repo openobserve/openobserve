@@ -653,6 +653,101 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Empty-state text and y-axis minimum step", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    const input = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
+
+    it("writes no_data_text and clears it to null when emptied", async () => {
+      const panel = panelOf("line");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await input("dashboard-config-no-data-text").vm.$emit("update:modelValue", "Set $meter");
+      expect(panel.data.config.no_data_text).toBe("Set $meter");
+      await input("dashboard-config-no-data-text").vm.$emit("update:modelValue", "  ");
+      expect(panel.data.config.no_data_text).toBeNull();
+    });
+
+    it("suggests the dashboard's variables when typing $ in the empty-state text", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf("line"),
+        variablesData: {
+          values: [
+            { name: "meter", type: "query_values", multiSelect: true },
+            { name: "site", type: "constant" },
+          ],
+        },
+      });
+      const field = wrapper.findComponent({ name: "OTemplateInput" });
+      expect(field.props("delimiter")).toBe("dollar");
+      expect(field.props("suggestions").map((s: { name: string }) => s.name)).toEqual([
+        "meter",
+        "meter:csv",
+        "meter:pipe",
+        "meter:doublequote",
+        "meter:singlequote",
+        "site",
+      ]);
+    });
+
+    it.each(["html", "markdown"])("offers no empty-state text for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(wrapper.find('[data-test="dashboard-config-no-data-text"]').exists()).toBe(false);
+    });
+
+    it("writes a positive y_axis_min_interval and null otherwise", async () => {
+      const panel = panelOf("line");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      const field = () => input("dashboard-config-y_axis_min_interval");
+      await field().vm.$emit("update:modelValue", "1");
+      expect(panel.data.config.y_axis_min_interval).toBe(1);
+      await field().vm.$emit("update:modelValue", "0");
+      expect(panel.data.config.y_axis_min_interval).toBeNull();
+      await field().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.y_axis_min_interval).toBeNull();
+    });
+
+    it("explains the minimum step under the field", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(wrapper.text()).toContain(
+        "Smallest gap between ticks. 1 gives whole numbers for counts.",
+      );
+    });
+
+    it("labels the series overrides button Add, or Edit with the count once rules exist", () => {
+      const button = () =>
+        wrapper.find('[data-test="dashboard-addpanel-config-series-overrides-add-btn"]');
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(button().text()).toBe("Add series override");
+      wrapper.unmount();
+      const rules = [
+        {
+          field: { matchBy: "series", value: "a" },
+          config: [{ type: "line_style", value: "dashed" }],
+        },
+        {
+          field: { matchBy: "series_regex", value: "^b" },
+          config: [{ type: "line_width", value: 3 }],
+        },
+      ];
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line", { override_config: rules }) });
+      expect(button().text()).toBe("Edit series overrides (2)");
+    });
+
+    it.each(["pie", "table", "metric"])("offers no minimum step for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(wrapper.find('[data-test="dashboard-config-y_axis_min_interval"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+
   describe("Heatmap colour scale min / max", () => {
     const panelOf = (type: string, config: Record<string, unknown> = {}) =>
       reactive({

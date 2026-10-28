@@ -140,6 +140,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
         "primaryButtonLabel",
         "secondaryButtonLabel",
         "neutralButtonLabel",
+        "primaryButtonVariant",
       ],
       emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
       template:
@@ -459,10 +460,13 @@ describe("SourceMaps.vue", () => {
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("title")).toBe("Delete Source Maps");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("svc-a");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("1.0.0");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("prod");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("2 files");
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="delete-source-maps-dialog-name"]');
+      expect(name.text()).toBe("svc-a");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("svc-a (1.0.0)");
+      expect(dialog.text()).toContain("prod");
+      expect(dialog.text()).toContain("2 files");
       expect((wrapper.vm as any).deleteDialog.data).toEqual(row);
     });
 

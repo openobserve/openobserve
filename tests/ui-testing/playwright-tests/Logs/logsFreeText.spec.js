@@ -336,12 +336,43 @@ test.describe('Logs bare-word search (item 1)', () => {
       .toBe(`SELECT * FROM "${FTS}" WHERE match_all('timeout')`);
 
     await open(page, NOFTS, 'timeout');
-    // Before the stream schema loads the planner cannot tell a no-FTS stream, so toggling then renders raw SQL.
     await logsPage.expectFieldListItemVisible('msg_text');
     await logsPage._setSqlModeViaVue(true);
     await expect(page.locator(panel)).toBeVisible({ timeout: 15000 });
     await expect.poll(() => logsPage._isSqlModeEnabledViaVue()).toBe(false);
     expect(await editorText(page)).toBe('timeout');
+  });
+
+  test('the SQL toggle waits for a slow schema load and is still refused on a no-FTS stream (#15549)', {
+    tag: ['@freeText', '@logs'],
+  }, async ({ page }) => {
+    const logsPage = new PageManager(page).logsPage;
+    const slowStreamRoute = new RegExp(`/api/${ORG}/streams(/${NOFTS}/schema)?\\?type=logs`);
+    await page.route(slowStreamRoute, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      await route.continue();
+    });
+    await open(page, NOFTS, 'timeout');
+    await logsPage._setSqlModeViaVue(true);
+    await expect(page.locator(panel)).toBeVisible({ timeout: 20000 });
+    await expect.poll(() => logsPage._isSqlModeEnabledViaVue()).toBe(false);
+    expect(await editorText(page)).toBe('timeout');
+    expect(await editorText(page)).not.toContain('SELECT');
+  });
+
+  test('the SQL toggle on a full-text stream waits for a slow schema and renders match_all (#15549)', {
+    tag: ['@freeText', '@logs'],
+  }, async ({ page }) => {
+    const logsPage = new PageManager(page).logsPage;
+    await page.route(new RegExp(`/api/${ORG}/streams/${FTS}/schema`), async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      await route.continue();
+    });
+    await open(page, FTS, 'timeout');
+    await logsPage._setSqlModeViaVue(true);
+    await expect
+      .poll(() => editorText(page), { timeout: 20000 })
+      .toBe(`SELECT * FROM "${FTS}" WHERE match_all('timeout')`);
   });
 
   test('field values use the rendered text and keep the results (AC6.4)', {

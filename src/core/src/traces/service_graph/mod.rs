@@ -52,7 +52,6 @@ pub(crate) async fn run_graph_search(
             start_time,
             end_time,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,

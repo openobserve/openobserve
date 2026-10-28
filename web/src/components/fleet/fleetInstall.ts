@@ -82,7 +82,7 @@ function unixCommand(t: InstallTarget): string {
     `--org ${q(t.org)}`,
     `--token ${q(t.token)}`,
     ...(t.version ? [`--version ${q(t.version)}`] : []),
-    ...(t.http ? ["--transport http"] : []),
+    `--transport ${t.http ? "http" : "ws"}`,
   ];
   return [
     `curl -fsSL ${SCRIPT_BASE}/fleet/install.sh | sudo bash -s -- \\`,
@@ -97,7 +97,7 @@ function windowsCommand(t: InstallTarget): string {
     `-Org ${ps(t.org)}`,
     `-Token ${ps(t.token)}`,
     ...(t.version ? [`-Version ${ps(t.version)}`] : []),
-    ...(t.http ? ["-Transport http"] : []),
+    `-Transport ${t.http ? "http" : "ws"}`,
   ];
   return [
     `& ([scriptblock]::Create((irm ${SCRIPT_BASE}/fleet/install.ps1))) \``,

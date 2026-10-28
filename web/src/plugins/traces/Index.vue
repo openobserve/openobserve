@@ -323,6 +323,7 @@ import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
@@ -1757,7 +1758,8 @@ const onAskAiTracing = () => {
 
   const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
   const stream = searchObj.data.stream.selectedStream?.value || "unknown";
-  const timeRange = searchObj.data.datetime.relativeTimePeriod || "custom";
+  const period = searchObj.data.datetime.relativeTimePeriod;
+  const timeRange = period ? describePeriod(period) : "custom";
 
   emit(
     "sendToAiChat",

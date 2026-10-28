@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nText } from "@/types/i18n";
+import { parseCalendarToken, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 import {
   evaluateScanPolicy,
@@ -410,6 +411,8 @@ function timeBounds(
   sinceUs = nowUs,
 ): { startUs: number; endUs: number } | null {
   if (time.type === "absolute") return { startUs: time.startUs, endUs: time.endUs };
+  const calendar = resolveCalendarPeriod(time.period, null, Math.floor(nowUs / 1000));
+  if (calendar) return { startUs: calendar.startTime, endUs: calendar.endTime };
   const duration = periodToMicros(time.period);
   return duration === null ? null : { startUs: sinceUs - duration, endUs: nowUs };
 }
@@ -532,7 +535,13 @@ export function isScopeCovered(
   if (!scope.streams.every((s) => consented.streams.includes(s))) return false;
   if (!sameSet(scope.regions, consented.regions) || !sameSet(scope.clusters, consented.clusters))
     return false;
-  if (scope.time.type === "relative" && consented.time.type === "relative") {
+  // Calendar periods sit at fixed dates, so only the containment check below can compare them.
+  if (
+    scope.time.type === "relative" &&
+    consented.time.type === "relative" &&
+    !parseCalendarToken(scope.time.period) &&
+    !parseCalendarToken(consented.time.period)
+  ) {
     const own = periodToMicros(scope.time.period);
     const allowed = periodToMicros(consented.time.period);
     return own !== null && allowed !== null && own <= allowed;
@@ -541,7 +550,10 @@ export function isScopeCovered(
   // A relative consent spans [dispatch - period, now]; the period cap keeps that slack from widening it.
   const allowed = timeBounds(consented.time, nowUs, Math.min(dispatchedUs, nowUs));
   if (!own || !allowed) return false;
-  const period = consented.time.type === "relative" ? periodToMicros(consented.time.period) : null;
+  const period =
+    consented.time.type === "relative" && !parseCalendarToken(consented.time.period)
+      ? periodToMicros(consented.time.period)
+      : null;
   if (period !== null && own.endUs - own.startUs > period) return false;
   return own.startUs >= allowed.startUs && own.endUs <= allowed.endUs;
 }

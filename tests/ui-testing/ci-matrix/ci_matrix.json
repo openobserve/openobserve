@@ -59,6 +59,7 @@
       "dashboard-config-axis.spec.js",
       "dashboard-config-gauge-maps.spec.js",
       "dashboard-config-general.spec.js",
+      "dashboard-config-heatmap.spec.js",
       "dashboard-config-legends.spec.js",
       "dashboard-config-line-style.spec.js",
       "dashboard-config-panel-time.spec.js",
@@ -84,6 +85,7 @@
       "dashboard-html-chart.spec.js",
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
+      "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
       "dashboard-zoom-brush.spec.js"

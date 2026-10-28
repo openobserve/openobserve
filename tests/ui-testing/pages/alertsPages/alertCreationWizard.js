@@ -1372,6 +1372,10 @@ export class AlertCreationWizard {
             await this.page.waitForTimeout(1000);
             await this.page.locator('[data-test="date-time-btn"]').click();
             await this.page.locator('[data-test="date-time-relative-30-m-btn"]').click();
+            // The auto-apply picker stays open after a pick, and its wider popover can cover the tab bar below.
+            const dateTimeMenu = this.page.locator('#date-time-menu');
+            await this.page.keyboard.press('Escape');
+            await dateTimeMenu.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
             testLogger.info('Added 30-minute time range comparison');
         } else {
             testLogger.info('Time range button not visible, skipping');

@@ -36,12 +36,12 @@ test.describe("Alert Calibration testcases", () => {
   );
 
   test(
-    "should show the empty runs state instead of the enable prompt on the dashboard by default",
+    "should show the runs view instead of the enable prompt on the dashboard by default",
     { tag: ["@alert-calibration", "@all"] },
     async () => {
       testLogger.info("Opening the alert calibration dashboard");
       await pm.alertCalibrationPage.navigateToDashboard();
-      await pm.alertCalibrationPage.expectEmptyRunsStateInsteadOfEnablePrompt();
+      await pm.alertCalibrationPage.expectRunsViewInsteadOfEnablePrompt();
       testLogger.info("Test completed");
     },
   );

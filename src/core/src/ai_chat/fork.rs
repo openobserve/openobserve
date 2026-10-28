@@ -202,6 +202,15 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
     })
 }
 
+/// Finished steps a Resume keeps: 0 when none finished, `None` once the report was submitted.
+pub fn reusable_steps(events: &[DurableEvent]) -> Option<u32> {
+    match plan_resume(events) {
+        Ok(plan) => Some(plan.reused_steps),
+        Err(ResumeRefusal::NoFinishedStep) => Some(0),
+        Err(ResumeRefusal::ReportSubmitted) => None,
+    }
+}
+
 /// Whether `message_id`'s events in `from..to` are only its text, some of it visible.
 fn only_text_before(events: &[DurableEvent], message_id: &str, from: i64, to: i64) -> bool {
     let mut visible = false;
