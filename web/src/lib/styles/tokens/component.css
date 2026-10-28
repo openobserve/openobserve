@@ -620,6 +620,17 @@
   --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-700);
   --color-select-item-disabled: var(--color-text-disabled);
+  /* Group header that carries an action: an accent tint between the item hover and selected fills. */
+  --color-select-header-bg: color-mix(
+    in srgb,
+    var(--color-accent) 10%,
+    var(--color-select-content-bg)
+  );
+  /* One step darker than text-secondary and the link colour, which both fall under 4.5:1 on the tint. */
+  --color-select-header-count-text: var(--color-grey-600);
+  --color-select-header-action-text: var(--color-primary-700);
+  --color-select-header-action-hover-bg: var(--color-surface-accent-active);
+  --color-select-header-action-focus-ring: var(--color-focus-ring-accent);
 
   /* Flame graph (components/common/FlameGraphView.vue): label text on the light series fills, in both themes. */
   --color-flame-frame-text: var(--color-grey-800);
@@ -1556,6 +1567,11 @@
   --color-select-item-selected-bg: var(--color-select-item-selected-bg);
   --color-select-item-selected-text: var(--color-select-item-selected-text);
   --color-select-item-disabled: var(--color-select-item-disabled);
+  --color-select-header-bg: var(--color-select-header-bg);
+  --color-select-header-count-text: var(--color-select-header-count-text);
+  --color-select-header-action-text: var(--color-select-header-action-text);
+  --color-select-header-action-hover-bg: var(--color-select-header-action-hover-bg);
+  --color-select-header-action-focus-ring: var(--color-select-header-action-focus-ring);
 
   /* Flame graph */
   --color-flame-frame-text: var(--color-flame-frame-text);

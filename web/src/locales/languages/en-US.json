@@ -21224,11 +21224,11 @@
     },
     "streamPicker": {
       "internalStreams": "Internal streams",
-      "hideInternal": "Hide internal streams",
       "hiddenCount": "{count} hidden",
-      "searchMatchCount": "{count} internal stream matches | {count} internal streams match",
-      "allInternalHidden": "The only stream is internal and hidden | All {count} streams are internal and hidden",
+      "matchCount": "{count} match",
+      "hide": "Hide",
       "show": "Show",
+      "hideInternal": "Hide internal streams",
       "showInternal": "Show internal streams",
       "announceHidden": "Internal streams hidden",
       "announceShown": "Internal streams shown"

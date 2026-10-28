@@ -5,6 +5,8 @@ import type { I18nText } from "@/types/i18n";
 import type { InjectionKey } from "vue";
 import type { FieldWidth } from "../Input/OInput.types";
 
+export type { SelectHeaderRowEmits, SelectHeaderRowProps } from "./OSelectHeaderRow.types";
+
 export type SelectValue = string | number | boolean | null;
 export type SelectModelValue = SelectValue | SelectValue[] | undefined;
 
@@ -54,6 +56,14 @@ export interface SelectOption {
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
+  /** Header only: quieter text after the label, e.g. a count. */
+  headerCount?: I18nText;
+  /** Header only: label of an action button on the header's end edge; clicking it emits `header-action`. */
+  headerAction?: I18nText;
+  /** Header only: accessible name of the header action when its label alone is ambiguous. */
+  headerActionAriaLabel?: I18nText;
+  /** Header only: stays listed while searching even when no option under it matches. */
+  keepOnSearch?: boolean;
   /** Makes this a non-selectable row that shows or hides the options whose `parentValue` is its `value`. */
   expandable?: boolean;
   /** Nests this option under the `expandable` row with this value. */
@@ -199,6 +209,8 @@ export interface SelectEmits {
   (_e: "blur", _event: FocusEvent): void;
   (_e: "change", _value: SelectModelValue): void;
   (_e: "keydown", _event: KeyboardEvent): void;
+  /** Fired when a header's `headerAction` button is activated, with that header option as passed in */
+  (_e: "header-action", _option: SelectOption): void;
 }
 
 export interface SelectSlots {

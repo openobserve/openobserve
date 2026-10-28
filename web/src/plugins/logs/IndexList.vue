@@ -53,25 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="streamPickerOpen = true"
           @close="onStreamPickerClose"
           @search="streamPickerSearch = $event"
+          @header-action="onStreamPickerHeaderAction"
         >
-          <template #empty>
-            <StreamPickerFooter
-              v-if="streamPickerOnlyInternalHidden && !streamPickerSearch.trim()"
-              variant="empty"
-              :hidden-count="streamPickerHiddenCount"
-              data-test="log-search-index-list-stream-picker"
-            />
-            <template v-else>{{ t("search.noResult") }}</template>
-          </template>
-          <template #after-options>
-            <StreamPickerFooter
-              :hidden-count="streamPickerHiddenCount"
-              :search-match-count="streamPickerSearchMatchCount"
-              :only-internal-hidden="streamPickerOnlyInternalHidden"
-              data-test="log-search-index-list-stream-picker"
-            />
-          </template>
+          <template #empty>{{ t("search.noResult") }}</template>
         </OSelect>
+        <span
+          aria-live="polite"
+          data-test="log-search-index-list-stream-picker-announcement"
+          class="sr-only"
+          >{{ streamPickerAnnouncement }}</span
+        >
         <OTooltip
           v-if="searchObj.data.stream.selectedStream.length > 1"
           :delay="500"
@@ -89,15 +80,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="database"
       >
-        <template v-if="quickPickStreams.length" #extra>
+        <template v-if="quickPickGroups.length" #extra>
           <div data-test="logs-search-stream-quick-pick" class="flex w-full flex-col gap-1">
             <template v-for="group in quickPickGroups" :key="group.id">
+              <OSelectHeaderRow
+                v-if="group.header"
+                :data-test="`logs-search-stream-quick-pick-header-${group.id}`"
+                :label="group.header.label"
+                :count="group.header.headerCount"
+                :action="group.header.headerAction"
+                :action-aria-label="group.header.headerActionAriaLabel"
+                @action="onStreamPickerHeaderAction(group.header)"
+              />
               <span
+                v-else
                 :data-test="`logs-search-stream-quick-pick-label-${group.id}`"
-                :class="[
-                  'text-text-secondary mb-0.5 text-center text-xs font-medium',
-                  group.id === 'internal' ? 'mt-1' : '',
-                ]"
+                class="text-text-secondary mb-0.5 text-center text-xs font-medium"
               >
                 {{ group.label }}
               </span>
@@ -316,7 +314,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import StreamPickerFooter from "@/components/common/StreamPickerFooter.vue";
+import OSelectHeaderRow from "@/lib/forms/Select/OSelectHeaderRow.vue";
 import { useStreamPickerOptions, type PickerStream } from "@/composables/useStreamPickerOptions";
 import type { StreamListItem } from "@/services/stream";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
@@ -355,7 +353,7 @@ export default defineComponent({
     OTruncatedText,
     OEmptyState,
     OSkeleton,
-    StreamPickerFooter,
+    OSelectHeaderRow,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -523,10 +521,10 @@ export default defineComponent({
     const streamPickerSearch = ref("");
     const {
       options: streamPickerOptions,
-      hiddenCount: streamPickerHiddenCount,
-      searchHiddenMatchCount: streamPickerSearchMatchCount,
-      onlyInternalHidden: streamPickerOnlyInternalHidden,
       hideInternalStreams,
+      internalHeader,
+      onHeaderAction: onStreamPickerHeaderAction,
+      announcement: streamPickerAnnouncement,
     } = useStreamPickerOptions({
       streams: pickerStreams,
       selected: () => searchObj.data.stream.selectedStream,
@@ -546,16 +544,22 @@ export default defineComponent({
     // dropdown's search. Falls back to the plain stream-list order when
     // ingestion stats aren't available.
     const QUICK_PICK_LIMIT = 8;
-    const quickPickCandidates = computed<PickerStream[]>(() => {
+    const quickPickOrdered = computed(() => {
       const detailed = searchObj.data.streamResults?.list;
       const ordered: PickerStream[] =
         Array.isArray(detailed) && detailed.length
           ? [...detailed].sort(compareStreamsByLatest)
           : pickerStreams.value;
-      const user = ordered.filter((s) => !s.is_internal);
-      // Same rule as the dropdown, so "+N more" counts only streams a search there can reach.
-      const internal = hideInternalStreams.value ? [] : ordered.filter((s) => s.is_internal);
-      return [...user, ...internal];
+      return {
+        user: ordered.filter((s) => !s.is_internal),
+        internal: ordered.filter((s) => s.is_internal),
+      };
+    });
+
+    // Same rule as the dropdown, so "+N more" counts only streams a search there can reach.
+    const quickPickCandidates = computed<PickerStream[]>(() => {
+      const { user, internal } = quickPickOrdered.value;
+      return hideInternalStreams.value ? user : [...user, ...internal];
     });
 
     const quickPickStreams = computed(() =>
@@ -566,20 +570,27 @@ export default defineComponent({
       })),
     );
 
-    const quickPickGroups = computed(() =>
-      [
+    const quickPickGroups = computed(() => {
+      const { user, internal } = quickPickOrdered.value;
+      // Only while internal streams would win a slot, so Show always reveals a stream.
+      const internalRow = internal.length > 0 && user.length < QUICK_PICK_LIMIT;
+      return [
         {
           id: "user",
           label: t("search.quickPickStreamsLabel"),
+          header: undefined,
           streams: quickPickStreams.value.filter((s) => !s.internal),
         },
         {
           id: "internal",
           label: t("components.streamPicker.internalStreams"),
+          header: internalRow
+            ? internalHeader(hideInternalStreams.value ? "hidden" : "shown", internal.length)
+            : undefined,
           streams: quickPickStreams.value.filter((s) => s.internal),
         },
-      ].filter((group) => group.streams.length > 0),
-    );
+      ].filter((group) => group.header || group.streams.length > 0);
+    });
 
     const quickPickMoreCount = computed(
       () => quickPickCandidates.value.length - quickPickStreams.value.length,
@@ -2029,9 +2040,8 @@ export default defineComponent({
       streamPickerOpen,
       streamPickerSearch,
       onStreamPickerClose,
-      streamPickerHiddenCount,
-      streamPickerSearchMatchCount,
-      streamPickerOnlyInternalHidden,
+      onStreamPickerHeaderAction,
+      streamPickerAnnouncement,
       hasUserDefinedSchemas,
       setPage,
       resetPagination,

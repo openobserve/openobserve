@@ -7,6 +7,7 @@ import type {
   SelectSlots,
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
+  SelectOption,
 } from "./OSelect.types";
 import {
   SELECT_VALUE_MAP_KEY,
@@ -14,6 +15,7 @@ import {
   NULL_VALUE_SENTINEL,
 } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
+import OSelectHeaderRow from "./OSelectHeaderRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -95,6 +97,12 @@ type NormalizedOption = {
   parentKey?: string;
   /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  headerCount?: I18nText;
+  headerAction?: I18nText;
+  headerActionAriaLabel?: I18nText;
+  keepOnSearch?: boolean;
+  /** The header option as passed in, handed back by `header-action`. */
+  source?: SelectOption;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -223,11 +231,17 @@ function normalizeOption(input: unknown): NormalizedOption | null {
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
+    const header = option as SelectOption;
     return {
       label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
+      headerCount: header.headerCount,
+      headerAction: header.headerAction,
+      headerActionAriaLabel: header.headerActionAriaLabel,
+      keepOnSearch: header.keepOnSearch === true,
+      source: header,
     };
   }
 
@@ -351,7 +365,9 @@ const baseFilteredOptions = computed(() => {
   const result: NormalizedOption[] = [];
   for (let i = 0; i < options.length; i++) {
     const opt = options[i];
-    if (opt.header) {
+    if (opt.header && opt.keepOnSearch) {
+      result.push(opt);
+    } else if (opt.header) {
       // Include the header only if at least one subsequent non-header item matches
       let j = i + 1;
       while (j < options.length && !options[j].header) {
@@ -419,7 +435,9 @@ const nestedFilteredOptions = computed(() => {
   if (isSearching.value) {
     const flat = base.filter((o) => !o.expandable);
     // A header kept only for a matching expandable row has nothing left under it.
-    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+    return flat.filter(
+      (o, i) => !o.header || o.keepOnSearch || (flat[i + 1] !== undefined && !flat[i + 1].header),
+    );
   }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
@@ -858,6 +876,26 @@ function handleExpandKey(e: KeyboardEvent): boolean {
   return true;
 }
 
+/** A header carrying a count or an action renders as OSelectHeaderRow instead of the plain label. */
+function isRichHeader(opt: NormalizedOption): boolean {
+  return opt.header && (opt.headerAction !== undefined || opt.headerCount !== undefined);
+}
+
+// The consumer usually swaps this header's text in response; a keyboard user must stay on its action.
+function handleHeaderAction(opt: NormalizedOption, event: MouseEvent) {
+  const hadFocus =
+    event.currentTarget instanceof HTMLElement && event.currentTarget === document.activeElement;
+  if (opt.source) emit("header-action", opt.source);
+  if (!hadFocus) return;
+  nextTick(() => {
+    const index = filteredOptions.value.findIndex((o) => o.header && o.value === opt.value);
+    const button = listboxScrollEl.value?.querySelector<HTMLElement>(
+      `[data-vrow="${index}"] [data-select-header-action]`,
+    );
+    if (button && button !== document.activeElement) button.focus();
+  });
+}
+
 function handleDropdownKeydown(e: KeyboardEvent) {
   const nav = navigableIndices.value;
 
@@ -908,6 +946,8 @@ const virtualizer = useVirtualizer(
     estimateSize: (index: number) => {
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
+      // min-h-8 on OSelectHeaderRow: room for its action button and focus ring.
+      if (isRichHeader(opt)) return 32;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
       const hasPalette = !!opt.colorPalette?.length;
@@ -1615,12 +1655,22 @@ const fieldWidthClass = computed(() => {
                         transform: `translateY(${vRow.start}px)`,
                       }"
                     >
+                      <OSelectHeaderRow
+                        v-if="isRichHeader(filteredOptions[vRow.index])"
+                        :label="filteredOptions[vRow.index].label"
+                        :count="filteredOptions[vRow.index].headerCount"
+                        :action="filteredOptions[vRow.index].headerAction"
+                        :action-aria-label="filteredOptions[vRow.index].headerActionAriaLabel"
+                        :data-test="parentDataTest ? `${parentDataTest}-header` : undefined"
+                        @action="handleHeaderAction(filteredOptions[vRow.index], $event)"
+                      />
+
                       <!-- Group header — non-interactive label. Virtualisation
                          renders each flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
                       <div
-                        v-if="filteredOptions[vRow.index].header"
+                        v-else-if="filteredOptions[vRow.index].header"
                         :class="[
                           'text-select-item-text flex h-full w-full px-3 py-1 text-xs font-bold select-none',
                           collapsibleGroups

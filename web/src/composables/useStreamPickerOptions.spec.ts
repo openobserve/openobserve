@@ -21,10 +21,15 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import streamsMock from "@/test/unit/mockData/streams";
 import {
+  INTERNAL_GROUP_HIDE,
+  INTERNAL_GROUP_SHOW,
   buildStreamPickerOptions,
+  internalGroupHeader,
   useStreamPickerOptions,
+  type InternalGroupText,
   type PickerStream,
   type StreamPickerInput,
+  type StreamPickerOption,
 } from "@/composables/useStreamPickerOptions";
 
 const base = streamsMock.stream_list.list[0];
@@ -43,7 +48,15 @@ const STREAMS: PickerStream[] = [
   stream("nginx_access"),
 ];
 
-const HEADER = raw("Internal streams");
+const TEXT: InternalGroupText = {
+  label: raw("Internal streams"),
+  hidden: (count) => raw(`${count} hidden`),
+  match: (count) => raw(`${count} match`),
+  hide: raw("Hide"),
+  show: raw("Show"),
+  hideAriaLabel: raw("Hide internal streams"),
+  showAriaLabel: raw("Show internal streams"),
+};
 
 const build = (overrides: Partial<StreamPickerInput> = {}) =>
   buildStreamPickerOptions({
@@ -51,29 +64,61 @@ const build = (overrides: Partial<StreamPickerInput> = {}) =>
     keep: new Set(),
     hide: false,
     search: "",
-    headerLabel: HEADER,
+    text: TEXT,
     ...overrides,
   });
 
-const labels = (options: { label: string; header?: boolean }[]) =>
-  options.map((o) => (o.header ? `# ${o.label}` : o.label));
+const labels = (options: StreamPickerOption[]) =>
+  options.map((o) =>
+    o.header ? `# ${o.label} · ${o.headerCount ?? ""} [${o.headerAction}]` : o.label,
+  );
+
+describe("internalGroupHeader", () => {
+  it("offers Hide over the listed group, counting every internal stream", () => {
+    expect(internalGroupHeader("shown", 3, TEXT)).toEqual({
+      label: "Internal streams",
+      value: INTERNAL_GROUP_HIDE,
+      header: true,
+      headerCount: "3",
+      headerAction: "Hide",
+      headerActionAriaLabel: "Hide internal streams",
+    });
+  });
+
+  it("offers Show on the collapsed group, counting the hidden streams", () => {
+    expect(internalGroupHeader("hidden", 2, TEXT)).toEqual({
+      label: "Internal streams",
+      value: INTERNAL_GROUP_SHOW,
+      header: true,
+      headerCount: "2 hidden",
+      headerAction: "Show",
+      headerActionAriaLabel: "Show internal streams",
+    });
+  });
+
+  it("keeps a search-match header listed while the search runs", () => {
+    const header = internalGroupHeader("match", 2, TEXT);
+    expect(header.headerCount).toBe("2 match");
+    expect(header.keepOnSearch).toBe(true);
+    expect(internalGroupHeader("hidden", 2, TEXT).keepOnSearch).toBeUndefined();
+  });
+
+  it("drops the count from a collapsed group that hides nothing", () => {
+    expect(internalGroupHeader("hidden", 0, TEXT).headerCount).toBeUndefined();
+  });
+});
 
 describe("buildStreamPickerOptions", () => {
-  it("lists user streams first, then a header and the internal streams, each in input order", () => {
+  it("lists user streams first, then the Hide header and the internal streams, each in input order", () => {
     expect(labels(build().options)).toEqual([
       "default",
       "k8s_events",
       "nginx_access",
-      "# Internal streams",
+      "# Internal streams · 3 [Hide]",
       "_rumdata",
       "_anomalies",
       "_rumlog",
     ]);
-  });
-
-  it("marks only the group label as a header option with no value", () => {
-    const headers = build().options.filter((o) => o.header);
-    expect(headers).toEqual([{ label: "Internal streams", header: true }]);
   });
 
   it("treats a stream without the field as a user stream", () => {
@@ -81,27 +126,30 @@ describe("buildStreamPickerOptions", () => {
     expect(labels(options)).toEqual(["legacy"]);
   });
 
-  it("emits no header when there are no internal streams", () => {
-    const { options, hiddenCount } = build({
-      streams: [stream("default"), stream("k8s_events")],
-    });
-    expect(options.some((o) => o.header)).toBe(false);
-    expect(hiddenCount).toBe(0);
+  it("emits no header when there are no internal streams, shown or hidden", () => {
+    const streams = [stream("default"), stream("k8s_events")];
+    expect(build({ streams }).options.some((o) => o.header)).toBe(false);
+    expect(build({ streams, hide: true }).options.some((o) => o.header)).toBe(false);
   });
 
-  it("emits no header when every internal stream is hidden", () => {
+  it("collapses every hidden internal stream into one Show row", () => {
     const { options, hiddenCount } = build({ hide: true });
-    expect(labels(options)).toEqual(["default", "k8s_events", "nginx_access"]);
+    expect(labels(options)).toEqual([
+      "default",
+      "k8s_events",
+      "nginx_access",
+      "# Internal streams · 3 hidden [Show]",
+    ]);
     expect(hiddenCount).toBe(3);
   });
 
-  it("keeps a selected internal stream under the header and leaves it out of the hidden count", () => {
+  it("keeps a selected internal stream under the collapsed row and leaves it out of the count", () => {
     const { options, hiddenCount } = build({ hide: true, keep: new Set(["_rumlog"]) });
     expect(labels(options)).toEqual([
       "default",
       "k8s_events",
       "nginx_access",
-      "# Internal streams",
+      "# Internal streams · 2 hidden [Show]",
       "_rumlog",
     ]);
     expect(hiddenCount).toBe(2);
@@ -113,31 +161,34 @@ describe("buildStreamPickerOptions", () => {
     expect(hiddenCount).toBe(0);
   });
 
-  it("counts hidden streams matching the search text, case-insensitively", () => {
-    expect(build({ hide: true, search: " RUM " }).searchHiddenMatchCount).toBe(2);
-    expect(build({ hide: true, search: "anom" }).searchHiddenMatchCount).toBe(1);
-    expect(build({ hide: true, search: "nginx" }).searchHiddenMatchCount).toBe(0);
+  it("turns the collapsed row into a match count when hidden streams match the search, case-insensitively", () => {
+    const header = (search: string, keep = new Set<string>()) =>
+      build({ hide: true, search, keep }).options.find((o) => o.header);
+    expect(header(" RUM ")).toMatchObject({ headerCount: "2 match", keepOnSearch: true });
+    expect(header("anom")?.headerCount).toBe("1 match");
+    expect(header("rum", new Set(["_rumdata"]))?.headerCount).toBe("1 match");
   });
 
-  it("does not count search matches while internal streams are shown or the search is empty", () => {
-    expect(build({ search: "rum" }).searchHiddenMatchCount).toBe(0);
-    expect(build({ hide: true, search: "  " }).searchHiddenMatchCount).toBe(0);
+  it("leaves the hidden count on a row the search does not keep when no hidden stream matches", () => {
+    const header = build({ hide: true, search: "nginx" }).options.find((o) => o.header);
+    expect(header?.headerCount).toBe("3 hidden");
+    expect(header?.keepOnSearch).toBeUndefined();
+    expect(build({ hide: true, search: "  " }).options.find((o) => o.header)?.headerCount).toBe(
+      "3 hidden",
+    );
   });
 
-  it("does not count a kept stream as a hidden search match", () => {
-    const result = build({ hide: true, search: "rum", keep: new Set(["_rumdata"]) });
-    expect(result.searchHiddenMatchCount).toBe(1);
+  it("never lists a hidden stream, even when the search matches it", () => {
+    const { options } = build({ hide: true, search: "rum" });
+    expect(options.some((o) => !o.header && o.label.startsWith("_"))).toBe(false);
   });
 
-  it("reports an org whose streams are all internal and hidden", () => {
+  it("gives an org whose streams are all internal and hidden just the collapsed row", () => {
     const internalOnly = STREAMS.filter((s) => s.is_internal);
-    expect(build({ streams: internalOnly, hide: true }).onlyInternalHidden).toBe(true);
-    expect(build({ streams: internalOnly }).onlyInternalHidden).toBe(false);
-    expect(
-      build({ streams: internalOnly, hide: true, keep: new Set(["_rumdata"]) }).onlyInternalHidden,
-    ).toBe(false);
-    expect(build({ hide: true }).onlyInternalHidden).toBe(false);
-    expect(build({ streams: [], hide: true }).onlyInternalHidden).toBe(false);
+    expect(labels(build({ streams: internalOnly, hide: true }).options)).toEqual([
+      "# Internal streams · 3 hidden [Show]",
+    ]);
+    expect(build({ streams: [], hide: true }).options).toEqual([]);
   });
 });
 
@@ -178,14 +229,19 @@ describe("useStreamPickerOptions", () => {
     localStorage.clear();
   });
 
-  it("labels the internal group from the locale", () => {
-    expect(visible()).toContain("# Internal streams");
+  it("labels the internal group header from the locale", () => {
+    expect(visible()).toContain("# Internal streams · 3 [Hide]");
   });
 
   it("follows the shared hide setting", async () => {
     picker.hideInternalStreams.value = true;
     await nextTick();
-    expect(visible()).toEqual(["default", "k8s_events", "nginx_access"]);
+    expect(visible()).toEqual([
+      "default",
+      "k8s_events",
+      "nginx_access",
+      "# Internal streams · 3 hidden [Show]",
+    ]);
     expect(picker.hiddenCount.value).toBe(3);
   });
 
@@ -207,32 +263,45 @@ describe("useStreamPickerOptions", () => {
     expect(picker.hiddenCount.value).toBe(3);
   });
 
-  it("still applies the switch while the popover is open", async () => {
+  it("hides and shows the group from its header action and persists the choice", async () => {
+    const storageKey = "o2:hideInternalStreams:picker@example.com:picker-org";
     open.value = true;
     await nextTick();
-    picker.hideInternalStreams.value = true;
+    picker.onHeaderAction(picker.options.value.find((o) => o.header)!);
     await nextTick();
-    expect(visible()).not.toContain("# Internal streams");
+    expect(picker.hideInternalStreams.value).toBe(true);
+    expect(localStorage.getItem(storageKey)).toBe("true");
+    expect(visible()).toContain("# Internal streams · 3 hidden [Show]");
+    expect(picker.announcement.value).toBe("Internal streams hidden");
+
+    picker.onHeaderAction(picker.options.value.find((o) => o.header)!);
+    await nextTick();
+    expect(picker.hideInternalStreams.value).toBe(false);
+    expect(localStorage.getItem(storageKey)).toBe("false");
+    expect(picker.announcement.value).toBe("Internal streams shown");
   });
 
-  it("exposes the hidden search-match count and the internal-only state", async () => {
+  it("ignores header actions from other headers", async () => {
+    picker.onHeaderAction({ value: "__header__Other" });
+    picker.onHeaderAction({});
+    await nextTick();
+    expect(picker.hideInternalStreams.value).toBe(false);
+    expect(picker.announcement.value).toBe("");
+  });
+
+  it("counts hidden streams that match the search text", async () => {
     picker.hideInternalStreams.value = true;
     search.value = "rum";
     await nextTick();
-    expect(picker.searchHiddenMatchCount.value).toBe(2);
-
-    streams.value = STREAMS.filter((s) => s.is_internal);
-    await nextTick();
-    expect(picker.onlyInternalHidden.value).toBe(true);
+    expect(visible()).toContain("# Internal streams · 2 match [Show]");
   });
 
-  it("showInternalStreams turns the shared setting off", async () => {
-    picker.hideInternalStreams.value = true;
-    picker.showInternalStreams();
-    await nextTick();
-    expect(picker.hideInternalStreams.value).toBe(false);
-    expect(localStorage.getItem("o2:hideInternalStreams:picker@example.com:picker-org")).toBe(
-      "false",
-    );
+  it("builds the quick-pick header in the same words", () => {
+    expect(picker.internalHeader("hidden", 3)).toMatchObject({
+      label: "Internal streams",
+      headerCount: "3 hidden",
+      headerAction: "Show",
+      headerActionAriaLabel: "Show internal streams",
+    });
   });
 });

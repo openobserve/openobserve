@@ -18,13 +18,35 @@ import { useHideInternalStreams } from "@/composables/useHideInternalStreams";
 import type { StreamListItem } from "@/services/stream";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
+/** Header value whose action hides the internal streams. */
+export const INTERNAL_GROUP_HIDE = "internal-streams:hide";
+/** Header value whose action shows the internal streams again. */
+export const INTERNAL_GROUP_SHOW = "internal-streams:show";
+
 export type PickerStream = Pick<StreamListItem, "name" | "is_internal">;
 
 export interface StreamPickerOption {
   label: I18nText;
   value?: string;
   header?: boolean;
+  headerCount?: I18nText;
+  headerAction?: I18nText;
+  headerActionAriaLabel?: I18nText;
+  keepOnSearch?: boolean;
 }
+
+export interface InternalGroupText {
+  label: I18nText;
+  hidden: (count: number) => I18nText;
+  match: (count: number) => I18nText;
+  hide: I18nText;
+  show: I18nText;
+  hideAriaLabel: I18nText;
+  showAriaLabel: I18nText;
+}
+
+/** `shown` counts every internal stream, `hidden` the ones left out, `match` the left-out ones the search hits. */
+export type InternalGroupMode = "shown" | "hidden" | "match";
 
 export interface StreamPickerInput {
   streams: readonly PickerStream[];
@@ -32,15 +54,12 @@ export interface StreamPickerInput {
   keep: ReadonlySet<string>;
   hide: boolean;
   search: string;
-  headerLabel: I18nText;
+  text: InternalGroupText;
 }
 
 export interface StreamPickerState {
   options: StreamPickerOption[];
   hiddenCount: number;
-  searchHiddenMatchCount: number;
-  /** Every stream is internal and hidden, so the list has nothing to show. */
-  onlyInternalHidden: boolean;
 }
 
 export interface StreamPickerSources {
@@ -50,7 +69,31 @@ export interface StreamPickerSources {
   search: MaybeRefOrGetter<string>;
 }
 
-/** Orders user streams first and internal streams after an "Internal streams" header, dropping hidden ones that are not kept. */
+/** The "Internal streams" header row: a Hide action over the listed group, or a Show action on the collapsed one. */
+export function internalGroupHeader(
+  mode: InternalGroupMode,
+  count: number,
+  text: InternalGroupText,
+): StreamPickerOption {
+  const shown = mode === "shown";
+  const countText = {
+    shown: raw(String(count)),
+    hidden: text.hidden(count),
+    match: text.match(count),
+  }[mode];
+  return {
+    label: text.label,
+    value: shown ? INTERNAL_GROUP_HIDE : INTERNAL_GROUP_SHOW,
+    header: true,
+    ...(shown || count > 0 ? { headerCount: countText } : {}),
+    headerAction: shown ? text.hide : text.show,
+    headerActionAriaLabel: shown ? text.hideAriaLabel : text.showAriaLabel,
+    // Hidden matches have no row of their own, so the header is the only result that says they exist.
+    ...(mode === "match" ? { keepOnSearch: true } : {}),
+  };
+}
+
+/** Orders user streams first and internal streams under their header, collapsing hidden ones into it. */
 export function buildStreamPickerOptions(input: StreamPickerInput): StreamPickerState {
   const user: StreamPickerOption[] = [];
   const internal: StreamPickerOption[] = [];
@@ -62,26 +105,34 @@ export function buildStreamPickerOptions(input: StreamPickerInput): StreamPicker
     else internal.push(option);
   }
 
-  const term = input.search.trim().toLowerCase();
-  const searchHiddenMatchCount = term
-    ? hiddenNames.filter((name) => name.toLowerCase().includes(term)).length
-    : 0;
-  const options = internal.length
-    ? [...user, { label: input.headerLabel, header: true }, ...internal]
-    : user;
+  if (!input.hide) {
+    const header = internalGroupHeader("shown", internal.length, input.text);
+    return { options: internal.length ? [...user, header, ...internal] : user, hiddenCount: 0 };
+  }
+  if (!internal.length && !hiddenNames.length) return { options: user, hiddenCount: 0 };
 
-  return {
-    options,
-    hiddenCount: hiddenNames.length,
-    searchHiddenMatchCount,
-    onlyInternalHidden: options.length === 0 && hiddenNames.length > 0,
-  };
+  const term = input.search.trim().toLowerCase();
+  const matches = term ? hiddenNames.filter((name) => name.toLowerCase().includes(term)).length : 0;
+  const header = matches
+    ? internalGroupHeader("match", matches, input.text)
+    : internalGroupHeader("hidden", hiddenNames.length, input.text);
+  return { options: [...user, header, ...internal], hiddenCount: hiddenNames.length };
 }
 
 /** Reactive stream-picker options over the shared hide setting; the kept set is frozen while the popover is open. */
 export function useStreamPickerOptions(sources: StreamPickerSources) {
   const { t } = useI18nTyped();
-  const { hideInternalStreams, showInternalStreams } = useHideInternalStreams();
+  const { hideInternalStreams } = useHideInternalStreams();
+
+  const text = computed<InternalGroupText>(() => ({
+    label: t("components.streamPicker.internalStreams"),
+    hidden: (count) => t("components.streamPicker.hiddenCount", { count }, count),
+    match: (count) => t("components.streamPicker.matchCount", { count }, count),
+    hide: t("components.streamPicker.hide"),
+    show: t("components.streamPicker.show"),
+    hideAriaLabel: t("components.streamPicker.hideInternal"),
+    showAriaLabel: t("components.streamPicker.showInternal"),
+  }));
 
   // Deselecting a hidden stream mid-popover must not pull its row out from under the cursor.
   const selectedAtOpen = ref<ReadonlySet<string>>(new Set());
@@ -99,16 +150,29 @@ export function useStreamPickerOptions(sources: StreamPickerSources) {
       keep: new Set([...selectedAtOpen.value, ...toValue(sources.selected)]),
       hide: hideInternalStreams.value,
       search: toValue(sources.search),
-      headerLabel: t("components.streamPicker.internalStreams"),
+      text: text.value,
     }),
   );
+
+  const announcement = ref<I18nText | "">("");
+
+  /** Handles a `header-action` from the picker or the quick-pick; headers other than the internal-streams one are ignored. */
+  const onHeaderAction = (option: { value?: unknown }) => {
+    if (option.value !== INTERNAL_GROUP_HIDE && option.value !== INTERNAL_GROUP_SHOW) return;
+    const hide = option.value === INTERNAL_GROUP_HIDE;
+    hideInternalStreams.value = hide;
+    announcement.value = hide
+      ? t("components.streamPicker.announceHidden")
+      : t("components.streamPicker.announceShown");
+  };
 
   return {
     options: computed(() => state.value.options),
     hiddenCount: computed(() => state.value.hiddenCount),
-    searchHiddenMatchCount: computed(() => state.value.searchHiddenMatchCount),
-    onlyInternalHidden: computed(() => state.value.onlyInternalHidden),
     hideInternalStreams,
-    showInternalStreams,
+    internalHeader: (mode: InternalGroupMode, count: number) =>
+      internalGroupHeader(mode, count, text.value),
+    onHeaderAction,
+    announcement,
   };
 }
