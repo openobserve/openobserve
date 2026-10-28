@@ -39,13 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
           <span class="flex flex-col items-start gap-1">
             <span data-test="oncall-about-routing-reason">
-              <!-- A sentence parseRoutingReason doesn't recognise ("...as an
-                   impacted caller of the failing service") still opens
-                   "routed to <id>" — the id is the one fact worth trusting;
-                   the prose around it is not, so it is dropped rather than
-                   shown verbatim. -->
+              <!-- Unrecognised wording: show the record's team, not the server's prose. -->
               <router-link
-                v-if="fallbackRoutedId && teamId"
+                v-if="fallbackRouted && teamId"
                 class="text-accent font-medium"
                 :to="{
                   name: 'onCallTeamDetail',
@@ -54,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
                 data-test="oncall-about-routing-id-link"
               >
-                {{ raw(fallbackRoutedId) }}
+                {{ raw(teamName) }}
               </router-link>
               <span
                 v-else-if="routingDimensions.length"
@@ -271,15 +267,11 @@ const routedByPrimary = computed<I18nText>(() => {
   return mechanismLine.value;
 });
 
-/// The id out of a routing sentence `parseRoutingReason` doesn't recognise —
-/// every branch it DOES recognise opens "routed to <id>" too, so an
-/// unrecognised one almost always still yields an id worth linking, without
-/// the guesswork of interpreting prose the server might change at any time.
-const fallbackRoutedId = computed(() => {
-  if (!props.routingReason || routing.value) return null;
+/// An unrecognised "routed to …" sentence links the record's own team, by the record's id.
+const fallbackRouted = computed(() => {
+  if (!props.routingReason || routing.value) return false;
   const decision = props.routingReason.split("; ").pop()?.trim() ?? "";
-  const match = /^routed to (\S+)/.exec(decision);
-  return match ? match[1] : null;
+  return decision.startsWith("routed to ");
 });
 
 /// A page routed `explicit` was not routed at all — the alert names its team,

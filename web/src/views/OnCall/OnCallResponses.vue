@@ -1486,7 +1486,7 @@ const handoverByTeam = computed<Record<string, number | null>>(() => {
     // is the position they were resolved into.
     const rotation = schedule.rotations?.[0];
     const rule = rotation ? winningRule(rotation, nowMicros, schedule.timezone) : null;
-    out[team.id] = rule ? nextHandover(rule, nowMicros) : null;
+    out[team.id] = rule ? nextHandover(rule, nowMicros, schedule.timezone) : null;
   }
   return out;
 });

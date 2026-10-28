@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :blind-spots="recordSummary.blind_spots"
           :org="orgId"
           :live="cardState === 'investigating'"
-          :can-resume="!!resumeRunId && !viewedRun && threadRunId === rca.run_id"
+          :can-resume="canResumeThreadRun"
           :resuming="resuming"
           :triggering="triggering"
           @resume="resumeLatest"
@@ -240,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :status="threadStatus"
       :run-live="threadLive"
       :run-state="threadRunState"
+      :can-resume="canResumeThreadRun"
       :trigger-label="threadTriggerLabel"
       :context-used="threadContextUsed"
       :run-stats="threadRunStats"
@@ -617,8 +618,12 @@ const cancelledText = computed<I18nText | null>(() => {
   const current = thread.value?.run_id === runId ? thread.value : null;
   // The summary can count a step the last thread read did not see yet; it describes the latest run.
   const total = Math.max(current?.steps.length ?? 0, viewed ? 0 : rca.summary.steps);
-  // Without a thread, the step that was open at the cancel is the one not counted.
-  const done = current ? finishedStepCount(current) : Math.max(total - 1, 0);
+  // Without a thread: the latest run's stored Resume count, else all but the step open at the cancel.
+  const done = current
+    ? finishedStepCount(current)
+    : viewed
+      ? 0
+      : (rca.summary.reusable_steps ?? Math.max(total - 1, 0));
   const user = viewed
     ? viewed.cancelled_by
     : (currentRun.value?.cancelled_by ?? rca.summary.cancelled_by);
@@ -636,6 +641,11 @@ const threadRunState = computed<RcaRunState | null>(() => {
   if (props.threadRunId === props.rca?.run_id) return props.rca.state;
   return findRun(props.threadRunId)?.state ?? null;
 });
+
+/** The thread shows the latest run and Resume can continue it. */
+const canResumeThreadRun = computed(
+  () => !!props.resumeRunId && !props.viewedRun && props.threadRunId === props.rca?.run_id,
+);
 
 const threadTriggerLabel = computed<I18nText | null>(() => {
   const item = findRun(props.threadRunId);
@@ -768,7 +778,10 @@ const downloadReport = () => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `incident-${props.incidentId}-rca.md`;
+  // The run is in the name, as the selector numbers it, so downloads of different runs do not collide.
+  const index = props.history.findIndex((run) => run.run_id === cardRunId.value);
+  const run = index < 0 ? cardRunId.value : `run-${props.history.length - index}`;
+  link.download = `incident-${props.incidentId}-rca-${run}.md`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -863,6 +863,15 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
+    // A new alert is new evidence, so a page whose ladder ran out may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && downtime.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(&alert.org_id, incident_id).await;
+    }
+
     // Starts after routing decides L0; an un-mute keeps an already stored off decision.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
@@ -2589,6 +2598,82 @@ async fn start_unmuted_incident_rca(
         )
         .await;
     }
+}
+
+/// Tells each of the incident's pages that a new alert joined, re-running a ladder that ran out.
+#[cfg(feature = "enterprise")]
+async fn page_again_after_new_alert(org_id: &str, incident_id: &str) {
+    use config::meta::oncall::{NewAlertEffect, ResponseEvent, ResponseEventKind};
+    use o2_enterprise::enterprise::oncall::{escalation::ENGINE_ACTOR, replicate};
+
+    let now = config::utils::time::now_micros();
+    let pages = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
+        Ok(pages) => pages,
+        Err(e) => {
+            log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {e}");
+            return;
+        }
+    };
+    for page in pages {
+        let body = match page.on_new_alert(now) {
+            NewAlertEffect::Nothing => continue,
+            NewAlertEffect::NoteOnly => "A new alert joined this page.",
+            NewAlertEffect::PageAgain => {
+                match restart_exhausted_ladder(org_id, &page, now).await {
+                    Ok(true) => "A new alert joined after nobody answered; paging again.",
+                    // Acked, snoozed or re-run since the read, so this alert only gets the note.
+                    Ok(false) => "A new alert joined this page.",
+                    Err(e) => {
+                        log::error!("[incidents] could not page {org_id}/{} again: {e}", page.id);
+                        continue;
+                    }
+                }
+            }
+        };
+        let event = ResponseEvent::new(ResponseEventKind::Sys, now, ENGINE_ACTOR, body);
+        if let Err(e) = replicate::add_event(org_id, &page.id, &event).await {
+            log::error!("[incidents] timeline of {org_id}/{}: {e}", page.id);
+        }
+    }
+}
+
+/// Re-runs an exhausted page's ladder if nobody touched it since `seen`, then re-arms its timer.
+#[cfg(feature = "enterprise")]
+async fn restart_exhausted_ladder(
+    org_id: &str,
+    seen: &config::meta::oncall::Response,
+    now: i64,
+) -> Result<bool, anyhow::Error> {
+    use config::meta::triggers::{Trigger, TriggerModule, TriggerStatus};
+    use o2_enterprise::enterprise::oncall::{escalation::EscalationTriggerData, replicate};
+
+    let Some(updated) =
+        infra::table::oncall_responses::restart_exhausted(org_id, seen, now).await?
+    else {
+        return Ok(false);
+    };
+    // Read before the delete: the row carries the investigation every later rung renders.
+    let carried =
+        match infra::scheduler::get(org_id, TriggerModule::OncallEscalation, &updated.id).await {
+            Ok(trigger) => EscalationTriggerData::read(&trigger.data),
+            Err(_) => EscalationTriggerData::none(),
+        };
+    let _ = infra::scheduler::delete(org_id, TriggerModule::OncallEscalation, &updated.id).await;
+    infra::scheduler::push(Trigger {
+        org: org_id.to_string(),
+        module: TriggerModule::OncallEscalation,
+        module_key: updated.id.clone(),
+        next_run_at: now,
+        is_realtime: false,
+        is_silenced: false,
+        status: TriggerStatus::Waiting,
+        retries: 0,
+        data: carried.write(),
+        ..Default::default()
+    })
+    .await?;
+    replicate::response(&updated).await;
+    Ok(true)
 }
 
 /// A manual run does not decide L0, so only a stored off reason skips the un-mute decision.

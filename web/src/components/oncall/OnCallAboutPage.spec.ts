@@ -65,19 +65,16 @@ describe("OnCallAboutPage", () => {
     );
   });
 
-  /// `parseRoutingReason` only understands today's four sentence shapes. A
-  /// fifth one the server starts sending ("...as an impacted caller of the
-  /// failing service") still opens "routed to <id>" — that id is trustworthy
-  /// even when the prose around it isn't, so it is kept and linked to the
-  /// team rather than dumping the whole sentence on the card.
-  it("keeps just the id, linked, from a routing sentence it doesn't recognise", () => {
+  /// Unrecognised wording still shows the record's team, linked by the record's own id.
+  it("keeps just the team, linked by the record's id, from a routing sentence it doesn't recognise", () => {
     const wrapper = render({
-      routingReason: "routed to tm_9 as an impacted caller of the failing service",
+      routingReason: "routed to Platform SRE as an impacted caller of the failing service",
       teamId: "tm_9",
+      teamName: "Platform SRE",
     });
 
     const reason = wrapper.find('[data-test="oncall-about-routing-reason"]');
-    expect(reason.text()).toBe("tm_9");
+    expect(reason.text()).toBe("Platform SRE");
     expect(reason.text()).not.toContain("impacted caller");
 
     const link = wrapper
