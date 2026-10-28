@@ -113,6 +113,7 @@ const mockDashboardPanelData = {
 
 describe("ConfigPanel", () => {
   let wrapper: any;
+  const mountedWrappers: ReturnType<typeof mount>[] = [];
 
   const defaultProps = {
     dashboardPanelData: mockDashboardPanelData,
@@ -129,18 +130,14 @@ describe("ConfigPanel", () => {
     vi.clearAllMocks();
 
     store.state.selectedOrganization = { identifier: "test-org" };
-
-    // Reset any potential state contamination between tests
-    if (wrapper) {
-      wrapper.unmount();
-      wrapper = null;
-    }
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
+    for (const mounted of mountedWrappers) {
+      if (mounted.exists()) mounted.unmount();
     }
+    mountedWrappers.length = 0;
+    wrapper = undefined;
   });
 
   const createWrapper = (props = {}, options = {}) => {
@@ -154,7 +151,7 @@ describe("ConfigPanel", () => {
       selectedStreamFields: props.dashboardPanelData?.meta?.stream?.selectedStreamFields || [],
     });
 
-    return mount(ConfigPanel, {
+    const mounted = mount(ConfigPanel, {
       props: {
         ...defaultProps,
         ...props,
@@ -180,6 +177,8 @@ describe("ConfigPanel", () => {
         },
       },
     });
+    mountedWrappers.push(mounted);
+    return mounted;
   };
 
   describe("gauge section", () => {

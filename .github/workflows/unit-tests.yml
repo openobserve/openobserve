@@ -33,6 +33,8 @@ jobs:
     outputs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
+      ui_shards: ${{ steps.ui_matrix.outputs.ui_shards }}
+      ui_shard_count: ${{ steps.ui_matrix.outputs.ui_shard_count }}
     steps:
       # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
       - if: github.event_name == 'pull_request'
@@ -61,6 +63,10 @@ jobs:
           else
             echo "has_ui_changes=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Read UI shard configuration
+        id: ui_matrix
+        run: node web/scripts/ui-tests/run.mjs matrix >> "$GITHUB_OUTPUT"
 
   backend_static_checks:
     needs: [check_changes]
@@ -261,7 +267,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: ${{ fromJSON(needs.check_changes.outputs.ui_shards) }}
     permissions:
       contents: read
 
@@ -289,8 +295,8 @@ jobs:
       - name: Upload shard coverage
         uses: actions/upload-artifact@v4
         with:
-          name: ui-unit-blob-${{ matrix.shard }}
-          path: web/.vitest-reports/blob-${{ matrix.shard }}-4.json
+          name: ui-unit-shard-${{ matrix.shard }}-${{ needs.check_changes.outputs.ui_shard_count }}
+          path: web/.vitest-reports/ui-unit-shard-${{ matrix.shard }}-${{ needs.check_changes.outputs.ui_shard_count }}/
           include-hidden-files: true
           overwrite: true
           retention-days: 3
@@ -299,7 +305,7 @@ jobs:
   # Runs even when a shard fails, so the ui_unit_tests check fails instead of being skipped.
   ui_unit_tests:
     needs: [check_changes, ui_unit_test_shards]
-    if: ${{ !cancelled() && needs.check_changes.outputs.has_ui_changes == 'true' }}
+    if: ${{ always() && needs.check_changes.outputs.has_ui_changes == 'true' }}
     timeout-minutes: 20
     runs-on:
       labels: ubicloud-standard-8
@@ -333,9 +339,9 @@ jobs:
       - name: Download shard coverage
         uses: actions/download-artifact@v4
         with:
-          pattern: ui-unit-blob-*
+          pattern: ui-unit-shard-*
           path: web/.vitest-reports
-          merge-multiple: true
+          merge-multiple: false
 
       - name: Merge shard coverage and check thresholds
         working-directory: web
@@ -363,6 +369,10 @@ jobs:
       - name: Install dependencies
         working-directory: web
         run: npm ci
+
+      - name: Verify UI shard partition and report validation
+        working-directory: web
+        run: node --test scripts/ui-tests/*.test.mjs
 
       - name: Prettier format check (any unformatted file fails)
         working-directory: web

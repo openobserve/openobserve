@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-# Default coverage thresholds - you can override these with environment variables
 export FRONTEND_COVERAGE_LINES=${FRONTEND_COVERAGE_LINES:-72}
 export FRONTEND_COVERAGE_FUNCTIONS=${FRONTEND_COVERAGE_FUNCTIONS:-65}
 export FRONTEND_COVERAGE_BRANCHES=${FRONTEND_COVERAGE_BRANCHES:-61}
@@ -13,8 +12,8 @@ Usage: $0 [-h | --help] [<command>]
 
 Commands:
   check             Run frontend tests with coverage and verify thresholds
-  shard <n>         Run CI shard <n> of 4 with coverage (thresholds are checked by merge)
-  merge             Merge all four CI shard reports and verify thresholds
+  shard <n>         Run CI shard <n> with coverage (thresholds are checked by merge)
+  merge             Merge all CI shard reports and verify thresholds
   html              Generate coverage report in HTML format
   show-env          Show the coverage thresholds
   test              Run tests with coverage
@@ -57,17 +56,16 @@ cmd_check() {
 }
 
 cmd_shard() {
-    npm run test:unit:coverage -- --config vitest.shard.config.ts --shard="$1/4"
+    local count index
+    count=$(node scripts/ui-tests/run.mjs count)
+    index=$(node --input-type=module -e 'import { shardIndex } from "./scripts/ui-tests/partition.mjs"; console.log(shardIndex(process.argv[1], process.argv[2]))' "${1:-}" "$count")
+    rm -rf ".vitest-reports/ui-unit-shard-$index-$count"
+    npm run test:unit:coverage -- --config vitest.shard.config.ts --shard="$index/$count"
 }
 
 cmd_merge() {
-    for shard in 1 2 3 4; do
-        test -s ".vitest-reports/blob-$shard-4.json" || {
-            echo "Missing coverage shard $shard/4 (its artifact may have expired: re-run all jobs)" >&2
-            return 1
-        }
-    done
-    npm run test:unit:coverage -- --merge-reports .vitest-reports
+    node scripts/ui-tests/run.mjs validate
+    npm run test:unit:coverage -- --config vitest.ci.config.ts --merge-reports .vitest-reports/merged
     cmd_verify
 }
 
@@ -92,6 +90,8 @@ try:
         report = json.load(f)
     
     totals = report['total']
+    if any(totals[metric]['total'] <= 0 for metric in thresholds):
+        raise ValueError('Coverage summary is empty')
     
     exit_status = 0
     for metric, threshold in thresholds.items():
