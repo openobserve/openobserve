@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { enableAutoUnmount, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it } from "vitest";
 import i18n from "@/locales";
 import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";
 import { formatPercent } from "./format";
+
+enableAutoUnmount(afterEach);
 
 const mountDetails = (name: string) =>
   mount(ProfilesFunctionDetails, {

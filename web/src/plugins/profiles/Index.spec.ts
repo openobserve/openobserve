@@ -643,9 +643,46 @@ describe("Profiles page", () => {
       [360_000, 300],
     ]);
     expect(series.showSymbol).toBe(true);
+    expect(
+      series.data.map((datum: unknown, dataIndex: number) => series.symbol(datum, { dataIndex })),
+    ).toEqual(["none", "none", "none", "emptyCircle"]);
     const { tooltip } = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
     expect(tooltip.valueFormatter(null)).toBe("—");
     expect(tooltip.valueFormatter(200)).toBe("200 B");
+  });
+
+  it("keeps symbols off for an in-use line whose gap leaves no point on its own", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 100 },
+          { timestamp: 120_000_000, value: 200 },
+          { timestamp: 360_000_000, value: 300 },
+          { timestamp: 420_000_000, value: 400 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, unit: "bytes", profile_type: "inuse_space" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0];
+    expect(series.data).toContainEqual([180_000, null]);
+    expect(series.showSymbol).toBe(false);
+    expect(series.symbol).toBeUndefined();
   });
 
   it("leaves the series unfilled when the response has no step", async () => {

@@ -913,7 +913,11 @@ describe("FlameGraphView theme and size", () => {
   });
 
   it("leaves resizes to ChartRenderer below lg, resizes at lg+ only when the container size differs from the drawn size, and stops watching on unmount", async () => {
-    const observers: { callback: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
+    const observers: {
+      callback: () => void;
+      disconnect: ReturnType<typeof vi.fn>;
+      observe: ReturnType<typeof vi.fn>;
+    }[] = [];
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -965,6 +969,8 @@ describe("FlameGraphView theme and size", () => {
       });
       await flushPromises();
       expect(observers).toHaveLength(1);
+      expect(observers[0].observe).toHaveBeenCalledTimes(1);
+      expect(observers[0].observe).toHaveBeenCalledWith(wrapper.element);
 
       breakpoint.lgUp = false;
       box.width = 400;

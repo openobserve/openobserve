@@ -1091,18 +1091,27 @@ const seriesChartData = computed(() => {
           formatter: (v: number) => formatSeriesAxisLabel(v),
         },
       },
-      series: lines.map((line, index) => ({
-        type: "line",
-        name: line.label,
-        smooth: false,
-        // With symbols off, a lone point (or one cut off by a gap) draws nothing, and two read as a bare segment.
-        showSymbol: line.points.length < 3 || lineData[index].some(([, value]) => value === null),
-        color: line.color || undefined,
-        lineStyle: { width: 2 },
-        // An area under one line reads as volume; under several it hides the lines below.
-        areaStyle: lines.length === 1 ? { opacity: 0.12 } : undefined,
-        data: lineData[index],
-      })),
+      series: lines.map((line, index) => {
+        const isolated = isolatedPoints(lineData[index]);
+        const fewPoints = line.points.length < 3;
+        return {
+          type: "line",
+          name: line.label,
+          smooth: false,
+          // With symbols off, a lone point (or one cut off by a gap) draws nothing, and two read as a bare segment.
+          showSymbol: fewPoints || isolated.size > 0,
+          symbol:
+            fewPoints || !isolated.size
+              ? undefined
+              : (_value: unknown, params: { dataIndex: number }) =>
+                  isolated.has(params.dataIndex) ? "emptyCircle" : "none",
+          color: line.color || undefined,
+          lineStyle: { width: 2 },
+          // An area under one line reads as volume; under several it hides the lines below.
+          areaStyle: lines.length === 1 ? { opacity: 0.12 } : undefined,
+          data: lineData[index],
+        };
+      }),
     },
   };
 });
@@ -1333,9 +1342,23 @@ const withGaps = (points: SeriesDatum[], stepMs: number, gapValue: number | null
   return filled;
 };
 
+/** Indexes of points with no non-null neighbour, which a line cannot draw without a symbol. */
+const isolatedPoints = (points: SeriesDatum[]) => {
+  const isolated = new Set<number>();
+  points.forEach(([, value], index) => {
+    if (value === null) return;
+    const before = points[index - 1]?.[1] ?? null;
+    const after = points[index + 1]?.[1] ?? null;
+    if (before === null && after === null) isolated.add(index);
+  });
+  return isolated;
+};
+
 /** Byte ticks on round binary steps (0, 2.5, 5 GiB), not decimal steps shown as 3.73 GiB. */
 const byteAxisInterval = (points: SeriesDatum[]) => {
-  const max = Math.max(0, ...points.map(([, value]) => value ?? 0));
+  // A loop, not Math.max(...spread), which overflows the call stack on long multi-line runs.
+  let max = 0;
+  for (const [, value] of points) if (value !== null && value > max) max = value;
   if (!max) return undefined;
   const unitSize = 1024 ** Math.min(4, Math.floor(Math.log(max) / Math.log(1024)));
   return niceStep(max / unitSize / 3) * unitSize;

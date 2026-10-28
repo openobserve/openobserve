@@ -1560,7 +1560,7 @@
     "functionDetails": "函数详情",
     "package": "包",
     "callPaths": "调用路径",
-    "calledBy": "调用方",
+    "calledBy": "被谁调用",
     "calls": "调用",
     "self": "自身",
     "total": "总量",
