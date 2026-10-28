@@ -395,6 +395,28 @@ describe("useTraceCorrelation", () => {
       expect(correlationData.value?.backend_spans).toHaveLength(0);
     });
 
+    it("reports no backend trace, not a failure, when the org has no traces stream", async () => {
+      const traceId = ref("test-trace-123");
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(createMockSearchResponse([createMockRumEvent()]))
+        .mockRejectedValueOnce({
+          response: {
+            status: 400,
+            data: { code: 20002, message: "Search stream not found: default" },
+          },
+        });
+
+      const { fetchCorrelation, correlationData, error, hasBackendTrace } = useTraceCorrelation(
+        traceId,
+        t,
+      );
+      await fetchCorrelation();
+
+      expect(error.value).toBeNull();
+      expect(hasBackendTrace.value).toBe(false);
+      expect(correlationData.value?.backend_spans).toHaveLength(0);
+    });
+
     it("should handle complete fetch failure", async () => {
       const traceId = ref("test-trace-123");
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
