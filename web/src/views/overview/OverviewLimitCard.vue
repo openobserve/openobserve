@@ -17,15 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     section="limit"
     :title="t('overview.sections.ingestLimit')"
     :view="view"
+    :locked-message="t('overview.limit.lockedMessage')"
     @retry="emit('retry')"
     @unlock="emit('unlock')"
   >
     <div class="flex flex-col gap-3" data-test="overview-limit-body">
       <div class="flex items-baseline justify-between gap-3">
         <span class="text-text-body text-sm">{{ t("overview.limit.used") }}</span>
-        <span class="text-text-heading text-sm font-medium" data-test="overview-limit-percent">{{
-          raw(`${percent.toFixed(1)}%`)
-        }}</span>
+        <span class="flex items-center gap-2">
+          <OTag
+            v-if="status"
+            type="countChip"
+            :value="status.tone"
+            data-test="overview-limit-status"
+            >{{ status.label }}</OTag
+          >
+          <span class="text-text-heading text-sm font-medium" data-test="overview-limit-percent">{{
+            raw(`${percent.toFixed(1)}%`)
+          }}</span>
+        </span>
       </div>
       <p class="text-text-secondary text-xs" data-test="overview-limit-scope">
         {{ t("overview.limit.scope") }}
@@ -78,6 +88,11 @@ const { t } = useI18nTyped();
 
 const view = computed(() => sectionView(props.section, props));
 const percent = computed(() => props.section?.data?.ingestion_used_percent ?? 0);
+const status = computed(() => {
+  if (percent.value >= 100) return { tone: "error", label: t("overview.limit.overLimit") };
+  if (percent.value >= 80) return { tone: "warning", label: t("overview.limit.nearLimit") };
+  return null;
+});
 const daysOver = computed(() => props.section?.data?.days_over_limit ?? 0);
 const expired = computed(() => props.section?.data?.expired === true);
 </script>

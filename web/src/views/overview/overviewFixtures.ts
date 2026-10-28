@@ -62,3 +62,16 @@ export const buildOverview = (over: Partial<OrgOverview> = {}): OrgOverview => (
   cached: false,
   ...over,
 });
+
+export const buildHealthyOverview = (): OrgOverview =>
+  buildOverview({
+    alerts: ok({
+      total: 12,
+      enabled: 10,
+      disabled: 2,
+      by_state: { firing: 0, pending: 0, error: 0, normal: 10 },
+      by_level: {},
+      failed_evaluation: 0,
+    }),
+    pipelines: ok({ total: 9, enabled: 8, disabled: 1, errored: 0 }),
+  });

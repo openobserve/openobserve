@@ -40,6 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Sections rendered top-to-bottom; each collapses when empty -->
 
+    <p
+      v-if="pageState !== 'forbidden' && overview"
+      class="text-text-secondary mb-2 text-xs"
+      data-test="overview-freshness-note"
+    >
+      {{ t("overview.freshness", { time: generatedAtLabel }) }}
+    </p>
+
     <OverviewHeadlineStrip
       v-if="pageState !== 'forbidden'"
       class="mb-5"
@@ -60,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.alerts"
         :pending="overviewPending"
         :failed="overviewFailed"
-        @retry="() => loadAll(true)"
+        @retry="() => loadOverview(true)"
         @open="goToAlertList"
       />
       <OverviewDataHealthCard
@@ -68,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.pipelines"
         :pending="overviewPending"
         :failed="overviewFailed"
-        @retry="() => loadAll(true)"
+        @retry="() => loadOverview(true)"
         @open="goToPipelines"
       />
     </div>
@@ -493,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.streams"
         :pending="overviewPending"
         :failed="overviewFailed"
-        @retry="() => loadAll(true)"
+        @retry="() => loadOverview(true)"
         @open="goToStreams"
         @start-ingesting="goToIngestion"
       />
@@ -502,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="overview?.limits"
         :pending="overviewPending"
         :failed="overviewFailed"
-        @retry="() => loadAll(true)"
+        @retry="() => loadOverview(true)"
         @unlock="openUpgradeDialog"
       />
     </div>
@@ -570,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty state — everything is healthy or no data yet -->
     <OEmptyState
-      v-else-if="pageState === 'all-clear'"
+      v-else-if="pageState === 'all-clear' && !overviewShowsProblem"
       illustration="check"
       size="hero"
       :hide-action="true"
@@ -716,6 +724,7 @@ import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
+import { formatTimestamp } from "@/utils/date";
 import { overviewKeys } from "@/services/overview.querykeys";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -853,6 +862,20 @@ const sectionFailure = reactive<Record<SectionKey, unknown>>({
 const overview = ref<OrgOverview | null>(null);
 const overviewFailed = ref(false);
 const overviewState = reactive({ loading: false, loaded: false });
+let overviewSeq = 0;
+const generatedAtLabel = computed(() =>
+  overview.value ? formatTimestamp(overview.value.generated_at, "YYYY-MM-DD HH:mm") : "",
+);
+// the all-clear hero must not contradict a problem the cards report
+const overviewShowsProblem = computed(() => {
+  const o = overview.value;
+  if (!o) return false;
+  return (
+    (o.alerts.data?.by_state.firing ?? 0) > 0 ||
+    (o.alerts.data?.failed_evaluation ?? 0) > 0 ||
+    (o.pipelines.data?.errored ?? 0) > 0
+  );
+});
 const overviewPending = computed(() => overviewState.loading && !overviewState.loaded);
 const alertCount = ref<number | null>(null);
 const summaryFailed = ref(false);
@@ -963,8 +986,10 @@ const loadAll = async (force = false) => {
   if (!allFailed.value && pageState.value !== "error") lastFetched.value = new Date();
 };
 
+// only the latest call may set the result or clear loading
 const loadOverview = async (force = false) => {
   const org = orgId.value;
+  const seq = ++overviewSeq;
   overviewState.loading = true;
   try {
     if (force) {
@@ -975,16 +1000,18 @@ const loadOverview = async (force = false) => {
       });
     }
     const res = await queryClient.fetchQuery(orgOverviewQuery(org, { refresh: force }));
-    if (org !== orgId.value) return;
+    if (seq !== overviewSeq) return;
     overview.value = res;
     overviewFailed.value = false;
   } catch {
-    if (org !== orgId.value) return;
+    if (seq !== overviewSeq) return;
     overview.value = null;
     overviewFailed.value = true;
   } finally {
-    overviewState.loading = false;
-    overviewState.loaded = true;
+    if (seq === overviewSeq) {
+      overviewState.loading = false;
+      overviewState.loaded = true;
+    }
   }
 };
 

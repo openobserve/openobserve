@@ -105,7 +105,7 @@ import incidentsService from "@/services/incidents";
 import serviceGraphService from "@/services/service_graph";
 import organizationsService from "@/services/organizations";
 import overviewService from "@/services/overview";
-import { buildOverview } from "./overview/overviewFixtures";
+import { buildHealthyOverview, buildOverview } from "./overview/overviewFixtures";
 import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
@@ -150,6 +150,12 @@ const internals = (w: VueWrapper) =>
     hasAnyData: boolean;
     isLoading: boolean;
     sectionState: Record<SectionKey, { loading: boolean; loaded: boolean }>;
+  };
+
+const internalsOverview = (w: VueWrapper) =>
+  w.vm as unknown as {
+    overviewPending: boolean;
+    overviewState: { loading: boolean; loaded: boolean };
   };
 
 describe("OverviewTab", () => {
@@ -255,7 +261,7 @@ describe("OverviewTab", () => {
     localStorage.removeItem("o2_overview_time");
 
     vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
-      data: buildOverview(),
+      data: buildHealthyOverview(),
     } as never);
     givenNoData();
     givenStreams({ logs: [{ name: "app", stream_type: "logs" }] });
@@ -1260,6 +1266,9 @@ describe("OverviewTab", () => {
     const tile = (key: string) => `[data-test="overview-headline-${key}"]`;
 
     it("should fetch /overview once on mount and render real values", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview(),
+      } as never);
       wrapper = mountOverviewTab();
       await flushPromises();
 
@@ -1297,7 +1306,9 @@ describe("OverviewTab", () => {
     });
 
     it("should show the error state on every /overview card, keep the rest, and retry with refresh=true", async () => {
-      vi.mocked(overviewService.getOrgOverview).mockRejectedValueOnce(new Error("boom"));
+      vi.mocked(overviewService.getOrgOverview)
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValue({ data: buildOverview() } as never);
       givenRecentEvents();
 
       wrapper = mountOverviewTab();
@@ -1357,6 +1368,83 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="overview-streams-empty"]').exists()).toBe(true);
+    });
+
+    it("should say the cards show the current state and when they were generated", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const note = wrapper.get('[data-test="overview-freshness-note"]').text();
+      expect(note).toContain("current state");
+      expect(note).toMatch(/Updated \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+    });
+
+    it("should hide the freshness note when /overview failed", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-freshness-note"]').exists()).toBe(false);
+    });
+
+    it("should keep the all-clear hero when the overview shows no problem", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+    });
+
+    it.each([
+      ["firing alerts", { alerts: { by_state: { firing: 1 }, failed_evaluation: 0 } }],
+      ["failing rules", { alerts: { by_state: { firing: 0 }, failed_evaluation: 2 } }],
+      ["pipeline errors", { pipelines: { errored: 1 } }],
+    ])("should not render the all-clear hero while %s are reported", async (_n, patch) => {
+      const base = buildHealthyOverview();
+      const data = {
+        ...base,
+        alerts: { ...base.alerts, data: { ...base.alerts.data!, ...(patch as any).alerts } },
+        pipelines: {
+          ...base.pipelines,
+          data: { ...base.pipelines.data!, ...(patch as any).pipelines },
+        },
+      };
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({ data } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should retry a single card with only the /overview request", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const alertCalls = vi.mocked(alertsService.getHistory).mock.calls.length;
+
+      await wrapper.get('[data-test="overview-alerts-retry-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(overviewService.getOrgOverview).toHaveBeenCalledTimes(2);
+      expect(alertsService.getHistory).toHaveBeenCalledTimes(alertCalls);
+    });
+
+    it("should keep loading until the latest overlapping /overview call settles", async () => {
+      const first = deferred<{ data: unknown }>();
+      vi.mocked(overviewService.getOrgOverview).mockReturnValue(first.promise as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      await wrapper.get(REFRESH_BTN).trigger("click");
+      await flushPromises();
+      expect(internalsOverview(wrapper).overviewState.loading).toBe(true);
+      expect(internalsOverview(wrapper).overviewPending).toBe(true);
+
+      first.resolve({ data: buildOverview() });
+      await flushPromises();
+      expect(internalsOverview(wrapper).overviewState.loading).toBe(false);
+      expect(internalsOverview(wrapper).overviewPending).toBe(false);
+      expect(wrapper.get(tile("firing")).text()).toContain("3");
     });
 
     it("should lock the incidents tile on a build without the incidents license", async () => {

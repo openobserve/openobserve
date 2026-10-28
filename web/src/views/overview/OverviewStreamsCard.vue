@@ -44,9 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4">
       <ul class="flex flex-col" data-test="overview-streams-types">
         <li v-for="type in byType" :key="type.stream_type">
-          <button
-            type="button"
-            class="hover:bg-table-row-hover-bg rounded-default flex w-full cursor-pointer items-center justify-between gap-3 px-2 py-1.5 text-left"
+          <OButton
+            variant="ghost"
+            block
+            class="h-auto justify-between"
             :data-test="`overview-streams-type-${type.stream_type}`"
             @click="emit('open')"
           >
@@ -56,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw("·") }}
               {{ raw(formatSizeFromMB(type.storage_size_mb)) }}
             </span>
-          </button>
+          </OButton>
         </li>
       </ul>
       <div v-if="topRows.length > 0" data-test="overview-streams-top">
@@ -65,20 +66,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <ul class="flex flex-col">
           <li v-for="row in topRows" :key="`${row.stream_type}-${row.name}`">
-            <button
-              type="button"
-              class="hover:bg-table-row-hover-bg rounded-default flex w-full cursor-pointer flex-col gap-1 px-2 py-1.5 text-left"
+            <OButton
+              variant="ghost"
+              block
+              class="h-auto justify-between"
               :data-test="`overview-streams-top-${row.stream_type}-${row.name}`"
               @click="emit('open')"
             >
-              <span class="flex items-center justify-between gap-3">
-                <OTruncatedText class="text-text-body text-sm">{{ raw(row.name) }}</OTruncatedText>
-                <span class="text-text-secondary shrink-0 text-xs">{{
-                  raw(formatSizeFromMB(row.storage_size_mb))
-                }}</span>
+              <span class="flex w-full flex-col gap-1 text-left">
+                <span class="flex items-center justify-between gap-3">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <OTag type="streamType" :value="row.stream_type" class="shrink-0" />
+                    <OTruncatedText class="text-text-body text-sm">{{
+                      raw(row.name)
+                    }}</OTruncatedText>
+                  </span>
+                  <span class="text-text-secondary shrink-0 text-xs">{{
+                    raw(formatSizeFromMB(row.storage_size_mb))
+                  }}</span>
+                </span>
+                <OProgressBar :value="sizeShare(row.storage_size_mb, topRows)" size="xs" />
               </span>
-              <OProgressBar :value="sizeShare(row.storage_size_mb, topRows)" size="xs" />
-            </button>
+            </OButton>
           </li>
         </ul>
       </div>

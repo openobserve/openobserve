@@ -82,7 +82,7 @@ describe("OverviewDataHealthCard", () => {
       data: { total: 3, enabled: 3, disabled: 0, errored: 0 },
     } as const;
     const w = mount(OverviewDataHealthCard, { props: { ...base, section }, global });
-    expect(w.get('[data-test="overview-data-health-row-pipelines"]').text()).toContain("None");
+    expect(w.get('[data-test="overview-data-health-row-pipelines"]').text()).toContain("No errors");
   });
 
   it("shows the empty note when there are no pipelines", () => {
@@ -115,6 +115,14 @@ describe("OverviewStreamsCard", () => {
     expect(w.get('[data-test="overview-streams-type-logs"]').text()).toContain("4 streams");
     expect(w.get('[data-test="overview-streams-type-logs"]').text()).toContain("1.50 GB");
     expect(w.get('[data-test="overview-streams-type-metrics"]').text()).toContain("512.00 MB");
+  });
+
+  it("tags each top stream with its type so same-named streams differ", () => {
+    const w = mount(OverviewStreamsCard, { props: { ...base, section: o.streams }, global });
+    expect(w.get('[data-test="overview-streams-top-logs-app_logs"]').text()).toContain("Logs");
+    expect(w.get('[data-test="overview-streams-top-metrics-cpu_usage"]').text()).toContain(
+      "Metrics",
+    );
   });
 
   it("lists top streams largest first", () => {
@@ -171,6 +179,27 @@ describe("OverviewLimitCard", () => {
     );
   });
 
+  it.each([
+    [79.9, null],
+    [80, "Near limit"],
+    [99.9, "Near limit"],
+    [100, "Over limit"],
+  ])("labels %s percent in text, not colour only", (percent, label) => {
+    const section = {
+      status: "ok",
+      data: {
+        scope: "deployment",
+        ingestion_used_percent: percent,
+        expired: false,
+        days_over_limit: 0,
+      },
+    } as const;
+    const w = mount(OverviewLimitCard, { props: { ...base, section }, global });
+    const tag = w.find('[data-test="overview-limit-status"]');
+    if (label) expect(tag.text()).toBe(label);
+    else expect(tag.exists()).toBe(false);
+  });
+
   it("flags an expired license", () => {
     const section = {
       status: "ok",
@@ -188,7 +217,9 @@ describe("OverviewLimitCard", () => {
     });
     const locked = w.get('[data-test="overview-limit-locked"]');
     expect(locked.element.tagName).toBe("BUTTON");
-    expect(locked.text()).toContain("enterprise license");
+    expect(locked.text()).toBe(
+      "Track ingestion against your license limit with an enterprise license.",
+    );
     expect(w.text()).not.toContain("secret internal");
     await locked.trigger("click");
     expect(w.emitted("unlock")).toHaveLength(1);

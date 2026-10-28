@@ -24,7 +24,6 @@ export type OverviewView = "loading" | "error" | "forbidden" | "locked" | "empty
 
 export const TOP_STREAMS_LIMIT = 5;
 
-/** Which state a card shows; `failed` is a failed request, `pending` a first load still in flight. */
 export function sectionView(
   section: OverviewSection<unknown> | null | undefined,
   opts: { pending: boolean; failed: boolean },
@@ -35,14 +34,12 @@ export function sectionView(
   return section.status;
 }
 
-/** Fill colour for the ingest-limit bar: red at or over the limit, amber from 80 percent. */
 export function percentVariant(percent: number): ProgressBarVariant {
   if (percent >= 100) return "danger";
   if (percent >= 80) return "warning";
   return "default";
 }
 
-/** Server percent to a 0..1 bar value, clamped. */
 export function percentToFraction(percent: number): number {
   return Math.min(1, Math.max(0, percent / 100));
 }
@@ -51,7 +48,6 @@ export interface TopStreamRow extends OverviewTopStream {
   stream_type: string;
 }
 
-/** Top streams across every type, largest stored size first. */
 export function mergeTopStreams(
   byType: OverviewStreamTypeSummary[],
   limit = TOP_STREAMS_LIMIT,
@@ -62,7 +58,6 @@ export function mergeTopStreams(
     .slice(0, limit);
 }
 
-/** Bar fraction of a row against the largest listed row. */
 export function sizeShare(sizeMb: number, rows: TopStreamRow[]): number {
   const max = Math.max(0, ...rows.map((r) => r.storage_size_mb));
   return max > 0 ? sizeMb / max : 0;

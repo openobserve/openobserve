@@ -49,6 +49,17 @@ describe("OverviewHeadlineStrip", () => {
     expect(tile(w, "streams").text()).toContain("2.00 GB");
   });
 
+  it("hides the pipelines sub-line when there are no pipelines", () => {
+    const base = buildOverview();
+    const overview = {
+      ...base,
+      pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
+    } as typeof base;
+    const w = mountStrip({ overview });
+    expect(tile(w, "pipelines").text()).not.toContain("of 0");
+    expect(tile(w, "pipelines").text()).not.toContain("of ");
+  });
+
   it("shows a skeleton, never a zero, while the first load is pending", () => {
     const w = mountStrip({ overview: null, pending: true });
     expect(w.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(5);
