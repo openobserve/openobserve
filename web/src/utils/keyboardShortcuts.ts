@@ -45,6 +45,13 @@ export function isInputFocused(target?: EventTarget | null): boolean {
   return !!role && INPUT_ROLES.includes(role);
 }
 
+/** True when the element (default: the focused one) sits inside a dialog, drawer or popover. */
+export function isInsideDialog(target?: EventTarget | null): boolean {
+  const el = target ?? document.activeElement;
+  if (!(el instanceof Element)) return false;
+  return !!el.closest('[role="dialog"], [role="alertdialog"]');
+}
+
 /**
  * Focuses a search field identified by its `data-test`, resilient to where the
  * attribute actually lands in the DOM:
