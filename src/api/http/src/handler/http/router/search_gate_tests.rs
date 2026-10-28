@@ -274,7 +274,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 62] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 65] = [
     ("api/management/src/request/alert_calibration/digests.rs", "read", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -326,6 +326,9 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 62] = [
     ("core/src/fleet.rs", "search_audit", Caller::Exempt("fleet audit trail from the meta org audit stream; its route stays open")),
     ("core/src/metrics/prom.rs", "get_label_values", Caller::Routed("promql::label_values")),
     ("core/src/metrics/prom.rs", "get_series", Caller::Routed("promql::label_values")),
+    ("core/src/public_dashboards/mod.rs", "promql", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
+    ("core/src/public_dashboards/mod.rs", "publish_estimate", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
+    ("core/src/public_dashboards/mod.rs", "sql", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
     ("core/src/self_reporting/search.rs", "get_usage", Caller::Exempt("licence usage from the meta org")),
     ("core/src/slo/job.rs", "prom_search", Caller::Background("SLO job")),
     ("core/src/slo/job.rs", "search", Caller::Background("SLO job")),
