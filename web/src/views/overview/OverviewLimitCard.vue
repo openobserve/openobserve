@@ -54,6 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ daysOver }}</OTag
         >
       </div>
+      <p class="text-text-secondary text-xs" data-test="overview-limit-block-note">
+        {{ t("overview.limit.blockNote") }}
+      </p>
       <div class="flex items-center justify-between gap-3">
         <span class="text-text-secondary text-sm">{{ t("overview.limit.license") }}</span>
         <OTag
@@ -74,12 +77,13 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { OverviewLimitsData, OverviewSection } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
-import { percentToFraction, percentVariant, sectionView } from "./overviewFormat";
+import { limitLevel, percentToFraction, percentVariant, sectionView } from "./overviewFormat";
 
 const props = defineProps<{
   section?: OverviewSection<OverviewLimitsData>;
   pending: boolean;
   failed: boolean;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{ retry: []; unlock: [] }>();
@@ -89,8 +93,10 @@ const { t } = useI18nTyped();
 const view = computed(() => sectionView(props.section, props));
 const percent = computed(() => props.section?.data?.ingestion_used_percent ?? 0);
 const status = computed(() => {
-  if (percent.value >= 100) return { tone: "error", label: t("overview.limit.overLimit") };
-  if (percent.value >= 80) return { tone: "warning", label: t("overview.limit.nearLimit") };
+  const level = limitLevel(percent.value);
+  if (level === "over") return { tone: "error", label: t("overview.limit.overLimit") };
+  if (level === "critical") return { tone: "error", label: t("overview.limit.nearLimit") };
+  if (level === "warning") return { tone: "warning", label: t("overview.limit.approachingLimit") };
   return null;
 });
 const daysOver = computed(() => props.section?.data?.days_over_limit ?? 0);

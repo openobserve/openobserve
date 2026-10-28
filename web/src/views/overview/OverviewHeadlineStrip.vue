@@ -29,7 +29,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatSizeFromMB } from "@/utils/formatters";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
-import { sectionView } from "./overviewFormat";
+import { firingCount, sectionView } from "./overviewFormat";
 
 export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "streams";
 export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable";
@@ -38,6 +38,7 @@ const props = defineProps<{
   overview: OrgOverview | null;
   pending: boolean;
   failed: boolean;
+  forbidden?: boolean;
   incidentsState: IncidentsTile;
   incidentsTotal: number;
 }>();
@@ -59,7 +60,11 @@ const sectionTile = <T,>(
   section: OverviewSection<T> | undefined,
   pick: (data: T) => number,
 ): { value: string | number; note?: I18nText; ok: boolean } => {
-  const view = sectionView(section, { pending: false, failed: props.failed });
+  const view = sectionView(section, {
+    pending: false,
+    failed: props.failed,
+    forbidden: props.forbidden,
+  });
   if (view !== "ok" || !section?.data)
     return { value: DASH, note: unavailableNote(view), ok: false };
   return { value: pick(section.data), ok: true };
@@ -67,13 +72,13 @@ const sectionTile = <T,>(
 
 const pipelinesSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
   if (!tile.ok) return tile.note;
-  const total = props.overview?.pipelines.data?.total ?? 0;
-  return total > 0 ? t("overview.cards.pipelinesOf", { total }) : undefined;
+  const enabled = props.overview?.pipelines.data?.enabled ?? 0;
+  return enabled > 0 ? t("overview.cards.pipelinesOf", { enabled }) : undefined;
 };
 
 const items = computed<StatItem[]>(() => {
   const o = props.overview;
-  const firing = sectionTile(o?.alerts, (d) => d.by_state.firing ?? 0);
+  const firing = sectionTile(o?.alerts, (d) => firingCount(d));
   const failing = sectionTile(o?.alerts, (d) => d.failed_evaluation);
   const pipelines = sectionTile(o?.pipelines, (d) => d.errored);
   const streams = sectionTile(o?.streams, (d) => d.total_streams);
@@ -109,6 +114,7 @@ const items = computed<StatItem[]>(() => {
       label: t("overview.cards.openIncidents"),
       value: incidentsOk ? props.incidentsTotal : DASH,
       sub: incidentNote[props.incidentsState],
+      loading: props.incidentsState === "loading",
       icon: "warning",
       tone: incidentsOk && props.incidentsTotal > 0 ? "warning" : "neutral",
       dataTest: "overview-headline-incidents",
@@ -130,6 +136,8 @@ const items = computed<StatItem[]>(() => {
         ? raw(formatSizeFromMB(o?.streams.data?.total_storage_size_mb ?? 0))
         : streams.note,
       icon: "storage",
+      // no real maximum exists, so a huge one keeps the tile bar from drawing full
+      max: Number.MAX_SAFE_INTEGER,
       tone: "neutral",
       dataTest: "overview-headline-streams",
     },

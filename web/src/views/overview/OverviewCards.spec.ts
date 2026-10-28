@@ -41,6 +41,27 @@ describe("OverviewAlertsCard", () => {
     expect(w.get('[data-test="overview-alerts-row-failing"]').text()).toContain("4");
   });
 
+  it("counts notify-failed rules as firing", () => {
+    const section = {
+      status: "ok",
+      data: { ...o.alerts.data!, by_state: { firing: 1, notify_failed: 2 } },
+    } as const;
+    const w = mount(OverviewAlertsCard, { props: { ...base, section }, global });
+    expect(w.get('[data-test="overview-alerts-row-firing"]').text()).toContain("3");
+  });
+
+  it("shows an empty state with an action when there are no alert rules", async () => {
+    const section = {
+      status: "ok",
+      data: { ...o.alerts.data!, total: 0, enabled: 0, by_state: {}, failed_evaluation: 0 },
+    } as const;
+    const w = mount(OverviewAlertsCard, { props: { ...base, section }, global });
+    expect(w.get('[data-test="overview-alerts-empty"]').text()).toContain("No alert rules yet");
+    expect(w.find('[data-test="overview-alerts-rows"]').exists()).toBe(false);
+    await w.get('[data-test="overview-alerts-open-btn"]').trigger("click");
+    expect(w.emitted("open")).toHaveLength(1);
+  });
+
   it("opens the alert list from a row", async () => {
     const w = mount(OverviewAlertsCard, { props: { ...base, section: o.alerts }, global });
     await w.get('[data-test="overview-alerts-row-firing"]').trigger("click");
@@ -70,10 +91,28 @@ describe("OverviewAlertsCard", () => {
   });
 });
 
+describe("forbidden request", () => {
+  it.each([
+    ["alerts", OverviewAlertsCard],
+    ["data-health", OverviewDataHealthCard],
+    ["streams", OverviewStreamsCard],
+    ["limit", OverviewLimitCard],
+  ])("shows %s as no access without Retry", (name, comp) => {
+    const w = mount(comp as never, {
+      props: { pending: false, failed: false, forbidden: true },
+      global,
+    });
+    expect(w.find(`[data-test="overview-${name}-forbidden"]`).exists()).toBe(true);
+    expect(w.find(`[data-test="overview-${name}-retry-btn"]`).exists()).toBe(false);
+  });
+});
+
 describe("OverviewDataHealthCard", () => {
   it("shows errored of total", () => {
     const w = mount(OverviewDataHealthCard, { props: { ...base, section: o.pipelines }, global });
-    expect(w.get('[data-test="overview-data-health-row-pipelines"]').text()).toContain("2 of 9");
+    expect(w.get('[data-test="overview-data-health-row-pipelines"]').text()).toContain(
+      "2 of 8 enabled",
+    );
   });
 
   it("shows none when no pipeline errors", () => {
@@ -85,13 +124,13 @@ describe("OverviewDataHealthCard", () => {
     expect(w.get('[data-test="overview-data-health-row-pipelines"]').text()).toContain("No errors");
   });
 
-  it("shows the empty note when there are no pipelines", () => {
+  it("shows the empty state when there are no pipelines", () => {
     const section = {
       status: "ok",
       data: { total: 0, enabled: 0, disabled: 0, errored: 0 },
     } as const;
     const w = mount(OverviewDataHealthCard, { props: { ...base, section }, global });
-    expect(w.find('[data-test="overview-data-health-none"]').exists()).toBe(true);
+    expect(w.get('[data-test="overview-data-health-none"]').text()).toContain("No pipelines yet");
   });
 
   it.each(stateSections)("renders %s without the API text", (_n, section, suffix) => {
@@ -134,6 +173,12 @@ describe("OverviewStreamsCard", () => {
       "overview-streams-top-logs-web_logs",
     ]);
     expect(rows[0].text()).toContain("1.00 GB");
+  });
+
+  it("labels each top stream bar with the stream name", () => {
+    const w = mount(OverviewStreamsCard, { props: { ...base, section: o.streams }, global });
+    const bar = w.get('[data-test="overview-streams-top-logs-app_logs"] [role="progressbar"]');
+    expect(bar.attributes("aria-label")).toBe("app_logs");
   });
 
   it("emits open from a top stream row", async () => {
@@ -180,9 +225,10 @@ describe("OverviewLimitCard", () => {
   });
 
   it.each([
-    [79.9, null],
-    [80, "Near limit"],
-    [99.9, "Near limit"],
+    [70, null],
+    [70.1, "Approaching limit"],
+    [90, "Approaching limit"],
+    [90.1, "Near limit"],
     [100, "Over limit"],
   ])("labels %s percent in text, not colour only", (percent, label) => {
     const section = {
@@ -198,6 +244,13 @@ describe("OverviewLimitCard", () => {
     const tag = w.find('[data-test="overview-limit-status"]');
     if (label) expect(tag.text()).toBe(label);
     else expect(tag.exists()).toBe(false);
+  });
+
+  it("labels the window and says search is blocked past the allowed days", () => {
+    const w = mount(OverviewLimitCard, { props: { ...base, section: o.limits }, global });
+    expect(w.text()).toContain("Ingested today (UTC)");
+    expect(w.text()).toContain("Days over the limit this month");
+    expect(w.get('[data-test="overview-limit-block-note"]').text()).toContain("Search is blocked");
   });
 
   it("flags an expired license", () => {

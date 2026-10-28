@@ -21,20 +21,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @retry="emit('retry')"
     @view-all="emit('open')"
   >
+    <template #empty>
+      <OEmptyState
+        size="inline"
+        icon="notifications"
+        :title="t('overview.alerts.emptyTitle')"
+        data-test="overview-alerts-empty"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="overview-alerts-open-btn"
+            @click="emit('open')"
+          >
+            {{ t("overview.alerts.emptyAction") }}
+          </OButton>
+        </template>
+      </OEmptyState>
+    </template>
     <ul class="flex flex-col" data-test="overview-alerts-rows">
       <li v-for="row in rows" :key="row.key">
-        <OButton
-          variant="ghost"
-          block
-          class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
-          :data-test="`overview-alerts-row-${row.key}`"
-          @click="emit('open')"
-        >
+        <OverviewRowButton :data-test="`overview-alerts-row-${row.key}`" @click="emit('open')">
           <span class="text-text-body text-sm">{{ row.label }}</span>
           <OTag type="countChip" :value="row.count > 0 ? row.tone : 'neutral'">{{
             row.count
           }}</OTag>
-        </OButton>
+        </OverviewRowButton>
       </li>
     </ul>
   </OverviewSectionCard>
@@ -43,23 +56,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { OverviewAlertsData, OverviewSection } from "@/ts/interfaces/overview";
+import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
-import { sectionView } from "./overviewFormat";
+import { firingCount, sectionView } from "./overviewFormat";
 
 const props = defineProps<{
   section?: OverviewSection<OverviewAlertsData>;
   pending: boolean;
   failed: boolean;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{ retry: []; open: [] }>();
 
 const { t } = useI18nTyped();
 
-const view = computed(() => sectionView(props.section, props));
+const view = computed(() => {
+  const base = sectionView(props.section, props);
+  return base === "ok" && props.section?.data?.total === 0 ? "empty" : base;
+});
 
 const rows = computed(() => {
   const data = props.section?.data;
@@ -67,7 +86,7 @@ const rows = computed(() => {
     {
       key: "firing",
       label: t("overview.alerts.firing"),
-      count: data?.by_state.firing ?? 0,
+      count: firingCount(data),
       tone: "error",
     },
     {

@@ -24,6 +24,7 @@ const overview = {
   getOrgOverview: (org: string, { top, refresh }: OverviewParams = {}) =>
     http().get(`/api/${org}/overview`, {
       params: { ...(top ? { top } : {}), ...(refresh ? { refresh: true } : {}) },
+      silentForbidden: true,
     }),
 };
 

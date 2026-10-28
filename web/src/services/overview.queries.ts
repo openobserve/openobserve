@@ -22,12 +22,10 @@ import type { OrgOverview } from "@/ts/interfaces/overview";
 export const OVERVIEW_TOP = 5;
 
 // `refresh` stays out of the key so a forced read replaces the cached entry instead of forking it.
-export const orgOverviewQuery = (org: string, opts: { top?: number; refresh?: boolean } = {}) => {
-  const top = opts.top ?? OVERVIEW_TOP;
-  return queryOptions({
-    queryKey: overviewKeys.data(org, top),
+export const orgOverviewQuery = (org: string, opts: { refresh?: boolean } = {}) =>
+  queryOptions({
+    queryKey: overviewKeys.data(org, OVERVIEW_TOP),
     queryFn: async (): Promise<OrgOverview> =>
-      (await overview.getOrgOverview(org, { top, refresh: opts.refresh })).data,
+      (await overview.getOrgOverview(org, { top: OVERVIEW_TOP, refresh: opts.refresh })).data,
     staleTime: LIVE_STALE_TIME,
   });
-};

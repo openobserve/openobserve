@@ -44,7 +44,7 @@ describe("OverviewHeadlineStrip", () => {
     expect(tile(w, "failing").text()).toContain("4");
     expect(tile(w, "incidents").text()).toContain("6");
     expect(tile(w, "pipelines").text()).toContain("2");
-    expect(tile(w, "pipelines").text()).toContain("of 9");
+    expect(tile(w, "pipelines").text()).toContain("of 8 enabled");
     expect(tile(w, "streams").text()).toContain("7");
     expect(tile(w, "streams").text()).toContain("2.00 GB");
   });
@@ -58,6 +58,33 @@ describe("OverviewHeadlineStrip", () => {
     const w = mountStrip({ overview });
     expect(tile(w, "pipelines").text()).not.toContain("of 0");
     expect(tile(w, "pipelines").text()).not.toContain("of ");
+  });
+
+  it("counts a notify-failed rule as firing", () => {
+    const base = buildOverview();
+    const overview = {
+      ...base,
+      alerts: {
+        status: "ok",
+        data: { ...base.alerts.data!, by_state: { firing: 2, notify_failed: 3 } },
+      },
+    } as typeof base;
+    expect(tile(mountStrip({ overview }), "firing").text()).toContain("5");
+  });
+
+  it("shows no access on every overview tile for a forbidden request", () => {
+    const w = mountStrip({ overview: null, forbidden: true });
+    for (const key of ["firing", "failing", "pipelines", "streams"]) {
+      expect(tile(w, key).text()).toContain("No access");
+    }
+  });
+
+  it("skeletons only the incidents tile while incidents load", () => {
+    const w = mountStrip({ incidentsState: "loading" });
+    expect(w.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(1);
+    expect(tile(w, "incidents").find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(
+      true,
+    );
   });
 
   it("shows a skeleton, never a zero, while the first load is pending", () => {

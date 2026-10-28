@@ -22,35 +22,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @view-all="emit('open')"
   >
     <template #empty>
-      <p class="text-text-secondary text-sm" data-test="overview-data-health-none">
-        {{ t("overview.dataHealth.noPipelines") }}
-      </p>
+      <OEmptyState
+        size="inline"
+        icon="database"
+        :title="t('overview.dataHealth.noPipelines')"
+        data-test="overview-data-health-none"
+      />
     </template>
-    <OButton
-      variant="ghost"
-      block
-      class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
-      data-test="overview-data-health-row-pipelines"
-      @click="emit('open')"
-    >
+    <OverviewRowButton data-test="overview-data-health-row-pipelines" @click="emit('open')">
       <span class="text-text-body text-sm">{{ t("overview.dataHealth.pipelinesErrored") }}</span>
       <span class="flex items-center gap-2">
         <OTag type="countChip" :value="errored > 0 ? 'error' : 'success'">{{
           errored > 0
-            ? t("overview.dataHealth.errorCount", { errored, total })
+            ? t("overview.dataHealth.errorCount", { errored, enabled })
             : t("overview.dataHealth.allHealthy")
         }}</OTag>
       </span>
-    </OButton>
+    </OverviewRowButton>
   </OverviewSectionCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { OverviewPipelinesData, OverviewSection } from "@/ts/interfaces/overview";
+import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import { sectionView } from "./overviewFormat";
 
@@ -58,6 +56,7 @@ const props = defineProps<{
   section?: OverviewSection<OverviewPipelinesData>;
   pending: boolean;
   failed: boolean;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{ retry: []; open: [] }>();
@@ -65,6 +64,7 @@ const emit = defineEmits<{ retry: []; open: [] }>();
 const { t } = useI18nTyped();
 
 const errored = computed(() => props.section?.data?.errored ?? 0);
+const enabled = computed(() => props.section?.data?.enabled ?? 0);
 const total = computed(() => props.section?.data?.total ?? 0);
 
 const view = computed(() => {
