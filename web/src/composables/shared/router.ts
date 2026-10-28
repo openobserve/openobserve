@@ -1290,7 +1290,7 @@ const useRoutes = () => {
           },
         },
         {
-          path: "heatmap",
+          path: "heatmaps",
           name: "RumClickHeatmap",
           component: ClickHeatmap,
           meta: {

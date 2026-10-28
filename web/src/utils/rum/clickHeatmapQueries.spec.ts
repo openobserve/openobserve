@@ -48,7 +48,7 @@ const URL = "view_url = '/pricing'";
 describe("pageListSql", () => {
   it("counts distinct clicks per page, busiest first", () => {
     expect(pageListSql(scope())).toBe(
-      `SELECT view_url, COUNT(DISTINCT action_id) AS clicks FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
+      `SELECT view_url, COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
     );
   });
 

@@ -23,229 +23,401 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="insights"
     bleed
   >
-    <template #actions>
-      <OSelect
-        v-model="rangeKey"
-        :aria-label="t('rum.heatmap.rangeLabel')"
-        :options="rangeOptions"
-        size="sm"
-        class="w-40"
-        data-test="rum-heatmap-range-select"
-        @update:model-value="loadApps"
-      />
-      <OSelect
-        v-model="appId"
-        :aria-label="t('rum.heatmap.appLabel')"
-        :options="appOptions"
-        size="sm"
-        searchable
-        class="w-48"
-        data-test="rum-heatmap-app-select"
-        @update:model-value="onAppChange"
-      />
-      <OSelect
-        v-model="deviceClass"
-        :aria-label="t('rum.heatmap.deviceLabel')"
-        :options="deviceOptions"
-        size="sm"
-        class="w-36"
-        data-test="rum-heatmap-device-select"
-        @update:model-value="loadPage(false)"
-      />
-      <OSelect
-        v-model="pageUrl"
-        :aria-label="t('rum.heatmap.pageLabel')"
-        :options="pageOptions"
-        :placeholder="t('rum.heatmap.pagePlaceholder')"
-        size="sm"
-        searchable
-        class="w-80 max-md:w-48"
-        data-test="rum-heatmap-page-select"
-        @update:model-value="loadPage()"
-      />
-    </template>
+    <div class="flex h-full min-h-0 flex-col">
+      <div
+        class="border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5"
+        data-test="rum-heatmap-toolbar"
+      >
+        <div class="w-44 shrink-0 max-md:w-full">
+          <OSelect
+            v-model="rangeKey"
+            :aria-label="t('rum.heatmap.rangeLabel')"
+            :options="rangeOptions"
+            size="sm"
+            data-test="rum-heatmap-range-select"
+            @update:model-value="loadApps"
+          >
+            <template #icon-left><OIcon name="schedule" size="sm" /></template>
+          </OSelect>
+        </div>
+        <div class="w-48 shrink-0 max-md:w-full">
+          <OSelect
+            v-model="appId"
+            :aria-label="t('rum.heatmap.appLabel')"
+            :options="appOptions"
+            size="sm"
+            searchable
+            data-test="rum-heatmap-app-select"
+            @update:model-value="onAppChange"
+          >
+            <template #icon-left><OIcon name="view-in-ar" size="sm" /></template>
+          </OSelect>
+        </div>
+        <OToggleGroup
+          :model-value="deviceClass"
+          :aria-label="t('rum.heatmap.deviceLabel')"
+          mobile-dropdown
+          data-test="rum-heatmap-device-select"
+          @update:model-value="onDeviceChange"
+        >
+          <OToggleGroupItem
+            v-for="opt in deviceOptions"
+            :key="opt.value"
+            :value="opt.value"
+            :icon-left="opt.icon"
+            size="sm"
+            :data-test="`rum-heatmap-device-${opt.value}`"
+          >
+            {{ opt.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <div class="min-w-0 flex-[1_1_20rem]">
+          <OPopover
+            v-model:open="pageOpen"
+            :aria-label="t('rum.heatmap.pageLabel')"
+            content-class="w-(--reka-popover-trigger-width) p-0"
+          >
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                block
+                :disabled="!pageRows.length"
+                :aria-label="t('rum.heatmap.pageLabel')"
+                data-test="rum-heatmap-page-select"
+              >
+                <template #icon-left><OIcon name="link" size="sm" /></template>
+                <span
+                  class="text-compact min-w-0 flex-1 truncate text-left font-mono"
+                  :title="pageUrl"
+                  data-test="rum-heatmap-page-current"
+                >
+                  {{ pageUrl || t("rum.heatmap.pagePlaceholder") }}
+                </span>
+                <span
+                  class="text-text-muted text-xs font-normal"
+                  data-test="rum-heatmap-page-count"
+                >
+                  {{ t("rum.heatmap.pageCount", { count: pageRows.length }, pageRows.length) }}
+                </span>
+                <template #icon-right><OIcon name="unfold-more" size="sm" /></template>
+              </OButton>
+            </template>
+            <div class="flex flex-col" data-test="rum-heatmap-page-list">
+              <div class="border-border-default border-b p-2">
+                <OSearchInput
+                  v-model="pageQuery"
+                  :placeholder="t('rum.heatmap.pageSearch')"
+                  data-test="rum-heatmap-page-search"
+                />
+              </div>
+              <div
+                class="text-text-muted grid grid-cols-[minmax(0,1fr)_4.5rem_5rem] gap-2 px-3 py-1.5 text-xs font-semibold"
+              >
+                <span>{{ t("rum.heatmap.pageColPage") }}</span>
+                <span class="text-right">{{ t("rum.heatmap.colClicks") }}</span>
+                <span class="text-right">{{ t("rum.heatmap.colSessions") }}</span>
+              </div>
+              <div class="max-h-72 overflow-auto">
+                <OButton
+                  v-for="p in visiblePages"
+                  :key="p.url"
+                  variant="ghost"
+                  size="sm"
+                  block
+                  :data-test="`rum-heatmap-page-option-${p.url}`"
+                  @click="onPagePick(p.url)"
+                >
+                  <span
+                    class="text-compact grid w-full grid-cols-[minmax(0,1fr)_4.5rem_5rem] items-center gap-2 text-left font-normal"
+                    :class="p.url === pageUrl ? 'text-accent' : ''"
+                  >
+                    <span class="truncate font-mono" :title="p.url">{{ p.url }}</span>
+                    <span class="text-right font-semibold">{{ addCommasToNumber(p.clicks) }}</span>
+                    <span class="text-right">{{ addCommasToNumber(p.sessions) }}</span>
+                  </span>
+                </OButton>
+                <p
+                  v-if="!visiblePages.length"
+                  class="text-text-muted px-3 py-4 text-center text-xs"
+                  data-test="rum-heatmap-page-none"
+                >
+                  {{ t("rum.heatmap.pageNone") }}
+                </p>
+              </div>
+            </div>
+          </OPopover>
+        </div>
+      </div>
 
-    <OEmptyState
-      v-if="!loading && !pageOptions.length && !loadError"
-      preset="no-data"
-      :title="t('rum.heatmap.noPages')"
-      data-test="rum-heatmap-empty"
-    />
-    <div v-else-if="loadError" class="p-4">
       <OBanner
+        v-if="settingsFailed"
         variant="warning"
         dense
-        :content="loadError ?? undefined"
-        data-test="rum-heatmap-load-error"
-      >
-        <template #actions>
-          <OButton variant="outline" size="sm" data-test="rum-heatmap-retry-btn" @click="onRetry">{{
-            t("common.retry")
-          }}</OButton>
-        </template>
-      </OBanner>
-    </div>
-    <div v-else class="flex h-full min-h-0 flex-col">
-      <div v-if="summary.clicks" class="shrink-0 px-4 pt-4" data-test="rum-heatmap-stats">
-        <OStatStrip :items="statItems" :loading="loading" />
-      </div>
-      <div class="flex min-h-0 flex-1 gap-4 p-4 max-lg:flex-col">
-        <div
-          ref="scrollerRef"
-          class="rounded-surface border-border-default min-w-0 flex-1 overflow-auto border"
+        :content="t('rum.heatmap.settingsFailed')"
+        data-test="rum-heatmap-settings-failed"
+      />
+      <OBanner
+        v-if="deviceSplitFailed"
+        variant="warning"
+        dense
+        :content="t('rum.heatmap.deviceSplitFailed')"
+        data-test="rum-heatmap-device-split-failed"
+      />
+
+      <OEmptyState
+        v-if="!loading && !pageRows.length && !loadError"
+        preset="no-data"
+        :title="t('rum.heatmap.noPages')"
+        data-test="rum-heatmap-empty"
+      />
+      <div v-else-if="loadError" class="p-4">
+        <OBanner
+          variant="warning"
+          dense
+          :content="loadError ?? undefined"
+          data-test="rum-heatmap-load-error"
         >
-          <OEmptyState
-            v-if="snapshotError"
-            size="block"
-            :title="snapshotError"
-            data-test="rum-heatmap-snapshot-error"
-          />
-          <OBanner
-            v-if="pageUrl && !loading && !groups.length"
-            variant="warning"
-            dense
-            :content="
-              deviceClass === 'all' ? t('rum.heatmap.noPosition') : t('rum.heatmap.noDeviceData')
-            "
-            data-test="rum-heatmap-no-position"
-          />
-          <div class="flex p-4">
-            <div ref="fitRef" class="mx-auto shrink-0 overflow-hidden">
-              <OSpinner v-if="snapshotLoading" size="lg" data-test="rum-heatmap-snapshot-loading" />
-              <div
-                v-show="snapshotReady"
-                ref="stageRef"
-                role="img"
-                :aria-label="t('rum.heatmap.stageLabel')"
-                class="origin-top-left [&_.replayer-mouse]:hidden [&_.replayer-mouse-tail]:hidden"
-                data-test="rum-heatmap-stage"
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="rum-heatmap-retry-btn"
+              @click="onRetry"
+              >{{ t("common.retry") }}</OButton
+            >
+          </template>
+        </OBanner>
+      </div>
+      <template v-else>
+        <div
+          v-if="summary.clicks"
+          class="border-border-default bg-surface-subtle flex shrink-0 flex-wrap items-stretch gap-y-2 border-b px-4 py-2.5"
+          data-test="rum-heatmap-stats"
+        >
+          <div
+            v-for="stat in statItems"
+            :key="stat.key"
+            class="border-border-default flex min-w-0 flex-col justify-center border-e px-6 first:ps-0"
+            :data-test="stat.dataTest"
+          >
+            <span class="text-text-secondary text-xs font-semibold">{{ stat.label }}</span>
+            <span class="text-xl leading-tight font-bold" :class="stat.valueClass">{{
+              stat.value
+            }}</span>
+          </div>
+          <div
+            v-if="summary.top"
+            class="flex min-w-0 flex-1 flex-col justify-center px-6"
+            data-test="rum-heatmap-stat-top"
+          >
+            <span class="text-text-secondary text-xs font-semibold">{{
+              t("rum.heatmap.statTopElement")
+            }}</span>
+            <span class="min-w-0 truncate font-bold">
+              {{ summary.top.name || summary.top.selector }}
+              <span class="text-text-muted font-normal">{{
+                t("rum.heatmap.statTopShare", {
+                  pct: sharePercent(summary.top.clicks, summary.clicks),
+                })
+              }}</span>
+            </span>
+          </div>
+        </div>
+        <div
+          class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(20rem,38%)] max-lg:grid-cols-1 max-lg:grid-rows-[minmax(24rem,1fr)_auto]"
+        >
+          <div class="relative min-h-0 min-w-0 p-4">
+            <div
+              ref="scrollerRef"
+              class="rounded-surface border-border-default h-full min-w-0 overflow-auto border"
+            >
+              <OEmptyState
+                v-if="snapshotError"
+                size="block"
+                :title="snapshotError"
+                data-test="rum-heatmap-snapshot-error"
               />
+              <OBanner
+                v-if="pageUrl && !loading && !groups.length"
+                variant="warning"
+                dense
+                :content="
+                  deviceClass === 'all'
+                    ? t('rum.heatmap.noPosition')
+                    : t('rum.heatmap.noDeviceData')
+                "
+                data-test="rum-heatmap-no-position"
+              />
+              <div class="flex p-4">
+                <div ref="fitRef" class="mx-auto shrink-0 overflow-hidden">
+                  <OSpinner
+                    v-if="snapshotLoading"
+                    size="lg"
+                    data-test="rum-heatmap-snapshot-loading"
+                  />
+                  <div
+                    v-show="snapshotReady"
+                    ref="stageRef"
+                    role="img"
+                    :aria-label="t('rum.heatmap.stageLabel')"
+                    class="origin-top-left [&_.replayer-mouse]:hidden [&_.replayer-mouse-tail]:hidden"
+                    data-test="rum-heatmap-stage"
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="snapshotReady"
+              class="border-border-default bg-surface-base rounded-default pointer-events-none absolute bottom-8 left-8 flex items-center gap-2 border px-2.5 py-1.5 text-xs shadow-sm"
+              data-test="rum-heatmap-legend"
+            >
+              {{ t("rum.heatmap.legendFewer") }}
+              <span class="bg-heat-legend h-2 w-24 rounded-full" aria-hidden="true" />
+              {{ t("rum.heatmap.legendMore") }}
+            </div>
+          </div>
+
+          <div
+            class="border-border-default flex min-h-0 flex-col border-s max-lg:border-s-0 max-lg:border-t"
+          >
+            <div class="border-border-default flex flex-col gap-2 border-b px-3 py-2.5">
+              <OSearchInput
+                v-model="elementQuery"
+                :placeholder="t('rum.heatmap.elementSearch')"
+                data-test="rum-heatmap-element-search"
+              />
+              <div class="flex flex-wrap items-center gap-1.5">
+                <OBadge
+                  v-for="chip in chips"
+                  :key="chip.key"
+                  :variant="chip.active ? 'primary-soft' : 'default-outline'"
+                  clickable
+                  :disabled="chip.disabled"
+                  :title="chip.title"
+                  :aria-pressed="chip.active"
+                  :data-test="`rum-heatmap-chip-${chip.key}`"
+                  @click="chip.toggle"
+                >
+                  {{ chip.label }}
+                </OBadge>
+                <span class="text-text-muted ms-auto text-xs" data-test="rum-heatmap-element-count">
+                  {{
+                    t("rum.heatmap.elementCount", { count: visibleRows.length }, visibleRows.length)
+                  }}
+                </span>
+              </div>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <OTable
+                :data="visibleRows"
+                :columns="columns"
+                :default-columns="false"
+                row-key="selector"
+                pagination="none"
+                sorting="server"
+                sort-by="clicks"
+                :sort-order="sortOrder"
+                :show-global-filter="false"
+                :frame="false"
+                horizontal-scroll
+                :row-class="rowClass"
+                :loading="loading"
+                data-test="rum-heatmap-elements-table"
+                @row-click="onRowClick"
+                @sort-change="onSortChange"
+              >
+                <template #cell-feature="{ row }">
+                  <div
+                    class="flex min-w-0 flex-col"
+                    :data-test="`rum-heatmap-feature-${row.selector}`"
+                  >
+                    <span
+                      v-if="row.firstUnused"
+                      class="text-text-secondary text-xs font-medium"
+                      data-test="rum-heatmap-unused-heading"
+                    >
+                      {{ t("rum.heatmap.unusedHeading") }}
+                    </span>
+                    <OTruncatedText class="text-sm font-semibold">{{ row.feature }}</OTruncatedText>
+                    <OTruncatedText
+                      v-if="row.name"
+                      class="text-text-muted font-mono text-xs"
+                      data-test="rum-heatmap-selector"
+                    >
+                      {{ row.selector }}
+                    </OTruncatedText>
+                    <span v-if="row.clicks" class="text-text-secondary text-xs">
+                      {{
+                        t(
+                          "rum.heatmap.sessionsCount",
+                          { count: addCommasToNumber(row.sessions) },
+                          row.sessions,
+                        )
+                      }}
+                      <span
+                        v-if="row.frustrated"
+                        :title="
+                          t('rum.heatmap.frustrationSplit', {
+                            rage: addCommasToNumber(row.rage),
+                            dead: addCommasToNumber(row.dead),
+                            error: addCommasToNumber(row.error),
+                          })
+                        "
+                        :data-test="`rum-heatmap-frustrated-${row.selector}`"
+                      >
+                        {{ frustrationText(row) }}
+                      </span>
+                      <span
+                        v-if="row.missing"
+                        class="text-status-warning-text font-semibold"
+                        :data-test="`rum-heatmap-not-on-snapshot-${row.selector}`"
+                      >
+                        · {{ t("rum.heatmap.chipNotOnSnapshot") }}
+                      </span>
+                    </span>
+                  </div>
+                </template>
+                <template #cell-clicks="{ row }">
+                  <div v-if="row.clicks" class="flex flex-col items-end gap-1.5">
+                    <span class="font-bold">{{ addCommasToNumber(row.clicks) }}</span>
+                    <span class="bg-border-default h-1 w-full rounded-full">
+                      <span
+                        class="bg-progress-bar-default block h-1 rounded-full"
+                        :style="{ width: barPercent(row.clicks) + '%' }"
+                      />
+                    </span>
+                  </div>
+                </template>
+                <template #cell-share="{ row }">
+                  <span v-if="row.clicks" class="text-text-secondary">{{
+                    t("rum.heatmap.sharePct", { pct: row.share })
+                  }}</span>
+                </template>
+              </OTable>
+            </div>
+            <div
+              class="border-border-default text-text-muted flex flex-wrap gap-x-1 border-t px-3 py-2 text-xs"
+              data-test="rum-heatmap-footer"
+            >
+              <span v-if="limitedText" data-test="rum-heatmap-limited">{{ limitedText }}</span>
+              <span v-if="limitedText && snapshotReady" aria-hidden="true">·</span>
+              <span v-if="snapshotReady" data-test="rum-heatmap-placed">
+                {{ t("rum.heatmap.drawn", { placed: placedCount, total: groups.length }) }}
+              </span>
+              <span v-if="unknownDeviceClicks" data-test="rum-heatmap-unknown-device">
+                {{
+                  t(
+                    "rum.heatmap.unknownDevice",
+                    { count: addCommasToNumber(unknownDeviceClicks) },
+                    unknownDeviceClicks,
+                  )
+                }}
+              </span>
             </div>
           </div>
         </div>
-
-        <div class="flex w-136 shrink-0 flex-col gap-2 max-lg:w-full">
-          <OBanner
-            v-if="settingsFailed"
-            variant="warning"
-            dense
-            :content="t('rum.heatmap.settingsFailed')"
-            data-test="rum-heatmap-settings-failed"
-          />
-          <span
-            v-if="pagesLimited"
-            class="text-text-secondary text-xs"
-            data-test="rum-heatmap-pages-limited"
-          >
-            {{ t("rum.heatmap.pagesLimited", { count: PAGE_LIST_LIMIT }, PAGE_LIST_LIMIT) }}
-          </span>
-          <span
-            v-if="rankingLimited"
-            class="text-text-secondary text-xs"
-            data-test="rum-heatmap-ranking-limited"
-          >
-            {{ t("rum.heatmap.rankingLimited", { count: RANKING_LIMIT }, RANKING_LIMIT) }}
-          </span>
-          <span
-            v-if="snapshotReady"
-            class="text-text-secondary text-xs"
-            data-test="rum-heatmap-placed"
-          >
-            {{ t("rum.heatmap.placed", { placed: placedCount, total: groups.length }) }}
-          </span>
-          <OBanner
-            v-if="deviceSplitFailed"
-            variant="warning"
-            dense
-            :content="t('rum.heatmap.deviceSplitFailed')"
-            data-test="rum-heatmap-device-split-failed"
-          />
-          <span
-            v-if="unknownDeviceClicks"
-            class="text-text-secondary text-xs"
-            data-test="rum-heatmap-unknown-device"
-          >
-            {{
-              t(
-                "rum.heatmap.unknownDevice",
-                { count: addCommasToNumber(unknownDeviceClicks) },
-                unknownDeviceClicks,
-              )
-            }}
-          </span>
-          <OTable
-            :data="tableRows"
-            :columns="columns"
-            :default-columns="false"
-            row-key="selector"
-            pagination="none"
-            sorting="none"
-            :show-global-filter="false"
-            :frame="false"
-            horizontal-scroll
-            :loading="loading"
-            data-test="rum-heatmap-elements-table"
-            @row-click="onRowClick"
-          >
-            <template #cell-feature="{ row }">
-              <div class="flex min-w-0 flex-col" :data-test="`rum-heatmap-feature-${row.selector}`">
-                <span
-                  v-if="row.firstUnused"
-                  class="text-text-secondary text-xs font-medium"
-                  data-test="rum-heatmap-unused-heading"
-                >
-                  {{ t("rum.heatmap.unusedHeading") }}
-                </span>
-                <OTruncatedText class="text-sm">{{ row.feature }}</OTruncatedText>
-                <OTruncatedText v-if="row.name" class="text-text-secondary text-xs">
-                  {{ row.selector }}
-                </OTruncatedText>
-                <span
-                  v-if="snapshotReady && row.clicks && !placedSelectors.has(row.selector)"
-                  class="text-text-secondary text-xs"
-                  :data-test="`rum-heatmap-not-on-snapshot-${row.selector}`"
-                >
-                  {{ t("rum.heatmap.notOnPage") }}
-                </span>
-              </div>
-            </template>
-            <template #cell-clicks="{ row, value }">
-              <ODataBarCell
-                :value="row.clicks"
-                :max="clicksMax"
-                :display="addCommasToNumber(Number(value))"
-              />
-            </template>
-            <template #cell-sessions="{ row }">
-              <span v-if="row.clicks">
-                {{
-                  t("rum.heatmap.sessionsReach", {
-                    count: addCommasToNumber(row.sessions),
-                    pct: sharePercent(row.sessions, summary.sessions),
-                  })
-                }}
-              </span>
-            </template>
-            <template #cell-frustrated="{ row }">
-              <span
-                v-if="row.clicks"
-                :title="
-                  t('rum.heatmap.frustrationSplit', {
-                    rage: addCommasToNumber(row.rage),
-                    dead: addCommasToNumber(row.dead),
-                    error: addCommasToNumber(row.error),
-                  })
-                "
-              >
-                {{ addCommasToNumber(row.frustrated) }}
-              </span>
-            </template>
-            <template #cell-share="{ row }">
-              <span v-if="row.clicks">{{ t("rum.heatmap.sharePct", { pct: row.share }) }}</span>
-            </template>
-          </OTable>
-        </div>
-      </div>
+      </template>
     </div>
   </OPageLayout>
 </template>
@@ -256,13 +428,16 @@ import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
-import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { addCommasToNumber } from "@/utils/formatters";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -310,6 +485,30 @@ interface ElementRow {
   dead: number;
   error: number;
   firstUnused?: boolean;
+  missing?: boolean;
+}
+
+interface PageRow {
+  url: string;
+  clicks: number;
+  sessions: number;
+}
+
+interface StatCell {
+  key: string;
+  label: I18nText;
+  value: string;
+  valueClass?: string;
+  dataTest: string;
+}
+
+interface FilterChip {
+  key: string;
+  label: I18nText;
+  active: boolean;
+  disabled?: boolean;
+  title?: I18nText;
+  toggle: () => void;
 }
 
 const APP_LIMIT = 100;
@@ -338,7 +537,15 @@ const deviceClass = ref<DeviceClass>("all");
 const appId = ref("");
 const appOptions = ref<{ label: ReturnType<typeof raw>; value: string }[]>([]);
 const pageUrl = ref("");
-const pageOptions = ref<{ label: ReturnType<typeof raw>; value: string }[]>([]);
+const pageRows = ref<PageRow[]>([]);
+const pageOpen = ref(false);
+const pageQuery = ref("");
+const elementQuery = ref("");
+const onlyMissing = ref(false);
+const onlyFrustrated = ref(false);
+const showUnused = ref(false);
+const unusedAvailable = ref(false);
+const sortOrder = ref<"asc" | "desc">("desc");
 const loading = ref(true);
 const groups = ref<ElementGroup[]>([]);
 const totals = ref({ clicks: 0, sessions: 0, frustrated: 0 });
@@ -393,10 +600,14 @@ const deviceLabel = (key: string, device: DeviceBucket) => {
 };
 
 const deviceOptions = computed(() => [
-  { label: t("rum.heatmap.deviceAll"), value: "all" },
-  { label: deviceLabel("rum.heatmap.deviceDesktop", "desktop"), value: "desktop" },
-  { label: deviceLabel("rum.heatmap.deviceTablet", "tablet"), value: "tablet" },
-  { label: deviceLabel("rum.heatmap.devicePhone", "phone"), value: "phone" },
+  { label: t("rum.heatmap.deviceAll"), value: "all", icon: "devices" },
+  {
+    label: deviceLabel("rum.heatmap.deviceDesktop", "desktop"),
+    value: "desktop",
+    icon: "computer",
+  },
+  { label: deviceLabel("rum.heatmap.deviceTablet", "tablet"), value: "tablet", icon: "tablet" },
+  { label: deviceLabel("rum.heatmap.devicePhone", "phone"), value: "phone", icon: "smartphone" },
 ]);
 
 const unknownDeviceClicks = computed(() => deviceClicks.value.unknown ?? 0);
@@ -404,8 +615,8 @@ const placedCount = computed(() => placedSelectors.value.size);
 const summary = computed<ClickSummary>(() => ({ ...totals.value, top: groups.value[0] ?? null }));
 const clicksMax = computed(() => groups.value[0]?.clicks ?? 0);
 const unusedRows = ref<ElementRow[]>([]);
-const tableRows = computed<ElementRow[]>(() => [
-  ...groups.value.map((g) => ({
+const clickedRows = computed<ElementRow[]>(() =>
+  groups.value.map((g) => ({
     selector: g.selector,
     name: g.name,
     feature: g.name || g.selector,
@@ -416,30 +627,80 @@ const tableRows = computed<ElementRow[]>(() => [
     rage: g.rage,
     dead: g.dead,
     error: g.error,
+    missing: snapshotReady.value && !placedSelectors.value.has(g.selector),
   })),
-  ...unusedRows.value.map((r, i) => ({ ...r, firstUnused: i === 0 })),
-]);
+);
+const matchesQuery = (r: ElementRow) =>
+  `${r.feature} ${r.selector}`.toLowerCase().includes(elementQuery.value.trim().toLowerCase());
+const visibleRows = computed<ElementRow[]>(() => {
+  const clicked = clickedRows.value.filter(
+    (r) =>
+      matchesQuery(r) &&
+      (!onlyMissing.value || r.missing) &&
+      (!onlyFrustrated.value || r.frustrated),
+  );
+  if (sortOrder.value === "asc") clicked.reverse();
+  const filtered = onlyMissing.value || onlyFrustrated.value;
+  const unused =
+    showUnused.value && unusedAvailable.value && !filtered
+      ? unusedRows.value.filter(matchesQuery).map((r, i) => ({ ...r, firstUnused: i === 0 }))
+      : [];
+  return [...clicked, ...unused];
+});
 const columns = computed<OTableColumnDef<ElementRow>[]>(() => [
   {
     id: "feature",
     header: t("rum.heatmap.colFeature"),
     size: 120,
-    meta: { fillRemaining: true },
+    meta: { autoWidth: true, fillRemaining: true },
   },
-  { id: "clicks", header: t("rum.heatmap.colClicks"), accessorKey: "clicks", size: 100 },
-  { id: "share", header: t("rum.heatmap.colShare"), size: 64, meta: { align: "right" } },
-  { id: "sessions", header: t("rum.heatmap.colSessions"), size: 96, meta: { align: "right" } },
   {
-    id: "frustrated",
-    header: t("rum.heatmap.colFrustrated"),
-    accessorKey: "frustrated",
-    size: 100,
+    id: "clicks",
+    header: t("rum.heatmap.colClicks"),
+    accessorKey: "clicks",
+    size: 88,
+    sortable: true,
     meta: { align: "right" },
   },
+  { id: "share", header: t("rum.heatmap.colShare"), size: 56, meta: { align: "right" } },
 ]);
-const statItems = computed<StatItem[]>(() => {
-  const { clicks, sessions, frustrated, top } = summary.value;
-  const items: StatItem[] = [
+const chips = computed<FilterChip[]>(() => [
+  {
+    key: "missing",
+    label: t("rum.heatmap.chipNotOnSnapshot"),
+    active: onlyMissing.value,
+    toggle: () => (onlyMissing.value = !onlyMissing.value),
+  },
+  {
+    key: "frustrated",
+    label: t("rum.heatmap.chipFrustrated"),
+    active: onlyFrustrated.value,
+    toggle: () => (onlyFrustrated.value = !onlyFrustrated.value),
+  },
+  {
+    key: "unused",
+    label: t("rum.heatmap.unusedHeading"),
+    active: showUnused.value && unusedAvailable.value,
+    disabled: !unusedAvailable.value,
+    title: unusedAvailable.value ? undefined : t("rum.heatmap.chipUnusedDisabled"),
+    toggle: () => (showUnused.value = !showUnused.value),
+  },
+]);
+const visiblePages = computed(() => {
+  const q = pageQuery.value.trim().toLowerCase();
+  return pageRows.value.filter((p) => p.url.toLowerCase().includes(q));
+});
+const limitedText = computed(() => {
+  const pages = pagesLimited.value ? PAGE_LIST_LIMIT : 0;
+  const elements = rankingLimited.value ? RANKING_LIMIT : 0;
+  if (pages && elements) return t("rum.heatmap.limitedBoth", { pages, elements });
+  if (pages) return t("rum.heatmap.limitedPages", { count: pages });
+  if (elements) return t("rum.heatmap.limitedElements", { count: elements });
+  return "";
+});
+const statItems = computed<StatCell[]>(() => {
+  const { clicks, sessions, frustrated } = summary.value;
+  return [
     {
       key: "clicks",
       label: t("rum.heatmap.statClicks"),
@@ -453,38 +714,13 @@ const statItems = computed<StatItem[]>(() => {
       dataTest: "rum-heatmap-stat-sessions",
     },
     {
-      key: "top",
-      label: top
-        ? t("rum.heatmap.statTopNamed", { name: top.name || top.selector })
-        : t("rum.heatmap.statTop"),
-      value: top ? t("rum.heatmap.sharePct", { pct: sharePercent(top.clicks, clicks) }) : "—",
-      tone: "primary",
-      dataTest: "rum-heatmap-stat-top",
-    },
-    {
       key: "frustrated",
       label: t("rum.heatmap.statFrustrated"),
       value: addCommasToNumber(frustrated),
-      sub: frustrated
-        ? t("rum.heatmap.statFrustratedSub", { pct: sharePercent(frustrated, clicks) })
-        : undefined,
-      tone: frustrated ? "warning" : "neutral",
+      valueClass: frustrated ? "text-status-warning-text" : "text-text-disabled",
       dataTest: "rum-heatmap-stat-frustrated",
     },
   ];
-  if (unusedRows.value.length) {
-    items.push({
-      key: "unused",
-      label: t("rum.heatmap.statUnused"),
-      value: `${addCommasToNumber(unusedRows.value.length)}${unusedRows.value.length >= MAX_UNUSED ? "+" : ""}`,
-      sub:
-        unusedRows.value.length >= MAX_UNUSED
-          ? t("rum.heatmap.statUnusedCapped", { count: MAX_UNUSED })
-          : t("rum.heatmap.statUnusedSub"),
-      dataTest: "rum-heatmap-stat-unused",
-    });
-  }
-  return items;
 });
 
 const tsField = () => store.state.zoConfig.timestamp_column || "_timestamp";
@@ -622,7 +858,7 @@ async function loadPages() {
   loading.value = true;
   try {
     const rows = appId.value
-      ? await searchRows<{ view_url: string }>(
+      ? await searchRows<{ view_url: string; clicks?: unknown; sessions?: unknown }>(
           "pages",
           pageListSql(scope()),
           PAGE_LIST_LIMIT,
@@ -631,15 +867,19 @@ async function loadPages() {
       : [];
     if (token !== loadToken || !rows) return;
     pagesLimited.value = rows.length >= PAGE_LIST_LIMIT;
-    pageOptions.value = rows.map((h) => ({ label: raw(h.view_url), value: h.view_url }));
-    if (!pageOptions.value.some((o) => o.value === pageUrl.value)) {
-      pageUrl.value = pageOptions.value[0]?.value ?? "";
+    pageRows.value = rows.map((h) => ({
+      url: h.view_url,
+      clicks: Number(h.clicks) || 0,
+      sessions: Number(h.sessions) || 0,
+    }));
+    if (!pageRows.value.some((p) => p.url === pageUrl.value)) {
+      pageUrl.value = pageRows.value[0]?.url ?? "";
     }
   } catch (error) {
     if (token !== loadToken) return;
     resetPage();
     failLoad("page list", error);
-    pageOptions.value = [];
+    pageRows.value = [];
     loading.value = false;
     return;
   }
@@ -658,6 +898,7 @@ function resetPage() {
   pagesLimited.value = false;
   selectedSelector.value = "";
   unusedRows.value = [];
+  unusedAvailable.value = false;
 }
 
 async function loadPage(refreshSplit = true, newCycle = true) {
@@ -983,7 +1224,8 @@ function drawHeat() {
     placed.add(g.selector);
   }
   placedSelectors.value = placed;
-  unusedRows.value = mostlyPlaced(placed) ? findUnusedControls(frame.doc, clickedEls, rects) : [];
+  unusedAvailable.value = mostlyPlaced(placed);
+  unusedRows.value = unusedAvailable.value ? findUnusedControls(frame.doc, clickedEls, rects) : [];
   elementRects = rects;
   renderHeat(canvas, spots);
   const selected = elementRects.get(selectedSelector.value);
@@ -1038,6 +1280,38 @@ function findUnusedControls(
     });
   }
   return rows;
+}
+
+function onDeviceChange(value: unknown) {
+  if (typeof value !== "string" || !value || value === deviceClass.value) return;
+  deviceClass.value = value as DeviceClass;
+  loadPage(false);
+}
+
+function onPagePick(url: string) {
+  pageOpen.value = false;
+  pageQuery.value = "";
+  if (url === pageUrl.value) return;
+  pageUrl.value = url;
+  loadPage();
+}
+
+function onSortChange() {
+  sortOrder.value = sortOrder.value === "desc" ? "asc" : "desc";
+}
+
+const rowClass = (row: ElementRow) =>
+  row.selector === selectedSelector.value ? "bg-surface-tint-accent" : "";
+
+const barPercent = (clicks: number) => (clicksMax.value > 0 ? (clicks / clicksMax.value) * 100 : 0);
+
+function frustrationText(row: ElementRow): string {
+  const parts = [
+    row.rage && t("rum.heatmap.rageCount", { count: addCommasToNumber(row.rage) }),
+    row.dead && t("rum.heatmap.deadCount", { count: addCommasToNumber(row.dead) }),
+    row.error && t("rum.heatmap.errorCount", { count: addCommasToNumber(row.error) }),
+  ].filter(Boolean);
+  return `· ${parts.join(" · ")}`;
 }
 
 function onRowClick(row: ElementRow) {

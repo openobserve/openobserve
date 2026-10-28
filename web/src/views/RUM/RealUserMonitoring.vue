@@ -144,16 +144,16 @@ const tabs = [
     value: "sessions",
   },
   {
+    label: t("rum.heatmap.tab"),
+    value: "heatmaps",
+  },
+  {
     label: t("rum.errorTracking"),
     value: "error_tracking",
   },
   {
     label: t("rum.sourceMaps"),
     value: "source_maps",
-  },
-  {
-    label: t("rum.heatmap.title"),
-    value: "heatmap",
   },
 ];
 
@@ -184,7 +184,7 @@ onMounted(async () => {
     Sessions: "sessions",
     rumPerformanceSummary: "performance",
     SourceMaps: "source_maps",
-    RumClickHeatmap: "heatmap",
+    RumClickHeatmap: "heatmaps",
   };
 
   if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -212,7 +212,7 @@ onUpdated(async () => {
       Sessions: "sessions",
       rumPerformanceSummary: "performance",
       SourceMaps: "source_maps",
-      RumClickHeatmap: "heatmap",
+      RumClickHeatmap: "heatmaps",
     };
 
     if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
@@ -250,7 +250,7 @@ const updateTabOnRouteChange = () => {
     rumPerformanceErrors: "performance",
     rumPerformanceApis: "performance",
     SourceMaps: "source_maps",
-    RumClickHeatmap: "heatmap",
+    RumClickHeatmap: "heatmaps",
   };
   const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   if (tab !== activeTab.value && tab !== undefined) {
@@ -338,7 +338,7 @@ const changeTab = (tab: string | number) => {
     return;
   }
 
-  if (tab === "heatmap") {
+  if (tab === "heatmaps") {
     router.push({
       name: "RumClickHeatmap",
       query: { org_identifier: store.state.selectedOrganization.identifier },

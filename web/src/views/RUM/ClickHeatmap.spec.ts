@@ -45,7 +45,7 @@ vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => {
 });
 
 import ClickHeatmap from "./ClickHeatmap.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import rumProductAnalytics from "@/services/rumProductAnalytics";
 import searchService from "@/services/search";
 import { PAGE_LIST_LIMIT, RANKING_LIMIT } from "@/utils/rum/clickHeatmapQueries";
@@ -137,9 +137,7 @@ describe("ClickHeatmap", () => {
     );
     h.run.mockClear();
 
-    const device = wrapper
-      .findAllComponents(OSelect)
-      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    const device = wrapper.findComponent(OToggleGroup);
     device?.vm.$emit("update:modelValue", "phone");
     await flushPromises();
 
@@ -166,9 +164,7 @@ describe("ClickHeatmap", () => {
       totals: () => new Promise((r) => (release = r)),
     });
     h.run.mockClear();
-    const device = wrapper
-      .findAllComponents(OSelect)
-      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    const device = wrapper.findComponent(OToggleGroup);
 
     device?.vm.$emit("update:modelValue", "phone");
     await flushPromises();
@@ -204,17 +200,17 @@ describe("ClickHeatmap", () => {
     }));
     answer({ ranking: () => ok(full) });
     const wrapper = await mountPage({ OTable: true });
-    expect(wrapper.find('[data-test="rum-heatmap-ranking-limited"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-heatmap-limited"]').text()).toBe(
+      `Top ${RANKING_LIMIT} elements by clicks`,
+    );
 
     answer({ totals: () => ({ status: "error", error: { message: "boom" } }) });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const device = wrapper
-      .findAllComponents(OSelect)
-      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    const device = wrapper.findComponent(OToggleGroup);
     device?.vm.$emit("update:modelValue", "phone");
     await flushPromises();
 
-    expect(wrapper.find('[data-test="rum-heatmap-ranking-limited"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="rum-heatmap-limited"]').exists()).toBe(false);
   });
 
   it("keeps the page-list note across a page reload", async () => {
@@ -224,7 +220,9 @@ describe("ClickHeatmap", () => {
     answer({ pages: () => ok(pages) });
     const wrapper = await mountPage();
 
-    expect(wrapper.find('[data-test="rum-heatmap-pages-limited"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-heatmap-limited"]').text()).toBe(
+      `Top ${PAGE_LIST_LIMIT} pages by clicks`,
+    );
   });
 
   it("explains a missing replay inside the left pane", async () => {
@@ -250,19 +248,18 @@ describe("ClickHeatmap", () => {
     expect(ids()).not.toContain("pages");
     expect(ids()).toContain("totals");
     expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
-    const page = wrapper
-      .findAllComponents(OSelect)
-      .find((s) => s.attributes("data-test") === "rum-heatmap-page-select");
-    expect(page?.props("modelValue")).toBe("https://x.test/home");
+    expect(wrapper.find('[data-test="rum-heatmap-page-current"]').text()).toBe(
+      "https://x.test/home",
+    );
   });
 
   it("shows device counts including zero once the split returns", async () => {
     answer();
     const wrapper = await mountPage();
-    const device = wrapper
-      .findAllComponents(OSelect)
-      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
-    const labels = (device?.props("options") as { label: unknown }[]).map((o) => String(o.label));
+    const labels = wrapper
+      .findAll('[data-test^="rum-heatmap-device-"]')
+      .map((el) => el.text())
+      .filter(Boolean);
 
     expect(labels).toContain("Tablet (0)");
     expect(labels).toContain("Desktop (4)");
@@ -277,9 +274,7 @@ describe("ClickHeatmap", () => {
     const wrapper = await mountPage();
     const firstRelease = release;
     answer();
-    const device = wrapper
-      .findAllComponents(OSelect)
-      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    const device = wrapper.findComponent(OToggleGroup);
     device?.vm.$emit("update:modelValue", "phone");
     await flushPromises();
     h.run.mockClear();
@@ -356,5 +351,78 @@ describe("ClickHeatmap", () => {
       expect.anything(),
     );
     expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
+  });
+
+  it("drops the not-clicked tile from the stats and shows the top element with its share", async () => {
+    answer({
+      totals: () => ok([{ clicks: 10, sessions: 5, frustrated: 0 }]),
+      ranking: () => ok([{ selector: "#buy", name: "Buy now", clicks: 4, sessions: 2 }]),
+    });
+    const wrapper = await mountPage({ OTable: true });
+
+    expect(wrapper.find('[data-test="rum-heatmap-stat-unused"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("10");
+    expect(wrapper.find('[data-test="rum-heatmap-stat-sessions"]').text()).toContain("5");
+    expect(wrapper.find('[data-test="rum-heatmap-stat-frustrated"]').text()).toContain("0");
+    expect(wrapper.find('[data-test="rum-heatmap-stat-top"]').text()).toBe(
+      "Top elementBuy now · 40% of clicks",
+    );
+  });
+
+  it("filters the element list by text and by the frustrated chip, with a count", async () => {
+    answer({
+      totals: () => ok([{ clicks: 10, sessions: 5, frustrated: 3 }]),
+      ranking: () =>
+        ok([
+          {
+            selector: "#buy",
+            name: "Buy now",
+            clicks: 6,
+            sessions: 3,
+            rage: 2,
+            dead: 1,
+            frustrated: 3,
+          },
+          { selector: "#help", name: "Help", clicks: 4, sessions: 2 },
+        ]),
+    });
+    const wrapper = await mountPage({ OTable: true });
+    const count = () => wrapper.find('[data-test="rum-heatmap-element-count"]').text();
+    expect(count()).toBe("2 elements");
+
+    await wrapper.find('[data-test="rum-heatmap-chip-frustrated"]').trigger("click");
+    expect(count()).toBe("1 element");
+
+    await wrapper.find('[data-test="rum-heatmap-chip-frustrated"]').trigger("click");
+    await wrapper.find('[data-test="rum-heatmap-element-search"] input').setValue("hel");
+    expect(count()).toBe("1 element");
+  });
+
+  it("disables the never-clicked chip until the snapshot is mostly placed", async () => {
+    answer();
+    const wrapper = await mountPage({ OTable: true });
+    const chip = wrapper.find('[data-test="rum-heatmap-chip-unused"]');
+
+    expect(chip.attributes("title")).toContain("90%");
+    expect(chip.attributes("aria-pressed")).toBe("false");
+  });
+
+  it("lists pages by clicks and sessions in the picker", async () => {
+    answer({
+      pages: () =>
+        ok([
+          { view_url: "https://x.test/home", clicks: 1240, sessions: 310 },
+          { view_url: "https://x.test/pricing", clicks: 812, sessions: 201 },
+        ]),
+    });
+    const wrapper = await mountPage({ OTable: true });
+
+    expect(wrapper.find('[data-test="rum-heatmap-page-count"]').text()).toBe("2 pages");
+    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+    await flushPromises();
+    const list = document.body.querySelector('[data-test="rum-heatmap-page-list"]');
+    expect(list?.textContent).toContain("1,240");
+    expect(list?.textContent).toContain("201");
+    wrapper.unmount();
   });
 });
