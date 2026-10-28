@@ -209,6 +209,10 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         run: pip install -r scripts/translations/requirements.txt
 
+      - name: Set trace ID
+        if: steps.guard.outputs.skip == 'false'
+        run: echo "O2_TRACE_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+
       - name: Run translation script
         id: run_translation
         if: steps.guard.outputs.skip == 'false'
@@ -242,9 +246,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           cd scripts/translations
-          # One trace id for all retry attempts, so the run's spend sums under one trace.
-          O2_TRACE_ID="$(openssl rand -hex 16)"
-          export O2_TRACE_ID
           ARGS=()
           if [ -n "$INPUT_LANGUAGES" ]; then
             read -ra REQUESTED <<< "$INPUT_LANGUAGES"

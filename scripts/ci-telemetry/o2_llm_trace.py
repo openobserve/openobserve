@@ -1,12 +1,16 @@
+#!/usr/bin/env python3
 # Copyright 2026 OpenObserve Inc.
-"""OTLP/JSON gen_ai spans for CI LLM calls, using the O2_TRACE_* env contract of scripts/ai-review/run-review.mjs."""
+# Source of truth: openobserve scripts/ci-telemetry/o2_llm_trace.py; o2-enterprise .github/scripts/o2_llm_trace.py is a byte-identical copy.
+"""gen_ai traces for CI LLM calls, shaped like scripts/ai-review/run-review.mjs, exported to OpenObserve as OTLP/JSON."""
 
 import atexit
 import base64
 import datetime
+import hashlib
 import json
 import os
 import re
+import sys
 import threading
 import time
 import urllib.parse
@@ -14,8 +18,13 @@ import urllib.request
 
 DEFAULT_STREAM = "github_actions_ai_traces"
 DEFAULT_TIMEOUT_MS = 10_000
-SPANS_PER_REQUEST = 500
+DEFAULT_BATCH_SIZE = 1
+EXPORT_INTERVAL_S = 1.0
 SCOPE_NAME = "scripts/ci-telemetry/o2_llm_trace.py"
+SERVICE_VERSION = "1.0.0"
+MAX_SYSTEM_CHARS = 100_000
+MAX_USER_CHARS = 150_000
+MAX_ERROR_CHARS = 500
 
 SPAN_KIND_INTERNAL = 1
 SPAN_KIND_CLIENT = 3
@@ -33,156 +42,292 @@ MODEL_ALIASES = {
 }
 PEAK_HOURS_UTC = ((1, 4), (6, 10))
 
-GITHUB_RESOURCE_ENV = {
-    "github.repository": "GITHUB_REPOSITORY",
-    "github.workflow": "GITHUB_WORKFLOW",
-    "github.run_id": "GITHUB_RUN_ID",
-    "github.run_number": "GITHUB_RUN_NUMBER",
-    "github.run_attempt": "GITHUB_RUN_ATTEMPT",
-    "github.job": "GITHUB_JOB",
-    "github.actor": "GITHUB_ACTOR",
-    "github.event_name": "GITHUB_EVENT_NAME",
-    "github.ref": "GITHUB_REF",
-    "github.sha": "GITHUB_SHA",
-}
+# Same redaction rules as scripts/ai-review/src/scrub.mjs.
+SECRET_ENV_NAME_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|AUTH)")
+MIN_SECRET_LENGTH = 8
+REDACTED = "[redacted]"
+SECRET_PATTERNS = (
+    re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
+    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)"),
+    re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
+)
+AUTH_HEADER_RE = re.compile(r"(Authorization:)[^\n]*", re.IGNORECASE)
+
+GITHUB_RESOURCE_ENV = (
+    ("github.repository", "GITHUB_REPOSITORY"),
+    ("github.workflow", "GITHUB_WORKFLOW"),
+    ("github.run_id", "GITHUB_RUN_ID"),
+    ("github.run_number", "GITHUB_RUN_NUMBER"),
+    ("github.run_attempt", "GITHUB_RUN_ATTEMPT"),
+    ("github.job", "GITHUB_JOB"),
+    ("github.actor", "GITHUB_ACTOR"),
+    ("github.event_name", "GITHUB_EVENT_NAME"),
+    ("github.ref", "GITHUB_REF"),
+    ("github.sha", "GITHUB_SHA"),
+)
+
+
+class Span:
+    """A started span; the Tracer serializes it when it ends."""
+
+    def __init__(self, trace_id, parent_id, name, kind, attributes):
+        self.trace_id = trace_id
+        self.span_id = _random_hex(8)
+        self.parent_id = parent_id
+        self.name = name
+        self.kind = kind
+        self.start_ns = time.time_ns()
+        self.attributes = dict(attributes or {})
+        self.events = []
+        self.status = {"code": STATUS_OK}
+        self.ended = False
+
+    def to_otlp(self, end_ns):
+        span = {
+            "traceId": self.trace_id,
+            "spanId": self.span_id,
+            "name": self.name,
+            "kind": self.kind,
+            "startTimeUnixNano": str(self.start_ns),
+            "endTimeUnixNano": str(end_ns),
+            "attributes": otlp_attributes(self.attributes),
+            "status": self.status,
+        }
+        if self.parent_id:
+            span["parentSpanId"] = self.parent_id
+        if self.events:
+            span["events"] = self.events
+        return span
 
 
 class Tracer:
-    """Collects one root span plus a `gen_ai.chat` child per API call and exports them once."""
+    """One root span per script run; ended spans are exported in the background about every second."""
 
-    def __init__(self, service_name, root_name=None, env=None, provider="deepseek"):
+    def __init__(self, service_name, root_name, provider="deepseek", content_prefix="ai.llm", root_attributes=None, env=None):
         self.env = os.environ if env is None else env
         self.service_name = service_name
         self.provider = provider
+        self.content_prefix = content_prefix
         self.endpoint = trace_endpoint(self.env)
         self.auth = auth_header(self.env)
         self.enabled = bool(self.endpoint and self.auth)
         self.trace_id = trace_id_from_env(self.env)
-        self.root_span_id = _random_hex(8)
-        self.root_name = root_name or service_name
-        self.root_start_ns = time.time_ns()
-        self.root_attributes = {}
-        self._spans = []
+        self.timeout_s = export_timeout_s(self.env)
+        self.batch_size = export_batch_size(self.env)
+        self.secrets = secret_values(self.env)
+        self.exported = 0
+        self.failed = 0
+        self._queue = []
         self._lock = threading.Lock()
-        self._flushed = False
-        self.call_count = 0
-        self.error_count = 0
-        if self.enabled:
-            atexit.register(self.flush)
-        else:
+        self._stop = threading.Event()
+        self._thread = None
+        self._shut_down = False
+        self.root = None
+        self.root_error = None
+        if not self.enabled:
             print(
                 "::notice::LLM trace export disabled: O2_TRACE_INGEST_URL and "
                 "O2_TRACE_AUTH (or O2_TRACE_USERNAME/O2_TRACE_PASSWORD) are not set."
             )
-
-    def chat_completion(self, client, attributes=None, **kwargs):
-        """Call `client.chat.completions.create(**kwargs)`, record a span, return or re-raise."""
-        started = time.time_ns()
-        try:
-            response = client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            self.record_call(kwargs.get("model"), started, time.time_ns(), error=exc, attributes=attributes)
-            raise
-        self.record_call(kwargs.get("model"), started, time.time_ns(), response=response, attributes=attributes)
-        return response
-
-    def record_call(self, model, started_ns, ended_ns, response=None, error=None, attributes=None):
-        with self._lock:
-            self.call_count += 1
-            if error is not None:
-                self.error_count += 1
-        if not self.enabled:
             return
-        data = response_dict(response)
-        if data is None and error is not None:
-            data = response_dict(getattr(error, "body", None))
-        usage = usage_from_response(data or {})
+        attrs = {"workflow.trace_id": self.trace_id, "github.pr.number": pr_number(self.env)}
+        attrs.update(root_attributes or {})
+        self.root = self.start_span(root_name, attrs, parent=None)
+        atexit.register(self.shutdown)
+
+    def start_span(self, name, attributes=None, parent=None, kind=SPAN_KIND_INTERNAL):
+        """Start a span under `parent` (default: the root span); None when export is disabled."""
+        if not self.enabled:
+            return None
+        parent = self.root if parent is None else parent
+        return Span(self.trace_id, parent.span_id if parent else None, name, kind, _clean(attributes))
+
+    def set_attributes(self, span, attributes):
+        if span is not None:
+            span.attributes.update(_clean(attributes))
+
+    def set_root_attributes(self, attributes):
+        self.set_attributes(self.root, attributes)
+
+    def set_outcome(self, outcome, error=None, attributes=None):
+        """Record the run's workflow.outcome; an error marks the root span ERROR when it ends."""
+        self.set_root_attributes(dict(attributes or {}, **{"workflow.outcome": outcome}))
+        self.root_error = error
+
+    def end_span(self, span, attributes=None, error=None):
+        if span is None or span.ended:
+            return
+        span.ended = True
+        self.set_attributes(span, attributes)
+        if error is not None:
+            message = str(error)[:MAX_ERROR_CHARS]
+            span.attributes["error.type"] = type(error).__name__
+            span.attributes["error.message"] = message
+            span.status = {"code": STATUS_ERROR, "message": message}
+            span.events.append(
+                {
+                    "timeUnixNano": str(time.time_ns()),
+                    "name": "exception",
+                    "attributes": otlp_attributes({"exception.type": type(error).__name__, "exception.message": message}),
+                }
+            )
+        with self._lock:
+            self._queue.append(span.to_otlp(time.time_ns()))
+            if self._thread is None and not self._shut_down:
+                self._thread = threading.Thread(target=self._export_loop, name="o2_llm_trace", daemon=True)
+                self._thread.start()
+
+    def llm_call(self, model, messages, parent=None, agent_name=None, agent_key=None, reasoning_effort=None, timeout_ms=None, attributes=None):
+        """A `gen_ai.chat` span for one logical call; retries go through the same LlmCall."""
         attrs = {
             "gen_ai.operation.name": "chat",
             "gen_ai.provider.name": self.provider,
             "gen_ai.request.model": model,
-            "gen_ai.response.model": (data or {}).get("model"),
-            "gen_ai.response.id": (data or {}).get("id"),
-            "gen_ai.response.finish_reasons": finish_reasons(data or {}),
+            "gen_ai.request.reasoning_effort": reasoning_effort or "default",
+            "gen_ai.agent.name": agent_name,
+            "ai.agent.key": agent_key,
+            "ai.agent.name": agent_name,
+            "timeout.ms": timeout_ms,
         }
-        attrs.update(usage_attributes(usage))
-        cost = estimate_cost((data or {}).get("model") or model, usage, started_ns / 1e9)
-        # Client-side so cache hits are billed at the cache rate even where the ingester ignores them.
-        if cost is not None:
-            attrs["gen_ai.usage.cost"] = cost
-        if attributes:
-            attrs.update(attributes)
-        status = {"code": STATUS_OK}
-        if error is not None:
-            message = str(error)[:500]
-            attrs["error.type"] = type(error).__name__
-            attrs["error.message"] = message
-            status = {"code": STATUS_ERROR, "message": message}
-        span = {
-            "traceId": self.trace_id,
-            "spanId": _random_hex(8),
-            "parentSpanId": self.root_span_id,
-            "name": "gen_ai.chat",
-            "kind": SPAN_KIND_CLIENT,
-            "startTimeUnixNano": str(started_ns),
-            "endTimeUnixNano": str(ended_ns),
-            "attributes": otlp_attributes(attrs),
-            "status": status,
-        }
-        with self._lock:
-            self._spans.append(span)
+        span = self.start_span("gen_ai.chat", attrs, parent=parent, kind=SPAN_KIND_CLIENT)
+        if span is not None:
+            span.attributes.update(request_attributes(messages, self.content_prefix, self.secrets))
+            self.set_attributes(span, attributes)
+        return LlmCall(self, span, model)
 
-    def flush(self):
-        """Close the root span and export everything once; later calls are no-ops."""
+    def chat(self, client, parent=None, agent_name=None, agent_key=None, timeout_ms=None, attributes=None, **kwargs):
+        """`client.chat.completions.create(**kwargs)` traced as one gen_ai.chat span; returns or re-raises."""
+        with self.llm_call(
+            kwargs.get("model"),
+            kwargs.get("messages") or [],
+            parent=parent,
+            agent_name=agent_name,
+            agent_key=agent_key,
+            reasoning_effort=kwargs.get("reasoning_effort"),
+            timeout_ms=timeout_ms,
+            attributes=attributes,
+        ) as call:
+            return call.create(client, **kwargs)
+
+    def shutdown(self):
+        """End the root span and export what is queued, bounded by O2_TRACE_EXPORT_TIMEOUT_MS."""
+        if not self.enabled or self._shut_down:
+            return
+        self.end_span(self.root, error=self.root_error)
         with self._lock:
-            if self._flushed or not self.enabled:
+            self._shut_down = True
+            thread = self._thread
+        deadline = time.monotonic() + self.timeout_s
+        self._stop.set()
+        if thread is not None:
+            thread.join(max(0.0, deadline - time.monotonic()))
+        self._drain(deadline)
+        with self._lock:
+            dropped = len(self._queue)
+        if dropped:
+            print(f"::warning::LLM trace export: {dropped} span(s) not sent before the export deadline.")
+        print(f"LLM trace export: {self.exported} span(s) sent, {self.failed} failed, trace_id={self.trace_id}")
+
+    def _export_loop(self):
+        while not self._stop.wait(EXPORT_INTERVAL_S):
+            self._drain(None)
+
+    def _drain(self, deadline):
+        while True:
+            if deadline is None and self._stop.is_set():
                 return
-            self._flushed = True
-            spans = list(self._spans)
-            self._spans.clear()
-            root_attrs = dict(self.root_attributes)
-            root_attrs["ai.llm.calls"] = self.call_count
-            root_attrs["ai.llm.errors"] = self.error_count
-        spans.insert(
-            0,
-            {
-                "traceId": self.trace_id,
-                "spanId": self.root_span_id,
-                "name": self.root_name,
-                "kind": SPAN_KIND_INTERNAL,
-                "startTimeUnixNano": str(self.root_start_ns),
-                "endTimeUnixNano": str(time.time_ns()),
-                "attributes": otlp_attributes(root_attrs),
-                "status": {"code": STATUS_ERROR if self.error_count else STATUS_OK},
-            },
-        )
-        resource = otlp_attributes(resource_attributes(self.service_name, self.env))
-        exported = 0
-        for i in range(0, len(spans), SPANS_PER_REQUEST):
-            payload = build_payload(resource, spans[i : i + SPANS_PER_REQUEST])
-            if not self._post(payload):
-                break
-            exported += len(spans[i : i + SPANS_PER_REQUEST])
-        print(f"LLM trace export: {exported}/{len(spans)} span(s), trace_id={self.trace_id}")
+            if deadline is not None and time.monotonic() >= deadline:
+                return
+            with self._lock:
+                batch = self._queue[: self.batch_size]
+                del self._queue[: self.batch_size]
+            if not batch:
+                return
+            timeout = self.timeout_s if deadline is None else max(0.1, deadline - time.monotonic())
+            sent = self._post(batch, timeout)
+            with self._lock:
+                if sent:
+                    self.exported += len(batch)
+                else:
+                    self.failed += len(batch)
 
-    def _post(self, payload):
+    def _post(self, spans, timeout):
+        payload = build_payload(otlp_attributes(resource_attributes(self.service_name, self.env, self.trace_id)), spans)
         request = urllib.request.Request(
             self.endpoint,
             data=json.dumps(payload).encode("utf-8"),
             method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": self.auth,
-                "stream-name": stream_name(self.env),
-            },
+            headers={"Content-Type": "application/json", "Authorization": self.auth, "stream-name": stream_name(self.env)},
         )
         try:
-            with urllib.request.urlopen(request, timeout=export_timeout_s(self.env)) as resp:
+            with urllib.request.urlopen(request, timeout=timeout) as resp:
                 resp.read()
             return True
         except Exception as exc:
-            print(f"::warning::LLM trace export failed: {type(exc).__name__}: {str(exc)[:300]}")
+            if self.failed < 3:
+                print(f"::warning::LLM trace export failed: {type(exc).__name__}: {scrub(str(exc), self.secrets)[:300]}")
             return False
+
+
+class LlmCall:
+    """Accumulates attempts, usage and cost for one gen_ai.chat span; use it as a context manager."""
+
+    def __init__(self, tracer, span, model):
+        self.tracer = tracer
+        self.span = span
+        self.model = model
+        self.attempts = 0
+        self.last_error = None
+        self.usage = {}
+        self.cost = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.end(exc)
+        return False
+
+    def create(self, client, **kwargs):
+        self.attempts += 1
+        self.tracer.set_attributes(self.span, request_params(kwargs))
+        try:
+            response = client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            self.last_error = exc
+            raise
+        self.record_response(response, kwargs.get("model") or self.model)
+        return response
+
+    def record_response(self, response, model=None):
+        self.last_error = None
+        if self.span is None:
+            return
+        data = response_dict(response) or {}
+        usage = usage_from_response(data)
+        # Every attempt is billed, so token counts and cost sum over retries, unlike callOpencode.
+        for key, value in usage.items():
+            if value is not None:
+                self.usage[key] = self.usage.get(key, 0) + value
+        started = time.time()
+        cost = estimate_cost(data.get("model") or model or self.model, usage, started)
+        if cost is not None:
+            self.cost = (self.cost or 0.0) + cost
+        self.span.attributes.update(
+            response_attributes(data, self.tracer.content_prefix, self.tracer.secrets, model or self.model)
+        )
+        self.span.attributes["ai.pricing.peak"] = is_peak(started)
+
+    def reject(self, error):
+        """Mark the latest attempt failed for a caller-side reason, such as an unusable response."""
+        self.last_error = error
+
+    def end(self, error=None):
+        attrs = {"ai.attempts": self.attempts}
+        attrs.update(usage_attributes(self.usage))
+        attrs["gen_ai.usage.cost"] = None if self.cost is None else round(self.cost, 10)
+        self.tracer.end_span(self.span, attrs, error if error is not None else self.last_error)
 
 
 def trace_endpoint(env):
@@ -220,6 +365,11 @@ def export_timeout_s(env):
     return (value if value > 0 else DEFAULT_TIMEOUT_MS) / 1000.0
 
 
+def export_batch_size(env):
+    value = (env.get("O2_TRACE_EXPORT_BATCH_SIZE") or "").strip()
+    return int(value) if value.isdigit() and int(value) > 0 else DEFAULT_BATCH_SIZE
+
+
 def trace_id_from_env(env):
     value = (env.get("O2_TRACE_ID") or "").strip().lower()
     if re.fullmatch(r"[0-9a-f]{32}", value) and value.strip("0"):
@@ -231,6 +381,9 @@ def pr_number(env):
     explicit = (env.get("PR_NUMBER") or "").strip()
     if explicit.isdigit():
         return int(explicit)
+    match = re.match(r"refs/pull/(\d+)/", env.get("GITHUB_REF") or "")
+    if match:
+        return int(match.group(1))
     path = env.get("GITHUB_EVENT_PATH")
     if not path:
         return None
@@ -239,28 +392,109 @@ def pr_number(env):
             event = json.load(fh)
     except (OSError, ValueError):
         return None
+    if not isinstance(event, dict):
+        return None
     number = (event.get("pull_request") or {}).get("number")
-    if number is None and (event.get("issue") or {}).get("pull_request"):
+    if number is None and "pull_request" in (event.get("issue") or {}):
         number = event["issue"].get("number")
     return number if isinstance(number, int) else None
 
 
-def resource_attributes(service_name, env):
+def workflow_run_url(env):
+    repo = env.get("GITHUB_REPOSITORY")
+    run_id = env.get("GITHUB_RUN_ID")
+    if not repo or not run_id:
+        return None
+    return f"{env.get('GITHUB_SERVER_URL') or 'https://github.com'}/{repo}/actions/runs/{run_id}"
+
+
+def resource_attributes(service_name, env, trace_id=None):
+    """The traceResourceAttributes() set of run-review.mjs plus workflow.trace_id."""
     attrs = {
         "service.name": service_name,
+        "service.version": SERVICE_VERSION,
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "o2_llm_trace",
         "ci.provider.name": "github-actions",
     }
-    for key, var in GITHUB_RESOURCE_ENV.items():
+    for key, var in GITHUB_RESOURCE_ENV:
         attrs[key] = env.get(var)
-    repo = env.get("GITHUB_REPOSITORY")
-    run_id = env.get("GITHUB_RUN_ID")
-    if repo and run_id:
-        server = env.get("GITHUB_SERVER_URL") or "https://github.com"
-        attrs["github.workflow.run_url"] = f"{server}/{repo}/actions/runs/{run_id}"
-    attrs["github.pr.number"] = pr_number(env)
+    attrs["github.workflow.run_url"] = workflow_run_url(env)
+    attrs["workflow.trace_id"] = trace_id
     return attrs
+
+
+def secret_values(env):
+    values = {
+        value.strip()
+        for name, value in env.items()
+        if SECRET_ENV_NAME_RE.search(name) and isinstance(value, str) and len(value.strip()) >= MIN_SECRET_LENGTH
+    }
+    return sorted(values, key=len, reverse=True)
+
+
+def scrub(text, secrets):
+    for value in secrets:
+        text = text.replace(value, REDACTED)
+    for pattern in SECRET_PATTERNS:
+        text = pattern.sub(REDACTED, text)
+    return AUTH_HEADER_RE.sub(lambda m: f"{m.group(1)} {REDACTED}", text)
+
+
+def sha256(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def message_parts(content, limit, secrets):
+    """gen_ai message parts; only text is kept, so inline images never reach the trace."""
+    if isinstance(content, str):
+        return [{"type": "text", "content": scrub(content[:limit], secrets)}]
+    parts = []
+    for part in content or []:
+        if isinstance(part, dict) and part.get("type") == "text":
+            parts.append({"type": "text", "content": scrub(str(part.get("text") or "")[:limit], secrets)})
+        elif isinstance(part, dict):
+            parts.append({"type": str(part.get("type") or "unknown")})
+    return parts
+
+
+def _parts_text(parts):
+    return "\n\n".join(p["content"] for p in parts if "content" in p)
+
+
+def request_attributes(messages, prefix, secrets):
+    """Request content in the genAiRequestAttributes() shape of scripts/ai-review/telemetry.mjs."""
+    system_parts = []
+    inputs = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role") or "user"
+        if role in ("system", "developer"):
+            system_parts.extend(message_parts(message.get("content"), MAX_SYSTEM_CHARS, secrets))
+        else:
+            inputs.append({"role": role, "parts": message_parts(message.get("content"), MAX_USER_CHARS, secrets)})
+    system_text = _parts_text(system_parts)
+    user_text = "\n\n".join(_parts_text(m["parts"]) for m in inputs)
+    return {
+        "gen_ai.system_instructions": json.dumps(system_parts, ensure_ascii=False),
+        "gen_ai.input.messages": json.dumps(inputs, ensure_ascii=False),
+        f"{prefix}.system_instructions.chars": len(system_text),
+        f"{prefix}.system_instructions.sha256": sha256(system_text),
+        f"{prefix}.input.chars": len(user_text),
+        f"{prefix}.input.sha256": sha256(user_text),
+    }
+
+
+def request_params(kwargs):
+    return _clean(
+        {
+            "gen_ai.request.model": kwargs.get("model"),
+            "gen_ai.request.max_tokens": kwargs.get("max_tokens") or kwargs.get("max_completion_tokens"),
+            "gen_ai.request.temperature": kwargs.get("temperature"),
+            "gen_ai.request.reasoning_effort": kwargs.get("reasoning_effort"),
+        }
+    )
 
 
 def response_dict(response):
@@ -278,6 +512,30 @@ def response_dict(response):
             if isinstance(value, dict):
                 return value
     return None
+
+
+def response_text(data):
+    choices = data.get("choices") or []
+    message = choices[0].get("message") if choices and isinstance(choices[0], dict) else None
+    content = (message or {}).get("content")
+    return content if isinstance(content, str) else ""
+
+
+def response_attributes(data, prefix, secrets, requested_model):
+    """Response content in the genAiResponseAttributes() shape; usage is added when the call ends."""
+    text = scrub(response_text(data), secrets)
+    return _clean(
+        {
+            "gen_ai.output.messages": json.dumps(
+                [{"role": "assistant", "parts": [{"type": "text", "content": text}]}], ensure_ascii=False
+            ),
+            "gen_ai.response.id": data.get("id"),
+            "gen_ai.response.model": data.get("model") or requested_model,
+            "gen_ai.response.finish_reasons": finish_reasons(data),
+            f"{prefix}.output.chars": len(text),
+            f"{prefix}.output.sha256": sha256(text),
+        }
+    )
 
 
 def _count(value):
@@ -305,11 +563,15 @@ def usage_from_response(data):
 
 def usage_attributes(usage):
     """OpenObserve's extractor treats input_tokens as including gen_ai.usage.cache_read.input_tokens."""
+    total = usage.get("total")
+    if total is None and usage.get("input") is not None and usage.get("output") is not None:
+        total = usage["input"] + usage["output"]
     return {
         "gen_ai.usage.input_tokens": usage.get("input"),
-        "gen_ai.usage.cache_read.input_tokens": usage.get("cache_read"),
         "gen_ai.usage.output_tokens": usage.get("output"),
-        "gen_ai.usage.total_tokens": usage.get("total"),
+        "gen_ai.usage.total_tokens": total,
+        "gen_ai.usage.cache_read.input_tokens": usage.get("cache_read"),
+        "gen_ai.usage.cache_creation.input_tokens": usage.get("cache_creation"),
         "ai.usage.reasoning_tokens": usage.get("reasoning"),
     }
 
@@ -320,7 +582,7 @@ def finish_reasons(data):
 
 
 def normalize_model(model):
-    name = (model or "").strip().lower()
+    name = (model or "").strip().lower().rsplit("/", 1)[-1]
     return MODEL_ALIASES.get(name, name)
 
 
@@ -362,11 +624,7 @@ def otlp_value(value):
 
 
 def otlp_attributes(attrs):
-    return [
-        {"key": key, "value": otlp_value(value)}
-        for key, value in attrs.items()
-        if value is not None and value != ""
-    ]
+    return [{"key": key, "value": otlp_value(value)} for key, value in attrs.items() if value is not None and value != ""]
 
 
 def build_payload(resource_attrs, spans):
@@ -374,12 +632,89 @@ def build_payload(resource_attrs, spans):
         "resourceSpans": [
             {
                 "resource": {"attributes": resource_attrs},
-                "scopeSpans": [{"scope": {"name": SCOPE_NAME, "version": "1.0.0"}, "spans": spans}],
+                "scopeSpans": [{"scope": {"name": SCOPE_NAME, "version": SERVICE_VERSION}, "spans": spans}],
             }
         ]
     }
 
 
+def claude_code_env(service_name, env):
+    """Claude Code's OTel env vars pointing at OpenObserve, or {} when the O2_TRACE_* config is incomplete."""
+    traces_url = trace_endpoint(env)
+    auth = auth_header(env)
+    if not traces_url or not auth:
+        return {}
+    base = traces_url[: -len("/v1/traces")]
+    trace_id = trace_id_from_env(env)
+    headers = ",".join(
+        f"{key}={urllib.parse.quote(value, safe='')}" for key, value in (("Authorization", auth), ("stream-name", stream_name(env)))
+    )
+    # Claude Code reports its own SDK and version, so ours would overwrite the real ones.
+    skip = ("telemetry.sdk.language", "telemetry.sdk.name", "service.version")
+    resource = ",".join(
+        f"{key}={urllib.parse.quote(str(value), safe='-_.~/:')}"
+        for key, value in resource_attributes(service_name, env, trace_id).items()
+        if value not in (None, "") and key not in skip
+    )
+    out = {
+        "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+        # Spans are only emitted behind this beta flag; OTEL_TRACES_EXPORTER alone does nothing.
+        "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+        "OTEL_SERVICE_NAME": service_name,
+        "OTEL_RESOURCE_ATTRIBUTES": resource,
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": base,
+        "OTEL_EXPORTER_OTLP_HEADERS": headers,
+        "OTEL_TRACES_EXPORT_INTERVAL": "1000",
+        "OTEL_LOGS_EXPORT_INTERVAL": "5000",
+        "OTEL_METRIC_EXPORT_INTERVAL": "10000",
+        # Claude Code joins an inbound W3C trace in SDK/-p mode, so its spans land under workflow.trace_id.
+        "TRACEPARENT": f"00-{trace_id}-{_random_hex(8)}-01",
+    }
+    for signal in ("traces", "logs", "metrics"):
+        out[f"OTEL_{signal.upper()}_EXPORTER"] = "otlp"
+        out[f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"] = f"{base}/v1/{signal}"
+    return out
+
+
+def write_claude_env(service_name, env):
+    """Append claude_code_env() to $GITHUB_ENV, masking every form of the auth header first."""
+    values = claude_code_env(service_name, env)
+    target = env.get("GITHUB_ENV")
+    if not values or not target:
+        print("::notice::Claude Code telemetry disabled: O2_TRACE_* secrets are not configured.")
+        return 0
+    auth = auth_header(env)
+    for part in (auth, auth.split(" ", 1)[-1], urllib.parse.quote(auth, safe=""), values["OTEL_EXPORTER_OTLP_HEADERS"]):
+        print(f"::add-mask::{part}")
+    if any("\n" in v for v in values.values()):
+        print("::warning::Claude Code telemetry disabled: a trace setting contains a newline.")
+        return 0
+    with open(target, "a", encoding="utf-8") as fh:
+        fh.writelines(f"{key}={value}\n" for key, value in values.items())
+    print(f"Claude Code telemetry enabled for {service_name}, trace_id={values['TRACEPARENT'].split('-')[1]}.")
+    return 0
+
+
+def main(argv):
+    """`o2_llm_trace.py claude-env [service.name]` enables Claude Code OTel export for later steps."""
+    if len(argv) < 2 or argv[1] != "claude-env":
+        print("usage: o2_llm_trace.py claude-env [service.name]", file=sys.stderr)
+        return 2
+    try:
+        return write_claude_env(argv[2] if len(argv) > 2 else "github-actions.claude-code-action", os.environ)
+    except Exception as exc:
+        print(f"::warning::Claude Code telemetry disabled: {type(exc).__name__}")
+        return 0
+
+
+def _clean(attributes):
+    return {k: v for k, v in (attributes or {}).items() if v is not None and v != ""}
+
+
 def _random_hex(n_bytes):
     return os.urandom(n_bytes).hex()
 
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
