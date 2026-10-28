@@ -371,6 +371,12 @@ async fn persist_alert_run_state(
     true
 }
 
+/// Whether the alert's firing cycle lives on its rollup row: every alert but a multi-alert,
+/// which clears per group. [pure]
+fn closes_single_row_cycle(query: &config::meta::alerts::QueryCondition) -> bool {
+    !query.multi_alert_enabled()
+}
+
 /// Ends the single-row firing cycle a clear run closes, ahead of the on-call clear-run and persist.
 async fn close_single_row_cycle(
     alert: &config::meta::alerts::alert::Alert,
@@ -379,7 +385,7 @@ async fn close_single_row_cycle(
 ) {
     use config::meta::alerts::state::ROLLUP_GROUP_KEY;
 
-    if config::meta::alerts::grouping::maintains_group_state(&alert.query_condition) {
+    if !closes_single_row_cycle(&alert.query_condition) {
         return;
     }
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
@@ -9578,7 +9584,6 @@ mod tests {
         assert_eq!(run_downtime(&alert, &rows, &["payments"]), None);
     }
 
-    #[cfg(feature = "enterprise")]
     fn sql_multi_alert() -> config::meta::alerts::alert::Alert {
         let mut sql = config::meta::alerts::alert::Alert::default();
         sql.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
@@ -9594,6 +9599,35 @@ mod tests {
             multi_alert: true,
         });
         sql
+    }
+
+    #[test]
+    fn only_a_multi_alert_leaves_its_clear_to_the_groups() {
+        let plain = config::meta::alerts::alert::Alert::default();
+        let multi = sql_multi_alert();
+        let mut group_by = sql_multi_alert();
+        group_by
+            .query_condition
+            .aggregation
+            .as_mut()
+            .unwrap()
+            .multi_alert = false;
+        let mut promql = config::meta::alerts::alert::Alert::default();
+        promql.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        promql.query_condition.promql_multi_alert = true;
+        for (alert, single_row) in [
+            (&plain, true),
+            (&group_by, true),
+            (&multi, false),
+            (&promql, false),
+        ] {
+            assert_eq!(
+                closes_single_row_cycle(&alert.query_condition),
+                single_row,
+                "{:?}",
+                alert.query_condition.aggregation
+            );
+        }
     }
 
     /// `dispatch_per_group` and `unmuted_group_rows` look a row's group up under this key.
