@@ -56,6 +56,7 @@ export function useCredentialSnippet(content: Ref<string>) {
     PASSCODE_PLACEHOLDERS.some((token) => (content.value ?? "").includes(token)),
   );
   const { ready } = useOrgCredential(needsPasscode);
+  const hasCredential = computed(() => !!passcode.value);
   const forbidden = computed(() => !!store.state.organizationData?.organizationPasscodeForbidden);
   const tokenName = computed<string | undefined>(() => {
     if (!passcode.value) return undefined;
@@ -64,7 +65,7 @@ export function useCredentialSnippet(content: Ref<string>) {
     return tokens.find((t) => t.token === passcode.value)?.name;
   });
 
-  return { code, codeMasked, needsPasscode, forbidden, tokenName, ready };
+  return { code, codeMasked, needsPasscode, forbidden, tokenName, ready, hasCredential };
 }
 
 export default useCredentialSnippet;

@@ -3,7 +3,7 @@ const testLogger = require("../utils/test-logger.js");
 const PageManager = require("../../pages/page-manager.js");
 
 const LANGUAGE_COOKIE = "vue3-typescript-admin-languageKey";
-const LOCALES = ["de", "ru", "nl", "pl", "es", "pt", "tr", "fr", "it"];
+const LOCALES = ["de", "ru", "nl", "pl", "es", "pt", "tr-turk", "fr", "it"];
 const PROFILE = '[data-test="header-my-account-profile-icon"]';
 const ROW = '[data-test="header-language-submenu-trigger"]';
 const LIST = '[data-test="language-dropdown-item"]';
