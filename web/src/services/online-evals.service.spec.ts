@@ -228,6 +228,69 @@ describe("mutation endpoints return response.data directly", () => {
   });
 });
 
+describe("quality APIs", () => {
+  it("quality.list sends snake_case params with whole-µs times and drops empty optionals", async () => {
+    mockGet.mockResolvedValue({ data: { list: [{ configId: "c1" }] } });
+    const result = await onlineEvalsService.quality.list("acme", {
+      start_time: 1791112620869676.5,
+      end_time: 1791199020869676,
+      agent_env: "prod",
+      agent_name: "",
+      agent_id: undefined,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/quality", {
+      params: { start_time: 1791112620869676, end_time: 1791199020869676, agent_env: "prod" },
+    });
+    expect(result).toEqual([{ configId: "c1" }]);
+  });
+
+  it("quality.scores hits the per-config path with the filter and page params", async () => {
+    const page = { average: null, distribution: [], list: [], total: 0, from: 10, size: 10 };
+    mockGet.mockResolvedValue({ data: page });
+    const result = await onlineEvalsService.quality.scores("acme", "7512827247535849473", {
+      start_time: 1,
+      end_time: 2,
+      scope: "trace",
+      unhealthy_only: true,
+      bucket_from: 3,
+      bucket_to: 5,
+      value: undefined,
+      from: 10,
+      size: 10,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/7512827247535849473/quality", {
+      params: {
+        start_time: 1,
+        end_time: 2,
+        scope: "trace",
+        unhealthy_only: true,
+        bucket_from: 3,
+        bucket_to: 5,
+        from: 10,
+        size: 10,
+      },
+    });
+    expect(result).toBe(page);
+  });
+
+  it("quality.timeline hits the per-config timeline path with whole-µs times and drops empty optionals", async () => {
+    const body = { timeline: [] };
+    mockGet.mockResolvedValue({ data: body });
+    const result = await onlineEvalsService.quality.timeline("acme", "7512827247535849473", {
+      start_time: 1.5,
+      end_time: 2,
+      scope: "session",
+      agent_name: "",
+      agent_env: "prod",
+    });
+    expect(mockGet).toHaveBeenCalledWith(
+      "/api/acme/score_configs/7512827247535849473/quality/timeline",
+      { params: { start_time: 1, end_time: 2, scope: "session", agent_env: "prod" } },
+    );
+    expect(result).toBe(body);
+  });
+});
+
 describe("jobs.create analytics", () => {
   beforeEach(() => vi.mocked(analytics.track).mockClear());
 

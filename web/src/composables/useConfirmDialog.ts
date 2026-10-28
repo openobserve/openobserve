@@ -1,13 +1,16 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
-import type { I18nText } from "@/types/i18n";
+import type { I18nKey, I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
 
 export interface ConfirmDialogOptions {
   title: I18nText;
-  message: I18nText;
+  message?: I18nText;
+  // Takes precedence over `message`; the key must contain a {name} placeholder.
+  messageKeypath?: I18nKey;
+  messageName?: string;
   confirmLabel?: I18nText;
   cancelLabel?: I18nText;
   persistent?: boolean;

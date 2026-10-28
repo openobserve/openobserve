@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { inject, type Ref } from "vue";
+import { inject, nextTick, reactive, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
@@ -121,6 +121,8 @@ const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = []
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Mutable so a test can open the dashboard from a folder other than the default.
+const mockRouteFolder = { value: "default" };
 // Extra query params a test wants on the route it mounts with (cleared before every test).
 const mockExtraRouteQuery: Record<string, string> = {};
 
@@ -155,7 +157,7 @@ vi.mock("vue-router", () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
     query: {
       dashboard: "test-dashboard-1",
-      folder: "default",
+      folder: mockRouteFolder.value,
       tab: "tab-1",
       ...mockExtraRouteQuery,
     },
@@ -172,7 +174,8 @@ global.mockHistoryState = mockHistoryState;
 // Global store mock instances
 const mockStoreCommit = vi.fn();
 const mockStoreDispatch = vi.fn();
-const mockStoreState = {
+// Reactive like the real store, so watchers on store state (e.g. the timezone) run in specs.
+const mockStoreState = reactive({
   selectedOrganization: { identifier: "test-org" },
   theme: "light",
   printMode: false,
@@ -180,8 +183,8 @@ const mockStoreState = {
   organizationData: {
     folders: [{ folderId: "default", name: "Default" }],
   },
-  zoConfig: { min_auto_refresh_interval: 5 },
-};
+  zoConfig: { min_auto_refresh_interval: 5 } as Record<string, unknown>,
+}) as Record<string, any>;
 
 vi.mock("vuex", async () => {
   const actual = await vi.importActual("vuex");
@@ -272,6 +275,7 @@ import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 
@@ -1808,6 +1812,256 @@ describe("ViewDashboard", () => {
     });
   });
 
+  describe("calendar time ranges", () => {
+    const NOW = new Date("2026-10-08T03:00:00Z");
+    const baseDashboard = {
+      dashboardId: "test-dashboard-1",
+      title: "Test Dashboard",
+      variables: { list: [] },
+      tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+    };
+
+    const mountWithPicker = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.currentDashboardData.data = baseDashboard;
+      wrapper.vm.dateTimePicker = { getConsumableDateTime: () => ({}) };
+    };
+
+    beforeEach(() => {
+      store.state.timezone = "UTC";
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("turns the calendar presets on for the header picker", async () => {
+      await mountWithPicker();
+      const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+      expect(picker.props("calendarPresets")).toBe(true);
+    });
+
+    it("reads a calendar token from the URL period and writes it back", async () => {
+      Object.assign(mockExtraRouteQuery, { period: "calendar:month:-1" });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toMatchObject({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:month:-1",
+      });
+      expect(wrapper.vm.getQueryParamsForDuration(wrapper.vm.selectedDate)).toEqual({
+        period: "calendar:month:-1",
+      });
+    });
+
+    it("opens on the dashboard's default calendar period when the URL has no time", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        ...baseDashboard,
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "calendar:week:0" },
+      });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toEqual({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:week:0",
+      });
+    });
+
+    it("keeps __global while an offset-0 period only grows with now", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(settled.start_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00Z") * 1000);
+
+      vi.setSystemTime(new Date("2026-10-08T04:00:00Z"));
+      wrapper.vm.computeAllPanelTimes();
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(settled);
+
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:-1" };
+      wrapper.vm.computeAllPanelTimes();
+      const moved = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(moved).not.toBe(settled);
+      expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-07T00:00:00Z") * 1000);
+      expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00.000Z") * 1000);
+    });
+
+    describe("timezone change from any picker", () => {
+      const panelWithOwnYesterday = {
+        ...baseDashboard,
+        tabs: [
+          {
+            tabId: "tab-1",
+            name: "Tab 1",
+            panels: [
+              {
+                id: "p1",
+                type: "line",
+                config: {
+                  panel_time_enabled: true,
+                  panel_time_range: { type: "relative", relativeTimePeriod: "calendar:day:-1" },
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const UTC_START = Date.parse("2026-10-07T00:00:00Z") * 1000;
+      const IST_START = Date.parse("2026-10-06T18:30:00Z") * 1000;
+      const yesterdayAt = (startTime: number) => ({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:day:-1",
+        startTime,
+        endTime: startTime + 86_400_000_000,
+      });
+      // What any picker's DateTime.onTimezoneChange does: the store zone changes, then the app reacts.
+      const changeZone = async (zone: string) => {
+        global.mockStoreState.timezone = zone;
+        await flushPromises();
+      };
+      const setAutoRun = (on: boolean) => {
+        global.mockStoreState.zoConfig = {
+          ...global.mockStoreState.zoConfig,
+          auto_query_enabled: on,
+        };
+      };
+
+      const mountWith = async (autoRun: boolean, global0: Record<string, unknown>) => {
+        setAutoRun(autoRun);
+        await mountWithPicker();
+        setPickerTimezoneSource(() => global.mockStoreState.timezone);
+        wrapper.vm.currentDashboardData.data = panelWithOwnYesterday;
+        wrapper.vm.timeGate.onPick(global0);
+        wrapper.vm.selectedDate = global0;
+        await flushPromises();
+        wrapper.vm.computeAllPanelTimes(true);
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+      };
+
+      afterEach(() => {
+        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
+        global.mockStoreState.zoConfig = { min_auto_refresh_interval: 5 };
+        global.mockStoreState.timezone = "UTC";
+      });
+
+      it("moves a panel's own calendar range when the store zone changes, once", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        const moved = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(moved.start_time.getTime()).toBe(IST_START);
+
+        await changeZone("Asia/Calcutta");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(moved);
+      });
+
+      it("re-applies a global calendar range through the time gate", async () => {
+        await mountWith(true, yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+
+        expect(wrapper.vm.selectedDate.startTime).toBe(IST_START);
+        expect(wrapper.vm.currentTimeObjPerPanel.__global.start_time.getTime()).toBe(IST_START);
+      });
+
+      it("queries a panel once when its own picker raised the zone change", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        global.mockStoreState.timezone = "Asia/Kolkata";
+        await nextTick();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        // The panel's own gate re-applies it a tick later, as RenderDashboardCharts does.
+        wrapper.vm.refreshPanelRequest("p1");
+        const fromPanelGate = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(fromPanelGate.start_time.getTime()).toBe(IST_START);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(fromPanelGate);
+      });
+
+      it("waits for Refresh with Auto Run off and forgets the wait when the zone goes back", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        expect(wrapper.vm.isRefreshPending).toBe(true);
+
+        await changeZone("UTC");
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+        expect(wrapper.vm.isRefreshPending).toBe(false);
+
+        await changeZone("Asia/Kolkata");
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("applies waiting panel windows when Auto Run is turned on", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.zoneRefreshPending).toBe(true);
+
+        setAutoRun(true);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("keeps a waiting header pick when the zone changes from another picker", async () => {
+        await mountWith(false, yesterdayAt(UTC_START));
+        const lastWeek = {
+          valueType: "relative",
+          relativeTimePeriod: "7d",
+          startTime: 1,
+          endTime: 2,
+        };
+        wrapper.vm.timeGate.onPick(lastWeek);
+        expect(wrapper.vm.timeGate.isWaiting.value).toBe(true);
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.relativeTimePeriod).toBe("7d");
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("7d");
+      });
+
+      it("moves a waiting calendar header pick to the new zone", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        wrapper.vm.timeGate.onPick(yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.startTime).toBe(IST_START);
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          relativeTimePeriod: "calendar:day:-1",
+          startTime: IST_START,
+        });
+      });
+    });
+
+    it("still refreshes __global on a forced recompute", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+
+      wrapper.vm.computeAllPanelTimes(true);
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).not.toBe(settled);
+    });
+  });
+
   describe("product analytics", () => {
     const mountWithOverflowActions = () =>
       createWrapper({
@@ -1855,6 +2109,58 @@ describe("ViewDashboard", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+  });
+
+  it("names beta in the publish button's label instead of a chip while public links are on", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    const publish = wrapper.find('[data-test="dashboard-publish-public"]');
+    const button = publish.find('[data-test="dashboard-publish-public-btn"]');
+    expect(button.exists()).toBe(true);
+    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    // This spec's t() returns the key, so the rendered label is checked against the real message.
+    expect(button.attributes("aria-label")).toBe("dashboard.publicDashboard.shareTooltip");
+    expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");
+  });
+
+  it("tells the public links drawer the dashboard's folder, so publishing can save it there", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    mockRouteFolder.value = "f9";
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+      mockRouteFolder.value = "default";
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "PublicLinksPanel" }).props("folderId")).toBe("f9");
+  });
+
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
   });
 
   describe("layout edit mode", () => {

@@ -11,6 +11,7 @@ import {
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
+  shouldShowNoDataText,
   shouldShowAxisConfig,
   shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
@@ -62,6 +63,7 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "gauge",
   "metric",
   "state-timeline",
+  "hostmap",
 ];
 
 export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
@@ -158,12 +160,17 @@ export function useConfigPanel(
   const { t, tm } = useI18nTyped();
 
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
+  const isHostmap = computed(() => dashboardPanelData.data.type === "hostmap");
 
   // ── Config options ────────────────────────────────────────────────────────
 
   const configOptions = computed<ConfigOptions>(() => ({
     general: {
       description: { label: t("dashboard.description") },
+      "no-data-text": {
+        label: t("dashboard.noDataText"),
+        visible: shouldShowNoDataText(dashboardPanelData),
+      },
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
@@ -385,6 +392,21 @@ export function useConfigPanel(
         visible: isStateTimeline.value,
       },
     },
+    hostmap: {
+      "entity-label": {
+        label: t("dashboard.hostmapEntityLabel"),
+        visible: isHostmap.value && !!promqlMode.value,
+      },
+      "group-by": {
+        label: [t("dashboard.hostmapGroupBy"), t("dashboard.hostmapThenBy")],
+        visible: isHostmap.value && !!promqlMode.value,
+      },
+      reduction: { label: t("dashboard.hostmapReduction"), visible: isHostmap.value },
+      "group-sort": { label: t("dashboard.hostmapGroupSort"), visible: isHostmap.value },
+      "cell-sort": { label: t("dashboard.hostmapCellSort"), visible: isHostmap.value },
+      "cell-shape": { label: t("dashboard.hostmapCellShape"), visible: isHostmap.value },
+      "cell-label": { label: t("dashboard.hostmapCellLabel"), visible: isHostmap.value },
+    },
     axis: {
       "axis-width": {
         label: t("common.axisWidth"),
@@ -414,6 +436,10 @@ export function useConfigPanel(
       },
       "y-axis": {
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
+        visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
+      "y-axis-min-interval": {
+        label: t("dashboard.yAxisMinInterval"),
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
       "axis-label-mode": {
@@ -554,6 +580,7 @@ export function useConfigPanel(
         label: [
           t("dashboard.configSectionSeriesOverrides"),
           t("dashboard.addSeriesOverride"),
+          t("dashboard.editSeriesOverridesLabel"),
           t("dashboard.seriesFormattingTitle"),
           ...(typeof tm === "function" &&
           Array.isArray(tm("dashboard.configSectionSeriesOverridesAliases"))

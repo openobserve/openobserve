@@ -15,7 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick, ref } from "vue";
+import { computed, defineComponent, nextTick, ref } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
@@ -158,6 +159,7 @@ global.console = {
 };
 
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -219,14 +221,17 @@ describe("PanelSchemaRenderer", () => {
     }
   });
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (
+    props = {},
+    extra: { plugins?: any[]; stubs?: Record<string, unknown> } = {},
+  ) => {
     return mount(PanelSchemaRenderer, {
       props: {
         ...defaultProps,
         ...props,
       },
       global: {
-        plugins: [i18n, store],
+        plugins: [i18n, store, ...(extra.plugins ?? [])],
         provide: {
           hoveredSeriesState: { value: null },
           variablesAndPanelsDataLoadingState: {
@@ -260,6 +265,7 @@ describe("PanelSchemaRenderer", () => {
           CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
           LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          ...extra.stubs,
         },
       },
     });
@@ -272,6 +278,17 @@ describe("PanelSchemaRenderer", () => {
   };
 
   /** The loader's state for the next mount: data and metadata as the executors store them. */
+  it("names the chart after the resolved panel title, not the raw template", async () => {
+    wrapper = createWrapper({
+      panelSchema: { ...defaultProps.panelSchema, title: "Hosts in ${rack}" },
+      variablesData: { values: [{ name: "rack", value: ["r1", "r2"] }] },
+    });
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ChartRenderer" }).attributes("label")).toBe(
+      "Hosts in r1, r2",
+    );
+  });
+
   const mockLoadedData = (data: unknown[], metadataQueries: Record<string, unknown>[]) =>
     vi.mocked(usePanelDataLoader).mockReturnValueOnce({
       data: ref(data),
@@ -668,6 +685,57 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
         false,
       );
+    });
+
+    it("shows the panel's empty-state text with dashboard variables substituted", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { no_data_text: "Set site_meter: candidates for $site_meter" },
+        },
+        variablesData: { values: [{ name: "site_meter", value: "pm-07", type: "custom" }] },
+      });
+      await flushPromises();
+
+      const empty = wrapper.find('[data-test="no-data"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("Set site_meter: candidates for pm-07");
+      expect(empty.text()).not.toContain("No Data");
+    });
+
+    it("shows No Data when the panel sets no empty-state text", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="no-data"]').text()).toContain("No Data");
     });
 
     it("clears a stale custom_chart error when switching to another chart type", async () => {
@@ -1279,6 +1347,69 @@ describe("PanelSchemaRenderer", () => {
       expect(() => {
         wrapper.vm.onChartClick(mockParams);
       }).not.toThrow();
+    });
+  });
+
+  describe("Drilldowns", () => {
+    const withDrilldown = (allowDrilldown?: boolean) =>
+      createWrapper({
+        ...(allowDrilldown === undefined ? {} : { allowDrilldown }),
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { drilldown: [{ name: "to logs", type: "logs", data: {} }] },
+        },
+      });
+    const click = { data: { name: "a", value: 1 }, event: { offsetX: 1, offsetY: 1 } };
+
+    it("opens the drilldown menu on a click by default", async () => {
+      wrapper = withDrilldown();
+      await wrapper.vm.onPanelClick(click);
+      expect(wrapper.vm.drilldownArray).toHaveLength(1);
+    });
+
+    it("ignores clicks when drilldowns are turned off", async () => {
+      wrapper = withDrilldown(false);
+      await wrapper.vm.onPanelClick(click);
+      expect(wrapper.vm.drilldownArray).toHaveLength(0);
+    });
+
+    // The table's search icon opens the logs drawer; the public page turns drilldowns off.
+    const exploreFromTable = async (allowDrilldown: boolean) => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: { template: "<div />" } }],
+      });
+      await router.push("/");
+      wrapper = createWrapper(
+        { allowDrilldown, panelSchema: { ...defaultProps.panelSchema, type: "table" } },
+        {
+          plugins: [router],
+          stubs: {
+            TableRenderer: {
+              name: "TableRenderer",
+              emits: ["explore-cell"],
+              template: '<div data-test="table-renderer"></div>',
+            },
+          },
+        },
+      );
+      wrapper
+        .findComponent({ name: "TableRenderer" })
+        .vm.$emit("explore-cell", { columnId: "count", value: 7, row: {} });
+      await flushPromises();
+      return { drawerOpen: wrapper.vm.cellDrawer.open, query: router.currentRoute.value.query };
+    };
+
+    it("opens the logs drawer from a table cell when drilldowns are on", async () => {
+      const { drawerOpen, query } = await exploreFromTable(true);
+      expect(drawerOpen).toBe(true);
+      expect(query.cell_value).toBe("7");
+    });
+
+    it("does not open the logs drawer from a table cell when drilldowns are off", async () => {
+      const { drawerOpen, query } = await exploreFromTable(false);
+      expect(drawerOpen).toBe(false);
+      expect(query.cell_value).toBeUndefined();
     });
   });
 
@@ -3875,6 +4006,100 @@ describe("PanelSchemaRenderer", () => {
       await flushPromises();
       return chunk;
     };
+
+    it("emits an empty series limit on mount, clearing a previous chart's series chip", async () => {
+      await mountRacing();
+      expect(wrapper.emitted("series-limit-update")?.[0]).toEqual([null]);
+    });
+
+    it("clears a line chart's series chip in the editor preview when the panel turns into a host map", async () => {
+      const data = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [{ panelQueryIndex: 0 }] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      const schemaOf = (type: string) => ({
+        id: "panel-preview",
+        type,
+        queryType: "promql",
+        queries: [{ query: "gpu_power_watts", fields: {}, config: {} }],
+        config: {},
+      });
+      // The editor keys its preview renderer by chart type and feeds its notices to PanelErrorButtons.
+      const Preview = defineComponent({
+        components: { PanelSchemaRenderer, PanelErrorButtons },
+        props: { type: { type: String, required: true } },
+        setup(props) {
+          const limit = ref<any>(null);
+          const message = ref("");
+          const schema = computed(() => schemaOf(props.type));
+          return { limit, message, schema, defaultProps };
+        },
+        template: `
+          <div>
+            <PanelErrorButtons :seriesLimit="limit" :limitNumberOfSeriesWarningMessage="message" />
+            <PanelSchemaRenderer
+              :key="type"
+              v-bind="defaultProps"
+              :panelSchema="schema"
+              @series-limit-update="limit = $event"
+              @limit-number-of-series-warning-message-update="message = $event"
+            />
+          </div>`,
+      });
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("gpu"),
+        extras: {
+          limitNumberOfSeriesWarningMessage: "Showing 100 of 512 series to keep the chart fast",
+        },
+      });
+      const host = mount(Preview, {
+        props: { type: "line" },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: PAGE_KEY,
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      onTestFinished(() => host.unmount());
+      await flushPromises();
+      data.value = [primary];
+      await flushPromises();
+      expect(host.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(true);
+
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("gpu"),
+        chartType: "hostmap",
+        extras: { panelId: "panel-preview" },
+      });
+      await host.setProps({ type: "hostmap" });
+      await flushPromises();
+      data.value = [{ ...primary }];
+      await flushPromises();
+      expect(host.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(false);
+    });
 
     it("emits an empty map notice on mount, clearing a previous chart's chip", async () => {
       await mountRacing();

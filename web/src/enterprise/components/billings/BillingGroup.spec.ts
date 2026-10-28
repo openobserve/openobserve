@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { config, mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -594,6 +594,24 @@ describe("BillingGroup.vue", () => {
       expect(billing.remove_billing_group_member).toHaveBeenCalledWith("default", "child-1");
       expect(billing.get_billing_group_membership).toHaveBeenCalledTimes(2);
       expect(dialog(wrapper, "org-group-remove-dialog").props("open")).toBe(false);
+    });
+
+    it("names the organization being removed in bold in the dialog body", async () => {
+      config.global.renderStubDefaultSlot = true;
+      try {
+        ({ wrapper } = await mountBillingGroup({ members: [member], renderTable: true }));
+        button(wrapper, "org-group-remove-member-child-1")!.vm.$emit("click");
+        await flushPromises();
+
+        const removeDialog = dialog(wrapper, "org-group-remove-dialog");
+        expect(removeDialog.props("primaryButtonVariant")).toBe("destructive");
+        const name = removeDialog.find('[data-test="org-group-remove-dialog-name"]');
+        expect(name.text()).toBe("Child One");
+        expect(name.classes()).toContain("font-semibold");
+        expect(removeDialog.text()).toContain("Child One becomes a free organization");
+      } finally {
+        config.global.renderStubDefaultSlot = false;
+      }
     });
 
     it("shows Leave billing group on the member view only", async () => {

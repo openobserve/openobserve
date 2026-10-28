@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="mode === 'visualize'"
+          calendar-presets
           @on:date-change="onDateChange"
         />
         <AutoRefreshInterval

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { computed } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
@@ -45,6 +46,19 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast: vi.fn(),
 }));
+
+const breakpoint = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  return {
+    ...original,
+    default: () => ({
+      ...original.default(),
+      isMobile: computed(() => breakpoint.mobile),
+      mdUp: computed(() => !breakpoint.mobile),
+    }),
+  };
+});
 
 const AUTH_URL = "https://slack.com/oauth/v2/authorize?client_id=1&state=signed";
 let popup: Window;
@@ -80,7 +94,16 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
     const w = mountEmpty();
     const text = w.text();
     expect(text).toContain("Connect a Slack workspace");
-    expect(text).toContain("Ask questions; answers use your own permissions");
+    expect(text).toContain(
+      "Your team asks OpenObserve questions from Slack and gets answers with their own permissions.",
+    );
+    expect(text).not.toContain("creates and installs your own Slack app");
+    expect(text).toContain("What happens next");
+    const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
+    expect(steps).toHaveLength(2);
+    expect(steps[0]).toContain("Add to Slack");
+    expect(steps[0]).toContain("Opens Slack in a popup: pick a channel for alerts, then Allow");
+    expect(steps[1]).toContain("Link people");
     expect(text).not.toMatch(/Acknowledge|unfurl|Phase/);
     expect(w.find('[data-test="slack-connect-consent"]').text()).toBe(
       "Two-way Slack also reads your direct messages with OpenObserve and replies in threads it is part of. It never reads other channel history.",
@@ -257,6 +280,42 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(w.emitted("setup")).toHaveLength(1);
   });
 
+  it("explains what Set up Slack app starts, in three steps", () => {
+    const w = mountEmpty({ isCloud: false });
+    const text = w.text();
+    expect(text).toContain(
+      "OpenObserve creates and installs your own Slack app; nothing is shared with a third party.",
+    );
+    expect(text).toContain("What happens next · about 5 minutes");
+    const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toContain("Check this server");
+    expect(steps[0]).toContain("Encryption key, web URL and AI agent");
+    expect(steps[1]).toContain("Create the app");
+    expect(steps[1]).toContain("Paste one configuration token from Slack");
+    expect(steps[2]).toContain("Install and link people");
+    expect(text).not.toContain("Ask questions; answers use your own permissions");
+    expect(text).toContain("Needs the Manage Slack permission");
+    expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
+    expect(w.find('[data-test="slack-connect-steps"]').attributes("role")).toBe("list");
+  });
+
+  it("shortens the step details on a phone", () => {
+    breakpoint.mobile = true;
+    try {
+      const steps = mountEmpty({ isCloud: false })
+        .findAll('[data-test="slack-connect-step"]')
+        .map((s) => s.text());
+      expect(steps[0]).toContain("Encryption key, web URL and AI agent");
+      expect(steps[0]).not.toContain("verified before anything touches Slack");
+      expect(steps[1]).toContain("Paste one configuration token from Slack");
+      expect(steps[1]).not.toContain("builds the app for you");
+      expect(steps[2]).toContain("Allow it in Slack, then link members");
+    } finally {
+      breakpoint.mobile = false;
+    }
+  });
+
   it("AC-12.1 Connect existing proves the admin with Sign in with Slack, then connects", async () => {
     const w = mountEmpty({
       isCloud: false,
@@ -287,7 +346,7 @@ describe("SlackConnectEmpty for an org the instance workspace does not serve (M4
   const labsStore = () =>
     createStore({
       state: {
-        selectedOrganization: { identifier: "labs", name: "Labs" },
+        selectedOrganization: { identifier: "labs", label: "Labs" },
         userInfo: { email: "lee@acme.example" },
         zoConfig: { slack_enabled: true, meta_org: "_meta" },
       },
@@ -347,9 +406,7 @@ describe("SlackConnectEmpty for an org the instance workspace does not serve (M4
     const served = mountEmpty({ isCloud: false });
     await flushPromises();
     expect(served.find('[data-test="slack-not-included"]').exists()).toBe(false);
-    expect(served.text()).toContain(
-      "OpenObserve creates your own Slack app from one configuration token",
-    );
+    expect(served.text()).toContain("OpenObserve creates and installs your own Slack app");
     expect(served.text()).not.toContain("For a different Slack workspace");
   });
 

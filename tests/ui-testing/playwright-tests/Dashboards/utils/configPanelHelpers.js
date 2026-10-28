@@ -101,6 +101,7 @@ export const generateDashboardName = () =>
  * @param {string} [options.panelName]
  * @param {string} [options.yField]
  * @param {string} [options.breakdownField] - optional breakdown ("b" axis) field
+ * @param {string} [options.zField] - optional heatmap value ("z" axis) field
  */
 async function buildPanel(page, pm, dashboardName, {
   chartType,
@@ -108,6 +109,7 @@ async function buildPanel(page, pm, dashboardName, {
   yField = "kubernetes_container_hash",
   breakdownField = null,
   xField = null,
+  zField = null,
 }) {
   await setupTestDashboard(page, pm, dashboardName);
   await pm.dashboardCreate.addPanel();
@@ -122,6 +124,9 @@ async function buildPanel(page, pm, dashboardName, {
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
   if (breakdownField) {
     await pm.chartTypeSelector.searchAndAddField(breakdownField, "b");
+  }
+  if (zField) {
+    await pm.chartTypeSelector.searchAndAddField(zField, "z");
   }
   await pm.dashboardPanelActions.addPanelName(panelName);
   await pm.dashboardPanelActions.applyDashboardBtn();
@@ -164,6 +169,22 @@ export async function setupBarPanelWithBreakdownAndConfig(page, pm, dashboardNam
 }
 
 /**
+ * Stacked-family panel (stacked / h-stacked / area-stacked) broken down by host so each bucket stacks several series — config sidebar opened and ready.
+ */
+export async function setupStackedPanelWithConfig(page, pm, dashboardName, {
+  chartType = "stacked",
+  panelName = "Test Panel",
+} = {}) {
+  await buildPanel(page, pm, dashboardName, {
+    chartType,
+    panelName,
+    breakdownField: "kubernetes_host",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Stacked panel with breakdown and config ready", { chartType, dashboardName, panelName });
+}
+
+/**
  * Line chart panel — config sidebar opened and ready.
  */
 export async function setupLinePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
@@ -179,6 +200,24 @@ export async function setupAreaPanelWithConfig(page, pm, dashboardName, panelNam
   await buildPanel(page, pm, dashboardName, { chartType: "area", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Area panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Heatmap panel (x = histogram(_timestamp), y = yField, z = count of pod name) — config sidebar opened.
+ * Pass a numeric yField (e.g. "code") to expose the Y-axis bucket settings.
+ */
+export async function setupHeatmapPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  yField = "kubernetes_namespace_name",
+} = {}) {
+  await buildPanel(page, pm, dashboardName, {
+    chartType: "heatmap",
+    panelName,
+    yField,
+    zField: "kubernetes_pod_name",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Heatmap panel with config ready", { dashboardName, panelName, yField });
 }
 
 /**
@@ -371,6 +410,26 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL stacked panel over the seeded cpu_usage metric — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLStackedPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "stacked", panelName, query: "cpu_usage" });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL stacked panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL heatmap panel — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLHeatmapPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "heatmap", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL heatmap panel with config ready", { dashboardName, panelName });
 }
 
 export async function setupPromQLMetricPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {

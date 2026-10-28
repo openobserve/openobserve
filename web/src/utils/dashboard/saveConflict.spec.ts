@@ -101,6 +101,15 @@ describe("diffDashboards", () => {
     expect(diffDashboards(base(), latest).changedSettings).toContain("other");
   });
 
+  it("names the default auto refresh, treating 0 and absent as the same Off", () => {
+    const latest: any = base();
+    latest.defaultRefreshInterval = 0;
+    expect(diffDashboards(base(), latest).changedSettings).toEqual([]);
+
+    latest.defaultRefreshInterval = 60;
+    expect(diffDashboards(base(), latest).changedSettings).toEqual(["defaultRefreshInterval"]);
+  });
+
   it("records the old name of a renamed tab", () => {
     const latest = base();
     latest.tabs[0].name = "Overview (prod)";

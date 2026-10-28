@@ -140,8 +140,9 @@ const stubs = {
     emits: ["update:modelValue", "keydown", "submit", "update:references"],
   },
   ConfirmDialog: {
+    name: "ConfirmDialog",
     template: '<div data-test="confirm-dialog" />',
-    props: ["modelValue", "title", "message"],
+    props: ["modelValue", "title", "message", "okVariant"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
   O2AIConfirmDialog: {
@@ -407,6 +408,46 @@ describe("O2AIChat", () => {
     });
   });
 
+  describe("delete chat dialog", () => {
+    beforeEach(() => {
+      wrapper = mountO2AIChat({ isOpen: true });
+    });
+
+    const deleteDialog = () =>
+      wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Delete Chat")!;
+
+    it("names the chat in bold behind a destructive Delete", async () => {
+      (wrapper.vm as any).chatHistory = [{ id: 42, title: "Latency review", serverBacked: false }];
+      await (wrapper.vm as any).requestDeleteChat(42);
+      await nextTick();
+
+      const dialog = deleteDialog();
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primaryButtonLabel")).toBe("Delete");
+      const name = wrapper.find('[data-test="o2-ai-chat-delete-chat-name"]');
+      expect(name.text()).toBe("Latency review");
+      expect(name.classes()).toContain("font-semibold");
+      expect(wrapper.find('[data-test="o-dialog-body"]').text()).toBe(
+        "Are you sure you want to delete the Latency review chat? This action cannot be undone.",
+      );
+    });
+
+    it("closes at once on Delete and deletes the chat it was opened for", async () => {
+      (wrapper.vm as any).chatHistory = [{ id: 42, title: "Latency review", serverBacked: false }];
+      await (wrapper.vm as any).requestDeleteChat(42);
+      await nextTick();
+      mockDeleteChatById.mockResolvedValueOnce(true);
+
+      await wrapper.find('[data-test="o-dialog-primary"]').trigger("click");
+      expect((wrapper.vm as any).showDeleteChatConfirmDialog).toBe(false);
+      await flushPromises();
+      expect(mockDeleteChatById).toHaveBeenCalledWith(42);
+    });
+  });
+
   describe("confirmDeleteChat", () => {
     beforeEach(() => {
       wrapper = mountO2AIChat({ isOpen: false });
@@ -470,6 +511,15 @@ describe("O2AIChat", () => {
       await nextTick();
 
       expect((wrapper.vm as any).showClearAllConfirmDialog).toBe(true);
+    });
+
+    it("uses a destructive OK button in the clear-all confirm", async () => {
+      wrapper.unmount();
+      wrapper = mountO2AIChat({ isOpen: true });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("okVariant")).toBe(
+        "destructive",
+      );
     });
   });
 

@@ -562,9 +562,11 @@ describe("ReportList Component", () => {
 
       // Verify dialog is shown with correct message
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(
-        `Are you sure you want to delete report "${report.name}"`,
-      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
+      expect(dialog.props("messageName")).toBe(report.name);
+      expect(dialog.props("okVariant")).toBe("destructive");
       expect(wrapper.vm.deleteDialog.data).toEqual({
         report_id: report.report_id,
         name: report.name,
@@ -631,9 +633,11 @@ describe("ReportList Component", () => {
 
       // Verify confirmation dialog is shown
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(
-        'Are you sure you want to delete report "Test Report 1"',
-      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
+      expect(dialog.props("messageName")).toBe("Test Report 1");
+      expect(dialog.props("okVariant")).toBe("destructive");
     });
   });
 

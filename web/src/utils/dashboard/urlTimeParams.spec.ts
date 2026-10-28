@@ -66,6 +66,19 @@ describe("urlTimeParams · queryParamsToSelectedDate", () => {
   });
 });
 
+describe("urlTimeParams · calendar tokens", () => {
+  it("round-trips a calendar token through `period` unchanged", () => {
+    const selected = queryParamsToSelectedDate({ period: "calendar:quarter:-1" });
+    expect(selected).toEqual({
+      valueType: "relative",
+      startTime: null,
+      endTime: null,
+      relativeTimePeriod: "calendar:quarter:-1",
+    });
+    expect(selectedDateToQueryParams(selected)).toEqual({ period: "calendar:quarter:-1" });
+  });
+});
+
 describe("urlTimeParams · selectedDateToQueryParams", () => {
   it("returns {} for null/undefined", () => {
     expect(selectedDateToQueryParams(null)).toEqual({});

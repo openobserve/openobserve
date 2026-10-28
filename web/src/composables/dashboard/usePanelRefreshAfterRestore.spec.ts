@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { defineComponent, h, provide, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { createDashboardFreshOnOpen, DASHBOARD_FRESH_ON_OPEN } from "./dashboardFreshOnOpen";
 
 const restoredState = () =>
@@ -35,11 +35,12 @@ const restoredState = () =>
     isOperationCancelled: false,
   });
 
-const setup = ({ autoRun = true, relative = true } = {}) => {
+const setup = ({ autoRun = true, relative = true, calendar = false } = {}) => {
   const state = restoredState();
   const visit = createDashboardFreshOnOpen({
     isAutoRunOn: () => autoRun,
     isRelativeRange: () => relative,
+    isCalendarRange: () => calendar,
   });
   let refresh: any;
   const Panel = defineComponent({
@@ -71,6 +72,25 @@ const startRun = (state: any, refresh: any) => {
   state.loading = true;
   state.data = [];
 };
+
+describe("cachedWindowDiffers", () => {
+  const selected = { start_time: new Date(1_000_000), end_time: new Date(1_900_000) };
+
+  it("is false for the same length", () => {
+    expect(
+      cachedWindowDiffers({ start_time: 2_000_000, end_time: 2_900_000 }, selected, false),
+    ).toBe(false);
+  });
+
+  it("exempts a shared start only for a calendar period", () => {
+    const sameStart = { start_time: 1_000_000, end_time: 1_500_000 };
+    expect(cachedWindowDiffers(sameStart, selected, true)).toBe(false);
+    expect(cachedWindowDiffers(sameStart, selected, false)).toBe(true);
+    expect(
+      cachedWindowDiffers({ start_time: 1_200_000, end_time: 1_500_000 }, selected, true),
+    ).toBe(true);
+  });
+});
 
 describe("usePanelRefreshAfterRestore", () => {
   it("never queues outside a dashboard view", () => {
@@ -145,6 +165,40 @@ describe("usePanelRefreshAfterRestore", () => {
     expect(refresh.acceptsCachedWindow(sameWindow, WINDOW)).toBe(true);
     expect(refresh.acceptsCachedWindow(sameLengthLater, WINDOW)).toBe(false);
     expect(refresh.acceptsCachedWindow(undefined, WINDOW)).toBe(false);
+  });
+
+  it("accepts a cached window for a calendar period only when it starts with that period", () => {
+    const { refresh } = setup({ autoRun: false, calendar: true });
+    const periodStart = WINDOW.start_time.getTime();
+
+    expect(
+      refresh.acceptsCachedWindow({ start_time: periodStart, end_time: 1_500_000 }, WINDOW),
+    ).toBe(true);
+    expect(
+      refresh.acceptsCachedWindow({ start_time: 1_800_000, end_time: 1_900_000 }, WINDOW),
+    ).toBe(false);
+  });
+
+  it("without a DASHBOARD_FRESH_ON_OPEN provider, still rejects a same-length calendar cache from another period", () => {
+    const outside = usePanelRefreshAfterRestore({
+      state: restoredState(),
+      panelSchema: ref({ id: "P1" }),
+    });
+    const lastWeek = {
+      start_time: WINDOW.start_time.getTime(),
+      end_time: WINDOW.end_time.getTime(),
+      relativeTimePeriod: "calendar:week:-1",
+    };
+    const priorWeek = {
+      start_time: lastWeek.start_time - 7 * 24 * 60 * 60 * 1000,
+      end_time: lastWeek.end_time - 7 * 24 * 60 * 60 * 1000,
+    };
+
+    expect(outside.acceptsCachedWindow(priorWeek, lastWeek)).toBe(false);
+    expect(outside.acceptsCachedWindow(lastWeek, lastWeek)).toBe(true);
+
+    const rolling = { ...lastWeek, relativeTimePeriod: "7d" };
+    expect(outside.acceptsCachedWindow(priorWeek, rolling)).toBe(true);
   });
 
   it("marks only a complete, error-free result as refreshed", () => {

@@ -55,6 +55,8 @@ export default class DashboardactionPage {
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    // Panel validation messages listed under the chart (DashboardErrors.vue)
+    this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
     // panel name is empty on save — the form schema blocks submit before any
     // toast is produced).
@@ -148,6 +150,10 @@ export default class DashboardactionPage {
   // Get the inner <canvas> element inside the chart-renderer
   getChartRendererCanvasElement() {
     return this.chartRendererCanvasEl;
+  }
+
+  getErrorToastWithText(text) {
+    return this.errorToast.filter({ hasText: text });
   }
 
   // Get dashboard-error locator
@@ -654,12 +660,53 @@ export default class DashboardactionPage {
     await this.page.waitForTimeout(1000);
   }
 
-  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
   async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    const names = (await this.getChartSeries(scopeSelector)).map((s) => s.name).filter(Boolean);
+    return [...new Set(names)];
+  }
+
+  async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    return charts.flatMap((chart) =>
+      chart.series.map((s) => ({
+        name: s.name,
+        values: s.points.map((point) =>
+          Array.isArray(point) ? point[point.length - 1] : point,
+        ),
+      })),
+    );
+  }
+
+  /**
+   * Value-axis bounds and stacked series of the first rendered chart, read from the live ECharts option.
+   * @param {"yAxis"|"xAxis"} valueAxis - the axis that carries values (xAxis for h-stacked)
+   * @param {string} scopeSelector
+   * @returns {Promise<{min: number|null, max: number|null, series: Array<{name: string, stack: string|null, points: Array}>}|null>}
+   */
+  async getChartValueAxisFit(valueAxis = "yAxis", scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const bounds = chart[valueAxis]?.[0] ?? {};
+    return { min: bounds.min ?? null, max: bounds.max ?? null, series: chart.series };
+  }
+
+  // Legend and axes are canvas-painted, so read the live option via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
     return this.page.evaluate((scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const names = new Set();
+      const charts = [];
       const visited = new Set();
+      const numberOrNull = (value) => (typeof value === "number" ? value : null);
+      const axesOf = (axis) =>
+        (Array.isArray(axis) ? axis : axis ? [axis] : []).map((a) => ({
+          type: a?.type ?? null,
+          min: numberOrNull(a?.min),
+          max: numberOrNull(a?.max),
+        }));
+      const pointOf = (point) => {
+        if (Array.isArray(point)) return point.map((v) => (v instanceof Date ? v.getTime() : v));
+        return point !== null && typeof point === "object" ? point.value : point;
+      };
       const walk = (node, depth) => {
         if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
         visited.add(node);
@@ -680,7 +727,16 @@ export default class DashboardactionPage {
             scopes.some((scope) => scope.contains(host))
           ) {
             try {
-              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+              const option = chart.getOption() ?? {};
+              charts.push({
+                xAxis: axesOf(option.xAxis),
+                yAxis: axesOf(option.yAxis),
+                series: (option.series ?? []).map((s) => ({
+                  name: s?.name ? String(s.name) : "",
+                  stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  points: (s?.data ?? []).map(pointOf),
+                })),
+              });
             } catch {
               // A disposed instance throws; it draws nothing anyway.
             }
@@ -691,7 +747,7 @@ export default class DashboardactionPage {
         if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
       };
       walk(document.querySelector("#app")?._vnode, 0);
-      return [...names];
+      return charts;
     }, scopeSelector);
   }
 

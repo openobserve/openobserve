@@ -163,7 +163,6 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
             start_time: range.0,
             end_time: range.1.saturating_add(1),
             quick_mode: false,
-            query_type: String::new(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,

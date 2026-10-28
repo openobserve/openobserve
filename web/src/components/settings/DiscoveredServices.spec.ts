@@ -91,7 +91,7 @@ const ODrawerStub = {
 // underlying ODialog so the spec stays decoupled from that component.
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message", "warningMessage"],
+  props: ["modelValue", "title", "message", "warningMessage", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
     <div data-test="confirm-dialog-stub" :data-open="String(!!modelValue)">
@@ -816,6 +816,9 @@ describe("DiscoveredServices", () => {
       expect(wrapper.vm.confirmResetOpen).toBe(true);
       expect(wrapper.find('[data-test="confirm-dialog-stub"]').attributes("data-open")).toBe(
         "true",
+      );
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("okVariant")).toBe(
+        "destructive",
       );
     });
 

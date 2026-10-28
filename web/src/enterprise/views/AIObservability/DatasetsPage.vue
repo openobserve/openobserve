@@ -514,9 +514,11 @@ async function save(values: DatasetForm) {
 async function removeDataset(row: LlmDataset) {
   const ok = await confirm({
     title: t("aiObservability.datasets.deleteTitle"),
-    message: t("aiObservability.datasets.deleteMessage", { name: row.name }),
+    messageKeypath: "aiObservability.datasets.deleteMessage",
+    messageName: row.name,
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   try {

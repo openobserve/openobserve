@@ -133,7 +133,7 @@ const stubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "title", "message"],
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: "<div v-if='modelValue'>{{ title }} {{ message }}</div>",
   },
@@ -722,7 +722,10 @@ describe("OnCallScheduleEditor", () => {
     it("asks first, naming the rotation, and writes nothing on cancel", async () => {
       const wrapper = await askToRemove();
       const confirm = confirmFor(wrapper, "oncall-rotation-remove-confirm");
-      expect(confirm.text()).toBe("Remove Primary? It is deleted now, for everyone on this team.");
+      expect(confirm.text()).toBe("Remove Primary?");
+      expect(confirm.props("messageKeypath")).toBe("oncall.removeRotationMessage");
+      expect(confirm.props("messageName")).toBe("Primary");
+      expect(confirm.props("okVariant")).toBe("destructive");
 
       confirm.vm.$emit("update:modelValue", false);
       confirm.vm.$emit("update:cancel");

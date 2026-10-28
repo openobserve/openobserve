@@ -66,4 +66,35 @@ describe("ReviewContentBox", () => {
       "aiObservability.queues.workbench.exitFullscreen",
     );
   });
+
+  it("shows the empty text inside the box when there is no content", () => {
+    const wrapper = mountBox({ content: "", emptyText: "Output not captured" });
+    expect(wrapper.find('[data-test="ai-review-content-empty-input"]').text()).toBe(
+      "Output not captured",
+    );
+    expect(wrapper.find(".llm").exists()).toBe(false);
+  });
+
+  it("keeps rendering the content, and stays blank when empty, without the empty text", () => {
+    expect(mountBox({ emptyText: "Output not captured" }).find(".llm").exists()).toBe(true);
+    const blank = mountBox({ content: "" });
+    expect(blank.find('[data-test="ai-review-content-empty-input"]').exists()).toBe(false);
+    expect(blank.find(".llm").exists()).toBe(true);
+  });
+
+  it("shows no skeleton by default, and skeleton lines in place of the content while loading", () => {
+    const idle = mountBox({ emptyText: "Output not captured" });
+    expect(idle.find('[data-test="ai-review-content-skeleton-input"]').exists()).toBe(false);
+    expect(idle.find(".llm").exists()).toBe(true);
+
+    const loading = mountBox({ loading: true, emptyText: "Output not captured" });
+    const skeleton = loading.find('[data-test="ai-review-content-skeleton-input"]');
+    expect(skeleton.findAll('[role="status"]').length).toBeGreaterThan(1);
+    expect(loading.find(".llm").exists()).toBe(false);
+    expect(loading.find('[data-test="ai-review-content-empty-input"]').exists()).toBe(false);
+    // The frame keeps its label and buttons, so nothing moves when the content lands.
+    expect(loading.text()).toContain("Input");
+    expect(loading.find('[data-test="ai-review-content-copy-input"]').exists()).toBe(true);
+    expect(loading.find('[data-test="ai-review-content-expand-input"]').exists()).toBe(true);
+  });
 });

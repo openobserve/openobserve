@@ -317,6 +317,10 @@ impl ExecutablePipeline {
     }
 
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
+        // No publish_error here: its stream params would name the other org.
+        if let Some(refusal) = pipeline.cross_org_refusal() {
+            return Err(anyhow!("Init error: {refusal}"));
+        }
         let node_map = pipeline
             .nodes
             .iter()
@@ -1601,6 +1605,8 @@ async fn process_llm_evaluation_node(
                         target_stream_type: ctx.source_stream_type.clone(),
                         target_agent_name: ctx.agent_name.clone(),
                         target_agent_id: ctx.agent_id.clone(),
+                        target_agent_env: ctx.agent_env.clone(),
+                        target_agent_version: ctx.agent_version.clone(),
                         scorer_id: None,
                         scorer_version: None,
                         scorer_type: None,
