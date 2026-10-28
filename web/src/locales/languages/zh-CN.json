@@ -5199,6 +5199,7 @@
     },
     "copyContentError": "复制内容时出错",
     "passcodeForbiddenMessage": "查看数据摄取令牌需要管理员或 Root 角色。请向管理员索取设置命令，或获取在此处查看它所需的角色。",
+    "passcodeUnavailableMessage": "无法加载组织的数据摄取令牌，因此此命令将无法通过身份验证。请刷新页面后重试。",
     "updateRUMTokenMessage": "确定要更新此组织的 RUM 令牌吗？",
     "completeAwsIntegration": "完成 AWS 集成",
     "deployAwsServicesOneClick": "使用单个 CloudFormation 堆栈一键部署所有选定的 AWS 服务。",

@@ -5199,6 +5199,7 @@
     },
     "copyContentError": "İçerik kopyalanırken hata oluştu.",
     "passcodeForbiddenMessage": "Veri alımı token'ını görüntülemek için Yönetici veya Root rolü gerekir. Kurulum komutunu ya da burada görmek için gereken rolü bir yöneticiden isteyin.",
+    "passcodeUnavailableMessage": "Kuruluşun veri alımı token'ı yüklenemedi, bu nedenle bu komut kimlik doğrulaması yapamaz. Yeniden denemek için sayfayı yenileyin.",
     "updateRUMTokenMessage": "Bu kuruluş için RUM token'ını güncellemek istediğinize emin misiniz?",
     "completeAwsIntegration": "AWS Entegrasyonunu Tamamla",
     "deployAwsServicesOneClick": "Seçilen tüm AWS hizmetlerini tek bir CloudFormation yığını kullanarak tek tıkla dağıtın.",

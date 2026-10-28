@@ -72,6 +72,12 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
                 }
             }
         };
+        // A NULL label is an absent label, which PromQL reads as "".
+        let predicate = if mat.is_match("") {
+            col(mat.name.as_str()).is_null().or(predicate)
+        } else {
+            predicate
+        };
         predicates.push(predicate);
     }
     predicates

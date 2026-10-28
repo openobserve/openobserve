@@ -1,7 +1,7 @@
 # AI Code Review (`scripts/ai-review`)
 
 Automated PR review that posts a single consolidated comment on every pull request. Driven by
-`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using DeepSeek-V4-Pro via `opencode`.
+`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using DeepSeek-V4.1-Flash at max reasoning effort via `opencode`.
 
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
@@ -15,11 +15,120 @@ Actions logs is fine; naming it in the comment is not.
 ## How it works (one paragraph)
 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /
-`full`), runs the tier's read-only specialist agents (security, code-quality, performance,
-documentation, release) in parallel — plus any *conditional* agent whose domain the diff touches —
-and a coordinator consolidates their findings into one comment with an approve/needs-work
-decision. The comment PATCHes itself in place on re-review. Full engine details live in the code;
-the rest of this README covers **setup, activation, and rollback** of the branded identity.
+`full`), runs the tier's specialist agents (security, correctness, code-quality, performance,
+documentation) in parallel — plus any *conditional* agent whose domain the diff touches (frontend,
+qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config.rs`, `.github/`,
+`deploy/` and Docker files) — and a coordinator consolidates their findings into one comment with
+an approve/needs-work decision. Correctness owns the PR's behaviour end to end (callers, sibling
+paths, state, the tests that prove the change); every tier runs it. Before the agents start, the
+runner greps the PR tree for where each symbol the diff changes is used outside the diff, and for
+other definitions of the same name (`src/impact.mjs`), and gives that map to every reviewer.
+Security and correctness also get `openobserve-checklist.md`, the defect classes that recur in
+this repo's fix history, each with a check to run against the diff. The comment PATCHes itself in place on re-review. If a reviewer
+fails or times out, the runner (not the model) adds a line to the comment saying which area went
+unreviewed.
+
+The coordinator also lists the findings it kept in a hidden JSON block, which the runner strips
+from the comment. Kept blockers and warnings whose `file:line` is an added or context line of the
+diff are posted as one `COMMENT` review with inline threads (at most 10, never approve or request
+changes). Each thread carries a hidden fingerprint of file and title, so a re-run skips findings
+already posted by `REVIEW_BOT_LOGIN`. A failed inline post only logs a warning. Set the variable
+`AI_REVIEW_INLINE` to `false` to turn the threads off. Every reviewer's parsed findings and the
+coordinator's kept list are also uploaded as the `ai-review-findings-*` artifact (7 days,
+scrubbed like the comment). Full engine details live in the code;
+the rest of this README covers **trusted execution, setup, activation, and rollback**.
+
+The v2 redesign (inline findings, a verifier, a human gate) is specified in
+`openobserve/designs` → `meta/process-improvements/ai-code-review-v2/DESIGN.md`; this directory
+currently holds its P0 hardening.
+
+## Trusted execution
+
+A PR must never be able to run code next to the review secrets or weaken its own review.
+
+| Layer | What it does |
+|-------|--------------|
+| `pull_request_target` | The workflow file and the engine always come from `main`. A PR's edits to `scripts/ai-review/**`, `opencode.jsonc`, `opencode.ci.jsonc` or the workflow take effect only after merge. |
+| Two checkouts | `./engine` = `main` (sparse: this directory, the opencode configs, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
+| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md`, or `CLAUDE.md` where a directory has no `AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
+| `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` or `opencode.ci.jsonc` from `./engine`), the `OPENCODE_*` disable flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
+| Config selection | `REVIEW_OPENCODE_CONFIG` = `default` (`opencode.jsonc`) or `ci-full` (`opencode.ci.jsonc`); any other value stops the run. The workflow sets `ci-full`. |
+| `opencode.jsonc` permissions | Each `ai-review-*` agent: deny `*`, then allow `read`, `glob`, `grep`; `external_directory` denied. A `provider.use` policy allows only `deepseek-review`. LSP, formatters, snapshots and sharing are off. |
+| `opencode.ci.jsonc` permissions | Same provider, model and agents, but each agent allows `*`: shell, edit, write and webfetch run with no prompt. The PR checkout is untrusted input to an agent that can run commands, and the provider key is in the opencode process environment, so a shell command can read it. |
+| Startup self-check | Refuses to review if any agent is missing, any non-built-in plugin or MCP server loaded, or a granted tool's plugin is not active. Under `default` it also refuses any agent that resolves to allow a tool other than `read`/`glob`/`grep` or any outside directory; under `ci-full` it refuses an agent that does not allow every tool without asking. Permission prompts are rejected under `default` and approved once under `ci-full`. |
+| `src/comments.mjs` | The previous review is only ever a marker comment by the reviewer app (`REVIEW_BOT_LOGIN` = `<app-slug>[bot]`), read across every page; anyone else's comment carrying the marker is never fed to the reviewers or edited. When the app token cannot be minted the review posts as `github-actions[bot]`, which any same-repo PR workflow can also post as, so that run uses no previous review and posts a fresh comment. |
+| `src/scrub.mjs` | Before posting: redacts values of secret-named env vars and token-shaped strings (inside code too), breaks forged `<!-- o2-review` markers, and neutralises `@mentions` outside code. |
+
+Sanitize is load-bearing, not belt and braces: opencode 1.18.x imported plugins from a project
+`.opencode/plugin(s)/` directory at prompt time even with `OPENCODE_DISABLE_PROJECT_CONFIG` set.
+2.2.0 no longer does in our tests, but 2.x dropped `OPENCODE_PURE` and the plugin and skill flags,
+so nothing pins that. `test/integration/opencode-sandbox.test.mjs` plants every loader and proves
+the combination holds.
+
+Fork PRs are skipped (they would need the on-request review of v2). Diffs over the API limit are
+rebuilt locally from the merge base, which the workflow fetches into `./pr`; the local diff
+ignores the PR's `.gitattributes` (`--no-ext-diff --no-textconv --text`).
+
+### opencode transport and pin
+
+The engine targets the opencode 2.x API under `/api`. It never makes a request that waits for an
+agent run: it creates a session bound to the agent, model and variant, puts the system prompt in a
+session instruction entry, sends `POST /api/session/:id/prompt` (which returns once the prompt is
+admitted), follows `session.execution.succeeded` / `failed` / `interrupted` on `/api/event` (with a
+poll for the session's idle record as a safety net), then reads the last assistant message. A
+blocking request that waits for the run dies at undici's 300 s `headersTimeout` ("fetch failed").
+A timed-out agent is interrupted server-side; transient provider errors are retried at most twice,
+each in a fresh session.
+
+The binary is pinned in `opencode-pin.env` and installed by `install-opencode.sh`, which verifies
+the release asset's SHA-256. Bump both lines together, to a release at least 14 days old (waived
+once, for 2.2.0).
+
+## Setup: the `ai-review` environment (admin, one-time)
+
+The review job runs in the GitHub environment `ai-review` with `deployment: false` (no deployment
+records on PRs). Create it under *Settings → Environments* with **Deployment branches: selected
+branches → `main`**, in both repos, then:
+
+- Move `OO_REVIEWER_APP_PRIVATE_KEY` into it and delete the repo-level copy (only this workflow
+  uses it).
+- The model key is the existing organization secret `DEEPSEEK_API_KEY`, shared with the other AI
+  workflows. Any same-repo PR can add a workflow that reads it, so a dedicated key in this
+  environment is the stronger setup; switching is a one-line change in the workflow.
+- Rotate `O2_TRACE_*` to an ingest-only credential; they stay at repo level because other AI
+  workflows export to the same stream.
+- Give the reviewer app *Actions: write* and *Pull requests: read* on o2-enterprise and
+  *Pull requests: write* on openobserve (it already has this), installed on both repos, for paired PRs (below). A new
+  permission waits for an org owner to accept it on the installation; until then the token cannot
+  be minted and paired OSS PRs are reviewed on their own as well.
+
+Without `DEEPSEEK_API_KEY` the job posts a "not reviewed: key not set" comment. If the `ai-review`
+environment does not exist, GitHub creates it on the first run with no branch restriction, so
+create it with the `main` policy before merging. Set the **organization** variable `AI_REVIEW_ENABLED` to `false`
+to stop every review run in both repos (the job never starts, so no secret is read); unset or any
+other value runs. Set it on one repo only and paired OSS PRs still defer to an ENT review that
+never runs.
+
+## Paired o2-enterprise PRs
+
+A change that spans both repos uses the same branch name in each. Those changes are reviewed once,
+in o2-enterprise:
+
+- **OSS side.** When the PR's branch has an open same-named o2-enterprise PR, this workflow does
+  not review. If that PR is out of draft and labelled `ready-for-ci`, it dispatches the
+  o2-enterprise review; otherwise it waits for that PR to become ready, so a draft ENT PR never
+  gets a paid run through its OSS twin. Either way it replaces this PR's review comment with a
+  pointer (`post-paired-pointer.sh`). This uses a reviewer-app token scoped to o2-enterprise
+  (Pull requests read, Actions write); if it cannot be minted, or any lookup or dispatch fails,
+  the OSS review runs as usual. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
+- **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
+  open same-named OSS PR, checks it out to `./pr/openobserve`, and reviews both diffs in one run.
+  OSS files appear with an `openobserve/` prefix in the review, and the OSS `AGENTS.md` and
+  `web/AGENTS.md` at the pinned commit join the rules. After a paired review it updates the OSS
+  PR's pointer as the reviewer app, so the pointer is right even when the ENT PR was opened second.
+- **Windows.** If the ENT PR closes, the OSS pointer stays until the next OSS push, which reviews
+  the OSS PR on its own and replaces the pointer. If a paired ENT run fails, the failure shows on
+  the ENT PR, not the OSS one.
 
 ## The Frontend UI Reviewer
 
@@ -55,7 +164,7 @@ Actually executing the suite stays with `playwright.yml`; this agent only reads.
 
 Adding another conditional agent: define it in `AGENTS` (with `requiresFocus` if it is
 domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, register
-`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its glyph to
+`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy and in `opencode.ci.jsonc` with the allow-all one, and add its glyph to
 `CATEGORY_GLYPH` and to `agents/coordinator.md`.
 
 ## Identity: how the comment gets its author
@@ -71,9 +180,9 @@ The workflow mints the App token via `actions/create-github-app-token`, **gated 
 
 ```yaml
 - id: app_token
-  if: ${{ steps.skip.outputs.skip_review == 'false' && vars.OO_REVIEWER_APP_ID != '' }}
+  if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != ''
   continue-on-error: true          # never breaks CI if minting fails
-  uses: actions/create-github-app-token@<pinned-sha>  # v2.2.2
+  uses: actions/create-github-app-token@<pinned-sha>  # v3.2.0
   with:
     app-id: ${{ vars.OO_REVIEWER_APP_ID }}
     private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
@@ -95,8 +204,8 @@ This is **fail-safe at every stage**:
    *Any account* to install on org repos). Name: `OpenObserve Code Reviewer`; upload the brand
    logo as the avatar; **uncheck Webhook → Active** (no server, no events).
 2. **Permissions (minimum):** Pull requests **Read & write**, Contents **Read-only**, Metadata
-   **Read-only**. **Do NOT grant Contents write** — the review agents are read-only by design and
-   the token must not be write-capable.
+   **Read-only**. **Do NOT grant Contents write** — the review agents never see this token, and it
+   must not be write-capable.
 3. **Install** the App on `openobserve` and `o2-enterprise`.
 4. **Generate a private key** (`.pem`) and note the numeric **App ID**.
 5. **Set on both repos** (or at org level), under *Settings → Secrets and variables → Actions*:
@@ -118,16 +227,31 @@ Delete the `OO_REVIEWER_APP_ID` variable on the repo(s). The next review instant
 
 ## Skipping a review
 
-Put any of these in the PR body or a comment: `[skip ai review]`, `[skip review]`, `[skip ci]`,
-or `break glass`.
+There is no text skip marker any more: `[skip ci]`, `[skip review]` and `break glass` used to
+disable the review for anyone who could comment, including the model quoting them. The review
+runs only on non-draft PRs labelled `ready-for-ci`, and it is advisory. Removing the label or
+converting the PR to draft cancels a review in progress. An audited
+`/review skip` command arrives with v2 (WP-14).
+
+## Testing
+
+```bash
+npm ci --ignore-scripts
+npm test                                   # unit tests
+OPENCODE_BIN=/path/to/opencode npm run test:integration   # real pinned opencode + stub model
+```
+
+`.github/workflows/ai-review-tests.yml` runs both on PRs that touch the engine. Because the
+review itself always runs `main`'s copy, a PR cannot exercise its own workflow or engine edits
+end to end: validate those in a sandbox repo, or dispatch the workflow from `main` after merge.
 
 ## Notes
 
 - `actions/create-github-app-token` is pinned to a full commit SHA (it receives the App's private
-  key). Bump the pin deliberately after review — same discipline as the `OPENCODE_VERSION` pin.
+  key). Bump the pin deliberately after review — same discipline as the opencode pin.
 - The App installation's granted permissions bound the token; keep the install at the minimum
   above so a mis-scoped install can't hand the reviewer a write-capable credential.
-- OSS (`openobserve`) and ENT (`o2-enterprise`) run identical engine files — keep them in sync.
+- o2-enterprise has no engine copy: its workflow checks out this directory at a pinned commit.
 
 ## Trace content and GenAI attributes
 
