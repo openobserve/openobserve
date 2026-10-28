@@ -12,11 +12,9 @@ spacing, and a 10s step so some eval points land on a sample and some do not. Th
 fixed count is alignment-independent (always 3); the bug returned 4 at the
 aligned points.
 
-Every evaluation is kept strictly interior to the ingested span: the PromQL data
-loader fetches a right-open time range, so a sample sitting exactly on the query
-end is not loaded. Evaluating there would under-count on any build and mask the
-boundary rule under test, so the query window leaves a sample of margin on each
-side.
+Every evaluation is kept strictly interior to the ingested span, leaving a sample
+of margin on each side, so only the left-boundary rule under test decides the
+count.
 """
 import time
 import uuid

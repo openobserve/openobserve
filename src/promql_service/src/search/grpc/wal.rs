@@ -141,6 +141,11 @@ fn register_remote_metric_table(
     Ok(table_ref)
 }
 
+/// The ingester's WAL tables keep `[start, end)`, while a selector's range includes its end.
+fn ingester_time_range((start, end): (i64, i64)) -> (i64, i64) {
+    (start, end.saturating_add(1))
+}
+
 /// get file list from local cache, no need match_source, each file will be
 /// searched
 #[allow(clippy::too_many_arguments)]
@@ -172,6 +177,7 @@ async fn get_wal_batches(
         .build(cfg.limit.cpu_num)
         .await?;
     let table_ref = register_remote_metric_table(&ctx, stream_name, Arc::clone(&schema))?;
+    let (search_start, search_end) = ingester_time_range(time_range);
 
     // create physical plan
     let (start, end) = time_range;
@@ -222,8 +228,8 @@ async fn get_wal_batches(
         search_infos: SearchInfos {
             plan: vec![],         // set in RemoteScanNode
             file_id_list: vec![], // not needed for wal
-            start_time: time_range.0,
-            end_time: time_range.1,
+            start_time: search_start,
+            end_time: search_end,
             timeout: cfg.limit.query_timeout,
             use_cache: false,
             histogram_interval: 0, // not needed for wal
@@ -279,12 +285,60 @@ async fn get_wal_batches(
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::datatypes::{DataType, Field},
+        arrow::{
+            array::{AsArray, Int64Array},
+            datatypes::{DataType, Field, Int64Type},
+        },
         common::tree_node::TreeNode,
     };
-    use search::datafusion::distributed_plan::NewEmptyExecVisitor;
+    use search::datafusion::{
+        distributed_plan::NewEmptyExecVisitor, sort_order::FileSortOrder,
+        table_provider::memtable::NewMemTable,
+    };
 
     use super::*;
+
+    #[tokio::test]
+    async fn ingester_wal_table_keeps_the_sample_at_the_selector_end() -> Result<()> {
+        let end = 1_793_167_020_000_000;
+        let minute = 60_000_000;
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int64Array::from(vec![
+                end - 6 * minute,
+                end - minute,
+                end,
+                end + 1,
+            ]))],
+        )?;
+        let table = NewMemTable::try_new(
+            schema,
+            vec![vec![batch]],
+            Default::default(),
+            FileSortOrder::None,
+            None,
+            vec![],
+            ingester_time_range((end - 5 * minute, end)),
+        )?;
+        let ctx = SessionContext::new();
+        ctx.register_table("m", Arc::new(table))?;
+        let batches = ctx
+            .sql("SELECT _timestamp FROM m ORDER BY _timestamp")
+            .await?
+            .collect()
+            .await?;
+        let kept: Vec<i64> = batches
+            .iter()
+            .flat_map(|b| b.column(0).as_primitive::<Int64Type>().values().to_vec())
+            .collect();
+        assert_eq!(kept, vec![end - minute, end]);
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_remote_metric_table_preserves_stream_name_in_physical_plan() -> Result<()> {
