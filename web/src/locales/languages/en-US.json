@@ -9203,7 +9203,53 @@
     "secondsAgo": "{count}s ago",
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
-    "daysAgo": "{count}d ago"
+    "daysAgo": "{count}d ago",
+    "cards": {
+      "firingAlerts": "Firing alerts",
+      "failingRules": "Failing rules",
+      "openIncidents": "Open incidents",
+      "pipelineErrors": "Pipeline errors",
+      "pipelinesOf": "of {total}",
+      "streams": "Streams"
+    },
+    "state": {
+      "tileForbidden": "No access",
+      "tileLocked": "Locked",
+      "tileError": "Unavailable",
+      "lockedMessage": "Available with an enterprise license. Select to learn more."
+    },
+    "sections": {
+      "alertsAndIncidents": "Alerts and incidents",
+      "dataHealth": "Data health",
+      "streams": "Streams",
+      "topStreams": "Largest streams by stored size",
+      "ingestLimit": "Ingest limit"
+    },
+    "alerts": {
+      "firing": "Firing",
+      "pending": "Pending",
+      "failing": "Failing to evaluate"
+    },
+    "dataHealth": {
+      "pipelinesErrored": "Pipelines with errors",
+      "errorCount": "{errored} of {total}",
+      "allHealthy": "None",
+      "noPipelines": "No pipelines yet."
+    },
+    "streams": {
+      "viewStreams": "View streams",
+      "emptyTitle": "No streams yet",
+      "emptyDesc": "Streams appear here once data starts arriving.",
+      "startIngesting": "Start ingesting",
+      "typeSummary": "{count} stream | {count} streams"
+    },
+    "limit": {
+      "used": "Ingestion used",
+      "daysOver": "Days over the limit",
+      "license": "License",
+      "expired": "Expired",
+      "valid": "Valid"
+    }
   },
   "chatHistory": {
     "title": "Chats",
