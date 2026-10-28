@@ -37,13 +37,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #tabs>
           <OTabs v-model="activeTab" align="left" @change="changeTab">
-            <OTab
-              v-for="tab in tabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-              :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
-            />
+            <template v-for="tab in tabs" :key="tab.value">
+              <OTab
+                v-if="tab.beta"
+                :name="tab.value"
+                :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
+              >
+                <span class="inline-flex items-center gap-2">
+                  {{ tab.label }}
+                  <BetaBadge />
+                </span>
+              </OTab>
+              <OTab
+                v-else
+                :name="tab.value"
+                :label="tab.label"
+                :data-test="`rum-tab-${tab.value.replace('_', '-')}`"
+              />
+            </template>
           </OTabs>
         </template>
       </OPageHeader>
@@ -87,6 +98,7 @@ import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
 
@@ -146,6 +158,7 @@ const tabs = [
   {
     label: t("rum.heatmap.tab"),
     value: "heatmaps",
+    beta: true,
   },
   {
     label: t("rum.errorTracking"),

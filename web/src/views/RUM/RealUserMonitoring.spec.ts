@@ -95,8 +95,22 @@ describe("RealUserMonitoring tabs", () => {
   it("no longer carries a Product Analytics tab: it has its own menu", async () => {
     await mountAt("/rum/sessions");
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
-    expect(tabs).toEqual(["Performance", "Sessions", "Heatmaps", "Error Tracking", "Source Maps"]);
+    expect(tabs).toEqual([
+      "Performance",
+      "Sessions",
+      "Heatmaps Beta",
+      "Error Tracking",
+      "Source Maps",
+    ]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
+  });
+
+  it("shows the Beta badge on the Heatmaps tab only", async () => {
+    await mountAt("/rum/sessions");
+    expect(wrapper!.findAll('[data-test="beta-badge"]')).toHaveLength(1);
+    expect(wrapper!.find('[data-test="rum-tab-heatmaps"] [data-test="beta-badge"]').exists()).toBe(
+      true,
+    );
   });
 
   it("clicking the Heatmaps tab opens the heatmaps route", async () => {

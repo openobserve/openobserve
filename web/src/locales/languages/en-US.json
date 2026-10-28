@@ -2028,6 +2028,7 @@
       "snapshotFailed": "Couldn't load the page snapshot.",
       "settingsFailed": "Couldn't load the app's bot and identity settings, so counts may include bot sessions.",
       "noPosition": "No clicks in this period for this page.",
+      "noTargets": "Clicks were recorded, but not which element was clicked, so there is no ranking for this page.",
       "appLabel": "Application",
       "frustrationSplit": "Rage {rage}, dead {dead}, error {error}",
       "unknownDevice": "{count} click without a viewport width is left out of the device split. | {count} clicks without a viewport width are left out of the device split.",

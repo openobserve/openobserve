@@ -173,6 +173,15 @@ describe("ClickHeatmap", () => {
     expect(ids().sort()).toEqual(["ranking", "replay-views", "totals"]);
   });
 
+  it("says the element is missing, not the clicks, when clicks exist without targets", async () => {
+    answer({ ranking: () => ok([]) });
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="rum-heatmap-no-position"]').text()).toContain(
+      "not which element was clicked",
+    );
+  });
+
   it("shows only the error banner with a retry when the clicks fail to load", async () => {
     answer({ totals: () => ({ status: "error", error: { message: "boom" } }) });
     vi.spyOn(console, "error").mockImplementation(() => {});

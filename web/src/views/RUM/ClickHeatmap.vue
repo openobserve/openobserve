@@ -264,9 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="warning"
                 dense
                 :content="
-                  deviceClass === 'all'
-                    ? t('rum.heatmap.noPosition')
-                    : t('rum.heatmap.noDeviceData')
+                  totals.clicks > 0
+                    ? t('rum.heatmap.noTargets')
+                    : deviceClass === 'all'
+                      ? t('rum.heatmap.noPosition')
+                      : t('rum.heatmap.noDeviceData')
                 "
                 data-test="rum-heatmap-no-position"
               />
