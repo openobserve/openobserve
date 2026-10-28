@@ -41,7 +41,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   invalidateLoginData: vi.fn(),
 }));
 
-vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
+vi.mock("@/utils/sessionServices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
+  stopSessionServices: vi.fn(),
+}));
 
 import MainLayout from "./MainLayout.vue";
 

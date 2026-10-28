@@ -89,7 +89,10 @@ const EditorRoute = defineComponent({
   setup: () => () => h(CreateProtocolCheck, routeProps),
 });
 
-const mountEditor = async (props: typeof routeProps = { checkType: "http" }) => {
+const mountEditor = async (
+  props: typeof routeProps = { checkType: "http" },
+  stubs: Record<string, unknown> = {},
+) => {
   routeProps = props;
   router = createRouter({
     history: createMemoryHistory(),
@@ -113,6 +116,7 @@ const mountEditor = async (props: typeof routeProps = { checkType: "http" }) => 
           CheckTlsConfig: true,
           CheckSshConfig: true,
           AgentSetupDrawer: true,
+          ...stubs,
         },
       },
     },
@@ -281,6 +285,48 @@ describe("CreateProtocolCheck drafts", () => {
     await wrapper!.find('[data-test="synthetics-create-save-btn"]').trigger("click");
     await flushPromises();
     expect(syntheticsService.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("a changed request header is named on restore, flagged on its value and blocks Save", async () => {
+    vi.mocked(syntheticsService.get).mockResolvedValue({
+      data: {
+        ...savedCheck(),
+        http: { ...savedCheck().http!, headers: [{ name: "X-Signature", value: "sig-1" }] },
+      },
+    } as never);
+    // Renders the type card slot, so the real HTTP card shows the flag.
+    const withTypeCard = {
+      CheckHttpConfig: false,
+      CheckConfigure: {
+        name: "CheckConfigure",
+        props: ["check", "validationErrors"],
+        emits: ["update:check"],
+        template: '<div><slot name="type-config" /></div>',
+      },
+    };
+    const props = { checkType: "http" as const, editId: "chk-1" };
+    await mountEditor(props, withTypeCard);
+    const current = configure().props("check") as ProtocolCheck;
+    await edit({ http: { ...current.http!, headers: [{ name: "X-Signature", value: "sig-2" }] } });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(JSON.stringify(readEditorDraft(editScope))).not.toContain("sig-2");
+    wrapper!.unmount();
+
+    await mountEditor(props, withTypeCard);
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "X-Signature header",
+    );
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    const value = wrapper!.find('[data-test="synthetics-check-http-header-value-0"]');
+    expect(value.exists()).toBe(true);
+    expect(wrapper!.text()).toContain(
+      "Re-enter this value: your change was not kept in the draft.",
+    );
+
+    await wrapper!.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+    await flushPromises();
+    expect(syntheticsService.update).not.toHaveBeenCalled();
   });
 
   it("save from the leave dialog on a check deleted meanwhile lets the leave go on", async () => {

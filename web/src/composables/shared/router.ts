@@ -13,20 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  routeGuard,
-  useLocalUserInfo,
-  useLocalCurrentUser,
-  invalidateLoginData,
-  getPath,
-} from "@/utils/zincutils";
+import { routeGuard, getPath } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import { forgetLinkRequest } from "@/utils/slackLink";
+import { endSignedInSession } from "@/utils/drafts/signOutFlow";
+import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
   PLAYLIST_TV_PATH,
   buildPlaylistQuery,
@@ -259,11 +254,10 @@ const useRoutes = () => {
         // must run even if a clear throws, and must respect the app base —
         // a bare "/login" 404s when the app is served under /web/.
         try {
-          invalidateLoginData();
-          useLocalCurrentUser("", true);
-          useLocalUserInfo("", true);
-          forgetLinkRequest();
+          // An editor's own leave dialog may retry this route after a cancelled sign-out flow, so it ends the session the same way.
+          endSignedInSession(store);
         } finally {
+          silenceUnloadPrompts();
           window.location.href = `${getPath()}login`;
         }
       },

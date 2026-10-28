@@ -383,6 +383,52 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
+    it("ends the session as the sign-out flow does, for an editor that retries /logout after cancelling it", async () => {
+      const { readEditorDraft, writeEditorDraft } = await import("@/utils/drafts/editorDraftStore");
+      const { resumeDraftSession } = await import("@/utils/drafts/draftSession");
+      const draftScope = {
+        kind: "function" as const,
+        org: "o",
+        entityId: "f",
+        userEmail: "me@x.io",
+      };
+      store.commit("setUserInfo", { email: "me@x.io" });
+      writeEditorDraft(draftScope, { data: {} });
+      const dispatch = vi.spyOn(store, "dispatch");
+      const aborted = vi.fn();
+      const prompt = vi.fn();
+      window.addEventListener("o2:abort-ai-streams", aborted);
+      window.addEventListener("beforeunload", prompt);
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      const { parentRoutes } = useRoutes();
+      parentRoutes.find((r: any) => r.path === "/logout").beforeEnter({}, {}, vi.fn());
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+
+      expect(dispatch).toHaveBeenCalledWith("logout", { draftsOf: "me@x.io" });
+      expect(readEditorDraft(draftScope)).toBeNull();
+      expect(writeEditorDraft(draftScope, { data: {} })).toBe(false);
+      expect(aborted).toHaveBeenCalledTimes(1);
+      expect(prompt).not.toHaveBeenCalled();
+      expect(window.location.href).toBe("/login");
+
+      window.removeEventListener("o2:abort-ai-streams", aborted);
+      window.removeEventListener("beforeunload", prompt);
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+      dispatch.mockRestore();
+      resumeDraftSession();
+      localStorage.clear();
+    });
+
     it("should redirect window.location.href to /login in /logout beforeEnter", () => {
       const { parentRoutes } = useRoutes();
       const logoutRoute = parentRoutes.find((r: any) => r.path === "/logout");

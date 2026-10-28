@@ -23,7 +23,11 @@ import {
 import { forgetLinkRequest } from "@/utils/slackLink";
 import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
-import { stopSessionServices, type SessionServicesStore } from "@/utils/sessionServices";
+import {
+  silenceUnloadPrompts,
+  stopSessionServices,
+  type SessionServicesStore,
+} from "@/utils/sessionServices";
 
 interface SignOutStore extends SessionServicesStore {
   state: SessionServicesStore["state"] & { userInfo?: { email?: string } };
@@ -33,21 +37,27 @@ interface SignOutStore extends SessionServicesStore {
 interface SignOutOptions {
   /** The session can no longer save (forced password reset), so the leave dialogs offer only Discard. */
   discardOnly?: boolean;
-  /** The old session is already dead (password or own role changed): no guard can keep the user in it. */
+  /** The old session is already dead (the user's own password changed): no guard can keep the user in it. */
   forced?: boolean;
 }
 
-// The guards have already been answered, so no editor's own "leave site?" prompt may ask again on the way out.
-const silenceUnloadPrompts = () => {
-  window.addEventListener("beforeunload", (event) => event.stopImmediatePropagation(), {
-    capture: true,
-  });
-};
-
 /** A full load, as the /logout route does, so nothing of the previous user's session stays in memory. */
 export const reloadToLogin = (): void => {
+  // The guards have already been answered, so no editor's own "leave site?" prompt may ask again on the way out.
   silenceUnloadPrompts();
   window.location.assign(`${getPath()}login`);
+};
+
+/** Ends the signed-in session here: services stopped, login data and this user's drafts gone, no draft written after. */
+export const endSignedInSession = (store: SignOutStore): void => {
+  const userEmail = String(store.state.userInfo?.email ?? "");
+  stopSessionServices(store);
+  invalidateLoginData();
+  store.dispatch("logout", { draftsOf: userEmail });
+  endEditorDraftSession(userEmail);
+  useLocalCurrentUser("", true);
+  useLocalUserInfo("", true);
+  forgetLinkRequest();
 };
 
 /** Signs out through the open editors' leave guards, so their Save still has a session, then reloads to login; resolves false when one of them keeps the user. */
@@ -57,18 +67,11 @@ export const signOutThroughLeaveGuards = (
   { discardOnly = false, forced = false }: SignOutOptions = {},
 ): Promise<boolean> => {
   beginDraftSignOut({ discardOnly, forced });
-  const userEmail = String(store.state.userInfo?.email ?? "");
   let signedOut = false;
   const endSession = () => {
     if (signedOut) return;
     signedOut = true;
-    stopSessionServices(store);
-    invalidateLoginData();
-    store.dispatch("logout", { draftsOf: userEmail });
-    endEditorDraftSession(userEmail);
-    useLocalCurrentUser("", true);
-    useLocalUserInfo("", true);
-    forgetLinkRequest();
+    endSignedInSession(store);
   };
   // Global guards run after the leave guards; going to /login in place first unmounts the editors.
   const removeGuard = router.beforeEach((to) => {

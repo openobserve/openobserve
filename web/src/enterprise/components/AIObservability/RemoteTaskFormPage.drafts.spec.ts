@@ -29,6 +29,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { blankSecretLists } from "@/utils/drafts/redactDraftSecrets";
 import RemoteTaskFormPage from "./RemoteTaskFormPage.vue";
 import {
   remoteTaskFormDefaults,
@@ -126,6 +127,13 @@ const mountAt = async (path: string) => {
     },
   );
   await flushPromises();
+};
+
+/** The stored task's hash as the draft records it: with every header value blanked. */
+const storedTaskHash = () => {
+  const values = remoteTaskToFormValues(storedTask);
+  blankSecretLists(values, ["/headers"]);
+  return hashDraftValue(values);
 };
 
 const form = () => (wrapper!.findComponent(OForm).vm as unknown as { form: FormApi }).form;
@@ -486,14 +494,14 @@ describe("RemoteTaskFormPage drafts", () => {
 
     const draft = readEditorDraft<RemoteTaskFormValues>(editScope);
     expect(draft?.data.description).toBe("edited");
-    expect(draft?.baseHash).toBe(hashDraftValue(remoteTaskToFormValues(storedTask)));
+    expect(draft?.baseHash).toBe(storedTaskHash());
     expect(readEditorDraft(newScope)).toBeNull();
   });
 
   it("warns when the task changed on the server, but not when only its run state did", async () => {
     writeEditorDraft(editScope, {
       data: { ...remoteTaskToFormValues(storedTask), description: "mine" },
-      baseHash: hashDraftValue(remoteTaskToFormValues(storedTask)),
+      baseHash: storedTaskHash(),
     });
     vi.mocked(remoteTasksService.get).mockResolvedValue({
       ...storedTask,

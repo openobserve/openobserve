@@ -75,7 +75,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
+vi.mock("@/utils/sessionServices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
+  stopSessionServices: vi.fn(),
+}));
 
 import userServiece from "@/services/users";
 import { userKeys } from "@/services/users.querykeys";

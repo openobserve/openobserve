@@ -387,7 +387,7 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      // Signing out clears every draft in this browser, so the user is told first.
+      // Signing out clears this user's drafts in this browser, so the user is told first.
       const count = countAllDraftsFor(String(this.store.state.userInfo?.email ?? ""));
       if (count > 0) {
         this.signOutDraftCount = count;

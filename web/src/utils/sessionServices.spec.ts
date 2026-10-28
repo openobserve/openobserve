@@ -17,7 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { closeSearchSocket } from "@/composables/useSearchWebSocket";
 import { dismissAll } from "@/lib/feedback/Toast/useToast";
-import { stopSessionServices } from "./sessionServices";
+import { expireSession, stopSessionServices } from "./sessionServices";
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: {
@@ -50,5 +50,36 @@ describe("stopSessionServices", () => {
     stopSessionServices({ state: { zoConfig: { rum: { enabled: false } } } });
     expect(closeSearchSocket).toHaveBeenCalledTimes(1);
     expect(openobserveRum.clearUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("expireSession", () => {
+  const realLocation = window.location;
+  afterEach(() => {
+    vi.stubGlobal("location", realLocation);
+    localStorage.clear();
+  });
+
+  it("stops the services, keeps the drafts and reloads without a leave prompt", () => {
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    localStorage.setItem("unrelated", "u");
+    localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");
+    localStorage.setItem("o2_panel_draft:me@x.io:o:d:p", "{}");
+    const prompt = vi.fn();
+    window.addEventListener("beforeunload", prompt);
+    const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
+
+    expireSession(store, { clearLocalStorage: true });
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+    window.removeEventListener("beforeunload", prompt);
+
+    expect(closeSearchSocket).toHaveBeenCalledTimes(1);
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+    expect(localStorage.getItem("unrelated")).toBeNull();
+    expect(localStorage.getItem("o2_draft:function:o:f:me%40x.io")).toBe("{}");
+    expect(localStorage.getItem("o2_panel_draft:me@x.io:o:d:p")).toBe("{}");
+    expect(prompt).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

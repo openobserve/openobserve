@@ -28,7 +28,10 @@ import { stopSessionServices } from "@/utils/sessionServices";
 import { invalidateLoginData } from "@/utils/zincutils";
 import { signOutThroughLeaveGuards } from "./signOutFlow";
 
-vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
+vi.mock("@/utils/sessionServices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
+  stopSessionServices: vi.fn(),
+}));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/zincutils")>()),

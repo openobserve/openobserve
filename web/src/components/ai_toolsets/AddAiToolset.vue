@@ -867,6 +867,7 @@ export default defineComponent({
         flagReentries(notKeptPaths);
       },
       base: () => (editId() ? serverToolset : undefined),
+      redactBase: (base) => redactToolsetDraft(base as AiToolsetDraftData).data,
       save: async () => {
         const run = { saved: false };
         leaveSave = run;

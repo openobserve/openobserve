@@ -74,6 +74,8 @@ export interface EditorDraft<T = unknown> {
 
 export interface EditorDraftInput<T = unknown> {
   data: T;
+  /** Puts back an earlier draft as it was; a new draft is stamped now. */
+  savedAt?: number;
   baseHash?: string;
   redactedPaths?: string[];
   redactedLabels?: Record<string, string>;
@@ -232,8 +234,8 @@ const persistIndex = (storage: Storage, index: Map<string, number>) => {
     if (indexCacheRaw === null) storage.removeItem(EDITOR_DRAFT_INDEX_KEY);
     else storage.setItem(EDITOR_DRAFT_INDEX_KEY, indexCacheRaw);
   } catch {
-    // Storage is full: the index stays in memory, and the next cleanup scan rewrites it.
-    indexCacheRaw = null;
+    // Storage is full: the in-memory index stays valid against the stale stored one, so lists do not rescan.
+    indexCacheRaw = storage.getItem(EDITOR_DRAFT_INDEX_KEY);
   }
 };
 
@@ -269,10 +271,14 @@ const readIndex = (storage: Storage): Map<string, number> => {
   return rebuilt;
 };
 
+// Storage already holds the change, so the index it is applied to is read without the key check, which only follows it.
 const updateIndex = (storage: Storage, change: (index: Map<string, number>) => void) => {
-  const index = new Map(readIndex(storage));
+  const raw = storage.getItem(EDITOR_DRAFT_INDEX_KEY);
+  const known = indexCache && raw === indexCacheRaw ? indexCache : parseIndex(raw);
+  const index = new Map(known ?? scanIndex(storage, Date.now()));
   change(index);
-  persistIndex(storage, index);
+  const keys = draftKeys(storage);
+  persistIndex(storage, coversKeys(index, keys) ? index : scanIndex(storage, Date.now()));
 };
 
 const isQuotaError = (error: unknown) =>
@@ -425,7 +431,7 @@ export const writeEditorDraft = <T>(
   const storage = getStorage();
   if (!storage) return false;
   const key = editorDraftKey(scope);
-  const savedAt = Date.now();
+  const savedAt = input.savedAt ?? Date.now();
   let payload: string;
   try {
     const draft: EditorDraft<T> = {

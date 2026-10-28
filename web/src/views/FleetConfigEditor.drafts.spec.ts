@@ -279,6 +279,66 @@ describe("FleetConfigEditor drafts", () => {
     );
   });
 
+  it("a block list of keys is stored blank, named on restore and blocks Save and Publish until retyped", async () => {
+    const saved = [
+      "extensions:",
+      "  auth:",
+      "    api_keys:",
+      "      - key-one",
+      "      - key-two",
+      "    tokens:",
+      "      - name: prod",
+      "        value: t-prod",
+      "",
+    ].join("\n");
+    vi.mocked(fleet.getConfig).mockImplementation(
+      async (_org: string, id: string) => ({ data: detail(id, saved) }) as never,
+    );
+    await mountEditor("edge");
+    await editYaml(`receivers:\n  otlp: {}\n${saved}`);
+    window.dispatchEvent(new Event("pagehide"));
+    const stored = readEditorDraft<{ yamlText: string }>(scope("edge"))!;
+    expect(stored.data.yamlText).not.toMatch(/key-one|key-two|t-prod/);
+    expect(stored.data.yamlText).toContain("- name: prod");
+    wrapper!.unmount();
+
+    await mountEditor("edge");
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "extensions.auth.api_keys[1]",
+    );
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    const text = String(code().props("code"));
+    expect(text).toContain("value: t-prod");
+    expect(text).toContain('- ""');
+    expect(text).not.toContain(": \n");
+
+    vi.mocked(toast).mockClear();
+    const editor = wrapper!.findComponent(FleetConfigEditor).vm as unknown as {
+      save: () => Promise<boolean>;
+      onPublish: () => void;
+      publishOpen: boolean;
+    };
+    expect(await editor.save()).toBe(false);
+    editor.onPublish();
+    expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+    expect(editor.publishOpen).toBe(false);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: expect.stringContaining("extensions.auth.api_keys[2]"),
+      }),
+    );
+
+    await editYaml(text.replace('      - ""\n      - ""', "      - key-one\n      - key-new"));
+    expect(await editor.save()).toBe(true);
+    expect(fleet.saveConfigDraft).toHaveBeenCalledWith(
+      expect.any(String),
+      "edge",
+      expect.objectContaining({ yaml: expect.stringContaining("value: t-prod") }),
+    );
+  });
+
   it("tells the user an import was not applied when they continue an earlier new-config draft", async () => {
     writeEditorDraft(scope(null), {
       data: {

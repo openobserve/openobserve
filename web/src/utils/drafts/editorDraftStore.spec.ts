@@ -433,6 +433,38 @@ describe("editorDraftStore", () => {
       expect(draftReads).toHaveLength(0);
     });
 
+    it("writes and deletes update the index without parsing other drafts", () => {
+      writeEditorDraft(scope, { data: { big: "x".repeat(1000) } });
+      writeEditorDraft({ ...scope, entityId: "fn2" }, { data: {} });
+      const added = { ...scope, entityId: "fn3" };
+      const getItem = vi.spyOn(Storage.prototype, "getItem");
+      writeEditorDraft(added, { data: {} });
+      deleteEditorDraft(added);
+      const draftReads = getItem.mock.calls.filter(
+        ([key]) => key.startsWith(EDITOR_DRAFT_PREFIX) && key !== editorDraftKey(added),
+      );
+      expect(draftReads).toHaveLength(0);
+      expect(listEditorDrafts("function", "org1", "me@x.io")).toHaveLength(2);
+    });
+
+    it("keeps listing from memory, without a rescan, when the index itself does not fit", () => {
+      writeEditorDraft(scope, { data: {} });
+      const original = Storage.prototype.setItem;
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+        value: string,
+      ) {
+        if (key === EDITOR_DRAFT_INDEX_KEY) throw quotaError();
+        return original.call(this, key, value);
+      });
+      expect(writeEditorDraft({ ...scope, entityId: "fn2" }, { data: {} })).toBe(true);
+      const getItem = vi.spyOn(Storage.prototype, "getItem");
+      expect(listEditorDrafts("function", "org1", "me@x.io")).toHaveLength(2);
+      expect(countEditorDraftsFor("me@x.io")).toBe(2);
+      expect(getItem.mock.calls.filter(([key]) => key.startsWith(EDITOR_DRAFT_PREFIX))).toEqual([]);
+    });
+
     it("keeps the index in step with writes and deletes", () => {
       writeEditorDraft(scope, { data: {} });
       const index = () => JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");

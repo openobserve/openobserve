@@ -843,6 +843,8 @@ const browserDraft = useEditorDraft<BrowserTestDraft>({
     phase.value = "editor";
   },
   base: () => serverCheck,
+  // The base is the check alone, not the draft's wrapper, so the draft's own redaction cannot run on it.
+  redactBase: (base) => redactCheckDraftSecrets(base as BrowserCheck).data,
   hasChanges: () => hasUnsavedChanges.value,
   save: saveFromLeaveDialog,
   redact: (data) => {

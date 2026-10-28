@@ -24,7 +24,7 @@ export const draftSigningOut = ref(false);
 /** True while a sign-out runs with a session that can no longer save (a forced password reset): only Discard is offered. */
 export const draftSignOutDiscardOnly = ref(false);
 
-/** True while a sign-out cannot be cancelled (password or own role changed): closing the leave dialog discards. */
+/** True while a sign-out cannot be cancelled (the user's own password changed): closing the leave dialog discards. */
 export const draftSignOutForced = ref(false);
 
 export const beginDraftSignOut = ({

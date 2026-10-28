@@ -770,7 +770,7 @@ export default defineComponent({
   },
   methods: {
     signout() {
-      // The user's own role changed, so the old session is over whatever an open editor answers.
+      // The user's own password changed, so the old session is over whatever an open editor answers.
       void signOutThroughLeaveGuards(this.$router, this.store, { forced: true });
     },
   },

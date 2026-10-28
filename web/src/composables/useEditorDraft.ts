@@ -109,7 +109,7 @@ export interface UseEditorDraftOptions<T> {
   serverDraftItem?: boolean;
   /** The leave dialog's Save label, when the editor's save is not a plain save (e.g. it publishes). */
   saveLabel?: () => I18nText;
-  /** Blanks secrets the built-in redaction cannot see in `base` before it is hashed (the hash is stored with the draft). */
+  /** Blanks secrets the built-in redaction cannot see in `base` before it is hashed (the hash is stored with the draft); `redact` never runs on the base, whose shape may differ. */
   redactBase?: (base: unknown) => unknown;
   /** Whether a same-component route update leaves this item; defaults to a path change. */
   leaveOnRouteUpdate?: (to: RouteLocationNormalized, from: RouteLocationNormalized) => boolean;
@@ -256,8 +256,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     paths: [],
     labels: {},
   });
-  // Set when Escape kept the stored draft: a save or discard with no edit leaves it; the first edit's autosave replaces it.
-  let keptSavedAt: number | null = null;
+  // Set when Escape kept the stored draft: this session's save, discard or undo never deletes it.
+  let keptDraft: EditorDraft<T> | null = null;
+  // Set once this session's draft is written over the kept one, which comes back when that draft goes.
+  let keptReplaced = false;
   let restoreResolver: ((choice: EditorDraftRestoreChoice) => void) | null = null;
   let leaveResolver: ((choice: EditorDraftLeaveChoice) => void) | null = null;
 
@@ -310,7 +312,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   };
 
   const keptDraftStillStored = () =>
-    keptSavedAt !== null && readEditorDraft(scope())?.savedAt === keptSavedAt;
+    keptDraft !== null && !keptReplaced && readEditorDraft(scope())?.savedAt === keptDraft.savedAt;
 
   const baselineSnapshot = (): unknown =>
     baselineJson === null || baselineJson === CHANGED_BEFORE_START
@@ -323,13 +325,15 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       containers: !options.redact,
       exemptKeys: options.secretExemptKeys,
     });
+    blankSecretLists(redacted.data, options.secretLists ?? []);
     return hashDraftValue(redacted.data);
   };
 
   /** Writes this session's draft over any kept one (it only runs once there is an edit); false when storage refused it. */
   const writeSessionDraft = (): boolean => {
     if (!storageAvailable) return false;
-    keptSavedAt = null;
+    if (keptDraftStillStored()) keptReplaced = true;
+    else if (!keptReplaced) keptDraft = null;
     const snapshot = options.snapshot();
     // An editor with its own redaction knows which fields of its secret containers are safe to keep.
     const redacted = redactDraftSecrets(snapshot, {
@@ -361,13 +365,24 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     isReady: () => storageAvailable && started && !disposed && !leaving && baselineJson !== null,
     hasChanges: hasUnsavedChanges,
     write: () => writeSessionDraft(),
-    remove: () => deleteEditorDraft(scope()),
+    remove: () => removeSessionDraft(),
   });
+
+  // This session's draft goes; a kept one it wrote over comes back as it was.
+  const removeSessionDraft = () => {
+    if (keptDraft && keptReplaced && writeEditorDraft(scope(), keptDraft)) {
+      keptReplaced = false;
+      return;
+    }
+    deleteEditorDraft(scope());
+    keptDraft = null;
+    keptReplaced = false;
+  };
 
   // A draft kept by Escape belongs to an earlier session, so this session's save or discard leaves it.
   const discardSessionDraft = () => {
     autosave.release();
-    if (!keptDraftStillStored()) deleteEditorDraft(scope());
+    if (!keptDraftStillStored()) removeSessionDraft();
   };
 
   const rebaseline = () => {
@@ -477,7 +492,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     const choice = await askRestore(draft, changedOnServer);
     if (disposed) return;
     if (choice === "fresh") deleteEditorDraft(scope());
-    if (choice === "dismiss") keptSavedAt = draft.savedAt;
+    if (choice === "dismiss") keptDraft = draft;
     if (choice === "continue") await continueDraft(draft);
   };
 
@@ -485,7 +500,8 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     if (disposed) return;
     started = false;
     baselineJson = null;
-    keptSavedAt = null;
+    keptDraft = null;
+    keptReplaced = false;
     notKept.value = { paths: [], labels: {} };
     resumeAfterLeave();
     // An edit the load then overwrote no longer shows its value, so only one still on screen counts.

@@ -1551,6 +1551,15 @@ const destinationDraft = useEditorDraft<AddDestinationForm>({
     flagReentries(notKeptPaths);
   },
   base: serverDestination,
+  // The saved destination keeps headers as a map and has no form fields, so the form's redaction cannot run on it.
+  redactBase: (base) => {
+    const saved = base as NonNullable<ReturnType<typeof serverDestination>>;
+    return {
+      ...saved,
+      url: urlCarriesSecret(saved.url, "") ? "" : saved.url,
+      headers: Object.fromEntries(Object.keys(saved.headers).map((key) => [key, ""])),
+    };
+  },
   save: async () => {
     const run = { saved: false };
     leaveSave = run;

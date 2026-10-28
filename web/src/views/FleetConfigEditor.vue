@@ -411,6 +411,7 @@ import {
   changedYamlSecretLines,
   redactYamlSecrets,
   restoreYamlSecrets,
+  yamlKeyPathLabel,
   yamlLineKeyPaths,
 } from "@/components/fleet/editor/yamlDraftSecrets";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
@@ -1079,7 +1080,7 @@ let notKeptYamlKeys: string[] = [];
 function blockOnBlankSecrets(): boolean {
   const blank = blankYamlSecretKeys(yamlText.value, notKeptYamlKeys);
   if (!blank.length) return false;
-  const keys = raw(blank.map((path) => path.split("/").join(".")).join(", "));
+  const keys = raw(blank.map(yamlKeyPathLabel).join(", "));
   toast({
     variant: "error",
     message: t("fleet.editor.reenterSecrets", { keys }, blank.length),
@@ -1087,18 +1088,18 @@ function blockOnBlankSecrets(): boolean {
   return true;
 }
 
+const yamlLinesOf = (paths: string[]): number[] =>
+  paths.flatMap((path) => {
+    const line = /^\/yamlText\/(\d+)$/.exec(path);
+    return line ? [Number(line[1])] : [];
+  });
+
 function applyDraft(
   data: FleetConfigDraft,
   { notKeptPaths, storedData }: EditorDraftApplyContext<FleetConfigDraft>,
 ) {
   // The line numbers point into the stored text, where refilled multi-line secrets are still one line.
-  notKeptYamlKeys = yamlLineKeyPaths(
-    storedData.yamlText,
-    notKeptPaths.flatMap((path) => {
-      const line = /^\/yamlText\/(\d+)$/.exec(path);
-      return line ? [Number(line[1])] : [];
-    }),
-  );
+  notKeptYamlKeys = yamlLineKeyPaths(storedData.yamlText, yamlLinesOf(notKeptPaths));
   yamlText.value = data.yamlText;
   graph.value = yamlToGraph(data.yamlText);
   const g = graph.value;
@@ -1126,6 +1127,7 @@ const configDraft = useEditorDraft<FleetConfigDraft>({
   }),
   apply: applyDraft,
   base: () => (isNew.value ? null : savedYaml.value),
+  redactBase: (base) => redactYamlSecrets(String(base)).text,
   hasChanges: () => unsaved.value,
   save,
   redact: (data) => {
@@ -1142,11 +1144,16 @@ const configDraft = useEditorDraft<FleetConfigDraft>({
   // Blanked lines are refilled from the saved YAML by key path, so continuing never wipes a stored credential.
   restoreSecrets: (data, _current, paths) => {
     if (isNew.value) return data;
-    const lines = paths.flatMap((path) => {
-      const line = /^\/yamlText\/(\d+)$/.exec(path);
-      return line ? [Number(line[1])] : [];
-    });
-    return { ...data, yamlText: restoreYamlSecrets(data.yamlText, lines, savedYaml.value) };
+    return {
+      ...data,
+      yamlText: restoreYamlSecrets(data.yamlText, yamlLinesOf(paths), savedYaml.value),
+    };
+  },
+  // A line with no key path leaves the list empty, so the dialog's general note covers every change.
+  describeRedacted: (paths, data) => {
+    const keys = yamlLineKeyPaths(data.yamlText, yamlLinesOf(paths));
+    if (keys.length !== paths.length) return [];
+    return [...new Set(keys.map(yamlKeyPathLabel))].map((label) => raw(label));
   },
   restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
   serverDraftItem: true,

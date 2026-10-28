@@ -577,6 +577,32 @@ describe("useEditorDraft", () => {
       expect(readEditorDraft<Form>(editScope)?.data.name).toBe("more work");
     });
 
+    it("an edit undone after escape puts the kept draft back as it was", async () => {
+      seed(editScope, { name: "kept" });
+      const keptAt = readEditorDraft(editScope)!.savedAt;
+      const draft = await mountHost();
+      const started = draft.start();
+      await flushPromises();
+      draft.chooseRestore("dismiss");
+      await started;
+
+      userInput();
+      await edit({ name: "new work" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("new work");
+      await edit({ name: "saved" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)).toMatchObject({
+        savedAt: keptAt,
+        data: { name: "kept" },
+      });
+
+      await edit({ name: "again" });
+      flushAutosave();
+      draft.discard();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("kept");
+    });
+
     it("discard leaves a draft kept by escape, keep draft replaces it", async () => {
       seed(editScope, { name: "kept" });
       const draft = await mountHost();
@@ -1200,6 +1226,24 @@ describe("useEditorDraft", () => {
       draft.chooseLeave("discard");
       expect(await discard).toBe(true);
       expect(onLeaveWithoutSave).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("base hash", () => {
+    it("is taken after the secret lists and the editor's base redaction", async () => {
+      const base = { name: "saved", password: "", tab: "a", headers: [{ key: "X", value: "v1" }] };
+      overrides = {
+        base: () => base,
+        secretLists: ["/headers"],
+        redactBase: (value) => ({ ...(value as typeof base), tab: "" }),
+      };
+      await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      flushAutosave();
+      expect(readEditorDraft(editScope)?.baseHash).toBe(
+        hashDraftValue({ ...base, tab: "", headers: [{ key: "X", value: "" }] }),
+      );
     });
   });
 

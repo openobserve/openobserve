@@ -34,6 +34,8 @@ const LIST_ITEM = /^-(\s+|$)/;
 const ITEM_LABEL_KEYS = ["job_name", "name", "key", "id"];
 // Marks a list item with no identity; a secret inside one is never refilled.
 const UNLABELLED_ITEM = "[#";
+// Kept inside a secret block so its list items can be matched; `key` is left out since it often holds the secret there.
+const KEPT_IDENTITY_KEYS = ["job_name", "name", "id"];
 
 interface Frame {
   indent: number;
@@ -140,16 +142,22 @@ const LIST_SCALAR_LINE = /^(\s*-\s+)(.*)$/;
 const isLiteralSecret = (value: string) =>
   value !== "" && !isBlankScalar(value) && !value.includes("${");
 
+/** Whether `line` belongs to the nested block of a key at column `keyCol`; a list may sit at the key's own column. */
+const inBlockOf = (line: string, keyCol: number): boolean =>
+  line.trim() === "" ||
+  indentOf(line) > keyCol ||
+  (indentOf(line) === keyCol && LIST_ITEM.test(line.trim()));
+
 /** Redacts the lines of a secret key's nested block (a list or map) from `start`; returns the index of its last line. */
 const redactSecretBlock = (
   source: string[],
   start: number,
-  keyIndent: number,
+  keyCol: number,
   out: string[],
   lines: number[],
 ): number => {
   let i = start;
-  while (i < source.length && (source[i].trim() === "" || indentOf(source[i]) > keyIndent)) {
+  while (i < source.length && inBlockOf(source[i], keyCol)) {
     const line = source[i];
     const match = KEY_LINE.exec(line);
     const item = match ? null : LIST_SCALAR_LINE.exec(line);
@@ -158,15 +166,18 @@ const redactSecretBlock = (
     const value = scalar.trim();
     const continued = match && value === "" ? plainContinuation(source, i) : 0;
     // A path or file setting under the block still names where a secret lives, not the secret.
-    const reference = !!match && REFERENCE_KEY.test(match[3]);
-    if (prefix === undefined || reference || (!isLiteralSecret(value) && !continued)) {
+    const kept =
+      !!match &&
+      (REFERENCE_KEY.test(match[3]) ||
+        (KEPT_IDENTITY_KEYS.includes(match[3]) && !BLOCK_SCALAR.test(value)));
+    if (prefix === undefined || kept || (!isLiteralSecret(value) && !continued)) {
       out.push(line);
       i++;
       continue;
     }
     lines.push(out.length);
     out.push(`${prefix}""${comment}`);
-    const bodyIndent = indentOf(line);
+    const bodyIndent = match ? match[1].length : indentOf(line);
     i += 1 + continued;
     if (!BLOCK_SCALAR.test(value)) continue;
     while (i < source.length && (source[i].trim() === "" || indentOf(source[i]) > bodyIndent)) i++;
@@ -174,18 +185,24 @@ const redactSecretBlock = (
   return i - 1;
 };
 
-const hasNestedBlock = (source: string[], i: number): boolean => {
-  const keyIndent = indentOf(source[i]);
+const hasNestedBlock = (source: string[], i: number, keyCol: number): boolean => {
   const next = source.slice(i + 1).find((line) => line.trim() !== "");
-  return next !== undefined && indentOf(next) > keyIndent;
+  return next !== undefined && inBlockOf(next, keyCol);
 };
 
-/** Each key's value in a flow collection; null for a key that occurs more than once, at any depth. */
+/** Each key's value in a flow collection, a nested list or map read whole; null for a key that occurs more than once, at any depth. */
 const flowValues = (flow: string): Map<string, string | null> => {
   const values = new Map<string, string | null>();
-  mapFlowPairs(flow, (key, value) => {
+  flow.replace(FLOW_PAIR, (pair: string, ...groups: (string | number)[]) => {
+    const key = String(groups[2]);
+    const end = Number(groups[5]) + pair.length;
+    const scalar = String(groups[4]).trimEnd();
+    const value =
+      scalar === "" && /[[{]/.test(flow[end] ?? "")
+        ? flow.slice(end, collectionEnd(flow, end))
+        : scalar;
     values.set(key, values.has(key) ? null : value);
-    return value;
+    return pair;
   });
   return values;
 };
@@ -274,14 +291,14 @@ const keyPaths = (lines: string[]): (string | null)[] => {
     while (stack[stack.length - 1].indent >= keyIndent) stack.pop();
     stack.push({ indent: keyIndent, key: match[3], item: false, items: 0 });
     paths.push(pathOf(stack));
-    if (BLOCK_SCALAR.test(splitComment(match[6] ?? "").scalar.trim())) blockIndent = indent;
+    if (BLOCK_SCALAR.test(splitComment(match[6] ?? "").scalar.trim())) blockIndent = keyIndent;
   }
   return paths;
 };
 
 /** The lines of a block scalar that starts at `from`, without the key line. */
 const blockBody = (lines: string[], from: number): string[] => {
-  const keyIndent = indentOf(lines[from]);
+  const keyIndent = KEY_LINE.exec(lines[from])?.[1].length ?? indentOf(lines[from]);
   const body: string[] = [];
   for (let i = from + 1; i < lines.length; i++) {
     if (lines[i].trim() !== "" && indentOf(lines[i]) <= keyIndent) break;
@@ -301,13 +318,17 @@ const refillFlow = (draftLine: string, sourceLine: string): string[] | null => {
   if (!draft || !source) return null;
   const sourceValues = flowValues(source[2]);
   const draftValues = flowValues(draft[2]);
+  let unresolved = false;
   // A key that repeats on either side cannot say which nested map or item its secret belongs to.
-  const flow = mapFlowPairs(draft[2], (key, value) =>
-    isBlankScalar(value) && SECRET_KEY_PATTERN.test(key) && draftValues.get(key) !== null
-      ? (sourceValues.get(key) ?? value)
-      : value,
-  );
-  return [draft[1] + flow];
+  const flow = mapFlowPairs(draft[2], (key, value) => {
+    if (!isBlankScalar(value) || !isSecretKey(key)) return value;
+    const saved = draftValues.get(key) === null ? null : sourceValues.get(key);
+    if (saved) return saved;
+    unresolved = true;
+    return value;
+  });
+  // A partly refilled line would pass for kept while a secret on it is still blank.
+  return unresolved ? null : [draft[1] + flow];
 };
 
 /** Rebuilds one blanked draft line from the source line at the same key path; null when it cannot. */
@@ -364,10 +385,19 @@ export const yamlLineKeyPaths = (text: string, lines: number[]): string[] => {
   });
 };
 
-const hasBlankSecret = (line: string): boolean => {
+/** Whether the key path sits under a secret key, where every scalar is a secret. */
+const underSecretKey = (path: string): boolean =>
+  path
+    .split("/")
+    .slice(0, -1)
+    .some((segment) => !segment.startsWith("[") && isSecretKey(segment));
+
+const hasBlankSecret = (line: string, path: string): boolean => {
   const match = KEY_LINE.exec(line);
-  const { scalar } = splitComment(match?.[6] ?? "");
-  if (match && isSecretKey(match[3]) && isBlankScalar(scalar.trim())) return true;
+  const value = match ? (match[6] ?? "") : line.trim().replace(LIST_ITEM, "");
+  const { scalar } = splitComment(value);
+  const secret = underSecretKey(path) || (!!match && isSecretKey(match[3]));
+  if (secret && isBlankScalar(scalar.trim())) return true;
   const flow = FLOW_LINE.exec(line);
   let blank = false;
   if (flow) {
@@ -384,21 +414,34 @@ export const blankYamlSecretKeys = (text: string, keyPathsToCheck: string[]): st
   const lines = text.split("\n");
   const paths = keyPaths(lines);
   return keyPathsToCheck.filter((path) =>
-    paths.some((linePath, index) => linePath === path && hasBlankSecret(lines[index])),
+    paths.some((linePath, index) => linePath === path && hasBlankSecret(lines[index], path)),
   );
 };
 
-/** Blanked lines whose value in `original` differs from `saved` at the same key path, i.e. the ones the user changed. */
+/** Blanked lines that refilling from `saved` would not bring back as they are in `original`: changed, or not refillable at all. */
 export const changedYamlSecretLines = (
   redacted: RedactedYaml,
   original: string,
   saved: string,
 ): number[] =>
-  redacted.lines.filter(
-    (line) =>
-      restoreYamlSecrets(redacted.text, [line], original) !==
-      restoreYamlSecrets(redacted.text, [line], saved),
-  );
+  redacted.lines.filter((line) => {
+    const fromOriginal = restoreYamlSecrets(redacted.text, [line], original);
+    // A line its own text cannot refill (an unlabelled list item, a repeated key) cannot be refilled from the saved one either.
+    if (fromOriginal === redacted.text) return true;
+    return fromOriginal !== restoreYamlSecrets(redacted.text, [line], saved);
+  });
+
+/** A key path as shown to the user: `auth/api_keys/[#2]` reads `auth.api_keys[2]`, `[name=prod]` reads `[prod]`. */
+export const yamlKeyPathLabel = (path: string): string =>
+  path
+    .split("/")
+    .map((segment) =>
+      segment.startsWith(UNLABELLED_ITEM)
+        ? `[${segment.slice(UNLABELLED_ITEM.length)}`
+        : segment.replace(/^\[[^=]*=(.*)\]$/, "[$1]"),
+    )
+    .join(".")
+    .replace(/\.\[/g, "[");
 
 /** Blanks literal values under secret-looking YAML keys, including block scalars, flow maps and every scalar of a list or map under such a key, line by line. */
 export const redactYamlSecrets = (yaml: string): RedactedYaml => {
@@ -424,10 +467,10 @@ export const redactYamlSecrets = (yaml: string): RedactedYaml => {
       !continued &&
       scalar.trim() === "" &&
       isSecretKey(match[3]) &&
-      hasNestedBlock(source, i)
+      hasNestedBlock(source, i, match[1].length)
     ) {
       out.push(line);
-      i = redactSecretBlock(source, i + 1, indentOf(line), out, lines);
+      i = redactSecretBlock(source, i + 1, match[1].length, out, lines);
       continue;
     }
     if (!match || keepsValue(match[3], scalar)) {
@@ -440,7 +483,8 @@ export const redactYamlSecrets = (yaml: string): RedactedYaml => {
     lines.push(out.length);
     out.push(`${match[1]}${match[2]}${match[3]}${match[2]}${match[4]} ""${comment}`);
     if (!BLOCK_SCALAR.test(scalar.trim())) continue;
-    const keyIndent = indentOf(line);
+    // A key inside a list item has siblings deeper than the dash, so the body is measured from the key.
+    const keyIndent = match[1].length;
     while (
       i + 1 < source.length &&
       (source[i + 1].trim() === "" || indentOf(source[i + 1]) > keyIndent)

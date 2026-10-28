@@ -43,7 +43,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: unknown[]) => toastMock(...args),
 }));
 
-vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
+vi.mock("@/utils/sessionServices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
+  stopSessionServices: vi.fn(),
+}));
 
 const pushMock = vi.fn();
 // Runs the global guards like vue-router does, so the shared sign-out flow can finish.

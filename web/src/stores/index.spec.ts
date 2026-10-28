@@ -63,7 +63,7 @@ describe("root store", () => {
   });
 
   describe("logout", () => {
-    it("clears every panel draft stored in this browser", async () => {
+    it("keeps every panel draft on a logout that names no user, as a session expiry does", async () => {
       const scope = { userEmail: "me@x.io", org: "o", dashboardId: "d", panelId: "p" };
       writePanelDraft(scope, {
         tabId: "t",
@@ -76,9 +76,9 @@ describe("root store", () => {
 
       await store.dispatch("logout");
 
-      expect(readPanelDraft(scope)).toBeNull();
+      expect(readPanelDraft(scope)).not.toBeNull();
       expect(localStorage.getItem("unrelated")).toBe("keep");
-      localStorage.removeItem("unrelated");
+      localStorage.clear();
     });
 
     it("clears only the named user's panel drafts on an explicit sign-out", async () => {
