@@ -255,6 +255,7 @@ import { paletteIndexFor } from "./flameGraphPackage";
 import { parseColor } from "@/lib/styles/tokens/colorMath";
 import { useI18nTyped } from "@/types/i18n";
 import { useThemeRevision } from "@/composables/useTheme";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 export interface FlameGraphNode {
   name: string;
@@ -915,7 +916,8 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
   if (menu.value && event.key === "Escape") closeMenu();
 };
 
-// ChartRenderer only follows window resizes on wide screens, so a side panel opening would leave the graph stale.
+// At lg+ ChartRenderer only follows window resizes, so a side panel opening would leave the graph stale; below lg it observes its own box.
+const { lgUp } = useBreakpoint();
 let resizeObserver: ResizeObserver | null = null;
 let resizeFrame = 0;
 const resizeChart = () => {
@@ -936,6 +938,7 @@ onMounted(() => {
   document.addEventListener("keydown", onDocumentKeydown);
   if (!rootEl.value || typeof ResizeObserver === "undefined") return;
   resizeObserver = new ResizeObserver(() => {
+    if (!lgUp.value) return;
     if (!resizeFrame) resizeFrame = requestAnimationFrame(resizeChart);
   });
   resizeObserver.observe(rootEl.value);

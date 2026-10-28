@@ -79,7 +79,11 @@ const stubs = {
 };
 
 /** Mounts the view under a host that holds its v-model state, as the page does. */
-const mountCompare = (initial: Partial<CompareState> = {}, store?: Store<{ theme: string }>) => {
+const mountCompare = (
+  initial: Partial<CompareState> = {},
+  store?: Store<{ theme: string }>,
+  stubOverrides: Record<string, unknown> = {},
+) => {
   const state = ref<CompareState>({
     label: null,
     baseline: null,
@@ -101,7 +105,9 @@ const mountCompare = (initial: Partial<CompareState> = {}, store?: Store<{ theme
     template: `<ProfilesCompare v-model:state="state" org-identifier="org" stream="default"
       :payload="payload" :labels="labels" search-query="" unit-label="CPU" :value-formatter="valueFormatter" />`,
   });
-  const wrapper = mount(Host, { global: { plugins: store ? [i18n, store] : [i18n], stubs } });
+  const wrapper = mount(Host, {
+    global: { plugins: store ? [i18n, store] : [i18n], stubs: { ...stubs, ...stubOverrides } },
+  });
   return { wrapper, state };
 };
 
@@ -301,6 +307,52 @@ describe("ProfilesCompare", () => {
       store.state.theme = "dark";
       await nextTick();
       expect(swatches()).toEqual(["rgb(0, 0, 9)", "rgb(0, 1, 9)", "rgb(0, 2, 9)"]);
+    } finally {
+      tokens.forEach((token) => html.style.removeProperty(token));
+    }
+  });
+
+  it("re-reads the table change dots when the theme switches", async () => {
+    mocks.diff.mockResolvedValue({
+      data: {
+        ...diffResponse.data,
+        top: [
+          ...diffResponse.data.top,
+          { name: "os.Read", before_self: 0, before_total: 10, after_self: 0, after_total: 20 },
+        ],
+      },
+    });
+    const html = document.documentElement;
+    const tokens = [
+      "--color-chart-series-1",
+      "--color-flame-grouped-fill",
+      "--color-status-negative",
+    ];
+    tokens.forEach((token, index) => html.style.setProperty(token, `rgb(${index}, 0, 0)`));
+    const store = createStore({ state: { theme: "light" } });
+    const table = {
+      name: "TableStub",
+      props: ["data", "columns"],
+      template:
+        '<div><div v-for="row in data" :key="row.name" :data-name="row.name"><slot name="cell-change" :row="row" /></div></div>',
+    };
+    try {
+      const { wrapper } = mountCompare({ display: "table" }, store, { OTable: table });
+      await flushPromises();
+      await nextTick();
+      const dot = (name: string) =>
+        (wrapper.find(`[data-name="${name}"] [aria-hidden="true"]`).element as HTMLElement).style
+          .backgroundColor;
+      expect(dot("encoding/json.Marshal")).toBe("rgb(2, 0, 0)");
+      expect(dot("net/http.serve")).toBe("rgb(0, 0, 0)");
+      expect(dot("os.Read")).toBe("rgb(1, 0, 0)");
+
+      tokens.forEach((token, index) => html.style.setProperty(token, `rgb(0, ${index}, 9)`));
+      store.state.theme = "dark";
+      await nextTick();
+      expect(dot("encoding/json.Marshal")).toBe("rgb(0, 2, 9)");
+      expect(dot("net/http.serve")).toBe("rgb(0, 0, 9)");
+      expect(dot("os.Read")).toBe("rgb(0, 1, 9)");
     } finally {
       tokens.forEach((token) => html.style.removeProperty(token));
     }

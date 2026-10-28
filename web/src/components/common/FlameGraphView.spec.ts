@@ -18,10 +18,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
+import { paletteIndexFor } from "@/components/common/flameGraphPackage";
 import i18n from "@/locales";
 
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
+const breakpoint = vi.hoisted(() => ({ lgUp: true }));
+vi.mock("@/composables/useBreakpoint", () => ({
+  default: () => ({
+    lgUp: {
+      get value() {
+        return breakpoint.lgUp;
+      },
+    },
+  }),
+}));
 
 const ChartRendererStub = {
   name: "ChartRenderer",
@@ -795,10 +806,37 @@ describe("FlameGraphView grouped frames", () => {
 });
 
 describe("FlameGraphView theme and size", () => {
+  const SERIES_STEPS = [1, 5, 7, 9];
+  const CHILD = "main.handleCheckout";
+  const themeTokens = [
+    "--color-flame-grouped-fill",
+    "--color-border-default",
+    ...SERIES_STEPS.map((step) => `--color-chart-series-${step}`),
+  ];
+  const setThemeTokens = (base: number) => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-flame-grouped-fill", `rgb(${base}, 2, 3)`);
+    html.style.setProperty("--color-border-default", `rgb(${base}, 5, 6)`);
+    SERIES_STEPS.forEach((step, index) =>
+      html.style.setProperty(`--color-chart-series-${step}`, `rgb(${base}, ${index}, ${step})`),
+    );
+  };
+  const childColor = (base: number) => {
+    const index = paletteIndexFor(CHILD, SERIES_STEPS.length);
+    return `rgb(${base}, ${index}, ${SERIES_STEPS[index]})`;
+  };
+  afterEach(() => {
+    themeTokens.forEach((token) => document.documentElement.style.removeProperty(token));
+  });
   const mountWithStore = (store = createStore({ state: { theme: "light" } })) =>
     mount(FlameGraphView, {
       props: {
-        root: { name: "main", self: 1, total: 4, children: [] },
+        root: {
+          name: "main",
+          self: 1,
+          total: 4,
+          children: [{ name: CHILD, self: 3, total: 3, children: [] }],
+        },
         unitLabel: "ns",
         summaryLabel: "total",
         summaryValue: "4",
@@ -818,49 +856,54 @@ describe("FlameGraphView theme and size", () => {
       wrapper.findComponent({ name: "ChartRenderer" }).props("data") as {
         options: {
           backgroundColor?: string;
-          series: { data: { itemStyle: { color: string; borderColor: string } }[] }[];
+          series: {
+            data: { block: { name: string }; itemStyle: { color: string; borderColor: string } }[];
+          }[];
         };
       }
     ).options;
+  const styleOf = (wrapper: ReturnType<typeof mountWithStore>, name: string) =>
+    optionsOf(wrapper).series[0].data.find((item) => item.block.name === name)?.itemStyle;
 
   it("re-reads the theme colours and rebuilds the chart when the theme switches", async () => {
-    const html = document.documentElement;
-    html.style.setProperty("--color-flame-grouped-fill", "rgb(1, 2, 3)");
-    html.style.setProperty("--color-border-default", "rgb(4, 5, 6)");
+    setThemeTokens(1);
     const store = createStore({ state: { theme: "light" } });
     const wrapper = mountWithStore(store);
     await flushPromises();
-    const before = optionsOf(wrapper).series[0].data[0].itemStyle;
-    expect(before).toMatchObject({ color: "rgb(1, 2, 3)", borderColor: "rgb(4, 5, 6)" });
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(1, 2, 3)",
+      borderColor: "rgb(1, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(1));
 
-    html.style.setProperty("--color-flame-grouped-fill", "rgb(7, 8, 9)");
-    html.style.setProperty("--color-border-default", "rgb(10, 11, 12)");
+    setThemeTokens(7);
     store.state.theme = "dark";
     await nextTick();
-    const after = optionsOf(wrapper).series[0].data[0].itemStyle;
-    expect(after).toMatchObject({ color: "rgb(7, 8, 9)", borderColor: "rgb(10, 11, 12)" });
-    html.style.removeProperty("--color-flame-grouped-fill");
-    html.style.removeProperty("--color-border-default");
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(7, 2, 3)",
+      borderColor: "rgb(7, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(7));
   });
 
   it("re-reads the theme colours when a theme colour preset is applied", async () => {
-    const html = document.documentElement;
-    html.style.setProperty("--color-flame-grouped-fill", "rgb(1, 2, 3)");
-    html.style.setProperty("--color-border-default", "rgb(4, 5, 6)");
-    const store = createStore({ state: { theme: "light" } });
-    const wrapper = mountWithStore(store);
+    setThemeTokens(1);
+    const wrapper = mountWithStore();
     await flushPromises();
-    const before = optionsOf(wrapper).series[0].data[0].itemStyle;
-    expect(before).toMatchObject({ color: "rgb(1, 2, 3)", borderColor: "rgb(4, 5, 6)" });
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(1, 2, 3)",
+      borderColor: "rgb(1, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(1));
 
-    html.style.setProperty("--color-flame-grouped-fill", "rgb(7, 8, 9)");
-    html.style.setProperty("--color-border-default", "rgb(10, 11, 12)");
+    setThemeTokens(7);
     window.dispatchEvent(new CustomEvent("themeColorChanged"));
     await nextTick();
-    const after = optionsOf(wrapper).series[0].data[0].itemStyle;
-    expect(after).toMatchObject({ color: "rgb(7, 8, 9)", borderColor: "rgb(10, 11, 12)" });
-    html.style.removeProperty("--color-flame-grouped-fill");
-    html.style.removeProperty("--color-border-default");
+    expect(styleOf(wrapper, "main")).toMatchObject({
+      color: "rgb(7, 2, 3)",
+      borderColor: "rgb(7, 5, 6)",
+    });
+    expect(styleOf(wrapper, CHILD)?.color).toBe(childColor(7));
   });
 
   it("draws on a transparent background, so the dark chart theme does not box it in", async () => {
@@ -869,7 +912,7 @@ describe("FlameGraphView theme and size", () => {
     expect(optionsOf(wrapper).backgroundColor).toBe("transparent");
   });
 
-  it("resizes the chart only when its container size differs from the drawn size, and stops watching on unmount", async () => {
+  it("leaves resizes to ChartRenderer below lg, resizes at lg+ only when the container size differs from the drawn size, and stops watching on unmount", async () => {
     const observers: { callback: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
     vi.stubGlobal(
       "ResizeObserver",
@@ -923,6 +966,13 @@ describe("FlameGraphView theme and size", () => {
       await flushPromises();
       expect(observers).toHaveLength(1);
 
+      breakpoint.lgUp = false;
+      box.width = 400;
+      notify();
+      expect(chartInstance.resize).not.toHaveBeenCalled();
+
+      breakpoint.lgUp = true;
+      box.width = 600;
       // ChartRenderer already resized for this change, so the chart matches its box.
       notify();
       expect(chartInstance.resize).not.toHaveBeenCalled();
@@ -938,6 +988,7 @@ describe("FlameGraphView theme and size", () => {
       wrapper.unmount();
       expect(observers[0].disconnect).toHaveBeenCalled();
     } finally {
+      breakpoint.lgUp = true;
       vi.unstubAllGlobals();
     }
   });
