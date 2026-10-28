@@ -58,8 +58,9 @@ const PRESET_KEYS: [QuickMuteChoice, ...QuickMuteChoice[]] = [
 ];
 
 export interface QuickMuteSchemaOptions {
-  /** An alert mute may go unfiled: the server files it when no downtime folder is open to the user. */
-  folderOptional?: boolean;
+  /** An alert mute may go unfiled: the server files it when no downtime folder is open to the user.
+   *  Read at each validation, since the dialog may be handed its alert after it is created. */
+  folderOptional?: () => boolean;
 }
 
 export const makeQuickMuteSchema = (
@@ -74,7 +75,7 @@ export const makeQuickMuteSchema = (
       end_date: z.string(),
       end_time: z.string(),
       reason: z.string(),
-      folder_id: options.folderOptional ? z.string() : z.string().min(1),
+      folder_id: z.string().refine((f) => !!f || !!options.folderOptional?.()),
       group_scope: z.enum(["this", "all"]).optional(),
       groups: z.array(z.string()).optional(),
     })

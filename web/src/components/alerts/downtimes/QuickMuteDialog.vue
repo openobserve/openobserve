@@ -280,7 +280,7 @@ const submitAlertMute = async (values: QuickMuteForm, alert: QuickMuteAlertConte
 const form = useOForm<QuickMuteForm>({
   defaultValues: defaults(),
   schema: makeQuickMuteSchema(t, () => timezone.value, nowMicros, {
-    folderOptional: !!props.alert,
+    folderOptional: () => !!props.alert,
   }),
   onSubmit: async (values) => {
     if (props.alert) {

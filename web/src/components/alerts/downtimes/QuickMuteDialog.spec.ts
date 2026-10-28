@@ -118,7 +118,7 @@ describe("quick mute form", () => {
       gt,
       () => "UTC",
       () => NOW,
-      { folderOptional: true },
+      { folderOptional: () => true },
     );
     expect(alertSchema.safeParse(values({ preset: "1h", folder_id: "" })).success).toBe(true);
     expect(schema.safeParse(values({ preset: "1h", folder_id: "" })).success).toBe(false);

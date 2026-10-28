@@ -208,6 +208,15 @@ describe("Quick Mute from an alert screen (MK-4)", () => {
     expect(vi.mocked(alerts.muteAlert).mock.calls[0][2]).toEqual({ until_clear: true });
   });
 
+  it("lets a responder with no folder mute an alert handed in after mount, as the list does", async () => {
+    await mountDialog(null, []);
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ alert: single, open: true });
+    await flushPromises();
+    await click("o-dialog-primary-btn");
+    expect(vi.mocked(alerts.muteAlert).mock.calls[0][2]).toEqual({ until_clear: true });
+  });
+
   it("names who is on call when the mute is refused, and stays open", async () => {
     vi.mocked(alerts.muteAlert).mockRejectedValue({
       response: {
