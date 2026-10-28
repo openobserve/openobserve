@@ -1,0 +1,106 @@
+name: Isolated AlertList proof
+
+on:
+  push:
+    branches: [bench/ui-alertlist-proof-20261028]
+    paths:
+      - .github/workflows/ui-alertlist-proof.yml
+      - .github/ui-alertlist-proof/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-alertlist-proof
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v5
+        timeout-minutes: 1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pinned source and record runner
+        timeout-minutes: 1
+        run: |
+          export PROOF_EVIDENCE="$RUNNER_TEMP/alertlist-evidence"
+          printf 'PROOF_EVIDENCE=%s\nPROOF_ARTIFACT=%s\n' "$PROOF_EVIDENCE" "$RUNNER_TEMP/alertlist-artifact" >> "$GITHUB_ENV"
+          printf 'PROOF_JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          mkdir -p "$PROOF_EVIDENCE"
+          test "$(git rev-parse HEAD:web)" = 944b1dd026a96157debb48a1beab071f08a72b2a
+          test -z "$(git status --porcelain -- web)"
+          {
+            git rev-parse HEAD
+            git rev-parse HEAD:web
+            uname -a
+            lscpu
+            free -b
+            df -B1 .
+          } > "$PROOF_EVIDENCE/runner.txt"
+
+      - uses: actions/setup-node@v7
+        id: node
+        timeout-minutes: 2
+        with:
+          node-version: 24.22.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install once with exact runtime
+        timeout-minutes: 5
+        working-directory: web
+        env:
+          NPM_CACHE_HIT: ${{ steps.node.outputs.cache-hit }}
+        run: |
+          printf '%s\n' "$NPM_CACHE_HIT" > "$PROOF_EVIDENCE/npm-cache-hit.txt"
+          test "$(node --version)" = v24.22.0
+          test "$(npm --version)" = 11.19.1
+          { node --version; npm --version; } > "$PROOF_EVIDENCE/runtime.txt"
+          /usr/bin/time -v -o "$PROOF_EVIDENCE/install-resources.txt" npm ci 2>&1 | tee "$PROOF_EVIDENCE/install.log"
+
+      - name: Compare frozen fixtures with real covered blobs
+        timeout-minutes: 24
+        run: |
+          remaining=$((1440 - $(date +%s) + PROOF_JOB_STARTED))
+          if (( remaining > 1320 )); then remaining=1320; fi
+          test "$remaining" -gt 0
+          python3 .github/ui-alertlist-proof/run-proof.py \
+            --web web \
+            --output "$PROOF_EVIDENCE/proof" \
+            --baseline .github/ui-alertlist-proof/AlertList.baseline.spec.ts \
+            --candidate .github/ui-alertlist-proof/AlertList.candidate.spec.ts \
+            --seed 1729 --test-timeout 240 --merge-timeout 90 --overall-timeout "$remaining" \
+            2>&1 | tee "$PROOF_EVIDENCE/proof-driver.log"
+
+      - name: Verify fixture restoration
+        if: always()
+        timeout-minutes: 1
+        run: |
+          mkdir -p "$PROOF_EVIDENCE"
+          git diff --exit-code -- web > "$PROOF_EVIDENCE/final-web-diff.txt"
+          test -z "$(git status --porcelain -- web)"
+
+      - name: Package bounded evidence
+        if: always()
+        timeout-minutes: 1
+        run: python3 .github/ui-alertlist-proof/package-evidence.py "$PROOF_EVIDENCE" "$PROOF_ARTIFACT"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        timeout-minutes: 2
+        with:
+          name: isolated-alertlist-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/alertlist-artifact/
+          retention-days: 1
+          if-no-files-found: error
