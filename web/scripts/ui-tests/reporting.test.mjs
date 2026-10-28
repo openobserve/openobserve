@@ -86,6 +86,13 @@ test(
                   it("inherits todo", () => { throw new Error("must stay todo"); });
                 });
               });
+            });
+            describe("ordinary todo", () => {
+              it.todo("ordinary todo case");
+            });
+            describe("mixed nonrunning", () => {
+              it.skip("mixed skipped case", () => { throw new Error("must stay skipped"); });
+              it.todo("mixed todo case");
             });`,
         d: `it("also passes", () => expect(value(3)).toBe(4));
             it("dynamic skip", ({ skip }) => skip());`,
@@ -145,14 +152,23 @@ test(
       };
       assert.deepEqual(validateReports(reports, expected), {
         files: 4,
-        tests: 7,
-        dispositions: { passed: 2, skipped: 3, todo: 2 },
+        tests: 10,
+        dispositions: { passed: 2, skipped: 4, todo: 4 },
       });
       const tests = reports.flatMap(({ metadata }) => metadata.files.flatMap((file) => file.tests));
       for (const mode of ["skip", "todo"]) {
         const inherited = tests.find((entry) => entry.name.endsWith(`inherits ${mode}`));
         assert.equal(inherited.mode, mode);
         assert.equal(inherited.state, "skipped");
+      }
+      for (const [name, mode] of [
+        ["ordinary todo > ordinary todo case", "todo"],
+        ["mixed nonrunning > mixed skipped case", "skip"],
+        ["mixed nonrunning > mixed todo case", "todo"],
+      ]) {
+        const entry = tests.find((entry) => entry.name === name);
+        assert.equal(entry.mode, mode);
+        assert.equal(entry.state, "skipped");
       }
       const unfinished = reports.map(({ metadata, blob }) => ({
         metadata: structuredClone(metadata),

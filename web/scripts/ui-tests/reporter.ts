@@ -93,9 +93,12 @@ export default class ShardReporter implements Reporter {
 
 export function reportedTest(test: TestCase) {
   let mode = test.options.mode;
-  for (let parent = test.parent; parent.type === "suite"; parent = parent.parent) {
-    if (parent.options.mode === "skip" || parent.options.mode === "todo") {
-      mode = parent.options.mode;
+  // Vitest may mark an ordinary suite as skipped while its leaves retain distinct todo modes.
+  if (mode === "run") {
+    for (let parent = test.parent; parent.type === "suite"; parent = parent.parent) {
+      if (parent.options.mode === "skip" || parent.options.mode === "todo") {
+        mode = parent.options.mode;
+      }
     }
   }
   const state = test.result().state;
