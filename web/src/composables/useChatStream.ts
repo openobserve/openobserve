@@ -55,6 +55,7 @@ import type {
 } from "@/ts/interfaces/chat";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { notifyChatListChanged } from "@/utils/chatListRevision";
+import { isNetworkFailure } from "@/utils/networkFailure";
 import { getUUIDv7 } from "@/utils/zincutils";
 
 const { fetchAiChat, cancelAiChat } = useAiChat();
@@ -572,7 +573,8 @@ export function useChatStream(options: UseChatStreamOptions) {
         }
         return;
       } else {
-        console.error("Error reading stream:", error);
+        if (isNetworkFailure(error)) console.warn("Error reading stream:", error);
+        else console.error("Error reading stream:", error);
         trackAnswerOutcome(turn, "ai_assistant_answer_failed", { stage: "stream" });
       }
     }

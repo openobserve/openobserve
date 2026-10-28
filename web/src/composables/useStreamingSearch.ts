@@ -20,6 +20,7 @@ import authService from "@/services/auth";
 import store from "@/stores";
 import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import { attemptTokenRefresh } from "@/services/http";
+import { isNetworkFailure } from "@/utils/networkFailure";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
 // Create and manage stream workers
@@ -32,11 +33,6 @@ const createStreamWorker = () => {
   }
   return streamWorker;
 };
-
-// Chrome, Safari and Firefox wordings of a fetch body read that lost its connection.
-const NETWORK_FAILURE_PATTERN = /network error|Load failed|Failed to fetch|NetworkError/i;
-const isNetworkFailure = (error: unknown): boolean =>
-  error instanceof TypeError && NETWORK_FAILURE_PATTERN.test(error.message);
 
 // Status and message sit on prototypes of a Response or Error, which the error spread would drop.
 const withErrorFields = (error: unknown): unknown =>
