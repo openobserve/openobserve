@@ -1518,6 +1518,7 @@
     "searchNoMatches": "일치 항목 없음",
     "runQuery": "쿼리 실행",
     "runOptions": "실행 옵션",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "시간 경과에 따른 프로파일 값",
     "breakdown": "분류",
     "breakdownNone": "없음",
