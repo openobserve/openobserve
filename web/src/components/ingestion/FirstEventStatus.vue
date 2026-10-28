@@ -107,6 +107,8 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"), 
 });
 const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
   watcher;
+// A status that replaces another starts over, so the host drops the old one's result.
+reporter?.state(state.value);
 
 const CLOCK_TICK_MS = 1000;
 

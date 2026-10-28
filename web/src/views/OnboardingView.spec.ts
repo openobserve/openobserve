@@ -22,6 +22,7 @@ import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { SETUP_CARD_ONBOARDING } from "@/components/ingestion/setupCard/types";
 import { markStartPending } from "@/components/onboarding/onboardingFlow";
 import { queryClient } from "@/composables/query/queryClient";
+import { streamKeys } from "@/services/stream.querykeys";
 import store from "@/test/unit/helpers/store";
 import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
@@ -506,6 +507,17 @@ describe("OnboardingView", () => {
     const { router } = await mountAt("/onboarding");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
+  });
+
+  // the org's last stream was deleted elsewhere: the cached list still has it, the server not
+  it("waits for a stale cached stream list to refresh before sending the user Home", async () => {
+    queryClient.setQueryData(streamKeys.nameList("default", "logs"), [listed("default")], {
+      updatedAt: 1,
+    });
+    const { router } = await mountAt("/onboarding");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(store.state.organizationData.isDataIngested).toBe(false);
   });
 
   it("renders a guide with no setup card for its guide-level URL, and records nothing", async () => {

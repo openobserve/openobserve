@@ -44,7 +44,7 @@ const route = useRoute();
 const openTokenPicker = inject(OPEN_TOKEN_PICKER, null);
 const snippetCopied = inject(FIRST_EVENT_SNIPPET_COPIED, null);
 
-const { code, codeMasked, needsPasscode, forbidden, tokenName } = useCredentialSnippet(
+const { code, codeMasked, needsPasscode, forbidden, tokenName, keyPending } = useCredentialSnippet(
   toRef(props, "content"),
 );
 
@@ -76,6 +76,7 @@ const onCopy = ({ partial }: CodeBlockCopyPayload) => {
       :chrome="chrome"
       :filename="filename"
       :wrap="wrap"
+      :copyable="!keyPending"
       :data-test="dataTest"
       inset
       class="mb-1"

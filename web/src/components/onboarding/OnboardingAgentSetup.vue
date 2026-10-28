@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 raw(powerShell.codeMasked.value)
               }}</OCode>
               <OButton
+                v-if="!powerShell.keyPending.value"
                 variant="ghost-muted"
                 size="icon-xs"
                 icon-left="content-copy"
@@ -80,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t('onboarding.agent.copyPowerShell', { powerShell: raw('PowerShell') })
                 "
                 data-test="onboarding-agent-setup-powershell-copy"
-                @click="copySnippet(powerShell.code.value)"
+                @click="copySnippet(powerShell)"
               />
             </p>
           </OnboardingSetupStep>
@@ -200,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :filter="detect.filter"
                 @state="state = $event"
                 @detected="result = $event"
-                @copy-command="copySnippet(exportLine.code.value)"
+                @copy-command="copySnippet(exportLine)"
               />
             </div>
           </OnboardingSetupStep>
@@ -391,8 +392,9 @@ provide(FIRST_EVENT_SNIPPET_COPIED, () => {
 const activeStep = computed(() => (!tokenCopied.value ? 1 : !promptCopied.value ? 2 : 3));
 
 // The PowerShell line, and the status's "Copy command", which copies the export line again.
-const copySnippet = async (code: string) => {
-  if (await copyToClipboard(code, t)) {
+const copySnippet = async (snippet: typeof exportLine) => {
+  if (snippet.keyPending.value) return;
+  if (await copyToClipboard(snippet.code.value, t)) {
     tokenCopied.value = true;
     restartWatch();
   }

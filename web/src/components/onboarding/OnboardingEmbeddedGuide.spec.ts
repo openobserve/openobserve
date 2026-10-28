@@ -16,7 +16,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { http, HttpResponse } from "msw";
-import { defineComponent, h, inject, onBeforeUnmount, ref } from "vue";
+import { defineComponent, h, inject, onBeforeUnmount, ref, type Ref } from "vue";
 import { createMemoryHistory, createRouter, useRoute } from "vue-router";
 
 import {
@@ -26,6 +26,7 @@ import {
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import analytics from "@/services/product_analytics";
+import apiKeys from "@/services/api_keys";
 import store from "@/test/unit/helpers/store";
 
 import FrontendRumConfig from "@/components/ingestion/recommended/FrontendRumConfig.vue";
@@ -37,12 +38,14 @@ import { buildChoices, resolvePath } from "./onboardingChoices";
 
 // The real curl page polls through this watch; it records what the page asked to watch.
 const watchArgs = vi.fn();
+// Each status's watch, so a test can make one receive.
+const watches: { state: Ref<string>; result: Ref<unknown> }[] = [];
 vi.mock("@/composables/firstEvent/useFirstEventWatch", async () => {
   const { ref: vueRef } = await import("vue");
   return {
     useFirstEventWatch: (...args: unknown[]) => {
       watchArgs(...args);
-      return {
+      const watch = {
         state: vueRef("waiting"),
         result: vueRef(),
         diagnosis: vueRef(),
@@ -55,6 +58,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", async () => {
         probeNow: vi.fn(),
         troubleshoot: vi.fn(),
       };
+      watches.push(watch);
+      return watch;
     },
   };
 });
@@ -302,6 +307,74 @@ describe("OnboardingEmbeddedGuide", () => {
       store.state.selectedOrganization = before;
       read.mockRestore();
     }
+  });
+
+  it("keeps the new org's RUM token when the old org's generated one lands after a switch", async () => {
+    global.server.use(
+      http.get(`${store.state.API_ENDPOINT}/api/:org/rumtoken`, () =>
+        HttpResponse.json({ data: { rum_token: "" } }),
+      ),
+    );
+    let answerOld!: (res: unknown) => void;
+    const create = vi
+      .spyOn(apiKeys, "createRUMToken")
+      .mockReturnValueOnce(new Promise((resolve) => (answerOld = resolve)) as never);
+    const before = store.state.selectedOrganization;
+    try {
+      store.state.selectedOrganization = { ...before, identifier: "org-a" };
+      const { wrapper } = await mountGuide("frontendMonitoring");
+      await wrapper.find('[data-test="onboarding-embedded-guide-rum-token"]').trigger("click");
+      expect(create).toHaveBeenCalledWith("org-a");
+      wrapper.unmount();
+      store.state.selectedOrganization = { ...before, identifier: "org-b" };
+      store.state.organizationData.rumToken = { rum_token: "org-b-token" };
+
+      answerOld({ data: { data: { new_key: "org-a-token" } } });
+      await flushPromises();
+
+      expect(store.state.organizationData.rumToken.rum_token).toBe("org-b-token");
+    } finally {
+      store.state.selectedOrganization = before;
+      create.mockRestore();
+    }
+  });
+
+  // the RUM page keys its card by platform, so a tab switch mounts a new status that starts waiting
+  it("drops the old status's result when the page swaps in a new one", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/onboarding/:path*", name: "onboarding", component: Chrome },
+        { path: "/ingestion/keyed", name: "keyedStatus", component: KeyedStatusPage },
+      ],
+    });
+    await router.push("/onboarding/frontend/browser");
+    const step = resolvePath(buildChoices(gt), ["frontend", "browser"]);
+    if (step.step !== "guide") throw new Error("expected a guide");
+    const wrapper = mount(OnboardingStepGuide, {
+      props: { choice: step.choice, row: step.row, guide: { ...step.guide, route: "keyedStatus" } },
+      global: { plugins: [store, router] },
+    });
+    await flushPromises();
+    const explore = () => wrapper.find('[data-test="onboarding-step-guide-explore"]').exists();
+
+    const browser = watches[watches.length - 1];
+    browser.result.value = {
+      streamName: "_rumdata",
+      streamType: "logs",
+      count: 1,
+      rangeStart: 1,
+      rangeEnd: 2,
+    };
+    browser.state.value = "received";
+    await flushPromises();
+    expect(explore()).toBe(true);
+
+    statusKey.value = "android";
+    await flushPromises();
+    expect(watches[watches.length - 1]).not.toBe(browser);
+    expect(explore()).toBe(false);
+    wrapper.unmount();
   });
 
   it("passes the org and email only to a page that declares them", async () => {

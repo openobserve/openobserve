@@ -172,11 +172,13 @@ const generateRumToken = () => {
     user_id: email.value,
     page: "Onboarding",
   });
+  const asked = org.value;
   return createRumToken
     .mutateAsync()
-    .then((res: { data: { data: { new_key: string } } }) =>
-      store.dispatch("setRUMToken", { rum_token: res.data.data.new_key }),
-    )
+    .then((res: { data: { data: { new_key: string } } }) => {
+      if (store.state.selectedOrganization?.identifier === asked)
+        void store.dispatch("setRUMToken", { rum_token: res.data.data.new_key });
+    })
     .catch((e: { response?: { status?: number; data?: { message?: string } } }) => {
       if (e?.response?.status === 403) return;
       toast({

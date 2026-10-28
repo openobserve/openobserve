@@ -2204,6 +2204,27 @@ describe("MainLayout — first-time cloud login", () => {
     wrapper.unmount();
   });
 
+  it("leaves a user who moved on while the lists loaded, and onboards on the next Home visit", async () => {
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async () => {
+      await held;
+      return { data: { list: [] } };
+    }) as never);
+    const { wrapper, router } = await mountAtHome();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+
+    answer();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    wrapper.unmount();
+  });
+
   // a flag set before it held the email, by a login just before the deploy
   it("takes a legacy 'true' flag as this user's first login, once", async () => {
     localStorage.setItem("isFirstTimeLogin", "true");

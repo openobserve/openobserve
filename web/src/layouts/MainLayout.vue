@@ -765,19 +765,19 @@ export default defineComponent({
       if (!isFirstLoginOf(store.state.userInfo?.email)) return;
       await router.isReady();
       // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
-      if (
+      const notNow = () =>
         config.isCloud === "true" &&
-        redirectPending(router.currentRoute.value.name as string | undefined)
-      )
-        return;
-      localStorage.removeItem("isFirstTimeLogin");
-      if (
+        redirectPending(router.currentRoute.value.name as string | undefined);
+      if (notNow()) return;
+      const hasData =
         config.isCloud !== "true" ||
         store.state.organizationData.isDataIngested === true ||
         // the store flag is still false at mount, so an org with data shows only in its stream lists
-        (await orgHasUserData(store.state.selectedOrganization?.identifier)) === true
-      )
-        return;
+        (await orgHasUserData(store.state.selectedOrganization?.identifier)) === true;
+      // A user who left Home while the lists loaded keeps the flag too.
+      if (notNow()) return;
+      localStorage.removeItem("isFirstTimeLogin");
+      if (hasData) return;
       markStartPending(store.state.userInfo?.email);
       await router.replace({
         name: "onboarding",

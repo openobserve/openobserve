@@ -27,6 +27,7 @@ import windowsCard from "@/components/ingestion/setupCard/content/windows";
 import type { RichCardDetect } from "@/components/ingestion/setupCard/types";
 import { queryClient } from "@/composables/query/queryClient";
 import { maskSecret } from "@/composables/useCredentialSnippet";
+import { useOrgCredential } from "@/composables/useOrgCredential";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import analytics from "@/services/product_analytics";
 import store from "@/test/unit/helpers/store";
@@ -303,6 +304,25 @@ describe("OnboardingAgentSetup", () => {
     w.findComponent(StatusStub).vm.$emit("copy-command");
     await flushPromises();
     expect(copiedTexts()).toEqual([`export O2_ACCESS_KEY="${token}"`]);
+  });
+
+  // an unread credential fills the lines with an empty key, which would not authenticate
+  it("copies no token line while the credential loads", async () => {
+    store.state.organizationData.organizationPasscode = "";
+    vi.mocked(useOrgCredential).mockImplementation(() => ({ ready: { value: false } }) as never);
+    try {
+      const w = await mountPage();
+      expect(byTest(w, "ingestion-onboarding-agent-token-code-block-copy-btn").exists()).toBe(
+        false,
+      );
+      expect(byTest(w, "onboarding-agent-setup-powershell-copy").exists()).toBe(false);
+      w.findComponent(StatusStub).vm.$emit("copy-command");
+      await flushPromises();
+      expect(copiedTexts()).toEqual([]);
+      expect(w.find('[aria-current="step"] h2').text()).toBe("Save your token");
+    } finally {
+      vi.mocked(useOrgCredential).mockImplementation(() => ({ ready: { value: true } }) as never);
+    }
   });
 
   it("goes back", async () => {

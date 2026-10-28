@@ -173,7 +173,9 @@ const org = computed<string>(() => store.state.selectedOrganization?.identifier 
 
 // The store flag is unreliable (an org with only synthetic checks sets it), so read the stream
 // lists; internal and synthetic streams do not count as data.
-const { hasUserData } = useOrgHasUserData(org);
+const { hasUserData: listed, isFetching } = useOrgHasUserData(org);
+// a stale cached answer shows while the lists refetch, and the org may have lost its data since
+const hasUserData = computed(() => (isFetching.value ? undefined : listed.value));
 watch(
   hasUserData,
   (has) => {

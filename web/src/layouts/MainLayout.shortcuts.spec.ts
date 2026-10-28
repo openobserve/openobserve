@@ -33,6 +33,9 @@ vi.mock("@openobserve/browser-rum", () => ({
 import MainLayout from "./MainLayout.vue";
 
 const StubDiv = defineComponent({ setup: () => () => h("div") });
+// Any page but Home, where Ctrl+B switches Home's tab instead. The real Logs page is a lazy import
+// heavy enough to outlast the test timeout on a busy machine.
+router.addRoute({ path: "/not-home", name: "notHome", component: StubDiv });
 
 function mountMainLayout() {
   return mount(MainLayout, {
@@ -100,7 +103,7 @@ describe("MainLayout — AI chat shortcut gate", () => {
     store.state.zoConfig.ai_enabled = false;
 
     wrapper = mountMainLayout();
-    await router.push({ name: "logs" });
+    await router.push({ name: "notHome" });
     await flushPromises();
 
     ctrlB()!.handler();
@@ -112,7 +115,7 @@ describe("MainLayout — AI chat shortcut gate", () => {
     store.state.zoConfig.ai_enabled = true;
 
     wrapper = mountMainLayout();
-    await router.push({ name: "logs" });
+    await router.push({ name: "notHome" });
     await flushPromises();
 
     ctrlB()!.handler();
