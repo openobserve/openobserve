@@ -3110,7 +3110,7 @@ fn batch_member(
     has_delivery_target(&batched).then_some(batched)
 }
 
-/// Sends the alert to its Slack app destinations now, outside its batch.
+/// Sends the alert to its Slack app destinations now, outside its batch; returns why one failed.
 #[allow(clippy::too_many_arguments)]
 #[cfg(feature = "enterprise")]
 async fn send_slack_app_unbatched(
@@ -3123,16 +3123,16 @@ async fn send_slack_app_unbatched(
     triggered_at: i64,
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
-) {
+) -> Option<String> {
     use crate::alerts::alert::AlertExt;
 
     if slack.is_empty() {
-        return;
+        return None;
     }
     let mut direct = alert.clone();
     direct.destinations = slack;
     direct.workflows.clear();
-    if let Err(e) = direct
+    let sent = direct
         .send_notification(
             trace_id,
             rows,
@@ -3145,13 +3145,27 @@ async fn send_slack_app_unbatched(
             &[],
             None,
         )
-        .await
-    {
+        .await;
+    let error = composite_delivery_error(&sent, None);
+    if let Some(e) = &error {
         log::error!(
             "[SCHEDULER trace_id {trace_id}] alert {}: Slack app send outside its batch failed: {e}",
             alert.name
         );
     }
+    error
+}
+
+/// Puts a failed out-of-batch Slack send on the run's row; the run itself stays delivered. [pure]
+#[cfg(feature = "enterprise")]
+fn note_slack_failure(row: &mut TriggerData, error: Option<String>) {
+    let Some(error) = error else {
+        return;
+    };
+    row.error = Some(match row.error.take() {
+        Some(earlier) => format!("{earlier}; {error}"),
+        None => error,
+    });
 }
 
 /// Who acked a single-row alert's current firing, when that ack withholds this run's send.
@@ -4157,7 +4171,7 @@ async fn handle_alert_triggers(
                 );
 
                 // R-137: each member firing gets its own Slack app message, never a batch.
-                send_slack_app_unbatched(
+                let slack_error = send_slack_app_unbatched(
                     &scheduler_trace_id,
                     &alert,
                     slack_app,
@@ -4169,6 +4183,7 @@ async fn handle_alert_triggers(
                     trigger_results.actual_value,
                 )
                 .await;
+                note_slack_failure(&mut trigger_data_stream, slack_error);
 
                 // Add to batch
                 let admission = crate::alerts::grouping::add_to_batch(
@@ -9858,5 +9873,37 @@ mod tests {
         alert.destinations.push("email".to_string());
         let member = batch_member(&alert, &slack).expect("the email still needs the batch");
         assert_eq!(member.destinations, vec!["email".to_string()]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_failed_slack_send_outside_the_batch_shows_on_the_run_row() {
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "TopicNotFound: slack_outbound".to_string(),
+        });
+        let mut row = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        note_slack_failure(&mut row, composite_delivery_error(&failed, None));
+        assert!(
+            row.error
+                .as_deref()
+                .is_some_and(|e| e.contains("TopicNotFound")),
+            "{:?}",
+            row.error
+        );
+        assert_eq!(row.status, RunOutcome::Firing, "the run stays delivered");
+
+        let mut partial = TriggerData {
+            error: Some("partial query".to_string()),
+            ..Default::default()
+        };
+        note_slack_failure(&mut partial, Some("slack down".to_string()));
+        assert_eq!(partial.error.as_deref(), Some("partial query; slack down"));
+
+        let mut clean = TriggerData::default();
+        note_slack_failure(&mut clean, None);
+        assert_eq!(clean.error, None);
     }
 }
