@@ -16,7 +16,7 @@
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 
-import { detectionSeen } from "@/composables/firstEvent/useFirstDataNotice";
+import { detectedStream } from "@/composables/firstEvent/useFirstDataNotice";
 import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
@@ -34,8 +34,13 @@ const hasRecords = (s: ListedStream) =>
 const userDataIn = (lists: (ListedStream[] | undefined)[], settled: boolean, org: string) => {
   const users = lists.map((list, i) => userStreams(list, USER_DATA_STREAM_TYPES[i]));
   if (users.some((list) => list.some(hasRecords))) return true;
-  // stats wait for the first flush, so only a first record a setup page saw arrive settles it sooner
-  if (users.some((list) => list.length > 0)) return detectionSeen(org) || undefined;
+  // stats wait for the first flush, so a stream a setup page saw its first record reach settles it sooner, while it is listed
+  const seen = detectedStream(org);
+  const seenListed = users.some(
+    (list, i) => USER_DATA_STREAM_TYPES[i] === seen?.type && list.some((s) => s.name === seen.name),
+  );
+  if (seenListed) return true;
+  if (users.some((list) => list.length > 0)) return undefined;
   return settled ? false : undefined;
 };
 

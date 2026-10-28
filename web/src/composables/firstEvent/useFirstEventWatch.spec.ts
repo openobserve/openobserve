@@ -1552,7 +1552,7 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(recentRejections).not.toHaveBeenCalled();
   });
 
-  it("marks the detection seen, so the next-visit banner never repeats it", async () => {
+  it("marks the detection seen, and the stream it saw, so the next-visit banner never repeats it", async () => {
     const w = watchOf("logs");
     w.start("open");
     await vi.advanceTimersByTimeAsync(1);
@@ -1561,6 +1561,7 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(w.state.value).toBe("received");
     expect(JSON.parse(localStorage.getItem("o2.onboarding.firstData.acme")!)).toMatchObject({
       seenDetection: true,
+      detectedStream: { type: "logs", name: "default" },
     });
   });
 });

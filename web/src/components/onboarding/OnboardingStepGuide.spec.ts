@@ -21,6 +21,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
 import { markHeardFromPending } from "@/components/login/heardFrom";
+import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 import { SETUP_STEPS_HOST, type SetupStepInfo } from "@/components/ingestion/setupCard/stepsHost";
 import type {
   FirstEventDiagnosis,
@@ -370,6 +371,37 @@ describe("OnboardingStepGuide", () => {
       expect(done("verify")).toBe("true");
     });
 
+    it("on PostgreSQL metrics, ticks the check and the steps before it, not the monitoring steps after it", async () => {
+      const pg = getDataSourceCard(
+        "postgres",
+        { url: "", org: "", token: "" },
+        i18n.global.t as unknown as TranslateFn,
+      )!;
+      // As the card reports them: the copy steps undone, the check at `verify` in the middle.
+      cardSteps.value = pg.steps.map((s, i) => ({
+        id: s.id,
+        title: s.id,
+        done: false,
+        active: i === 0,
+        notProvenByDetect: s.notProvenByDetect,
+        detectionAnchor: s.detectionAnchor,
+      }));
+      const w = await mountGuide();
+      card(w).vm.$emit("received", { ...metrics, streamName: "postgresql_commits" });
+      card(w).vm.$emit("state", "received");
+      await flushPromises();
+      const done = (id: string) =>
+        w.find(`[data-test="onboarding-guide-rail-${id}"]`).attributes("data-done");
+      expect(navStatus(w, "verify").text()).toBe("Data received");
+      expect(navStatus(w, "verify-dbm").exists()).toBe(false);
+      const anchor = pg.steps.findIndex((s) => s.detectionAnchor);
+      expect(pg.steps[anchor].id).toBe("verify");
+      for (const s of pg.steps.slice(0, anchor + 1)) expect(done(s.id)).toBe("true");
+      const after = pg.steps.slice(anchor + 1).map((s) => s.id);
+      expect(after).toContain("dbm-grant");
+      for (const id of after) expect(done(id)).toBe("false");
+    });
+
     it("drops the old result when the card's check starts waiting again", async () => {
       const w = await mountGuide();
       card(w).vm.$emit("received", metrics);
@@ -410,6 +442,49 @@ describe("OnboardingStepGuide", () => {
         "text/markdown",
       );
       expect(w.emitted("agent")).toBeUndefined();
+    });
+
+    describe.each([
+      ["the setup card's", undefined, undefined],
+      ["the page's own", curl, true],
+      ["the org-wide", curl, false],
+    ])("restarts %s stopped check", (_, at, pageOwnCheck) => {
+      afterEach(() => {
+        pageChecks.value = false;
+      });
+
+      const mountStopped = async () => {
+        pageChecks.value = !!pageOwnCheck;
+        const w = await mountGuide(false, undefined, at, true);
+        if (pageOwnCheck !== undefined) {
+          w.findComponent(EmbeddedStub).vm.$emit("status", pageOwnCheck);
+          await flushPromises();
+        }
+        expect(w.findComponent(FirstEventStatus).exists()).toBe(true);
+        watch.state.value = "stopped";
+        watch.start.mockClear();
+        return w;
+      };
+
+      it.each([
+        ["copying the agent prompt", '[data-test="onboarding-step-guide-agent-copy"]'],
+        ["downloading the setup file", '[data-test="onboarding-step-guide-agent-download"]'],
+      ])("on %s", async (__, button) => {
+        const w = await mountStopped();
+        await w.find(button).trigger("click");
+        await flushPromises();
+        expect(watch.start).toHaveBeenCalledWith("copy");
+      });
+
+      it("on copying the agent key", async () => {
+        const w = await mountStopped();
+        w.find("aside")
+          .findComponent(CredentialCodeBlock)
+          .findComponent({ name: "OCodeBlock" })
+          .vm.$emit("copy", { partial: false });
+        await flushPromises();
+        expect(watch.start).toHaveBeenCalledWith("copy");
+      });
     });
 
     it("sends the agent prompt and file to the stream the card's input names", async () => {

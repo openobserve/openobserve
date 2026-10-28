@@ -1100,21 +1100,22 @@ describe("SetupCardRenderer — steps host", () => {
 
   it("reports the steps in order, then their done and active changes", async () => {
     const setSteps = mountWithHost(CONTENT);
+    // The verify step is the one that holds the data check.
     expect(setSteps).toHaveBeenLastCalledWith([
       { id: "install", title: "Install", done: false, active: true },
-      { id: "verify", title: "Verify", done: false, active: false },
+      { id: "verify", title: "Verify", done: false, active: false, detectionAnchor: true },
     ]);
     wrapper.findComponent(OCodeBlock).vm.$emit("copy", {});
     await flushPromises();
     expect(setSteps).toHaveBeenLastCalledWith([
       { id: "install", title: "Install", done: true, active: false },
-      { id: "verify", title: "Verify", done: false, active: true },
+      { id: "verify", title: "Verify", done: false, active: true, detectionAnchor: true },
     ]);
     bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
     expect(setSteps).toHaveBeenLastCalledWith([
       { id: "install", title: "Install", done: true, active: false },
-      { id: "verify", title: "Verify", done: true, active: false },
+      { id: "verify", title: "Verify", done: true, active: false, detectionAnchor: true },
     ]);
   });
 

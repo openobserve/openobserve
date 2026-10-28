@@ -38,6 +38,13 @@ export interface FirstDataRecord {
   shown?: boolean;
   dismissed?: boolean;
   seenDetection?: boolean;
+  /** The stream whose first record a setup page saw arrive. */
+  detectedStream?: DetectedStream;
+}
+
+export interface DetectedStream {
+  type: string;
+  name: string;
 }
 
 export interface FirstDataStream {
@@ -85,17 +92,21 @@ export function writeFirstDataRecord(org: string, record: FirstDataRecord): void
 const detections = ref(0);
 
 /** Called when the setup page's bar turned green, so the next visit never repeats the news. */
-export function markDetectionSeen(org: string): void {
+export function markDetectionSeen(org: string, stream?: DetectedStream): void {
   if (!org) return;
   const record = readFirstDataRecord(org) ?? { lastVisit: Date.now(), hadData: false };
-  writeFirstDataRecord(org, { ...record, seenDetection: true });
+  writeFirstDataRecord(org, {
+    ...record,
+    seenDetection: true,
+    ...(stream ? { detectedStream: stream } : {}),
+  });
   detections.value++;
 }
 
-/** Whether a setup page in this browser saw the org's first record arrive. */
-export function detectionSeen(org: string): boolean {
+/** The stream whose first record a setup page in this browser saw arrive. */
+export function detectedStream(org: string): DetectedStream | undefined {
   void detections.value;
-  return !!readFirstDataRecord(org)?.seenDetection;
+  return readFirstDataRecord(org)?.detectedStream;
 }
 
 /** Whether the org holds a user stream, read with the notice's own bounded probes; null when a read fails. */

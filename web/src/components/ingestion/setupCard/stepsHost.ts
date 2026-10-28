@@ -23,6 +23,8 @@ export interface SetupStepInfo {
   active: boolean;
   /** Data the card's check finds does not complete this step. */
   notProvenByDetect?: boolean;
+  /** The step that holds the card's data check. */
+  detectionAnchor?: boolean;
 }
 
 /** Optional host: a setup card reports its visible steps here so a page can mirror them. */

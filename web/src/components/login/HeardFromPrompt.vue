@@ -88,7 +88,10 @@ const options = computed(() =>
 const answer = async (value: unknown) => {
   const from = HEARD_FROM_VALUES.find((v) => v === value);
   if (!from || sending.value || !visible.value) return;
-  sending.value = true;
+  // Logout can clear the user before the reply lands, so the answer settles who clicked.
+  const who = email();
+  const mine = useHeardFromSending(() => who);
+  mine.value = true;
   try {
     const res = await billings.submit_new_user_info(props.org, {
       from,
@@ -97,7 +100,7 @@ const answer = async (value: unknown) => {
       skipped: false,
     });
     if (res.status === 200) {
-      clearHeardFromPending(email());
+      clearHeardFromPending(who);
       toast({ message: t("login.heardFrom.thanks"), variant: "success" });
       analytics.track("onboarding_heard_from_answered", { from });
       return;
@@ -105,7 +108,7 @@ const answer = async (value: unknown) => {
   } catch {
     // Same toast as a non-200 answer; the question stays so the user can try again.
   } finally {
-    sending.value = false;
+    mine.value = false;
   }
   toast({ message: t("toastMessages.login.somethingWentWrong"), variant: "error" });
 };

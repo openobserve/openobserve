@@ -115,11 +115,38 @@ describe("useOrgHasUserData", () => {
     await flushPromises();
     expect(result.hasUserData.value).toBeUndefined();
 
-    markDetectionSeen("seen");
+    markDetectionSeen("seen", { type: "logs", name: "default" });
 
     expect(result.hasUserData.value).toBe(true);
     queryClient.clear();
     expect(await orgHasUserData("seen")).toBe(true);
+    wrapper.unmount();
+  });
+
+  // the streams were deleted and a new one pre-created: an old green bar says nothing about it
+  it("does not count a detection once the stream it saw is gone, for a new empty stream", async () => {
+    listsFor({ gone: { logs: ["default"] } });
+    markDetectionSeen("gone", { type: "logs", name: "default" });
+    queryClient.clear();
+    expect(await orgHasUserData("gone")).toBe(true);
+    vi.restoreAllMocks();
+
+    listsFor({ gone: {} });
+    queryClient.clear();
+    expect(await orgHasUserData("gone")).toBe(false);
+    vi.restoreAllMocks();
+
+    listsFor({ gone: { logs: ["fresh"] } }, 0);
+    const { result, wrapper } = setup("gone");
+    await flushPromises();
+    expect(result.hasUserData.value).toBeUndefined();
+    queryClient.clear();
+    expect(await orgHasUserData("gone")).toBeUndefined();
+    // nor the same name in another signal
+    vi.restoreAllMocks();
+    listsFor({ gone: { metrics: ["default"] } }, 0);
+    queryClient.clear();
+    expect(await orgHasUserData("gone")).toBeUndefined();
     wrapper.unmount();
   });
 

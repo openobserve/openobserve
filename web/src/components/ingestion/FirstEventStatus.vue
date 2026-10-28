@@ -28,6 +28,7 @@ import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { FIRST_EVENT_BARS } from "@/composables/firstEvent/firstEventCopied";
 import { FIRST_EVENT_REPORTER } from "@/composables/firstEvent/firstEventReporter";
 import {
   useFirstEventWatch,
@@ -107,6 +108,7 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"), 
 });
 const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
   watcher;
+const leaveBars = inject(FIRST_EVENT_BARS, null)?.(watcher.start);
 // A status that replaces another starts over, so the host drops the old one's result.
 reporter?.state(state.value);
 
@@ -122,6 +124,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (clock) clearInterval(clock);
   detach?.();
+  leaveBars?.();
 });
 
 const elapsedMs = computed(() => Math.max(0, nowMs.value - (startedAtMs.value ?? nowMs.value)));

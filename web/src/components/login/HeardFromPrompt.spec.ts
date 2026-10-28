@@ -190,6 +190,35 @@ describe("HeardFromPrompt.vue", () => {
     first.unmount();
   });
 
+  it("settles the user who answered when they log out before the answer lands", async () => {
+    let finish!: (res: { status: number }) => void;
+    submitNewUserInfo.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    markHeardFromPending(EMAIL);
+    markHeardFromPending(undefined);
+    const store = createStore({ state: { userInfo: { email: EMAIL } as { email?: string } } });
+    const mountOn = () =>
+      mount(HeardFromPrompt, { props: { org: ORG }, global: { plugins: [i18n, store] } });
+    const first = mountOn();
+    await flushPromises();
+    await first.find('[data-test="heard-from-prompt-option-github"]').trigger("click");
+    // Logout unmounts the page and clears the user before the reply arrives.
+    first.unmount();
+    store.state.userInfo = {};
+    finish({ status: 200 });
+    await flushPromises();
+
+    expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+    expect(localStorage.getItem(`${HEARD_FROM_PENDING_PREFIX}anonymous`)).toBe("true");
+    // The user's own send is over, so asked again later they can answer.
+    store.state.userInfo = { email: EMAIL };
+    markHeardFromPending(EMAIL);
+    wrapper = mountOn();
+    await flushPromises();
+    await byTest("heard-from-prompt-option-reddit").trigger("click");
+    await flushPromises();
+    expect(submitNewUserInfo).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ["answers", (w: VueWrapper) => w.find('[data-test="heard-from-prompt-option-github"]')],
     ["skips", (w: VueWrapper) => w.find('[data-test="heard-from-prompt-dismiss-btn"]')],

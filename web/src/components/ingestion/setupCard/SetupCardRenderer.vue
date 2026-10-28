@@ -372,6 +372,7 @@ if (stepsHost) {
         done: isStepDone(s),
         active: i === activeIndex.value,
         notProvenByDetect: s.notProvenByDetect,
+        detectionAnchor: s.detectionAnchor,
       })),
     (steps) => stepsHost.setSteps(steps),
     { immediate: true },

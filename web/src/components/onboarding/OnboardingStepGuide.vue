@@ -215,7 +215,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- A page with no check of its own: watch the org for any new stream, as the coding agent page does. -->
             <FirstEventStatus
               v-if="pageHasStatus === false"
-              ref="orgStatus"
               :org="org"
               @detected="result = $event"
               @state="onState"
@@ -250,7 +249,7 @@ import { SETUP_STEPS_HOST, type SetupStepInfo } from "@/components/ingestion/set
 import { SETUP_CARD_ONBOARDING } from "@/components/ingestion/setupCard/types";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
-import { provideSnippetCopied } from "@/composables/firstEvent/firstEventCopied";
+import { provideBarsCopied } from "@/composables/firstEvent/firstEventCopied";
 import type {
   FirstEventResult,
   FirstEventState,
@@ -365,15 +364,18 @@ const checkStatus = computed((): GuideNavStep["status"] => {
 
 const navSteps = computed((): GuideNavStep[] => {
   const received = !!result.value;
+  // The step that holds the card's check; a card that names none checks at its last step.
+  const anchor = cardSteps.value.findIndex((step) => step.detectionAnchor);
+  const check = anchor >= 0 ? anchor : cardSteps.value.length - 1;
   const steps: GuideNavStep[] = cardSteps.value.length
-    ? cardSteps.value.map((step, i, all) =>
-        // The card's last step is the one that checks for data.
-        i === all.length - 1
+    ? cardSteps.value.map((step, i) =>
+        i === check
           ? { ...step, title: raw(step.title), done: received, status: checkStatus.value }
           : {
               ...step,
               title: raw(step.title),
-              done: step.done || (received && !step.notProvenByDetect),
+              // Data proves the steps before the check; the optional ones after it keep the card's state.
+              done: step.done || (received && i < check && !step.notProvenByDetect),
             },
       )
     : [
@@ -411,9 +413,8 @@ const goToStep = (id: string) => {
 // Set by a Data sources page once it renders; with no check of its own, the org-wide one runs.
 const pageHasStatus = ref<boolean>();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-const orgStatus = ref<InstanceType<typeof FirstEventStatus> | null>(null);
-// A copy on the page restarts the org-wide check's fast cadence, as on a Data sources page.
-provideSnippetCopied(orgStatus);
+// The help box's key, prompt and file restart the running check, the card's, the page's or the org-wide one.
+const restartCheck = provideBarsCopied();
 
 // An invitee lands on Home, so the inviter sends them this guide's link.
 // The coding agent help: the key goes into the terminal, and the prompt or file names it only.
@@ -448,16 +449,20 @@ const copyPrompt = async () => {
     await copyToClipboard(buildAgentPrompt(agentCtx(agentFocus.value)), t, {
       successMessage: t("onboarding.agent.promptCopied"),
     })
-  )
+  ) {
     analytics.track("onboarding_agent_prompt_copied", { focus: agentFocus.value, from: "guide" });
+    restartCheck();
+  }
 };
 const downloadSetup = () => {
   if (!agentFocus.value) return;
   const file = buildAgentSetupFile(agentCtx(agentFocus.value));
-  if (downloadFile("openobserve-setup.md", file, "text/markdown"))
+  if (downloadFile("openobserve-setup.md", file, "text/markdown")) {
     analytics.track("onboarding_agent_prompt_downloaded", {
       focus: agentFocus.value,
       from: "guide",
     });
+    restartCheck();
+  }
 };
 </script>
