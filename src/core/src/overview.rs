@@ -39,7 +39,7 @@ use stream::try_get_streams;
 
 const DEFAULT_TOP_N: usize = 5;
 const MAX_TOP_N: usize = 20;
-/// User-facing stream types; profiles, service graph, filelist, index and metadata streams are left
+/// User-facing stream types only; profiles, service graph, filelist and internal streams are left
 /// out.
 const OVERVIEW_STREAM_TYPES: [StreamType; 4] = [
     StreamType::Logs,
@@ -100,7 +100,7 @@ pub struct Section<T> {
 }
 
 impl<T> Section<T> {
-    pub fn ok(data: T) -> Self {
+    fn ok(data: T) -> Self {
         Self {
             status: SectionStatus::Ok,
             data: Some(data),
@@ -108,7 +108,7 @@ impl<T> Section<T> {
         }
     }
 
-    pub fn error(message: &str) -> Self {
+    fn error(message: &str) -> Self {
         Self {
             status: SectionStatus::Error,
             data: None,
@@ -116,7 +116,7 @@ impl<T> Section<T> {
         }
     }
 
-    pub fn forbidden() -> Self {
+    fn forbidden() -> Self {
         Self {
             status: SectionStatus::Forbidden,
             data: None,
@@ -124,7 +124,7 @@ impl<T> Section<T> {
         }
     }
 
-    pub fn locked() -> Self {
+    fn locked() -> Self {
         Self {
             status: SectionStatus::Locked,
             data: None,
@@ -204,7 +204,7 @@ pub struct PipelinesData {
     pub total: u64,
     pub enabled: u64,
     pub disabled: u64,
-    /// Pipelines with an error row inside the pipeline error retention window.
+    /// Pipelines that still have an error row the retention cleanup has not removed.
     pub errored: u64,
 }
 
@@ -247,8 +247,7 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
     })
 }
 
-/// Overview returned when the caller's grants cannot be resolved; every scoped section reports an
-/// error.
+/// Overview for a caller whose grants could not be resolved; each scoped section reports an error.
 pub async fn scope_unavailable() -> Overview {
     Overview {
         streams: Section::error("failed to resolve permissions"),
@@ -642,6 +641,18 @@ mod tests {
     #[tokio::test]
     async fn test_limits_locked_without_enterprise() {
         assert_eq!(limits_section().await.status, SectionStatus::Locked);
+    }
+
+    #[tokio::test]
+    async fn test_permitted_list_is_honoured_without_a_stream_type() {
+        let org = "overview_no_type_org";
+        seed_stream(org, StreamType::Logs, "visible", 1.0).await;
+        seed_stream(org, StreamType::Logs, "hidden", 2.0).await;
+        seed_stream(org, StreamType::Metrics, "hidden_metric", 3.0).await;
+        let permitted = Some(vec!["logs:visible".to_string()]);
+        let streams = try_get_streams(org, None, false, permitted).await.unwrap();
+        let names: Vec<&str> = streams.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, vec!["visible"]);
     }
 
     #[test]
