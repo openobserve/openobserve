@@ -325,6 +325,37 @@ describe("OnboardingAgentSetup", () => {
     }
   });
 
+  // a failed read settles with no key, and that key would not authenticate either
+  it("copies no token line when the credential read settled without a key", async () => {
+    store.state.organizationData.organizationPasscode = "";
+    const w = await mountPage();
+    expect(byTest(w, "ingestion-onboarding-agent-token-code-block-copy-btn").exists()).toBe(false);
+    expect(byTest(w, "onboarding-agent-setup-powershell-copy").exists()).toBe(false);
+    w.findComponent(StatusStub).vm.$emit("copy-command");
+    await flushPromises();
+    expect(copiedTexts()).toEqual([]);
+    expect(start).not.toHaveBeenCalled();
+    expect(w.find('[aria-current="step"] h2').text()).toBe("Save your token");
+  });
+
+  it("does not tick a new setup's prompt when the old prompt's copy finishes late", async () => {
+    let finish!: (ok: boolean) => void;
+    vi.mocked(copyToClipboard).mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (finish = resolve)),
+    );
+    const w = await mountPage();
+    await byTest(w, "onboarding-agent-setup-copy").trigger("click");
+    await chooseFocus(w, "backend");
+    finish(true);
+    await flushPromises();
+    const promptStep = w
+      .findAllComponents({ name: "OnboardingSetupStep" })
+      .find((s) => s.props("n") === 2)!;
+    expect(promptStep.props("done")).toBe(false);
+    expect(start).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
   it("goes back", async () => {
     const w = await mountPage();
     await byTest(w, "onboarding-agent-setup-back").trigger("click");

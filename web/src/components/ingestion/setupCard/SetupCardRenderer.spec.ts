@@ -33,6 +33,8 @@ import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import linuxCard from "./content/linux";
 import kubernetesCard from "./content/kubernetes";
+import otlpTracesCard from "./content/otlpTraces";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { gt } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 
@@ -1078,6 +1080,7 @@ describe("SetupCardRenderer — steps host", () => {
     if (wrapper) wrapper.unmount();
   });
 
+  const setStream = vi.fn();
   const mountWithHost = (content: RichCardContent, onboarding?: SetupCardPresets) => {
     const setSteps = vi.fn();
     wrapper = mount(SetupCardRenderer, {
@@ -1086,7 +1089,7 @@ describe("SetupCardRenderer — steps host", () => {
         plugins: [store, router],
         stubs: { FirstEventStatus: FirstEventStatusStub },
         provide: {
-          [SETUP_STEPS_HOST as symbol]: { setSteps },
+          [SETUP_STEPS_HOST as symbol]: { setSteps, setStream },
           ...(onboarding ? { [SETUP_CARD_ONBOARDING as symbol]: ref(onboarding) } : {}),
         },
       },
@@ -1119,6 +1122,29 @@ describe("SetupCardRenderer — steps host", () => {
     mountWithHost(CONTENT);
     expect(wrapper.find("#setup-step-install").attributes("data-test")).toBe("ai-step-install");
     expect(wrapper.find("#setup-step-verify").attributes("data-test")).toBe("ai-step-verify");
+  });
+
+  it("marks the tracing step as one the cluster's logs do not prove, so it waits for its copy", async () => {
+    const presets: SetupCardPresets = { traces: "ebpf", languages: [] };
+    const setSteps = mountWithHost(kubernetesCard(SUBS, gt, presets), presets);
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    const steps = setSteps.mock.lastCall![0];
+    expect(steps.map((s: { id: string }) => s.id)).toEqual(["install", "instrument", "verify"]);
+    expect(steps[0].notProvenByDetect).toBeUndefined();
+    expect(steps[1]).toMatchObject({ done: false, notProvenByDetect: true });
+    expect(steps[2]).toMatchObject({ done: true });
+  });
+
+  it("reports the stream the user picks, and no stream for a card without the input", async () => {
+    mountWithHost(otlpTracesCard(SUBS, gt));
+    expect(setStream).toHaveBeenLastCalledWith("default");
+    wrapper.findComponent(OInput).vm.$emit("update:modelValue", "checkout");
+    await flushPromises();
+    expect(setStream).toHaveBeenLastCalledWith("checkout");
+    wrapper.unmount();
+    mountWithHost(CONTENT);
+    expect(setStream).toHaveBeenLastCalledWith(undefined);
   });
 
   it("reports the onboarding titles, folded optional step included", () => {

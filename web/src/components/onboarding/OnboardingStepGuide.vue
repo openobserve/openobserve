@@ -347,7 +347,12 @@ provide(HEARD_FROM_ASKED_BY_HOST, true);
 // A setup card reports its steps; a Data sources page has none to report, so the nav uses a
 // generic pair for it. Either way "Explore Your Data" ends the list.
 const cardSteps = ref<SetupStepInfo[]>([]);
-provide(SETUP_STEPS_HOST, { setSteps: (steps) => (cardSteps.value = steps) });
+// The card's stream input can move its check off "default"; the agent prompt follows it.
+const cardStream = ref<string>();
+provide(SETUP_STEPS_HOST, {
+  setSteps: (steps) => (cardSteps.value = steps),
+  setStream: (stream) => (cardStream.value = stream),
+});
 
 const checkStatus = computed((): GuideNavStep["status"] => {
   if (result.value) return { text: t("onboarding.rail.received"), tone: "ok" };
@@ -365,7 +370,11 @@ const navSteps = computed((): GuideNavStep[] => {
         // The card's last step is the one that checks for data.
         i === all.length - 1
           ? { ...step, title: raw(step.title), done: received, status: checkStatus.value }
-          : { ...step, title: raw(step.title), done: step.done || received },
+          : {
+              ...step,
+              title: raw(step.title),
+              done: step.done || (received && !step.notProvenByDetect),
+            },
       )
     : [
         {
@@ -429,7 +438,7 @@ const agentFocus = computed((): AgentFocus | undefined => {
 const agentCtx = (focus: AgentFocus) => ({
   endpoint: endpoint.value?.url ?? "",
   org: org.value,
-  stream: "default",
+  stream: cardStream.value ?? "default",
   focus,
   traces: tracePresets?.value,
 });

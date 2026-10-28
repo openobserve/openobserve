@@ -20,12 +20,14 @@ import { cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { queryClient } from "@/composables/query/queryClient";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import { streamKeys } from "@/services/stream.querykeys";
+import { isUserDataStream } from "@/utils/internalStreams";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
 
 /**
  * Whether the Logs page shows its intro: only while the org has no logs stream of any kind, so an
  * org with only O2's own or synthetics streams can still search. Only ever turned off for the mount.
- * With the restricted-routes flag on, the page ends it when FirstDataPanel reports; with it off this
+ * With the restricted-routes flag on, the page ends it when FirstDataPanel reports, or this does when
+ * the only logs streams are ones the panel never reports (O2's own); with it off this
  * re-reads the logs list on the first-event budget, paused while the tab is hidden.
  */
 export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
@@ -33,6 +35,13 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
   const { hasLogsStream, isFetching } = useOrgHasUserData(org);
   const showIntro = ref<boolean>();
   const pageWatches = () => store.state.zoConfig?.restricted_routes_on_empty_data === true;
+  // FirstDataPanel never reports a stream O2 writes itself, so a list of only those ends it here
+  const onlyInternalLogs = () => {
+    const list =
+      queryClient.getQueryData<{ name?: string }[]>(streamKeys.nameList(toValue(org), "logs")) ??
+      [];
+    return list.length > 0 && !list.some((s) => isUserDataStream(s?.name ?? "", "logs"));
+  };
   watch(
     [hasLogsStream, isFetching],
     ([has, fetching]) => {
@@ -40,7 +49,7 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
       if (showIntro.value === undefined) {
         if (has !== undefined) showIntro.value = !has;
         // only a list that shows a stream ends it: a failed read (a 401 at session expiry) is not data
-      } else if (showIntro.value && has === true && !pageWatches()) {
+      } else if (showIntro.value && has === true && (!pageWatches() || onlyInternalLogs())) {
         showIntro.value = false;
       }
     },

@@ -179,6 +179,23 @@ describe("useNoDataIntro", () => {
     wrapper.unmount();
   });
 
+  // FirstDataPanel's watch never reports a stream O2 writes itself, so the list has to end the intro
+  it("with the flag on, ends the intro when the first logs stream is O2's own", async () => {
+    store.state.zoConfig.restricted_routes_on_empty_data = true;
+    queryClient.clear();
+    lists([]);
+    const { showIntro, wrapper } = setup();
+    await flushPromises();
+    expect(showIntro.value).toBe(true);
+
+    lists(["usage"]);
+    await queryClient.refetchQueries();
+    await flushPromises();
+
+    expect(showIntro.value).toBe(false);
+    wrapper.unmount();
+  });
+
   it("never shows the intro from a stale cached 'no data' that refetches to data", async () => {
     queryClient.clear();
     for (const type of USER_DATA_STREAM_TYPES) {

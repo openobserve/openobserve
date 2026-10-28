@@ -371,8 +371,14 @@ if (stepsHost) {
         title: stepTitle(s),
         done: isStepDone(s),
         active: i === activeIndex.value,
+        notProvenByDetect: s.notProvenByDetect,
       })),
     (steps) => stepsHost.setSteps(steps),
+    { immediate: true },
+  );
+  watch(
+    () => (props.content.streamInput ? watchedStream.value : undefined),
+    (stream) => stepsHost.setStream(stream),
     { immediate: true },
   );
 }

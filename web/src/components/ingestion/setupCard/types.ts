@@ -211,6 +211,8 @@ export interface RichCardStep {
   detectionAnchor?: boolean;
   /** Optional step whose body starts folded; the user opens it from its heading. */
   collapsed?: boolean;
+  /** The card's data check does not prove this step: tracing, on a card that checks for logs. */
+  notProvenByDetect?: boolean;
 }
 
 export interface RichCardDetect {

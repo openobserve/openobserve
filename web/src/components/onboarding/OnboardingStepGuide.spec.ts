@@ -88,8 +88,9 @@ const status = (emit: (event: "state" | "received", value: unknown) => void) =>
   });
 
 // The real card is covered by its own specs; here it only reports its state, its detection and,
-// when a test sets them, its steps to the page's nav.
+// when a test sets them, its steps and its stream to the page.
 const cardSteps = ref<SetupStepInfo[]>();
+const cardStream = ref<string>();
 const CardStub = defineComponent({
   name: "DataSourceSetupCard",
   props: ["slug"],
@@ -97,6 +98,7 @@ const CardStub = defineComponent({
   setup(_, { slots, emit }) {
     const host = inject(SETUP_STEPS_HOST, null);
     if (cardSteps.value) host?.setSteps(cardSteps.value);
+    if (cardStream.value) host?.setStream(cardStream.value);
     return () => h("div", [slots["hero-under-title"]?.(), snippet(), status(emit)]);
   },
 });
@@ -345,6 +347,29 @@ describe("OnboardingStepGuide", () => {
       watch.result.value = undefined;
     });
 
+    it("leaves the tracing step open when the data check finds only the cluster's logs", async () => {
+      cardSteps.value = [
+        { id: "install", title: "Quick install", done: false, active: true },
+        {
+          id: "instrument",
+          title: "Trace your apps",
+          done: false,
+          active: false,
+          notProvenByDetect: true,
+        },
+        { id: "verify", title: "Check Your Data", done: false, active: false },
+      ];
+      const w = await mountGuide();
+      card(w).vm.$emit("received", { ...metrics, streamName: "default", streamType: "logs" });
+      card(w).vm.$emit("state", "received");
+      await flushPromises();
+      const done = (id: string) =>
+        w.find(`[data-test="onboarding-guide-rail-${id}"]`).attributes("data-done");
+      expect(done("install")).toBe("true");
+      expect(done("instrument")).toBe("false");
+      expect(done("verify")).toBe("true");
+    });
+
     it("drops the old result when the card's check starts waiting again", async () => {
       const w = await mountGuide();
       card(w).vm.$emit("received", metrics);
@@ -385,6 +410,24 @@ describe("OnboardingStepGuide", () => {
         "text/markdown",
       );
       expect(w.emitted("agent")).toBeUndefined();
+    });
+
+    it("sends the agent prompt and file to the stream the card's input names", async () => {
+      cardStream.value = "checkout";
+      try {
+        const w = await mountGuide(false, undefined, {
+          choice: backend,
+          row: libraryRow,
+          guide: tile("java"),
+        });
+        await w.find('[data-test="onboarding-step-guide-agent-copy"]').trigger("click");
+        await flushPromises();
+        expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toContain("stream-name=checkout");
+        await w.find('[data-test="onboarding-step-guide-agent-download"]').trigger("click");
+        expect(vi.mocked(downloadFile).mock.calls[0][1]).toContain("stream-name=checkout");
+      } finally {
+        cardStream.value = undefined;
+      }
     });
 
     it.each([

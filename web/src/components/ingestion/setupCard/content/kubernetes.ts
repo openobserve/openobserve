@@ -204,10 +204,11 @@ const instrumentChoices = (t: TranslateFn): (RichCardStepVariant | RichCardStepV
  * per language, each with its own namespace field. Skipped, there is no step.
  */
 const instrumentStep = (t: TranslateFn, presets?: SetupCardPresets): RichCardStep | undefined => {
-  const step: Pick<RichCardStep, "id" | "chip" | "completeOn"> = {
+  const step: Pick<RichCardStep, "id" | "chip" | "completeOn" | "notProvenByDetect"> = {
     id: "instrument",
     chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
     completeOn: "copy",
+    notProvenByDetect: true,
   };
   if (presets?.traces === "off") return undefined;
   if (presets?.traces === "ebpf") {

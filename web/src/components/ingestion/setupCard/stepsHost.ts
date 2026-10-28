@@ -21,9 +21,13 @@ export interface SetupStepInfo {
   title: string;
   done: boolean;
   active: boolean;
+  /** Data the card's check finds does not complete this step. */
+  notProvenByDetect?: boolean;
 }
 
 /** Optional host: a setup card reports its visible steps here so a page can mirror them. */
 export const SETUP_STEPS_HOST: InjectionKey<{
   setSteps(steps: SetupStepInfo[]): void;
+  /** The stream the card's stream input names; undefined for a card without one. */
+  setStream(stream: string | undefined): void;
 }> = Symbol("setupStepsHost");

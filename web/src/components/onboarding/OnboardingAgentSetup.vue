@@ -407,10 +407,12 @@ const usedPrompt = (action: "copied" | "downloaded") => {
 };
 
 const copyPrompt = async () => {
-  if (
-    await copyToClipboard(prompt.value, t, { successMessage: t("onboarding.agent.promptCopied") })
-  )
-    usedPrompt("copied");
+  const text = prompt.value;
+  const copied = await copyToClipboard(text, t, {
+    successMessage: t("onboarding.agent.promptCopied"),
+  });
+  // A focus change during the copy shows another prompt than the one copied.
+  if (copied && text === prompt.value) usedPrompt("copied");
 };
 
 const download = () => {
