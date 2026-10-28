@@ -82,6 +82,9 @@ vi.mock("@/composables/useStreams", () => ({
         // This one is in userDataSet so it populates streamFields
         { name: "user_agent_device_brand", type: "keyword" },
         { name: "geo_info_city", type: "keyword" },
+        { name: "o2source", type: "keyword" },
+        { name: "o2_evp_origin", type: "keyword" },
+        { name: "o2_evp_origin_version", type: "keyword" },
       ],
     }),
   }),
@@ -602,9 +605,35 @@ describe("AppErrors", () => {
         expect.objectContaining({
           name: "ErrorViewer",
           params: { id: ISSUE_1.latest_error_id },
-          query: { timestamp: ISSUE_1.zo_sql_timestamp },
+          query: {
+            timestamp: ISSUE_1.zo_sql_timestamp,
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
         }),
       );
+    });
+
+    it("keeps the org on the Error Viewer link, so a reload in another org reopens the same error", async () => {
+      mockIssues.value = [ISSUE_1];
+      const original = store.state.selectedOrganization.identifier;
+      store.state.selectedOrganization.identifier = "rum_errors_org";
+      try {
+        ({ wrapper, router } = await mountAppErrors());
+        await flushPromises();
+        const pushSpy = vi.spyOn(router, "push");
+
+        await wrapper.findAll('[data-test="table-row"]')[0].trigger("click");
+        await flushPromises();
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "ErrorViewer",
+            query: expect.objectContaining({ org_identifier: "rum_errors_org" }),
+          }),
+        );
+      } finally {
+        store.state.selectedOrganization.identifier = original;
+      }
     });
 
     it("sets errorTrackingState.data.selectedError on row click", async () => {
@@ -672,6 +701,17 @@ describe("AppErrors", () => {
           }),
         }),
       );
+    });
+
+    it("keeps the o2-prefixed SDK fields in the field sidebar (o2-enterprise#2724)", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      const names = (wrapper.vm as any).streamFields.map((f: { name: string }) => f.name);
+      expect(names).toEqual(
+        expect.arrayContaining(["o2source", "o2_evp_origin", "o2_evp_origin_version"]),
+      );
+      expect(names).not.toContain("error_message");
     });
 
     it("passes startTime and endTime from dateTime state to fetchAll", async () => {

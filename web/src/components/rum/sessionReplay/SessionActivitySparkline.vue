@@ -59,10 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</small>
     </div>
 
-    <!-- Pre-intersection cells also show the skeleton — "—" would read as
-       "no data" for rows that simply haven't been fetched yet. -->
+    <!-- A row with bounds that has not scrolled into view is unfetched, not empty; a row without bounds shows "—". -->
     <div
-      v-else-if="loading || !started"
+      v-else-if="loading || (!started && hasRange)"
       class="flex h-7 animate-pulse items-end gap-[0.0938rem]"
       data-test="rum-session-activity-loading"
       :aria-label="t('rum.loadingMsg')"
@@ -80,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import useSessionActivity, { type SessionActivity } from "@/composables/useSessionActivity";
 
@@ -103,26 +102,40 @@ const started = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
+const hasRange = computed(() => !props.isBounce && !!props.startTime && !!props.endTime);
+let request = 0;
+
+// Bounds can change while a query is out, so only the newest request may write.
+const load = () => {
+  const id = ++request;
+  const { sessionId, startTime, endTime, isBounce } = props;
+  if (isBounce || !startTime || !endTime) {
+    activity.value = null;
+    loading.value = false;
+    return;
+  }
+  loading.value = true;
+  fetchActivity(sessionId, startTime, endTime, props.hasFrustrationField ?? false)
+    .then((result) => {
+      if (id === request) activity.value = result;
+    })
+    .finally(() => {
+      if (id === request) loading.value = false;
+    });
+};
+
 const startFetch = () => {
   if (started.value) return;
   started.value = true;
-  if (props.isBounce || !props.startTime || !props.endTime) return;
-  loading.value = true;
-  fetchActivity(props.sessionId, props.startTime, props.endTime, props.hasFrustrationField ?? false)
-    .then((result) => {
-      activity.value = result;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+  load();
 };
 
 // True lazy loading: the table's virtualizer over-renders far beyond the
 // viewport (overscan 100), so mounting is NOT visibility — only fetch when
 // the cell actually scrolls into view. Disconnect after the first trigger;
 // the composable's cache makes re-entering rows instant.
-onMounted(() => {
-  if (props.isBounce || !props.startTime || !props.endTime) return;
+const observe = () => {
+  if (!hasRange.value || started.value || observer) return;
   if (typeof IntersectionObserver === "undefined" || !rootEl.value) {
     startFetch();
     return;
@@ -140,7 +153,14 @@ onMounted(() => {
     { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);
-});
+};
+
+onMounted(observe);
+// A row gets _rumdata bounds first and the replay's later, and each window needs its own query.
+watch(
+  () => [props.startTime, props.endTime, props.isBounce],
+  () => (started.value ? load() : observe()),
+);
 
 onBeforeUnmount(() => {
   observer?.disconnect();
