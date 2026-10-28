@@ -170,6 +170,19 @@ export async function setupBarPanelWithBreakdownAndConfig(page, pm, dashboardNam
 }
 
 /**
+ * Stacked or h-stacked panel WITH a breakdown field — config sidebar opened and ready.
+ */
+export async function setupStackedPanelWithBreakdownAndConfig(page, pm, dashboardName, chartType = "stacked", panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, {
+    chartType,
+    panelName,
+    breakdownField: "kubernetes_host",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Stacked panel with breakdown and config ready", { chartType, dashboardName, panelName });
+}
+
+/**
  * Line chart panel — config sidebar opened and ready.
  */
 export async function setupLinePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
@@ -395,6 +408,16 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL panel of any chart type and query — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLChartWithConfig(page, pm, dashboardName, { chartType, query, panelName = "Test Panel" }) {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType, query, panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL panel with config ready", { chartType, query, dashboardName, panelName });
 }
 
 /**

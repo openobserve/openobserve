@@ -365,6 +365,13 @@ export default class DashboardactionPage {
     await this.waitForChartToRender();
   }
 
+  /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
+  nextPromQLQueryRangeRequest() {
+    return this.page
+      .waitForRequest((req) => req.url().includes("/prometheus/api/v1/query_range"), { timeout: 30000 })
+      .then((req) => new URL(req.url()));
+  }
+
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
 
   // Returns the per-panel edit dropdown locator (data-test keyed by panel name)

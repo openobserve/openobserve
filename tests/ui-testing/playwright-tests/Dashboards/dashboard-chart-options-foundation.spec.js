@@ -4,11 +4,12 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 import PageManager from "../../pages/page-manager";
-import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
+import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import {
   generateDashboardName,
-  buildPromQLPanel,
+  setupPromQLChartWithConfig,
+  setupStackedPanelWithBreakdownAndConfig,
   setupMapsPanelWithConfig,
   reopenPanelConfig,
   waitForPanelRenderSettled,
@@ -19,21 +20,7 @@ const { ensureMetricsIngested } = require("../utils/shared-metrics-setup.js");
 test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
 
-const PROMQL_RANGE_URL = /\/prometheus\/api\/v1\/query_range\?/;
 const TAGS = ["@dashboard", "@dashboardChartOptions", "@P1", "@all"];
-
-/** Builds a PromQL panel of `chartType` and opens the config sidebar. */
-async function setupPromQLChart(page, pm, dashboardName, chartType, query = "cpu_usage") {
-  await buildPromQLPanel(page, pm, dashboardName, { chartType, query });
-  await pm.dashboardPanelConfigs.openConfigPanel();
-}
-
-/** Resolves with the next PromQL query_range request URL, parsed. */
-function nextPromQLRequest(page) {
-  return page
-    .waitForRequest((req) => PROMQL_RANGE_URL.test(req.url()), { timeout: 30000 })
-    .then((req) => new URL(req.url()));
-}
 
 test.describe("Dashboard chart options — PromQL series limit, query type, reducer", () => {
   test.beforeAll(async () => {
@@ -50,7 +37,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
 
-    await setupPromQLChart(page, pm, dashboardName, "line");
+    await setupPromQLChartWithConfig(page, pm, dashboardName, { chartType: "line", query: "cpu_usage" });
     await expect(configs.promqlSeriesLimit).toHaveCount(0);
 
     await pm.chartTypeSelector.selectChartType("stacked");
@@ -68,7 +55,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
 
-    await setupPromQLChart(page, pm, dashboardName, "stacked");
+    await setupPromQLChartWithConfig(page, pm, dashboardName, { chartType: "stacked", query: "cpu_usage" });
     await configs.setPromqlSeriesLimit(1);
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForPanelRenderSettled(page, pm);
@@ -90,12 +77,12 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
 
-    await setupPromQLChart(page, pm, dashboardName, "line");
+    await setupPromQLChartWithConfig(page, pm, dashboardName, { chartType: "line", query: "cpu_usage" });
     await expect(configs.promqlQueryTypeTrigger).toBeVisible();
     await expect(configs.promqlQueryTypeTrigger).toContainText("Range");
 
     await configs.selectPromqlQueryType("Instant");
-    const request = nextPromQLRequest(page);
+    const request = pm.dashboardPanelActions.nextPromQLQueryRangeRequest();
     await pm.dashboardPanelActions.applyDashboardBtn();
     const url = await request;
     expect(url.searchParams.get("start")).toBe(url.searchParams.get("end"));
@@ -114,7 +101,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
 
-    await setupPromQLChart(page, pm, dashboardName, "gauge", "sum(cpu_usage)");
+    await setupPromQLChartWithConfig(page, pm, dashboardName, { chartType: "gauge", query: "sum(cpu_usage)" });
     await expect(configs.aggregation).toBeVisible();
 
     await pm.chartTypeSelector.selectChartType("h-bar");
@@ -137,7 +124,7 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     const configs = pm.dashboardPanelConfigs;
     const dashboardName = generateDashboardName();
 
-    await setupPromQLChart(page, pm, dashboardName, "metric", "sum(cpu_usage)");
+    await setupPromQLChartWithConfig(page, pm, dashboardName, { chartType: "metric", query: "sum(cpu_usage)" });
     await expect(configs.aggregation).toBeVisible();
 
     await configs.selectPromqlQueryType("Instant");
@@ -163,17 +150,7 @@ test.describe("Dashboard chart options — stacked thresholds and maps pan/zoom"
       const configs = pm.dashboardPanelConfigs;
       const dashboardName = generateDashboardName();
 
-      await setupTestDashboard(page, pm, dashboardName);
-      await pm.dashboardCreate.addPanel();
-      await pm.chartTypeSelector.selectChartType(chartType);
-      await pm.chartTypeSelector.selectStreamType("logs");
-      await pm.chartTypeSelector.selectStream("e2e_automate");
-      await pm.chartTypeSelector.removeField("y_axis_1", "y");
-      await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
-      await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "b");
-      await pm.dashboardPanelActions.addPanelName("Test Panel");
-      await pm.dashboardPanelActions.applyDashboardBtn();
-      await configs.openConfigPanel();
+      await setupStackedPanelWithBreakdownAndConfig(page, pm, dashboardName, chartType);
 
       await configs.selectThresholdsShowAs("Shaded band");
       await configs.addThresholdStep(5);
