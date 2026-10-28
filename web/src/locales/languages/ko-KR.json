@@ -5754,6 +5754,7 @@
       "providerNameRum": "실제 사용자 모니터링",
       "quickInstallDesc": "**단일 명령**으로 OpenObserve 수집기를 설치하세요. 클러스터 이름을 설정하고 실행하기만 하면 됩니다. 이름이 모든 레코드에 태그를 지정하므로 여러 클러스터가 보고되면 구분할 수 있습니다.",
       "quickInstallTitle": "빠른 설치(권장)",
+      "dbInstallerMetricsOnlyNote": "이 명령은 메트릭만 수집합니다. 아래의 **데이터베이스 모니터링** 단계는 메트릭 + 데이터베이스 모니터링 명령에만 적용되므로, 해당 단계를 사용하려면 먼저 해당 명령으로 전환하세요.",
       "dbInstallerDbmNote": "이 명령을 실행하기 전에 아래의 **데이터베이스 모니터링** 단계를 먼저 수행하세요. 수집기는 첫 시작부터 해당 단계에서 설정한 액세스와 로깅이 필요합니다. 이미 실행했나요? 해당 단계를 완료한 다음 같은 서비스 이름으로 이 명령을 다시 실행하세요. 설치된 수집기가 그 자리에서 업데이트됩니다.",
       "dbInstallerDbmVariant": "메트릭 + 데이터베이스 모니터링",
       "dbInstallerMysqlLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 보통 `/var/log/mysql/error.log`이며, RHEL에서는 `/var/log/mariadb/mariadb.log`입니다. 다음으로 찾을 수 있습니다: SHOW VARIABLES LIKE 'log_error';",

@@ -5754,6 +5754,7 @@
       "providerNameRum": "Real User Monitoring",
       "quickInstallDesc": "Installeer de OpenObserve-collector met **één opdracht** — stel gewoon uw clusternaam in en voer deze uit. De naam labelt elke record, zodat u clusters van elkaar kunt onderscheiden zodra er meerdere rapporteren.",
       "quickInstallTitle": "Snelle installatie (aanbevolen)",
+      "dbInstallerMetricsOnlyNote": "Dit commando verzamelt alleen metrieken. De stappen voor **Databasemonitoring** hieronder gelden alleen voor het commando Metrieken + Databasemonitoring; schakel er eerst naar over als je ze wilt gebruiken.",
       "dbInstallerDbmNote": "Voer de stappen voor **Databasemonitoring** hieronder uit voordat je dit commando uitvoert: de collector heeft de toegang en logging nodig die daarbij vanaf de eerste start worden ingesteld. Al uitgevoerd? Rond die stappen af en voer dit commando daarna opnieuw uit met dezelfde servicenaam; het werkt de geïnstalleerde collector ter plaatse bij.",
       "dbInstallerDbmVariant": "Metrieken + Databasemonitoring",
       "dbInstallerMysqlLogPathHelp": "De collector moet dit bestand kunnen lezen. Meestal `/var/log/mysql/error.log`, of `/var/log/mariadb/mariadb.log` op RHEL. Vind het met: SHOW VARIABLES LIKE 'log_error';",

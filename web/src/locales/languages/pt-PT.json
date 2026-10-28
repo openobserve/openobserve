@@ -5754,6 +5754,7 @@
       "providerNameRum": "Monitorização de utilizadores reais",
       "quickInstallDesc": "Instale o coletor OpenObserve com **um único comando** — basta definir o nome do cluster e executar. O nome etiqueta cada registo, para que possa distinguir os clusters quando vários estiverem a reportar.",
       "quickInstallTitle": "Instalação rápida (recomendada)",
+      "dbInstallerMetricsOnlyNote": "Este comando recolhe apenas métricas. Os passos de **Monitorização de bases de dados** abaixo aplicam-se apenas ao comando Métricas + Monitorização de bases de dados; mude primeiro para esse comando se os quiser.",
       "dbInstallerDbmNote": "Execute os passos de **Monitorização de bases de dados** abaixo antes de executar este comando: o collector precisa do acesso e do registo de logs que estes configuram desde o primeiro arranque. Já o executou? Conclua esses passos e, em seguida, execute novamente este comando com o mesmo nome de serviço; atualiza o collector instalado no local.",
       "dbInstallerDbmVariant": "Métricas + Monitorização de bases de dados",
       "dbInstallerMysqlLogPathHelp": "O collector tem de conseguir ler este ficheiro. Normalmente `/var/log/mysql/error.log`, ou `/var/log/mariadb/mariadb.log` no RHEL. Encontre-o com: SHOW VARIABLES LIKE 'log_error';",

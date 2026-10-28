@@ -5754,6 +5754,7 @@
       "providerNameRum": "Gerçek Kullanıcı İzleme",
       "quickInstallDesc": "OpenObserve toplayıcısını **tek komutla** kurun — yalnızca küme adınızı ayarlayın ve çalıştırın. Ad her kaydı etiketler; böylece birkaç küme raporlama yaptığında kümeleri birbirinden ayırt edebilirsiniz.",
       "quickInstallTitle": "Hızlı kurulum (önerilir)",
+      "dbInstallerMetricsOnlyNote": "Bu komut yalnızca metrikleri toplar. Aşağıdaki **Veritabanı İzleme** adımları yalnızca Metrikler + Veritabanı İzleme komutu için geçerlidir; bu adımları istiyorsanız önce o komuta geçin.",
       "dbInstallerDbmNote": "Bu komutu çalıştırmadan önce aşağıdaki **Veritabanı İzleme** adımlarını uygulayın: toplayıcı, ilk başlangıcından itibaren bu adımların ayarladığı erişime ve günlüklemeye ihtiyaç duyar. Zaten çalıştırdınız mı? Bu adımları tamamlayın, ardından bu komutu aynı hizmet adıyla yeniden çalıştırın; kurulu toplayıcıyı yerinde günceller.",
       "dbInstallerDbmVariant": "Metrikler + Veritabanı İzleme",
       "dbInstallerMysqlLogPathHelp": "Toplayıcı bu dosyayı okuyabilmelidir. Genellikle `/var/log/mysql/error.log`, RHEL'de ise `/var/log/mariadb/mariadb.log` olur. Şununla bulun: SHOW VARIABLES LIKE 'log_error';",

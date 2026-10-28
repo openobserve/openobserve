@@ -5754,6 +5754,7 @@
       "providerNameRum": "真实用户监测",
       "quickInstallDesc": "使用**单条命令**安装 OpenObserve 采集器 — 只需设置集群名称并运行。该名称会标记每条记录，因此当多个集群上报时，您可以区分它们。",
       "quickInstallTitle": "快速安装（推荐）",
+      "dbInstallerMetricsOnlyNote": "此命令仅采集指标。下方的 **数据库监控** 步骤仅适用于“指标 + 数据库监控”命令；如需使用这些步骤，请先切换到该命令。",
       "dbInstallerDbmNote": "请先完成下方 **数据库监控** 步骤，再运行此命令：采集器从首次启动起就需要这些步骤所设置的访问权限和日志记录。已经运行过了？请完成这些步骤，然后使用相同的服务名称再次运行此命令；它会在原位置更新已安装的采集器。",
       "dbInstallerDbmVariant": "指标 + 数据库监控",
       "dbInstallerMysqlLogPathHelp": "采集器必须能够读取此文件。通常为 `/var/log/mysql/error.log`，在 RHEL 上为 `/var/log/mariadb/mariadb.log`。可通过以下命令查找：SHOW VARIABLES LIKE 'log_error';",

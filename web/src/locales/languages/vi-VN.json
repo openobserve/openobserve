@@ -5754,6 +5754,7 @@
       "providerNameRum": "Giám sát người dùng thực",
       "quickInstallDesc": "Cài đặt collector OpenObserve bằng **một lệnh duy nhất** — chỉ cần đặt tên cụm của bạn và chạy. Tên này gắn thẻ mọi bản ghi, vì vậy bạn có thể phân biệt các cụm khi có nhiều cụm đang báo cáo.",
       "quickInstallTitle": "Cài đặt nhanh (khuyến nghị)",
+      "dbInstallerMetricsOnlyNote": "Lệnh này chỉ thu thập chỉ số. Các bước **Giám sát cơ sở dữ liệu** bên dưới chỉ áp dụng cho lệnh Metrics + Database Monitoring; hãy chuyển sang lệnh đó trước nếu bạn muốn thực hiện các bước này.",
       "dbInstallerDbmNote": "Hãy thực hiện các bước **Giám sát cơ sở dữ liệu** bên dưới trước khi chạy lệnh này: collector cần quyền truy cập và thiết lập ghi log mà các bước đó tạo ra ngay từ lần khởi động đầu tiên. Đã chạy rồi? Hãy hoàn tất các bước đó, rồi chạy lại lệnh này với cùng tên dịch vụ; lệnh sẽ cập nhật collector đã cài đặt ngay tại chỗ.",
       "dbInstallerDbmVariant": "Chỉ số + Giám sát cơ sở dữ liệu",
       "dbInstallerMysqlLogPathHelp": "Collector phải đọc được tệp này. Thường là `/var/log/mysql/error.log`, hoặc `/var/log/mariadb/mariadb.log` trên RHEL. Tìm bằng: SHOW VARIABLES LIKE 'log_error';",

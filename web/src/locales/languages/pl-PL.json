@@ -5754,6 +5754,7 @@
       "providerNameRum": "Monitorowanie rzeczywistych użytkowników",
       "quickInstallDesc": "Zainstaluj kolektor OpenObserve **jednym poleceniem** — wystarczy ustawić nazwę klastra i uruchomić. Nazwa taguje każdy rekord, więc możesz odróżnić klastry, gdy kilka z nich raportuje.",
       "quickInstallTitle": "Szybka instalacja (zalecana)",
+      "dbInstallerMetricsOnlyNote": "To polecenie zbiera tylko metryki. Poniższe kroki **monitorowania baz danych** dotyczą wyłącznie polecenia Metryki + Monitorowanie baz danych; jeśli chcesz je wykonać, najpierw przełącz się na nie.",
       "dbInstallerDbmNote": "Wykonaj poniższe kroki **Monitorowania bazy danych** przed uruchomieniem tego polecenia: kolektor potrzebuje dostępu i rejestrowania skonfigurowanych w tych krokach już od pierwszego uruchomienia. Uruchomiłeś już to polecenie? Dokończ te kroki, a następnie uruchom je ponownie z tą samą nazwą usługi; zaktualizuje ono zainstalowany kolektor w miejscu.",
       "dbInstallerDbmVariant": "Metryki + monitorowanie bazy danych",
       "dbInstallerMysqlLogPathHelp": "Kolektor musi mieć możliwość odczytu tego pliku. Zwykle jest to `/var/log/mysql/error.log` lub `/var/log/mariadb/mariadb.log` w systemie RHEL. Znajdź go za pomocą: SHOW VARIABLES LIKE 'log_error';",
