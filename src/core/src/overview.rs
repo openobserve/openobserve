@@ -224,25 +224,17 @@ pub fn normalize_top_n(requested: Option<usize>) -> usize {
 
 /// Resolves which streams and pipelines the caller may see; errors when the grant lookup fails.
 pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope, anyhow::Error> {
-    let [logs, metrics, traces, enrichment] = OVERVIEW_STREAM_TYPES.map(|t| t.to_string());
-    let (logs_grants, metrics_grants, traces_grants, enrichment_grants, pipeline_grants) = tokio::try_join!(
-        list_grants(org_id, user_id, &logs),
-        list_grants(org_id, user_id, &metrics),
-        list_grants(org_id, user_id, &traces),
-        list_grants(org_id, user_id, &enrichment),
-        list_grants(org_id, user_id, "pipelines"),
-    )?;
-    let mut stream_grants = HashMap::new();
-    for (stream_type, grants) in OVERVIEW_STREAM_TYPES.into_iter().zip([
-        logs_grants,
-        metrics_grants,
-        traces_grants,
-        enrichment_grants,
-    ]) {
-        if let Some(grants) = grants {
-            stream_grants.insert(stream_type, grants);
-        }
-    }
+    let stream_lookups = futures::future::try_join_all(OVERVIEW_STREAM_TYPES.map(|stream_type| {
+        let resource = stream_type.to_string();
+        async move { list_grants(org_id, user_id, &resource).await }
+    }));
+    let (stream_results, pipeline_grants) =
+        tokio::try_join!(stream_lookups, list_grants(org_id, user_id, "pipelines"))?;
+    let stream_grants = OVERVIEW_STREAM_TYPES
+        .into_iter()
+        .zip(stream_results)
+        .filter_map(|(stream_type, grants)| grants.map(|g| (stream_type, g)))
+        .collect();
     Ok(OverviewScope {
         user_id: user_id.to_string(),
         stream_grants,
