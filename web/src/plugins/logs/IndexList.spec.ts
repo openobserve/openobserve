@@ -20,8 +20,10 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { nextTick, ref } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import streamsMock from "@/test/unit/mockData/streams";
+import { useHideInternalStreams } from "@/composables/useHideInternalStreams";
 
 // Define mock functions outside of the mock factory
 const mockExtractFields = vi.fn();
@@ -3030,5 +3032,180 @@ describe("Index List — field values query for pipe-bearing filters", () => {
     const sql = lastValuesSql();
     expect(selectListOf(sql)).toBe("SELECT *");
     expect(sql.slice(sql.toUpperCase().indexOf(" FROM "))).toContain("match_all('error')");
+  });
+});
+
+describe("Stream picker — internal streams", () => {
+  let wrapper: any;
+  let setting!: ReturnType<typeof useHideInternalStreams>;
+
+  const stream = (name: string, isInternal = false, docTimeMax = 0) => ({
+    ...streamsMock.stream_list.list[0],
+    name,
+    stats: { doc_time_max: docTimeMax },
+    ...(isInternal ? { is_internal: true } : {}),
+  });
+
+  const loadStreams = async (list: ReturnType<typeof stream>[]) => {
+    wrapper.vm.searchObj.data.streamResults = { list };
+    wrapper.vm.searchObj.data.stream.streamLists = list.map((s) => ({
+      label: s.name,
+      value: s.name,
+    }));
+    await flushPromises();
+  };
+
+  const DEFAULT_LIST = [
+    stream("_rumdata", true, 90),
+    stream("default", false, 50),
+    stream("_anomalies", true, 80),
+    stream("k8s_events", false, 40),
+  ];
+
+  const select = () => wrapper.findComponent({ name: "OSelect" });
+  const optionLabels = () =>
+    (select().props("options") as { label: string; header?: boolean }[]).map((o) =>
+      o.header ? `# ${o.label}` : o.label,
+    );
+  const quickPickLabels = () =>
+    wrapper
+      .findAll('[data-test^="logs-search-stream-quick-pick-"]')
+      .filter((el: any) => el.attributes("data-test") !== "logs-search-stream-quick-pick-more")
+      .map((el: any) => el.text());
+
+  beforeEach(async () => {
+    localStorage.clear();
+    const Probe = defineComponent({
+      setup() {
+        setting = useHideInternalStreams();
+        return () => h("div");
+      },
+    });
+    mount(Probe, { global: { plugins: [store] } });
+    setting.hideInternalStreams.value = false;
+    wrapper = mount(IndexList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    await loadStreams(DEFAULT_LIST);
+  });
+
+  afterEach(async () => {
+    wrapper.vm.searchObj.data.streamResults = [];
+    wrapper.vm.searchObj.data.stream.streamLists = [];
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    setting.hideInternalStreams.value = false;
+    wrapper.unmount();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("lists user streams first and internal streams under a header", () => {
+    expect(optionLabels()).toEqual([
+      "default",
+      "k8s_events",
+      "# Internal streams",
+      "_rumdata",
+      "_anomalies",
+    ]);
+  });
+
+  it("pins selected streams within their group in multi-select", () => {
+    expect(select().props("multiple")).toBe(true);
+    expect(select().props("pinSelectedInGroups")).toBe(true);
+  });
+
+  it("removes internal streams while hidden and counts them", async () => {
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    expect(optionLabels()).toEqual(["default", "k8s_events"]);
+    expect(wrapper.vm.streamPickerHiddenCount).toBe(2);
+  });
+
+  it("keeps a selected internal stream visible under the header while hidden", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["_rumdata"];
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    expect(optionLabels()).toEqual(["default", "k8s_events", "# Internal streams", "_rumdata"]);
+    expect(wrapper.vm.streamPickerHiddenCount).toBe(1);
+  });
+
+  it("keeps a stream deselected while the popover is open until it closes", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["_rumdata"];
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    select().vm.$emit("open");
+    await flushPromises();
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    await flushPromises();
+    expect(optionLabels()).toContain("_rumdata");
+
+    select().vm.$emit("close");
+    await flushPromises();
+    expect(optionLabels()).not.toContain("_rumdata");
+  });
+
+  it("counts hidden streams that match the search text and clears the search on close", async () => {
+    setting.hideInternalStreams.value = true;
+    select().vm.$emit("open");
+    select().vm.$emit("search", "_r");
+    await flushPromises();
+    expect(wrapper.vm.streamPickerSearchMatchCount).toBe(1);
+
+    select().vm.$emit("close");
+    await flushPromises();
+    expect(wrapper.vm.streamPickerSearch).toBe("");
+    expect(wrapper.vm.streamPickerSearchMatchCount).toBe(0);
+  });
+
+  it("reports an org whose streams are all internal and hidden", async () => {
+    await loadStreams([stream("_rumdata", true), stream("_anomalies", true)]);
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    expect(optionLabels()).toEqual([]);
+    expect(wrapper.vm.streamPickerOnlyInternalHidden).toBe(true);
+  });
+
+  describe("quick pick", () => {
+    it("lists internal streams last under their own label", () => {
+      expect(quickPickLabels()).toEqual([
+        "Recently active streams",
+        "default",
+        "k8s_events",
+        "Internal streams",
+        "_rumdata",
+        "_anomalies",
+      ]);
+      expect(
+        wrapper.find('[data-test="logs-search-stream-quick-pick-label-internal"]').exists(),
+      ).toBe(true);
+    });
+
+    it("drops internal streams and their label while hidden", async () => {
+      setting.hideInternalStreams.value = true;
+      await flushPromises();
+      expect(quickPickLabels()).toEqual(["Recently active streams", "default", "k8s_events"]);
+    });
+
+    it("fills the slots with user streams before internal ones and counts the rest", async () => {
+      const users = Array.from({ length: 9 }, (_, i) => stream(`app_${i}`, false, i));
+      await loadStreams([stream("_rumdata", true, 100), ...users]);
+      expect(wrapper.vm.quickPickStreams.map((s: { value: string }) => s.value)).not.toContain(
+        "_rumdata",
+      );
+      expect(wrapper.vm.quickPickStreams).toHaveLength(8);
+      expect(wrapper.find('[data-test="logs-search-stream-quick-pick-more"]').text()).toContain(
+        "2",
+      );
+    });
+
+    it("leaves hidden streams out of the more count", async () => {
+      const users = Array.from({ length: 9 }, (_, i) => stream(`app_${i}`, false, i));
+      await loadStreams([stream("_rumdata", true, 100), stream("_rumlog", true, 99), ...users]);
+      setting.hideInternalStreams.value = true;
+      await flushPromises();
+      expect(wrapper.vm.quickPickMoreCount).toBe(1);
+    });
   });
 });

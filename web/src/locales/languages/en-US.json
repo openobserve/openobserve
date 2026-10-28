@@ -21222,6 +21222,17 @@
       "moreInfoAbout": "More information about {field}",
       "moreInfo": "More information"
     },
+    "streamPicker": {
+      "internalStreams": "Internal streams",
+      "hideInternal": "Hide internal streams",
+      "hiddenCount": "{count} hidden",
+      "searchMatchCount": "{count} internal stream matches | {count} internal streams match",
+      "allInternalHidden": "The only stream is internal and hidden | All {count} streams are internal and hidden",
+      "show": "Show",
+      "showInternal": "Show internal streams",
+      "announceHidden": "Internal streams hidden",
+      "announceShown": "Internal streams shown"
+    },
     "templateInput": {
       "suggestions": "Variable suggestions"
     },
