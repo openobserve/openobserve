@@ -508,6 +508,34 @@ describe("BarConverter", () => {
       expect(result.yAxis.type).toBe("value");
     });
 
+    it.each(["stacked", "h-stacked"])("stacks each time-shift period on its own in %s", (type) => {
+      const query = (nameSuffix?: string): any => ({
+        series: [
+          { name: nameSuffix ? `a (${nameSuffix})` : "a", values: [], data: { "1": "1" } },
+          { name: nameSuffix ? `b (${nameSuffix})` : "b", values: [], data: { "1": "2" } },
+        ],
+        timestamps: [[1, "2021-01-01 00:00:00"]],
+        queryIndex: 0,
+        ...(nameSuffix && { seriesRole: "shifted", nameSuffix }),
+      });
+
+      const result = converter.convert(
+        [query(), query("1d ago"), query("1w ago")],
+        { type, config: {} },
+        mockStore,
+        { legends: [] },
+      );
+
+      expect(result.series.map((s: any) => s.stack)).toEqual([
+        "total",
+        "total",
+        "total (1d ago)",
+        "total (1d ago)",
+        "total (1w ago)",
+        "total (1w ago)",
+      ]);
+    });
+
     it("should populate extras.legends for stacked chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {
@@ -899,6 +927,129 @@ describe("BarConverter", () => {
 
       expect(result.grid.left).toBe(16);
     });
+
+    const DAY = 86400;
+    const spanning = (stamps: Array<[number, Date | string]>): ProcessedPromQLData[] => [
+      {
+        series: [
+          {
+            name: "series1",
+            values: [],
+            data: Object.fromEntries(stamps.map(([ts]) => [ts, "10"])),
+          },
+        ],
+        timestamps: stamps,
+        queryIndex: 0,
+      },
+    ];
+
+    const labelsOf = (type: string, stamps: Array<[number, Date | string]>) => {
+      const result = converter.convert(
+        spanning(stamps),
+        { type, config: {} },
+        mockStore,
+        mockExtras,
+      );
+      return type === "h-stacked" ? result.yAxis.data : result.xAxis.data;
+    };
+
+    it.each(["h-stacked", "stacked"])("%s: steps on different dates carry MM-DD", (type) => {
+      expect(
+        labelsOf(type, [
+          [0, "2026-10-24T17:05:00.000"],
+          [DAY, "2026-10-25T17:05:00.000"],
+        ]),
+      ).toEqual(["10-24 17:05", "10-25 17:05"]);
+    });
+
+    it("dates Date labels from their own fields", () => {
+      expect(
+        labelsOf("h-stacked", [
+          [0, new Date(2026, 9, 24, 9, 5, 0)],
+          [2 * DAY, new Date(2026, 9, 26, 9, 5, 0)],
+        ]),
+      ).toEqual(["10-24 09:05", "10-26 09:05"]);
+    });
+
+    it("keeps the seconds of dated labels when a step has them", () => {
+      expect(
+        labelsOf("h-stacked", [
+          [0, "2026-10-24T23:59:30.000"],
+          [30, "2026-10-25T00:00:00.000"],
+        ]),
+      ).toEqual(["10-24 23:59:30", "10-25 00:00:00"]);
+    });
+
+    it("dates a short span that crosses midnight", () => {
+      expect(
+        labelsOf("h-stacked", [
+          [0, "2026-10-24T22:00:00.000"],
+          [12 * 3600, "2026-10-25T10:00:00.000"],
+        ]),
+      ).toEqual(["10-24 22:00", "10-25 10:00"]);
+    });
+
+    it("keeps time-only labels while every step falls on one date", () => {
+      expect(
+        labelsOf("h-stacked", [
+          [0, "2026-10-24T00:00:00.000"],
+          [DAY - 1, "2026-10-24T23:59:59.000"],
+        ]),
+      ).toEqual(["00:00:00", "23:59:59"]);
+    });
+
+    it("keeps a date-less time label as is", () => {
+      expect(
+        labelsOf("h-stacked", [
+          [0, "17:05:00"],
+          [DAY, "17:05:00"],
+        ]),
+      ).toEqual(["17:05:00", "17:05:00"]);
+    });
+
+    it.each(["h-stacked", "stacked"])(
+      "attaches the panel's mark lines to every %s series",
+      (type) => {
+        const processedData: ProcessedPromQLData[] = [
+          {
+            series: [
+              { name: "a", values: [], data: { "1": "10" } },
+              { name: "b", values: [], data: { "1": "5" } },
+            ],
+            timestamps: [[1, "2026-10-25T17:05:00.000"]],
+            queryIndex: 0,
+          },
+        ];
+        const panelSchema = {
+          type,
+          config: { mark_line: [{ name: "limit", type: "xAxis", value: 12 }] },
+        };
+
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+
+        expect(result.series).toHaveLength(2);
+        result.series.forEach((s: any) => {
+          expect(s.markLine.data).toEqual([
+            expect.objectContaining({ name: "limit", xAxis: 12, yAxis: null }),
+          ]);
+        });
+      },
+    );
+
+    it("h-bar keeps series-name categories and draws no mark line", () => {
+      const result = converter.convert(
+        spanning([
+          [0, "2026-10-24T17:05:00.000"],
+          [DAY, "2026-10-25T17:05:00.000"],
+        ]),
+        { type: "h-bar", config: { mark_line: [{ type: "xAxis", value: 12 }] } },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.yAxis.data).toEqual(["series1"]);
+      expect(result.series[0].markLine).toBeUndefined();
+    });
   });
 
   describe("edge cases", () => {
@@ -1166,5 +1317,68 @@ describe("BarConverter", () => {
 
       expect(result.grid.left).toBe(250);
     });
+  });
+});
+
+describe("BarConverter h-bar reducer colour, bar width and bar track", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const data = (): ProcessedPromQLData[] => [
+    {
+      series: [
+        {
+          name: "series1",
+          values: [
+            [1, "10"],
+            [2, "90"],
+          ],
+          data: {},
+        },
+        { name: "series2", values: [[1, "40"]], data: {} },
+      ],
+      timestamps: [[1, "00:00:00"]],
+      queryIndex: 0,
+    },
+  ];
+  const convert = (config: any, type = "h-bar") =>
+    new BarConverter().convert(data(), { type, config }, store, { legends: [] });
+
+  it("colours each bar by its reduced value, not by the raw samples", async () => {
+    const { getSeriesColor } = await import("../colorPalette");
+    vi.mocked(getSeriesColor).mockClear();
+    convert({ aggregation: "min" });
+    expect(vi.mocked(getSeriesColor).mock.calls.map((call) => call[2])).toEqual([[10], [40]]);
+  });
+
+  it("leaves bar width, track and axis max unset by default", () => {
+    const result: any = convert({});
+    expect(result.series[0].barWidth).toBeUndefined();
+    expect(result.series[0].showBackground).toBeUndefined();
+    expect(result.xAxis.max).toBeUndefined();
+  });
+
+  it("draws the track and pins the value axis to the largest reduced bar", () => {
+    const result: any = convert({ show_bar_track: true, bar_width: 14, aggregation: "min" });
+    expect(result.series[0].showBackground).toBe(true);
+    expect(result.series[0].barWidth).toBe(14);
+    expect(result.series[0].backgroundStyle.color).toBeTruthy();
+    expect(result.xAxis.max).toBe(40);
+    expect(result.xAxis.axisLabel.hideOverlap).toBe(true);
+  });
+
+  it("pins the track to y_axis_max when set, even below the largest bar", () => {
+    expect(convert({ show_bar_track: true, y_axis_max: 25 }).xAxis.max).toBe(25);
+    expect(convert({ show_bar_track: true, y_axis_max: "150" }).xAxis.max).toBe(150);
+  });
+
+  it("drops an invalid bar width on h-bar and stacked bars", () => {
+    expect(convert({ bar_width: -3 }).series[0].barWidth).toBeUndefined();
+    expect(convert({ bar_width: 12.6 }, "h-stacked").series[0].barWidth).toBeUndefined();
+    expect(convert({ bar_width: 16 }, "h-stacked").series[0].barWidth).toBe(16);
+  });
+
+  it("ignores the track on stacked bars", () => {
+    const result: any = convert({ show_bar_track: true }, "h-stacked");
+    expect(result.series[0].showBackground).toBeUndefined();
+    expect(result.xAxis.max).toBeUndefined();
   });
 });

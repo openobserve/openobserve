@@ -22,6 +22,7 @@ import fleet from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import { fleetKeys } from "@/services/fleet.querykeys";
 import FleetCollectors from "./FleetCollectors.vue";
+import { useRemoveRequest } from "./useCollectorActions";
 
 const { confirmMock, toastMock } = vi.hoisted(() => ({ confirmMock: vi.fn(), toastMock: vi.fn() }));
 
@@ -175,7 +176,10 @@ describe("FleetCollectors", () => {
 
   it("loads the org-wide list for the selected org", async () => {
     wrapper = await mountList();
-    expect(fleet.listCollectors).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(fleet.listCollectors).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      expect.objectContaining({ offset: 0 }),
+    );
   });
 
   it("renders a row per API collector", async () => {
@@ -552,23 +556,25 @@ describe("FleetCollectors", () => {
       expect(wrapper.find('[data-test="fleet-collectors-row-redeliver-c2"]').exists()).toBe(false);
     });
 
-    it("removes the selected rows once each after a confirm that warns they reappear", async () => {
+    it("removes the selected rows once each after the remove dialog confirms", async () => {
       vi.mocked(fleet.deleteCollector).mockResolvedValue({ status: 204 } as any);
       wrapper = await mountList();
       (wrapper.vm as any).selectedIds = ["c1", "c2"];
       await settle();
       await wrapper.find('[data-test="fleet-collectors-bulk-remove"]').trigger("click");
+      const { request, answer } = useRemoveRequest();
+      expect(request.value?.targets.map((c) => c.id)).toEqual(["c1", "c2"]);
+      expect(request.value?.online).toBe(1);
+      answer(true);
       await settle();
-      expect(confirmMock.mock.calls[0][0].title).toBe("Remove 2 collectors?");
-      expect(confirmMock.mock.calls[0][0].message).toContain("1 of these collectors is online");
       expect(fleet.deleteCollector).toHaveBeenCalledTimes(2);
       expect((wrapper.vm as any).selectedIds).toEqual([]);
     });
 
-    it("does not remove when the confirm is cancelled", async () => {
-      confirmMock.mockResolvedValue(false);
+    it("does not remove when the remove dialog is cancelled", async () => {
       wrapper = await mountList("/", menu);
       await wrapper.find('[data-test="fleet-collectors-row-remove-c1"]').trigger("click");
+      useRemoveRequest().answer(false);
       await settle();
       expect(fleet.deleteCollector).not.toHaveBeenCalled();
     });
@@ -581,6 +587,7 @@ describe("FleetCollectors", () => {
       (wrapper.vm as any).selectedIds = ["c1", "c2"];
       await settle();
       await wrapper.find('[data-test="fleet-collectors-bulk-remove"]').trigger("click");
+      useRemoveRequest().answer(true);
       await settle();
       expect((wrapper.vm as any).selectedIds).toEqual(["c2"]);
       expect(toastMock).toHaveBeenCalledWith(

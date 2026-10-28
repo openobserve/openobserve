@@ -41,4 +41,17 @@ describe("checkIfConfigChangeRequiredApiCallOrNot", () => {
       checkIfConfigChangeRequiredApiCallOrNot(panel({ hide: true }, "sql"), panel({}, "sql")),
     ).toBe(false);
   });
+
+  it("reloads a PromQL panel moved to or from a chart type with its own series cap", () => {
+    const typed = (type: string, queryType = "promql") => ({ ...panel({}, queryType), type });
+    expect(checkIfConfigChangeRequiredApiCallOrNot(typed("line"), typed("hostmap"))).toBe(true);
+    expect(checkIfConfigChangeRequiredApiCallOrNot(typed("hostmap"), typed("line"))).toBe(true);
+    expect(checkIfConfigChangeRequiredApiCallOrNot(typed("state-timeline"), typed("hostmap"))).toBe(
+      true,
+    );
+    expect(checkIfConfigChangeRequiredApiCallOrNot(typed("line"), typed("bar"))).toBe(false);
+    expect(
+      checkIfConfigChangeRequiredApiCallOrNot(typed("line", "sql"), typed("hostmap", "sql")),
+    ).toBe(false);
+  });
 });

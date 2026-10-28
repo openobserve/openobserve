@@ -152,7 +152,6 @@ const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
   { id: "channel", header: t("slackApp.channels.columnChannel"), size: 200, meta: { flex: true } },
   { id: "default_org", header: t("slackApp.channels.columnDefaultOrg"), size: 140 },
   { id: "answers", header: t("slackApp.channels.columnAnswers"), size: 130 },
-  { id: "alert_routes", header: t("slackApp.channels.columnAlertRoutes"), size: 120 },
   { id: "set_by", header: t("slackApp.channels.columnSetBy"), size: 220 },
   { id: "actions", header: raw(""), size: ownOrgOnly.value ? 170 : 100, isAction: true },
 ]);
@@ -236,9 +235,6 @@ const save = async (value: DefaultForm): Promise<void> => {
               : t("slackApp.channels.private")
           }}
         </template>
-      </template>
-      <template #cell-alert_routes>
-        <span class="text-text-muted">{{ raw("—") }}</span>
       </template>
       <template #cell-set_by="{ row }">
         <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
@@ -389,7 +385,8 @@ const save = async (value: DefaultForm): Promise<void> => {
     <ConfirmDialog
       v-model="removeOpen"
       :title="t('slackApp.channels.removeTitle', { channel: removing?.channel_name ?? '' })"
-      :message="t('slackApp.channels.removeMessage', { channel: removing?.channel_name ?? '' })"
+      message-keypath="slackApp.channels.removeMessage"
+      :message-name="removing ? `#${removing.channel_name}` : ''"
       :ok-label="t('slackApp.channels.remove')"
       ok-variant="destructive"
       focus-cancel

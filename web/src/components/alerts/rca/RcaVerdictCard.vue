@@ -283,9 +283,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- A re-run of an analyzed incident is live. -->
+    <!-- A re-run of an analyzed incident, or a resumed run, is live. -->
     <OBanner
-      v-else-if="cardState === 'investigating' && hasEarlierReport"
+      v-else-if="cardState === 'investigating' && (hasEarlierReport || liveResumeStep)"
       data-test="rca-reanalyzing-banner"
       variant="info"
       inline-actions
@@ -294,11 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="xs" />
       </template>
       <p data-test="rca-reanalyzing-message" class="text-banner-info-text m-0 text-sm font-medium">
-        {{
-          liveMode === "build_on_previous"
-            ? t("alerts.incidents.rcaRun.reanalyzingBuildOnPrevious")
-            : t("alerts.incidents.rcaRun.reanalyzingFresh")
-        }}
+        {{ reanalyzingText }}
       </p>
       <template #actions>
         <OButton
@@ -487,6 +483,8 @@ const props = withDefaults(
     stage?: string | null;
     /** Mode of the live run, for the M banner. */
     liveMode?: RcaRunMode | null;
+    /** Title of the step the live run resumed from; set only for a resumed run. */
+    liveResumeStep?: string | null;
     /** Mode of the failed run; Retry offers it first. */
     failedMode?: RcaRunMode | null;
     /** A completed run precedes the latest one: M shows, and Retry offers both modes. */
@@ -507,7 +505,7 @@ const props = withDefaults(
     pausedStep?: string | null;
     /** The agent's open question. */
     pausedQuestion?: string | null;
-    /** Answer deadline of the paused run in local "HH:mm". */
+    /** Answer deadline of the paused run in local "HH:mm <zone>". */
     deadlineText?: string | null;
     /** A completed run unblocked by an answer. */
     unblocked?: RcaUnblockedLine | null;
@@ -526,6 +524,7 @@ const props = withDefaults(
     stageIndex: null,
     stage: null,
     liveMode: null,
+    liveResumeStep: null,
     failedMode: null,
     hasEarlierReport: false,
     error: null,
@@ -645,16 +644,23 @@ const pill = computed<{
         label: t("alerts.incidents.rcaRun.state.failed"),
       };
     default:
-      // A cancelled run with a partial record reads "Failed"; the recordless card keeps "Cancelled".
       return {
         tone: "err",
         icon: "cancel",
         spinner: false,
-        label: partial.value
-          ? t("alerts.incidents.rcaRun.state.failed")
-          : t("alerts.incidents.rcaRun.state.cancelled"),
+        label: t("alerts.incidents.rcaRun.state.cancelled"),
       };
   }
+});
+
+/** The M banner line: a resumed run names its step, a re-run names its mode. */
+const reanalyzingText = computed<I18nText>(() => {
+  if (props.liveResumeStep) {
+    return t("alerts.incidents.rcaRun.resumingFrom", { step: props.liveResumeStep });
+  }
+  return props.liveMode === "build_on_previous"
+    ? t("alerts.incidents.rcaRun.reanalyzingBuildOnPrevious")
+    : t("alerts.incidents.rcaRun.reanalyzingFresh");
 });
 
 /** Next to the pill: the live label or the inconclusive qualifier. */

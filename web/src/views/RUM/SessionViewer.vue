@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSplitter
         v-model="splitterSize"
-        :limits="[200, 1400]"
+        :limits="SPLITTER_LIMITS"
         unit="px"
         class="h-full w-full"
         separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:intent="replayIntent"
               :events="segmentEvents"
               :segments="segments"
-              :is-loading="!!isLoading.length"
+              :is-loading="segmentsLoading"
               :single-snapshot="singleSnapshot"
               :watermark="replayWatermark"
               :anchor-moved-for-tabs="anchorMovedForTabs"
@@ -287,6 +287,7 @@ import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
+import { watchDebounced } from "@vueuse/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
@@ -498,7 +499,35 @@ const isMobileReplay = computed(() =>
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const mobilePlayerRef = ref<any>(null);
-const splitterSize = ref(600);
+const SPLITTER_STORAGE_KEY = "o2.rum.sessionReplay.splitterWidth";
+const SPLITTER_LIMITS: [number, number] = [200, 1400];
+const SPLITTER_DEFAULT = 600;
+
+// Storage can throw (private mode); the default width is a fine fallback.
+function readSplitterWidth(): number {
+  try {
+    const stored = Number(window.localStorage.getItem(SPLITTER_STORAGE_KEY) ?? NaN);
+    if (!Number.isFinite(stored)) return SPLITTER_DEFAULT;
+    return Math.min(Math.max(stored, SPLITTER_LIMITS[0]), SPLITTER_LIMITS[1]);
+  } catch {
+    return SPLITTER_DEFAULT;
+  }
+}
+
+const splitterSize = ref(readSplitterWidth());
+
+// OSplitter emits on every drag frame and has no drag-end event, so writes are debounced.
+watchDebounced(
+  splitterSize,
+  (value) => {
+    try {
+      window.localStorage.setItem(SPLITTER_STORAGE_KEY, String(Math.round(value)));
+    } catch {
+      // Unavailable storage keeps the width for this visit only.
+    }
+  },
+  { debounce: 300 },
+);
 const { performanceState } = usePerformance();
 const { getStream } = useStreams(t);
 

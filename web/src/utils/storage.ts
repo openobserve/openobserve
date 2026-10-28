@@ -129,6 +129,24 @@ export const useLocalTimezone = (val = "", isDelete = false) => {
   return timezone.value;
 };
 
+/** Applies a linked timezone to the store and its stored key, so the picker and every query use it from now on. */
+export const applyTimezone = (
+  store: { dispatch: (type: string, payload?: unknown) => unknown },
+  zone: string | null | undefined,
+): void => {
+  if (!zone) return;
+  useLocalTimezone(zone);
+  store.dispatch("setTimezone", zone);
+};
+
+/** Applies a shared timezone (a saved view) for this session only; the user's own stored zone is left as it was. */
+export const applySessionTimezone = (
+  store: { dispatch: (type: string, payload?: unknown) => unknown },
+  zone: string | null | undefined,
+): void => {
+  if (zone) store.dispatch("setTimezone", zone);
+};
+
 export const useLocalWrapContent = (val = "", isDelete = false) => {
   const wrapcontent: any = useLocalStorage("wrapContent", val, isDelete);
   return wrapcontent.value;

@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { invalidateChartTheme } from "@/utils/chartTheme";
 
 // Mock date-fns-tz
 vi.mock("date-fns-tz", () => ({
@@ -346,6 +347,183 @@ describe("getAnnotationsData", () => {
     expect(result).toEqual({
       markLines: [],
       markAreas: [],
+    });
+  });
+
+  it("draws a query-source marker as a solid line in its source colour, without a label", () => {
+    const marker = {
+      title: "api deployed",
+      text: "",
+      start_time: 1640995200000000,
+      end_time: null,
+      source: { id: "s1", name: "Deploys", color: "#34d399" },
+    };
+    const result = getAnnotationsData({ value: [marker] }, "UTC");
+
+    expect(result.markLines[0]).toMatchObject({
+      symbol: ["none", "circle"],
+      label: { show: false },
+      lineStyle: { color: "#34d399", type: "solid" },
+      itemStyle: { color: "#34d399" },
+      annotationDetails: marker,
+    });
+  });
+
+  const band = (color: string, manual = false) =>
+    getAnnotationsData(
+      {
+        value: [
+          {
+            title: "maintenance",
+            start_time: 1640995200000000,
+            end_time: 1640998800000000,
+            ...(manual ? {} : { source: { id: "s2", name: "Maintenance", color } }),
+          },
+        ],
+      },
+      "UTC",
+    ).markAreas[0][0];
+
+  it("hatches a query-source region in its source colour, edged by an opaque line", () => {
+    const area = band("#fb923c");
+
+    expect(area).toMatchObject({
+      label: { show: false },
+      itemStyle: { borderColor: "#fb923c", borderWidth: 1 },
+    });
+    expect(area.itemStyle.color.repeat).toBe("repeat");
+    expect(area.itemStyle.color.image).toBeInstanceOf(HTMLCanvasElement);
+    expect(area.itemStyle.color.image.width).toBe(8);
+    expect(area.itemStyle).not.toHaveProperty("opacity");
+  });
+
+  it("reuses one hatch tile per colour", () => {
+    expect(band("#34d399").itemStyle.color.image).toBe(band("#34d399").itemStyle.color.image);
+    expect(band("#34d399").itemStyle.color.image).not.toBe(band("#5b8ef0").itemStyle.color.image);
+  });
+
+  it("evicts the oldest tile once the cache cap is exceeded, instead of growing forever", () => {
+    const first = band("#000001").itemStyle.color.image;
+    for (let i = 2; i <= 41; i++) {
+      band(`#${i.toString(16).padStart(6, "0")}`);
+    }
+    expect(band("#000001").itemStyle.color.image).not.toBe(first);
+  });
+
+  it("falls back to a translucent tint where no canvas can draw the hatch", () => {
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(null as never);
+    try {
+      expect(band("#a78bfa").itemStyle).toMatchObject({ color: "#a78bfa38", borderWidth: 1 });
+      expect(band("rgb(1, 2, 3)").itemStyle).toMatchObject({
+        color: "rgb(1, 2, 3)",
+        opacity: 0.22,
+      });
+    } finally {
+      getContext.mockRestore();
+    }
+  });
+
+  it("keeps a manual annotation band on the series' shared selection fill", () => {
+    const area = band("#fb923c", true);
+    expect(area).not.toHaveProperty("itemStyle");
+    expect(area.label).toEqual({ show: true, formatter: "maintenance", distance: 0.2 });
+  });
+
+  describe("dark-theme marker colour", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      invalidateChartTheme();
+    });
+
+    const withDarkCanvas = (run: () => void) => {
+      const real = window.getComputedStyle;
+      vi.spyOn(window, "getComputedStyle").mockImplementation((el: Element) =>
+        el === document.documentElement
+          ? ({ getPropertyValue: () => "#0d1117" } as unknown as CSSStyleDeclaration)
+          : real(el),
+      );
+      run();
+    };
+
+    it("lightens a near-black source colour on a dark canvas, for both the line and the band", () => {
+      withDarkCanvas(() => {
+        const line = getAnnotationsData(
+          {
+            value: [
+              {
+                title: "deploy",
+                start_time: 1640995200000000,
+                end_time: null,
+                source: { id: "s1", name: "Deploys", color: "#111827" },
+              },
+            ],
+          },
+          "UTC",
+        ).markLines[0];
+        expect(line.lineStyle.color).not.toBe("#111827");
+        expect(line.itemStyle.color).toBe(line.lineStyle.color);
+
+        const area = getAnnotationsData(
+          {
+            value: [
+              {
+                title: "maintenance",
+                start_time: 1640995200000000,
+                end_time: 1640998800000000,
+                source: { id: "s2", name: "Maintenance", color: "#111827" },
+              },
+            ],
+          },
+          "UTC",
+        ).markAreas[0][0];
+        expect(area.itemStyle.borderColor).not.toBe("#111827");
+        expect(area.itemStyle.borderColor).toBe(line.lineStyle.color);
+      });
+    });
+
+    it("leaves an already-readable source colour unchanged on a dark canvas", () => {
+      withDarkCanvas(() => {
+        const result = getAnnotationsData(
+          {
+            value: [
+              {
+                title: "deploy",
+                start_time: 1640995200000000,
+                end_time: null,
+                source: { id: "s1", name: "Deploys", color: "#34d399" },
+              },
+            ],
+          },
+          "UTC",
+        );
+        expect(result.markLines[0].lineStyle.color).toBe("#34d399");
+      });
+    });
+  });
+
+  it("leaves a manual annotation's dashed default look untouched next to query markers", () => {
+    const result = getAnnotationsData(
+      {
+        value: [
+          { title: "rollback", start_time: 1640995200000000 },
+          {
+            title: "deploy",
+            start_time: 1640995300000000,
+            source: { id: "s1", name: "Deploys", color: "#34d399" },
+          },
+        ],
+      },
+      "UTC",
+    );
+
+    expect(result.markLines[0]).not.toHaveProperty("lineStyle");
+    expect(result.markLines[0].symbol).toEqual(["circle", "triangle"]);
+    expect(result.markLines[0].label).toEqual({
+      show: true,
+      formatter: "rollback",
+      distance: 0.2,
     });
   });
 });

@@ -166,9 +166,10 @@ describe("SQL line/area", () => {
     expect(markers(options)[0].markArea.data).toHaveLength(2);
   });
 
-  it("stacked bar panels ignore thresholds", async () => {
+  it("stacked bars keep their colours and get limit lines only", async () => {
     const options = await runSQL(lineSQL("stacked", STEPS), rows());
     expect(options.visualMap).toBeUndefined();
+    expect(markers(options)[0].markLine.data.map((d: any) => d.yAxis)).toEqual([500, 1000]);
   });
 
   it("multi-query: every merged series is coloured by its final index", async () => {
@@ -683,6 +684,97 @@ describe("percentage steps on stacked areas use the stacked totals", () => {
     const panel = lineSQL("area-stacked", pct80, { y_axis_min: 0, y_axis_max: 1000 });
     const options = await runSQL(panel, [breakdownRows(three)]);
     expect(limit(options)).toBe(800);
+  });
+});
+
+describe("stacked and h-stacked bars", () => {
+  const endpointX = { label: "Endpoint", alias: "x_axis_1", column: "endpoint", args: [] };
+  const stackRows = (values: Record<string, number[]>) =>
+    ["/a", "/b"].flatMap((endpoint, i) =>
+      Object.entries(values).map(([service, v]) => ({
+        x_axis_1: endpoint,
+        breakdown_1: service,
+        y_axis_1: v[i],
+      })),
+    );
+  const stackPanel = (type: string, thresholds: any) =>
+    sqlPanel(type, { thresholds }, [
+      sqlQuery({ x: [endpointX], y: [yField()], breakdown: [breakdown] }),
+    ]);
+  const pct80 = { mode: "percentage", steps: [{ value: 80, color: RED }] };
+
+  it("SQL h-stacked: vertical limit lines on the x value axis, no recolouring", async () => {
+    const rows = stackRows({ api: [100, 600], web: [50, 300] });
+    const options = await runSQL(stackPanel("h-stacked", STEPS), [rows]);
+    expect(options.visualMap).toBeUndefined();
+    const lines = markers(options)[0].markLine.data;
+    expect(lines.map((d: any) => d.xAxis)).toEqual([500, 1000]);
+    expect(lines.every((d: any) => d.yAxis === undefined)).toBe(true);
+  });
+
+  it("SQL h-stacked: color_band draws bands along the x axis", async () => {
+    const rows = stackRows({ api: [100, 600], web: [50, 300] });
+    const options = await runSQL(stackPanel("h-stacked", { ...STEPS, showAs: "color_band" }), [
+      rows,
+    ]);
+    expect(markers(options)[0].markArea.data.map((b: any) => b[0].xAxis)).toEqual([500, 1000]);
+  });
+
+  it.each(["stacked", "h-stacked"])(
+    "SQL %s: percentage steps span the positive and the negative stacks apart",
+    async (type) => {
+      // positives stack to 100 at /a, negatives to -50, so 80% of -50..100 is 70
+      const rows = stackRows({ api: [100, 20], web: [-50, -10] });
+      const options = await runSQL(stackPanel(type, pct80), [rows]);
+      const [line] = markers(options)[0].markLine.data;
+      expect(line[type === "h-stacked" ? "xAxis" : "yAxis"]).toBe(70);
+    },
+  );
+
+  it.each(["stacked", "area-stacked"])(
+    "SQL %s: no per-segment over-limit cue in the tooltip",
+    async (type) => {
+      const rows = stackRows({ api: [600, 100], web: [700, 50] });
+      const options = await runSQL(stackPanel(type, STEPS), [rows]);
+      const point = (name: string, value: number) => ({
+        seriesName: name,
+        seriesIndex: options.series.findIndex((s: any) => s.name === name),
+        name: "/a",
+        marker: "<i></i>",
+        value,
+        data: value,
+      });
+      expect(options.tooltip.formatter([point("api", 600), point("web", 700)])).not.toContain(
+        "over",
+      );
+    },
+  );
+
+  it("SQL stacked with two Y fields and no breakdown: each bar is its own range", async () => {
+    const twoY = sqlPanel("stacked", { thresholds: pct80 }, [
+      sqlQuery({ x: [endpointX], y: [yField(), { ...yField("P99"), alias: "y_axis_2" }] }),
+    ]);
+    const rows = [
+      { x_axis_1: "/a", y_axis_1: 100, y_axis_2: 80 },
+      { x_axis_1: "/b", y_axis_1: 20, y_axis_2: 10 },
+    ];
+    const options = await runSQL(twoY, [rows]);
+    // side-by-side bars reach 100, not a 180 stack, so 80% is 80
+    expect(markers(options)[0].markLine.data[0].yAxis).toBe(80);
+  });
+
+  it.each([
+    ["stacked", "yAxis"],
+    ["h-stacked", "xAxis"],
+  ])("PromQL %s: limit lines on the value axis, series colours kept", async (type, axis) => {
+    const data = [promMatrix({ api: [100, 600, 1200], web: [50, 300, 900] })];
+    const plain = await runPromQL(promPanel(type, {}), data);
+    const options = await runPromQL(promPanel(type, { thresholds: STEPS }), data);
+    expect(options.visualMap).toBeUndefined();
+    expect(dataSeries(options).map((s: any) => s.color)).toEqual(
+      dataSeries(plain).map((s: any) => s.color),
+    );
+    expect(markers(options)[0].markLine.data.map((d: any) => d[axis])).toEqual([500, 1000]);
   });
 });
 

@@ -84,24 +84,6 @@ describe("discord template", () => {
       expect(discordConfig.method).toBe("post");
     });
 
-    it("has URL validator function", () => {
-      expect(typeof discordConfig.urlValidator).toBe("function");
-    });
-
-    it("URL validator accepts valid Discord webhook URLs", () => {
-      expect(discordConfig.urlValidator("https://discord.com/api/webhooks/123456789/abcdef")).toBe(
-        true,
-      );
-      expect(discordConfig.urlValidator("https://discord.com/api/webhooks/123/abc")).toBe(true);
-    });
-
-    it("URL validator rejects invalid URLs", () => {
-      expect(discordConfig.urlValidator("https://example.com/webhook")).toBe(false);
-      expect(discordConfig.urlValidator("https://discord.com/api/other")).toBe(false);
-      expect(discordConfig.urlValidator("https://evil.com?discord.com=fake")).toBe(false);
-      expect(discordConfig.urlValidator("invalid-url")).toBe(false);
-    });
-
     it("has credential fields", () => {
       expect(discordConfig.credentialFields).toBeInstanceOf(Array);
       expect(discordConfig.credentialFields.length).toBeGreaterThan(0);

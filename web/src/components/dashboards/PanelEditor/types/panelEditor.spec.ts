@@ -320,10 +320,11 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("markdown");
         expect(ALL_CHART_TYPES).toContain("custom_chart");
         expect(ALL_CHART_TYPES).toContain("state-timeline");
+        expect(ALL_CHART_TYPES).toContain("hostmap");
       });
 
-      it("should have 20 chart types", () => {
-        expect(ALL_CHART_TYPES.length).toBe(20);
+      it("should have 21 chart types", () => {
+        expect(ALL_CHART_TYPES.length).toBe(21);
       });
     });
 
@@ -366,8 +367,8 @@ describe("panelEditor types and utilities", () => {
         expect(AGGREGATION_REQUIRED_CHART_TYPES).not.toContain("custom_chart");
       });
 
-      it("should have 16 chart types", () => {
-        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(16);
+      it("should have 17 chart types", () => {
+        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(17);
       });
     });
 

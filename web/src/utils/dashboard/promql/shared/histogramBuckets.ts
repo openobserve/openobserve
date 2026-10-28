@@ -42,7 +42,7 @@ export interface HistogramSeriesOutput {
   le: string;
   /** Numeric value of `le` (`Infinity` for the +Inf bucket) */
   leValue: number;
-  /** timestamp (string key) -> non-cumulative, non-negative value */
+  /** timestamp (string key) -> non-cumulative, non-negative value; absent where the bucket is empty */
   data: Record<string, number>;
 }
 
@@ -53,6 +53,18 @@ export interface HistogramSeriesOutput {
  * magnitude is matched here rather than handed straight to `Number()`.
  */
 const INFINITY_SPELLINGS = new Set(["inf", "infinity"]);
+
+/** The `heatmap_mode` that reads a PromQL heatmap's series as the cumulative buckets of classic histograms. */
+export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
+
+/** Labels that vary within one histogram rather than between histograms. */
+const BUCKET_LABELS = new Set(["le", "__name__"]);
+
+export interface HistogramGroup<T> {
+  label: string;
+  labels: Record<string, string>;
+  series: T[];
+}
 
 /**
  * Parse a Prometheus `le` label value into a number.
@@ -105,6 +117,43 @@ function toNumericValue(raw: number | string | null | undefined): number {
   return Number.isNaN(parsed) ? NaN : parsed;
 }
 
+/** Splits bucket series into histograms by every label except `le` and `__name__`, in first-seen order. */
+export function groupHistogramSeries<T extends { metric?: Record<string, string> }>(
+  series: T[],
+): HistogramGroup<T>[] {
+  const groups = new Map<string, HistogramGroup<T>>();
+  for (const entry of series ?? []) {
+    const labels = Object.entries(entry?.metric ?? {})
+      .filter(([name]) => !BUCKET_LABELS.has(name))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    // Keyed on the pairs, not the rendered text, which a value containing `", ` could forge.
+    const key = JSON.stringify(labels);
+    const group = groups.get(key);
+    if (group) group.series.push(entry);
+    else {
+      const label = labels.map(([name, value]) => `${name}="${value}"`).join(", ");
+      groups.set(key, { label, labels: Object.fromEntries(labels), series: [entry] });
+    }
+  }
+  return [...groups.values()];
+}
+
+/** The first whole histograms of `series` that fit in `limit` series, at least one, in input order; a histogram missing a bucket would fold its counts into the next. */
+export function limitWholeHistograms<T extends { metric?: Record<string, string> }>(
+  series: T[],
+  limit: number,
+): { kept: T[]; shown: number; total: number } {
+  const groups = groupHistogramSeries(series);
+  const keep = new Set<T>();
+  let shown = 0;
+  for (const group of groups) {
+    if (shown > 0 && keep.size + group.series.length > limit) break;
+    for (const entry of group.series) keep.add(entry);
+    shown++;
+  }
+  return { kept: series.filter((entry) => keep.has(entry)), shown, total: groups.length };
+}
+
 /**
  * Convert cumulative Prometheus histogram bucket series into per-bucket
  * (non-cumulative) series.
@@ -118,20 +167,9 @@ function toNumericValue(raw: number | string | null | undefined): number {
  *    is `cumulative[i] - cumulative[i - 1]` (for `i = 0` it is `cumulative[0]`,
  *    i.e. the implicit lower bound of 0).
  *
- *    Missing / NaN / null cumulative values are treated as "carry forward the
- *    previous bucket's cumulative value at this timestamp". Because buckets are
- *    cumulative and monotonically non-decreasing, an absent bucket cannot be
- *    distinguished from one that gained no observations, so carrying the
- *    previous cumulative forward makes it contribute exactly 0 to the diff
- *    while leaving the NEXT bucket's diff correct relative to the last value we
- *    actually observed. (Treating it as 0 instead would fabricate a huge
- *    negative step followed by a huge positive one.) A missing bucket 0 carries
- *    forward the implicit lower bound of 0.
+ *    A missing cumulative value leaves that bucket and the one above it empty, never 0.
  * 5. Negative differences (float artifacts or malformed, non-monotonic data)
  *    are clamped to 0.
- *
- * Every returned series carries an entry for every timestamp in the union, so
- * the heatmap grid is fully populated.
  */
 export function deaccumulateHistogramSeries(
   series: HistogramSeriesInput[],
@@ -182,14 +220,11 @@ export function deaccumulateHistogramSeries(
     let previousCumulative = 0;
 
     for (let i = 0; i < buckets.length; i++) {
-      const rawValue = toNumericValue(buckets[i].data[ts]);
-
-      // Carry the previous cumulative forward when this bucket has no value.
-      const cumulative = Number.isNaN(rawValue) ? previousCumulative : rawValue;
-
-      const diff = cumulative - previousCumulative;
-      output[i].data[ts] = diff > 0 ? diff : 0;
-
+      const cumulative = toNumericValue(buckets[i].data[ts]);
+      if (!Number.isNaN(cumulative) && !Number.isNaN(previousCumulative)) {
+        const diff = cumulative - previousCumulative;
+        output[i].data[ts] = diff > 0 ? diff : 0;
+      }
       previousCumulative = cumulative;
     }
   }

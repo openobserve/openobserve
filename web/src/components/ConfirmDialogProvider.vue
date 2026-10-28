@@ -16,7 +16,21 @@
     @click:secondary="handleCancel"
     @update:open="handleUpdateOpen"
   >
-    <div class="text-center">{{ currentDialog.message }}</div>
+    <i18n-t
+      v-if="currentDialog.messageKeypath"
+      :keypath="currentDialog.messageKeypath"
+      tag="div"
+      class="text-center"
+    >
+      <template #name>
+        <span
+          data-test="confirm-dialog-provider-name"
+          class="text-text-heading font-semibold break-all"
+          >{{ currentDialog.messageName }}</span
+        >
+      </template>
+    </i18n-t>
+    <div v-else class="text-center">{{ currentDialog.message }}</div>
   </ODialog>
 </template>
 

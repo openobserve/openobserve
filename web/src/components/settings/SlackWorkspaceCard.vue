@@ -566,7 +566,8 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
     <ConfirmDialog
       v-model="forgetOpen"
       :title="t('slackApp.card.forgetTitle')"
-      :message="t('slackApp.card.forgetMessage')"
+      message-keypath="slackApp.card.forgetMessage"
+      :message-name="installation.team_name"
       :ok-label="t('slackApp.card.forget')"
       ok-variant="destructive"
       focus-cancel

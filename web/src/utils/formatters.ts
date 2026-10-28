@@ -113,12 +113,17 @@ export const truncateText = (text: string, maxLength: number): string => {
   return `${text.slice(0, Math.max(maxLength - 1, 0))}…`;
 };
 
+// True when `num / divisor` would print as 1000.0 or more at one decimal, so the
+// value belongs in the next unit up (999 950 is "1.0M", not "1000.0K").
+const roundsToNextUnit = (num: number, divisor: number) =>
+  Number((num / divisor).toFixed(1)) >= 1000;
+
 export const formatLargeNumber = (number: number) => {
   if (number === undefined || number === null) return "";
 
-  if (number >= 1000000000) {
+  if (number >= 1000000000 || roundsToNextUnit(number, 1000000)) {
     return (number / 1000000000).toFixed(1) + "B";
-  } else if (number >= 1000000) {
+  } else if (number >= 1000000 || roundsToNextUnit(number, 1000)) {
     return (number / 1000000).toFixed(1) + "M";
   } else if (number >= 1000) {
     return (number / 1000).toFixed(1) + "K";
@@ -140,6 +145,7 @@ export const formatEventCount = (num: number): string => {
   const units = ["", "K", "M", "B", "T"];
   let tier = Math.floor(Math.log10(num) / 3);
 
+  if (tier < units.length - 1 && roundsToNextUnit(num, Math.pow(10, tier * 3))) tier++;
   if (tier >= units.length) tier = units.length - 1;
 
   const scaled = num / Math.pow(10, tier * 3);
@@ -355,8 +361,8 @@ export function utcMinuteToTzHhmm(minute: number, timeZone: string): string {
   return formatter.format(d);
 }
 
-/** Short display name for an IANA timezone, e.g. "GMT+5:30" or "PST". */
-export function timezoneAbbr(timeZone: string): string {
+/** Short display name for an IANA timezone at `at` (default now), e.g. "GMT+5:30" or "PST". */
+export function timezoneAbbr(timeZone: string, at: Date = new Date()): string {
   const formatter = cachedFormatter(
     abbrFormatters,
     timeZone,
@@ -367,7 +373,7 @@ export function timezoneAbbr(timeZone: string): string {
       }),
   );
   if (!formatter) return timeZone;
-  const parts = formatter.formatToParts(new Date());
+  const parts = formatter.formatToParts(at);
   return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
 }
 

@@ -71,7 +71,7 @@ const stubs = {
     ],
     template: "<div />",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
+  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
 };
 
 function render() {
@@ -221,6 +221,18 @@ describe("OnCallOwnership", () => {
     });
     expect(service.createOwnershipRule).not.toHaveBeenCalled();
     expect(service.deleteOwnershipRule).not.toHaveBeenCalled();
+  });
+
+  it("asks to remove a rule with a destructive confirm button", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    list(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("okVariant")).toBe("destructive");
   });
 
   it("deletes a rule by its rule id once confirmed", async () => {

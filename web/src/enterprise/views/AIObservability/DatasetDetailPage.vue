@@ -768,6 +768,7 @@ async function removeItem(row: LlmDatasetItem): Promise<boolean> {
     message: t("aiObservability.datasets.detail.deleteItemMessage"),
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return false;
   try {

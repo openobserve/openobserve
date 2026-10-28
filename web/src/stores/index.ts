@@ -23,7 +23,9 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -90,7 +92,7 @@ const organizationObj = {
   }>,
 };
 
-export default createStore({
+const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
     userInfo: {},
@@ -453,6 +455,7 @@ export default createStore({
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
+      clearAllPanelDrafts();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -614,3 +617,8 @@ export default createStore({
     incidents,
   },
 });
+
+// Zone-less calendar resolves (query builders, guards) must use the zone the picker shows.
+setPickerTimezoneSource(() => store.state.timezone);
+
+export default store;

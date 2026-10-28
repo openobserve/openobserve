@@ -1401,6 +1401,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       handleDeleteSavedView: vi.fn((item) => {
         componentInstance.savedViewDropdownModel = false;
         componentInstance.deleteViewID = item.view_id;
+        componentInstance.deleteViewName = item.view_name;
         componentInstance.confirmDelete = true;
       }),
 

@@ -1,0 +1,94 @@
+{
+  // Loaded from the trusted base-branch checkout via OPENCODE_CONFIG when REVIEW_OPENCODE_CONFIG=ci-full.
+  // Same provider, model and agents as opencode.jsonc, but every tool (shell, edit, webfetch, ...) is allowed
+  // and nothing asks for permission. Keep the two files in step apart from the agent permissions.
+  "$schema": "https://opencode.ai/config.json",
+
+  // Nothing here may reach into the PR tree: no `instructions`, no `skills`, no plugins.
+  "update": "disable",
+  "share": "disabled",
+  "snapshots": false,
+  // LSP servers would build the PR (rust-analyzer runs build scripts and proc macros).
+  "lsp": false,
+  "formatter": false,
+
+  // Policies refuse every other provider, including the bundled free ones; a review talks to one endpoint only.
+  "policies": [
+    { "action": "provider.use", "resource": "*", "effect": "deny" },
+    { "action": "provider.use", "resource": "deepseek-review", "effect": "allow" }
+  ],
+
+  "providers": {
+    "deepseek-review": {
+      "name": "DeepSeek (review)",
+      // Bundled in the opencode binary, so nothing is installed at run time.
+      "package": "@opencode/ai/providers/openai-compatible",
+      "env": ["DEEPSEEK_API_KEY"],
+      "settings": { "baseURL": "https://api.deepseek.com" },
+      // DeepSeek reads max_tokens and returns its reasoning as reasoning_content.
+      "compatibility": { "maxTokensField": "max_tokens", "reasoningField": "reasoning_content" },
+      "models": {
+        "deepseek-flash": {
+          "name": "DeepSeek-V4.1-Flash",
+          // Selected with REVIEW_MODEL_VARIANT=max (the workflow matrix); opencode sends "reasoning_effort": "max".
+          "variants": [{ "id": "max", "settings": { "reasoningEffort": "max" } }],
+          "limit": { "context": 1048576, "output": 393216 },
+          // USD per 1M tokens at peak rate; models fetch is disabled, so without this every cost reads 0.
+          // TODO: these are still the V4-Pro rates; replace them with the Flash price list.
+          "cost": { "input": 1.32, "output": 3.96, "cache": { "read": 0.044 } }
+        }
+      }
+    }
+  },
+
+  "model": "deepseek-review/deepseek-flash",
+
+  // One allow-all rule: it comes after opencode's built-in defaults (last match wins), so no tool ever asks.
+  "agents": {
+    "ai-review-security": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-correctness": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-code-quality": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-performance": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-documentation": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-release": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-frontend": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-qa": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    },
+    "ai-review-coordinator": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [{ "action": "*", "resource": "*", "effect": "allow" }]
+    }
+  }
+}

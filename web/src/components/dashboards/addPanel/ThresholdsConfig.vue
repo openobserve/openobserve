@@ -26,10 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="showAsValue"
       :options="showAsOptions"
       :label="t('dashboard.thresholdShowAs')"
-      :help-text="isStacked ? t('dashboard.thresholdStackedHint') : undefined"
       data-test="dashboard-config-thresholds-show-as"
       @update:model-value="onShowAs"
-    />
+    >
+      <template v-if="isStacked" #tooltip>
+        <OTooltip :content="t('dashboard.thresholdStackedHint')" max-width="15.625rem" />
+      </template>
+    </OSelect>
 
     <OToggleGroup
       type="single"
@@ -140,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="isMetric && hasColouredValueMappings"
+      v-if="(isMetric || chartType === 'gauge') && hasColouredValueMappings"
       class="text-text-secondary flex items-center gap-1.5 text-xs"
       data-test="dashboard-config-thresholds-mapping-note"
     >
@@ -158,6 +161,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
@@ -224,8 +228,19 @@ const uid = useId();
 const rootRef = ref<HTMLElement | null>(null);
 
 const isMetric = computed(() => props.chartType === "metric");
-const isStacked = computed(() => props.chartType === "area-stacked");
-const SHOW_AS_CHART_TYPES = ["line", "area", "area-stacked", "bar", "h-bar", "scatter"];
+const isStacked = computed(() =>
+  ["area-stacked", "stacked", "h-stacked"].includes(props.chartType),
+);
+const SHOW_AS_CHART_TYPES = [
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "scatter",
+];
 const supportsShowAs = computed(() => SHOW_AS_CHART_TYPES.includes(props.chartType));
 
 // Mode, Show as and Base picked before the first step wait here, since the key is only written once a step exists.

@@ -475,9 +475,11 @@ async function refresh(force = false) {
 async function removeTask(row: RemoteTask) {
   const ok = await confirm({
     title: t("aiObservability.remoteTasks.delete.title"),
-    message: t("aiObservability.remoteTasks.delete.message", { name: row.name }),
+    messageKeypath: "aiObservability.remoteTasks.delete.message",
+    messageName: row.name,
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   try {

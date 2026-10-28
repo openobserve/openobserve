@@ -22,7 +22,7 @@ use config::{
     get_config,
     meta::promql::value::{RangeValue, Value},
     utils::{
-        hash::{Sum64, gxhash},
+        hash::key_sum64,
         time::{HourFormat, get_ymdh_from_micros, now_micros, second_micros},
     },
 };
@@ -472,7 +472,7 @@ async fn remove_index_entry(bucket_id: usize, key: &str, file_key: String) {
 }
 
 fn get_bucket_id(key: &str) -> usize {
-    let hash = gxhash::new().sum64(key);
+    let hash = key_sum64(key);
     hash as usize % METRICS_INDEX_CACHE_BUCKETS
 }
 
