@@ -408,6 +408,40 @@ describe("useChatStream", () => {
     });
   });
 
+  describe("stream read failures", () => {
+    const failingRead = (error: Error) => ({
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: async () => {
+            throw error;
+          },
+        }),
+      },
+    });
+
+    it("warns, not errors, when the connection drops mid-answer", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetchAiChat.mockResolvedValue(failingRead(new TypeError("network error")));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(warn).toHaveBeenCalledWith("Error reading stream:", expect.any(TypeError));
+      expect(console.error).not.toHaveBeenCalledWith("Error reading stream:", expect.anything());
+      expect(trackedEvents()).toContain("ai_assistant_answer_failed");
+    });
+
+    it("still errors on a read failure that is not a dropped connection", async () => {
+      mockFetchAiChat.mockResolvedValue(failingRead(new Error("decoder broke")));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(console.error).toHaveBeenCalledWith("Error reading stream:", expect.any(Error));
+    });
+  });
+
   describe("pinned hand-off context", () => {
     const explicitContextOf = (call: number) => mockFetchAiChat.mock.calls[call][4];
 
