@@ -548,16 +548,14 @@ pub async fn delete_by_date(
 
     // update stream stats retention time
     let stats_data_range = ("".to_string(), super::stats::get_yesterday_boundary());
-    // its stream_stats insert hits the same column limit, which would keep the job pending forever
-    if !schema::is_stream_key_too_long(org_id, stream_type, stream_name)
-        && let Err(e) = super::stats::update_stats_from_file_list_for_stream(
-            org_id,
-            stream_type,
-            stream_name,
-            stats_data_range,
-            false,
-        )
-        .await
+    if let Err(e) = super::stats::update_stats_from_file_list_for_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        stats_data_range,
+        false,
+    )
+    .await
     {
         log::error!("[COMPACTOR] delete_by_date update stats failed: {e}");
         return Err(e);
