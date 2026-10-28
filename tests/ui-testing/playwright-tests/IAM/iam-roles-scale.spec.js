@@ -151,8 +151,10 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
 
         // Looking at the JSON is not editing it — a round trip that stages changes
         // would let an untouched role be rewritten by a stray Save.
-        await expect(pm.rolesPage.reviewChangesButton,
-            'the Table -> JSON -> Table round trip staged changes').toHaveCount(0);
+        // Read the change count, not the button: dfolder List without stream Get is a
+        // companion gap, which keeps Review Changes enabled with nothing staged.
+        expect((await pm.rolesPage.unsavedCount.allInnerTexts()).join(''),
+            'the Table -> JSON -> Table round trip staged changes').not.toMatch(/[1-9]/);
 
         const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
         if (payload) {

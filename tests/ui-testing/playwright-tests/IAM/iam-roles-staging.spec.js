@@ -129,7 +129,7 @@ test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () =
     });
 
     // The drawer closes once nothing is left to review (useRoleSummary), so there is no empty state to wait for.
-    test('S-05 · undoing every change closes the drawer and drops Review Changes', {
+    test('S-05 · undoing every change closes the drawer and disables Review Changes', {
         tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
     }, async ({ page }) => {
         const name = await openFresh(page, 'undoall');
@@ -143,7 +143,7 @@ test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () =
             await page.waitForTimeout(300);
         }
         await expect(pm.rolesPage.drawer).toBeHidden({ timeout: 10000 });
-        await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
+        await expect(pm.rolesPage.reviewChangesButton).toBeDisabled();
 
         // And nothing may reach the API afterwards.
         const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
@@ -257,11 +257,11 @@ test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () =
         await page.unroute('**/api/*/roles/*');
     });
 
-    // A clean role has nothing to review, so the affordance is not offered at all.
-    test('S-12 · a clean role offers no Review Changes', {
+    // A clean role has nothing to review, so Review Changes shows but is disabled.
+    test('S-12 · a clean role shows Review Changes disabled', {
         tag: ['@iam', '@iamRolesStaging', '@P2', '@all']
     }, async ({ page }) => {
         await openFresh(page, 'clean');
-        await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
+        await expect(pm.rolesPage.reviewChangesButton).toBeDisabled();
     });
 });
