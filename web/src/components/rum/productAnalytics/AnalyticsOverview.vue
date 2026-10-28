@@ -634,9 +634,12 @@ const kpis = computed<StatItem[]>(() => {
           ? unit.label
           : t("rum.analytics.kpi.users"),
       value: id?.field ? addCommasToNumber(id.users) : "—",
+      // Identity resolves after the summary, and an unresolved one is not an absent user id.
       sub: id?.field
         ? raw(id.field)
-        : (identityGapMessage(id, true) ?? t("rum.analytics.kpi.noIdentity")),
+        : id
+          ? (identityGapMessage(id, true) ?? t("rum.analytics.kpi.noIdentity"))
+          : undefined,
       subIcon: unit.partial ? "info-outline" : undefined,
       subTooltip:
         unit.partial && id?.field
@@ -644,6 +647,7 @@ const kpis = computed<StatItem[]>(() => {
           : undefined,
       tone: "teal",
       icon: "person",
+      loading: !id,
       dataTest: "rum-analytics-kpi-users",
     },
     {
@@ -659,7 +663,8 @@ const kpis = computed<StatItem[]>(() => {
     {
       key: "coverage",
       label: t("rum.analytics.kpi.coverage"),
-      value: `${((id?.field ? id.coverage : 0) * 100).toFixed(1)}%`,
+      // Coverage comes from identity, so before it resolves a 0.0% would read as a real share.
+      value: id ? `${((id.field ? id.coverage : 0) * 100).toFixed(1)}%` : "—",
       tone: "neutral",
       icon: "how-to-reg",
       dataTest: "rum-analytics-kpi-identity-coverage",
@@ -882,8 +887,11 @@ const run = async (force = false) => {
   );
 };
 
+// A count before Pages and Clicks answer would read as a real zero.
 const chipLabel = (label: I18nText, count: number) =>
-  t("rum.analytics.chips.withCount", { label, count });
+  pagesPanel.value.status === "ok" && clicksPanel.value.status === "ok"
+    ? t("rum.analytics.chips.withCount", { label, count })
+    : label;
 
 const onChip = (v: unknown) => {
   if (v) chip.value = v as ChipFilter;
