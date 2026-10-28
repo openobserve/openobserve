@@ -36,7 +36,7 @@ test("response content and provider-reported usage use standard attributes", () 
     {
       info: {
         id: "msg-123",
-        modelID: "deepseek-v4-pro",
+        modelID: "deepseek-flash",
         finish: "stop",
         cost: 0.42,
         tokens: {
