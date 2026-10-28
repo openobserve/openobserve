@@ -315,6 +315,20 @@ describe("useOrgHasUserData", () => {
     wrapper.unmount();
   });
 
+  // a page opened inside the list's fresh time must not make the server list it again
+  it("starts from a page's own fresh list, and does not ask for it again", async () => {
+    queryClient.clear();
+    const spy = listsFor({ org1: { metrics: ["up"] } });
+    await queryClient.fetchQuery(streamNameListQuery("org1", "metrics"));
+    const { result, wrapper } = setup("org1", { keepCache: true });
+    await flushPromises();
+    expect(result.hasUserData.value).toBe(true);
+    expect(spy.mock.calls.filter(([, type]) => type === "metrics")).toHaveLength(1);
+    expect(await orgHasUserData("org1")).toBe(true);
+    expect(spy.mock.calls.filter(([, type]) => type === "metrics")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   // its early read must not stand in for a page's list, which then misses a stream made since
   it("keeps its own copy of the lists, and follows a page's own fresher read", async () => {
     const lists: Lists = {};

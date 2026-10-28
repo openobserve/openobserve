@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, type MaybeRefOrGetter, onScopeDispose, toValue } from "vue";
-import { hashKey, queryOptions, useQuery, useQueryClient } from "@tanstack/vue-query";
+import {
+  hashKey,
+  type QueryClient,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/vue-query";
 
 import { detectedStream } from "@/composables/firstEvent/useFirstDataNotice";
 import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
@@ -25,9 +31,17 @@ import { USER_DATA_STREAM_TYPES, isUserDataStream } from "@/utils/internalStream
 
 type ListedStream = { name?: string; stats?: { doc_num?: number; doc_time_max?: number } };
 
-// the same read in its own cache entry: a page's list keeps its usual freshness and lists a stream made since
-const probeQuery = (org: string, type: string) =>
-  queryOptions({ ...streamNameListQuery(org, type), queryKey: streamKeys.hasDataProbe(org, type) });
+// the same read in its own cache entry: a page's list keeps its usual freshness and lists a stream made since.
+// It starts from a page's list when one is cached, so a fresh one is not asked for again.
+const probeQuery = (client: QueryClient, org: string, type: string) => {
+  const page = streamNameListQuery(org, type);
+  return queryOptions({
+    ...page,
+    queryKey: streamKeys.hasDataProbe(org, type),
+    initialData: () => client.getQueryData(page.queryKey),
+    initialDataUpdatedAt: () => client.getQueryState(page.queryKey)?.dataUpdatedAt,
+  });
+};
 
 const userStreams = (list: ListedStream[] | undefined, type: string) =>
   (list ?? []).filter(
@@ -76,7 +90,7 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
   onScopeDispose(stopFollowing);
   const queries = USER_DATA_STREAM_TYPES.map((type) =>
     useQuery(() => {
-      const options = probeQuery(toValue(org), type);
+      const options = probeQuery(client, toValue(org), type);
       const usual = options.staleTime as number;
       // While the org has no data a later mount asks again, as data can arrive with nothing watching.
       return Object.assign(options, {
@@ -113,7 +127,9 @@ export async function orgHasUserData(org: string | undefined): Promise<boolean |
   if (!org) return undefined;
   try {
     const lists = await Promise.all(
-      USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(probeQuery(org, type))),
+      USER_DATA_STREAM_TYPES.map((type) =>
+        queryClient.fetchQuery(probeQuery(queryClient, org, type)),
+      ),
     );
     return userDataIn(lists, true, org);
   } catch {
