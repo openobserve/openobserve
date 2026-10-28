@@ -190,19 +190,23 @@ jobs:
               esac
             done
             if [ -z "$newer" ]; then
-              NOTE="None of the failed test files changed on main after this run started; rerunning the failed jobs."
-            elif [ "$all" = true ]; then
-              SKIP=true
-              MESSAGE="Not rerunning. Every failed test file changed on main:"$'\n\n'"$newer"$'\n'"These tests changed on main after this run started; a rerun would replay the old copies. $HOW_TO_UPDATE to test with the newer versions."
+              NOTE="No failed test file has a newer version on main than the copy this run tested; rerunning the failed jobs."
+            elif [ "$all" != true ]; then
+              MESSAGE="Rerunning the failed tests. Some failed test files have a newer version on main than the copy this run tested, so the rerun replays the old copies of these:"$'\n\n'"$newer"$'\n'"$HOW_TO_UPDATE to test them with the newer versions."
+            elif [ "$RUN_EVENT" != "pull_request" ]; then
+              MESSAGE="Rerunning the failed tests, because only pull request runs skip reruns (the PR comment explains the skip). Every failed test file has a newer version on main than the copy this run tested, so the rerun replays the old copies of these:"$'\n\n'"$newer"
             else
-              MESSAGE="Rerunning the failed tests. Some failed test files changed on main after this run started, so the rerun replays the old copies of these:"$'\n\n'"$newer"$'\n'"$HOW_TO_UPDATE to test them with the newer versions."
+              SKIP=true
+              MESSAGE="Not rerunning. Every failed test file has a newer version on main than the copy this run tested:"$'\n\n'"$newer"$'\n'"A rerun would replay the old copies. $HOW_TO_UPDATE to test with the newer versions."
             fi
           }
 
           upsert_comment() {
-            local cid
+            local me cid
+            # The PAT can edit anyone's comment, so only a marker comment it wrote itself is updated.
+            me=$(GH_TOKEN="$COMMENT_TOKEN" gh api user --jq .login) && [ -n "$me" ] || return 1
             cid=$(GH_TOKEN="$COMMENT_TOKEN" gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
-                    -q ".[] | select(.body | contains(\"$MARKER\")) | .id") || return 1
+                    -q ".[] | select(.user.login == \"$me\" and (.body | contains(\"$MARKER\"))) | .id") || return 1
             cid=${cid%%$'\n'*}
             if [ -n "$cid" ]; then
               GH_TOKEN="$COMMENT_TOKEN" gh api -X PATCH "repos/$GH_REPO/issues/comments/$cid" -f body="$1" > /dev/null
@@ -228,8 +232,8 @@ jobs:
               echo "::warning::Could not post the rerun advice comment on PR #$PR."
             fi
           fi
-          # A silent skip on a PR leaves a red check nobody explains, so skipping needs the comment to land.
-          if [ "$SKIP" = true ] && [ "$RUN_EVENT" = "pull_request" ] && [ "$COMMENTED" != true ]; then
+          # A silent skip leaves a red check nobody explains, so skipping needs the PR comment to land.
+          if [ "$SKIP" = true ] && [ "$COMMENTED" != true ]; then
             SKIP=false
             MESSAGE="Rerunning anyway, because this advice could not be posted on the PR. ${MESSAGE#Not rerunning. }"
           fi
@@ -303,7 +307,7 @@ jobs:
           echo "::endgroup::"
 
           if [ "$SKIP_RERUN" = "true" ]; then
-            echo "::notice::Not rerunning: every failed test file changed on main after this run (see the job summary)."
+            echo "::notice::Not rerunning: every failed test file has a newer version on main than the copy this run tested (see the job summary)."
             exit 0
           fi
 

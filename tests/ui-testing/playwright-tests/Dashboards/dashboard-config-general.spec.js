@@ -16,8 +16,7 @@ const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 // Kept for reference, commented rather than deleted so it can be restored easily.
-// This override beat --retries=0 locally (making a clean baseline impossible) and
-// in CI it *cut* the project's retry budget (3 standard / 2 alpha1) down to 1.
+// This override beat --retries=0 locally, making a clean baseline impossible.
 // test.describe.configure({ retries: 1 });
 
 test.describe("ConfigPanel — General Settings", () => {
