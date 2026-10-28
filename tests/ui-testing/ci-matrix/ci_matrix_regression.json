@@ -128,6 +128,7 @@
       "landing-regression.spec.js",
       "internal-route-guards.spec.js",
       "datetime-paste-invalid-values-14648.spec.js",
+      "iam-users-15546-edit-dialog-cancel.spec.js",
       "query-management-sql-tooltip.spec.js"
     ],
     "disabled": []

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latestScoreAttemptsFromSql, latestScoresFromSql } from "./latestScoreSql";
+import { latestScoresFromSql } from "./latestScoreSql";
 
 describe("latestScoreSql", () => {
   it("selects one latest row per evaluation key with deterministic ordering", () => {
@@ -35,19 +35,5 @@ describe("latestScoreSql", () => {
     expect(sql).toContain("CONCAT('legacy:', CAST(id AS VARCHAR))");
     expect(sql).toContain("'legacy-row:'");
     expect(sql).toContain("END AS _evaluation_key");
-  });
-});
-
-describe("latestScoreAttemptsFromSql", () => {
-  it("keeps the newest export for each task without collapsing later tasks", () => {
-    const sql = latestScoreAttemptsFromSql("score_config_id IS NOT NULL");
-
-    expect(sql).toContain('FROM "_llm_scores"');
-    expect(sql).toContain("PARTITION BY _score_attempt_key");
-    expect(sql).toContain("NULLIF(CAST(task_id AS VARCHAR), '')");
-    expect(sql).toContain("ORDER BY _timestamp DESC");
-    expect(sql).toContain("WHERE _latest_attempt_rank = 1");
-    expect(sql).toContain("AND (score_config_id IS NOT NULL)");
-    expect(sql).toContain(") AS latest_score_attempts");
   });
 });

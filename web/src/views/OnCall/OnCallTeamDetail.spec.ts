@@ -743,7 +743,12 @@ describe("OnCallTeamDetail", () => {
       // Named in the prompt: two rotations in one team routinely differ by one
       // word, and deleting the wrong one silently stops paging.
       expect(confirm!.props("modelValue")).toBe(true);
-      expect(confirm!.props("message")).toContain("Primary");
+      expect(confirm!.props("messageKeypath")).toBe("oncall.laneDeleteMessage");
+      expect(confirm!.props("messageName")).toBe("Primary");
+      expect(confirm!.props("okVariant")).toBe("destructive");
+      const name = document.body.querySelector('[data-test="confirm-dialog-name"]');
+      expect(name?.textContent).toBe("Primary");
+      expect(name?.className).toContain("font-semibold");
       expect(service.setSchedule).not.toHaveBeenCalled();
 
       confirm!.vm.$emit("update:ok");

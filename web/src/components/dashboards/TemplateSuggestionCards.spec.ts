@@ -243,6 +243,9 @@ describe("TemplateSuggestionCards", () => {
     await wrapper.find('[data-test="template-card-hostmetrics"]').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="template-replace-confirm"]').exists()).toBe(true);
+    const name = wrapper.find('[data-test="template-replace-confirm-name"]');
+    expect(name.text()).toBe("Host Metrics");
+    expect(name.classes()).toContain("font-semibold");
 
     await wrapper.find('[data-test="template-replace-confirm-ok"]').trigger("click");
     await flushPromises();

@@ -557,6 +557,10 @@ describe("AnnouncementBannerEditorForm", () => {
     });
     document.querySelector<HTMLElement>('[data-test="announcement-editor-delete-style"]')!.click();
     await flushPromises();
+    const named = document.querySelector(
+      '[data-test="announcement-editor-delete-style-message"] span.font-semibold',
+    );
+    expect(named?.textContent).toBe("Release");
     document
       .querySelector<HTMLElement>(
         '[data-test="announcement-editor-delete-style-dialog"] [data-test="o-dialog-primary-btn"]',
@@ -572,6 +576,28 @@ describe("AnnouncementBannerEditorForm", () => {
     service.setConfig.mockClear();
     await submit(wrapper);
     expect(service.setConfig).toHaveBeenCalled();
+  });
+
+  it("keeps the deleted style's name for the closing fade", async () => {
+    const labelled = { message: "Second", style: "style-1" };
+    service.getConfig.mockResolvedValue({
+      data: { banners: [stored[0], labelled], styles: [{ id: "style-1", name: "Release" }] },
+    });
+    const wrapper = await mountForm({ message: "Second", styleId: "style-1" }, 1, labelled, {
+      styles: [release],
+    });
+    document.querySelector<HTMLElement>('[data-test="announcement-editor-delete-style"]')!.click();
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>(
+        '[data-test="announcement-editor-delete-style-dialog"] [data-test="o-dialog-primary-btn"]',
+      )!
+      .click();
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as { deleteStyleOpen: boolean; deleteStyleName: string };
+    expect(vm.deleteStyleOpen).toBe(false);
+    expect(vm.deleteStyleName).toBe("Release");
   });
 
   it("warns only when a critical banner reaches every org the promotion targets", async () => {

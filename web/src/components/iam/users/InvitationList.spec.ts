@@ -297,6 +297,17 @@ describe("InvitationList - rejectInvitation", () => {
     // The second dialog is the reject dialog
     expect(dialogs[1].props("open")).toBe(true);
   });
+
+  it("names the org in bold and uses a destructive Reject button", async () => {
+    const wrapper = await mountInvitationList();
+    (wrapper.vm as any).rejectInvitation({ token: "tok-2", org_name: "Org Two", org_id: "org-2" });
+    await flushPromises();
+    const dialog = wrapper.findAllComponents(ODialogStub)[1];
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    const message = dialog.find('[data-test="invitation-list-reject-message"]');
+    expect(message.find("span.font-semibold").text()).toBe("Org Two");
+    expect(message.text()).toContain("reject the invitation to join Org Two?");
+  });
 });
 
 // 6. confirmAcceptInvitation

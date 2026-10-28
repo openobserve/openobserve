@@ -178,6 +178,16 @@ describe("rcaThread utils", () => {
         ),
       ).toBe(1);
     });
+
+    it("an ended run counts the steps Resume keeps, not every closed step", () => {
+      // C7: step 3 made no call and shares its message with step 4, so Resume repeats both.
+      const steps = [1, 2, 3, 4].map((index) => rcaStep({ index }));
+      const ended = { active: false, report_submitted: false, steps };
+      expect(finishedStepCount(rcaThread(ended))).toBe(3);
+      expect(finishedStepCount(rcaThread({ ...ended, reusable_steps: 2 }))).toBe(2);
+      // A live thread never carries the Resume count.
+      expect(finishedStepCount(rcaThread({ active: true, steps, reusable_steps: 2 }))).toBe(4);
+    });
   });
 
   it("Copy thread text has the start, step titles, notes, tool names and key args (TH38)", () => {

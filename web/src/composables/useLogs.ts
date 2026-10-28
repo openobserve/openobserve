@@ -19,7 +19,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
-import { b64DecodeUnicode, useLocalTimezone } from "@/utils/zincutils";
+import { b64DecodeUnicode } from "@/utils/zincutils";
+import { applyTimezone } from "@/utils/storage";
 
 import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
@@ -462,7 +463,7 @@ const useLogs = (t: TranslateFn) => {
       delete queryParams.refresh;
     }
 
-    useLocalTimezone(queryParams.timezone);
+    applyTimezone(store, queryParams.timezone);
 
     if (queryParams.functionContent) {
       searchObj.data.tempFunctionContent = b64DecodeUnicode(queryParams.functionContent) || "";

@@ -200,6 +200,8 @@ pub struct RunSummaryFields {
     pub stage_count: u8,
     pub steps: u32,
     pub tool_calls: u32,
+    /// Finished steps a Resume of the ended run keeps; `None` before the run ends.
+    pub reusable_steps: Option<u32>,
     /// Up to three users who steered the latest run, newest first.
     pub steered_by: Vec<String>,
     pub unblocked_by: Option<String>,
@@ -220,6 +222,7 @@ impl Default for RunSummaryFields {
             stage_count: RCA_STAGE_COUNT,
             steps: 0,
             tool_calls: 0,
+            reusable_steps: None,
             steered_by: Vec::new(),
             unblocked_by: None,
             detail: None,

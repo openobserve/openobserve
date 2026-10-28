@@ -397,7 +397,6 @@ pub async fn search_multi(
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
 
-                multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
                 log::debug!(

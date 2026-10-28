@@ -349,6 +349,41 @@ mod tests {
     }
 
     #[test]
+    fn test_v8_default_refresh_interval_survives_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        value["defaultRefreshInterval"] = serde_json::json!(60);
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        assert_eq!(stored["defaultRefreshInterval"], 60);
+        let reloaded: v8::Dashboard = serde_json::from_value(stored).unwrap();
+        assert_eq!(reloaded.default_refresh_interval, Some(60));
+    }
+
+    #[test]
+    fn test_v8_default_refresh_interval_omitted_when_unset() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        assert!(
+            !stored
+                .as_object()
+                .unwrap()
+                .contains_key("defaultRefreshInterval")
+        );
+    }
+
+    #[test]
     fn test_deserialize_unsupported_version_returns_err() {
         let json = serde_json::json!({
             "version": 99,

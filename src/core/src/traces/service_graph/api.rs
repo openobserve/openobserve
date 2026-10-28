@@ -47,6 +47,8 @@ pub struct ServiceGraphQuery {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start of the window (microseconds); with end_time, replaces the last 60 minutes"),
+        ("end_time" = Option<i64>, Query, description = "End of the window (microseconds); with start_time, replaces the last 60 minutes"),
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
     ),
     responses(

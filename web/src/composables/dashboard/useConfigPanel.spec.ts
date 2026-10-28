@@ -40,6 +40,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
+  shouldShowNoDataText: vi.fn(() => false),
   shouldShowAxisConfig: vi.fn(() => false),
   shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),
@@ -188,6 +189,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "legend",
     "data",
     "stateTimeline",
+    "hostmap",
     "axis",
     "labels",
     "lineStyle",
@@ -208,8 +210,8 @@ describe("ORDERED_SECTION_IDS", () => {
     "sparkline",
   ];
 
-  it("contains all 24 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(24);
+  it("contains all 25 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(25);
   });
 
   it("contains every expected section id", () => {
@@ -631,6 +633,31 @@ describe("useConfigPanel – data section", () => {
     vi.mocked(shouldShowNoValueReplacement).mockReturnValueOnce(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("data", "no-value-replacement")).toBe(true);
+  });
+});
+
+describe("useConfigPanel – host map section", () => {
+  const shared = ["reduction", "group-sort", "cell-sort", "cell-shape", "cell-label"];
+
+  it("shows the cell options for SQL and keeps unit, decimals and thresholds", () => {
+    const c = makeComposable(makePanelData("hostmap"));
+    for (const option of shared) expect(c.isConfigOptionVisible("hostmap", option)).toBe(true);
+    expect(c.isConfigOptionVisible("hostmap", "entity-label")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "unit")).toBe(true);
+    expect(c.isConfigOptionVisible("data", "decimals")).toBe(true);
+    expect(c.isSectionVisible("thresholds")).toBe(true);
+  });
+
+  it("shows the label inputs only for PromQL", () => {
+    const c = makeComposable(makePanelData("hostmap"), ref(true));
+    expect(c.isConfigOptionVisible("hostmap", "entity-label")).toBe(true);
+    expect(c.isConfigOptionVisible("hostmap", "group-by")).toBe(true);
+    // The host map's own cell cap bounds its PromQL series, so the panel series limit stays hidden.
+    expect(c.isConfigOptionVisible("general", "promql-series-limit")).toBe(false);
+  });
+
+  it("hides the host map options for other types", () => {
+    expect(makeComposable(makePanelData("line")).isSectionVisible("hostmap")).toBe(false);
   });
 });
 
