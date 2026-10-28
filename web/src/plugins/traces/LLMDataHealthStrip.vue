@@ -213,7 +213,7 @@ function viewTrace(traceId: string) {
     class="bg-card-glass-bg rounded-default border-border-default mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border px-3 py-2 text-xs"
     data-test="llm-data-health-strip"
   >
-    <span class="text-text-primary inline-flex items-center gap-1.5 font-semibold">
+    <span class="text-text-heading inline-flex items-center gap-1.5 font-semibold">
       <OIcon name="monitor-heart" size="sm" />
       {{ t("llmDataTrust.health.title") }}
     </span>
@@ -277,7 +277,7 @@ function viewTrace(traceId: string) {
         :data-test="`llm-data-health-card-${check.id}`"
       >
         <div class="flex items-center justify-between gap-2">
-          <span class="text-text-primary text-sm font-semibold">{{ LABELS[check.id] }}</span>
+          <span class="text-text-heading text-sm font-semibold">{{ LABELS[check.id] }}</span>
           <OBadge :variant="statusVariant(check.status)" size="sm">{{
             statusLabel(check.status)
           }}</OBadge>
