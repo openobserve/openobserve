@@ -266,6 +266,56 @@ describe("ClickHeatmap", () => {
     expect(labels).toContain("Desktop (4)");
   });
 
+  it("stops a superseded snapshot chain before it queries the segments", async () => {
+    let release: (v: unknown) => void = () => {};
+    answer({
+      "replay-views": () => ok([{ view_id: "v1" }]),
+      "replay-flags": () => new Promise((r) => (release = r)),
+    });
+    const wrapper = await mountPage();
+    const firstRelease = release;
+    answer();
+    const device = wrapper
+      .findAllComponents(OSelect)
+      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    device?.vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+    h.run.mockClear();
+
+    firstRelease(ok([{ view_id: "v1", has_full_snapshot: true }]));
+    await flushPromises();
+
+    expect(ids()).not.toContain("replay-segments");
+  });
+
+  it("keeps totals and ranking and shows a notice when only the device split fails", async () => {
+    answer({ devices: () => ({ status: "error", error: { message: "boom" } }) });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="rum-heatmap-device-split-failed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("4");
+  });
+
+  it("shows the load error when the ranking fails even if totals succeed", async () => {
+    answer({ ranking: () => ({ status: "error", error: { message: "boom" } }) });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-heatmap-device-split-failed"]').exists()).toBe(false);
+  });
+
+  it("looks up replay snapshots with one grouped row per view", async () => {
+    answer({ "replay-views": () => ok([{ view_id: "v1" }]) });
+    await mountPage();
+
+    const flags = h.run.mock.calls.find((c) => c[0] === "replay-flags");
+    expect(flags?.[1].sql).toContain("GROUP BY view_id");
+    expect(flags?.[1].sql).toContain("bool_or(has_full_snapshot)");
+  });
+
   it("runs the snapshot lookups through the real search helper without a stream rejection", async () => {
     h.real = true;
     vi.spyOn(console, "error").mockImplementation(() => {});

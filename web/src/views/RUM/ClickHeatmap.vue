@@ -153,6 +153,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("rum.heatmap.placed", { placed: placedCount, total: groups.length }) }}
           </span>
+          <OBanner
+            v-if="deviceSplitFailed"
+            variant="warning"
+            dense
+            :content="t('rum.heatmap.deviceSplitFailed')"
+            data-test="rum-heatmap-device-split-failed"
+          />
           <span
             v-if="unknownDeviceClicks"
             class="text-text-secondary text-xs"
@@ -182,6 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #cell-feature="{ row }">
               <div class="flex min-w-0 flex-col" :data-test="`rum-heatmap-feature-${row.selector}`">
+                <span
+                  v-if="row.firstUnused"
+                  class="text-text-secondary text-xs font-medium uppercase"
+                  data-test="rum-heatmap-unused-heading"
+                >
+                  {{ t("rum.heatmap.unusedHeading") }}
+                </span>
                 <OTruncatedText class="text-sm">{{ row.feature }}</OTruncatedText>
                 <OTruncatedText v-if="row.name" class="text-text-secondary text-xs">
                   {{ row.selector }}
@@ -196,13 +210,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #cell-clicks="{ row, value }">
-              <ODataBarCell :value="row.clicks" :max="clicksMax" :display="String(value)" />
+              <ODataBarCell
+                :value="row.clicks"
+                :max="clicksMax"
+                :display="addCommasToNumber(Number(value))"
+              />
             </template>
             <template #cell-sessions="{ row }">
               <span v-if="row.clicks">
                 {{
                   t("rum.heatmap.sessionsReach", {
-                    count: row.sessions,
+                    count: addCommasToNumber(row.sessions),
                     pct: sharePercent(row.sessions, summary.sessions),
                   })
                 }}
@@ -213,13 +231,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="row.clicks"
                 :title="
                   t('rum.heatmap.frustrationSplit', {
-                    rage: row.rage,
-                    dead: row.dead,
-                    error: row.error,
+                    rage: addCommasToNumber(row.rage),
+                    dead: addCommasToNumber(row.dead),
+                    error: addCommasToNumber(row.error),
                   })
                 "
               >
-                {{ row.frustrated }}
+                {{ addCommasToNumber(row.frustrated) }}
               </span>
             </template>
             <template #cell-share="{ row }">
@@ -291,6 +309,7 @@ interface ElementRow {
   rage: number;
   dead: number;
   error: number;
+  firstUnused?: boolean;
 }
 
 const APP_LIMIT = 100;
@@ -304,7 +323,6 @@ const INTERACTIVE_SELECTOR =
   'button, a[href], input:not([type="hidden"]), select, textarea, [role="button"]';
 const SNAPSHOT_WAIT_MS = 8000;
 const MAX_REPLAY_SEGMENTS = 80;
-const MAX_SNAPSHOT_LOOKUP_ROWS = 500;
 const SETTLE_MS = 400;
 const FULL_SNAPSHOT = 2;
 const META = 4;
@@ -326,6 +344,7 @@ const groups = ref<ElementGroup[]>([]);
 const totals = ref({ clicks: 0, sessions: 0, frustrated: 0 });
 const deviceClicks = ref<Partial<Record<DeviceBucket, number>>>({});
 const deviceSplitLoaded = ref(false);
+const deviceSplitFailed = ref(false);
 const schemaFlags = ref<Record<string, boolean>>({});
 const exclusions = ref<AnalyticsScope["exclusions"]>(undefined);
 const placedSelectors = ref<Set<string>>(new Set());
@@ -370,7 +389,7 @@ const rangeOptions = computed(() => [
 const deviceLabel = (key: string, device: DeviceBucket) => {
   const n = deviceClicks.value[device];
   if (!deviceSplitLoaded.value) return t(key);
-  return raw(`${t(key)} (${addCommasToNumber(n ?? 0)})`);
+  return t("rum.heatmap.deviceWithCount", { device: t(key), count: addCommasToNumber(n ?? 0) });
 };
 
 const deviceOptions = computed(() => [
@@ -398,7 +417,7 @@ const tableRows = computed<ElementRow[]>(() => [
     dead: g.dead,
     error: g.error,
   })),
-  ...unusedRows.value,
+  ...unusedRows.value.map((r, i) => ({ ...r, firstUnused: i === 0 })),
 ]);
 const columns = computed<OTableColumnDef<ElementRow>[]>(() => [
   {
@@ -458,7 +477,10 @@ const statItems = computed<StatItem[]>(() => {
       key: "unused",
       label: t("rum.heatmap.statUnused"),
       value: `${addCommasToNumber(unusedRows.value.length)}${unusedRows.value.length >= MAX_UNUSED ? "+" : ""}`,
-      sub: t("rum.heatmap.statUnusedSub"),
+      sub:
+        unusedRows.value.length >= MAX_UNUSED
+          ? t("rum.heatmap.statUnusedCapped", { count: MAX_UNUSED })
+          : t("rum.heatmap.statUnusedSub"),
       dataTest: "rum-heatmap-stat-unused",
     });
   }
@@ -640,6 +662,7 @@ async function loadPage(refreshSplit = true, newCycle = true) {
   if (refreshSplit) {
     deviceClicks.value = {};
     deviceSplitLoaded.value = false;
+    deviceSplitFailed.value = false;
   }
   const pageListFull = pagesLimited.value;
   resetPage();
@@ -664,17 +687,28 @@ async function loadClicks(token: number, withSplit: boolean) {
     const sc = scope();
     const url = pageUrl.value;
     const rankSql = rankingSql(sc, url, deviceClass.value);
-    const [split, tot, ranked] = await Promise.all([
+    const [splitRes, totRes, rankRes] = await Promise.allSettled([
       withSplit
         ? searchRows<Record<string, unknown>>("devices", deviceSplitSql(sc, url), 8, win)
         : [],
       searchRows<Record<string, unknown>>("totals", totalsSql(sc, url, deviceClass.value), 1, win),
       rankSql ? searchRows<Record<string, unknown>>("ranking", rankSql, RANKING_LIMIT, win) : [],
     ]);
-    if (token !== loadToken || !split || !tot || !ranked) return;
+    if (token !== loadToken) return;
+    if (totRes.status === "rejected") throw totRes.reason;
+    if (rankRes.status === "rejected") throw rankRes.reason;
+    const tot = totRes.value;
+    const ranked = rankRes.value;
+    if (!tot || !ranked) return;
     if (withSplit) {
-      deviceClicks.value = Object.fromEntries(split.map((r) => [r.cls, Number(r.clicks) || 0]));
-      deviceSplitLoaded.value = true;
+      if (splitRes.status === "rejected") {
+        console.error("Click heatmap: device split failed", splitRes.reason);
+        deviceSplitFailed.value = true;
+      } else if (splitRes.value) {
+        const split = splitRes.value;
+        deviceClicks.value = Object.fromEntries(split.map((r) => [r.cls, Number(r.clicks) || 0]));
+        deviceSplitLoaded.value = true;
+      }
     }
     rankingLimited.value = ranked.length >= RANKING_LIMIT;
     const row = tot[0] ?? {};
@@ -698,22 +732,24 @@ interface SnapshotSource {
   seekMs: number;
 }
 
-async function pickReplayView(): Promise<string | null> {
+async function pickReplayView(token: number): Promise<string | null> {
   const stream = await getStream("_rumdata", "logs", true);
+  if (token !== loadToken) return null;
   const hasActions = (stream?.schema ?? []).some((f: any) => f?.name === "view_action_count");
   const views = await replayRows(
     "replay-views",
     `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE ${rowScope(scope())} AND type = 'view' AND view_url = ${sqlLiteral(pageUrl.value)}${deviceClause(scope(), deviceClass.value)} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
     30,
   );
-  if (!views.length) return null;
+  if (!views.length || token !== loadToken) return null;
   const ids = views.map((v) => sqlLiteral(String(v.view_id))).join(",");
   const rows = await replayRows(
     "replay-flags",
-    `SELECT has_full_snapshot, view_id FROM "_sessionreplay" WHERE view_id IN (${ids})`,
-    MAX_SNAPSHOT_LOOKUP_ROWS,
+    `SELECT view_id, bool_or(has_full_snapshot) AS has_full_snapshot FROM "_sessionreplay" WHERE view_id IN (${ids}) GROUP BY view_id`,
+    views.length,
     "_sessionreplay",
   );
+  if (token !== loadToken) return null;
   const withSnapshot = new Set(
     rows.filter((r) => isSnapshotFlag(r.has_full_snapshot)).map((r) => String(r.view_id)),
   );
@@ -733,9 +769,9 @@ function decodeReplayEvents(bodies: any[]): any[] {
 }
 
 // The first snapshot is taken at page load, before an app has drawn its content, so play on to when people clicked.
-async function loadSnapshotSource(): Promise<SnapshotSource | null> {
-  const viewId = await pickReplayView();
-  if (!viewId) return null;
+async function loadSnapshotSource(token: number): Promise<SnapshotSource | null> {
+  const viewId = await pickReplayView(token);
+  if (!viewId || token !== loadToken) return null;
   const segments = await replayRows(
     "replay-segments",
     `SELECT start, segment FROM "_sessionreplay" WHERE view_id = ${sqlLiteral(viewId)} ORDER BY start ASC`,
@@ -749,6 +785,7 @@ async function loadSnapshotSource(): Promise<SnapshotSource | null> {
       return [];
     }
   });
+  if (token !== loadToken) return null;
   const events = decodeReplayEvents(bodies);
   if (!events.length) return null;
   const first = Number(events[0].timestamp);
@@ -758,6 +795,7 @@ async function loadSnapshotSource(): Promise<SnapshotSource | null> {
     `SELECT max(date) AS d FROM "_rumdata" WHERE ${rowScope(scope())} AND type = 'action' AND view_id = ${sqlLiteral(viewId)}`,
     1,
   );
+  if (token !== loadToken) return null;
   const clickAt = Number(lastClick?.d);
   const target = Number.isFinite(clickAt) && clickAt > first ? clickAt : last;
   return { events, seekMs: Math.min(Math.max(target - first, 0), Math.max(last - first, 0)) };
@@ -767,7 +805,7 @@ async function loadSnapshot(token: number) {
   snapshotLoading.value = true;
   snapshotReady.value = false;
   try {
-    const source = await loadSnapshotSource();
+    const source = await loadSnapshotSource(token);
     if (token !== loadToken) return;
     const meta = source?.events.find((e) => e.type === META);
     if (!source || !source.events.some((e) => e.type === FULL_SNAPSHOT) || !meta) {
