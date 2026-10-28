@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # Copyright 2026 OpenObserve Inc.
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Wait for an instrumented app's first spans in OpenObserve, print the first
-trace link, then run the OpenObserve AI data health checks.
+"""Wait for an instrumented app's first GenAI spans in OpenObserve, print the
+first trace link, then run the OpenObserve AI data health checks.
+
+Only spans with gen_ai.operation.name count: HTTP or database spans alone mean
+the LLM client is not instrumented.
 
 Python 3 standard library only. Credentials come from the project's .env (or
 the process environment); the script prints variable names, never values.
 
 Exit codes:
-  0  spans arrived and no health check is in error
-  1  spans arrived but at least one health check is in error
-  2  configuration problem, or no spans arrived before the timeout
+  0  GenAI spans arrived and no health check is in error
+  1  GenAI spans arrived but at least one health check is in error
+  2  configuration problem, or no GenAI span arrived before the timeout
 """
 
 import argparse
@@ -125,8 +128,10 @@ def sql_string(value):
 
 
 def first_trace(client, stream, service, start_us, end_us):
-    """Return (span_count, first_trace_id) for spans in the window, or (0, None)."""
-    where = f" WHERE service_name = {sql_string(service)}" if service else ""
+    """Return (span_count, first_trace_id) for GenAI spans in the window, or (0, None)."""
+    where = " WHERE gen_ai_operation_name IS NOT NULL"
+    if service:
+        where += f" AND service_name = {sql_string(service)}"
     table = '"' + stream.replace('"', '""') + '"'
     count_hits = client.search_traces(
         f"SELECT count(*) AS spans FROM {table}{where}", start_us, end_us, 1
@@ -163,9 +168,10 @@ def wait_for_spans(client, stream, service, start_us, timeout_s):
             last_error = str(err.reason)
         if time.monotonic() - started >= timeout_s:
             reason = f" (last error: {last_error})" if last_error else ""
-            print(f"✗ No spans on stream '{stream}' after {timeout_s:.0f} s{reason}.")
-            print("  Check that the init lines run before the LLM client is imported and that the")
-            print("  process exits cleanly or calls openobserve_flush() so the exporter sends its batch.")
+            print(f"✗ No GenAI spans on stream '{stream}' after {timeout_s:.0f} s{reason}.")
+            print("  Only spans with gen_ai.operation.name count. Check that the OpenAI/Anthropic")
+            print("  instrumentor is installed, that the init lines run before the LLM client is")
+            print("  imported, and that the process exits cleanly or calls openobserve_flush().")
             sys.exit(2)
         time.sleep(3)
 
@@ -205,7 +211,7 @@ def describe(check):
     total = int(check.get("total", 0))
     if check_id == "unpriced_models" and check.get("models"):
         parts = [
-            f"{m.get('model', '?')} · {int(m.get('tokens', 0)):,} tokens counted as $0"
+            f"{m.get('model') or '(no model name)'} · {int(m.get('tokens', 0)):,} tokens counted as $0"
             for m in check["models"]
         ]
         return ", ".join(parts)
@@ -222,6 +228,8 @@ def run_health(client, ui_url, org, stream, start_us, end_us, agent):
         "start_time": start_us,
         "end_time": end_us,
         "refresh": "true",
+        # The script prints a sample trace per failing check.
+        "include_samples": "true",
     }
     if agent:
         query["agent"] = agent
@@ -238,6 +246,12 @@ def run_health(client, ui_url, org, stream, start_us, end_us, agent):
         return 2
 
     checks = {c.get("id"): c for c in result.get("checks", [])}
+    if not any(int(c.get("total", 0)) for c in checks.values()):
+        scope = f" for agent '{agent}'" if agent else ""
+        print(f"✗ No GenAI spans on stream '{stream}'{scope} in this window: every check covered 0 spans.")
+        print("  No span carries gen_ai.operation.name, so the LLM client is not instrumented.")
+        print(f"  Install the OpenAI/Anthropic instrumentor: {DOCS_URL}")
+        return 2
     ordered = [checks[i] for i in CHECK_ORDER if i in checks]
     ordered += [c for i, c in checks.items() if i not in CHECK_ORDER]
     width = max(len(CHECK_LABELS.get(c.get("id"), c.get("id", ""))) for c in ordered) if ordered else 0
@@ -291,7 +305,7 @@ def main():
     print(f"  Org {org} · stream {stream}")
 
     if not args.health_only:
-        print(f"  Waiting for spans on '{stream}' (up to {args.timeout:.0f} s)…")
+        print(f"  Waiting for GenAI spans on '{stream}' (up to {args.timeout:.0f} s)…")
         spans, trace_id, elapsed = wait_for_spans(client, stream, args.service, start_us, args.timeout)
         # Give the exporter's trailing batch a moment, then recount so the
         # printed total and the checks cover the whole run.

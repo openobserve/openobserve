@@ -18,9 +18,10 @@
 //! plus the per-model unpriced / approximate listing behind Model Pricing's Unpriced tab.
 //!
 //! The checks run on request against the trace stream and are cached in memory for
-//! [`CACHE_TTL_MICROS`] per (org, stream, scope, window rounded to the minute): Insights loads
-//! them on every visit, and a short cache keeps refreshes cheap without a scheduled job or a
-//! results stream. A stream whose schema lacks a column is handled per check, never an error.
+//! [`CACHE_TTL_MICROS`] per (org, stream, scope, window after the caller's max query range,
+//! rounded to the minute): Insights loads them on every visit, and a short cache keeps
+//! refreshes cheap without a scheduled job or a results stream. A stream whose schema lacks a
+//! column is handled per check, never an error.
 
 use std::{
     collections::HashMap,
@@ -82,6 +83,10 @@ pub struct DataHealthQuery {
     /// Skip the short server-side cache.
     #[serde(default)]
     pub refresh: bool,
+    /// Also return up to three sample trace ids per failing check. Off by default: only the
+    /// Review checks drawer shows them, and each costs a window-wide query.
+    #[serde(default)]
+    pub include_samples: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -103,7 +108,8 @@ pub enum CheckId {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ModelUsage {
-    pub model: String,
+    /// Null for spans that carry no model name.
+    pub model: Option<String>,
     pub spans: i64,
     pub tokens: i64,
 }
@@ -118,8 +124,9 @@ pub struct HealthCheck {
     pub total: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<ModelUsage>>,
-    /// Up to three recent trace ids with the problem.
-    pub samples: Vec<String>,
+    /// Up to three recent trace ids with the problem; present only with `include_samples`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub samples: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -271,14 +278,32 @@ fn samples_sql(stream: &str, base: &str, pred: &Pred) -> String {
     )
 }
 
-fn unpriced_models_sql(stream: &str, base: &str, pred: &str, cols: &Columns) -> Option<String> {
-    let model = cols.model_column()?;
-    Some(format!(
-        "SELECT {model} AS model, COUNT(*) AS spans, {} AS tokens FROM {} \
-         WHERE {base} AND {pred} GROUP BY {model} ORDER BY tokens DESC LIMIT {MAX_MODELS}",
+/// The `model` select item and grouping key. A stream with no model column holds only spans
+/// without a model name: they form one group, read back with no `model` value.
+fn model_grouping(cols: &Columns) -> (String, Option<&'static str>) {
+    match cols.model_column() {
+        Some(model) => (format!("{model} AS model, "), Some(model)),
+        None => (String::new(), None),
+    }
+}
+
+/// A model name from a result row; `None` when the spans carry none.
+fn model_from(hit: &json::Value) -> Option<String> {
+    hit.get("model")
+        .and_then(|v| v.as_str())
+        .filter(|m| !m.is_empty())
+        .map(str::to_string)
+}
+
+fn unpriced_models_sql(stream: &str, base: &str, pred: &str, cols: &Columns) -> String {
+    let (select, model) = model_grouping(cols);
+    let group = model.map(|m| format!(" GROUP BY {m}")).unwrap_or_default();
+    format!(
+        "SELECT {select}COUNT(*) AS spans, {} AS tokens FROM {} \
+         WHERE {base} AND {pred}{group} ORDER BY tokens DESC LIMIT {MAX_MODELS}",
         cols.tokens_expr(),
         quote_ident(stream)
-    ))
+    )
 }
 
 fn status_for(id: CheckId, affected: i64) -> CheckStatus {
@@ -298,7 +323,7 @@ fn affected_from(pred: &Pred, row: &json::Value, i: usize, total: i64) -> i64 {
     }
 }
 
-fn all_pass(total: i64) -> Vec<HealthCheck> {
+fn all_pass(total: i64, include_samples: bool) -> Vec<HealthCheck> {
     CHECK_IDS
         .iter()
         .map(|&id| HealthCheck {
@@ -307,12 +332,13 @@ fn all_pass(total: i64) -> Vec<HealthCheck> {
             affected: 0,
             total,
             models: (id == CheckId::UnpricedModels).then(Vec::new),
-            samples: vec![],
+            samples: include_samples.then(Vec::new),
         })
         .collect()
 }
 
-/// The search window after the stream's max query range is applied.
+/// The search window after the caller's max query range for the stream is applied.
+#[derive(Debug)]
 struct Window {
     start: i64,
     end: i64,
@@ -405,21 +431,48 @@ async fn stream_columns(org_id: &str, stream: &str) -> Option<Columns> {
         .map(|s| Columns::from_schema(&s))
 }
 
+/// The queries that follow the counts: sample trace ids per failing check, only when the
+/// caller asked for samples, and the unpriced model breakdown.
+fn follow_up_sql(
+    stream: &str,
+    base: &str,
+    cols: &Columns,
+    preds: &[Pred],
+    checks: &[HealthCheck],
+    include_samples: bool,
+) -> (Vec<(usize, String)>, Option<String>) {
+    let samples = if include_samples {
+        checks
+            .iter()
+            .zip(preds)
+            .enumerate()
+            .filter(|(_, (c, _))| c.affected > 0)
+            .map(|(i, (_, pred))| (i, samples_sql(stream, base, pred)))
+            .collect()
+    } else {
+        vec![]
+    };
+    let models = match (&preds[0], checks[0].affected > 0) {
+        (Pred::Sql(p), true) => Some(unpriced_models_sql(stream, base, p, cols)),
+        _ => None,
+    };
+    (samples, models)
+}
+
 async fn compute_checks(
     org_id: &str,
     user_id: &str,
     query: &DataHealthQuery,
+    window: &Window,
 ) -> Result<Vec<HealthCheck>, anyhow::Error> {
+    let include_samples = query.include_samples;
     let Some(cols) = stream_columns(org_id, &query.stream_name).await else {
-        return Ok(all_pass(0));
+        return Ok(all_pass(0, include_samples));
     };
     let Some(base) = base_where(&cols, query) else {
-        return Ok(all_pass(0));
+        return Ok(all_pass(0, include_samples));
     };
     let stream = &query.stream_name;
-    let window =
-        Window::for_stream(org_id, user_id, stream, query.start_time, query.end_time).await;
-    let window = &window;
     let preds: Vec<Pred> = CHECK_IDS.iter().map(|&id| check_pred(id, &cols)).collect();
 
     let rows = run_sql(
@@ -445,26 +498,19 @@ async fn compute_checks(
                 affected,
                 total,
                 models: (id == CheckId::UnpricedModels).then(Vec::new),
-                samples: vec![],
+                samples: include_samples.then(Vec::new),
             }
         })
         .collect();
 
-    // Samples for every failing check, plus the unpriced model breakdown, run concurrently.
-    let sample_jobs = checks
-        .iter()
-        .zip(&preds)
-        .enumerate()
-        .filter(|(_, (c, _))| c.affected > 0)
-        .map(|(i, (_, pred))| {
-            let sql = samples_sql(stream, &base, pred);
-            async move { (i, run_sql(org_id, user_id, sql, window, MAX_SAMPLES).await) }
-        })
+    let (sample_sqls, models_sql) =
+        follow_up_sql(stream, &base, &cols, &preds, &checks, include_samples);
+    let sample_jobs = sample_sqls
+        .into_iter()
+        .map(
+            |(i, sql)| async move { (i, run_sql(org_id, user_id, sql, window, MAX_SAMPLES).await) },
+        )
         .collect::<Vec<_>>();
-    let models_sql = match (&preds[0], checks[0].affected > 0) {
-        (Pred::Sql(p), true) => unpriced_models_sql(stream, &base, p, &cols),
-        _ => None,
-    };
     let models_job = async {
         match models_sql {
             Some(sql) => run_sql(org_id, user_id, sql, window, MAX_MODELS)
@@ -476,23 +522,22 @@ async fn compute_checks(
     let (samples, models) = tokio::join!(futures::future::join_all(sample_jobs), models_job);
 
     for (i, hits) in samples {
-        checks[i].samples = hits?
-            .iter()
-            .filter_map(|h| {
-                h.get("trace_id")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-            })
-            .collect();
+        checks[i].samples = Some(
+            hits?
+                .iter()
+                .filter_map(|h| {
+                    h.get("trace_id")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string)
+                })
+                .collect(),
+        );
     }
     if let Some(hits) = models? {
         checks[0].models = Some(
             hits.iter()
                 .map(|h| ModelUsage {
-                    model: h
-                        .get("model")
-                        .map(json::get_string_value)
-                        .unwrap_or_default(),
+                    model: model_from(h),
                     spans: h.get("spans").map_or(0, json::get_int_value),
                     tokens: h.get("tokens").map_or(0, json::get_int_value),
                 })
@@ -512,16 +557,19 @@ async fn compute_checks(
 static CACHE: LazyLock<Mutex<HashMap<String, DataHealthResponse>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn cache_key(org_id: &str, q: &DataHealthQuery) -> String {
+/// Keyed by the window after the caller's max query range, so callers with different range
+/// limits never share an entry.
+fn cache_key(org_id: &str, q: &DataHealthQuery, window: &Window) -> String {
     format!(
-        "{org_id}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+        "{org_id}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
         q.stream_name,
         q.agent.as_deref().unwrap_or(""),
         q.agent_id.as_deref().unwrap_or(""),
         q.env.as_deref().unwrap_or(""),
         q.version.as_deref().unwrap_or(""),
-        q.start_time / WINDOW_QUANTUM_MICROS,
-        q.end_time / WINDOW_QUANTUM_MICROS,
+        window.start / WINDOW_QUANTUM_MICROS,
+        window.end / WINDOW_QUANTUM_MICROS,
+        q.include_samples,
     )
 }
 
@@ -533,14 +581,31 @@ fn cache_get(key: &str, now: i64) -> Option<DataHealthResponse> {
         .cloned()
 }
 
-fn cache_put(key: String, value: DataHealthResponse) {
-    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+/// Inserts `value`, first dropping expired entries and then, if the map is still full, only
+/// the oldest entry, so one new scope never evicts every warm one.
+fn insert_bounded(
+    cache: &mut HashMap<String, DataHealthResponse>,
+    key: String,
+    value: DataHealthResponse,
+    max_entries: usize,
+) {
     let now = value.checked_at;
     cache.retain(|_, r| now - r.checked_at < CACHE_TTL_MICROS);
-    if cache.len() >= CACHE_MAX_ENTRIES {
-        cache.clear();
+    if cache.len() >= max_entries
+        && !cache.contains_key(&key)
+        && let Some(oldest) = cache
+            .iter()
+            .min_by_key(|(_, r)| r.checked_at)
+            .map(|(k, _)| k.clone())
+    {
+        cache.remove(&oldest);
     }
     cache.insert(key, value);
+}
+
+fn cache_put(key: String, value: DataHealthResponse) {
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    insert_bounded(&mut cache, key, value, CACHE_MAX_ENTRIES);
 }
 
 fn validate_window(start_time: i64, end_time: i64) -> Result<(), &'static str> {
@@ -550,12 +615,29 @@ fn validate_window(start_time: i64, end_time: i64) -> Result<(), &'static str> {
     Ok(())
 }
 
-#[cfg(feature = "enterprise")]
-async fn can_read_traces(org_id: &str, user_id: &str, stream: &str) -> bool {
-    openobserve_core::auth::check_permissions(
-        stream, org_id, user_id, "traces", "GET", None, false, false, true,
-    )
-    .await
+/// The gates the trace endpoints apply on enterprise: the license search allowance (429), then
+/// read access to the trace stream (403).
+async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(), Response> {
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = search_service::check_search_allowed(org_id, Some(stream)) {
+            return Err(MetaHttpResponse::too_many_requests(e.to_string()));
+        }
+        if let Some(denied) = openobserve_core::authz::check_stream_permissions(
+            stream,
+            org_id,
+            user_id,
+            &StreamType::Traces,
+            openobserve_core::authz::StreamPermissionResourceType::Search,
+        )
+        .await
+        {
+            return Err(denied);
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, user_id, stream);
+    Ok(())
 }
 
 /// GetGenAiDataHealth
@@ -568,12 +650,13 @@ async fn can_read_traces(org_id: &str, user_id: &str, stream: &str) -> bool {
     tag = "GenAI Settings",
     operation_id = "GetGenAiDataHealth",
     summary = "AI data health checks",
-    description = "Counts LLM spans with no model price, no agent identity, zero duration, or no session id in a trace stream and window. Results are cached for about a minute; pass refresh=true to recompute.",
+    description = "Counts LLM spans with no model price, no agent identity, zero duration, or no session id in a trace stream and window. Pass include_samples=true for sample trace ids per failing check. Results are cached for about a minute; pass refresh=true to recompute.",
     params(("org_id" = String, Path, description = "Organization ID"), DataHealthQuery),
     responses(
         (status = 200, description = "Data health checks", body = DataHealthResponse),
         (status = 400, description = "Invalid query"),
         (status = 403, description = "Forbidden"),
+        (status = 429, description = "Search not allowed for the organization"),
         (status = 500, description = "Internal server error")
     ),
     security(("Authorization" = []))
@@ -589,19 +672,26 @@ pub async fn get_data_health(
         return MetaHttpResponse::bad_request(e);
     }
     let user_id = &user_email.user_id;
-    #[cfg(feature = "enterprise")]
-    if !can_read_traces(&org_id, user_id, &query.stream_name).await {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
+    if let Err(resp) = authorize_read(&org_id, user_id, &query.stream_name).await {
+        return resp;
     }
 
-    let key = cache_key(&org_id, &query);
+    let window = Window::for_stream(
+        &org_id,
+        user_id,
+        &query.stream_name,
+        query.start_time,
+        query.end_time,
+    )
+    .await;
+    let key = cache_key(&org_id, &query, &window);
     let now = now_micros();
     if !query.refresh
         && let Some(cached) = cache_get(&key, now)
     {
         return MetaHttpResponse::json(cached);
     }
-    match compute_checks(&org_id, user_id, &query).await {
+    match compute_checks(&org_id, user_id, &query, &window).await {
         Ok(checks) => {
             let resp = DataHealthResponse {
                 checked_at: now,
@@ -631,7 +721,8 @@ pub struct UnpricedModelsQuery {
 /// A model whose spans in the window were priced approximately or not at all.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct UnpricedModelRow {
-    pub model: String,
+    /// Null for spans that carry no model name: they have tokens but nothing to price.
+    pub model: Option<String>,
     pub status: CostStatus,
     pub spans: i64,
     pub tokens: i64,
@@ -644,7 +735,11 @@ fn unpriced_list_sql(stream: &str, cols: &Columns) -> Option<String> {
     if !cols.has(COST_STATUS_COLUMN) {
         return None;
     }
-    let model = cols.model_column()?;
+    let (select, model) = model_grouping(cols);
+    let group = match model {
+        Some(m) => format!("{m}, {COST_STATUS_COLUMN}"),
+        None => COST_STATUS_COLUMN.to_string(),
+    };
     let cost = if cols.has(COST_COLUMN) {
         "COALESCE(SUM(gen_ai_usage_cost), 0)"
     } else {
@@ -657,10 +752,9 @@ fn unpriced_list_sql(stream: &str, cols: &Columns) -> Option<String> {
         "NULL"
     };
     Some(format!(
-        "SELECT {model} AS model, {COST_STATUS_COLUMN} AS status, COUNT(*) AS spans, {} AS tokens, \
-         {cost} AS cost, {agents} AS agents FROM {} \
-         WHERE {COST_STATUS_COLUMN} IS NOT NULL AND {model} IS NOT NULL \
-         GROUP BY {model}, {COST_STATUS_COLUMN} ORDER BY tokens DESC LIMIT {MAX_UNPRICED_ROWS}",
+        "SELECT {select}{COST_STATUS_COLUMN} AS status, COUNT(*) AS spans, {} AS tokens, \
+         {cost} AS cost, {agents} AS agents FROM {} WHERE {COST_STATUS_COLUMN} IS NOT NULL \
+         GROUP BY {group} ORDER BY tokens DESC LIMIT {MAX_UNPRICED_ROWS}",
         cols.tokens_expr(),
         quote_ident(stream)
     ))
@@ -682,7 +776,7 @@ fn parse_unpriced_row(hit: &json::Value) -> Option<UnpricedModelRow> {
         _ => vec![],
     };
     Some(UnpricedModelRow {
-        model: hit.get("model")?.as_str()?.to_string(),
+        model: model_from(hit),
         status,
         spans: hit.get("spans").map_or(0, json::get_int_value),
         tokens: hit.get("tokens").map_or(0, json::get_int_value),
@@ -715,20 +809,15 @@ pub async fn unpriced_models(
     Ok(hits.iter().filter_map(parse_unpriced_row).collect())
 }
 
-/// Validates the window and, on enterprise, the caller's read access to the stream.
+/// Validates the window and applies the trace endpoints' search allowance and stream access
+/// gates.
 pub async fn authorize_unpriced(
     org_id: &str,
     user_id: &str,
     query: &UnpricedModelsQuery,
 ) -> Result<(), Response> {
     validate_window(query.start_time, query.end_time).map_err(MetaHttpResponse::bad_request)?;
-    #[cfg(feature = "enterprise")]
-    if !can_read_traces(org_id, user_id, &query.stream_name).await {
-        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = (org_id, user_id);
-    Ok(())
+    authorize_read(org_id, user_id, &query.stream_name).await
 }
 
 #[cfg(test)]
@@ -756,6 +845,7 @@ mod tests {
             env: None,
             version: None,
             refresh: false,
+            include_samples: false,
         }
     }
 
@@ -894,14 +984,78 @@ mod tests {
         assert!(unpriced_list_sql("default", &cols(&["gen_ai_response_model"])).is_none());
         let sql = unpriced_list_sql("default", &cols(FULL)).unwrap();
         assert!(sql.contains("GROUP BY gen_ai_response_model, gen_ai_usage_cost_status"));
+        // Model-less spans are listed too, as one row per status.
+        assert!(!sql.contains("gen_ai_response_model IS NOT NULL"));
         let row = parse_unpriced_row(&json::json!({
             "model": "acme-internal-llm", "status": "unpriced", "spans": 3, "tokens": 900,
             "cost": null, "agents": ["research-agent"]
         }))
         .unwrap();
+        assert_eq!(row.model.as_deref(), Some("acme-internal-llm"));
         assert_eq!(row.status, CostStatus::Unpriced);
         assert_eq!(row.agents, vec!["research-agent".to_string()]);
         assert_eq!(row.cost, 0.0);
+    }
+
+    #[test]
+    fn spans_without_a_model_name_form_a_null_model_row() {
+        let row = parse_unpriced_row(&json::json!({
+            "model": null, "status": "unpriced", "spans": 2, "tokens": 300, "cost": null
+        }))
+        .unwrap();
+        assert_eq!(row.model, None);
+        assert_eq!(row.tokens, 300);
+        // A stream that never saw a model column groups by status alone.
+        let c = cols(&["gen_ai_operation_name", "gen_ai_usage_cost_status"]);
+        let sql = unpriced_list_sql("default", &c).unwrap();
+        assert!(sql.starts_with("SELECT gen_ai_usage_cost_status AS status,"));
+        assert!(sql.contains("GROUP BY gen_ai_usage_cost_status ORDER BY"));
+        let sql = unpriced_models_sql("default", "b", "p", &c);
+        assert!(sql.starts_with("SELECT COUNT(*) AS spans,"));
+        assert!(!sql.contains("GROUP BY"));
+        assert_eq!(model_from(&json::json!({"spans": 2})), None);
+        assert_eq!(model_from(&json::json!({"model": ""})), None);
+    }
+
+    fn failing_checks(cols: &Columns) -> (Vec<Pred>, Vec<HealthCheck>) {
+        let preds: Vec<Pred> = CHECK_IDS.iter().map(|&id| check_pred(id, cols)).collect();
+        let checks = CHECK_IDS
+            .iter()
+            .map(|&id| HealthCheck {
+                id,
+                status: status_for(id, 5),
+                affected: 5,
+                total: 10,
+                models: None,
+                samples: None,
+            })
+            .collect();
+        (preds, checks)
+    }
+
+    #[test]
+    fn samples_are_queried_only_when_asked_for() {
+        let c = cols(FULL);
+        let (preds, checks) = failing_checks(&c);
+        let (samples, models) = follow_up_sql("default", "b", &c, &preds, &checks, false);
+        assert!(samples.is_empty());
+        // The unpriced model breakdown is part of the strip, so it always runs.
+        assert!(models.is_some());
+        let (samples, _) = follow_up_sql("default", "b", &c, &preds, &checks, true);
+        assert_eq!(samples.len(), CHECK_IDS.len());
+        assert!(
+            samples
+                .iter()
+                .all(|(_, sql)| sql.contains("GROUP BY trace_id"))
+        );
+        // Without samples the field is left out of the response.
+        let check = &all_pass(0, false)[0];
+        assert!(json::to_value(check).unwrap().get("samples").is_none());
+        let check = &all_pass(0, true)[0];
+        assert_eq!(
+            json::to_value(check).unwrap().get("samples"),
+            Some(&json::json!([]))
+        );
     }
 
     #[test]
@@ -909,13 +1063,70 @@ mod tests {
         let mut a = query();
         a.start_time = 120_000_000;
         a.end_time = 180_000_001;
+        let wa = Window::clamped(a.start_time, a.end_time, 0);
         let mut b = a.clone();
         b.start_time += 1_000_000;
-        assert_eq!(cache_key("o", &a), cache_key("o", &b));
+        let wb = Window::clamped(b.start_time, b.end_time, 0);
+        assert_eq!(cache_key("o", &a, &wa), cache_key("o", &b, &wb));
         b.agent = Some("x".into());
-        assert_ne!(cache_key("o", &a), cache_key("o", &b));
+        assert_ne!(cache_key("o", &a, &wa), cache_key("o", &b, &wb));
         let mut c = a.clone();
         c.agent_id = Some("x".into());
-        assert_ne!(cache_key("o", &a), cache_key("o", &c));
+        assert_ne!(cache_key("o", &a, &wa), cache_key("o", &c, &wa));
+        let mut d = a.clone();
+        d.include_samples = true;
+        assert_ne!(cache_key("o", &a, &wa), cache_key("o", &d, &wa));
+    }
+
+    #[test]
+    fn callers_with_different_range_limits_get_different_keys() {
+        const HOUR: i64 = 3600 * 1_000_000;
+        let mut q = query();
+        q.end_time = 1_000 * HOUR;
+        q.start_time = q.end_time - 7 * 24 * HOUR;
+        let capped = Window::clamped(q.start_time, q.end_time, 1);
+        let uncapped = Window::clamped(q.start_time, q.end_time, 0);
+        assert_ne!(capped.start, uncapped.start);
+        assert_ne!(cache_key("o", &q, &capped), cache_key("o", &q, &uncapped));
+        // The same cap on the same request shares the entry.
+        let capped_again = Window::clamped(q.start_time, q.end_time, 1);
+        assert_eq!(
+            cache_key("o", &q, &capped),
+            cache_key("o", &q, &capped_again)
+        );
+    }
+
+    fn resp(checked_at: i64) -> DataHealthResponse {
+        DataHealthResponse {
+            checked_at,
+            checks: vec![],
+        }
+    }
+
+    #[test]
+    fn a_full_cache_evicts_expired_then_only_the_oldest() {
+        let now = 10 * CACHE_TTL_MICROS;
+        let mut cache = HashMap::new();
+        insert_bounded(&mut cache, "old".into(), resp(now - 3), 3);
+        insert_bounded(&mut cache, "mid".into(), resp(now - 2), 3);
+        insert_bounded(&mut cache, "new".into(), resp(now - 1), 3);
+        // Full: the oldest goes, the warm entries stay.
+        insert_bounded(&mut cache, "next".into(), resp(now), 3);
+        let mut keys: Vec<_> = cache.keys().cloned().collect();
+        keys.sort();
+        assert_eq!(keys, ["mid", "new", "next"]);
+        // Replacing a present key evicts nothing.
+        insert_bounded(&mut cache, "mid".into(), resp(now), 3);
+        assert_eq!(cache.len(), 3);
+        // Expired entries are dropped before any live one.
+        insert_bounded(
+            &mut cache,
+            "late".into(),
+            resp(now - 1 + CACHE_TTL_MICROS),
+            3,
+        );
+        let mut keys: Vec<_> = cache.keys().cloned().collect();
+        keys.sort();
+        assert_eq!(keys, ["late", "mid", "next"]);
     }
 }

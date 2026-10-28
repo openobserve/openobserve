@@ -128,8 +128,14 @@ const router = useRouter();
 // Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts.
 // Agent Behavior has no from/to/period URL sync (urlSync:false), matching its
 // prior behavior of resolving from shared state only.
-const { dateState, timeRange, applyRelative, onDateChange, mountResolve, DEFAULT_RELATIVE } =
-  useAiDateController({ urlSync: false });
+const {
+  dateState,
+  timeRange,
+  applyRelative,
+  onDateChange: onDateStateChange,
+  mountResolve,
+  DEFAULT_RELATIVE,
+} = useAiDateController({ urlSync: false });
 
 // The scope in the URL (`type`, `stream`, `agent`, `env`, `version`) wins over
 // the defaults, so a link shared from any Monitor page opens the same agent
@@ -137,6 +143,9 @@ const { dateState, timeRange, applyRelative, onDateChange, mountResolve, DEFAULT
 // decides: Agent (the page is about one agent's behaviour) when the window has
 // agents, Stream (every span's signals) when it has none.
 const urlScope = readUrlScope(route.query);
+// The URL's agent is applied once, on the first settle that has agents; later
+// settles (a new window) keep whatever the user picked since.
+let pendingUrlScope = urlScope.agent || urlScope.env || urlScope.version ? urlScope : null;
 const explicitMode = explicitScopeMode(urlScope);
 const filterMode = ref<ScopeMode>(explicitMode ?? "agent");
 const modeExplicit = ref(explicitMode !== null);
@@ -253,18 +262,28 @@ async function loadStreams() {
 // Streams and agents in parallel: together they settle the mode (agents in the
 // window → Agent, none → Stream) and the URL's agent before the panel gets a
 // stream, so it fetches once. A failed agents load settles nothing (the page
-// stays on Agent with the error); its retry (`force`) runs this again.
+// stays on Agent with the error); its retry (`force`) runs this again, and so
+// does a new date window, whose agents may differ.
 async function settleScope(force = false) {
   const { startTime, endTime } = timeRange.value;
   await Promise.all([loadStreams(), loadAgents(startTime, endTime, force)]);
   if (!modeExplicit.value) {
     filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
   }
-  if (urlScope.agent || urlScope.env || urlScope.version) {
-    selectAgentByScope(urlScope.env, urlScope.agent, urlScope.version);
+  if (pendingUrlScope && agents.value.length) {
+    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.agent, pendingUrlScope.version);
+    pendingUrlScope = null;
   }
   scopeReady.value = true;
   syncScopeUrl();
+}
+
+// Date state is owned by useAiDateController. A user's pick re-settles the
+// scope for the new window, as Agent Graph reloads its agents; the window
+// replay DateTime fires on mount is already covered by the mount settle.
+function onDateChange(value: unknown) {
+  onDateStateChange(value);
+  if ((value as { userChangedValue?: boolean } | null)?.userChangedValue === true) settleScope();
 }
 
 onMounted(() => {

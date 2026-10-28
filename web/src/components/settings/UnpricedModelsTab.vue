@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="model-pricing-unpriced-table"
         :data="models"
         :columns="columns"
-        row-key="model"
+        :row-key="rowKey"
         :loading="loading"
         pagination="none"
         sorting="client"
@@ -79,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-model="{ row }">
           <div class="flex min-w-0 flex-col py-1" data-test="model-pricing-unpriced-row">
-            <OTruncatedText as="div" class="font-medium">{{ row.model }}</OTruncatedText>
+            <OTruncatedText as="div" class="font-medium">{{
+              row.model ?? t("modelPricing.unpriced.noModelName")
+            }}</OTruncatedText>
             <span class="text-text-secondary text-xs">{{ seenBy(row) }}</span>
           </div>
         </template>
@@ -102,7 +104,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-tokens="{ row }">{{ formatTokens(row.tokens) }}</template>
         <template #cell-cost="{ row }">${{ formatCost(row.cost) }}</template>
         <template #cell-actions="{ row }">
-          <div class="flex items-center justify-end gap-1">
+          <div
+            v-if="row.model === null"
+            class="flex items-center justify-end gap-1.5"
+            data-test="model-pricing-unpriced-no-model"
+          >
+            <span class="text-text-secondary text-xs">{{
+              t("modelPricing.unpriced.noModelHint")
+            }}</span>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="model-pricing-unpriced-docs-btn"
+              @click.stop="openInstrumentationDocs"
+            >
+              {{ t("modelPricing.unpriced.instrumentationDocs") }}
+            </OButton>
+          </div>
+          <div v-else class="flex items-center justify-end gap-1">
             <OButton
               variant="outline"
               size="sm"
@@ -188,6 +207,7 @@ import {
   exactModelPattern,
 } from "@/components/settings/unpricedModelPricing";
 import { formatCost, formatTokens } from "@/utils/llmUtils";
+import { AI_INSTRUMENTATION_DOCS_URL } from "@/plugins/traces/llmDataTrust.utils";
 import { isAxiosError } from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -292,7 +312,13 @@ function matchedPrices(row: UnpricedModel): I18nText | "" {
   });
 }
 
+/** Spans without a model name group into one row, keyed apart from every named model. */
+function rowKey(row: UnpricedModel): string {
+  return row.model ?? "";
+}
+
 function createPrice(row: UnpricedModel) {
+  if (row.model === null) return;
   router.push({
     name: "modelPricingEditor",
     query: {
@@ -301,6 +327,11 @@ function createPrice(row: UnpricedModel) {
       match_pattern: exactModelPattern(row.model),
     },
   });
+}
+
+/** Spans without a model name have nothing to price; the fix is in the instrumentation. */
+function openInstrumentationDocs() {
+  window.open(AI_INSTRUMENTATION_DOCS_URL, "_blank", "noopener,noreferrer");
 }
 
 function notifySaveError(e: unknown) {
@@ -321,13 +352,14 @@ function notifySaveError(e: unknown) {
 }
 
 async function keepPrices(row: UnpricedModel) {
-  if (!row.matched) return;
-  pendingModel.value = row.model;
+  const model = row.model;
+  if (!row.matched || model === null) return;
+  pendingModel.value = model;
   try {
-    await saveModelPricing.mutateAsync({ data: buildKeepPricesPayload(row.model, row.matched) });
+    await saveModelPricing.mutateAsync({ data: buildKeepPricesPayload(model, row.matched) });
     toast({
       variant: "success",
-      message: t("modelPricing.unpriced.keptNotif", { model: row.model, name: row.matched.name }),
+      message: t("modelPricing.unpriced.keptNotif", { model, name: row.matched.name }),
     });
   } catch (e) {
     notifySaveError(e);
@@ -343,12 +375,14 @@ const muteDialog = ref<{ show: boolean; model: string; message: I18nText }>({
 });
 
 function confirmMute(row: UnpricedModel) {
+  const model = row.model;
+  if (model === null) return;
   muteDialog.value = {
     show: true,
-    model: row.model,
+    model,
     message: t("modelPricing.unpriced.muteConfirmMessage", {
-      model: row.model,
-      name: buildMutePayload(row.model).name,
+      model,
+      name: buildMutePayload(model).name,
     }),
   };
 }

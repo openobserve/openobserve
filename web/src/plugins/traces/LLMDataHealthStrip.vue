@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      link each problem to the setting or guide that fixes it. Hidden when every
      check passes. -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -35,6 +35,7 @@ import type {
   DataHealthResponse,
 } from "@/services/gen-ai-data-health.service";
 import { fixTarget, healthCounts, sortChecks } from "./llmDataTrust.utils";
+import type { DataHealthSamples } from "./composables/useLLMDataHealth";
 import { formatTokens } from "@/utils/llmUtils";
 
 const props = defineProps<{
@@ -42,10 +43,14 @@ const props = defineProps<{
   loading?: boolean;
   error?: boolean;
   stream: string;
+  /** Sample trace ids per check; null until loaded. */
+  samples: DataHealthSamples | null;
+  samplesLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
   rerun: [];
+  "load-samples": [];
   "view-trace": [traceId: string];
 }>();
 
@@ -186,6 +191,15 @@ function openDrawer(id: DataHealthCheckId | null) {
   drawerOpen.value = true;
 }
 
+// Samples cost a query per failing check, so they load only while the drawer
+// is open; a new scope or a re-run clears them and they load again.
+watch(
+  () => drawerOpen.value && props.samples === null && !props.samplesLoading,
+  (needed) => {
+    if (needed) emit("load-samples");
+  },
+);
+
 function shortTraceId(id: string): string {
   return id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
 }
@@ -287,17 +301,23 @@ function viewTrace(traceId: string) {
           v-if="check.id === 'unpriced_models' && check.models?.length"
           class="flex flex-wrap gap-1"
         >
-          <OBadge v-for="m in check.models" :key="m.model" variant="default-outline" size="sm">{{
-            raw(`${m.model} · ${formatTokens(m.tokens)}`)
-          }}</OBadge>
+          <OBadge
+            v-for="m in check.models"
+            :key="m.model ?? ''"
+            variant="default-outline"
+            size="sm"
+            >{{
+              raw(`${m.model ?? t("llmDataTrust.noModelName")} · ${formatTokens(m.tokens)}`)
+            }}</OBadge
+          >
         </div>
         <div
-          v-if="check.status !== 'pass' && check.samples.length"
+          v-if="check.status !== 'pass' && samples?.[check.id]?.length"
           class="text-2xs text-text-secondary flex flex-wrap items-center gap-1.5"
         >
           <span>{{ t("llmDataTrust.health.samples") }}</span>
           <button
-            v-for="id in check.samples"
+            v-for="id in samples?.[check.id]"
             :key="id"
             type="button"
             class="text-text-link hover:text-text-link-hover font-mono underline"

@@ -228,6 +228,45 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     await scope.loadAgents();
     expect(scope.agentsError.value).toBe("forbidden");
   });
+
+  it("drops an agents response or failure that lands after the org changed", async () => {
+    const org = ref("org-switch-old");
+    const agents = ref<GenAiAgentListItem[]>([]);
+    const agentsLoaded = ref(false);
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => org.value,
+      getWindow: () => ({ start: 100, end: 200 }),
+      allAgents: true,
+      agents,
+      agentsLoaded,
+      t,
+    });
+    const ok = Promise.withResolvers<unknown>();
+    listAgents.mockReturnValue(ok.promise);
+    const pending = scope.loadAgents();
+    org.value = "org-switch-new";
+    ok.resolve({ agents: [agentA] });
+    await pending;
+    expect(agents.value).toEqual([]);
+    expect(agentsLoaded.value).toBe(false);
+
+    // The error path is dropped the same way.
+    org.value = "org-switch-old-2";
+    const fail = Promise.withResolvers<unknown>();
+    listAgents.mockReturnValue(fail.promise);
+    agents.value = [agentB];
+    const failing = scope.loadAgents();
+    org.value = "org-switch-new";
+    fail.reject(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+    await failing;
+    expect(agents.value).toEqual([agentB]);
+    expect(scope.agentsError.value).toBeNull();
+    expect(agentsLoaded.value).toBe(false);
+  });
 });
 
 describe("resolveScopeMode", () => {

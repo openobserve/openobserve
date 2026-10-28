@@ -22,7 +22,8 @@ export type DataHealthStatus = "pass" | "warning" | "error";
 
 /** Mirrors the backend `ModelUsage` (`gen_ai_health.rs`). */
 export interface DataHealthModelUsage {
-  model: string;
+  /** Null for spans that carry no model name. */
+  model: string | null;
   spans: number;
   tokens: number;
 }
@@ -34,7 +35,8 @@ export interface DataHealthCheck {
   affected: number;
   total: number;
   models?: DataHealthModelUsage[];
-  samples: string[];
+  /** Sample trace ids; present only when requested with `include_samples`. */
+  samples?: string[];
 }
 
 export interface DataHealthResponse {
@@ -53,6 +55,8 @@ export interface DataHealthParams {
   env?: string | null;
   version?: string | null;
   refresh?: boolean;
+  /** Also return sample trace ids per failing check (each costs a window-wide query). */
+  include_samples?: boolean;
 }
 
 /** GET /api/{org}/gen_ai/data_health — AI data health checks for one stream and window. */
@@ -67,6 +71,7 @@ export const getDataHealth = (orgId: string, params: DataHealthParams) => {
   if (params.env) query.env = params.env;
   if (params.version) query.version = params.version;
   if (params.refresh) query.refresh = true;
+  if (params.include_samples) query.include_samples = true;
   return http().get<DataHealthResponse>(`/api/${encodeURIComponent(orgId)}/gen_ai/data_health`, {
     params: query,
   });
