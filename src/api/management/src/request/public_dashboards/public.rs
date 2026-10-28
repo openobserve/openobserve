@@ -261,6 +261,9 @@ async fn serve_data_on<C: ConnectionTrait>(
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
+    if let Some(refused) = search_refused(&pd.org_id) {
+        return refused;
+    }
     let range_key = range_key.map_or_else(|| default_range_key(&pd), str::to_string);
     let Some(range) = offered_range(&pd, &range_key) else {
         // A removed range's file goes on a later ask; a made-up key costs only a read lock.
@@ -433,6 +436,17 @@ fn expired() -> Response {
 // A failed read is temporary, so the viewer retries instead of treating the link as gone.
 fn server_error() -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong.").into_response()
+}
+
+/// A closed licence search gate serves the viewer nothing, warm results included; meta passes.
+fn search_refused(org: &str) -> Option<Response> {
+    if org == config::META_ORG_ID {
+        return None;
+    }
+    // The gate's own message names the licence id, which an anonymous viewer must not see.
+    search_service::check_search_allowed(org, None)
+        .err()
+        .map(|_| too_many_requests(READ_WINDOW))
 }
 
 fn unavailable() -> Response {
@@ -1103,5 +1117,36 @@ mod tests {
         assert!(store::read_header(&key).await.is_none());
         let resp = serve_data_on(&primary, slug, Some("../r60"), None).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_closed_search_gate_refuses_the_public_data_read_with_429() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let slug = "Lc8Zt2mR7aB3cD4eF5gH6Q";
+        let live = Model {
+            id: config::ider::uuid(),
+            slug: slug.into(),
+            time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
+            default_range_key: Some("r3600".into()),
+            ..link()
+        };
+        let primary = sqlite().await;
+        table::insert_capped(&primary, &live, 50, 10, false)
+            .await
+            .unwrap();
+        let _gate = close_search_gate_for_tests().await;
+        for etag in [None, Some("\"r1\"")] {
+            let resp = serve_data_on(&primary, slug, Some("r3600"), etag).await;
+            assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+            assert_eq!(resp.headers()[header::RETRY_AFTER], "60");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body = String::from_utf8_lossy(&body);
+            assert!(!body.contains("License ID"), "{body}");
+        }
+        assert!(search_refused(config::META_ORG_ID).is_none());
     }
 }

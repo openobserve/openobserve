@@ -38,19 +38,14 @@
               <div class="mb-3 text-base font-medium">
                 {{ t("about.enter_license_key") }}
               </div>
-              <OForm
-                ref="noLicenseForm"
-                :schema="licenseSchema"
-                :default-values="licenseDefaults"
-                @submit="updateLicense"
-                v-slot="{ isSubmitting }"
-              >
+              <OForm ref="noLicenseForm" :form="noLicenseDraft" v-slot="{ isSubmitting }">
                 <OFormTextarea
                   data-test="no-license-key-input"
                   name="licenseKey"
+                  :disabled="updating"
                   :rows="8"
                   :placeholder="t('about.paste_license_placeholder')"
-                  style="min-height: 12.5rem"
+                  class="min-h-50"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -60,6 +55,25 @@
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
                   </div>
                 </div>
+                <LicenseKeyCheck :result="result" :refusal="refusal" />
+                <OBanner
+                  v-if="checkError"
+                  variant="error-soft"
+                  icon="cancel"
+                  class="my-3"
+                  data-test="license-key-check-error"
+                  >{{ t("about.key_check_failed", { message: checkError }) }}</OBanner
+                >
+                <OButton
+                  data-test="check-no-license-btn"
+                  variant="outline"
+                  size="sm-action"
+                  class="me-2 mt-2"
+                  :loading="checking"
+                  :disabled="isSubmitting || updating"
+                  @click="checkLicense(false)"
+                  >{{ t("about.check_license_key") }}</OButton
+                >
                 <OButton
                   data-test="no-license-update-btn"
                   variant="primary"
@@ -67,6 +81,7 @@
                   class="mt-2"
                   type="submit"
                   :loading="isSubmitting"
+                  :disabled="checking || updating"
                 >
                   {{ t("about.update_license") }}
                 </OButton>
@@ -80,9 +95,24 @@
             v-if="licenseData.license && licenseData.decision"
             :decision="licenseData.decision"
             :base="licenseData.base"
+            :waivers="licenseData.waivers"
             :env-key-active="!!licenseData.env_key_active"
             :env-key-in-use="licenseData.env_key_in_use"
             :evaluated-at="licenseData.evaluated_at"
+            :rev-hwm-warning="licenseData.rev_hwm_warning"
+            :can-update-license="licenseData.can_update_license === true"
+            @add-license-key="showUpdateFormAndFocus"
+            @boundary="refetchAtBoundary"
+          />
+          <LicenseOnlineRefreshCard
+            v-if="licenseData.refresh"
+            :refresh="licenseData.refresh"
+            :license-expires-at="licenseData.license.expires_at"
+            :can-update="licenseData.can_update_license === true"
+            :env-key-active="!!licenseData.env_key_active"
+            :is-root="!!licenseData.refresh.key_id || !!licenseData.refresh.stored_key"
+            @add-license-key="showUpdateFormAndFocus"
+            @refreshed="reloadLicenseData"
           />
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
@@ -219,12 +249,12 @@
                   {{ t("about.add_new_license_key") }}
                 </OButton>
                 <OButton
+                  v-if="!licenseData.refresh && licenseData.can_update_license === true"
                   data-test="refresh-license-limits-btn"
-                  variant="primary"
+                  variant="outline"
                   size="sm-action"
-                  v-if="licenseData.license != null"
-                  :loading="refreshing"
-                  @click="triggerLimitRefresh"
+                  :loading="refreshingLimits"
+                  @click="refreshLimitsOnOldNode"
                 >
                   {{ t("about.refresh_license_limits") }}
                 </OButton>
@@ -232,26 +262,25 @@
             </OCardSection>
           </OCard>
 
-          <LicenseWaiversCard :waivers="licenseData.waivers" />
+          <LicenseWaiversCard
+            :waivers="licenseData.waivers"
+            :can-update="licenseData.can_update_license === true"
+            @boundary="refetchAtBoundary"
+          />
 
           <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
             <OCardSection role="body">
               <div class="mb-2 text-base font-medium">
                 {{ t("about.update_license_key") }}
               </div>
-              <OForm
-                ref="updateLicenseForm"
-                :schema="licenseSchema"
-                :default-values="licenseDefaults"
-                @submit="updateLicense"
-                v-slot="{ isSubmitting }"
-              >
+              <OForm ref="updateLicenseForm" :form="updateLicenseDraft" v-slot="{ isSubmitting }">
                 <OFormTextarea
                   data-test="update-license-key-input"
                   name="licenseKey"
+                  :disabled="updating"
                   :rows="6"
                   :placeholder="t('about.paste_new_license_placeholder')"
-                  style="min-height: 9.375rem"
+                  class="min-h-37.5"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -261,7 +290,16 @@
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
                   </div>
                 </div>
-                <div class="flex gap-2">
+                <LicenseKeyCheck :result="result" :refusal="refusal" />
+                <OBanner
+                  v-if="checkError"
+                  variant="error-soft"
+                  icon="cancel"
+                  class="my-3"
+                  data-test="license-key-check-error"
+                  >{{ t("about.key_check_failed", { message: checkError }) }}</OBanner
+                >
+                <div class="flex flex-wrap gap-2">
                   <OButton
                     data-test="cancel-update-license-btn"
                     variant="outline"
@@ -270,17 +308,27 @@
                     :disabled="isSubmitting"
                     @click="
                       showUpdateForm = false;
-                      licenseKey = '';
+                      resetLicenseDrafts();
                     "
                   >
                     {{ t("common.cancel") }}
                   </OButton>
+                  <OButton
+                    data-test="check-update-license-btn"
+                    variant="outline"
+                    size="sm-action"
+                    :loading="checking"
+                    :disabled="isSubmitting || updating"
+                    @click="checkLicense(true)"
+                    >{{ t("about.check_license_key") }}</OButton
+                  >
                   <OButton
                     data-test="confirm-update-license-btn"
                     variant="primary"
                     size="sm-action"
                     type="submit"
                     :loading="isSubmitting"
+                    :disabled="checking || updating"
                   >
                     {{ t("about.update_license") }}
                   </OButton>
@@ -485,14 +533,39 @@
 </template>
 
 <script lang="ts">
-import { licenseQuery } from "@/services/license_server.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  LICENSE_BOUNDARY_DEBOUNCE_MS,
+  LICENSE_BOUNDARY_RETRIES,
+  LICENSE_BOUNDARY_RETRY_MS,
+  isRevRefusal,
+  isKeyCheckResult,
+  type KeyCheckResult,
+  type RevRefusal,
+} from "@/utils/licenseWaivers";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import LicenseKeyCheck from "./LicenseKeyCheck.vue";
+import {
+  licenseQuery,
+  checkLicenseMutation,
+  updateLicenseMutation,
+} from "@/services/license_server.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import LicenseOnlineRefreshCard from "./LicenseOnlineRefreshCard.vue";
 import LicenseStatusCard from "./LicenseStatusCard.vue";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -509,6 +582,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
+import { refreshMessage } from "@/utils/licenseRefresh";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -520,7 +594,10 @@ export default defineComponent({
   components: {
     LicensePeriod,
     LicenseStatusCard,
+    LicenseOnlineRefreshCard,
     LicenseWaiversCard,
+    LicenseKeyCheck,
+    OBanner,
     RenderDashboardCharts,
     OButton,
     ODialog,
@@ -537,50 +614,113 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
-    const refreshing = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
+    const result = ref<KeyCheckResult | null>(null);
+    const refusal = ref<RevRefusal | null>(null);
+    const checkError = ref("");
+    const checking = ref(false);
+    const updating = ref(false);
+    const checkMutation = useMutation(checkLicenseMutation());
+    const updateMutation = useMutation(updateLicenseMutation());
+    let draftVersion = 0;
+    const clearKeyCheck = () => {
+      draftVersion++;
+      result.value = null;
+      refusal.value = null;
+      checkError.value = "";
+    };
     const showUpdateForm = ref(false);
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
-    const { refreshLicenseLimits, scheduleReload } = useLicenseRefresh();
+    const { scheduleReload, refreshLicenseLimits } = useLicenseRefresh();
+    const refreshingLimits = ref(false);
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
-    // Schema-driven validation replaces the `:disabled="!licenseKey.trim()"`
-    // gate. The same licenseKey is entered in two mutually-exclusive cards, each
-    // wrapped in its own <OForm> that OWNS the field (by name). `licenseKey` is
-    // only the shared INCOMING working value (auto-filled from URL, cleared on
-    // save/cancel) — bridged one-way into whichever form is mounted via the
-    // watch below; the typed value is read back from the submit payload, never
-    // from this ref. Options-API: schema/defaults MUST be returned from setup().
     const licenseSchema = makeLicenseSchema(t);
-    const noLicenseForm = ref<any>(null);
-    const updateLicenseForm = ref<any>(null);
-    const licenseDefaults = computed((): LicenseForm => ({ licenseKey: licenseKey.value }));
-
-    // Bridge programmatic licenseKey changes (URL auto-fill, cancel/clear) into
-    // whichever card's form is mounted. Use form.reset (NOT setFieldValue) so the
-    // field re-seeds AND submit state resets (submissionAttempts → 0) — no
-    // post-save "required" flash on the v-show'd update card when clearing to "".
-    watch(licenseKey, (v) => {
-      noLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
-      updateLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
+    const noLicenseForm = ref(null);
+    const updateLicenseForm = ref(null);
+    const noLicenseDraft = useOForm<LicenseForm>({
+      defaultValues: { licenseKey: "" },
+      schema: licenseSchema,
+      onSubmit: (value) => updateLicense(value),
     });
+    const updateLicenseDraft = useOForm<LicenseForm>({
+      defaultValues: { licenseKey: "" },
+      schema: licenseSchema,
+      onSubmit: (value) => updateLicense(value),
+    });
+    const noLicenseKey = noLicenseDraft.useStore((state) => state.values.licenseKey);
+    const updateLicenseKey = updateLicenseDraft.useStore((state) => state.values.licenseKey);
+    const licenseDefaults = computed((): LicenseForm => ({ licenseKey: licenseKey.value }));
+    const resetLicenseDrafts = () => {
+      clearKeyCheck();
+      licenseKey.value = "";
+      noLicenseDraft.reset({ licenseKey: "" });
+      updateLicenseDraft.reset({ licenseKey: "" });
+    };
+    watch([noLicenseKey, updateLicenseKey], clearKeyCheck, { flush: "sync" });
+    watch(
+      licenseKey,
+      (value) => {
+        clearKeyCheck();
+        noLicenseDraft.reset({ licenseKey: value });
+        updateLicenseDraft.reset({ licenseKey: value });
+      },
+      { flush: "sync" },
+    );
+
+    const checkLicense = async (hasLicense: boolean) => {
+      if (checking.value || updating.value) return;
+      const form = hasLicense ? updateLicenseDraft : noLicenseDraft;
+      const key = form.state.values.licenseKey.trim();
+      if (!key) {
+        await form.handleSubmit();
+        return;
+      }
+      clearKeyCheck();
+      const version = draftVersion;
+      checking.value = true;
+      try {
+        const response = await checkMutation.mutateAsync(key);
+        if (version !== draftVersion) return;
+        if (!isKeyCheckResult(response.data)) throw new Error(t("about.key_check_malformed"));
+        result.value = response.data;
+      } catch (error) {
+        if (version !== draftVersion) return;
+        const failure = error as {
+          response?: { status?: number; data?: { message?: string } };
+          message?: string;
+        };
+        checkError.value =
+          failure.response?.status === 403
+            ? t("about.key_check_forbidden")
+            : failure.response?.data?.message ||
+              failure.message ||
+              t("settings.licensePage.unexpectedError");
+      } finally {
+        checking.value = false;
+      }
+    };
 
     // Only the first load may swap the page for the spinner; later reloads would unmount the form.
-    const loadLicenseData = async ({ background = false } = {}) => {
+    const loadLicenseData = async ({ background = false, quiet = false } = {}) => {
       try {
         if (!background) loading.value = true;
         licenseData.value = await queryClient.fetchQuery(licenseQuery());
         if (!background) checkAndAutoFillLicenseFromUrl();
+        return true;
       } catch (error) {
         console.error("Error loading license data:", error);
-        toast({
-          variant: "error",
-          message: t("about.failed_to_load_license_info"),
-        });
+        if (!quiet) {
+          toast({
+            variant: "error",
+            message: t("about.failed_to_load_license_info"),
+          });
+        }
+        return false;
       } finally {
         if (!background) loading.value = false;
       }
@@ -588,25 +728,80 @@ export default defineComponent({
 
     const reloadLicenseData = () => loadLicenseData({ background: true });
 
+    // a node older than the online refresh sends no refresh status, so its card never renders
+    const refreshLimitsOnOldNode = async () => {
+      if (refreshingLimits.value) return;
+      refreshingLimits.value = true;
+      try {
+        const outcome = await refreshLicenseLimits(async () => {
+          await reloadLicenseData();
+        });
+        const message = refreshMessage(outcome.body, t, outcome.status);
+        toast({ variant: message.variant, message: message.text });
+        await reloadLicenseData();
+      } finally {
+        refreshingLimits.value = false;
+      }
+    };
+
+    let boundaryRefetch: ReturnType<typeof setTimeout> | undefined;
+    let boundaryUs = 0;
+    let boundaryRetries = 0;
+    let boundaryChain = 0;
+    let boundaryErrorShown = false;
+    let unmounted = false;
+    const clearBoundaryRefetch = () => {
+      if (boundaryRefetch !== undefined) clearTimeout(boundaryRefetch);
+      boundaryRefetch = undefined;
+    };
+    const scheduleBoundaryRefetch = (chain: number, delayMs: number) => {
+      clearBoundaryRefetch();
+      boundaryRefetch = setTimeout(() => refetchAfterBoundary(chain), delayMs);
+    };
+    // the server re-evaluates on its own tick, so a decision from before the boundary is fetched again
+    const refetchAfterBoundary = async (chain: number) => {
+      boundaryRefetch = undefined;
+      const loaded = await loadLicenseData({ background: true, quiet: boundaryErrorShown });
+      if (!loaded && chain === boundaryChain) boundaryErrorShown = true;
+      // a boundary that arrived during the fetch started a newer chain, which owns the timer
+      if (unmounted || chain !== boundaryChain) return;
+      const evaluatedAt = Number(licenseData.value?.evaluated_at ?? 0);
+      if (!(evaluatedAt > 0 && evaluatedAt < boundaryUs)) return;
+      if (boundaryRetries >= LICENSE_BOUNDARY_RETRIES) return;
+      boundaryRetries++;
+      scheduleBoundaryRefetch(chain, LICENSE_BOUNDARY_RETRY_MS);
+    };
+    const refetchAtBoundary = (atUs: number) => {
+      boundaryUs = Math.max(boundaryUs, atUs);
+      boundaryRetries = 0;
+      boundaryChain++;
+      boundaryErrorShown = false;
+      scheduleBoundaryRefetch(boundaryChain, LICENSE_BOUNDARY_DEBOUNCE_MS);
+    };
+    onBeforeUnmount(() => {
+      unmounted = true;
+      clearBoundaryRefetch();
+    });
+
     // The settle reload already refetched the licence query, so reuse it instead of a second request.
     const adoptRefetchedLicense = () => {
       const data = queryClient.getQueryData(licenseQuery().queryKey);
       if (data) licenseData.value = data as typeof licenseData.value;
     };
 
-    // @submit handler — fires only once the schema passes (licenseKey required +
-    // trim), so the `:disabled` gate is gone (R3). Still callable directly with
-    // no args (reads the shared working ref); OForm awaits it so the inline Save
-    // button's spinner spans the request.
     const updateLicense = async (value?: LicenseForm) => {
+      if (checking.value || updating.value) return;
+      clearKeyCheck();
+      const version = draftVersion;
+      updating.value = true;
       const key = (value?.licenseKey ?? licenseKey.value ?? "").trim();
       try {
-        await licenseServer.update_license(key);
+        await updateMutation.mutateAsync(key);
         toast({
           variant: "success",
           message: t("about.license_updated_success"),
         });
-        licenseKey.value = "";
+        resetLicenseDrafts();
         isLicenseKeyAutoFilled.value = false;
         showUpdateForm.value = false;
 
@@ -619,7 +814,12 @@ export default defineComponent({
         await reloadLicenseData();
         scheduleReload(adoptRefetchedLicense);
       } catch (error) {
-        const e = error as { response?: { data?: { message?: string } } };
+        const e = error as { response?: { status?: number; data?: { message?: string } } };
+        if (version !== draftVersion) return;
+        if (e.response?.status === 409 && isRevRefusal(e.response.data)) {
+          refusal.value = e.response.data;
+          return;
+        }
         console.error("Error updating license:", error);
         toast({
           variant: "error",
@@ -629,6 +829,8 @@ export default defineComponent({
               (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
           ),
         });
+      } finally {
+        updating.value = false;
       }
     };
 
@@ -646,16 +848,6 @@ export default defineComponent({
           textarea.focus();
         }
       }, 100);
-    };
-
-    const triggerLimitRefresh = async () => {
-      if (refreshing.value) return;
-      refreshing.value = true;
-      try {
-        if (await refreshLicenseLimits(adoptRefetchedLicense)) await reloadLicenseData();
-      } finally {
-        refreshing.value = false;
-      }
     };
 
     const maskKey = (key: string) => {
@@ -1021,12 +1213,25 @@ export default defineComponent({
       raw,
       store,
       loading,
-      refreshing,
+      reloadLicenseData,
+      refreshingLimits,
+      refreshLimitsOnOldNode,
+      refetchAtBoundary,
       licenseData,
       licenseKey,
       showUpdateForm,
       showLicenseKeyModal,
       updateLicense,
+      checkLicense,
+      clearKeyCheck,
+      resetLicenseDrafts,
+      result,
+      refusal,
+      checkError,
+      checking,
+      updating,
+      noLicenseDraft,
+      updateLicenseDraft,
       // Form wiring (Options-API: schema/defaults MUST be returned so :schema
       // resolves and validation runs).
       licenseSchema,
@@ -1040,7 +1245,6 @@ export default defineComponent({
       showLicenseExpiryWarning,
       getLicenseExpiryMessage,
       showUpdateFormAndFocus,
-      triggerLimitRefresh,
       maskKey,
       getMaskedLicenseKey,
       copyLicenseKey,

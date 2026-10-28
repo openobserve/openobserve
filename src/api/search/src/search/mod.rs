@@ -234,19 +234,8 @@ pub async fn search(
         }
     };
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
-        }
+    if let Some(refused) = search_license_refusal(&org_id, &req.query.sql, stream_type) {
+        return refused;
     }
 
     // Handle histogram data for UI
@@ -489,7 +478,8 @@ pub async fn around_v1(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -624,7 +614,8 @@ pub async fn around_v2(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -741,7 +732,8 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -1286,6 +1278,28 @@ fn resolve_typed_stream_names(
         .collect())
 }
 
+/// The licence 429 unless every stream `sql` reads, under the type its SQL names, is exempt.
+#[cfg(feature = "enterprise")]
+fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> Option<Response> {
+    // an unparsed query is checked as the whole org, so a parse gap never opens the gate
+    let refused = match resolve_typed_stream_names(sql, stream_type) {
+        Ok(streams) => streams.iter().find_map(|(stream, stream_type)| {
+            search_service::check_search_allowed(org_id, Some((stream, *stream_type))).err()
+        }),
+        Err(_) => search_service::check_search_allowed(org_id, None).err(),
+    };
+    refused.map(|e| {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(MetaHttpResponse::error(
+                StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            )),
+        )
+            .into_response()
+    })
+}
+
 /// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
 #[cfg(feature = "enterprise")]
 async fn check_sql_stream_permissions(
@@ -1413,21 +1427,8 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     {
-        let stream_names = match resolve_stream_names(&req.sql) {
-            Ok(stream_names) => stream_names,
-            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
-        };
-        for stream in stream_names.iter() {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
+        if let Some(refused) = search_license_refusal(&org_id, &req.sql, stream_type) {
+            return refused;
         }
         if let Some(res) = check_sql_stream_permissions(
             &req.sql,

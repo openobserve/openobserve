@@ -97,7 +97,9 @@ pub async fn get_trace_dag(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) =
+            search_service::check_search_allowed(&org_id, Some((&stream_name, StreamType::Traces)))
+        {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }

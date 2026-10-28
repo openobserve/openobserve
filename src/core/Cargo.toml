@@ -148,6 +148,7 @@ zstd.workspace = true
 
 [dev-dependencies]
 infra = { workspace = true, features = ["test-utils"] }
+o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
 

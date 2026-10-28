@@ -164,6 +164,14 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn synthetics_results_stays_gated_while_search_is_blocked() {
+        // customers can ingest into this name, so it must never join the operational allowlist
+        assert!(!search_service::is_operational_stream(
+            openobserve_synthetics::RESULTS_STREAM
+        ));
+    }
+
     /// Stored values are non-empty so a test can tell "overwritten" from
     /// "blanked".
     fn item(id: &str) -> SyntheticListItem {

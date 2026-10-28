@@ -241,17 +241,8 @@ pub async fn search_http2_stream(
         }
     };
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                axum::Json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
-        }
+    if let Some(refused) = super::search_license_refusal(&org_id, &req.query.sql, stream_type) {
+        return refused;
     }
 
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
@@ -768,8 +759,8 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&values_req.stream_name))
-        {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(

@@ -789,12 +789,12 @@ pub async fn create_config(
     ) {
         let anomaly_id_for_training = anomaly_id.clone();
         tokio::spawn(async move {
-            if let Err(e) =
+            let started =
                 o2_enterprise::enterprise::anomaly_detection::scheduler::trigger_training(
                     &anomaly_id_for_training,
                 )
-                .await
-            {
+                .await;
+            if let Some(e) = initial_training_error(started) {
                 log::error!(
                     "[anomaly_detection {}] failed to trigger initial training on create: {}",
                     anomaly_id_for_training,
@@ -2167,6 +2167,14 @@ fn ensure_trainable(config: &infra::table::entity::anomaly_detection_config::Mod
         )));
     }
     Ok(())
+}
+
+/// The create-time training error worth logging; a license hold only defers training.
+#[cfg(feature = "enterprise")]
+fn initial_training_error(started: Result<()>) -> Option<anyhow::Error> {
+    started
+        .err()
+        .filter(|e| !o2_enterprise::enterprise::anomaly_detection::scheduler::training_deferred(e))
 }
 
 /// Create-time training gate: the config's own `enabled`, not just the global kill-switch.
@@ -7174,5 +7182,18 @@ mod tests {
                 validate_config_request(&req).unwrap_or_else(|e| panic!("{signal:?}: {e}"));
             }
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_license_hold_defers_initial_training_instead_of_failing_it() {
+        use o2_enterprise::enterprise::{
+            anomaly_detection::scheduler::trigger_training, license::close_search_gate_for_tests,
+        };
+
+        let _gate = close_search_gate_for_tests().await;
+        assert!(initial_training_error(trigger_training("no-such-id").await).is_none());
+        assert!(initial_training_error(Err(anyhow::anyhow!("db down"))).is_some());
+        assert!(initial_training_error(Ok(())).is_none());
     }
 }

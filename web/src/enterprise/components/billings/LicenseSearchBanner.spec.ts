@@ -183,6 +183,82 @@ describe("LicenseSearchBanner", () => {
     expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
   });
 
+  it("paused usage copy pluralizes the over-limit day count", async () => {
+    for (const [exceeded, phrase] of [
+      [1, "on 1 day this month"],
+      [5, "on 5 days this month"],
+    ] as const) {
+      queryClient.clear();
+      vi.mocked(licenseServer.get_license).mockResolvedValue({
+        data: {
+          ...pausedLicense,
+          decision: { ...pausedLicense.decision, exceeded_days: exceeded },
+        },
+      } as never);
+      const w = await mountBanner(PAUSED);
+      expect(w.find('[data-test="license-search-banner"]').text()).toContain(phrase);
+      w.unmount();
+      wrapper = undefined;
+    }
+  });
+
+  it("refresh button reads Refresh now", async () => {
+    const w = await mountBanner(PAUSED);
+    expect(w.get('[data-test="license-banner-refresh"]').text()).toBe("Refresh now");
+  });
+  it("renewed outcome shows the new expiry inline even after config unpauses search", async () => {
+    const DateTimeFormat = Intl.DateTimeFormat;
+    vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (locale, options) {
+      return new DateTimeFormat(locale ?? "en-GB", options);
+    });
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+      data: { outcome: "renewed", renewed: { license_id: "new", expires_at: 1825113600000000 } },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await flushPromises();
+    expect(w.get('[data-test="license-banner-outcome"]').text()).toBe(
+      "A renewed license was applied. It now expires on Nov 2, 2027.",
+    );
+    store.commit("setConfig", { meta_org: META, license_search_allowed: true });
+    await flushPromises();
+    expect(w.get('[data-test="license-banner-outcome"]').text()).toContain(
+      "It now expires on Nov 2, 2027",
+    );
+    expect(w.findComponent(OBanner).props("variant")).toBe("success");
+  });
+  it("an unchanged refresh preserves the paused warning until config confirms recovery", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+      data: { outcome: "unchanged" },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("Search is paused.");
+    expect(w.text()).toContain("License is up to date");
+    expect(w.findComponent(OBanner).props("variant")).toBe("error");
+  });
+  it("unreachable outcome keeps the paused banner and shows the error line", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+      data: { error: "unreachable", limits_refreshed: true },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("Search is paused.");
+    expect(w.get('[data-test="license-banner-outcome"]').text()).toContain(
+      "Could not reach the license server. Limits were refreshed.",
+    );
+  });
+  it("does not send overlapping refresh clicks", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
+      () => new Promise(() => {}) as never,
+    );
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
+  });
   it("paused hides refresh from a user who may not update the license", async () => {
     vi.mocked(licenseServer.get_license).mockResolvedValue({
       data: { ...pausedLicense, can_update_license: false },

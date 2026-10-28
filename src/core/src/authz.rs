@@ -527,10 +527,6 @@ pub async fn check_permissions(
         return true;
     }
 
-    if report_failure_lifts_rbac().await {
-        return true;
-    }
-
     let object_str = auth_info.o2_type;
     log::debug!("Role of user {user_id} is {role:#?}");
     let role = if role == UserRole::Root {
@@ -582,19 +578,10 @@ pub async fn list_objects_for_user(
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
 }
 
-/// Off or lifted RBAC allows every read, as [`check_permissions`] answers.
+/// Off RBAC allows every read, as [`check_permissions`] answers.
 #[cfg(feature = "enterprise")]
 pub async fn rbac_enforced() -> bool {
-    o2_openfga::config::get_config().enabled && !report_failure_lifts_rbac().await
-}
-
-/// Never before the first usage report: an unloaded license also reads as a reporting failure.
-#[cfg(feature = "enterprise")]
-pub async fn report_failure_lifts_rbac() -> bool {
-    use o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, last_reported_timestamp,
-    };
-    block_feature_for_report_failure().await && last_reported_timestamp().await > 0
+    o2_openfga::config::get_config().enabled
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1347,13 +1334,88 @@ mod tests {
         }
     }
 
+    #[test]
+    fn rbac_is_never_lifted_by_a_report_failure() {
+        let source = include_str!("authz.rs");
+        let code = source
+            .split(concat!("#[cfg(test)]\nmod ", "tests {"))
+            .next()
+            .unwrap();
+        for needle in [
+            concat!("block_feature", "_for_report_failure"),
+            concat!("report_failure", "_lifts_rbac"),
+        ] {
+            assert!(!code.contains(needle), "authz.rs calls {needle}");
+        }
+    }
+
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn report_failure_does_not_lift_rbac_before_any_report() {
+    async fn rbac_enforced_follows_only_the_openfga_switch() {
         assert_eq!(
-            o2_enterprise::enterprise::license::last_reported_timestamp().await,
-            0
+            rbac_enforced().await,
+            o2_openfga::config::get_config().enabled
         );
-        assert!(!report_failure_lifts_rbac().await);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn report_grace_license(now: i64, active: bool) -> o2_enterprise::enterprise::license::License {
+        serde_json::from_value(serde_json::json!({
+            "version":2,"license_id":"grace-authz","installation_id":"*","active":true,
+            "created_at":now-1_000_000,"expires_at":now+86_400_000_000i64,"msv":"0.0.0",
+            "company":"Test Co","address":"1 Test Way","contact_name":"Test User",
+            "contact_email":"test@example.com","additional_emails":[],"base_urls":[],
+            "limits":{"Ingestion":{"typ":"PerDayCount","value":100}},"company_id":"test",
+            "environment_type":"online","limit_breach_allowed_count":0,
+            "allow_search_after_limit_exceeded":false,"validator_url":"","validator_auth":"",
+            "no_usage_report_allowed_duration":1,
+            "waivers":[{"id":"g","type":"report_grace","starts_at":now-3_600_000_000i64,
+                "ends_at":if active {now+3_600_000_000i64} else {now-1}}]
+        }))
+        .unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn report_grace_preserves_authorized_and_unauthorized_query_decisions() {
+        use o2_enterprise::enterprise::license::{
+            TEST_STATICS_LOCK, block_feature_for_report_failure, replace_license_for_tests,
+            set_last_reported_timestamp_for_tests,
+        };
+        let held = TEST_STATICS_LOCK.lock().await;
+        let previous_ts = o2_enterprise::enterprise::license::last_reported_timestamp().await;
+        let now = chrono::Utc::now().timestamp_micros();
+        let previous = replace_license_for_tests(
+            &held,
+            Some(("grace".into(), report_grace_license(now, true))),
+        )
+        .await;
+        set_last_reported_timestamp_for_tests(&held, now - 86_400_000_000i64);
+        let checker = FakeChecker::default().reads("authorized", "o1/logs/app");
+        let sources = [sql("o1", "select * from app")];
+        for active in [true, false] {
+            replace_license_for_tests(
+                &held,
+                Some(("grace".into(), report_grace_license(now, active))),
+            )
+            .await;
+            assert_eq!(block_feature_for_report_failure().await, !active);
+            assert!(
+                authorize_with(&checker, "authorized", &sources)
+                    .await
+                    .is_ok()
+            );
+            assert!(
+                authorize_with(&checker, "unauthorized", &sources)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(
+                rbac_enforced().await,
+                o2_openfga::config::get_config().enabled
+            );
+        }
+        replace_license_for_tests(&held, previous).await;
+        set_last_reported_timestamp_for_tests(&held, previous_ts);
     }
 }
