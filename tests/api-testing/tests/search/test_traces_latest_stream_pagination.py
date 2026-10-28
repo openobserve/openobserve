@@ -1,4 +1,4 @@
-"""Streamed trace list pagination: a size of 0, below 0 or omitted lists 10 traces  [regression #15507].
+"""Streamed trace list pagination: a size of 0, below 0 or omitted uses ZO_QUERY_DEFAULT_LIMIT  [regression #15507].
 
 The streamed endpoint used to stop before its first partition for size=-1 and size=0 and return no traces. Every
 case runs through `traces/latest_stream` in all four sort combinations, because timestamp and duration sorts take
@@ -147,12 +147,12 @@ def seeded(client: OpenObserveClient) -> Generator[Seeded, None, None]:
 @pytest.mark.parametrize("sort", SORTS, ids=lambda s: f"{s[0]}-{s[1]}")
 @pytest.mark.parametrize(
     ("size", "count"),
-    [(-1, 10), (0, 10), (-5, 10), (None, 10), (1, 1), (2, 2), (20, 15)],
+    [(-1, 15), (0, 15), (-5, 15), (None, 15), (1, 1), (2, 2), (20, 15)],
 )
 def test_streamed_pages_follow_the_size_contract(
     client: OpenObserveClient, seeded: Seeded, sort: tuple[str, str], size: int | None, count: int
 ):
-    """#15507: a size of 0, below 0 or omitted returns the first 10 traces, a positive size its own count."""
+    """#15507: a size of 0, below 0 or omitted returns every seeded trace, a positive size its own count."""
     hits = _latest_stream(client, seeded.stream, seeded.window, sort, size=size, **{"from": 0})
     expected = _in_order(seeded.ordered, sort)[:count]
     got = _ids(hits)
@@ -161,7 +161,7 @@ def test_streamed_pages_follow_the_size_contract(
 
 
 @pytest.mark.parametrize("sort", DESC_SORTS, ids=lambda s: f"{s[0]}-{s[1]}")
-@pytest.mark.parametrize(("size", "count"), [(-1, 10), (0, 10), (None, 10), (2, 2), (20, 13)])
+@pytest.mark.parametrize(("size", "count"), [(-1, 13), (0, 13), (None, 13), (2, 2), (20, 13)])
 def test_descending_offsets_skip_the_first_traces(
     client: OpenObserveClient, seeded: Seeded, sort: tuple[str, str], size: int | None, count: int
 ):

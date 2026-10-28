@@ -15,7 +15,7 @@
 
 use arrow_schema::Schema;
 use config::{
-    TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME, get_config,
     meta::search::{Query, Request, SearchEventType},
     utils::time::now_micros,
 };
@@ -28,8 +28,6 @@ use super::{
     response::TraceResponseItem,
 };
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
-
-const DEFAULT_PAGE_SIZE: i64 = 10;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraceListMode {
@@ -162,12 +160,11 @@ impl TraceListOptions {
         if end == 0 {
             return Err("end_time is empty".to_string());
         }
-        let mut size = query.get("size").map_or(DEFAULT_PAGE_SIZE, |v| {
-            v.parse::<i64>().unwrap_or(DEFAULT_PAGE_SIZE)
-        });
-        if size <= 0 {
-            size = DEFAULT_PAGE_SIZE;
-        }
+        let size = query
+            .get("size")
+            .and_then(|v| v.parse::<i64>().ok())
+            .filter(|size| *size > 0)
+            .unwrap_or_else(|| get_config().limit.query_default_limit);
         let mut options = Self {
             filter,
             from: query
@@ -365,27 +362,30 @@ mod tests {
 
     #[test]
     fn parsing_preserves_defaults_and_unclamped_offset() {
+        let limit = get_config().limit.query_default_limit;
         for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
             let mut query = query();
             let defaults = TraceListOptions::parse(&query, mode).unwrap();
-            assert_eq!((defaults.from, defaults.size, defaults.timeout), (0, 10, 0));
+            assert_eq!(
+                (defaults.from, defaults.size, defaults.timeout),
+                (0, limit, 0)
+            );
             query.insert("from".to_string(), "-2".to_string());
             query.insert("size".to_string(), "-1".to_string());
             let options = TraceListOptions::parse(&query, mode).unwrap();
-            assert_eq!((options.from, options.size), (-2, 10));
-            query.insert("size".to_string(), "invalid".to_string());
-            assert_eq!(TraceListOptions::parse(&query, mode).unwrap().size, 10);
+            assert_eq!((options.from, options.size), (-2, limit));
         }
     }
 
     #[test]
-    fn sizes_below_one_resolve_to_the_default_page() {
+    fn sizes_below_one_resolve_to_the_query_default_limit() {
+        let limit = get_config().limit.query_default_limit;
         for (size, expected) in [
-            (None, 10),
-            (Some("0"), 10),
-            (Some("-1"), 10),
-            (Some("-5"), 10),
-            (Some("invalid"), 10),
+            (None, limit),
+            (Some("0"), limit),
+            (Some("-1"), limit),
+            (Some("-5"), limit),
+            (Some("invalid"), limit),
             (Some("1"), 1),
             (Some("2"), 2),
             (Some("2000"), 2000),
