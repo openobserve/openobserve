@@ -50,7 +50,9 @@ export interface UnpricedModel {
   tokens: number;
   cost: number;
   agents: string[];
-  /** The definition the model resolves to today: set when approximate, null when unpriced. */
+  /** True when an exact definition covers new spans, but recorded costs still have a gap. */
+  priced_now?: boolean;
+  /** The pricing definition the model resolves to today, if any. */
   matched: PricingMatch | null;
 }
 

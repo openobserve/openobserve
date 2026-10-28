@@ -93,8 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex min-w-0 flex-col py-1">
             <div class="flex min-w-0 items-center gap-1.5">
               <OTruncatedText as="span">{{ row.matched.name }}</OTruncatedText>
-              <OBadge variant="warning-soft" size="sm" class="shrink-0">
-                {{ t("modelPricing.unpriced.approximate") }}
+              <OBadge
+                :variant="row.priced_now ? 'success-soft' : 'warning-soft'"
+                size="sm"
+                class="shrink-0"
+              >
+                {{
+                  t(
+                    row.priced_now
+                      ? "modelPricing.unpriced.pricedNow"
+                      : "modelPricing.unpriced.approximate",
+                  )
+                }}
               </OBadge>
             </div>
             <span v-if="matchedPrices(row)" class="text-text-secondary text-xs">
@@ -122,6 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("modelPricing.unpriced.instrumentationDocs") }}
             </OButton>
           </div>
+          <span
+            v-else-if="row.priced_now"
+            class="text-text-secondary text-xs"
+            data-test="model-pricing-unpriced-priced-since"
+            >{{ t("modelPricing.unpriced.historicalGap") }}</span
+          >
           <div v-else class="flex items-center justify-end gap-1">
             <OButton
               variant="outline"

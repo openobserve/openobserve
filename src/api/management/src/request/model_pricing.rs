@@ -614,11 +614,13 @@ pub struct UnpricedModel {
     pub row: crate::request::gen_ai_health::UnpricedModelRow,
     /// Null when no definition matches the model today.
     pub matched: Option<UnpricedModelMatch>,
+    /// An exact definition covers new spans; these older spans retain their recorded cost.
+    pub priced_now: bool,
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UnpricedModelsResponse {
-    /// The models with the most tokens, minus those an exact price covers today.
+    /// Models with recorded pricing gaps, including those priced since ingestion.
     pub models: Vec<UnpricedModel>,
     /// Distinct models ingest marked in the window, uncapped and before today's prices are
     /// applied; spans without a model name count as one.
@@ -629,9 +631,7 @@ pub struct UnpricedModelsResponse {
     pub models_truncated: bool,
 }
 
-/// Joins the spans' ingest-time status with today's definitions: a model that now has an exact
-/// price (created, kept or muted since) is dropped; the rest carry what they resolve to now.
-/// Spans with no model name have nothing to match, so they stay unpriced.
+/// Joins recorded pricing gaps with today's definitions without hiding historical gaps.
 fn resolve_unpriced(
     rows: Vec<crate::request::gen_ai_health::UnpricedModelRow>,
     entries: &[CachedModelPricing],
@@ -644,9 +644,7 @@ fn resolve_unpriced(
             .model
             .as_deref()
             .and_then(|m| model_pricing::find_pricing_sync_at(entries, m, Some(now_micros)));
-        if matches!(&resolved, Some(r) if r.match_kind == MatchKind::Exact) {
-            continue;
-        }
+        let priced_now = matches!(&resolved, Some(r) if r.match_kind == MatchKind::Exact);
         // A model seen both unpriced and approximate (a price was added mid-window) is one row.
         if let Some(existing) = by_model.get_mut(&row.model) {
             existing.row.spans += row.spans;
@@ -666,13 +664,22 @@ fn resolve_unpriced(
             tiers: r.definition.tiers,
         });
         let mut row = row;
-        row.status = if matched.is_some() {
-            config::meta::model_pricing::CostStatus::Approximate
-        } else {
-            config::meta::model_pricing::CostStatus::Unpriced
-        };
+        if !priced_now {
+            row.status = if matched.is_some() {
+                config::meta::model_pricing::CostStatus::Approximate
+            } else {
+                config::meta::model_pricing::CostStatus::Unpriced
+            };
+        }
         order.push(row.model.clone());
-        by_model.insert(row.model.clone(), UnpricedModel { row, matched });
+        by_model.insert(
+            row.model.clone(),
+            UnpricedModel {
+                row,
+                matched,
+                priced_now,
+            },
+        );
     }
     order
         .into_iter()
@@ -1630,14 +1637,14 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_unpriced_drops_exact_and_merges_statuses() {
+    fn test_resolve_unpriced_keeps_historical_gaps_and_merges_statuses() {
         use config::meta::model_pricing::CostStatus;
         let mut entries = built_in_gpt_4o();
         // Approximate today: `gpt-5.4` covers only part of `gpt-5.4-mini`.
         entries.push(entry("GPT-5.4", r"(?i)gpt-5\.4", PricingSource::BuiltIn));
         let rows = vec![
             unpriced_row("acme-internal-llm", CostStatus::Unpriced, 100),
-            // Was unpriced at ingest, has an exact price now: fixed, so dropped.
+            // Now exactly priced, but the historical gap must remain visible.
             unpriced_row("gpt-4o", CostStatus::Unpriced, 50),
             unpriced_row("gpt-5.4-mini", CostStatus::Approximate, 30),
             // Seen unpriced earlier in the window, approximate since: one row.
@@ -1645,12 +1652,21 @@ mod tests {
         ];
         let out = resolve_unpriced(rows, &entries, 0);
         let models: Vec<_> = out.iter().map(|m| m.row.model.as_deref()).collect();
-        assert_eq!(models, [Some("acme-internal-llm"), Some("gpt-5.4-mini")]);
+        assert_eq!(
+            models,
+            [
+                Some("acme-internal-llm"),
+                Some("gpt-4o"),
+                Some("gpt-5.4-mini")
+            ]
+        );
         assert!(out[0].matched.is_none());
-        assert_eq!(out[0].row.status, CostStatus::Unpriced);
-        assert_eq!(out[1].row.status, CostStatus::Approximate);
-        assert_eq!(out[1].row.tokens, 50);
-        assert_eq!(out[1].matched.as_ref().unwrap().name, "GPT-5.4");
+        assert!(!out[0].priced_now);
+        assert!(out[1].priced_now);
+        assert_eq!(out[2].row.status, CostStatus::Approximate);
+        assert!(!out[2].priced_now);
+        assert_eq!(out[2].row.tokens, 50);
+        assert_eq!(out[2].matched.as_ref().unwrap().name, "GPT-5.4");
     }
 
     #[test]

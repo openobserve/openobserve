@@ -217,9 +217,10 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
 }
 
 /// Return all model names belonging to the built-in org.
-/// Used by the sync job to detect models removed from the upstream source.
+/// Used for synchronization and seed initialization; read the primary so a
+/// lagging replica cannot make a stored built-in list appear empty.
 pub async fn list_built_in_names() -> Result<Vec<String>, Error> {
-    let client = get_orm_client_ro().await;
+    let client = get_orm_client_rw().await;
     let rows: Vec<(String,)> = Entity::find()
         .select_only()
         .column(Column::Name)

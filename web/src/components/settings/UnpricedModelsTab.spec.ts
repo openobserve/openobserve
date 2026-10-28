@@ -139,6 +139,18 @@ describe("UnpricedModelsTab", () => {
     expect(wrapper.find('[data-test="model-pricing-unpriced-banner"]').exists()).toBe(true);
   });
 
+  it("keeps a historical gap visible after an exact price covers new spans", async () => {
+    const row = { ...unpricedResponse.models[1], priced_now: true };
+    wrapper = mountTab([row]);
+    const shown = await waitForRow(wrapper, row.model!);
+    expect(shown.text()).toContain("Priced for new spans");
+    expect(shown.find('[data-test="model-pricing-unpriced-priced-since"]').exists()).toBe(true);
+    expect(shown.find('[data-test="model-pricing-unpriced-create-btn"]').exists()).toBe(false);
+    expect(shown.find('[data-test="model-pricing-unpriced-keep-btn"]').exists()).toBe(false);
+    expect(shown.find('[data-test="model-pricing-unpriced-mute-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
+  });
+
   it("shows the all-priced empty state and no banner when no model is listed", async () => {
     wrapper = mountTab([]);
     await vi.waitFor(() =>
