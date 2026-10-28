@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "Удалить {count} именованное событие? Воронки, которые его используют, покажут тег удаленного шага. | Удалить именованные события ({count})? Воронки, которые их используют, покажут тег удаленного шага.",
         "bulkDeleteInUseMessage": "Удалить {count} именованное событие? Сохраненные воронки покажут шаг «Удаленное событие» для: {names}. | Удалить именованные события ({count})? Сохраненные воронки покажут шаг «Удаленное событие» для: {names}.",
         "notFound": "Это именованное событие больше не существует",
-        "discardTitle": "Отменить изменения?",
-        "discardMessage": "У этого именованного события есть несохраненные изменения. Выйти без сохранения?",
         "editorApp": "Приложение: {app}",
         "details": "Подробности",
         "opParam": "Параметр URL",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "На этой вкладке есть несохраненные изменения."
       },
-      "leaveConfirm": {
-        "title": "Отменить несохраненные изменения?",
-        "message": "У вас есть несохраненные изменения разрешений или участников. Покинув эту страницу, вы их отмените."
-      },
       "show": "Показать",
       "searchPermissions": "Поиск разрешений",
       "filterModules": "Фильтр модулей",
@@ -3808,9 +3825,6 @@
         "emoji": "Вставить эмодзи",
         "placeholder": "текст"
       },
-      "leaveTitle": "Сбросить изменения?",
-      "leaveMessage": "Ваши изменения этого баннера не сохранены.",
-      "leaveConfirm": "Сбросить",
       "publishNow": "Опубликовать сейчас",
       "schedule": "Запланировать",
       "statusLive": "Сейчас активен",
@@ -3822,7 +3836,6 @@
       "savedEnded": "Баннер сохранён; его расписание уже завершилось",
       "conflict": "Этот баннер был изменён кем-то другим. Перезагрузите, чтобы увидеть последнюю версию.",
       "reload": "Перезагрузить",
-      "keepEditing": "Продолжить редактирование",
       "orgsSome": "Только эти организации",
       "orgsPick": "Организации",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "Тип секрета",
     "staticSecret": "Статический секрет",
     "staticSecretName": "Имя",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "Имя DFC",
     "dfcIV": "IV DFC",
     "dfcEncryptedData": "Зашифрованные данные DFC",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "Максимум попыток должен быть от 1 до 3",
           "concurrencyRange": "Максимальный параллелизм должен быть от 1 до 32",
           "signingKeyRequired": "Не удалось создать ключ подписи. Попробуйте еще раз."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "Скопируйте ключ подписи",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "ИИ SRE не запускается; вызов ведёт себя точно так же, как без ИИ-триажа",
     "l0BudgetLabel": "Бюджет удержания",
     "l0BudgetRange": "От 30 до 600 секунд — сервер отклоняет значения вне этого диапазона, а не ограничивает их",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "Fail-open — если агент медленный или не отвечает, оповещение отправляется немедленно.",
     "l0AllowPromotion": "Повысить критичность",
     "l0AllowPromotionNote": "Применяется, когда вердикт агента это оправдывает.",

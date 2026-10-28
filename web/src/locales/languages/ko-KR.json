@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "명명된 이벤트 {count}개를 삭제하시겠습니까? 이를 사용하는 퍼널에는 삭제된 단계 태그가 표시됩니다. | 명명된 이벤트 {count}개를 삭제하시겠습니까? 이를 사용하는 퍼널에는 삭제된 단계 태그가 표시됩니다.",
         "bulkDeleteInUseMessage": "명명된 이벤트 {count}개를 삭제하시겠습니까? 저장된 퍼널에 다음에 대한 삭제된 이벤트 단계가 표시됩니다: {names}. | 명명된 이벤트 {count}개를 삭제하시겠습니까? 저장된 퍼널에 다음에 대한 삭제된 이벤트 단계가 표시됩니다: {names}.",
         "notFound": "이 명명된 이벤트는 더 이상 존재하지 않습니다",
-        "discardTitle": "변경 사항을 삭제하시겠습니까?",
-        "discardMessage": "이 명명된 이벤트에 저장되지 않은 변경 사항이 있습니다. 저장하지 않고 나가시겠습니까?",
         "editorApp": "앱: {app}",
         "details": "세부 정보",
         "opParam": "URL 매개변수",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "이 탭에는 저장되지 않은 변경 사항이 있습니다."
       },
-      "leaveConfirm": {
-        "title": "저장하지 않은 변경사항은 삭제하시겠습니까?",
-        "message": "권한 또는 구성원 변경 사항을 저장하지 않았습니다.이 페이지를 떠나면 변경 내용이 삭제됩니다."
-      },
       "show": "표시",
       "searchPermissions": "권한 검색",
       "filterModules": "모듈 필터",
@@ -3808,9 +3825,6 @@
         "emoji": "이모지 삽입",
         "placeholder": "텍스트"
       },
-      "leaveTitle": "변경 사항을 취소하시겠습니까?",
-      "leaveMessage": "이 배너에 대한 편집 내용이 저장되지 않았습니다.",
-      "leaveConfirm": "취소",
       "publishNow": "지금 게시",
       "schedule": "일정 예약",
       "statusLive": "현재 게시 중",
@@ -3822,7 +3836,6 @@
       "savedEnded": "배너가 저장되었습니다. 일정이 이미 종료되었습니다",
       "conflict": "다른 사람이 이 배너를 변경했습니다. 최신 버전을 보려면 다시 로드하세요.",
       "reload": "다시 로드",
-      "keepEditing": "계속 편집",
       "orgsSome": "이 조직만",
       "orgsPick": "조직",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "시크릿 타입",
     "staticSecret": "정적 비밀",
     "staticSecretName": "이름",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC 이름",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC 암호화 데이터",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "최대 시도 횟수는 1~3 사이여야 합니다.",
           "concurrencyRange": "최대 동시 실행 수는 1에서 32 사이여야 합니다.",
           "signingKeyRequired": "서명 키를 생성할 수 없습니다. 다시 시도하세요."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "서명 키 복사",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "AI SRE가 실행되지 않으며, 호출은 AI 트리아지 없이 이전과 동일하게 동작합니다",
     "l0BudgetLabel": "보류 예산",
     "l0BudgetRange": "30~600초 사이 — 서버는 이 범위를 벗어난 값을 조정하지 않고 거부합니다.",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "페일오픈 — 에이전트가 느리거나 응답하지 않으면 알림이 즉시 전송됩니다.",
     "l0AllowPromotion": "심각도 상향",
     "l0AllowPromotionNote": "에이전트의 판정에 따라 적용됩니다.",

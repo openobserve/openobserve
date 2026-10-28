@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import type { SyntheticCheckType } from "@/types/synthetics";
@@ -451,5 +452,66 @@ describe("CheckTypePicker.vue", () => {
         expect(badgeContainers[i].find(".o-tag-stub").exists()).toBe(true);
       }
     });
+  });
+});
+
+describe("CheckTypePicker drafts (real cards)", () => {
+  let wrapper: VueWrapper | null = null;
+  const store = createStore({ state: { timezone: "UTC" } });
+  const savedAt = Date.UTC(2026, 9, 21, 14, 32);
+
+  beforeEach(() => {
+    // jsdom has no layout; every element gets a box so the dot counts as visible.
+    vi.spyOn(Element.prototype, "getClientRects").mockReturnValue({
+      length: 1,
+      item: () => null,
+    } as unknown as DOMRectList);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const mountReal = () => {
+    wrapper = mount(CheckTypePicker, {
+      props: { variant: "modal", layout: "row", draftSavedAt: { http: savedAt, tcp: null } },
+      attachTo: document.body,
+      global: { plugins: [i18n, store] },
+    });
+    return wrapper;
+  };
+
+  const card = (type: string) =>
+    document.body.querySelector<HTMLButtonElement>(
+      `[data-test="check-type-picker-row-card-${type}"] button`,
+    )!;
+
+  it("marks only the type that holds a draft, and names it on the card", async () => {
+    mountReal();
+    await flushPromises();
+    expect(
+      card("http").querySelector('[data-test="check-type-picker-row-card-http-draft-dot"]'),
+    ).not.toBeNull();
+    expect(
+      document.body.querySelector('[data-test="check-type-picker-row-card-tcp-draft-dot"]'),
+    ).toBeNull();
+    expect(card("http").getAttribute("aria-label")).toMatch(/· unsaved draft from .*2026/);
+    expect(card("tcp").hasAttribute("aria-label")).toBe(false);
+    expect(card("http").querySelector("[title]")).toBeNull();
+  });
+
+  it("shows the draft's date when the user hovers that card", async () => {
+    vi.useFakeTimers();
+    mountReal();
+    await flushPromises();
+    card("http").dispatchEvent(new MouseEvent("mouseenter"));
+    vi.advanceTimersByTime(800);
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent).toMatch(
+      /Unsaved draft · .*2026/,
+    );
   });
 });

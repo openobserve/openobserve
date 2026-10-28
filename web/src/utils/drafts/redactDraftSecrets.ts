@@ -60,12 +60,17 @@ const blankAt = (node: Container, key: string, segments: string[], paths: string
   paths.push(pointer([...segments, key]));
 };
 
+interface WalkRules {
+  containers: boolean;
+  exempt: ReadonlySet<string>;
+}
+
 const walk = (
   node: unknown,
   segments: string[],
   paths: string[],
   inSecret: boolean,
-  containers: boolean,
+  rules: WalkRules,
 ) => {
   if (!isContainer(node)) return;
   if (Array.isArray(node)) {
@@ -74,20 +79,22 @@ const walk = (
       if (inSecret && typeof child === "string" && child !== "") {
         node[index] = "";
         paths.push(pointer(childSegments));
-      } else walk(child, childSegments, paths, inSecret, containers);
+      } else walk(child, childSegments, paths, inSecret, rules);
     });
     return;
   }
   const pairIsSecret = isSecretPair(node);
   for (const [key, value] of Object.entries(node)) {
-    const keyIsSecret = SECRET_KEY_PATTERN.test(key);
+    const exempt = rules.exempt.has(key);
+    const keyIsSecret = !exempt && SECRET_KEY_PATTERN.test(key);
     const blank =
       typeof value === "string" &&
       value !== "" &&
+      !exempt &&
       (keyIsSecret || (pairIsSecret && key === "value") || (inSecret && !IDENTITY_FIELDS.has(key)));
     if (blank) blankAt(node, key, segments, paths);
     else
-      walk(value, [...segments, key], paths, inSecret || (containers && keyIsSecret), containers);
+      walk(value, [...segments, key], paths, inSecret || (rules.containers && keyIsSecret), rules);
   }
 };
 
@@ -135,14 +142,14 @@ const currentEntryValue = (
   return matches.length === 1 && isRecord(matches[0]) ? matches[0][target.field] : undefined;
 };
 
-/** Blanks secret string values in a deep copy of `data` and reports where; with `containers`, every string under a secret-looking key too. */
+/** Blanks secret string values in a deep copy of `data` and reports where; with `containers`, every string under a secret-looking key too, and never one under an `exemptKeys` key. */
 export const redactDraftSecrets = <T>(
   data: T,
-  { containers = true }: { containers?: boolean } = {},
+  { containers = true, exemptKeys = [] }: { containers?: boolean; exemptKeys?: string[] } = {},
 ): RedactedDraft<T> => {
   const copy = JSON.parse(JSON.stringify(data ?? null)) as T;
   const paths: string[] = [];
-  walk(copy, [], paths, false, containers);
+  walk(copy, [], paths, false, { containers, exempt: new Set(exemptKeys) });
   return { data: copy, paths };
 };
 

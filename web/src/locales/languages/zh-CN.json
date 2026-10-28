@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "删除 {count} 个命名事件？使用它的漏斗将显示已删除步骤标签。 | 删除 {count} 个命名事件？使用它们的漏斗将显示已删除步骤标签。",
         "bulkDeleteInUseMessage": "删除 {count} 个命名事件？已保存的漏斗将为以下项显示“已删除事件”步骤：{names}。 | 删除 {count} 个命名事件？已保存的漏斗将为以下项显示“已删除事件”步骤：{names}。",
         "notFound": "此命名事件已不存在",
-        "discardTitle": "放弃更改？",
-        "discardMessage": "此命名事件有未保存的更改。不保存就离开吗？",
         "editorApp": "应用：{app}",
         "details": "详细信息",
         "opParam": "URL 参数",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "此选项卡有未保存的更改。"
       },
-      "leaveConfirm": {
-        "title": "丢弃未保存的更改？",
-        "message": "您有未保存的权限或成员更改。离开此页面将丢弃它们。"
-      },
       "show": "显示",
       "searchPermissions": "搜索权限",
       "filterModules": "筛选模块",
@@ -3808,9 +3825,6 @@
         "emoji": "插入表情符号",
         "placeholder": "文本"
       },
-      "leaveTitle": "放弃更改？",
-      "leaveMessage": "您对此横幅的修改尚未保存。",
-      "leaveConfirm": "放弃",
       "publishNow": "立即发布",
       "schedule": "排期",
       "statusLive": "当前正在展示",
@@ -3822,7 +3836,6 @@
       "savedEnded": "横幅已保存；其排期已结束",
       "conflict": "此横幅已被其他人更改。重新加载以查看最新版本。",
       "reload": "重新加载",
-      "keepEditing": "继续编辑",
       "orgsSome": "仅这些组织",
       "orgsPick": "组织",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "密钥类型",
     "staticSecret": "静态密钥",
     "staticSecretName": "名称",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC 名称",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC 加密数据",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "最大尝试次数必须在 1 到 3 之间",
           "concurrencyRange": "最大并发数必须在 1 到 32 之间",
           "signingKeyRequired": "无法生成签名密钥。请重试。"
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "复制您的签名密钥",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "不运行 AI SRE；寻呼行为与未启用 AI 分诊时完全一致",
     "l0BudgetLabel": "保留预算",
     "l0BudgetRange": "介于 30 到 600 秒之间 — 服务器会拒绝此范围之外的值，而不是将其截断。",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "故障开放 — 如果智能体缓慢或无响应，则立即发送告警。",
     "l0AllowPromotion": "提升严重级别",
     "l0AllowPromotionNote": "当智能体的判定认为有必要时应用。",

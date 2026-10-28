@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "刪除 {count} 個具名事件？使用它的漏斗會顯示已刪除步驟標籤。 | 刪除 {count} 個具名事件？使用它們的漏斗會顯示已刪除步驟標籤。",
         "bulkDeleteInUseMessage": "刪除 {count} 個具名事件？已儲存的漏斗將針對以下項目顯示「已刪除事件」步驟：{names}。 | 刪除 {count} 個具名事件？已儲存的漏斗將針對以下項目顯示「已刪除事件」步驟：{names}。",
         "notFound": "此具名事件已不存在",
-        "discardTitle": "捨棄變更？",
-        "discardMessage": "此具名事件有未儲存的變更。要不儲存就直接離開嗎？",
         "editorApp": "應用程式：{app}",
         "details": "詳細資料",
         "opParam": "URL 參數",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "此分頁有未儲存的變更。"
       },
-      "leaveConfirm": {
-        "title": "捨棄未儲存的變更？",
-        "message": "您有未儲存的權限或成員變更。離開此頁面將會捨棄這些變更。"
-      },
       "show": "顯示",
       "searchPermissions": "搜尋權限",
       "filterModules": "篩選模組",
@@ -3808,9 +3825,6 @@
         "emoji": "插入表情符號",
         "placeholder": "文字"
       },
-      "leaveTitle": "要捨棄變更嗎？",
-      "leaveMessage": "您對此橫幅的編輯尚未儲存。",
-      "leaveConfirm": "捨棄",
       "publishNow": "立即發佈",
       "schedule": "排程",
       "statusLive": "目前即時顯示中",
@@ -3822,7 +3836,6 @@
       "savedEnded": "橫幅已儲存；其排程已經結束",
       "conflict": "此橫幅已被其他人變更。請重新載入以查看最新版本。",
       "reload": "重新載入",
-      "keepEditing": "繼續編輯",
       "orgsSome": "僅限這些組織",
       "orgsPick": "組織",
       "orgOption": "{name} ({id})",
@@ -14826,6 +14839,7 @@
     "secretType": "密碼類型",
     "staticSecret": "靜態機密",
     "staticSecretName": "名稱",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC 名稱",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC 加密資料",
@@ -16693,7 +16707,9 @@
           "attemptsRange": "最大嘗試次數必須介於 1 到 3 之間",
           "concurrencyRange": "最大並行數必須介於 1 和 32 之間",
           "signingKeyRequired": "無法產生簽署金鑰。請再試一次。"
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "複製您的簽署金鑰",
@@ -24345,6 +24361,7 @@
     "l0OffSentence": "不會執行 AI SRE；呼叫的行為與未啟用 AI 分診時完全相同",
     "l0BudgetLabel": "緩衝時間",
     "l0BudgetRange": "介於 30 至 600 秒 — 伺服器會拒絕此範圍外的數值，而非自動取邊界值。",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "故障時放行 — 若 AI 代理運作遲緩或無回應，警示會立即發出。",
     "l0AllowPromotion": "提高嚴重度",
     "l0AllowPromotionNote": "僅在 AI 代理的判定認為有需要時套用。",

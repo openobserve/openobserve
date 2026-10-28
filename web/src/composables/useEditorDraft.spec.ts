@@ -22,6 +22,7 @@ import { raw } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import {
   deleteEditorDraft,
@@ -461,6 +462,66 @@ describe("useEditorDraft", () => {
       expect(form.password).toBe("");
     });
 
+    it("stores a base hash over the base with its secrets blanked, and still sees a server change", async () => {
+      server = { name: "saved", password: "s3cret", tab: "a" };
+      await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      flushAutosave();
+      const stored = readEditorDraft(editScope)?.baseHash;
+      expect(stored).toBe(hashDraftValue({ name: "saved", password: "", tab: "a" }));
+      expect(stored).not.toBe(hashDraftValue(server));
+      wrapper?.unmount();
+
+      server = { name: "renamed on server", password: "s3cret", tab: "a" };
+      const again = await mountHost();
+      const started = again.start();
+      await flushPromises();
+      expect(again.state.changedOnServer).toBe(true);
+      again.chooseRestore("dismiss");
+      await started;
+    });
+
+    it("blanks secrets of the base through redactBase before hashing", async () => {
+      overrides = {
+        redactBase: (base) => ({ ...(base as Form), tab: "" }),
+      };
+      server = { name: "saved", password: "", tab: "hidden-material" };
+      await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      flushAutosave();
+      expect(readEditorDraft(editScope)?.baseHash).toBe(
+        hashDraftValue({ name: "saved", password: "", tab: "" }),
+      );
+    });
+
+    it("words the dialogs for an item with a server-side draft, and takes a Save label", async () => {
+      overrides = { serverDraftItem: true, saveLabel: () => raw("Publish") };
+      seed(editScope, { name: "draft" });
+      const draft = await mountHost();
+      const started = draft.start();
+      await flushPromises();
+      expect(byTest("editor-draft-continue")?.textContent).toContain("Continue editing");
+      draft.chooseRestore("dismiss");
+      await started;
+
+      userInput();
+      await edit({ name: "typed" });
+      const result = leave();
+      await flushPromises();
+      expect(leaveDialogButton("o-dialog-secondary-btn")?.textContent).toContain(
+        "Keep in this browser",
+      );
+      expect(leaveDialogButton("editor-draft-leave-save")?.textContent).toContain("Publish");
+      expect(byTest("editor-draft-leave-message")?.textContent).toContain(
+        "keep your changes in this browser until you sign out",
+      );
+      expect(byTest("editor-draft-leave-message")?.textContent).not.toContain("draft");
+      draft.chooseLeave("stay");
+      expect(await result).toBe(false);
+    });
+
     it("warns when the server item changed after the draft was written", async () => {
       seed(editScope, { name: "draft" }, { baseHash: hashDraftValue({ old: true }) });
       const draft = await mountHost();
@@ -875,6 +936,105 @@ describe("useEditorDraft", () => {
     });
   });
 
+  describe("fields in a teleported drawer, or in extra input roots", () => {
+    const mountDrawerHost = async (extra: Partial<UseEditorDraftOptions<Form>> = {}) => {
+      let draft!: EditorDraftController;
+      const DrawerHost = defineComponent({
+        setup() {
+          draft = useEditorDraft<Form>({
+            kind: "function",
+            entityLabel: () => raw("function"),
+            entityId: () => entityId,
+            snapshot: () => ({ ...form }),
+            apply,
+            base: () => server,
+            save,
+            ...extra,
+          });
+          return () =>
+            h("div", [
+              h(
+                ODrawer,
+                { open: true, title: raw("Settings") },
+                { default: () => h("input", { "data-test": "drawer-field" }) },
+              ),
+            ]);
+        },
+      });
+      wrapper = mount(DrawerHost, { attachTo: document.body, global: { plugins: [store] } });
+      await flushPromises();
+      return draft;
+    };
+
+    it("takes the baseline on focus of a field inside a teleported ODrawer", async () => {
+      const draft = await mountDrawerHost();
+      await draft.start();
+      const field = byTest("drawer-field") as HTMLInputElement;
+      expect(wrapper!.element.contains(field)).toBe(false);
+      field.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      await edit({ name: "typed in the drawer" });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+    });
+
+    it("counts an edit made in the drawer while the item loads", async () => {
+      const draft = await mountDrawerHost();
+      const field = byTest("drawer-field") as HTMLInputElement;
+      field.value = "early";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await draft.start();
+      expect(draft.hasUnsavedChanges()).toBe(true);
+    });
+
+    it("treats fields under inputRoots as the editor's", async () => {
+      const outside = document.createElement("div");
+      outside.innerHTML = '<input data-test="outside-field" />';
+      document.body.appendChild(outside);
+      try {
+        overrides = { inputRoots: () => [outside, null] };
+        const draft = await startHost();
+        (byTest("outside-field") as HTMLElement).dispatchEvent(
+          new FocusEvent("focusin", { bubbles: true }),
+        );
+        await edit({ name: "typed outside" });
+        expect(draft.hasUnsavedChanges()).toBe(true);
+      } finally {
+        outside.remove();
+      }
+    });
+  });
+
+  describe("secretExemptKeys", () => {
+    it("keeps a non-secret field whose key matches the secret pattern", async () => {
+      type Auth = { authApiKeyHeaderName: string; authApiKeyToken: string };
+      const auth = reactive<Auth>({ authApiKeyHeaderName: "", authApiKeyToken: "" });
+      let draft!: EditorDraftController;
+      const Host = defineComponent({
+        setup() {
+          draft = useEditorDraft<Auth>({
+            kind: "function",
+            entityLabel: () => raw("function"),
+            entityId: () => null,
+            snapshot: () => ({ ...auth }),
+            apply: (data) => Object.assign(auth, data),
+            save: async () => true,
+            secretExemptKeys: ["authApiKeyHeaderName"],
+          });
+          return () => h(EditorDraftDialogs, { draft });
+        },
+      });
+      wrapper = mount(Host, { attachTo: document.body, global: { plugins: [store] } });
+      await draft.start();
+      userInput();
+      Object.assign(auth, { authApiKeyHeaderName: "X-Judge-Key", authApiKeyToken: "secret" });
+      await nextTick();
+      flushAutosave();
+      expect(readEditorDraft<Auth>(newScope)?.data).toEqual({
+        authApiKeyHeaderName: "X-Judge-Key",
+        authApiKeyToken: "",
+      });
+    });
+  });
+
   describe("edits before start", () => {
     const hostField = () => byTest("host-field") as HTMLInputElement;
     const typeInto = (field: HTMLInputElement, value: string) => {
@@ -1107,6 +1267,10 @@ describe("useEditorDraftIds", () => {
     expect(ids.hasNew).toBe(true);
     expect(ids.hasNewVariant("tcp")).toBe(true);
     expect(ids.hasNewVariant("http")).toBe(false);
+    expect(ids.savedAtVariant("tcp")).toBe(
+      readEditorDraft({ ...newScope, variant: "tcp" })?.savedAt,
+    );
+    expect(ids.savedAtVariant("http")).toBeNull();
     expect(ids.savedAt(null)).toBe(readEditorDraft(newScope)?.savedAt);
     expect(ids.savedAt("fn1")).toBe(readEditorDraft(editScope)?.savedAt);
     expect(ids.savedAt("missing")).toBeNull();

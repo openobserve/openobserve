@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :changed-on-server="draft.state.changedOnServer"
     :credentials-not-saved="draft.state.credentialsNotSaved"
     :not-kept-fields="draft.state.notKeptFields"
+    :note="draft.state.restoreNote"
+    :server-draft-item="draft.state.serverDraftItem"
     @continue="draft.chooseRestore('continue')"
     @fresh="draft.chooseRestore('fresh')"
     @dismiss="draft.chooseRestore('dismiss')"
@@ -35,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :can-keep-draft="draft.state.canKeepDraft"
     :signing-out="draft.state.signingOut"
     :can-save="draft.state.canSave"
+    :server-draft-item="draft.state.serverDraftItem"
+    :save-label="draft.state.saveLabel"
     @choose="draft.chooseLeave"
   />
 </template>

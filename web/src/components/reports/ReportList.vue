@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`reports.add`) }}
           <EditorDraftDot
             v-if="reportDrafts.hasNew"
+            :saved-at="reportDrafts.savedAt(null)"
             corner
             data-test="report-list-add-report-draft-dot"
           />

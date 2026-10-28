@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "Supprimer {count} événement nommé ? Les entonnoirs qui l'utilisent afficheront une étiquette d'étape supprimée. | Supprimer {count} événements nommés ? Les entonnoirs qui les utilisent afficheront une étiquette d'étape supprimée.",
         "bulkDeleteInUseMessage": "Supprimer {count} événement nommé ? Les entonnoirs enregistrés afficheront une étape Événement supprimé pour : {names}. | Supprimer {count} événements nommés ? Les entonnoirs enregistrés afficheront une étape Événement supprimé pour : {names}.",
         "notFound": "Cet événement nommé n'existe plus",
-        "discardTitle": "Abandonner les modifications ?",
-        "discardMessage": "Cet événement nommé comporte des modifications non enregistrées. Quitter sans les enregistrer ?",
         "editorApp": "Application : {app}",
         "details": "Détails",
         "opParam": "Paramètre d'URL",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "Cet onglet contient des modifications non enregistrées."
       },
-      "leaveConfirm": {
-        "title": "Ignorer les modifications non enregistrées ?",
-        "message": "Vous avez une autorisation non enregistrée ou des modifications de membre n'ont pas été enregistrées. Si vous quittez cette page, ils seront ignorés."
-      },
       "show": "Afficher",
       "searchPermissions": "Rechercher des permissions",
       "filterModules": "Filtrer les modules",
@@ -3808,9 +3825,6 @@
         "emoji": "Insérer un emoji",
         "placeholder": "texte"
       },
-      "leaveTitle": "Abandonner les modifications ?",
-      "leaveMessage": "Vos modifications de ce bandeau n'ont pas été enregistrées.",
-      "leaveConfirm": "Abandonner",
       "publishNow": "Publier maintenant",
       "schedule": "Programmer",
       "statusLive": "Actuellement actif",
@@ -3822,7 +3836,6 @@
       "savedEnded": "Bandeau enregistré ; sa programmation est déjà terminée",
       "conflict": "Cette bannière a été modifiée par quelqu'un d'autre. Rechargez pour voir la dernière version.",
       "reload": "Recharger",
-      "keepEditing": "Continuer la modification",
       "orgsSome": "Uniquement ces organisations",
       "orgsPick": "Organisations",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "Type de secret",
     "staticSecret": "Secret statique",
     "staticSecretName": "Nom",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "Nom DFC",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "Données cryptées DFC",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "Le nombre maximal de tentatives doit être compris entre 1 et 3",
           "concurrencyRange": "Le nombre maximal de requêtes simultanées doit être compris entre 1 et 32.",
           "signingKeyRequired": "Impossible de générer une clé de signature. Réessayez."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "Copiez votre clé de signature",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "aucun SRE IA n'intervient ; la notification se comporte exactement comme sans triage IA",
     "l0BudgetLabel": "Délai d'attente",
     "l0BudgetRange": "Entre 30 et 600 secondes — le serveur refuse les valeurs en dehors de cet intervalle plutôt que de les borner",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "Fail-open — si l'agent est lent ou ne répond pas, l'alerte est envoyée immédiatement.",
     "l0AllowPromotion": "Augmenter la gravité",
     "l0AllowPromotionNote": "S'applique lorsque le verdict de l'agent le justifie.",

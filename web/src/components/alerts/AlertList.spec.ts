@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -2225,11 +2226,41 @@ describe("AlertList - editor drafts", () => {
     writeEditorDraft({ ...scope(null), variant: "anomaly" }, { data: draftData });
     await flushPromises();
     expect(dot()).toBe(true);
+    const dotProps = wrapper
+      .findAllComponents(EditorDraftDot)
+      .find((c: any) => c.props("dataTest") === "alert-list-add-alert-draft-dot");
+    expect(dotProps?.props("savedAt")).toBe(
+      readEditorDraft({ ...scope(null), variant: "anomaly" })?.savedAt,
+    );
 
     wrapper.vm.activeTab = "all";
     deleteEditorDraft(scope(null));
     await flushPromises();
     expect(dot()).toBe(false);
+  });
+
+  it("dates the Add button's dot with the draft that tab's Add opens, even when the other is newer", async () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now - 60_000);
+    writeEditorDraft(scope(null), { data: draftData });
+    vi.mocked(Date.now).mockReturnValue(now);
+    writeEditorDraft({ ...scope(null), variant: "anomaly" }, { data: draftData });
+    vi.mocked(Date.now).mockRestore();
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    wrapper.vm.activeTab = "all";
+    await flushPromises();
+
+    const dot = () =>
+      wrapper
+        .findAllComponents(EditorDraftDot)
+        .find((c: any) => c.props("dataTest") === "alert-list-add-alert-draft-dot");
+    expect(dot()?.props("savedAt")).toBe(now - 60_000);
+
+    wrapper.vm.activeTab = "anomalyDetection";
+    await flushPromises();
+    expect(dot()?.props("savedAt")).toBe(now);
   });
 
   it("drops every user's draft of a deleted alert and keeps the rest", async () => {

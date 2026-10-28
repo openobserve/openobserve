@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "Eliminar {count} evento nomeado? Os funis que o usam mostrarão uma etiqueta de etapa eliminada. | Eliminar {count} eventos nomeados? Os funis que os usam mostrarão uma etiqueta de etapa eliminada.",
         "bulkDeleteInUseMessage": "Eliminar {count} evento nomeado? Funis guardados mostrarão uma etapa de evento eliminado para: {names}. | Eliminar {count} eventos nomeados? Funis guardados mostrarão uma etapa de evento eliminado para: {names}.",
         "notFound": "Este evento nomeado já não existe",
-        "discardTitle": "Descartar alterações?",
-        "discardMessage": "Este evento nomeado tem alterações não salvas. Sair sem salvá-las?",
         "editorApp": "Aplicativo: {app}",
         "details": "Detalhes",
         "opParam": "Parâmetro de URL",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "Este separador tem alterações não guardadas."
       },
-      "leaveConfirm": {
-        "title": "Descartar alterações não guardadas?",
-        "message": "Tem alterações de permissões ou de membros não guardadas. Sair desta página irá descartá-las."
-      },
       "show": "Mostrar",
       "searchPermissions": "Pesquisar Permissões",
       "filterModules": "Filtrar módulos",
@@ -3808,9 +3825,6 @@
         "emoji": "Inserir emoji",
         "placeholder": "texto"
       },
-      "leaveTitle": "Descartar alterações?",
-      "leaveMessage": "As suas edições a este banner não foram guardadas.",
-      "leaveConfirm": "Descartar",
       "publishNow": "Publicar agora",
       "schedule": "Agendar",
       "statusLive": "Em exibição neste momento",
@@ -3822,7 +3836,6 @@
       "savedEnded": "Banner guardado; o seu agendamento já terminou",
       "conflict": "Este banner foi alterado por outra pessoa. Recarregue para ver a versão mais recente.",
       "reload": "Recarregar",
-      "keepEditing": "Continuar a editar",
       "orgsSome": "Apenas estas organizações",
       "orgsPick": "Organizações",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "Tipo de segredo",
     "staticSecret": "Segredo Estático",
     "staticSecretName": "Nome",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "Nome do DFC",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "Dados encriptados do DFC",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "O máximo de tentativas deve estar entre 1 e 3",
           "concurrencyRange": "A simultaneidade máxima deve estar entre 1 e 32",
           "signingKeyRequired": "Não foi possível gerar uma chave de assinatura. Tente novamente."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "Copie a sua chave de assinatura",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "nenhum SRE de IA é executado; o acionamento comporta-se exatamente como sem triagem por IA",
     "l0BudgetLabel": "Tempo de espera",
     "l0BudgetRange": "Entre 30 e 600 segundos — o servidor recusa valores fora deste intervalo em vez de ajustá-los",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "Fail-open — se o agente estiver lento ou não responder, o alerta é enviado imediatamente.",
     "l0AllowPromotion": "Elevar severidade",
     "l0AllowPromotionNote": "Aplicado quando o veredito do agente justificar.",

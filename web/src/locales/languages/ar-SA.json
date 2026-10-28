@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "حذف {count} حدث مسمّى؟ ستعرض القمع التي تستخدمه وسم خطوة محذوفة. | حذف {count} من الأحداث المسمّاة؟ ستعرض القمع التي تستخدمها وسم خطوة محذوفة.",
         "bulkDeleteInUseMessage": "حذف {count} حدث مسمّى؟ ستعرض القمعات المحفوظة خطوة حدث محذوف لـ: {names}. | حذف {count} من الأحداث المسمّاة؟ ستعرض القمعات المحفوظة خطوة حدث محذوف لـ: {names}.",
         "notFound": "هذا الحدث المسمّى لم يعد موجودًا",
-        "discardTitle": "تجاهل التغييرات؟",
-        "discardMessage": "يحتوي هذا الحدث المسمّى على تغييرات غير محفوظة. هل تريد المغادرة دون حفظها؟",
         "editorApp": "التطبيق: {app}",
         "details": "التفاصيل",
         "opParam": "معامل URL",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "يحتوي هذا التبويب على تغييرات غير محفوظة."
       },
-      "leaveConfirm": {
-        "title": "هل تريد تجاهل التغييرات غير المحفوظة؟",
-        "message": "لديك تغييرات في الأذونات أو الأعضاء غير محفوظة. مغادرة هذه الصفحة ستتخلص منها."
-      },
       "show": "عرض",
       "searchPermissions": "البحث في الأذونات",
       "filterModules": "تصفية الوحدات",
@@ -3808,9 +3825,6 @@
         "emoji": "إدراج رمز تعبيري",
         "placeholder": "النص"
       },
-      "leaveTitle": "هل تريد تجاهل التغييرات؟",
-      "leaveMessage": "لم يتم حفظ تعديلاتك على هذه اللافتة.",
-      "leaveConfirm": "تجاهل",
       "publishNow": "نشر الآن",
       "schedule": "جدولة",
       "statusLive": "مباشر حاليًا",
@@ -3822,7 +3836,6 @@
       "savedEnded": "تم حفظ اللافتة؛ انتهى جدولها الزمني بالفعل",
       "conflict": "تم تغيير هذه اللافتة بواسطة شخص آخر. أعد التحميل لرؤية أحدث إصدار.",
       "reload": "إعادة التحميل",
-      "keepEditing": "متابعة التحرير",
       "orgsSome": "هذه المؤسسات فقط",
       "orgsPick": "المؤسسات",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "النوع السري",
     "staticSecret": "السر الثابت",
     "staticSecretName": "الاسم",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "اسم DFC",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "بيانات DFC المشفرة",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "يجب أن تكون المحاولات القصوى بين 1 و3",
           "concurrencyRange": "يجب أن يكون الحد الأقصى للالتزامن بين 1 و32",
           "signingKeyRequired": "لم أتمكن من توليد مفتاح توقيع. حاول مرة أخرى."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "انسخ مفتاح التوقيع الخاص بك",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "لا يعمل SRE الذكاء الاصطناعي؛ يتصرف التنبيه تمامًا كما كان بدون فرز الذكاء الاصطناعي",
     "l0BudgetLabel": "مدة الانتظار",
     "l0BudgetRange": "بين 30 و600 ثانية — يرفض الخادم القيم خارج هذا النطاق بدلاً من تقييدها.",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "فشل مفتوح — إذا كان الوكيل بطيئًا أو غير مستجيب، يُرسل التنبيه فورًا.",
     "l0AllowPromotion": "رفع درجة الخطورة",
     "l0AllowPromotionNote": "يُطبَّق عندما يستوجب حكم الوكيل ذلك.",

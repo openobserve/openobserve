@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.downtimes.newDowntime") }}
           <EditorDraftDot
             v-if="downtimeDrafts.hasNew"
+            :saved-at="downtimeDrafts.savedAt(null)"
             corner
             data-test="downtime-list-add-draft-dot"
           />
@@ -330,10 +331,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       @click.stop="duplicateDowntime(row)"
                     >
-                      <OTooltip side="bottom" :content="t('alerts.downtimes.actions.duplicate')" />
+                      <OTooltip
+                        side="bottom"
+                        :content="
+                          downtimeDrafts.hasNewVariant(`clone:${row.id}`)
+                            ? draftLabel(
+                                t('alerts.downtimes.actions.duplicate'),
+                                downtimeDrafts.savedAtVariant(`clone:${row.id}`),
+                              )
+                            : t('alerts.downtimes.actions.duplicate')
+                        "
+                      />
                       <EditorDraftDot
                         v-if="downtimeDrafts.hasNewVariant(`clone:${row.id}`)"
                         corner
+                        :tooltip="false"
                         :data-test="`downtime-list-${row.id}-duplicate-draft-dot`"
                       />
                     </OButton>
@@ -598,6 +610,7 @@ import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryR
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
 import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
@@ -624,6 +637,7 @@ const RAIL_COLORS: Record<DowntimeListItem["status"], string> = {
 
 const { t } = useI18nTyped();
 const store = useStore();
+const draftLabel = useDraftLabel();
 const viewerZone = useViewerTimezone();
 const route = useRoute();
 const router = useRouter();
@@ -1094,7 +1108,12 @@ const confirmDelete = async () => {
   const id = pendingDelete.value;
   try {
     await deleteMutation.mutateAsync({ id, folder: folderOf(id) });
-    deleteEditorDraftsFor({ kind: "downtime", org: orgId.value, entityId: id });
+    deleteEditorDraftsFor({
+      kind: "downtime",
+      org: orgId.value,
+      entityId: id,
+      variant: `clone:${id}`,
+    });
     toast({ variant: "success", message: t("toastMessages.downtimes.deleted") });
   } catch {
     toast({ variant: "error", message: t("toastMessages.downtimes.deleteFailed") });

@@ -17,6 +17,7 @@
 //
 // Render tests for SyntheticMonitoring.vue — the main synthetics list page.
 
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -37,6 +38,7 @@ const {
   mockServiceGetLocations,
   mockServiceGetAgentSetup,
   mockStatusPagesList,
+  mockStatusPagesDelete,
   mockRouterPush,
   mockRouterReplace,
   mockRoute,
@@ -56,6 +58,7 @@ const {
   mockRouterPush: vi.fn().mockResolvedValue(undefined),
   mockRouterReplace: vi.fn().mockResolvedValue(undefined),
   mockStatusPagesList: vi.fn().mockResolvedValue({ data: { pages: [] } }),
+  mockStatusPagesDelete: vi.fn().mockResolvedValue({}),
   // `query` is swapped for a reactive proxy by the vue-router mock, so a test can drive `?section=` the way Back/Forward would.
   mockRoute: { query: {} as Record<string, string> },
 }));
@@ -101,7 +104,7 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
 vi.mock("@/services/status_pages", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: { list: mockStatusPagesList },
+    default: { list: mockStatusPagesList, delete: mockStatusPagesDelete },
   });
 });
 
@@ -1218,6 +1221,13 @@ describe("SyntheticMonitoring", () => {
       expect(wrapper.find('[data-test="synthetic-monitoring-new-check-draft-dot"]').exists()).toBe(
         true,
       );
+      // The dot's tooltip dates the variant's draft.
+      const dot = wrapper
+        .findAllComponents(EditorDraftDot)
+        .find((c) => c.props("dataTest") === "synthetic-monitoring-new-check-draft-dot");
+      expect(dot?.props("savedAt")).toBe(
+        readEditorDraft({ ...draftScope("synthetic_check", null), variant: "tcp" })?.savedAt,
+      );
       localStorage.clear();
     });
 
@@ -1239,6 +1249,24 @@ describe("SyntheticMonitoring", () => {
       expect(readEditorDraft(draftScope("synthetic_browser", "m1"))).toBeNull();
       expect(readEditorDraft(draftScope("synthetic_browser", "a"))).toBeNull();
       expect(readEditorDraft(draftScope("synthetic_check", "b"))).not.toBeNull();
+      localStorage.clear();
+    });
+
+    it("drops a deleted status page's drafts, and keeps them when the delete fails", async () => {
+      localStorage.clear();
+      writeEditorDraft(draftScope("status_page", "sp1"), { data: {} });
+      writeEditorDraft(draftScope("status_page", "sp2"), { data: {} });
+      wrapper = mountPage();
+      await flushPromises();
+
+      confirmMock.mockResolvedValueOnce(true);
+      await (wrapper.vm as any).confirmDeleteStatusPage({ id: "sp1", name: "Public" });
+      mockStatusPagesDelete.mockRejectedValueOnce(new Error("boom"));
+      confirmMock.mockResolvedValueOnce(true);
+      await (wrapper.vm as any).confirmDeleteStatusPage({ id: "sp2", name: "Internal" });
+
+      expect(readEditorDraft(draftScope("status_page", "sp1"))).toBeNull();
+      expect(readEditorDraft(draftScope("status_page", "sp2"))).not.toBeNull();
       localStorage.clear();
     });
 

@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_templates.add`) }}
           <EditorDraftDot
             v-if="templateDrafts.hasNew"
+            :saved-at="templateDrafts.savedAt(null)"
             corner
             data-test="template-list-add-draft-dot"
         /></OButton>
@@ -227,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EditorDraftDot
                 v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
                 corner
+                :tooltip="false"
                 :data-test="`alert-template-list-${row.name}-clone-draft-dot`"
               />
             </OButton>
@@ -266,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <EditorDraftDot
                     v-if="templateDrafts.hasNewVariant(`clone:${row.name}`)"
                     corner
+                    :tooltip="false"
                     :data-test="`alert-template-list-${row.name}-more-actions-draft-dot`"
                   />
                 </OButton>
@@ -610,7 +613,14 @@ const dropTemplates = (names: string[]) => {
   // Anything that failed to delete stays selected, so a bulk retry is one click.
   selectedTemplates.value = selectedTemplates.value.filter((tpl: any) => !gone.has(tpl.name));
   const org = store.state.selectedOrganization.identifier;
-  for (const name of gone) deleteEditorDraftsFor({ kind: "alert_template", org, entityId: name });
+  for (const name of gone) {
+    deleteEditorDraftsFor({
+      kind: "alert_template",
+      org,
+      entityId: name,
+      variant: `clone:${name}`,
+    });
+  }
   // The rows render straight from the cache, so pruning it is what removes them.
   queryClient.setQueriesData({ queryKey: templateKeys.all(org) }, (list: any) =>
     Array.isArray(list) ? list.filter((tpl: any) => !gone.has(tpl.name)) : list,

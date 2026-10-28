@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`function.add`) }}
           <EditorDraftDot
             v-if="functionDrafts.hasNew"
+            :saved-at="functionDrafts.savedAt(null)"
             corner
             data-test="function-list-add-function-draft-dot"
           />

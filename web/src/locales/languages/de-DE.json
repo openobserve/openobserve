@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "{count} benanntes Ereignis löschen? Funnels, die es verwenden, zeigen ein Tag für einen gelöschten Schritt an. | {count} benannte Ereignisse löschen? Funnels, die sie verwenden, zeigen ein Tag für einen gelöschten Schritt an.",
         "bulkDeleteInUseMessage": "{count} benanntes Ereignis löschen? Gespeicherte Funnels zeigen für {names} einen Schritt für ein gelöschtes Ereignis an. | {count} benannte Ereignisse löschen? Gespeicherte Funnels zeigen für {names} einen Schritt für ein gelöschtes Ereignis an.",
         "notFound": "Dieses benannte Ereignis existiert nicht mehr",
-        "discardTitle": "Änderungen verwerfen?",
-        "discardMessage": "Dieses benannte Ereignis hat ungespeicherte Änderungen. Verlassen, ohne sie zu speichern?",
         "editorApp": "App: {app}",
         "details": "Details",
         "opParam": "URL-Parameter",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "Diese Registerkarte enthält ungespeicherte Änderungen."
       },
-      "leaveConfirm": {
-        "title": "Ungespeicherte Änderungen verwerfen?",
-        "message": "Sie haben ungespeicherte Berechtigungen oder Mitgliederänderungen. Wenn Sie diese Seite verlassen, werden sie verworfen."
-      },
       "show": "Anzeigen",
       "searchPermissions": "Berechtigungen durchsuchen",
       "filterModules": "Module filtern",
@@ -3808,9 +3825,6 @@
         "emoji": "Emoji einfügen",
         "placeholder": "Text"
       },
-      "leaveTitle": "Änderungen verwerfen?",
-      "leaveMessage": "Ihre Änderungen an diesem Banner wurden nicht gespeichert.",
-      "leaveConfirm": "Verwerfen",
       "publishNow": "Jetzt veröffentlichen",
       "schedule": "Planen",
       "statusLive": "Derzeit live",
@@ -3822,7 +3836,6 @@
       "savedEnded": "Banner gespeichert; sein Zeitplan ist bereits beendet",
       "conflict": "Dieses Banner wurde von jemand anderem geändert. Neu laden, um die neueste Version zu sehen.",
       "reload": "Neu laden",
-      "keepEditing": "Weiter bearbeiten",
       "orgsSome": "Nur diese Organisationen",
       "orgsPick": "Organisationen",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "Geheimer Typ",
     "staticSecret": "Statisches Geheimnis",
     "staticSecretName": "Name",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC-Name",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC-verschlüsselte Daten",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "Die maximale Anzahl der Versuche muss zwischen 1 und 3 liegen",
           "concurrencyRange": "Maximale Parallelität muss zwischen 1 und 32 liegen.",
           "signingKeyRequired": "Signaturschlüssel konnte nicht generiert werden. Bitte erneut versuchen."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "Signaturschlüssel kopieren",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "kein KI-SRE läuft; die Alarmierung verhält sich genau wie ohne KI-Triage",
     "l0BudgetLabel": "Haltebudget",
     "l0BudgetRange": "Zwischen 30 und 600 Sekunden – der Server lehnt Werte außerhalb dieses Bereichs ab, anstatt sie zu begrenzen.",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "Fail-open – wenn der Agent langsam ist oder nicht reagiert, wird der Alarm sofort gesendet.",
     "l0AllowPromotion": "Schweregrad erhöhen",
     "l0AllowPromotionNote": "Angewendet, wenn das Urteil des Agenten es rechtfertigt.",
