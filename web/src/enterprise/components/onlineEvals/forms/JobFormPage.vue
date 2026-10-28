@@ -334,11 +334,9 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
-import onlineEvalsService, {
-  type EvalJob,
-  type Scorer,
-  type SpanSelector,
-} from "@/services/online-evals.service";
+import { type EvalJob, type Scorer, type SpanSelector } from "@/services/online-evals.service";
+import { saveEvalJobMutation, setJobActiveMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   entityId,
   samplingModeOf,
@@ -401,6 +399,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const saveJob = useMutation(() => saveEvalJobMutation(props.orgId));
+const setJobActive = useMutation(() => setJobActiveMutation(props.orgId));
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh per create/edit action, so building it once is safe.
@@ -900,14 +900,14 @@ async function onSubmit(value: JobForm) {
     };
 
     if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.jobs.update(props.orgId, props.row.id, payload);
+      await saveJob.mutateAsync({ id: props.row.id, payload });
       // Promote a draft to active when the user chose Save & Activate. Only
       // drafts surface that button (showActivateChoice), so activateAfter can
       // only be true for a draft here; the isDraft guard is defensive and
       // matches the template (a missing status is treated as draft).
       if (activateAfter && isDraft.value) {
         try {
-          await onlineEvalsService.jobs.activate(props.orgId, props.row.id);
+          await setJobActive.mutateAsync({ id: props.row.id, active: true });
           toast({
             variant: "success",
             message: t("onlineEvals.job.savedAndActivated"),
@@ -926,10 +926,10 @@ async function onSubmit(value: JobForm) {
         });
       }
     } else {
-      const created = await onlineEvalsService.jobs.create(props.orgId, payload);
+      const created = await saveJob.mutateAsync({ payload });
       if (activateAfter && created?.id) {
         try {
-          await onlineEvalsService.jobs.activate(props.orgId, created.id);
+          await setJobActive.mutateAsync({ id: created.id, active: true });
           toast({
             variant: "success",
             message: t("onlineEvals.job.createdAndActivated"),

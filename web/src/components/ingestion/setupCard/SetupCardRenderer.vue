@@ -49,6 +49,7 @@ import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import type { FirstEventState, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "../FirstEventStatus.vue";
 import { cliFlagArg, safeHttpUrl, sanitizeInput, shellQuote } from "./subs";
+import { downloadEnvFile } from "./envFile";
 import type {
   CardSubstitutions,
   RichCardContent,
@@ -399,18 +400,7 @@ const onStepCopy = (step: RichCardStep, index: number, payload?: CodeBlockCopyPa
 };
 
 // ── .env download (from the per-org subs) ────────────────────────────────────
-const downloadEnv = () => {
-  const body =
-    `OPENOBSERVE_URL=${props.subs.url}\n` +
-    `OPENOBSERVE_ORG=${props.subs.org}\n` +
-    `OPENOBSERVE_AUTH_TOKEN=Basic ${props.subs.token}\n`;
-  const blob = new Blob([body], { type: "text/plain" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = ".env";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-};
+const downloadEnv = () => downloadEnvFile(props.subs);
 
 // ── presentation helpers ─────────────────────────────────────────────────────
 const escapeHtml = (s: string) =>

@@ -43,7 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       show-index
       pagination="none"
       :empty-message="
-        panel.emptyStateKey ? t(panel.emptyStateKey) : t('traces.lLMErrorTable.noData')
+        loadFailed
+          ? t('traces.lLMErrorTable.loadFailed')
+          : panel.emptyStateKey
+            ? t(panel.emptyStateKey)
+            : t('traces.lLMErrorTable.noData')
       "
       @row-click="onRowClick"
       data-test="llm-recent-errors-table"
@@ -117,7 +121,16 @@ const { executeQuery, cancelAll } = useLLMStreamQuery();
 const timezone = computed(() => store.state.timezone || "UTC");
 
 const rows = ref<any[]>([]);
-const loading = ref(false);
+// True until the query for the current inputs has returned. The panel loads
+// lazily (on entering the viewport) and may mount before its stream is known,
+// so "no rows" says nothing until then — the table shows its loading state, and
+// "No errors in this time range" only after a query really came back empty.
+const loading = ref(true);
+// Bumped per load so a superseded response can't overwrite newer rows or end
+// the newer load's loading state.
+let loadSeq = 0;
+// The last query failed: the empty table says so instead of "No errors".
+const loadFailed = ref(false);
 
 const columns: OTableColumnDef[] = [
   {
@@ -168,11 +181,14 @@ async function loadErrors() {
   // Serve this exact selection+window from the in-memory cache if we have it —
   // a tab toggle back here skips the query entirely. Keyed on the dashboard's
   // canonical selection id (`cacheKey`); skip caching only if it wasn't passed.
+  const seq = ++loadSeq;
   const key = props.cacheKey;
   if (key) {
     const cached = errorRowsCache.get(key);
     if (cached) {
       rows.value = cached;
+      loadFailed.value = false;
+      loading.value = false;
       return;
     }
   }
@@ -188,16 +204,21 @@ async function loadErrors() {
   });
   try {
     const hits = await executeQuery(sql, props.startTime, props.endTime);
+    if (seq !== loadSeq) return;
     // OTable needs a stable row-key; error spans can repeat a trace_id, so key
     // by position instead.
     rows.value = (hits as any[]).map((h, i) => ({ ...h, id: i }));
+    loadFailed.value = false;
     // Snapshot for this selection+window so a return visit restores instantly.
     if (key) errorRowsCache.set(key, rows.value);
   } catch (e: any) {
+    if (seq !== loadSeq) return;
+    // A failed query is not "no errors": say it could not load.
     rows.value = [];
+    loadFailed.value = true;
     console.error(`[LLM panel ${props.panel.id}] fetch error`, e);
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 }
 
@@ -215,6 +236,9 @@ watch(
   () => [props.streamName, props.startTime, props.endTime, props.agentFilter],
   () => {
     needsReload.value = true;
+    // The rows on screen belong to the old inputs: back to loading until the
+    // new query (run now, or when the panel scrolls into view) returns.
+    loading.value = true;
     if (isVisible.value) loadErrors();
   },
 );

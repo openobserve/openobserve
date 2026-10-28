@@ -304,6 +304,11 @@ fn experiment_result_rows(
                     score_configs,
                 ),
                 p50_latency_ms: aggregate.p50_latency_ms,
+                error_message: aggregate
+                    .failure_causes
+                    .into_iter()
+                    .next()
+                    .map(|cause| cause.message),
                 dispersion: dispersions.remove(&first.row_id).map(Into::into),
             })
         })
@@ -1639,6 +1644,7 @@ mod tests {
             output: None,
             score_summaries: Vec::new(),
             p50_latency_ms: None,
+            error_message: None,
             dispersion: Some(crate::models::experiments::ExperimentRowDispersionBody {
                 row_id,
                 logical_id: format!("case-{row_index}"),

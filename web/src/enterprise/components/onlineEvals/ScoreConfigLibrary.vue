@@ -109,7 +109,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService from "@/services/online-evals.service";
+import { saveScoreConfigMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   fetchOnlineEvalsCatalog,
   type CatalogScoreConfig,
@@ -127,6 +128,8 @@ const emit = defineEmits<{
   (e: "update:selected-count", value: number): void;
   (e: "imported"): void;
 }>();
+
+const saveScoreConfig = useMutation(() => saveScoreConfigMutation(props.orgId));
 
 const isLoadingCatalog = ref(false);
 const loadError = ref("");
@@ -254,7 +257,7 @@ async function importSelected() {
 
   for (const entry of selected) {
     try {
-      await onlineEvalsService.scoreConfigs.create(props.orgId, payloadFor(entry));
+      await saveScoreConfig.mutateAsync({ payload: payloadFor(entry) });
       successCount++;
     } catch (err: any) {
       // Duplicates are not a hard failure — user explicitly asked for the

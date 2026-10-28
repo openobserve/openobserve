@@ -117,6 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AiScopeBar>
     </template>
 
+    <!-- Stream mode because these LLM spans carry no agent identity: the graph
+         shows the stream's services; the banner says why there is no agent. -->
+    <AiNoAgentIdentityBanner v-if="noAgentIdentity && scopeReady" data-test="agent-graph" />
+
     <!-- Gate the graph until the effective stream is genuinely resolved.
          ServiceGraph loads unconditionally in its own onMounted, so mounting it
          before loadAgents() resolves would fire an initial query against the
@@ -138,8 +142,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       agent-highlight
       class="min-h-0 flex-1"
     />
-    <!-- No agents discovered in the current org / time window — show an empty
-         state, NOT the fallback `default` service graph (the original bug). -->
+    <!-- Agent mode whose agents list failed to load: not "no agents". -->
+    <div
+      v-else-if="scopeReady && agentsLoadFailed"
+      class="flex min-h-0 flex-1 items-center justify-center"
+    >
+      <AiAgentsLoadError
+        :error="agentsError ?? 'failed'"
+        size="block"
+        data-test="agent-graph"
+        @retry="loadAgents(true)"
+      />
+    </div>
+    <!-- Nothing to graph in the current org / time window: no agents in Agent
+         mode, or no LLM stream at all — an empty state, NOT the fallback
+         `default` service graph (the original bug). -->
     <div
       v-else-if="hasNoAgents"
       data-test="agent-graph-no-agents"
@@ -164,7 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, ref, computed, onMounted } from "vue";
+import { defineAsyncComponent, ref, computed, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import type { AcceptableValue } from "reka-ui";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -179,18 +197,28 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
-import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
-import { queryClient } from "@/composables/query/queryClient";
-import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
+import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
+import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
-import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
+import {
+  useAgentScope,
+  readUrlScope,
+  explicitScopeMode,
+  resolveScopeMode,
+  rememberModeChoice,
+  scopeUrlQuery,
+  type ScopeMode,
+} from "@/enterprise/composables/useAgentScope";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
+const router = useRouter();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.
@@ -207,10 +235,26 @@ const {
 
 const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
 
-// Default scope is "agent" — the AI module is agent-centric (agents load on
-// mount, so the default is ready on first paint).
-const filterMode = ref<"stream" | "agent">("agent");
-const activeStream = ref<string>("");
+// The scope in the URL (`type`, `stream`, `agent`, `env`, `version`) wins over
+// the defaults, so a link shared from any Monitor page opens the same agent
+// here. Without an explicit mode (URL or remembered toggle) the agents list
+// decides: Agent when the window has agents, Stream when it has none.
+const urlScope = readUrlScope(route.query);
+const explicitMode = explicitScopeMode(urlScope);
+const filterMode = ref<ScopeMode>(explicitMode ?? "agent");
+const modeExplicit = ref(explicitMode !== null);
+// False until the first agents load has settled the mode and the selection;
+// the graph mounts only after it, exactly once.
+const scopeReady = ref(false);
+// Whether an agents list has decided the mode. A failed agents load decides
+// nothing, so the next load after it decides again.
+let modeSettled = false;
+// Seeded once from the URL after the first agents load, then cleared.
+let pendingUrlScope: { env: string; name: string; version: string } | null =
+  urlScope.agent || urlScope.env || urlScope.version
+    ? { env: urlScope.env, name: urlScope.agent, version: urlScope.version }
+    : null;
+const activeStream = ref<string>(urlScope.stream);
 
 // Agent Graph's OWN visualization + layout selection — deliberately NOT the
 // shared traces store (`searchObj.meta.serviceGraph*Type`) that the Traces
@@ -267,36 +311,33 @@ const {
   },
 });
 
-// Graph owns its `agents`/`agentsLoaded` refs and its from-agents
-// `availableStreams` computed (its Stream picker is derived from agent-bearing
-// streams, not from all trace streams). Its own reconciling `loadAgents`
-// (evict-stale-key + evict-stale-stream + default-both) also stays page-local.
-// These are injected INTO useAgentScope purely to obtain the shared derived
-// computeds (agentSelectOptions/streamSelectOptions/selectedStreamCount/
-// selectedAgent/effectiveStream); Graph does NOT use the composable's loadAgents.
+// Graph owns its `agents`/`agentsLoaded` refs and its `availableStreams`
+// computed, injected INTO useAgentScope for the shared derived computeds and
+// its loader.
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);
 
-// Stream-scoped identity, mirroring LLM Insights — same-named agents in
-// different streams (or different env/version) don't collide.
-const agentKey = (a: GenAiAgentListItem) => agentOptionKey(a);
+// LLM trace streams, for Stream mode when no agent identity exists. Loaded into
+// a ref of their own: the loader clamps the ref it is given to its own list.
+const llmStreamPick = ref("");
+const { availableStreams: llmStreams, ensureStreamsLoaded } = useLlmTraceStreams(llmStreamPick, t);
 
-// Streams offered in the Stream picker are ONLY those that actually carry agent
-// data — i.e. the distinct source_streams of discovered agents. A trace stream
-// with services but no agents (e.g. `introspection`) has nothing agent-related
-// to show here, so it must not appear. Derived from the agents list rather than
-// from all trace streams for exactly this reason. Passed into useAgentScope,
-// which only READS it (streamSelectOptions/selectedStreamCount).
-const availableStreams = computed(() => [...new Set(agents.value.map((a) => a.source_stream))]);
+// Streams offered in the Stream picker: the agent-bearing streams (the distinct
+// source_streams of discovered agents) when agents exist — a trace stream with
+// services but no agents (e.g. `introspection`) has nothing agent-related to
+// show. With no agents at all, the LLM streams, so an org whose spans carry no
+// agent identity still sees its LLM services graphed.
+const availableStreams = computed(() =>
+  agents.value.length ? [...new Set(agents.value.map((a) => a.source_stream))] : llmStreams.value,
+);
 
-// Shared derived scope computeds from useAgentScope. `activeAgent` (the
-// composable's single selection ref) replaces Graph's former `activeAgentKey`;
-// Graph's `loadAgents` reconciliation writes into it. `allAgents:false` → no
-// All-Agents entry, matching Graph's first-agent-default behavior. Graph's own
-// `agents`/`agentsLoaded` refs and from-agents `availableStreams` computed are
-// injected, so the composable reads Graph's data and never loads on its own.
+// `allAgents:false` → no All-Agents entry; the cascade defaults to the first
+// agent.
 const {
-  activeAgent,
+  loadAgents: loadAgentList,
+  agentsError,
+  agentsLoadFailed,
+  noAgentIdentity,
   streamSelectOptions,
   selectedStreamCount,
   selectedAgent,
@@ -307,6 +348,7 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  selectAgentByScope,
 } = useAgentScope({
   filterMode,
   activeStream,
@@ -326,24 +368,52 @@ const {
   t,
 });
 
-// Whether there is simply nothing agent-related to graph in the current org /
-// time window. There are no agents at all → both modes have nothing to show
-// (the Stream picker is itself derived from agent-bearing streams).
-const hasNoAgents = computed(() => agentsLoaded.value && !agents.value.length);
+// Nothing to graph in the current org / time window: no agent to pick in Agent
+// mode, or no stream at all in Stream mode.
+const hasNoAgents = computed(
+  () =>
+    scopeReady.value &&
+    (filterMode.value === "agent" ? !agents.value.length : !availableStreams.value.length),
+);
 
 // The graph may only mount once it has a real stream to query. In agent mode
 // that requires an actually-selected agent (whose source_stream is the stream);
-// in stream mode, a chosen agent-bearing stream. This prevents ServiceGraph's
-// mount-time load from ever firing against a fallback/agentless stream.
-const graphReady = computed(() =>
-  filterMode.value === "agent"
-    ? !!selectedAgent.value && !!effectiveStream.value
-    : !!activeStream.value,
+// in stream mode, a chosen stream. This prevents ServiceGraph's mount-time load
+// from ever firing against a fallback stream, or before the mode is settled.
+const graphReady = computed(
+  () =>
+    scopeReady.value &&
+    (filterMode.value === "agent"
+      ? !!selectedAgent.value && !!effectiveStream.value
+      : !!activeStream.value),
 );
 
-function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
-  if (mode === "stream" || mode === "agent") filterMode.value = mode;
+function syncScopeUrl() {
+  const agent = selectedAgent.value
+    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    : null;
+  const query = scopeUrlQuery(route.query, {
+    mode: filterMode.value,
+    explicit: modeExplicit.value,
+    stream: activeStream.value,
+    agent,
+  });
+  router.replace({ query }).catch(() => {});
 }
+
+// A toggle click is an explicit choice: kept in the URL and remembered for the
+// other Monitor pages.
+function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
+  if (mode !== "stream" && mode !== "agent") return;
+  filterMode.value = mode;
+  modeExplicit.value = true;
+  rememberModeChoice(mode);
+  syncScopeUrl();
+}
+
+watch([activeStream, selectedEnv, selectedAgentName], () => {
+  if (scopeReady.value) syncScopeUrl();
+});
 
 function effectiveWindow() {
   if (dateState.value.valueType === "relative" && dateState.value.relativeTimePeriod) {
@@ -356,42 +426,30 @@ function effectiveWindow() {
   };
 }
 
-async function loadAgents() {
-  try {
-    const org = store.state.selectedOrganization.identifier;
-    const { startTime, endTime } = effectiveWindow();
-    const res = await queryClient.fetchQuery(genAiAgentsQuery(org, startTime, endTime));
-    agents.value = res.agents ?? [];
-    // Reconcile the selection against the fresh list. Reloading (e.g. after a
-    // time-range change) can return a different or empty set, which would
-    // otherwise leave `activeAgent` pointing at an agent no longer present —
-    // the dropdown then shows a stale name while the graph has no agent. Clear a
-    // now-invalid key, and auto-select the first agent when none is selected.
-    // `activeAgent` is useAgentScope's selection ref (Graph keeps its OWN richer
-    // reconciliation here rather than the composable's key-only clamp).
-    const keys = new Set(agents.value.map((a) => agentKey(a)));
-    if (activeAgent.value && !keys.has(activeAgent.value)) {
-      activeAgent.value = "";
-    }
-    if (!activeAgent.value && agents.value.length) {
-      activeAgent.value = agentKey(agents.value[0]);
-    }
-    // Same reconciliation for the Stream picker, whose options are the distinct
-    // agent-bearing source_streams (availableStreams). Clear a now-absent
-    // stream, and default to the first agent-bearing stream.
-    if (activeStream.value && !availableStreams.value.includes(activeStream.value)) {
-      activeStream.value = "";
-    }
-    if (!activeStream.value && availableStreams.value.length) {
-      activeStream.value = availableStreams.value[0];
-    }
-  } catch {
-    agents.value = [];
-    activeAgent.value = "";
-    activeStream.value = "";
-  } finally {
-    agentsLoaded.value = true;
+// Loads the agents (and LLM streams) for the window, then settles the scope:
+// on the first load the mode (unless explicit) and the URL's agent; on every
+// load the Stream picker, whose options can change with the list. The cascade
+// itself is reconciled against the fresh list by useAgentScope. `force` (the
+// load-error retry) bypasses the agents cache.
+async function loadAgents(force = false) {
+  const { startTime, endTime } = effectiveWindow();
+  await Promise.all([loadAgentList(startTime, endTime, force), ensureStreamsLoaded()]);
+  if (!modeSettled && !modeExplicit.value) {
+    filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
   }
+  if (!agentsError.value) modeSettled = true;
+  if (pendingUrlScope && agents.value.length) {
+    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.name, pendingUrlScope.version);
+    pendingUrlScope = null;
+  }
+  if (activeStream.value && !availableStreams.value.includes(activeStream.value)) {
+    activeStream.value = "";
+  }
+  if (!activeStream.value && availableStreams.value.length) {
+    activeStream.value = availableStreams.value[0];
+  }
+  scopeReady.value = true;
+  syncScopeUrl();
 }
 
 // Date-only state update is owned by useAiDateController; the page's extra
