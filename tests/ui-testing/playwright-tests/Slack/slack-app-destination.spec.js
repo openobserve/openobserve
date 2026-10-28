@@ -47,6 +47,7 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
   let install;
   let teamId;
   let ready = false;
+  let buildType;
   let why = 'needs an enterprise build with Slack on and the Slack mock';
   const u = api.uniq();
   const names = {
@@ -152,6 +153,7 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     test.setTimeout(5 * 60 * 1000);
     apiContext = await playwright.request.newContext();
     const config = await api.orgConfig(apiContext, process.env.ORGNAME || 'default');
+    buildType = config.build_type;
     if (config.build_type === 'opensource' || config.slack_enabled !== true) {
       why = `server reports build_type=${config.build_type}, slack_enabled=${config.slack_enabled}`;
       return;
@@ -334,6 +336,7 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
   });
 
   test('connect from the form on self-hosted points to Settings; the Cloud popup path is a live check (Z)', async () => {
+    test.skip(buildType === 'cloud', 'Cloud connects from the form; the Settings hint is self-hosted only');
     const other = (await api.createOrg(apiContext, 'slack_pw_app_empty')).id;
     await page.goto(`${api.BASE()}/web/alert-destinations?org_identifier=${encodeURIComponent(other)}`, {
       waitUntil: 'domcontentloaded',
