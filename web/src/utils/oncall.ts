@@ -358,6 +358,14 @@ export function pageState(
   return ranOut ? "exhausted" : record.state;
 }
 
+/** A team is deleted only when the page names one and the loaded team list lacks it; a teamless page is unrouted, and an unloaded list proves nothing. [pure] */
+export function isDeletedTeam(
+  teamId: string | null | undefined,
+  knownTeamIds: string[] | null,
+): boolean {
+  return !!teamId && knownTeamIds !== null && !knownTeamIds.includes(teamId);
+}
+
 /** What is happening to a page, as one phrase: the Pages list, Recent pages and the page header all say this. */
 export type PagePhrase =
   | { kind: "resolved"; afterMicros: number | null }

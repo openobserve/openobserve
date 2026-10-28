@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.statUnrouted") }}
         </OTag>
         <OTag
-          v-else-if="isDeletedTeam(row.latest.team_id)"
+          v-else-if="teamIsDeleted(row.latest.team_id)"
           variant="default-soft"
           size="sm"
           data-test="oncall-row-team-deleted"
@@ -966,6 +966,7 @@ import {
   isDeliverableChannel,
   isEscalating,
   isOnCallUnavailable,
+  isDeletedTeam,
   isSnoozed,
   nextHandover,
   winningRule,
@@ -1125,7 +1126,8 @@ const teamNameById = computed<Record<string, string>>(() =>
   Object.fromEntries(teams.value.map((team) => [team.id, team.name])),
 );
 
-const isDeletedTeam = (teamId: string) => teamsLoaded.value && !(teamId in teamNameById.value);
+const teamIsDeleted = (teamId: string) =>
+  isDeletedTeam(teamId, teamsLoaded.value ? teams.value.map((team) => team.id) : null);
 
 // A ksuid asks the reader to look it up somewhere else, same as team_id
 // (`fetchTeamContext` below). There is no bulk "get these incidents" endpoint,

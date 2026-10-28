@@ -43,6 +43,7 @@ import {
   isRotationValid,
   isShiftRuleValid,
   isSnoozed,
+  isDeletedTeam,
   pagePhrase,
   pageState,
   isStaffed,
@@ -503,6 +504,24 @@ describe("pageState", () => {
     ];
     for (const [record, ladder, expected] of cases) {
       expect(pageState(record as any, ladder as any)).toBe(expected);
+    }
+  });
+});
+
+describe("isDeletedTeam", () => {
+  it("calls a team deleted only when it has an id the loaded list does not have", () => {
+    const cases: [string | null | undefined, string[] | null, boolean][] = [
+      [null, ["team_1"], false],
+      [undefined, ["team_1"], false],
+      ["", ["team_1"], false],
+      ["", [], false],
+      ["team_gone", ["team_1"], true],
+      ["team_gone", [], true],
+      ["team_1", ["team_1"], false],
+      ["team_1", null, false],
+    ];
+    for (const [teamId, known, expected] of cases) {
+      expect(isDeletedTeam(teamId, known), `${teamId} / ${known}`).toBe(expected);
     }
   });
 });

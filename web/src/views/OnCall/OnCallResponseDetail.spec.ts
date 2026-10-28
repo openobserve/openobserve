@@ -1746,5 +1746,24 @@ describe("OnCallResponseDetail — responding", () => {
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("teamDeleted")).toBe(true);
     });
+
+    /// An unrouted page has no team at all, which is a routing fact, not a deleted team.
+    it.each([
+      ["teamless", "", [{ id: "team_2", name: "Payments" }], false],
+      ["present", "team_1", [{ id: "team_1", name: "Platform" }], false],
+      ["team list unavailable", "team_1", null, false],
+    ] as const)(
+      "does not call a %s page's team deleted",
+      async (_name, teamId, teams, expected) => {
+        if (teams) service.listTeams.mockResolvedValue({ data: teams } as any);
+        else service.listTeams.mockRejectedValue(new Error("down"));
+        const wrapper = await renderWith({ team_id: teamId });
+
+        expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(expected);
+        for (const name of ["OnCallAboutPage", "OnCallWhoIsOn", "OnCallReachAlarm"]) {
+          expect(wrapper.findComponent({ name }).props("teamDeleted"), name).toBe(expected);
+        }
+      },
+    );
   });
 });

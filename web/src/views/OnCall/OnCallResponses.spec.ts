@@ -1053,6 +1053,13 @@ describe("OnCallResponses", () => {
     expect(tag.text()).toBe("Deleted team");
   });
 
+  it("says an unrouted page is unrouted, never a deleted team", async () => {
+    const wrapper = await withPages([page({ team_id: "" })]);
+
+    expect(wrapper.find('[data-test="oncall-row-team-deleted"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Unrouted");
+  });
+
   it("keeps the id when the team list could not be loaded", async () => {
     service.listTeams.mockRejectedValue(new Error("down"));
     service.listResponses.mockResolvedValue({ data: [page({ team_id: "team_gone" })] } as any);

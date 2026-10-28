@@ -835,6 +835,7 @@ import {
   isSnoozed,
   isUnresolved,
   formatOnCallInstant,
+  isDeletedTeam,
   pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
@@ -860,9 +861,7 @@ const systemActivityCount = computed(
 const teamName = ref("");
 /// Ids of the teams that exist, `null` until the list has answered.
 const knownTeamIds = ref<string[] | null>(null);
-const teamDeleted = computed(
-  () => !!response.value && !!knownTeamIds.value?.every((id) => id !== response.value?.team_id),
-);
+const teamDeleted = computed(() => isDeletedTeam(response.value?.team_id, knownTeamIds.value));
 const loading = ref(false);
 /// Set only when a load fails with nothing on screen; a 404 leaves it null and reads as not found.
 const loadError = ref<string | null>(null);
