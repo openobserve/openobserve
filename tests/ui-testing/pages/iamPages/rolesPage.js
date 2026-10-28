@@ -99,7 +99,7 @@ export class RolesPage {
         this.presetDetail = page.locator('[data-test="edit-role-preset-detail"]');
         this.presetBack = page.locator('[data-test="edit-role-preset-back"]');
         this.presetApply = page.locator('[data-test="edit-role-preset-apply"]');
-        // A viewer can close the panel; the floating button reopens it and the choice persists in localStorage.
+        // A viewer can close the panel; the floating button reopens it, and each page visit starts open.
         this.presetsClose = page.locator('[data-test="edit-role-presets-close"]');
         this.presetsOpen = page.locator('[data-test="edit-role-presets-open"]');
 
@@ -304,7 +304,7 @@ export class RolesPage {
         return this.page.locator(`[data-test="edit-role-preset-${id}-status"]`);
     }
 
-    /** Reopens the Presets panel if it was closed, since the closed state can carry over in the browser context. */
+    /** Reopens the Presets panel if a test closed it earlier on the same page visit. */
     async ensurePresetsOpen() {
         await expect(this.presetsPanel.or(this.presetsOpen)).toBeVisible({ timeout: 15000 });
         if (await this.presetsOpen.isVisible()) await this.presetsOpen.click();

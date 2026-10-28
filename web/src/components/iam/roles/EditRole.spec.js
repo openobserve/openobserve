@@ -3880,6 +3880,32 @@ describe("EditRole - presets panel wiring", () => {
     expect(summary.props("previewPreset")("readonly").status).toBe("ready");
     expect(summary.props("applying")).toBe(false);
   });
+
+  // Opening a module unmounts the overview, so only the page can remember the closed panel.
+  it("keeps the panel closed after a module is opened and left", async () => {
+    const wrapper = await mountEditRole();
+    await wrapper.find('[data-test="edit-role-presets-close"]').trigger("click");
+
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "RoleSummary" }).exists()).toBe(false);
+
+    wrapper.vm.activeModule = "";
+    await flushPromises();
+    expect(wrapper.find('[data-test="edit-role-presets-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-presets-open"]').exists()).toBe(true);
+  });
+
+  it("starts with the panel open on a fresh visit after it was closed", async () => {
+    const earlier = await mountEditRole();
+    await earlier.find('[data-test="edit-role-presets-close"]').trigger("click");
+    earlier.unmount();
+
+    const wrapper = await mountEditRole();
+
+    expect(wrapper.find('[data-test="edit-role-presets-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-presets-open"]').exists()).toBe(false);
+  });
 });
 
 describe("EditRole - presets panel stream lists", () => {

@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The end gutter keeps the top card clear of the floating Show Presets button. -->
           <div
             class="grid auto-rows-fr grid-cols-1 gap-4 @min-[30rem]/role-cards:grid-cols-2 @min-[46rem]/role-cards:grid-cols-3"
-            :class="{ 'pe-10': presetsCollapsed }"
+            :class="{ 'pe-10': !presetsOpen }"
           >
             <button
               v-for="module in modules"
@@ -131,13 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <OButton
-        v-if="presetsCollapsed"
+        v-if="!presetsOpen"
         variant="outline"
         size="icon-sm"
         class="absolute end-3 top-3 z-10"
         :aria-label="t('iam.editRole.presetsShow')"
         data-test="edit-role-presets-open"
-        @click="setPresetsCollapsed(false)"
+        @click="setPresetsOpen(true)"
       >
         <OIcon name="library-add" size="sm" />
         <OTooltip :content="t('iam.editRole.presetsShow')" side="left" />
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :summary-actions="summaryActions"
         @apply="(presetId) => emit('preset', presetId)"
         @load-streams="emit('load-streams')"
-        @close="setPresetsCollapsed(true)"
+        @close="setPresetsOpen(false)"
       />
     </div>
   </div>
@@ -217,24 +217,14 @@ const { t } = useI18nTyped();
 
 const grouped = (count: number) => raw(count.toLocaleString());
 
-const PRESETS_COLLAPSED_KEY = "iam:editRolePresetsCollapsed";
 const root = ref<HTMLElement | null>(null);
-const presetsCollapsed = ref(false);
-try {
-  presetsCollapsed.value = localStorage.getItem(PRESETS_COLLAPSED_KEY) === "1";
-} catch {
-  // localStorage unavailable (private mode): the panel stays open.
-}
+// The page holds this so a closed panel survives this component remounting, but not the next visit.
+const presetsOpen = defineModel<boolean>("presetsOpen", { default: true });
 
 // Focus follows the toggle so a keyboard user is not dropped to the page when the clicked button unmounts.
-const setPresetsCollapsed = (collapsed: boolean) => {
-  presetsCollapsed.value = collapsed;
-  try {
-    localStorage.setItem(PRESETS_COLLAPSED_KEY, collapsed ? "1" : "0");
-  } catch {
-    // Nothing to persist to: the choice still holds for this visit.
-  }
-  const target = collapsed ? "edit-role-presets-open" : "edit-role-presets-close";
+const setPresetsOpen = (open: boolean) => {
+  presetsOpen.value = open;
+  const target = open ? "edit-role-presets-close" : "edit-role-presets-open";
   nextTick(() => root.value?.querySelector<HTMLElement>(`[data-test="${target}"]`)?.focus());
 };
 </script>

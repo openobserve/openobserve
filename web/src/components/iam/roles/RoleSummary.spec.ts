@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -160,16 +160,13 @@ describe("RoleSummary - module cards", () => {
 });
 
 describe("RoleSummary - presets panel toggle", () => {
-  const COLLAPSED_KEY = "iam:editRolePresetsCollapsed";
   const openButton = '[data-test="edit-role-presets-open"]';
   const closeButton = '[data-test="edit-role-presets-close"]';
   let wrapper: VueWrapper | undefined;
 
-  beforeEach(() => localStorage.removeItem(COLLAPSED_KEY));
   afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
-    localStorage.removeItem(COLLAPSED_KEY);
   });
 
   it("shows the panel by default, with no reopen button", async () => {
@@ -179,7 +176,7 @@ describe("RoleSummary - presets panel toggle", () => {
     expect(wrapper.find(openButton).exists()).toBe(false);
   });
 
-  it("closes from the X, moves focus to the reopen button and remembers it", async () => {
+  it("closes from the X, shows the reopen button with focus and tells the page", async () => {
     wrapper = await mountSummary({ modules: [makeModule("stream")] }, document.body);
 
     await wrapper.find(closeButton).trigger("click");
@@ -189,17 +186,13 @@ describe("RoleSummary - presets panel toggle", () => {
     const reopen = wrapper.find(openButton);
     expect(reopen.attributes("aria-label")).toBe(String(i18n.global.t("iam.editRole.presetsShow")));
     expect(document.activeElement).toBe(reopen.element);
-    expect(localStorage.getItem(COLLAPSED_KEY)).toBe("1");
-
-    wrapper.unmount();
-    wrapper = await mountSummary({ modules: [makeModule("stream")] });
-    expect(wrapper.find(panel).exists()).toBe(false);
-    expect(wrapper.find(openButton).exists()).toBe(true);
+    expect(wrapper.emitted("update:presetsOpen")).toEqual([[false]]);
   });
 
-  it("reopens from the button, moves focus to the X and remembers it", async () => {
-    localStorage.setItem(COLLAPSED_KEY, "1");
+  it("reopens from the button and moves focus to the X", async () => {
     wrapper = await mountSummary({ modules: [makeModule("stream")] }, document.body);
+    await wrapper.find(closeButton).trigger("click");
+    await flushPromises();
 
     await wrapper.find(openButton).trigger("click");
     await flushPromises();
@@ -207,10 +200,21 @@ describe("RoleSummary - presets panel toggle", () => {
     expect(wrapper.find(panel).exists()).toBe(true);
     expect(wrapper.find(openButton).exists()).toBe(false);
     expect(document.activeElement).toBe(wrapper.find(closeButton).element);
-    expect(localStorage.getItem(COLLAPSED_KEY)).toBe("0");
+    expect(wrapper.emitted("update:presetsOpen")).toEqual([[false], [true]]);
+  });
 
-    wrapper.unmount();
+  // A stored choice would keep the panel closed on later visits, which must always start open.
+  it("neither reads nor writes localStorage", async () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
     wrapper = await mountSummary({ modules: [makeModule("stream")] });
-    expect(wrapper.find(panel).exists()).toBe(true);
+
+    await wrapper.find(closeButton).trigger("click");
+    await wrapper.find(openButton).trigger("click");
+
+    expect(getItem).not.toHaveBeenCalled();
+    expect(setItem).not.toHaveBeenCalled();
+    getItem.mockRestore();
+    setItem.mockRestore();
   });
 });

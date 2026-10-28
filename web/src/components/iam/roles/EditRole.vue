@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ModulePane>
                 <RoleSummary
                   v-else-if="permissionsUiType === 'table'"
+                  v-model:presets-open="presetsOpen"
                   class="h-full"
                   :modules="summaryModules"
                   :loading="isFetchingInitialRoles"
@@ -404,6 +405,9 @@ const removedServiceAccounts = ref(new Set());
 const roleUsers: Ref<string[]> = ref([]);
 
 const permissionsUiType = ref("table");
+
+// Held here, not in RoleSummary, so a closed Presets panel stays closed when a module is opened and left.
+const presetsOpen = ref(true);
 
 const { getStreams } = useStreams(t);
 
