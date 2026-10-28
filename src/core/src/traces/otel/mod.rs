@@ -687,11 +687,11 @@ mod tests {
         span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
         span_attrs.insert(
             "gen_ai.request.model".to_string(),
-            json::json!("claude-3-5-sonnet"),
+            json::json!("claude-sonnet-4-6"),
         );
         span_attrs.insert(
             "gen_ai.response.model".to_string(),
-            json::json!("claude-3-5-sonnet"),
+            json::json!("claude-sonnet-4-6"),
         );
         span_attrs.insert("gen_ai.system".to_string(), json::json!("anthropic"));
         span_attrs.insert("gen_ai.request.temperature".to_string(), json::json!(0.7));
@@ -756,7 +756,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
-            Some("claude-3-5-sonnet"),
+            Some("claude-sonnet-4-6"),
             "Should extract model name from gen_ai.response.model"
         );
 
