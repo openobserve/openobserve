@@ -143,6 +143,18 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Enable Claude Code telemetry export
+        # Telemetry is best-effort: a missing secret or a script error must never block the Claude run.
+        continue-on-error: true
+        env:
+          O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
+          O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
+          O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
+          O2_TRACE_PASSWORD: ${{ secrets.O2_TRACE_PASSWORD }}
+          O2_TRACE_AUTH: ${{ secrets.O2_TRACE_AUTH }}
+          O2_TRACE_STREAM: ${{ secrets.O2_TRACE_STREAM }}
+        run: python3 scripts/ci-telemetry/claude_otel_env.py github-actions.claude-code-action
+
       - name: Analyze bugs with Claude
         uses: anthropics/claude-code-action@16f9f71ab9c490faf367f94dd294897edc25be33 # v1.0.261
         with:

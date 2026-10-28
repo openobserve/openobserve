@@ -29,7 +29,7 @@ next run, exactly like a hard API failure.
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
-    DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
+    DEEPSEEK_MODEL     Model id (default "deepseek-flash").
     DEEPSEEK_BASE_URL  API base URL (default "https://api.deepseek.com").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
     TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
@@ -39,6 +39,7 @@ import json
 import os
 import re
 import hashlib
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -627,6 +628,7 @@ _NAMED = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*\Z")
 _LIST = re.compile(r"\d+\Z")
 
 _client = None
+_tracer = None
 # Batches are translated concurrently (see translate_pending), so the lazy client
 # construction below must be race-free.
 _client_lock = threading.Lock()
@@ -819,7 +821,7 @@ def _get_client():
     work). The client itself is thread-safe and shared by every worker; only its
     construction is locked.
     """
-    global _client
+    global _client, _tracer
     if _client is None:
         with _client_lock:
             if _client is None:
@@ -830,6 +832,8 @@ def _get_client():
                     raise TranslationError(
                         "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
                     )
+                # Set before _client: other workers stop locking once _client is non-None.
+                _tracer = _make_tracer()
                 _client = OpenAI(
                     api_key=api_key,
                     base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
@@ -842,8 +846,15 @@ def _get_client():
     return _client
 
 
+def _make_tracer():
+    sys.path.insert(0, os.path.join(_script_dir(), "..", "ci-telemetry"))
+    from o2_llm_trace import Tracer
+
+    return Tracer("github-actions.translations", root_name="translations")
+
+
 def _model():
-    return os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+    return os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")
 
 
 def build_module_glossary(source, existing):
@@ -974,7 +985,14 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
     last_err = None
     for attempt in range(max_retries):
         try:
-            resp = _get_client().chat.completions.create(
+            client = _get_client()
+            resp = _tracer.chat_completion(
+                client,
+                attributes={
+                    "ai.translations.locale": locale,
+                    "ai.translations.items": len(items),
+                    "ai.translations.attempt": attempt + 1,
+                },
                 model=_model(),
                 messages=[
                     {"role": "system", "content": prompt},
