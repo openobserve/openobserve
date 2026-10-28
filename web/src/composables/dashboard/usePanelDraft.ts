@@ -276,18 +276,6 @@ export const clearPanelDraftsFor = (userEmail: string) => {
   bumpRevision();
 };
 
-/** Runs on logout so no draft outlives the session that wrote it. */
-export const clearAllPanelDrafts = () => {
-  const storage = getStorage();
-  if (!storage) return;
-  try {
-    draftKeys(storage).forEach((key) => storage.removeItem(key));
-  } catch {
-    return;
-  }
-  bumpRevision();
-};
-
 /** Minute precision in the user's locale and timezone, e.g. "Oct 21, 2026, 14:32". */
 export const formatPanelDraftTime = (ts: number, locale: string, timeZone?: string): string => {
   const options: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };

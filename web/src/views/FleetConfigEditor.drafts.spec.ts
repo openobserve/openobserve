@@ -64,6 +64,10 @@ const SECRET_YAML = [
   "",
 ].join("\n");
 
+const yamlPointer = (...path: (string | { l: string } | { i: number })[]) =>
+  `/yamlText/${encodeURIComponent(JSON.stringify(path))}`;
+const AUTH_POINTER = yamlPointer("exporters", "otlphttp", "headers", "Authorization");
+
 const scope = (entityId: string | null): EditorDraftScope => ({
   kind: "fleet_config",
   org: "default",
@@ -166,7 +170,7 @@ describe("FleetConfigEditor drafts", () => {
     expect(draft?.data.yamlText).toContain("X-Env-Token: ${env:O2_TOKEN}");
     expect(draft?.data.yamlText).not.toContain("c2VjcmV0");
     expect(draft?.data.mode).toBe("yaml");
-    expect(draft?.redactedPaths).toEqual(["/yamlText/3"]);
+    expect(draft?.redactedPaths).toEqual([AUTH_POINTER]);
   });
 
   it("offers local changes under their own title and continues them", async () => {
@@ -198,7 +202,7 @@ describe("FleetConfigEditor drafts", () => {
     const edited = `receivers:\n  otlp: {}\n${SECRET_YAML}`;
     await editYaml(edited);
     window.dispatchEvent(new Event("pagehide"));
-    expect(readEditorDraft(scope("edge"))?.redactedPaths).toEqual(["/yamlText/5"]);
+    expect(readEditorDraft(scope("edge"))?.redactedPaths).toEqual([AUTH_POINTER]);
     wrapper!.unmount();
 
     await mountEditor("edge");
@@ -214,7 +218,7 @@ describe("FleetConfigEditor drafts", () => {
     await mountEditor("edge");
     await editYaml(SECRET_YAML.replace("Basic c2VjcmV0", "Basic bmV3"));
     window.dispatchEvent(new Event("pagehide"));
-    expect(readEditorDraft(scope("edge"))?.changedRedactedPaths).toEqual(["/yamlText/3"]);
+    expect(readEditorDraft(scope("edge"))?.changedRedactedPaths).toEqual([AUTH_POINTER]);
     wrapper!.unmount();
 
     await mountEditor("edge");
@@ -337,6 +341,128 @@ describe("FleetConfigEditor drafts", () => {
       "edge",
       expect.objectContaining({ yaml: expect.stringContaining("value: t-prod") }),
     );
+  });
+
+  it("keeps a not-kept secret blocking Save after Continue, another edit, a reload and a second Continue", async () => {
+    vi.mocked(fleet.getConfig).mockImplementation(
+      async (_org: string, id: string) => ({ data: detail(id, SECRET_YAML) }) as never,
+    );
+    await mountEditor("edge");
+    await editYaml(SECRET_YAML.replace("Basic c2VjcmV0", "Basic bmV3"));
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+
+    await mountEditor("edge");
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    const continued = String(code().props("code"));
+    expect(continued).toContain('Authorization: ""');
+    await editYaml(`receivers:\n  otlp: {}\n${continued}`);
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft(scope("edge"))?.changedRedactedPaths).toEqual([AUTH_POINTER]);
+    wrapper!.unmount();
+
+    await mountEditor("edge");
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "exporters.otlphttp.headers.Authorization",
+    );
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    expect(code().props("code")).toContain("receivers:\n  otlp: {}");
+    expect(code().props("code")).toContain('Authorization: ""');
+
+    vi.mocked(fleet.saveConfigDraft).mockClear();
+    const editor = wrapper!.findComponent(FleetConfigEditor).vm as unknown as {
+      save: () => Promise<boolean>;
+    };
+    expect(await editor.save()).toBe(false);
+    expect(fleet.saveConfigDraft).not.toHaveBeenCalled();
+  });
+
+  it("stores no header_setter value named like a secret, refills it by key and blocks a changed one", async () => {
+    const saved = [
+      "extensions:",
+      "  headers_setter:",
+      "    headers:",
+      "      - key: Authorization",
+      "        value: Bearer abc",
+      "      - {key: X-Api-Key, value: k-flow}",
+      "",
+    ].join("\n");
+    vi.mocked(fleet.getConfig).mockImplementation(
+      async (_org: string, id: string) => ({ data: detail(id, saved) }) as never,
+    );
+    await mountEditor("edge");
+    await editYaml(saved.replace("k-flow", "k-new"));
+    window.dispatchEvent(new Event("pagehide"));
+    const stored = readEditorDraft<{ yamlText: string }>(scope("edge"))!;
+    expect(stored.data.yamlText).not.toMatch(/Bearer abc|k-flow|k-new/);
+    wrapper!.unmount();
+
+    await mountEditor("edge");
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "extensions.headers_setter.headers[X-Api-Key].value",
+    );
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    expect(code().props("code")).toContain("value: Bearer abc");
+    expect(code().props("code")).toContain('{key: X-Api-Key, value: ""}');
+
+    vi.mocked(toast).mockClear();
+    const editor = wrapper!.findComponent(FleetConfigEditor).vm as unknown as {
+      save: () => Promise<boolean>;
+    };
+    expect(await editor.save()).toBe(false);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("extensions.headers_setter.headers[X-Api-Key].value"),
+      }),
+    );
+  });
+
+  it("redacts CRLF YAML and commented-out secrets, and gives the CRLF text back on Continue", async () => {
+    const saved = [
+      "exporters:",
+      "  otlphttp:",
+      "    headers:",
+      "      Authorization: Basic c2VjcmV0",
+      "",
+    ].join("\r\n");
+    vi.mocked(fleet.getConfig).mockImplementation(
+      async (_org: string, id: string) => ({ data: detail(id, saved) }) as never,
+    );
+    await mountEditor("edge");
+    const edited = `${saved}# password: oldSecret\r\n`;
+    await editYaml(edited);
+    window.dispatchEvent(new Event("pagehide"));
+    const stored = readEditorDraft<{ yamlText: string }>(scope("edge"))!;
+    expect(stored.data.yamlText).not.toMatch(/c2VjcmV0|oldSecret/);
+    expect(stored.data.yamlText).toContain('Authorization: ""\r\n# password: ""\r\n');
+    wrapper!.unmount();
+
+    await mountEditor("edge");
+    expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    expect(code().props("code")).toBe(edited.replace("oldSecret", '""'));
+  });
+
+  it("stores no YAML that does not parse when it may hold a secret, and continues from the saved YAML", async () => {
+    vi.mocked(fleet.getConfig).mockImplementation(
+      async (_org: string, id: string) => ({ data: detail(id, SECRET_YAML) }) as never,
+    );
+    await mountEditor("edge");
+    await editYaml("exporters:\n  otlphttp:\n    headers: [Authorization: Basic bmV3\n");
+    window.dispatchEvent(new Event("pagehide"));
+    const stored = readEditorDraft<{ yamlText: string }>(scope("edge"))!;
+    expect(stored.data.yamlText).toBe("");
+    wrapper!.unmount();
+
+    await mountEditor("edge");
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("YAML");
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    expect(code().props("code")).toBe(SECRET_YAML);
   });
 
   it("tells the user an import was not applied when they continue an earlier new-config draft", async () => {

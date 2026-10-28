@@ -408,11 +408,11 @@ import FleetConfigVariables from "@/components/fleet/editor/FleetConfigVariables
 import FleetAddPipelineDialog from "@/components/fleet/editor/FleetAddPipelineDialog.vue";
 import {
   blankYamlSecretKeys,
-  changedYamlSecretLines,
+  changedYamlSecrets,
   redactYamlSecrets,
   restoreYamlSecrets,
-  yamlKeyPathLabel,
-  yamlLineKeyPaths,
+  yamlSecretLabel,
+  YAML_NOT_STORED,
 } from "@/components/fleet/editor/yamlDraftSecrets";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import type { GroupIssue } from "@/components/fleet/editor/FleetEditorGroupNode.vue";
@@ -944,7 +944,6 @@ async function confirmPublish() {
       issues.value = warnings;
       if (id.value === sentId) {
         configDraft.markSaved();
-        notKeptYamlKeys = [];
       }
     }
     toast({
@@ -993,7 +992,6 @@ async function save(): Promise<boolean> {
     // An edit typed during the request is still unsaved, so only a matching text clears the local draft.
     if (yamlText.value === sent) {
       configDraft.markSaved();
-      notKeptYamlKeys = [];
     }
     toast({ variant: "success", message: t("fleet.editor.draftSaved") });
     return true;
@@ -1074,13 +1072,22 @@ interface FleetConfigDraft {
   selection: { nodeId: string; pipelineId: string | null; key: string } | null;
 }
 
-// Key paths of secrets the user changed that the draft did not keep; Save and Publish wait until they are typed again.
-let notKeptYamlKeys: string[] = [];
+const YAML_POINTER = "/yamlText/";
 
+const yamlPointer = (id: string) => `${YAML_POINTER}${encodeURIComponent(id)}`;
+
+const yamlIdsOf = (paths: string[]): string[] =>
+  paths.flatMap((path) =>
+    path.startsWith(YAML_POINTER) ? [decodeURIComponent(path.slice(YAML_POINTER.length))] : [],
+  );
+
+const YAML_NOT_STORED_POINTER = yamlPointer(YAML_NOT_STORED);
+
+// Save and Publish wait until the secrets a continued draft did not keep are typed again.
 function blockOnBlankSecrets(): boolean {
-  const blank = blankYamlSecretKeys(yamlText.value, notKeptYamlKeys);
+  const blank = yamlIdsOf(configDraft.pendingReentries());
   if (!blank.length) return false;
-  const keys = raw(blank.map(yamlKeyPathLabel).join(", "));
+  const keys = raw(blank.map(yamlSecretLabel).join(", "));
   toast({
     variant: "error",
     message: t("fleet.editor.reenterSecrets", { keys }, blank.length),
@@ -1088,20 +1095,11 @@ function blockOnBlankSecrets(): boolean {
   return true;
 }
 
-const yamlLinesOf = (paths: string[]): number[] =>
-  paths.flatMap((path) => {
-    const line = /^\/yamlText\/(\d+)$/.exec(path);
-    return line ? [Number(line[1])] : [];
-  });
-
-function applyDraft(
-  data: FleetConfigDraft,
-  { notKeptPaths, storedData }: EditorDraftApplyContext<FleetConfigDraft>,
-) {
-  // The line numbers point into the stored text, where refilled multi-line secrets are still one line.
-  notKeptYamlKeys = yamlLineKeyPaths(storedData.yamlText, yamlLinesOf(notKeptPaths));
-  yamlText.value = data.yamlText;
-  graph.value = yamlToGraph(data.yamlText);
+function applyDraft(data: FleetConfigDraft, { notKeptPaths }: EditorDraftApplyContext) {
+  // A draft whose YAML did not parse kept none of it, so the saved YAML is the closest to it.
+  const text = notKeptPaths.includes(YAML_NOT_STORED_POINTER) ? savedYaml.value : data.yamlText;
+  yamlText.value = text;
+  graph.value = yamlToGraph(text);
   const g = graph.value;
   mode.value = g && data.mode === "visual" ? "visual" : "yaml";
   leavePropertiesWithoutGraph();
@@ -1135,25 +1133,28 @@ const configDraft = useEditorDraft<FleetConfigDraft>({
     const saved = isNew.value ? "" : savedYaml.value;
     return {
       data: { ...data, yamlText: redacted.text },
-      paths: redacted.lines.map((line) => `/yamlText/${line}`),
-      changedPaths: changedYamlSecretLines(redacted, data.yamlText, saved).map(
-        (line) => `/yamlText/${line}`,
-      ),
+      paths: redacted.ids.map(yamlPointer),
+      changedPaths: changedYamlSecrets(redacted, data.yamlText, saved).map(yamlPointer),
     };
   },
-  // Blanked lines are refilled from the saved YAML by key path, so continuing never wipes a stored credential.
+  // Blanked secrets are refilled from the saved YAML by path, so continuing never wipes a stored credential.
   restoreSecrets: (data, _current, paths) => {
     if (isNew.value) return data;
     return {
       ...data,
-      yamlText: restoreYamlSecrets(data.yamlText, yamlLinesOf(paths), savedYaml.value),
+      yamlText: restoreYamlSecrets(data.yamlText, yamlIdsOf(paths), savedYaml.value),
     };
   },
-  // A line with no key path leaves the list empty, so the dialog's general note covers every change.
-  describeRedacted: (paths, data) => {
-    const keys = yamlLineKeyPaths(data.yamlText, yamlLinesOf(paths));
-    if (keys.length !== paths.length) return [];
-    return [...new Set(keys.map(yamlKeyPathLabel))].map((label) => raw(label));
+  blankSecrets: (data, paths) =>
+    blankYamlSecretKeys(data.yamlText, yamlIdsOf(paths)).map(yamlPointer),
+  // A secret with no readable path leaves the list empty, so the dialog's general note covers every change.
+  describeRedacted: (paths) => {
+    const ids = yamlIdsOf(paths);
+    const labels = ids.map((id) =>
+      id === YAML_NOT_STORED ? t("fleet.configs.yaml") : raw(yamlSecretLabel(id)),
+    );
+    if (ids.length !== paths.length || labels.some((label) => label === "")) return [];
+    return [...new Set(labels)];
   },
   restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
   serverDraftItem: true,
@@ -1171,7 +1172,6 @@ function dropDrafts() {
 }
 
 async function startDraft() {
-  notKeptYamlKeys = [];
   await configDraft.start();
   const imported = pendingImport;
   pendingImport = null;

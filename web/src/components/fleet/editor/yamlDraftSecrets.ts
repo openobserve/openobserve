@@ -13,484 +13,540 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import {
+  isAlias,
+  isMap,
+  isPair,
+  isScalar,
+  isSeq,
+  parseDocument,
+  visit,
+  type Document,
+  type Pair,
+  type Range,
+  type Scalar,
+  type YAMLMap,
+} from "yaml";
 import { SECRET_KEY_PATTERN } from "@/utils/drafts/redactDraftSecrets";
 
 export interface RedactedYaml {
   text: string;
-  /** Zero-based line numbers, in the redacted text, whose value was blanked. */
-  lines: number[];
+  /** Ids of the blanked secrets (see `yamlSecretLabel`); only `YAML_NOT_STORED` when the text was dropped. */
+  ids: string[];
 }
 
-const KEY_LINE = /^(\s*(?:-\s+)?)(["']?)([^"'\s:#][^"':#]*?)\2(\s*:)(?:(\s+)(.*))?$/;
-const BLOCK_SCALAR = /^[|>][0-9+-]*$/;
+/** The id of a whole YAML text left out of a draft because it did not parse and may hold a secret. */
+export const YAML_NOT_STORED = "yaml";
+
 // A path or file setting names where the secret lives, not the secret itself.
 const REFERENCE_KEY = /_(file|path)$/i;
-// The part of a line that is a flow collection, after an optional list dash and key.
-const FLOW_LINE = /^(\s*(?:-\s+)?(?:[^{}[\]#]*?:\s+)?)([{[].*)$/;
-const FLOW_PAIR =
-  /([{,]\s*)(["']?)([^"'{}[\],:\s][^"'{}[\],:]*?)\2(\s*:\s*)("(?:\\.|[^"\\])*"|'(?:''|[^'])*'|(?:\$\{[^}]*\}|[^,{}[\]])*)/g;
-const LIST_ITEM = /^-(\s+|$)/;
-// A list item is matched by the first of these keys it has, else by its first scalar, never by position.
+// A list item is matched by the first of these fields it has, else by its first plain field, never by position.
 const ITEM_LABEL_KEYS = ["job_name", "name", "key", "id"];
-// Marks a list item with no identity; a secret inside one is never refilled.
-const UNLABELLED_ITEM = "[#";
-// Kept inside a secret block so its list items can be matched; `key` is left out since it often holds the secret there.
+// Kept under a secret key so its list items can still be matched; `key` is left out since it often holds the secret there.
 const KEPT_IDENTITY_KEYS = ["job_name", "name", "id"];
+const BLOCK_HEADER = /^[|>][0-9+-]*/;
+// For a commented-out line that is not YAML: the text after a secret-looking word and its `:` or `=`.
+const COMMENT_SECRET = new RegExp(
+  `((?:${SECRET_KEY_PATTERN.source})[^\\s:=]*["']?\\s*[:=]\\s*)(\\S.*?)\\s*$`,
+  "i",
+);
 
-interface Frame {
-  indent: number;
-  key: string;
-  item: boolean;
-  items: number;
+/** A map key, a list item matched by its label, or a list item with no unique label (1-based). */
+type Segment = string | { l: string } | { i: number };
+
+interface Child {
+  segment: Segment;
+  node: unknown;
+  /** For a scalar: it is a secret; for a collection: everything under it is. */
+  secret: boolean;
+  label: string | null;
+  /** Where a map value's key ends, so comments between the key and its value count as under it. */
+  keyEnd: number | null;
 }
 
-const indentOf = (line: string) => line.length - line.trimStart().length;
+interface Edit {
+  start: number;
+  end: number;
+  text: string;
+}
 
-const splitComment = (value: string): { scalar: string; comment: string } => {
-  if (value.startsWith("#")) return { scalar: "", comment: ` ${value}` };
-  const quoted = /^(["'])(?:\\.|(?!\1).)*\1/.exec(value);
-  const end = quoted ? quoted[0].length : value.search(/\s#/);
-  if (end < 0) return { scalar: value, comment: "" };
-  return { scalar: value.slice(0, end), comment: value.slice(end) };
+interface Found {
+  secrets: { node: Scalar; path: Segment[] }[];
+  /** Source spans whose every scalar is a secret, for commented-out lines inside them. */
+  spans: [number, number][];
+}
+
+interface CommentLine {
+  /** Offset of the `#`. */
+  start: number;
+  /** Offset of the line end, before any `\r`. */
+  end: number;
+  column: number;
+  line: number;
+  ownLine: boolean;
+}
+
+const rangeOf = (node: { range?: Range | null }): Range => node.range ?? [0, 0, 0];
+
+const parse = (text: string): Document | null => {
+  const doc = parseDocument(text);
+  return doc.errors.length ? null : doc;
 };
 
-const isSecretKey = (key: string) => SECRET_KEY_PATTERN.test(key) && !REFERENCE_KEY.test(key);
+const keyOf = (pair: Pair): string | null => (isScalar(pair.key) ? String(pair.key.value) : null);
 
-const keepsValue = (key: string, scalar: string) =>
-  !isSecretKey(key) ||
-  scalar.trim() === "" ||
-  scalar.trim() === '""' ||
-  scalar.trim() === "''" ||
-  // An env reference is resolved on the collector, so it is not a secret in the text.
-  scalar.includes("${");
-
-const isBlankScalar = (scalar: string) => scalar === '""' || scalar === "''";
-
-/** How many lines after `from` continue a plain multi-line scalar whose key line has no value; 0 when they do not. */
-const plainContinuation = (lines: string[], from: number): number => {
-  const keyIndent = indentOf(lines[from]);
-  let last = 0;
-  for (let i = from + 1; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed === "") continue;
-    if (indentOf(lines[i]) <= keyIndent) break;
-    if (KEY_LINE.test(lines[i]) || LIST_ITEM.test(trimmed) || trimmed.startsWith("#")) return 0;
-    last = i - from;
-  }
-  return last;
-};
-
-/** Calls `visit` for each pair of a flow collection; its return replaces the pair's value. */
-const mapFlowPairs = (flow: string, visit: (key: string, value: string) => string): string =>
-  flow.replace(
-    FLOW_PAIR,
-    (_m, lead: string, quote: string, key: string, sep: string, value: string) => {
-      const scalar = value.trimEnd();
-      return `${lead}${quote}${key}${quote}${sep}${visit(key, scalar)}${value.slice(scalar.length)}`;
-    },
-  );
-
-const FLOW_KEY_BEFORE_COLLECTION =
-  /([{,]\s*)(["']?)([^"'{}[\],:\s][^"'{}[\],:]*?)\2(\s*:\s*)(?=[[{])/g;
-
-/** Where the bracketed collection starting at `start` ends (exclusive); quoted text is skipped. */
-const collectionEnd = (text: string, start: number): number => {
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '"' || ch === "'") {
-      const close = text.indexOf(ch, i + 1);
-      if (close < 0) return text.length;
-      i = close;
-    } else if (ch === "[" || ch === "{") depth++;
-    else if (ch === "]" || ch === "}") {
-      depth--;
-      if (depth === 0) return i + 1;
-    }
-  }
-  return text.length;
-};
-
-// A secret key holding a list or map in flow style: the whole collection is the secret.
-const blankSecretFlowCollections = (flow: string): string => {
-  let out = "";
-  let from = 0;
-  FLOW_KEY_BEFORE_COLLECTION.lastIndex = 0;
-  for (
-    let m = FLOW_KEY_BEFORE_COLLECTION.exec(flow);
-    m;
-    m = FLOW_KEY_BEFORE_COLLECTION.exec(flow)
-  ) {
-    if (!isSecretKey(m[3])) continue;
-    const valueStart = m.index + m[0].length;
-    const end = collectionEnd(flow, valueStart);
-    if (flow.slice(valueStart, end).includes("${")) continue;
-    out += `${flow.slice(from, valueStart)}""`;
-    from = end;
-    FLOW_KEY_BEFORE_COLLECTION.lastIndex = end;
-  }
-  return out + flow.slice(from);
-};
-
-const redactFlow = (flow: string): string =>
-  mapFlowPairs(blankSecretFlowCollections(flow), (key, value) =>
-    keepsValue(key, value) ? value : '""',
-  );
-
-const LIST_SCALAR_LINE = /^(\s*-\s+)(.*)$/;
-
-const isLiteralSecret = (value: string) =>
-  value !== "" && !isBlankScalar(value) && !value.includes("${");
-
-/** Whether `line` belongs to the nested block of a key at column `keyCol`; a list may sit at the key's own column. */
-const inBlockOf = (line: string, keyCol: number): boolean =>
-  line.trim() === "" ||
-  indentOf(line) > keyCol ||
-  (indentOf(line) === keyCol && LIST_ITEM.test(line.trim()));
-
-/** Redacts the lines of a secret key's nested block (a list or map) from `start`; returns the index of its last line. */
-const redactSecretBlock = (
-  source: string[],
-  start: number,
-  keyCol: number,
-  out: string[],
-  lines: number[],
-): number => {
-  let i = start;
-  while (i < source.length && inBlockOf(source[i], keyCol)) {
-    const line = source[i];
-    const match = KEY_LINE.exec(line);
-    const item = match ? null : LIST_SCALAR_LINE.exec(line);
-    const prefix = match ? `${match[1]}${match[2]}${match[3]}${match[2]}${match[4]} ` : item?.[1];
-    const { scalar, comment } = splitComment((match ? match[6] : item?.[2]) ?? "");
-    const value = scalar.trim();
-    const continued = match && value === "" ? plainContinuation(source, i) : 0;
-    // A path or file setting under the block still names where a secret lives, not the secret.
-    const kept =
-      !!match &&
-      (REFERENCE_KEY.test(match[3]) ||
-        (KEPT_IDENTITY_KEYS.includes(match[3]) && !BLOCK_SCALAR.test(value)));
-    if (prefix === undefined || kept || (!isLiteralSecret(value) && !continued)) {
-      out.push(line);
-      i++;
-      continue;
-    }
-    lines.push(out.length);
-    out.push(`${prefix}""${comment}`);
-    const bodyIndent = match ? match[1].length : indentOf(line);
-    i += 1 + continued;
-    if (!BLOCK_SCALAR.test(value)) continue;
-    while (i < source.length && (source[i].trim() === "" || indentOf(source[i]) > bodyIndent)) i++;
-  }
-  return i - 1;
-};
-
-const hasNestedBlock = (source: string[], i: number, keyCol: number): boolean => {
-  const next = source.slice(i + 1).find((line) => line.trim() !== "");
-  return next !== undefined && inBlockOf(next, keyCol);
-};
-
-/** Each key's value in a flow collection, a nested list or map read whole; null for a key that occurs more than once, at any depth. */
-const flowValues = (flow: string): Map<string, string | null> => {
-  const values = new Map<string, string | null>();
-  flow.replace(FLOW_PAIR, (pair: string, ...groups: (string | number)[]) => {
-    const key = String(groups[2]);
-    const end = Number(groups[5]) + pair.length;
-    const scalar = String(groups[4]).trimEnd();
-    const value =
-      scalar === "" && /[[{]/.test(flow[end] ?? "")
-        ? flow.slice(end, collectionEnd(flow, end))
-        : scalar;
-    values.set(key, values.has(key) ? null : value);
-    return pair;
+// An entry such as `key: Authorization` + `value: …` (headers_setter, attributes processor) holds its secret in `value`.
+const namesSecret = (map: YAMLMap): boolean =>
+  map.items.some((pair) => {
+    const key = keyOf(pair);
+    return (
+      (key === "key" || key === "name") &&
+      isScalar(pair.value) &&
+      typeof pair.value.value === "string" &&
+      SECRET_KEY_PATTERN.test(pair.value.value)
+    );
   });
-  return values;
+
+const fieldIsSecret = (key: string | null, inSecret: boolean, pairSecret: boolean): boolean => {
+  if (key === null) return inSecret;
+  if (REFERENCE_KEY.test(key)) return false;
+  if (SECRET_KEY_PATTERN.test(key) || (pairSecret && key === "value")) return true;
+  return inSecret && !KEPT_IDENTITY_KEYS.includes(key);
 };
 
-const pathOf = (stack: Frame[]) =>
-  stack
-    .slice(1)
-    .map((frame) => frame.key)
-    .join("/");
+const isBlockScalar = (node: Scalar) =>
+  node.type === "BLOCK_LITERAL" || node.type === "BLOCK_FOLDED";
 
-const isIdentityValue = (key: string, value: string) =>
-  value !== "" &&
-  !isBlankScalar(value) &&
-  !BLOCK_SCALAR.test(value) &&
-  !/^[{[]/.test(value) &&
-  !SECRET_KEY_PATTERN.test(key);
+const isLabelValue = (node: unknown): node is Scalar =>
+  isScalar(node) && node.value !== null && node.value !== "" && !isBlockScalar(node);
 
-/** The identity of the list item opening at `start`: an identity key's value, else its first scalar. */
-const itemLabel = (lines: string[], start: number): string | null => {
-  const first = KEY_LINE.exec(lines[start]);
-  if (!first) {
-    const bare = splitComment(lines[start].trim().replace(LIST_ITEM, "")).scalar.trim();
-    return bare && !isBlankScalar(bare) ? `=${bare}` : null;
-  }
-  const dashIndent = indentOf(lines[start]);
-  const keyIndent = first[1].length;
+const isLiteralSecret = (node: Scalar) =>
+  node.value !== null &&
+  node.value !== "" &&
+  typeof node.value !== "boolean" &&
+  // An env reference is resolved on the collector, so it is not a secret in the text.
+  !String(node.value).includes("${");
+
+const itemLabel = (item: unknown, inSecret: boolean): string | null => {
+  if (isScalar(item)) return !inSecret && isLabelValue(item) ? `=${String(item.value)}` : null;
+  if (!isMap(item)) return null;
+  const pairSecret = namesSecret(item);
   const fields = new Map<string, string>();
-  for (let i = start; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (i > start && trimmed === "") continue;
-    if (i > start && indentOf(lines[i]) <= dashIndent) break;
-    if (i > start && (indentOf(lines[i]) !== keyIndent || LIST_ITEM.test(trimmed))) continue;
-    const match = KEY_LINE.exec(lines[i]);
-    const value = match ? splitComment(match[6] ?? "").scalar.trim() : "";
-    if (match && isIdentityValue(match[3], value) && !fields.has(match[3])) {
-      fields.set(match[3], value);
-    }
+  for (const pair of item.items) {
+    const key = keyOf(pair);
+    if (key === null || fields.has(key) || fieldIsSecret(key, inSecret, pairSecret)) continue;
+    if (isLabelValue(pair.value)) fields.set(key, String(pair.value.value));
   }
   const key = ITEM_LABEL_KEYS.find((name) => fields.has(name)) ?? fields.keys().next().value;
   return key === undefined ? null : `${key}=${fields.get(key)}`;
 };
 
-const openListItem = (stack: Frame[], lines: string[], index: number) => {
-  const indent = indentOf(lines[index]);
-  let top = stack[stack.length - 1];
-  while (top.indent > indent || (top.indent === indent && top.item)) {
-    stack.pop();
-    top = stack[stack.length - 1];
-  }
-  const label = itemLabel(lines, index);
-  top.items++;
-  stack.push({
-    indent,
-    key: label === null ? `${UNLABELLED_ITEM}${top.items}]` : `[${label}]`,
-    item: true,
-    items: 0,
-  });
-};
-
-/** The key path of each line (null for comments, blanks, block scalar bodies and bare values). */
-const keyPaths = (lines: string[]): (string | null)[] => {
-  const stack: Frame[] = [{ indent: -1, key: "", item: false, items: 0 }];
-  const paths: (string | null)[] = [];
-  let blockIndent: number | null = null;
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    const trimmed = line.trim();
-    const indent = indentOf(line);
-    if (blockIndent !== null && (trimmed === "" || indent > blockIndent)) {
-      paths.push(null);
-      continue;
-    }
-    blockIndent = null;
-    if (trimmed === "" || trimmed.startsWith("#")) {
-      paths.push(null);
-      continue;
-    }
-    const dash = LIST_ITEM.exec(trimmed);
-    if (dash) openListItem(stack, lines, index);
-    const match = KEY_LINE.exec(line);
-    if (!match) {
-      paths.push(dash ? pathOf(stack) : null);
-      continue;
-    }
-    const keyIndent = match[1].length;
-    while (stack[stack.length - 1].indent >= keyIndent) stack.pop();
-    stack.push({ indent: keyIndent, key: match[3], item: false, items: 0 });
-    paths.push(pathOf(stack));
-    if (BLOCK_SCALAR.test(splitComment(match[6] ?? "").scalar.trim())) blockIndent = keyIndent;
-  }
-  return paths;
-};
-
-/** The lines of a block scalar that starts at `from`, without the key line. */
-const blockBody = (lines: string[], from: number): string[] => {
-  const keyIndent = KEY_LINE.exec(lines[from])?.[1].length ?? indentOf(lines[from]);
-  const body: string[] = [];
-  for (let i = from + 1; i < lines.length; i++) {
-    if (lines[i].trim() !== "" && indentOf(lines[i]) <= keyIndent) break;
-    body.push(lines[i]);
-  }
-  return body;
-};
-
-const shiftIndent = (line: string, delta: number): string => {
-  if (line.trim() === "") return line;
-  return delta >= 0 ? " ".repeat(delta) + line : line.slice(Math.min(-delta, indentOf(line)));
-};
-
-const refillFlow = (draftLine: string, sourceLine: string): string[] | null => {
-  const draft = FLOW_LINE.exec(draftLine);
-  const source = FLOW_LINE.exec(sourceLine);
-  if (!draft || !source) return null;
-  const sourceValues = flowValues(source[2]);
-  const draftValues = flowValues(draft[2]);
-  let unresolved = false;
-  // A key that repeats on either side cannot say which nested map or item its secret belongs to.
-  const flow = mapFlowPairs(draft[2], (key, value) => {
-    if (!isBlankScalar(value) || !isSecretKey(key)) return value;
-    const saved = draftValues.get(key) === null ? null : sourceValues.get(key);
-    if (saved) return saved;
-    unresolved = true;
-    return value;
-  });
-  // A partly refilled line would pass for kept while a secret on it is still blank.
-  return unresolved ? null : [draft[1] + flow];
-};
-
-/** Rebuilds one blanked draft line from the source line at the same key path; null when it cannot. */
-const refillLine = (draftLine: string, sourceLines: string[], from: number): string[] | null => {
-  const draft = KEY_LINE.exec(draftLine);
-  const source = KEY_LINE.exec(sourceLines[from]);
-  if (!draft || !source) return null;
-  const { scalar, comment } = splitComment(draft[6] ?? "");
-  if (!isBlankScalar(scalar.trim())) return refillFlow(draftLine, sourceLines[from]);
-  const sourceScalar = splitComment(source[6] ?? "").scalar;
-  const delta = indentOf(draftLine) - indentOf(sourceLines[from]);
-  if (sourceScalar.trim() === "") {
-    const continued = plainContinuation(sourceLines, from);
-    if (!continued) return null;
-    const body = sourceLines.slice(from + 1, from + 1 + continued);
-    return [
-      `${draft[1]}${draft[2]}${draft[3]}${draft[2]}${draft[4]}${comment}`,
-      ...body.map((line) => shiftIndent(line, delta)),
-    ];
-  }
-  const head = `${draft[1]}${draft[2]}${draft[3]}${draft[2]}${draft[4]} ${sourceScalar}${comment}`;
-  if (!BLOCK_SCALAR.test(sourceScalar.trim())) return [head];
-  return [head, ...blockBody(sourceLines, from).map((line) => shiftIndent(line, delta))];
-};
-
-/** Refills the lines `redactYamlSecrets` blanked from the line at the same key path in `source`; unmatched lines stay blank. */
-export const restoreYamlSecrets = (redacted: string, lines: number[], source: string): string => {
-  const draftLines = redacted.split("\n");
-  const sourceLines = source.split("\n");
-  const draftPaths = keyPaths(draftLines);
-  // A path that occurs twice in the source cannot say which of its values is the draft's.
-  const sourceAt = new Map<string, number | null>();
-  keyPaths(sourceLines).forEach((path, index) => {
-    if (path !== null) sourceAt.set(path, sourceAt.has(path) ? null : index);
-  });
-  const refilled = new Map<number, string[]>();
-  for (const line of lines) {
-    const path = draftPaths[line];
-    if (!path || path.includes(UNLABELLED_ITEM)) continue;
-    const from = sourceAt.get(path);
-    if (from === undefined || from === null) continue;
-    const next = refillLine(draftLines[line], sourceLines, from);
-    if (next) refilled.set(line, next);
-  }
-  return draftLines.flatMap((line, index) => refilled.get(index) ?? [line]).join("\n");
-};
-
-/** The key paths (e.g. `exporters/otlphttp/headers/Authorization`) of the given lines; lines with no key path are skipped. */
-export const yamlLineKeyPaths = (text: string, lines: number[]): string[] => {
-  const paths = keyPaths(text.split("\n"));
-  return lines.flatMap((line) => {
-    const path = paths[line];
-    return path ? [path] : [];
-  });
-};
-
-/** Whether the key path sits under a secret key, where every scalar is a secret. */
-const underSecretKey = (path: string): boolean =>
-  path
-    .split("/")
-    .slice(0, -1)
-    .some((segment) => !segment.startsWith("[") && isSecretKey(segment));
-
-const hasBlankSecret = (line: string, path: string): boolean => {
-  const match = KEY_LINE.exec(line);
-  const value = match ? (match[6] ?? "") : line.trim().replace(LIST_ITEM, "");
-  const { scalar } = splitComment(value);
-  const secret = underSecretKey(path) || (!!match && isSecretKey(match[3]));
-  if (secret && isBlankScalar(scalar.trim())) return true;
-  const flow = FLOW_LINE.exec(line);
-  let blank = false;
-  if (flow) {
-    mapFlowPairs(flow[2], (key, value) => {
-      if (isSecretKey(key) && isBlankScalar(value)) blank = true;
-      return value;
+const childrenOf = (node: unknown, inSecret: boolean): Child[] => {
+  if (isMap(node)) {
+    const pairSecret = namesSecret(node);
+    return node.items.map((pair, index) => {
+      const key = keyOf(pair);
+      return {
+        segment: key ?? { i: index + 1 },
+        node: pair.value,
+        secret: fieldIsSecret(key, inSecret, pairSecret),
+        label: null,
+        keyEnd: isScalar(pair.key) ? rangeOf(pair.key)[1] : null,
+      };
     });
   }
-  return blank;
+  if (!isSeq(node)) return [];
+  const labels = node.items.map((item) => itemLabel(item, inSecret));
+  return node.items.map((item, index) => {
+    const label = labels[index];
+    const unique = label !== null && labels.indexOf(label) === labels.lastIndexOf(label);
+    return {
+      segment: unique ? { l: label } : { i: index + 1 },
+      node: item,
+      secret: inSecret,
+      label,
+      keyEnd: null,
+    };
+  });
 };
 
-/** Of `keyPaths`, the ones whose line in `text` still holds a blank secret; a path no longer in the text counts as resolved. */
-export const blankYamlSecretKeys = (text: string, keyPathsToCheck: string[]): string[] => {
-  const lines = text.split("\n");
-  const paths = keyPaths(lines);
-  return keyPathsToCheck.filter((path) =>
-    paths.some((linePath, index) => linePath === path && hasBlankSecret(lines[index], path)),
+const collectSecrets = (doc: Document, rootSecret: boolean): Found => {
+  const pathOf = new Map<unknown, Segment[]>();
+  const secrets = new Map<Scalar, Segment[]>();
+  const spans: [number, number][] = [];
+  const walkedSecret = new Set<unknown>();
+  const aliased: unknown[] = [];
+  const visitNode = (node: unknown, path: Segment[], secret: boolean, keyEnd: number | null) => {
+    if (isAlias(node)) {
+      if (secret) aliased.push(node.resolve(doc));
+      return;
+    }
+    if (!pathOf.has(node)) pathOf.set(node, path);
+    if (isScalar(node)) {
+      if (secret && isLiteralSecret(node)) secrets.set(node, path);
+      return;
+    }
+    if (!isMap(node) && !isSeq(node)) return;
+    if (secret) {
+      if (walkedSecret.has(node)) return;
+      walkedSecret.add(node);
+      spans.push([keyEnd ?? rangeOf(node)[0], rangeOf(node)[2]]);
+    }
+    for (const child of childrenOf(node, secret)) {
+      visitNode(child.node, [...path, child.segment], child.secret, child.keyEnd);
+    }
+  };
+  visitNode(doc.contents, [], rootSecret, null);
+  // An alias under a secret key exposes the node it points to, wherever that is anchored.
+  for (let index = 0; index < aliased.length; index++) {
+    const path = pathOf.get(aliased[index]);
+    if (path) visitNode(aliased[index], path, true, null);
+  }
+  return {
+    secrets: [...secrets]
+      .map(([node, path]) => ({ node, path }))
+      .sort((a, b) => rangeOf(a.node)[0] - rangeOf(b.node)[0]),
+    spans,
+  };
+};
+
+/** Where a block scalar's header line ends, so a comment on it is kept apart from the body. */
+const headerEnd = (text: string, node: Scalar): number => {
+  const [start, end] = rangeOf(node);
+  const lineBreak = text.slice(start, end).search(/\r?\n/);
+  return lineBreak < 0 ? end : start + lineBreak;
+};
+
+// Only the scalar's own text is replaced, so its anchor, tag, comment and line breaks stay.
+const blankEdits = (text: string, node: Scalar): Edit[] => {
+  const [start, end] = rangeOf(node);
+  if (!isBlockScalar(node)) return [{ start, end, text: '""' }];
+  const header = BLOCK_HEADER.exec(text.slice(start, end))?.[0] ?? "";
+  const bodyStart = headerEnd(text, node);
+  const bodyEnd = start + text.slice(start, end).trimEnd().length;
+  const edits = [{ start, end: start + header.length, text: '""' }];
+  if (bodyEnd > bodyStart) edits.push({ start: bodyStart, end: bodyEnd, text: "" });
+  return edits;
+};
+
+const scalarSpans = (text: string, doc: Document): [number, number][] => {
+  const spans: [number, number][] = [];
+  visit(doc, {
+    Scalar(_key, node) {
+      const [start, end] = rangeOf(node);
+      spans.push([isBlockScalar(node) ? headerEnd(text, node) : start, end]);
+    },
+  });
+  return spans;
+};
+
+const commentLines = (text: string, doc: Document): CommentLine[] => {
+  const scalars = scalarSpans(text, doc);
+  const inScalar = (pos: number) => scalars.some(([start, end]) => pos >= start && pos < end);
+  const comments: CommentLine[] = [];
+  let lineStart = 0;
+  text.split("\n").forEach((raw, line) => {
+    const body = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+    for (let column = body.indexOf("#"); column >= 0; column = body.indexOf("#", column + 1)) {
+      const start = lineStart + column;
+      if ((column > 0 && !/\s/.test(body[column - 1])) || inScalar(start)) continue;
+      const ownLine = body.slice(0, column).trim() === "";
+      comments.push({ start, end: lineStart + body.length, column, line, ownLine });
+      break;
+    }
+    lineStart += raw.length + 1;
+  });
+  return comments;
+};
+
+/** Runs of whole-line comments at one column, read together so a commented-out block keeps its nesting. */
+const commentBlocks = (comments: CommentLine[]): CommentLine[][] => {
+  const blocks: CommentLine[][] = [];
+  for (const comment of comments) {
+    const block = blocks[blocks.length - 1];
+    const last = block?.[block.length - 1];
+    const joins =
+      last?.ownLine &&
+      comment.ownLine &&
+      last.line + 1 === comment.line &&
+      last.column === comment.column;
+    if (joins) block.push(comment);
+    else blocks.push([comment]);
+  }
+  return blocks;
+};
+
+const fallbackCommentEdits = (lines: string[], starts: number[], inSecret: boolean): Edit[] =>
+  lines.flatMap((line, index) => {
+    if (inSecret) {
+      const value = line.trim();
+      const start = starts[index] + line.indexOf(value);
+      return value ? [{ start, end: start + value.length, text: '""' }] : [];
+    }
+    const match = COMMENT_SECRET.exec(line);
+    if (!match || match[2].includes("${")) return [];
+    const start = starts[index] + match.index + match[1].length;
+    return [{ start, end: start + match[2].length, text: '""' }];
+  });
+
+/** Blanks secrets in commented-out YAML, read as YAML where it parses and by `key: value` where it does not. */
+const commentEdits = (text: string, doc: Document, spans: [number, number][]): Edit[] =>
+  commentBlocks(commentLines(text, doc)).flatMap((block) => {
+    const lines = block.map((comment) => text.slice(comment.start + 1, comment.end));
+    const starts: number[] = [];
+    lines.reduce((offset, line) => {
+      starts.push(offset);
+      return offset + line.length + 1;
+    }, 0);
+    const inSecret = spans.some(([start, end]) => block[0].start >= start && block[0].start < end);
+    const inner = secretEdits(lines.join("\n"), inSecret);
+    const edits = inner ? inner.edits : fallbackCommentEdits(lines, starts, inSecret);
+    const toSource = (pos: number) => {
+      let index = starts.length - 1;
+      while (index > 0 && starts[index] > pos) index--;
+      return block[index].start + 1 + pos - starts[index];
+    };
+    return edits.map((edit) => ({ ...edit, start: toSource(edit.start), end: toSource(edit.end) }));
+  });
+
+function secretEdits(text: string, rootSecret: boolean): { edits: Edit[]; ids: string[] } | null {
+  const doc = parse(text);
+  if (!doc) return null;
+  // Under a secret key, a commented-out list or map is a secret, while a line of prose is not.
+  const contentIsSecret = rootSecret && (isMap(doc.contents) || isSeq(doc.contents));
+  const { secrets, spans } = collectSecrets(doc, contentIsSecret);
+  return {
+    edits: [
+      ...secrets.flatMap(({ node }) => blankEdits(text, node)),
+      ...commentEdits(text, doc, spans),
+    ],
+    ids: secrets.map(({ path }) => JSON.stringify(path)),
+  };
+}
+
+const applyEdits = (text: string, edits: Edit[]): string => {
+  let out = "";
+  let from = 0;
+  for (const edit of [...edits].sort((a, b) => a.start - b.start)) {
+    // Overlapping edits widen the blanked span rather than let a byte of either through.
+    if (edit.start < from) {
+      from = Math.max(from, edit.end);
+      continue;
+    }
+    out += text.slice(from, edit.start) + edit.text;
+    from = edit.end;
+  }
+  return out + text.slice(from);
+};
+
+const isSegment = (segment: unknown): segment is Segment =>
+  typeof segment === "string" ||
+  (typeof segment === "object" &&
+    segment !== null &&
+    (("l" in segment && typeof segment.l === "string") ||
+      ("i" in segment && typeof segment.i === "number")));
+
+const pathOfId = (id: string): Segment[] | null => {
+  try {
+    const path: unknown = JSON.parse(id);
+    return Array.isArray(path) && path.every(isSegment) ? path : null;
+  } catch {
+    return null;
+  }
+};
+
+const sameSegment = (a: Segment, b: Segment) => JSON.stringify(a) === JSON.stringify(b);
+
+/** With `anyItem`, an unlabelled item segment matches every item of its list, and a label every item carrying it. */
+const segmentMatches = (child: Child, segment: Segment, anyItem: boolean): boolean => {
+  if (!anyItem || typeof segment === "string") return sameSegment(child.segment, segment);
+  if (typeof child.segment === "string") return false;
+  return "i" in segment || child.label === segment.l;
+};
+
+const findNodes = (doc: Document, path: Segment[], anyItem: boolean): unknown[] => {
+  let level: { node: unknown; secret: boolean }[] = [{ node: doc.contents, secret: false }];
+  for (const segment of path) {
+    level = level.flatMap(({ node, secret }) =>
+      childrenOf(node, secret).filter((child) => segmentMatches(child, segment, anyItem)),
+    );
+  }
+  return level.map(({ node }) => node);
+};
+
+const findUnique = (doc: Document, path: Segment[]): unknown => {
+  const nodes = findNodes(doc, path, false);
+  return nodes.length === 1 ? nodes[0] : null;
+};
+
+/** The column of the block collection a node sits in, which its continuation lines must stay indented past. */
+const blockIndent = (text: string, doc: Document, target: Scalar): number => {
+  let indent = 0;
+  visit(doc, {
+    Scalar(_key, node, path) {
+      if (node !== target) return;
+      const parent = [...path].reverse().find((n) => (isMap(n) || isSeq(n)) && !n.flow);
+      if (parent && (isMap(parent) || isSeq(parent))) {
+        const start = rangeOf(parent)[0];
+        indent = start - (text.lastIndexOf("\n", start - 1) + 1);
+      }
+      return visit.BREAK;
+    },
+  });
+  return indent;
+};
+
+const shiftLine = (line: string, delta: number): string => {
+  if (line.trim() === "") return line;
+  if (delta >= 0) return " ".repeat(delta) + line;
+  return line.slice(Math.min(-delta, line.length - line.trimStart().length));
+};
+
+/** The draft text with `target`'s blank replaced by the saved scalar's own source, re-indented to the draft. */
+const withSavedScalar = (
+  text: string,
+  doc: Document,
+  target: Scalar,
+  source: string,
+  sourceDoc: Document,
+  saved: Scalar,
+): string => {
+  const [start, end] = rangeOf(target);
+  const [savedStart, savedEnd] = rangeOf(saved);
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const delta = blockIndent(text, doc, target) - blockIndent(source, sourceDoc, saved);
+  const [first, ...rest] = source.slice(savedStart, savedEnd).split(/\r?\n/);
+  const shifted = rest.map((line) => shiftLine(line, delta));
+  if (!isBlockScalar(saved))
+    return text.slice(0, start) + [first, ...shifted].join(eol) + text.slice(end);
+  const header = BLOCK_HEADER.exec(first)?.[0] ?? "";
+  const lineEnd = end + text.slice(end).search(/\r?\n|$/);
+  const lastContent = shifted.findLastIndex((line) => line.trim() !== "");
+  // Its trailing line breaks are the ones redaction left after the blank, so only the content goes back.
+  const body = shifted.slice(0, lastContent + 1);
+  const tail = lineEnd === text.length && body.length < shifted.length ? eol : "";
+  return `${text.slice(0, start)}${header}${text.slice(end, lineEnd)}${["", ...body].join(eol)}${tail}${text.slice(lineEnd)}`;
+};
+
+const scalarKey = (value: unknown) => JSON.stringify([typeof value, String(value)]);
+
+/** Every node in document order, scalars by value, and where `target` sits among them. */
+const shapeOf = (doc: Document, target: unknown): { shape: string[]; at: number } => {
+  const shape: string[] = [];
+  let at = -1;
+  visit(doc, (_key, node) => {
+    if (node === target) at = shape.length;
+    if (isScalar(node)) shape.push(scalarKey(node.value));
+    else if (isAlias(node)) shape.push(`*${node.source}`);
+    else shape.push(isPair(node) ? ":" : isMap(node) ? "{" : "[");
+  });
+  return { shape, at };
+};
+
+// A refill must change the blank's value to the saved one and nothing else, or it is not used.
+const onlyTargetChanged = (
+  before: Document,
+  target: Scalar,
+  after: Document,
+  value: unknown,
+): boolean => {
+  const { shape, at } = shapeOf(before, target);
+  const next = shapeOf(after, null).shape;
+  return (
+    at >= 0 &&
+    next.length === shape.length &&
+    next.every((entry, index) =>
+      index === at ? entry === scalarKey(value) : entry === shape[index],
+    )
   );
 };
 
-/** Blanked lines that refilling from `saved` would not bring back as they are in `original`: changed, or not refillable at all. */
-export const changedYamlSecretLines = (
+const refillOne = (
+  text: string,
+  path: Segment[],
+  source: string,
+  sourceDoc: Document,
+): string | null => {
+  const doc = parse(text);
+  const target = doc ? findUnique(doc, path) : null;
+  const saved = findUnique(sourceDoc, path);
+  if (!doc || !isScalar(target) || target.value !== "" || !isScalar(saved)) return null;
+  if (saved.value === null || saved.value === "") return null;
+  const candidate = withSavedScalar(text, doc, target, source, sourceDoc, saved);
+  const after = parse(candidate);
+  return after && onlyTargetChanged(doc, target, after, saved.value) ? candidate : null;
+};
+
+/** Refills the blanked secrets `ids` from the scalar at the same path in `source`; any it cannot match unambiguously stays `""`. */
+export const restoreYamlSecrets = (redacted: string, ids: string[], source: string): string => {
+  const sourceDoc = parse(source);
+  const draftDoc = parse(redacted);
+  if (!sourceDoc || !draftDoc) return redacted;
+  const offset = (path: Segment[]) => {
+    const node = findUnique(draftDoc, path);
+    return isScalar(node) ? rangeOf(node)[0] : -1;
+  };
+  // An item with no unique label has no identity to match, so its secrets are never refilled.
+  const paths = ids
+    .flatMap((id) => {
+      const path = pathOfId(id);
+      return path && path.every((s) => typeof s === "string" || "l" in s) ? [path] : [];
+    })
+    .sort((a, b) => offset(b) - offset(a));
+  let text = redacted;
+  for (const path of paths) text = refillOne(text, path, source, sourceDoc) ?? text;
+  return text;
+};
+
+/** Of `ids`, the secrets still blank in `text`; one no longer in the text counts as resolved, and all count while it does not parse. */
+export const blankYamlSecretKeys = (text: string, ids: string[]): string[] => {
+  const doc = parse(text);
+  return ids.filter((id) => {
+    const path = pathOfId(id);
+    if (!path) return false;
+    if (!doc) return true;
+    return findNodes(doc, path, true).some((node) => isScalar(node) && node.value === "");
+  });
+};
+
+/** Blanked secrets that refilling from `saved` would not bring back as they are in `original`: changed, or not matchable at all. */
+export const changedYamlSecrets = (
   redacted: RedactedYaml,
   original: string,
   saved: string,
-): number[] =>
-  redacted.lines.filter((line) => {
-    const fromOriginal = restoreYamlSecrets(redacted.text, [line], original);
-    // A line its own text cannot refill (an unlabelled list item, a repeated key) cannot be refilled from the saved one either.
-    if (fromOriginal === redacted.text) return true;
-    return fromOriginal !== restoreYamlSecrets(redacted.text, [line], saved);
+): string[] => {
+  const restored = parse(restoreYamlSecrets(redacted.text, redacted.ids, saved));
+  const originalDoc = parse(original);
+  return redacted.ids.filter((id) => {
+    const path = pathOfId(id);
+    const now = path && restored ? findUnique(restored, path) : null;
+    const was = path && originalDoc ? findUnique(originalDoc, path) : null;
+    return !(
+      isScalar(now) &&
+      isScalar(was) &&
+      now.value !== "" &&
+      scalarKey(now.value) === scalarKey(was.value)
+    );
   });
+};
 
-/** A key path as shown to the user: `auth/api_keys/[#2]` reads `auth.api_keys[2]`, `[name=prod]` reads `[prod]`. */
-export const yamlKeyPathLabel = (path: string): string =>
-  path
-    .split("/")
-    .map((segment) =>
-      segment.startsWith(UNLABELLED_ITEM)
-        ? `[${segment.slice(UNLABELLED_ITEM.length)}`
-        : segment.replace(/^\[[^=]*=(.*)\]$/, "[$1]"),
-    )
-    .join(".")
-    .replace(/\.\[/g, "[");
+/** A secret's id as shown to the user, e.g. `auth.api_keys[2]` or `auth.tokens[prod].value`. */
+export const yamlSecretLabel = (id: string): string =>
+  (pathOfId(id) ?? [])
+    .map((segment) => {
+      if (typeof segment === "string") return `.${segment}`;
+      if ("i" in segment) return `[${segment.i}]`;
+      return `[${segment.l.slice(segment.l.indexOf("=") + 1)}]`;
+    })
+    .join("")
+    .replace(/^\./, "");
 
-/** Blanks literal values under secret-looking YAML keys, including block scalars, flow maps and every scalar of a list or map under such a key, line by line. */
+/** Blanks every secret scalar in place (by key name, anywhere under a secret key, or as the `value` of a secret-named entry) and secrets in commented-out lines; every other byte is kept. */
 export const redactYamlSecrets = (yaml: string): RedactedYaml => {
-  const out: string[] = [];
-  const lines: number[] = [];
-  const source = yaml.split("\n");
-  for (let i = 0; i < source.length; i++) {
-    const line = source[i];
-    const match = KEY_LINE.exec(line);
-    const { scalar, comment } = splitComment(match?.[6] ?? "");
-    const continued =
-      match && scalar.trim() === "" && isSecretKey(match[3]) ? plainContinuation(source, i) : 0;
-    const continuation = source.slice(i + 1, i + 1 + continued).join("\n");
-    if (match && continued && !continuation.includes("${")) {
-      lines.push(out.length);
-      out.push(`${match[1]}${match[2]}${match[3]}${match[2]}${match[4]} ""${comment}`);
-      i += continued;
-      continue;
-    }
-    // A secret key holding a block list or map: every scalar under it is a secret.
-    if (
-      match &&
-      !continued &&
-      scalar.trim() === "" &&
-      isSecretKey(match[3]) &&
-      hasNestedBlock(source, i, match[1].length)
-    ) {
-      out.push(line);
-      i = redactSecretBlock(source, i + 1, match[1].length, out, lines);
-      continue;
-    }
-    if (!match || keepsValue(match[3], scalar)) {
-      const flow = FLOW_LINE.exec(line);
-      const redactedFlow = flow ? flow[1] + redactFlow(flow[2]) : line;
-      if (redactedFlow !== line) lines.push(out.length);
-      out.push(redactedFlow);
-      continue;
-    }
-    lines.push(out.length);
-    out.push(`${match[1]}${match[2]}${match[3]}${match[2]}${match[4]} ""${comment}`);
-    if (!BLOCK_SCALAR.test(scalar.trim())) continue;
-    // A key inside a list item has siblings deeper than the dash, so the body is measured from the key.
-    const keyIndent = match[1].length;
-    while (
-      i + 1 < source.length &&
-      (source[i + 1].trim() === "" || indentOf(source[i + 1]) > keyIndent)
-    ) {
-      i++;
-    }
-  }
-  return { text: out.join("\n"), lines };
+  const redacted = secretEdits(yaml, false);
+  if (redacted) return { text: applyEdits(yaml, redacted.edits), ids: redacted.ids };
+  // Every secret is found through a secret-looking word, so unreadable text without one has nothing to blank.
+  return SECRET_KEY_PATTERN.test(yaml)
+    ? { text: "", ids: [YAML_NOT_STORED] }
+    : { text: yaml, ids: [] };
 };

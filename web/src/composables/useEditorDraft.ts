@@ -61,11 +61,9 @@ export type EditorDraftRestoreChoice = "continue" | "fresh" | "dismiss";
 
 export type EditorDraftLeaveChoice = "save" | "keep" | "discard" | "stay";
 
-export interface EditorDraftApplyContext<T = unknown> {
-  /** Redacted fields the user had changed: they come back blank and must be re-entered before saving. */
+export interface EditorDraftApplyContext {
+  /** Redacted fields the user had changed, or that could not be refilled: they come back blank and must be re-entered before saving. */
   notKeptPaths: string[];
-  /** The draft as stored, before any refill, which is what `notKeptPaths` point into. */
-  storedData: T;
 }
 
 export interface UseEditorDraftOptions<T> {
@@ -77,7 +75,7 @@ export interface UseEditorDraftOptions<T> {
   newVariant?: () => string | null;
   /** Serialisable editor state; must cover everything `hasChanges` tracks. */
   snapshot: () => T;
-  apply: (data: T, context: EditorDraftApplyContext<T>) => void | Promise<void>;
+  apply: (data: T, context: EditorDraftApplyContext) => void | Promise<void>;
   /** Edit mode: the loaded server item, in the same shape on every load; null/undefined once deleted. */
   base?: () => unknown;
   /** The editor's own dirty rule, applied on top of "the snapshot differs from the baseline". */
@@ -100,6 +98,8 @@ export interface UseEditorDraftOptions<T> {
   inputRoots?: () => (Element | null | undefined)[];
   /** Refills the blanked secrets of a continued draft from the current state, in place of the built-in path restore. */
   restoreSecrets?: (draftData: T, currentData: T, redactedPaths: string[]) => T;
+  /** Of `paths`, the ones still blank in `data`, for paths the built-in check cannot read (e.g. into a YAML string); a refill that leaves one blank counts as not kept. */
+  blankSecrets?: (data: T, paths: string[]) => string[];
   /** An extra line in the restore dialog about what continuing this draft will do (e.g. a key that is regenerated). */
   restoreNote?: (draftData: T) => I18nText | null;
   /** Names the fields behind redacted paths, so the restore dialog can say which changes were not kept. */
@@ -311,6 +311,11 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     return options.hasChanges ? options.hasChanges() : true;
   };
 
+  const blankOf = (data: T, paths: string[], labels: Record<string, string>): string[] =>
+    options.blankSecrets
+      ? options.blankSecrets(data, paths)
+      : blankRedactedPaths(data, paths, labels);
+
   const keptDraftStillStored = () =>
     keptDraft !== null && !keptReplaced && readEditorDraft(scope())?.savedAt === keptDraft.savedAt;
 
@@ -345,12 +350,21 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     const base = options.base?.();
     const redactedPaths = [...new Set([...redacted.paths, ...listPaths, ...(extra?.paths ?? [])])];
     const changed = changedRedactedPaths(snapshot, baselineSnapshot(), redactedPaths);
+    // A not-kept secret still blank is no value to redact, yet the next restore must still ask for it.
+    const stillBlank = blankOf(snapshot, notKept.value.paths, notKept.value.labels);
+    const carriedLabels = Object.fromEntries(
+      stillBlank.flatMap((path) =>
+        path in notKept.value.labels ? [[path, notKept.value.labels[path]]] : [],
+      ),
+    );
     return writeEditorDraft(scope(), {
       data: extra ? extra.data : redacted.data,
       baseHash: isNil(base) ? undefined : baseHashOf(base),
       redactedPaths,
-      redactedLabels: redactedEntryLabels(snapshot, redactedPaths),
-      changedRedactedPaths: [...new Set([...changed, ...(extra?.changedPaths ?? [])])],
+      redactedLabels: { ...carriedLabels, ...redactedEntryLabels(snapshot, redactedPaths) },
+      changedRedactedPaths: [
+        ...new Set([...changed, ...(extra?.changedPaths ?? []), ...stillBlank]),
+      ],
     });
   };
 
@@ -442,16 +456,29 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   const notKeptPathsOf = (draft: EditorDraft<T>): string[] =>
     draft.changedRedactedPaths ?? draft.redactedPaths ?? [];
 
+  /** What continuing `draft` against the editor as it is now gives back, and which secrets it does not keep. */
+  const planRestore = (draft: EditorDraft<T>) => {
+    const current = plainCopy(options.snapshot());
+    const changed = notKeptPathsOf(draft);
+    // A changed secret is never refilled: the old value would silently replace what the user typed.
+    const paths = (draft.redactedPaths ?? []).filter((path) => !changed.includes(path));
+    const restored = options.restoreSecrets
+      ? options.restoreSecrets(draft.data, current, paths)
+      : restoreRedacted(draft.data, current, paths, draft.redactedLabels ?? {});
+    const unrestored = options.blankSecrets ? options.blankSecrets(restored, paths) : [];
+    return { current, restored, notKeptPaths: [...new Set([...changed, ...unrestored])] };
+  };
+
   const askRestore = (draft: EditorDraft<T>, changedOnServer: boolean) =>
     new Promise<EditorDraftRestoreChoice>((resolve) => {
       restoreResolver = resolve;
       state.restoreSavedAt = draft.savedAt;
       state.changedOnServer = changedOnServer;
-      const changed = notKeptPathsOf(draft);
-      state.credentialsNotSaved = changed.length > 0;
+      const notKeptPaths = planRestore(draft).notKeptPaths;
+      state.credentialsNotSaved = notKeptPaths.length > 0;
       state.restoreNote = options.restoreNote?.(draft.data) ?? null;
-      state.notKeptFields = changed.length
-        ? (options.describeRedacted?.(changed, draft.data) ?? [])
+      state.notKeptFields = notKeptPaths.length
+        ? (options.describeRedacted?.(notKeptPaths, draft.data) ?? [])
         : [];
       state.restoreOpen = true;
     });
@@ -464,17 +491,11 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   };
 
   const continueDraft = async (draft: EditorDraft<T>) => {
-    const current = plainCopy(options.snapshot());
+    const { current, restored, notKeptPaths } = planRestore(draft);
     // Taken before applying, so the restored work counts as unsaved against the state it replaces.
     baselineJson = stableStringify(current);
-    const changed = notKeptPathsOf(draft);
-    // A changed secret is never refilled: the old value would silently replace what the user typed.
-    const paths = (draft.redactedPaths ?? []).filter((path) => !changed.includes(path));
-    const restored = options.restoreSecrets
-      ? options.restoreSecrets(draft.data, current, paths)
-      : restoreRedacted(draft.data, current, paths, draft.redactedLabels ?? {});
-    notKept.value = { paths: changed, labels: draft.redactedLabels ?? {} };
-    await options.apply(restored, { notKeptPaths: changed, storedData: plainCopy(draft.data) });
+    notKept.value = { paths: notKeptPaths, labels: draft.redactedLabels ?? {} };
+    await options.apply(restored, { notKeptPaths });
     autosave.adopt();
   };
 
@@ -693,8 +714,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     markSaved,
     discard,
     hasUnsavedChanges,
-    pendingReentries: () =>
-      blankRedactedPaths(options.snapshot(), notKept.value.paths, notKept.value.labels),
+    pendingReentries: () => blankOf(options.snapshot(), notKept.value.paths, notKept.value.labels),
     storageAvailable,
     state,
     chooseRestore,

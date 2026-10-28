@@ -443,7 +443,9 @@ export const writeEditorDraft = <T>(
       ...(input.redactedLabels && Object.keys(input.redactedLabels).length
         ? { redactedLabels: input.redactedLabels }
         : {}),
-      ...(input.redactedPaths?.length && input.changedRedactedPaths
+      // A not-kept secret left blank is no longer redacted, so it can be changed with nothing redacted.
+      ...((input.redactedPaths?.length || input.changedRedactedPaths?.length) &&
+      input.changedRedactedPaths
         ? { changedRedactedPaths: input.changedRedactedPaths }
         : {}),
     };

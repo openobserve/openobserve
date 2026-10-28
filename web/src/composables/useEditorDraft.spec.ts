@@ -320,7 +320,6 @@ describe("useEditorDraft", () => {
 
       expect(apply).toHaveBeenCalledWith(expect.objectContaining({ name: "draft name" }), {
         notKeptPaths: [],
-        storedData: expect.objectContaining({ name: "draft name" }),
       });
       expect(form.name).toBe("draft name");
       expect(draft.hasUnsavedChanges()).toBe(true);
@@ -443,11 +442,71 @@ describe("useEditorDraft", () => {
       expect(form).toMatchObject({ name: "draft", password: "" });
       expect(apply).toHaveBeenLastCalledWith(expect.anything(), {
         notKeptPaths: ["/password"],
-        storedData: expect.objectContaining({ password: "" }),
       });
       expect(again.pendingReentries()).toEqual(["/password"]);
       await edit({ password: "typed again" });
       expect(again.pendingReentries()).toEqual([]);
+    });
+
+    it("keeps a not-kept secret not kept across a second Continue while it is still blank", async () => {
+      overrides = { describeRedacted: (paths) => paths.map(() => raw("Password")) };
+      form.password = "stored";
+      seed(
+        editScope,
+        { name: "draft", password: "" },
+        { redactedPaths: ["/password"], changedRedactedPaths: ["/password"] },
+      );
+      const first = await mountHost();
+      const started = first.start();
+      await flushPromises();
+      first.chooseRestore("continue");
+      await started;
+      expect(form.password).toBe("");
+
+      userInput();
+      await edit({ name: "edited after continue" });
+      flushAutosave();
+      expect(readEditorDraft(editScope)?.changedRedactedPaths).toEqual(["/password"]);
+      wrapper?.unmount();
+
+      Object.assign(form, { name: "saved", password: "stored" });
+      const second = await mountHost();
+      const restarted = second.start();
+      await flushPromises();
+      expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+        "Your change to the Password was not kept.",
+      );
+      second.chooseRestore("continue");
+      await restarted;
+      expect(form).toMatchObject({ name: "edited after continue", password: "" });
+      expect(second.pendingReentries()).toEqual(["/password"]);
+
+      userInput();
+      await edit({ password: "typed again" });
+      flushAutosave();
+      expect(readEditorDraft(editScope)?.changedRedactedPaths).toEqual(["/password"]);
+      expect(second.pendingReentries()).toEqual([]);
+    });
+
+    it("counts a secret the editor's refill left blank as not kept and names it", async () => {
+      overrides = {
+        restoreSecrets: (data) => data,
+        blankSecrets: (data, paths) => (data.password === "" ? paths : []),
+        describeRedacted: (paths) => paths.map((path) => raw(path)),
+      };
+      seed(
+        editScope,
+        { name: "draft", password: "" },
+        { redactedPaths: ["/password"], changedRedactedPaths: [] },
+      );
+      const draft = await mountHost();
+      const started = draft.start();
+      await flushPromises();
+      expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("/password");
+      draft.chooseRestore("continue");
+      await started;
+      expect(apply).toHaveBeenLastCalledWith(expect.anything(), { notKeptPaths: ["/password"] });
+      expect(draft.pendingReentries()).toEqual(["/password"]);
     });
 
     it("treats every secret of a draft written before changes were tracked as changed", async () => {
