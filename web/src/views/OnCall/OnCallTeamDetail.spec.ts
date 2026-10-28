@@ -69,6 +69,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
+import shiftParity from "../../../../src/config/src/meta/oncall/shift_parity.json";
 
 const service = vi.mocked(oncallService);
 const toasted = vi.mocked(toast);
@@ -440,6 +441,45 @@ describe("OnCallTeamDetail", () => {
 
       await save(wrapper);
       expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    // #3149: swap covers are stored at the handovers the server counts in the team's zone.
+    it("offers swap shifts at the team-zone handovers the server uses", async () => {
+      const c = shiftParity[0];
+      const now = vi.spyOn(Date, "now").mockReturnValue(c.at_micros / 1000);
+      service.getTeam.mockResolvedValue({
+        data: { id: "team_1", name: "Platform", timezone: c.timezone },
+      } as any);
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: c.timezone,
+          rotations: [
+            {
+              id: "rot_1",
+              name: "Primary",
+              shift_rules: [
+                {
+                  name: "Base",
+                  members: c.members,
+                  shift_micros: c.shift_micros,
+                  anchor_micros: c.anchor_micros,
+                },
+              ],
+            },
+          ],
+        },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      const [first] = wrapper.findComponent({ name: "OnCallCoverForm" }).props("shifts") as any[];
+      now.mockRestore();
+      expect(first).toMatchObject({
+        startMicros: c.shift_start,
+        endMicros: c.next_handover,
+        member: c.holder,
+      });
     });
 
     /// A swap is two covers written back to back, so it invalidates exactly

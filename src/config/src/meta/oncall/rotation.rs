@@ -3710,4 +3710,50 @@ mod tests {
             );
         }
     }
+
+    /// The holder, next holder and handovers `web/src/utils/oncall.spec.ts` also checks.
+    #[test]
+    fn test_shift_maths_matches_the_shared_parity_cases() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            case: String,
+            timezone: String,
+            members: Vec<String>,
+            shift_micros: i64,
+            anchor_micros: i64,
+            at_micros: i64,
+            holder: String,
+            next_holder: String,
+            shift_start: i64,
+            next_handover: i64,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("shift_parity.json")).unwrap();
+        for c in cases {
+            let rule = ShiftRule {
+                shift_micros: c.shift_micros,
+                ..ShiftRule::weekly("Base", c.members, c.anchor_micros)
+            };
+            let tz: chrono_tz::Tz = c.timezone.parse().unwrap();
+            let at = c.at_micros;
+            assert_eq!(
+                rule.member_at(at, tz),
+                Some(c.holder.as_str()),
+                "{}",
+                c.case
+            );
+            assert_eq!(
+                rule.member_offset(at, 1, tz),
+                Some(c.next_holder.as_str()),
+                "{}",
+                c.case
+            );
+            assert_eq!(rule.shift_start(at, tz), Some(c.shift_start), "{}", c.case);
+            assert_eq!(
+                rule.next_handover(at, tz),
+                Some(c.next_handover),
+                "{}",
+                c.case
+            );
+        }
+    }
 }

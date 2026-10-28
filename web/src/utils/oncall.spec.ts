@@ -72,7 +72,6 @@ import {
   ruleAppliesAt,
   routingReasonOf,
   rungProblem,
-  shiftBands,
   shortReachReason,
   toZonedInputValue,
   zonedMidnight,
@@ -95,6 +94,7 @@ import {
 import type { TranslateFn } from "@/types/i18n";
 import i18n from "@/locales";
 import rosterParity from "../../../src/config/src/meta/oncall/roster_parity.json";
+import shiftParity from "../../../src/config/src/meta/oncall/shift_parity.json";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -107,26 +107,50 @@ function weekly(members: string[], level: EscalationLevel = "primary"): Rotation
   };
 }
 
+// #3149: shifts count in the TEAM's zone, so these equal the Rust side whatever zone the browser is in.
+describe("shift maths matches the server (shift_parity.json)", () => {
+  it.each(shiftParity.map((c) => [c.case, c] as const))("%s", (_name, c) => {
+    const rule = {
+      name: "Base",
+      members: c.members,
+      shift_micros: c.shift_micros,
+      anchor_micros: c.anchor_micros,
+    };
+    const rotation = { id: "r", name: "R", shift_rules: [rule] };
+    expect(memberAt(rule, c.at_micros, c.timezone)).toBe(c.holder);
+    expect(resolveHolder(rotation, c.at_micros, c.timezone).member).toBe(c.holder);
+    expect(resolveNextHolder(rotation, c.at_micros, c.timezone)).toBe(c.next_holder);
+    expect(nextHandover(rule, c.at_micros, c.timezone)).toBe(c.next_handover);
+    const [first, second] = upcomingShifts(rule, c.at_micros, 2, c.timezone);
+    expect(first).toMatchObject({
+      startMicros: c.shift_start,
+      endMicros: c.next_handover,
+      member: c.holder,
+    });
+    expect(second).toMatchObject({ startMicros: c.next_handover, member: c.next_holder });
+  });
+});
+
 describe("memberAt", () => {
   it("puts the first member on call from the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + MICROS_PER_DAY)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_DAY, "UTC")).toBe("ana@o2.ai");
   });
 
   // The handover instant belongs to the INCOMING person. An inclusive bound
   // would leave both of them on call for the same alert.
   it("treats the handover boundary as exclusive", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK - 1)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK)).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK - 1, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + MICROS_PER_WEEK, "UTC")).toBe("bob@o2.ai");
   });
 
   it("wraps around the member list", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
     const expected = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
     for (let week = 0; week < 9; week++) {
-      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK)).toBe(expected[week % 3]);
+      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK, "UTC")).toBe(expected[week % 3]);
     }
   });
 
@@ -134,15 +158,15 @@ describe("memberAt", () => {
   // wrap. Without it this returns undefined instead of the right person.
   it("walks backwards for instants before the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    expect(memberAt(r, ANCHOR - 1)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK - 1)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR - 1, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR - MICROS_PER_WEEK - 1, "UTC")).toBe("ana@o2.ai");
   });
 
   it("keeps a single member on call at every instant", () => {
     const r = weekly(["ana@o2.ai"]);
     for (const offset of [-MICROS_PER_WEEK, 0, MICROS_PER_DAY, 99 * MICROS_PER_WEEK]) {
-      expect(memberAt(r, ANCHOR + offset)).toBe("ana@o2.ai");
+      expect(memberAt(r, ANCHOR + offset, "UTC")).toBe("ana@o2.ai");
     }
   });
 
@@ -153,17 +177,17 @@ describe("memberAt", () => {
       shift_micros: 8 * MICROS_PER_HOUR,
       anchor_micros: ANCHOR,
     };
-    expect(memberAt(r, ANCHOR)).toBe("ana@o2.ai");
-    expect(memberAt(r, ANCHOR + 8 * MICROS_PER_HOUR)).toBe("bob@o2.ai");
-    expect(memberAt(r, ANCHOR + 16 * MICROS_PER_HOUR)).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, ANCHOR + 8 * MICROS_PER_HOUR, "UTC")).toBe("bob@o2.ai");
+    expect(memberAt(r, ANCHOR + 16 * MICROS_PER_HOUR, "UTC")).toBe("ana@o2.ai");
   });
 
   // An unusable rotation must read as a gap, never as a silently chosen
   // fallback member.
   it("resolves to nobody when the rotation is unusable", () => {
-    expect(memberAt(weekly([]), ANCHOR)).toBeNull();
-    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR)).toBeNull();
-    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR)).toBeNull();
+    expect(memberAt(weekly([]), ANCHOR, "UTC")).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR, "UTC")).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR, "UTC")).toBeNull();
   });
 });
 
@@ -171,14 +195,14 @@ describe("nextHandover", () => {
   it("brackets the instant and hands over to the next member", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
     const at = ANCHOR + MICROS_PER_DAY;
-    const handover = nextHandover(r, at)!;
+    const handover = nextHandover(r, at, "UTC")!;
     expect(handover).toBe(ANCHOR + MICROS_PER_WEEK);
-    expect(memberAt(r, handover - 1)).toBe("ana@o2.ai");
-    expect(memberAt(r, handover)).toBe("bob@o2.ai");
+    expect(memberAt(r, handover - 1, "UTC")).toBe("ana@o2.ai");
+    expect(memberAt(r, handover, "UTC")).toBe("bob@o2.ai");
   });
 
   it("is null for an unusable rotation", () => {
-    expect(nextHandover(weekly([]), ANCHOR)).toBeNull();
+    expect(nextHandover(weekly([]), ANCHOR, "UTC")).toBeNull();
   });
 });
 
@@ -416,54 +440,6 @@ describe("speakTarget", () => {
   });
 });
 
-describe("shiftBands", () => {
-  const DAY = 86_400_000_000;
-  const rotation = (members: string[], shift = DAY) => ({
-    name: "Primary",
-    members,
-    shift_micros: shift,
-    anchor_micros: 0,
-  });
-
-  it("lays shifts across the window as fractions of it", () => {
-    const bands = shiftBands(rotation(["ana", "bob"]), 0, 2 * DAY);
-
-    expect(bands).toHaveLength(2);
-    expect(bands[0]).toMatchObject({ user_email: "ana", offset: 0, width: 0.5 });
-    expect(bands[1]).toMatchObject({ user_email: "bob", offset: 0.5, width: 0.5 });
-  });
-
-  /// A band running past the edge would be drawn wider than the chart and push
-  /// everything else off screen.
-  it("clips a shift that overruns the window", () => {
-    const bands = shiftBands(rotation(["ana"], 7 * DAY), 0, DAY);
-
-    expect(bands).toHaveLength(1);
-    expect(bands[0].width).toBe(1);
-    expect(bands[0].endMicros).toBe(DAY);
-  });
-
-  it("includes a shift that started before the window", () => {
-    const bands = shiftBands(rotation(["ana", "bob"]), DAY / 2, DAY);
-
-    expect(bands[0].user_email).toBe("ana");
-    expect(bands[0].startMicros).toBe(DAY / 2);
-  });
-
-  /// A one-minute shift over a month would otherwise draw tens of thousands of
-  /// slivers and lock the page.
-  it("bounds how many bands it will draw", () => {
-    const bands = shiftBands(rotation(["ana"], 60_000_000), 0, 365 * DAY);
-    expect(bands.length).toBeLessThanOrEqual(500);
-  });
-
-  it("draws nothing for an unusable rotation", () => {
-    expect(shiftBands(rotation([]), 0, DAY)).toEqual([]);
-    expect(shiftBands(rotation(["ana"], 0), 0, DAY)).toEqual([]);
-    expect(shiftBands(rotation(["ana"]), DAY, DAY)).toEqual([]);
-  });
-});
-
 describe("colorIndexFor", () => {
   /// A band that changes colour as you page through the calendar is
   /// unreadable, so the colour comes from the person, not their position.
@@ -541,7 +517,7 @@ describe("ownershipPath", () => {
 describe("upcomingShifts", () => {
   it("starts with the shift containing the given instant", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3);
+    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3, "UTC");
 
     expect(shifts).toHaveLength(3);
     expect(shifts[0].member).toBe("ana@o2.ai");
@@ -554,7 +530,7 @@ describe("upcomingShifts", () => {
   // Each shift must end exactly where the next begins, or the preview implies
   // a gap or an overlap that the resolver does not have.
   it("produces contiguous shifts", () => {
-    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5);
+    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5, "UTC");
     for (let i = 1; i < shifts.length; i++) {
       expect(shifts[i].startMicros).toBe(shifts[i - 1].endMicros);
     }
@@ -564,24 +540,24 @@ describe("upcomingShifts", () => {
   // of showing it.
   it("agrees with memberAt at every boundary", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
-    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8)) {
-      expect(memberAt(r, shift.startMicros)).toBe(shift.member);
-      expect(memberAt(r, shift.endMicros - 1)).toBe(shift.member);
+    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8, "UTC")) {
+      expect(memberAt(r, shift.startMicros, "UTC")).toBe(shift.member);
+      expect(memberAt(r, shift.endMicros - 1, "UTC")).toBe(shift.member);
     }
   });
 
   it("works for instants before the anchor", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
-    const shifts = upcomingShifts(r, ANCHOR - 1, 2);
+    const shifts = upcomingShifts(r, ANCHOR - 1, 2, "UTC");
     expect(shifts[0].member).toBe("bob@o2.ai");
     expect(shifts[0].endMicros).toBe(ANCHOR);
     expect(shifts[1].member).toBe("ana@o2.ai");
   });
 
   it("returns nothing for an unusable rotation or a non-positive count", () => {
-    expect(upcomingShifts(weekly([]), ANCHOR, 3)).toEqual([]);
-    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3)).toEqual([]);
-    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0)).toEqual([]);
+    expect(upcomingShifts(weekly([]), ANCHOR, 3, "UTC")).toEqual([]);
+    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3, "UTC")).toEqual([]);
+    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0, "UTC")).toEqual([]);
   });
 });
 
@@ -1793,8 +1769,8 @@ describe("rotation drawer, part B", () => {
     const rule = layer("Base", before, 0, []);
     const now = ANCHOR + offset;
     const after = { ...rule, members: withRoster(rule, members, now, "UTC") };
-    expect(turnLine(after.members, memberAt(after, now))).toEqual(expectedOrder);
-    expect(nextHandover(after, now)).toBe(nextHandover(rule, now));
+    expect(turnLine(after.members, memberAt(after, now, "UTC"))).toEqual(expectedOrder);
+    expect(nextHandover(after, now, "UTC")).toBe(nextHandover(rule, now, "UTC"));
   });
 
   // The Rust suite runs these same cases (`roster_parity.json`), so preview and save cannot drift.
