@@ -1761,6 +1761,12 @@ async fn save_enrichment_batch(
     use schema::{check_for_schema, stream_schema_exists};
 
     let stream_name = format_stream_name(table_name.to_string());
+    // before a first batch deletes the old table, since check_for_schema would reject the new one
+    if let Some(violation) =
+        schema::stream_key_violation(org_id, StreamType::EnrichmentTables, &stream_name)
+    {
+        return Err(anyhow!(violation));
+    }
 
     if !LOCAL_NODE.is_ingester() {
         return Err(anyhow!("not an ingester"));
@@ -2375,5 +2381,18 @@ mod tests {
         assert_eq!(r2[0].get("a").unwrap().as_str().unwrap(), "4");
         assert_eq!(r2[1].get("b").unwrap().as_str().unwrap(), "8");
         assert_eq!(lo2.len(), 0);
+    }
+
+    /// A replacing first batch deletes the old table, so a too-long name must fail before that.
+    #[tokio::test]
+    async fn test_save_enrichment_batch_rejects_too_long_table() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
+        let name = "t".repeat(schema::STREAM_KEY_MAX_LEN);
+        let err = save_enrichment_batch("org", &name, Vec::new(), false, true)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().starts_with("Stream name too long"), "{err}");
     }
 }

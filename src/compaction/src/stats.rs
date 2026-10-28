@@ -89,6 +89,10 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
             }
             total_streams += streams.len();
             for stream_name in streams {
+                // its stream_stats insert hits the same column limit and would abort the whole scan
+                if schema::is_stream_key_too_long(&org_id, stream_type, &stream_name) {
+                    continue;
+                }
                 let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
                 if !updated_streams.is_empty() && !updated_streams.contains(&stream_key) {
                     continue;

@@ -8262,6 +8262,7 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-builtins",
  "openobserve-core",
+ "schema",
  "search_service",
  "serde",
  "serde_json",

@@ -765,6 +765,14 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+    // before the pipelines and the schema hooks, which would create the stream
+    if let Err(e) = check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name) {
+        return Ok(otlp_rejection_response(
+            req_type,
+            http::StatusCode::BAD_REQUEST,
+            e.to_string(),
+        ));
+    }
     // Refused before the pipelines run: a remote-stream destination writes inside them.
     #[cfg(feature = "vectorscan")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
@@ -1317,6 +1325,7 @@ pub async fn handle_otlp_request(
         (started_at, &start),
         json_data_by_stream,
         &user.to_email(),
+        &mut partial_success,
     )
     .await
     {
@@ -1448,6 +1457,11 @@ pub async fn ingest_json(
             )
                 .into_response());
         }
+    }
+
+    // before the pipelines and the schema hooks, which would create the stream
+    if let Err(e) = check_stream_key_len(org_id, StreamType::Traces, traces_stream_name) {
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     let start = std::time::Instant::now();
@@ -1664,6 +1678,7 @@ pub async fn ingest_json(
         (started_at, &start),
         json_data_by_stream,
         &user.to_email(),
+        &mut partial_success,
     )
     .await
     {
@@ -1725,8 +1740,11 @@ fn format_response(
     let partial = partial_success.rejected_spans > 0;
 
     let res = if partial {
-        partial_success.error_message =
-            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        if partial_success.error_message.is_empty() {
+            partial_success.error_message =
+                "Some spans were rejected due to exceeding the allowed retention period"
+                    .to_string();
+        }
         ExportTraceServiceResponse {
             partial_success: Some(partial_success),
         }
@@ -1771,11 +1789,17 @@ async fn write_traces_by_stream(
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, IngestJsonData>,
     user_email: &str,
+    partial_success: &mut ExportTracePartialSuccess,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        // before the new-stream hooks, since such a stream is never created
-        check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+        // a pipeline destination is rejected alone, so the request's other streams are still
+        // written
+        if let Err(e) = check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name) {
+            log::debug!("[TRACES] {e}");
+            partial_success.rejected_spans += json_data.len() as i64;
+            partial_success.error_message = e.to_string();
+            continue;
+        }
         if crate::ingestion::checks_for_new_stream(org_id)
             && !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await
         {
@@ -3719,5 +3743,50 @@ mod tests {
                 .contains(&format!("only {limit} columns accept"))
         );
         assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
+    }
+
+    /// A too-long pipeline destination is counted as rejected spans instead of failing the request.
+    #[tokio::test]
+    async fn test_write_traces_by_stream_rejects_too_long_stream() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
+        let stream_name = "s".repeat(schema::STREAM_KEY_MAX_LEN);
+        let rows = vec![
+            (1, config::utils::json::Map::new()),
+            (2, config::utils::json::Map::new()),
+        ];
+        let data = std::collections::HashMap::from([(stream_name, (rows, None))]);
+        let mut partial_success = super::ExportTracePartialSuccess::default();
+        let start = std::time::Instant::now();
+        super::write_traces_by_stream("org", (0, &start), data, "", &mut partial_success)
+            .await
+            .unwrap();
+        assert_eq!(partial_success.rejected_spans, 2);
+        assert!(
+            partial_success
+                .error_message
+                .starts_with("Stream name too long"),
+            "{}",
+            partial_success.error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_format_response_keeps_a_specific_error_message() {
+        let partial_success = super::ExportTracePartialSuccess {
+            rejected_spans: 1,
+            error_message: "Stream name too long".to_string(),
+        };
+        let response = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        )
+        .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("Stream name too long"), "{body}");
     }
 }

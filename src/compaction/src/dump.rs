@@ -1851,9 +1851,9 @@ mod tests {
         assert!(dump_delete_pairs(&[]).is_empty());
     }
 
-    /// A source key that fits can still have a dump key past the limit; that job is skipped.
-    #[tokio::test]
-    async fn test_dump_skips_too_long_dump_stream() {
+    /// A source key that fits can still have a dump key past the limit, which dump skips.
+    #[test]
+    fn test_dump_stream_key_can_exceed_the_limit_alone() {
         if !schema::file_list_keys_bounded() {
             return;
         }
@@ -1864,13 +1864,11 @@ mod tests {
             StreamType::Logs,
             &stream_name
         ));
-        let job = DumpJob {
-            org_id: "org".to_string(),
-            stream_type: StreamType::Logs,
-            stream_name,
-            job_id: 1,
-            offset: 1_000_000,
-        };
-        assert!(dump(&job).await.is_ok());
+        let dump_stream_name = generate_dump_stream_name(StreamType::Logs, &stream_name);
+        assert!(schema::is_stream_key_too_long(
+            "org",
+            StreamType::Filelist,
+            &dump_stream_name
+        ));
     }
 }

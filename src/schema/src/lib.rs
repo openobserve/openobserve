@@ -124,6 +124,30 @@ pub fn check_request_columns_limit(
     ))
 }
 
+#[derive(Debug)]
+pub enum StreamSettingsError {
+    StreamDeleting(String),
+    BadRequest(String),
+    NotFound(String),
+}
+
+impl std::fmt::Display for StreamSettingsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StreamDeleting(message) | Self::BadRequest(message) | Self::NotFound(message) => {
+                f.write_str(message)
+            }
+        }
+    }
+}
+
+impl std::error::Error for StreamSettingsError {}
+
+pub struct SavedStreamSettings {
+    pub settings: StreamSettings,
+    pub previous_settings: Option<StreamSettings>,
+}
+
 /// Whether the meta store bounds the file_list `org` and `stream` columns; SQLite does not.
 pub fn file_list_keys_bounded() -> bool {
     MetaStore::from(get_config().common.meta_store.as_str()) == MetaStore::PostgreSQL
@@ -164,50 +188,6 @@ pub fn stream_key_violation(
         return None;
     }
     stream_key_length_violation(org_id, stream_type, stream_name)
-}
-
-fn stream_key_length_violation(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Option<String> {
-    // VARCHAR(n) counts characters, not bytes
-    let org_len = org_id.chars().count();
-    if org_len > ORG_ID_MAX_LEN {
-        return Some(format!(
-            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
-        ));
-    }
-    let len = org_len + stream_type.as_str().len() + stream_name.chars().count() + 2;
-    (len > STREAM_KEY_MAX_LEN).then(|| {
-        format!(
-            "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
-        )
-    })
-}
-
-#[derive(Debug)]
-pub enum StreamSettingsError {
-    StreamDeleting(String),
-    BadRequest(String),
-    NotFound(String),
-}
-
-impl std::fmt::Display for StreamSettingsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StreamDeleting(message) | Self::BadRequest(message) | Self::NotFound(message) => {
-                f.write_str(message)
-            }
-        }
-    }
-}
-
-impl std::error::Error for StreamSettingsError {}
-
-pub struct SavedStreamSettings {
-    pub settings: StreamSettings,
-    pub previous_settings: Option<StreamSettings>,
 }
 
 /// Validate, normalize, and persist stream settings stored in schema metadata.
@@ -551,6 +531,26 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
 fn dedup_preserve_order(values: &mut Vec<String>) {
     let mut seen = HashSet::new();
     values.retain(|value| seen.insert(value.clone()));
+}
+
+fn stream_key_length_violation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<String> {
+    // VARCHAR(n) counts characters, not bytes
+    let org_len = org_id.chars().count();
+    if org_len > ORG_ID_MAX_LEN {
+        return Some(format!(
+            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
+        ));
+    }
+    let len = org_len + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    (len > STREAM_KEY_MAX_LEN).then(|| {
+        format!(
+            "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
+        )
+    })
 }
 
 pub async fn check_for_schema(
