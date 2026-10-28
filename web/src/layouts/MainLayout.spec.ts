@@ -2003,7 +2003,7 @@ describe("MainLayout — focus-mode route", () => {
           WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
-          CommunitySlackInvite: StubDiv,
+          CommunitySlackInvite: { name: "CommunitySlackInvite", setup: () => () => h("div") },
           ThemeSwitcher: StubDiv,
           PredefinedThemes: StubDiv,
           SlackIcon: StubDiv,
@@ -2044,6 +2044,8 @@ describe("MainLayout — focus-mode route", () => {
     expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
     expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
     expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
+    // it mounts before the page renders, so only its absence keeps the Slack invite off onboarding
+    expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -2055,6 +2057,7 @@ describe("MainLayout — focus-mode route", () => {
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
     expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
     expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(true);
     wrapper.unmount();
   });
 });
@@ -2222,6 +2225,30 @@ describe("MainLayout — first-time cloud login", () => {
     await router.push({ name: "home", query: { org_identifier: "org1" } });
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("onboarding");
+    wrapper.unmount();
+  });
+
+  it("holds only Home: a user who leaves it while the lists load sees the page at once", async () => {
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async () => {
+      await held;
+      return { data: { list: [] } };
+    }) as never);
+    const { wrapper, router } = await mountAtHome();
+    const hold = () => (wrapper.vm as unknown as { holdForOnboarding: boolean }).holdForOnboarding;
+    expect(hold()).toBe(true);
+
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    expect(hold()).toBe(false);
+    // back on Home before the lists answer, the hold covers it again
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    expect(hold()).toBe(true);
+
+    answer();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(hold()).toBe(false);
     wrapper.unmount();
   });
 

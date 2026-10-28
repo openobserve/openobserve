@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 // Cloud onboarding (/onboarding): step 1 choices, rows, which-one tiles, a guide or the coding
-// agent page inside onboarding, the guide's step nav, the agent page's listen bar and the first-data panel.
+// agent page inside onboarding, the guide's step nav, the agent page's data check and the first-data panel.
 const { expect } = require('@playwright/test');
 
 const CHOICE_IDS = ['infrastructure', 'backend', 'frontend', 'logs', 'llm'];
@@ -19,7 +19,8 @@ class OnboardingPage {
         this.which = page.locator('[data-test="onboarding-step-which"]');
         this.guide = page.locator('[data-test="onboarding-step-guide"]');
         this.agentSetup = page.locator('[data-test="onboarding-agent-setup"]');
-        this.listenBar = page.locator('[data-test="onboarding-listen-bar"]');
+        // The agent page's inline data check; its listen bar shows only once data arrives.
+        this.agentStatus = this.agentSetup.locator('[data-test="first-event-status"]');
         // The guide's data check: the one step in its nav that carries a status.
         this.guideStatus = page.locator('[data-test="onboarding-guide-rail"] [data-tone]');
         this.firstData = page.locator('[data-test="onboarding-first-data"]');
@@ -86,6 +87,11 @@ class OnboardingPage {
     async otherIds() {
         return this.others.evaluateAll((els) =>
             els.map((el) => el.getAttribute('data-test').replace('onboarding-step-choose-other-', '')));
+    }
+
+    // state: waiting until the first record arrives (FirstEventState)
+    async expectAgentStatus(state, timeout = 20000) {
+        await expect(this.agentStatus).toHaveAttribute('data-state', state, { timeout });
     }
 
     // tone: waiting | ok | attention

@@ -97,7 +97,7 @@ test.describe('Onboarding on first login', () => {
         );
     });
 
-    test('the coding agent card opens the agent page with the listen bar', {
+    test('the coding agent card opens the agent page, waiting for data', {
         tag: ['@onboarding', '@get-started', '@cloud', '@P2'],
     }, async ({ page }) => {
         await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
@@ -106,7 +106,8 @@ test.describe('Onboarding on first login', () => {
 
         await page.waitForURL(/\/onboarding\/agent/, { timeout: 20000 });
         await expect(ob.agentSetup).toBeVisible();
-        await expect(ob.listenBar).toBeVisible();
+        // A fresh org has no data, so the page waits; the listen bar shows only once data arrives.
+        await ob.expectAgentStatus('waiting');
         await expect.poll(() => ob.attributionBodies.length).toBe(1);
         expect(ob.attributionBodies[0]).toMatchObject({ skipped: false });
     });

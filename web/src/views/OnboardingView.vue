@@ -146,12 +146,12 @@ watch(
   (step) => {
     if (step.step === "redirect") {
       router.replace({ name: "onboarding", params: { path: step.path }, query: orgQuery.value });
-    } else if (step.step === "guide") {
-      // Every guide renders here. Arriving by URL records nothing.
-      suppressConnectPrompt(store.state.userInfo?.email);
-    } else if (step.step === "agent") {
+      return;
+    }
+    // Every step claims the session, so the Slack invite waits for a later one. Arriving by URL records nothing.
+    suppressConnectPrompt(store.state.userInfo?.email);
+    if (step.step === "agent") {
       // Every way in (step 1, a guide, a row, a data page's intro) lands here, so the start is recorded here.
-      suppressConnectPrompt(store.state.userInfo?.email);
       void recordStartBounded(
         store.state.selectedOrganization?.identifier ?? "",
         store.state.userInfo?.email,

@@ -411,6 +411,23 @@ describe("OnboardingView", () => {
     expect(router.currentRoute.value.path).toBe("/onboarding/infrastructure/kubernetes-cluster");
   });
 
+  it.each([
+    ["/onboarding", "onboarding-step-choose"],
+    ["/onboarding/infrastructure", "onboarding-step-rows"],
+    ["/onboarding/infrastructure/databases", "onboarding-step-which"],
+    ["/onboarding/infrastructure/kubernetes-cluster/traces", "onboarding-step-traces"],
+  ])(
+    "claims the session for the Slack invite on %s, so it never opens over onboarding",
+    async (path, step) => {
+      const { wrapper } = await mountAt(path);
+      expect(wrapper.find(`[data-test="${step}"]`).exists()).toBe(true);
+      expect(
+        sessionStorage.getItem(`connectDataSourcePromptShown:${store.state.userInfo.email}`),
+      ).toBe("true");
+      expect(billings.submit_new_user_info).not.toHaveBeenCalled();
+    },
+  );
+
   it("records nothing for a row that only opens the which-one page", async () => {
     const { wrapper } = await mountAt("/onboarding/infrastructure");
     await wrapper.find('[data-test="onboarding-step-rows-row-databases"]').trigger("click");

@@ -235,7 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <CommunitySlackInvite />
+    <!-- It checks once, on mount, before the page claims the session, so it stays off focus-mode pages (onboarding). -->
+    <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
@@ -800,9 +801,10 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.name,
       (name) => {
-        if (name !== "home" || deciding || !isFirstLoginOf(store.state.userInfo?.email)) return;
-        holdForOnboarding.value = config.isCloud === "true";
-        void onboardFirstLogin();
+        const firstLogin = name === "home" && isFirstLoginOf(store.state.userInfo?.email);
+        // Only Home waits on the decision: a page the user moved to while the lists load shows at once.
+        holdForOnboarding.value = firstLogin && config.isCloud === "true";
+        if (firstLogin && !deciding) void onboardFirstLogin();
       },
     );
 

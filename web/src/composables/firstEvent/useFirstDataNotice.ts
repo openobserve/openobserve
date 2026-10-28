@@ -108,11 +108,24 @@ export function markDetectionSeen(org: string, stream?: DetectedStream): void {
   detections.value++;
 }
 
+const expiryTimers = new Set<string>();
+
 /** The stream whose first record a setup page in this browser saw arrive, until its stats have had time to flush. */
 export function detectedStream(org: string): DetectedStream | undefined {
   void detections.value;
   const seen = readFirstDataRecord(org)?.detectedStream;
-  return seen && Date.now() - (seen.at ?? 0) < DETECTION_MARK_MS ? seen : undefined;
+  const left = (seen?.at ?? 0) + DETECTION_MARK_MS - Date.now();
+  if (!seen || left <= 0) return undefined;
+  // Date.now() is not reactive and an unchanged refetch keeps its data, so one timer per mark bumps the counter at expiry
+  const key = `${org}:${seen.at}`;
+  if (!expiryTimers.has(key)) {
+    expiryTimers.add(key);
+    setTimeout(() => {
+      expiryTimers.delete(key);
+      detections.value++;
+    }, left);
+  }
+  return seen;
 }
 
 /** Whether the org holds a user stream, read with the notice's own bounded probes; null when a read fails. */

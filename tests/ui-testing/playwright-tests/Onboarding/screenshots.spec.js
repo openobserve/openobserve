@@ -114,7 +114,7 @@ const SCREENS = [
             const ob = new OnboardingPage(page);
             await openGuide(page, '/onboarding/agent', orgId);
             await expect(ob.agentSetup).toBeVisible({ timeout: 20000 });
-            await expect(ob.listenBar).toBeVisible();
+            await ob.expectAgentStatus('waiting');
         },
     },
     {

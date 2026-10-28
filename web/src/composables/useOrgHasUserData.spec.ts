@@ -169,6 +169,23 @@ describe("useOrgHasUserData", () => {
     expect(await orgHasUserData("aged")).toBeUndefined();
   });
 
+  // Date.now() is not reactive, and an unchanged refetch keeps the same data, so only the mark's expiry can clear it
+  it("drops an expired detection from a mounted answer, though the lists come back the same", async () => {
+    listsFor({ held: { logs: ["default"] } }, 0);
+    const { result, wrapper } = setup("held");
+    await flushPromises();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    markDetectionSeen("held", { type: "logs", name: "default" });
+    expect(result.hasUserData.value).toBe(true);
+
+    vi.advanceTimersByTime(16 * 60_000);
+    const refetched = queryClient.refetchQueries();
+    await vi.runOnlyPendingTimersAsync();
+    await refetched;
+    expect(result.hasUserData.value).toBeUndefined();
+    wrapper.unmount();
+  });
+
   it("counts a traces stream", async () => {
     expect((await run({ traces: ["checkout"] })).after).toBe(true);
   });
