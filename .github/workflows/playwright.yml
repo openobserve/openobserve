@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: read  # for `gh run list` (last nightly's head_sha)
+      actions: read  # for `gh run list` (last nightly's commit and result)
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
@@ -933,7 +933,7 @@ jobs:
               FAILED_SHARDS="$FAILED_SHARDS $SHARD"
             fi
             if [ -f "$RECORD/.last-run.json" ]; then
-              N=$(jq '.failedTests | if type == "array" then length else error("no failedTests array") end' "$RECORD/.last-run.json" 2>/dev/null) \
+              N=$(jq -e '.failedTests | if type == "array" then length else error("no failedTests array") end' "$RECORD/.last-run.json" 2>/dev/null) \
                 || { echo "::warning::Shard $SHARD left an unreadable failed-test list; no rerun advice"; exit 0; }
               LISTED=$((LISTED + N))
             fi
