@@ -176,9 +176,11 @@ pub async fn end_on_clear(org_id: &str, alert_id: &str, group_key: &str, cleared
     if candidates.is_empty() {
         return;
     }
-    let alert_cleared = group_key == ROLLUP_GROUP_KEY || no_group_firing(alert_id).await;
+    let Some(firing) = firing_after_clear(alert_id, group_key).await else {
+        return;
+    };
     for row in candidates {
-        if !clear_ends(row, alert_id, group_key, alert_cleared) {
+        if !clear_ends(row, alert_id, group_key, &firing) {
             continue;
         }
         match downtimes::cancel_on_clear(org_id, &row.id, cleared_at).await {
@@ -214,8 +216,8 @@ pub fn source_of(ack_source: config::meta::alerts::ack::AckSource) -> MuteSource
     }
 }
 
-/// Whether a clear of `group_key` ends `row`; `alert_cleared` means no group of the alert fires.
-fn clear_ends(row: &Downtime, alert_id: &str, group_key: &str, alert_cleared: bool) -> bool {
+/// Whether a clear of `group_key` ends `row`, given the alert's groups still `firing`. [pure]
+fn clear_ends(row: &Downtime, alert_id: &str, group_key: &str, firing: &[String]) -> bool {
     let Some(end) = row
         .end_on_clear
         .as_ref()
@@ -223,18 +225,25 @@ fn clear_ends(row: &Downtime, alert_id: &str, group_key: &str, alert_cleared: bo
     else {
         return false;
     };
-    match end.group_key.as_deref() {
-        Some(key) if !key.is_empty() => key == group_key,
-        _ => alert_cleared,
+    match (end.group_key.as_deref(), row.alert_groups.as_deref()) {
+        (Some(key), _) if !key.is_empty() => key == group_key,
+        (_, Some(groups)) if !groups.is_empty() => {
+            !groups.iter().any(|g| firing.contains(&g.group_key))
+        }
+        _ => firing.is_empty(),
     }
 }
 
-async fn no_group_firing(alert_id: &str) -> bool {
+/// The alert's groups still firing after this clear; a rollup clear leaves none, `None` on error.
+async fn firing_after_clear(alert_id: &str, group_key: &str) -> Option<Vec<String>> {
+    if group_key == ROLLUP_GROUP_KEY {
+        return Some(vec![]);
+    }
     match infra::table::alert_states::firing_groups(alert_id, None).await {
-        Ok(rows) => rows.is_empty(),
+        Ok(rows) => Some(rows.into_iter().map(|(key, _)| key).collect()),
         Err(e) => {
             log::warn!("[ALERT_MUTE] could not list the firing groups of {alert_id}: {e}");
-            false
+            None
         }
     }
 }
@@ -354,7 +363,8 @@ fn covers(have: Option<&[AlertGroupRef]>, want: Option<&[AlertGroupRef]>) -> boo
     })
 }
 
-/// One group ends on that group's clear; the whole alert or several groups end once none fires.
+/// One group ends on that group's clear; several groups once none of them fires; the whole alert
+/// once no group fires.
 fn until_clear_of(alert_id: &str, groups: Option<&[AlertGroupRef]>) -> EndOnClear {
     let group_key = match groups {
         Some([one]) => Some(one.group_key.clone()),
@@ -551,23 +561,42 @@ mod tests {
             Some(vec![group("k1")]),
             Some(until_clear_of("a1", Some(&[group("k1")]))),
         );
-        assert!(clear_ends(&one, "a1", "k1", false));
+        let still = ["k2".to_string()];
+        assert!(clear_ends(&one, "a1", "k1", &still));
         assert!(
-            !clear_ends(&one, "a1", "k2", false),
+            !clear_ends(&one, "a1", "k2", &still),
             "another group's clear leaves it"
         );
-        assert!(!clear_ends(&one, "a2", "k1", true));
+        assert!(!clear_ends(&one, "a2", "k1", &[]));
         let whole = row(None, Some(until_clear_of("a1", None)));
         assert!(
-            !clear_ends(&whole, "a1", "k1", false),
+            !clear_ends(&whole, "a1", "k1", &still),
             "a group clears while another fires"
         );
-        assert!(clear_ends(&whole, "a1", "k1", true));
-        assert!(clear_ends(&whole, "a1", ROLLUP_GROUP_KEY, true));
+        assert!(clear_ends(&whole, "a1", "k1", &[]));
+        assert!(clear_ends(&whole, "a1", ROLLUP_GROUP_KEY, &[]));
         let timed = row(None, None);
         assert!(
-            !clear_ends(&timed, "a1", ROLLUP_GROUP_KEY, true),
+            !clear_ends(&timed, "a1", ROLLUP_GROUP_KEY, &[]),
             "a timed mute outlives the clear"
+        );
+    }
+
+    #[test]
+    fn a_mute_of_several_groups_ends_once_none_of_them_fires() {
+        let groups = vec![group("a"), group("b")];
+        let both = row(
+            Some(groups.clone()),
+            Some(until_clear_of("a1", Some(&groups))),
+        );
+        let c = "c".to_string();
+        assert!(
+            !clear_ends(&both, "a1", "a", &["b".to_string(), c.clone()]),
+            "b still fires"
+        );
+        assert!(
+            clear_ends(&both, "a1", "b", &[c]),
+            "an unmuted group firing does not hold the mute"
         );
     }
 
