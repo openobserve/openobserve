@@ -3086,32 +3086,49 @@ fn correlates_muted_firing(
     creates_incident && incidents_enabled && downtime.incident_mode.is_muted()
 }
 
-/// Sends the alert to its Slack app destinations now and returns it without them, for the batch.
+/// The names of the alert's Slack app destinations.
+#[cfg(feature = "enterprise")]
+async fn slack_app_names(alert: &config::meta::alerts::alert::Alert) -> Vec<String> {
+    crate::alerts::slack_publish::slack_app_destinations(&alert.org_id, &alert.destinations)
+        .await
+        .into_iter()
+        .map(|(_, name)| name)
+        .collect()
+}
+
+/// The alert as its batch carries it, without its Slack app destinations; `None` when that
+/// leaves the batch nothing to notify. [pure]
+#[cfg(feature = "enterprise")]
+fn batch_member(
+    alert: &config::meta::alerts::alert::Alert,
+    slack_app: &[String],
+) -> Option<config::meta::alerts::alert::Alert> {
+    let mut batched = alert.clone();
+    batched
+        .destinations
+        .retain(|name| !slack_app.contains(name));
+    has_delivery_target(&batched).then_some(batched)
+}
+
+/// Sends the alert to its Slack app destinations now, outside its batch.
 #[allow(clippy::too_many_arguments)]
 #[cfg(feature = "enterprise")]
 async fn send_slack_app_unbatched(
     trace_id: &str,
     alert: &config::meta::alerts::alert::Alert,
+    slack: Vec<String>,
     rows: &[serde_json::Map<String, serde_json::Value>],
     rows_end_time: i64,
     start_time: Option<i64>,
     triggered_at: i64,
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
-) -> config::meta::alerts::alert::Alert {
+) {
     use crate::alerts::alert::AlertExt;
 
-    let slack: Vec<String> =
-        crate::alerts::slack_publish::slack_app_destinations(&alert.org_id, &alert.destinations)
-            .await
-            .into_iter()
-            .map(|(_, name)| name)
-            .collect();
-    let mut batched = alert.clone();
     if slack.is_empty() {
-        return batched;
+        return;
     }
-    batched.destinations.retain(|name| !slack.contains(name));
     let mut direct = alert.clone();
     direct.destinations = slack;
     direct.workflows.clear();
@@ -3135,7 +3152,6 @@ async fn send_slack_app_unbatched(
             alert.name
         );
     }
-    batched
 }
 
 /// Who acked a single-row alert's current firing, when that ack withholds this run's send.
@@ -4070,9 +4086,8 @@ async fn handle_alert_triggers(
         let is_multi_alert = alert.query_condition.multi_alert_enabled();
 
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
-        // A batch notifies its first alert's destinations, so one with none must not open it.
         #[cfg(feature = "enterprise")]
-        let grouping_enabled = !is_multi_alert
+        let grouping_wanted = !is_multi_alert
             && has_target
             && alert
                 .deduplication
@@ -4080,15 +4095,20 @@ async fn handle_alert_triggers(
                 .and_then(|d| d.grouping.as_ref())
                 .map(|g| g.enabled)
                 .unwrap_or(false);
-
-        #[cfg(not(feature = "enterprise"))]
-        let grouping_enabled = {
-            let _ = is_multi_alert;
-            false
+        // A batch notifies its first alert's destinations, so one with none must not open it.
+        #[cfg(feature = "enterprise")]
+        let batched = if grouping_wanted {
+            let slack_app = slack_app_names(&alert).await;
+            batch_member(&alert, &slack_app).map(|member| (member, slack_app))
+        } else {
+            None
         };
 
-        if grouping_enabled {
-            #[cfg(feature = "enterprise")]
+        #[cfg(not(feature = "enterprise"))]
+        let _ = is_multi_alert;
+
+        #[cfg(feature = "enterprise")]
+        if let Some((batch_alert, slack_app)) = batched {
             {
                 let grouping_config = alert
                     .deduplication
@@ -4137,9 +4157,10 @@ async fn handle_alert_triggers(
                 );
 
                 // R-137: each member firing gets its own Slack app message, never a batch.
-                let batch_alert = send_slack_app_unbatched(
+                send_slack_app_unbatched(
                     &scheduler_trace_id,
                     &alert,
+                    slack_app,
                     &data,
                     trigger_results.end_time,
                     Some(start_time),
@@ -9822,5 +9843,20 @@ mod tests {
             Some(&(PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS)),
             "{written:?}"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_slack_app_only_alert_opens_no_batch_and_a_mixed_one_batches_the_rest() {
+        let slack = vec!["slack-app".to_string()];
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.destinations = slack.clone();
+        assert!(
+            batch_member(&alert, &slack).is_none(),
+            "a batch with no destinations would drop the email of an alert that joins it"
+        );
+        alert.destinations.push("email".to_string());
+        let member = batch_member(&alert, &slack).expect("the email still needs the batch");
+        assert_eq!(member.destinations, vec!["email".to_string()]);
     }
 }
