@@ -2726,7 +2726,7 @@ pub fn other_service_routes() -> Router {
         )
         .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(|req, next| {
-            require_features(&[Feature::Logs, Feature::KinesisFirehose], req, next)
+            require_features(&[Feature::Logs], req, next)
         }))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2745,12 +2745,7 @@ pub fn other_service_routes() -> Router {
 
     let rum_routes = Router::new()
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
-        .route(
-            "/v1/{org_id}/replay",
-            post(rum::ingest::sessionreplay).route_layer(middleware::from_fn(|req, next| {
-                require_features(&[Feature::SessionReplay], req, next)
-            })),
-        )
+        .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(|req, next| {
@@ -2783,7 +2778,7 @@ pub fn splunk_collector_routes() -> Router {
     let event_handler = || {
         post(hec_collector::collector_event)
             .route_layer(middleware::from_fn(|req, next| {
-                require_features(&[Feature::Logs, Feature::SplunkHec], req, next)
+                require_features(&[Feature::Logs], req, next)
             }))
             .route_layer(middleware::from_fn(hec_collector::splunk_auth_middleware))
             .fallback(hec_collector::collector_method_not_allowed)

@@ -183,13 +183,13 @@ describe("OPageHeader on a locked page", () => {
     await router.push("/");
     const Locked = defineComponent({
       setup() {
-        provideFeatureLock(ref("downtimes"));
+        provideFeatureLock(ref("alerts"));
         return () => h(OPageHeader, { title: "Downtimes", subtitle: "Muted alerts" } as never);
       },
     });
     wrapper = mount(Locked, { global: { plugins: [i18n, router] } });
     const lock = wrapper.get('[data-test="app-page-header-locked"]');
-    expect(lock.attributes("aria-label")).toBe("Locked: needs downtimes");
+    expect(lock.attributes("aria-label")).toBe("Locked: needs alerts");
     expect(lock.element.previousElementSibling?.tagName).toBe("H1");
   });
 });

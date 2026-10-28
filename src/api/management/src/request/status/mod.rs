@@ -532,11 +532,11 @@ pub async fn zo_config(
     );
     let downtimes_enabled = enterprise_value!(
         false,
-        o2cfg.downtimes.enabled && check_features(&[Feature::Downtimes])
+        o2cfg.downtimes.enabled && check_features(&[Feature::Alerts])
     );
     let alert_calibration_enabled = enterprise_value!(
         false,
-        o2cfg.alert_calibration.enabled && check_features(&[Feature::AlertInsights])
+        o2cfg.alert_calibration.enabled && check_features(&[Feature::Alerts])
     );
     // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
@@ -544,7 +544,6 @@ pub async fn zo_config(
         incidents_enabled
             && o2cfg.incidents.rca_enabled
             && openobserve_core::alerts::incidents::rca_agent_available()
-            && check_features(&[Feature::RootCauseAnalysis])
     );
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
@@ -2686,7 +2685,6 @@ mod tests {
             openobserve_core::alerts::incidents::incidents_enabled()
                 && o2cfg.incidents.rca_enabled
                 && openobserve_core::alerts::incidents::rca_agent_available()
-                && check_features(&[Feature::RootCauseAnalysis])
         );
     }
 
