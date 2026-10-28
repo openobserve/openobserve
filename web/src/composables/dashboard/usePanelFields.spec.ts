@@ -210,6 +210,34 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
     });
 
+    it("reads the state with max for a state timeline, never a count", () => {
+      panelData.data.type = "state-timeline";
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addYAxisItem({ name: "link_state" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("max");
+    });
+
+    it("reads a numeric host map value with max, and keeps count for text fields", () => {
+      panelData.data.type = "hostmap";
+      (panelData as any).meta.streamFields = {
+        groupedFields: [
+          {
+            stream_alias: null,
+            schema: [
+              { name: "temperature", type: "Float64" },
+              { name: "status", type: "Utf8" },
+            ],
+          },
+        ],
+      };
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addYAxisItem({ name: "temperature" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("max");
+      panelData.data.queries[0].fields.y = [];
+      fields.addYAxisItem({ name: "status" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+
     it("does not add second item to pie chart (max 1 y)", () => {
       panelData.data.type = "pie";
       fields = usePanelFields({ dashboardPanelData: panelData, store });
@@ -260,6 +288,15 @@ describe("usePanelFields", () => {
       fields.addBreakDownAxisItem({ name: "region" });
       fields.addBreakDownAxisItem({ name: "country" }); // blocked
       expect(panelData.data.queries[0].fields.breakdown).toHaveLength(1);
+    });
+
+    it("takes exactly one row field for a state timeline", () => {
+      panelData.data.type = "state-timeline";
+      fields = usePanelFields({ dashboardPanelData: panelData, store });
+      fields.addBreakDownAxisItem({ name: "gpu" });
+      fields.addBreakDownAxisItem({ name: "host" }); // blocked
+      expect(panelData.data.queries[0].fields.breakdown).toHaveLength(1);
+      expect(panelData.data.queries[0].fields.breakdown[0].args[0].value.field).toBe("gpu");
     });
   });
 

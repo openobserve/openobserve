@@ -220,6 +220,19 @@ pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static ORG_CLEANUP_FAILED_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "org_cleanup_failed_steps",
+            "Org deletion steps that exhausted their attempts, per org.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
 /// Completed orphan-detection passes. A dead-man's switch, not a workload count.
 ///
 /// The detector runs only on scheduler nodes and reads only its own region's
@@ -3082,6 +3095,114 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// public dashboards (design 8.5)
+pub static PUBLIC_DASHBOARD_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "public_dashboard_reads_total",
+            "Public dashboard data reads by outcome.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_BUILDS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "public_dashboard_builds_total",
+            "Public dashboard builds by outcome.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_BUILD_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "public_dashboard_build_seconds",
+            "Public dashboard build time.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_RESULT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "public_dashboard_result_bytes",
+            "Size of public dashboard result files.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(prometheus::exponential_buckets(1024.0, 4.0, 10).expect("buckets"))
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "public_dashboard_mem_cache_hits_total",
+            "Public dashboard bodies served from the memory cache.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_MEM_CACHE_MISSES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "public_dashboard_mem_cache_misses_total",
+            "Public dashboard bodies decompressed from disk.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_FILE_CACHE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "public_dashboard_file_cache_bytes",
+            "Bytes of public dashboard result files in the disk result cache.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_INFLIGHT_BUILDS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "public_dashboard_inflight_builds",
+            "Public dashboard builds running on this querier.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static PUBLIC_DASHBOARD_LINKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "public_dashboard_links",
+            "Public dashboard links by status.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+
 pub(crate) fn register(registry: &Registry) {
     // http latency
     registry
@@ -3134,6 +3255,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ORG_CLEANUP_FAILED_STEPS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
@@ -3742,6 +3866,15 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
         Box::new(RCA_RESUME_TOTAL.clone()),
         Box::new(RCA_LIVE_STREAMS.clone()),
+        Box::new(PUBLIC_DASHBOARD_READS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_BUILDS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_BUILD_SECONDS.clone()),
+        Box::new(PUBLIC_DASHBOARD_RESULT_BYTES.clone()),
+        Box::new(PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_MEM_CACHE_MISSES_TOTAL.clone()),
+        Box::new(PUBLIC_DASHBOARD_FILE_CACHE_BYTES.clone()),
+        Box::new(PUBLIC_DASHBOARD_INFLIGHT_BUILDS.clone()),
+        Box::new(PUBLIC_DASHBOARD_LINKS.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }
@@ -3790,6 +3923,7 @@ mod tests {
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = ORG_CLEANUP_FAILED_STEPS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
@@ -4005,6 +4139,61 @@ mod tests {
                     .collect()
             };
             assert_eq!(labels, expected, "{}", family.name());
+        }
+    }
+
+    #[test]
+    fn public_dashboard_metrics_are_the_nine_of_the_design() {
+        let registry = Registry::new();
+        register(&registry);
+        PUBLIC_DASHBOARD_READS_TOTAL
+            .with_label_values(&["o", "fresh"])
+            .inc();
+        PUBLIC_DASHBOARD_BUILDS_TOTAL
+            .with_label_values(&["o", "complete"])
+            .inc();
+        PUBLIC_DASHBOARD_BUILD_SECONDS
+            .with_label_values(&["o"])
+            .observe(1.0);
+        PUBLIC_DASHBOARD_RESULT_BYTES
+            .with_label_values(&["o"])
+            .observe(10.0);
+        PUBLIC_DASHBOARD_LINKS
+            .with_label_values(&["o", "live"])
+            .set(1);
+        let names: std::collections::BTreeSet<String> = registry
+            .gather()
+            .into_iter()
+            .map(|m| m.name().to_string())
+            .filter(|n| n.starts_with("zo_public_dashboard_"))
+            .collect();
+        assert_eq!(
+            names.into_iter().collect::<Vec<_>>(),
+            [
+                "zo_public_dashboard_build_seconds",
+                "zo_public_dashboard_builds_total",
+                "zo_public_dashboard_file_cache_bytes",
+                "zo_public_dashboard_inflight_builds",
+                "zo_public_dashboard_links",
+                "zo_public_dashboard_mem_cache_hits_total",
+                "zo_public_dashboard_mem_cache_misses_total",
+                "zo_public_dashboard_reads_total",
+                "zo_public_dashboard_result_bytes",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_org_cleanup_failed_steps_help_names_only_its_org_label() {
+        use prometheus::core::Collector;
+        let desc = ORG_CLEANUP_FAILED_STEPS.desc();
+        assert_eq!(desc[0].variable_labels, ["org"]);
+        let help = &desc[0].help;
+        for absent in ["'organization", "'stream type'", "'stream'"] {
+            assert!(
+                !help.contains(absent),
+                "help names a label it lacks: {help}"
+            );
         }
     }
 }

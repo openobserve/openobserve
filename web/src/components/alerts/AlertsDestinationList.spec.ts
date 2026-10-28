@@ -115,7 +115,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -401,6 +401,14 @@ describe("AlertsDestinationList", () => {
 
       expect((wrapper.vm as any).confirmDelete.visible).toBe(true);
       expect((wrapper.vm as any).confirmDelete.data.name).toBe(dest.name);
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
+        );
+      expect(dialog!.props("messageName")).toBe(dest.name);
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("calls destinationService.delete with correct args on deleteDestination()", async () => {
@@ -478,6 +486,13 @@ describe("AlertsDestinationList", () => {
 
       (wrapper.vm as any).openBulkDeleteDialog();
       expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
   });
 
@@ -524,10 +539,11 @@ describe("AlertsDestinationList", () => {
       method: "post",
       emails: ["alerts@example.com", "oncall@example.com"],
     });
+    const lowerPutDest = makeDestination(5, { name: "lower-put", method: "put" });
 
     beforeEach(async () => {
       (destinationService.list as any).mockResolvedValue({
-        data: [makeDestination(1), emailDest],
+        data: [makeDestination(1), emailDest, lowerPutDest],
       });
       wrapper = mountComponent();
       await flushPromises();
@@ -551,6 +567,10 @@ describe("AlertsDestinationList", () => {
         "https://example.com/hook-1",
       );
       expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
+    });
+
+    it("shows a lowercase stored method in uppercase", () => {
+      expect(wrapper!.find('[data-test="destination-method-lower-put"]').text()).toBe("PUT");
     });
 
     it("labels the column URL / Recipients, not URL", () => {
@@ -699,6 +719,27 @@ describe("AlertsDestinationList", () => {
       expect(saved.filterQuery).toBe("abc");
       expect(saved.tab).toBe("prebuilt");
       expect(saved.pageSize).toBe(100);
+    });
+  });
+  describe("templates load denied", () => {
+    it("falls back to no templates without an unhandled rejection on a 403", async () => {
+      const { queryClient } = await import("@/composables/query/queryClient");
+      queryClient.clear();
+      (templateService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (destinationService.list as any).mockResolvedValue({ data: [] });
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const w: any = mountComponent();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled.mock.calls.map(([reason]) => reason)).not.toContainEqual({
+        response: { status: 403 },
+      });
+      expect(w.vm.templates).toEqual([]);
+      w.unmount();
     });
   });
 });

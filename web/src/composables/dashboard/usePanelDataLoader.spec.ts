@@ -173,6 +173,11 @@ vi.mock("./useAnnotations", () => ({
 let shouldStreamingThrow = false;
 let streamOverride: ((payload: any, callbacks: any) => any) | null = null;
 
+const { mockGetStream } = vi.hoisted(() => ({ mockGetStream: vi.fn() }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
+
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi.fn().mockImplementation((payload, callbacks) => {
@@ -571,6 +576,57 @@ describe("usePanelDataLoader", () => {
       expect(loader.loading.value).toBe(false);
       expect(loader.data.value).toEqual(injected.value.data);
       expect(loader.metadata.value).toEqual(injected.value.metadata);
+    });
+
+    it("renders injected data for a panel whose query text was stripped, with its error", async () => {
+      // Public dashboards strip query text; the injected snapshot must still render.
+      const panelSchema = ref({ id: "public-panel", queryType: "sql", queries: [{}] });
+      const injected = ref({
+        data: [[{ x_axis_1: "2026-01-01T00:00:00", y_axis_1: 3 }]],
+        metadata: { queries: [{ startTime: 1000, endTime: 2000 }] },
+        resultMetaData: [[{ histogram_interval: 30 }]],
+        errorDetail: { message: "withheld", code: "" },
+      });
+
+      const loader = usePanelDataLoader(
+        panelSchema,
+        ref({ start_time: new Date(Date.now() - 3600000), end_time: new Date() }),
+        ref({ values: [] }),
+        ref({ offsetWidth: 1000 }),
+        ref(false), // forceLoad
+        ref("dashboards"), // searchType
+        ref("d"), // dashboardId
+        ref("f"), // folderId
+        ref(null), // reportId
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        ref(undefined), // regionClusterParams
+        ref(false), // allowAnnotationsAPI
+        injected, // injectedPromqlData
+      );
+
+      await loader.loadData();
+
+      expect(loader.data.value).toEqual(injected.value.data);
+      expect(loader.resultMetaData.value).toEqual(injected.value.resultMetaData);
+      expect(loader.errorDetail.value).toEqual({ message: "withheld", code: "" });
+      expect(loader.isPartialData.value).toBe(false);
+
+      // A server-partial entry gets the panel's partial chip, never the interrupted-load state.
+      injected.value = {
+        ...injected.value,
+        resultMetaData: [[{ histogram_interval: 30, is_partial: true }]],
+        serverPartial: true,
+      } as typeof injected.value;
+      await loader.loadData();
+      expect(loader.resultMetaData.value).toEqual(injected.value.resultMetaData);
+      expect(loader.isPartialData.value).toBe(false);
     });
 
     it("should handle invalid timestamps", () => {
@@ -1512,6 +1568,96 @@ describe("usePanelDataLoader", () => {
     });
   });
 
+  describe("enrichment table panels", () => {
+    it("searches the table's own span instead of the dashboard range", async () => {
+      const tableStartUs = Date.UTC(2020, 0, 1) * 1000;
+      mockGetStream.mockResolvedValueOnce({
+        stats: { doc_time_min: tableStartUs, doc_time_max: tableStartUs },
+      });
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+
+      expect(mockGetStream).toHaveBeenCalledWith("geo", "enrichment_tables", false);
+      const { start_time, end_time } = payloads[0].queryReq.query;
+      expect(start_time).toBe(tableStartUs - 1_000_000);
+      expect(end_time).toBeGreaterThanOrEqual((Date.now() - 60_000) * 1000);
+    });
+  });
+
+  describe("enrichment table panels superseded while the stats load", () => {
+    it("fires only the newer run's query", async () => {
+      global.AbortController = class {
+        signal = { aborted: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+        abort() {
+          this.signal.aborted = true;
+        }
+      } as unknown as typeof AbortController;
+      let releaseFirst: (v: unknown) => void = () => {};
+      mockGetStream
+        .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+        .mockResolvedValueOnce({ stats: { doc_time_min: 5_000_000, doc_time_max: 5_000_000 } });
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+
+      const first = loader.loadData();
+      await vi.waitFor(() => expect(mockGetStream).toHaveBeenCalledTimes(1));
+      await loader.loadData();
+      releaseFirst({ stats: { doc_time_min: 9_000_000, doc_time_max: 9_000_000 } });
+      await first;
+
+      expect(payloads.map((p: any) => p.queryReq.query.start_time)).toEqual([4_000_000]);
+    });
+  });
+
   describe("superseded runs", () => {
     const supersedeRun = async (edition: { isEnterprise: string; isCloud: string }) => {
       const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
@@ -1835,6 +1981,62 @@ describe("usePanelDataLoader", () => {
         await loader.loadData();
 
         expect(loader.data.value).toBeDefined();
+      });
+
+      it.each([
+        ["a window with the same start but another end, outside a calendar period", 0, true],
+        ["a window of another length and start", 30 * 60_000, true],
+      ])("flags restored data from %s as different: %s", async (_label, startShift, differs) => {
+        const panelSchema = createMockPanelSchema();
+        const start = new Date(Date.now() - 3_600_000);
+        const selectedTimeObj = ref({ start_time: start, end_time: new Date() });
+        mockCacheData = {
+          key: {
+            panelSchema: panelSchema.value,
+            variablesData: [],
+            forceLoad: false,
+            dashboardId: "test-dashboard",
+            folderId: "test-folder",
+          },
+          value: {
+            data: [{ test: "cached_data" }],
+            loading: false,
+            errorDetail: { message: "", code: "" },
+            metadata: { queries: [] },
+            annotations: [],
+            resultMetaData: [],
+            lastTriggeredAt: Date.now(),
+            isPartialData: false,
+            isOperationCancelled: false,
+          },
+          cacheTimeRange: {
+            start_time: start.getTime() + startShift,
+            end_time: Date.now() - 600_000,
+          },
+        };
+
+        allowPanelToBecomeVisible();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          createMockVariablesData(),
+          ref({ offsetWidth: 1000 }),
+          ref(false),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+
+        await loader.loadData();
+
+        expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBe(differs);
       });
 
       it("restores the server diagnostics with the cached result, so a first view shows its notices", async () => {

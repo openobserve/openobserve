@@ -19,7 +19,11 @@ mod otlp_json_compat;
 pub mod query;
 mod validation;
 
-use std::{collections::HashMap, io::BufReader, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::BufReader,
+    sync::Arc,
+};
 
 use axum::{http, response::Response as HttpResponse};
 use bytes::Bytes;
@@ -159,6 +163,8 @@ fn map_otlp_handler_error(
 }
 
 const EXTRACTOR_VERSION: &str = "v1";
+/// OTel semconv default `service.name`, suffixed with `:<process.executable.name>` when known.
+const UNKNOWN_SERVICE: &str = "unknown_service";
 /// Resource attributes promoted to fixed columns (hot query dimensions).
 const HOT_RESOURCE_ATTRS: &[(&str, &str)] = &[
     ("service.name", "service_name"),
@@ -664,6 +670,17 @@ fn build_sample_records(
             }
         }
     }
+    // A NULL service_name is never listed by meta, so the UI cannot select those rows.
+    if !base.contains_key("service_name") {
+        let service_name = match base.get("process_executable_name").and_then(|v| v.as_str()) {
+            Some(exe) => format!("{UNKNOWN_SERVICE}:{exe}"),
+            None => UNKNOWN_SERVICE.to_string(),
+        };
+        base.insert(
+            "service_name".to_string(),
+            json::Value::String(service_name),
+        );
+    }
 
     base.insert(
         "extractor_version".to_string(),
@@ -672,6 +689,7 @@ fn build_sample_records(
 
     let mut records = Vec::with_capacity(profile.samples.len());
     let mut rejected = 0_i64;
+    let mut timed_instances = HashSet::new();
     for sample in &profile.samples {
         let (stack, frame_count) = resolve_stack(sample.stack_index, dictionary);
         let (trace_id, span_id) = resolve_link(sample.link_index, dictionary);
@@ -750,10 +768,31 @@ fn build_sample_records(
                 record.insert(key.clone(), value.clone());
             }
 
+            // One row per process carries the profiled time so per-instance rates count it once.
+            if profile.duration_nano > 0 && timed_instances.insert(instance_identity(&record)) {
+                record.insert(
+                    query::PROFILE_DURATION_COLUMN.to_string(),
+                    json::Value::Number((profile.duration_nano as i64).into()),
+                );
+            }
+
             records.push(record);
         }
     }
     (records, rejected)
+}
+
+fn instance_identity(record: &json::Map<String, json::Value>) -> Vec<String> {
+    query::INSTANCE_KEY_COLUMNS
+        .iter()
+        .map(|col| {
+            record
+                .get(*col)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect()
 }
 
 /// Expand one OTLP Sample into `(timestamp_micros, value)` observations.
@@ -874,7 +913,7 @@ fn format_location_frames(location_index: i32, dictionary: &ProfilesDictionary) 
     }
 }
 
-/// Format an unsymbolized location as `{mapping_id}+0x{rel}` (+ optional `/{frame_type}`).
+/// Format an unsymbolized location as `[{file}@]{id}+0x{rel}` (+ optional `/{frame_type}`).
 ///
 /// eBPF native frames omit Line/Function and expect backends to retain mapping metadata
 /// for later symbolization. Bare `0x{va}` collapses frames across different binaries.
@@ -882,18 +921,21 @@ fn format_unsymbolized_frame(
     location: &opentelemetry_proto::tonic::profiles::v1development::Location,
     dictionary: &ProfilesDictionary,
 ) -> Option<String> {
-    let mapping_id = resolve_mapping_identity(location.mapping_index, dictionary);
-    let rel = relative_file_offset(location, dictionary);
-    let frame = match (mapping_id.as_deref(), rel, location.address) {
-        (Some(id), Some(off), _) => format!("{id}+0x{off:x}"),
-        (Some(id), None, addr) if addr != 0 => format!("{id}+0x{addr:x}"),
-        (None, _, addr) if addr != 0 => format!("0x{addr:x}"),
+    let mapping = mapping_at(location.mapping_index, dictionary);
+    let file = mapping.and_then(|m| mapping_file_name(m, dictionary));
+    let build_id = mapping.and_then(|m| mapping_build_id(m, dictionary));
+    let offset = match relative_file_offset(location, dictionary) {
+        Some(rel) if file.is_some() || build_id.is_some() => rel,
+        _ if location.address != 0 => location.address,
         _ => return None,
     };
-    match location_frame_type(location, dictionary) {
-        Some(ft) if !ft.is_empty() => Some(format!("{frame}/{ft}")),
-        _ => Some(frame),
-    }
+    let frame_type = location_frame_type(location, dictionary).unwrap_or_default();
+    let sep = if frame_type.is_empty() { "" } else { "/" };
+    Some(match (file, build_id.as_deref()) {
+        (Some(file), Some(id)) => format!("{file}@{id}+0x{offset:x}{sep}{frame_type}"),
+        (Some(id), None) | (None, Some(id)) => format!("{id}+0x{offset:x}{sep}{frame_type}"),
+        (None, None) => format!("0x{offset:x}{sep}{frame_type}"),
+    })
 }
 
 fn relative_file_offset(
@@ -910,8 +952,23 @@ fn relative_file_offset(
     Some(location.address - mapping.memory_start + mapping.file_offset)
 }
 
-fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary) -> Option<String> {
-    let mapping = mapping_at(mapping_index, dictionary)?;
+fn mapping_file_name<'a>(
+    mapping: &opentelemetry_proto::tonic::profiles::v1development::Mapping,
+    dictionary: &'a ProfilesDictionary,
+) -> Option<&'a str> {
+    let path = string_at(&dictionary.string_table, mapping.filename_strindex)?;
+    Some(
+        std::path::Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(path),
+    )
+}
+
+fn mapping_build_id(
+    mapping: &opentelemetry_proto::tonic::profiles::v1development::Mapping,
+    dictionary: &ProfilesDictionary,
+) -> Option<String> {
     for &attr_index in &mapping.attribute_indices {
         if attr_index <= 0 {
             continue;
@@ -919,10 +976,10 @@ fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary)
         let Some(attr) = dictionary.attribute_table.get(attr_index as usize) else {
             continue;
         };
-        let Some(key) = lookup_string(&dictionary.string_table, attr.key_strindex) else {
+        let Some(key) = string_at(&dictionary.string_table, attr.key_strindex) else {
             continue;
         };
-        if !MAPPING_ID_ATTR_KEYS.contains(&key.as_str()) {
+        if !MAPPING_ID_ATTR_KEYS.contains(&key) {
             continue;
         }
         if let Some(value) = resolve_any_value_string(attr.value.as_ref(), Some(dictionary))
@@ -931,13 +988,7 @@ fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary)
             return Some(value);
         }
     }
-    lookup_string(&dictionary.string_table, mapping.filename_strindex).map(|path| {
-        std::path::Path::new(&path)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string())
-            .unwrap_or(path)
-    })
+    None
 }
 
 fn location_frame_type(
@@ -951,7 +1002,7 @@ fn location_frame_type(
         let Some(attr) = dictionary.attribute_table.get(attr_index as usize) else {
             continue;
         };
-        let Some(key) = lookup_string(&dictionary.string_table, attr.key_strindex) else {
+        let Some(key) = string_at(&dictionary.string_table, attr.key_strindex) else {
             continue;
         };
         if key != PROFILE_FRAME_TYPE_ATTR {
@@ -1103,12 +1154,16 @@ fn get_profile_type_unit(
 }
 
 fn lookup_string(values: &[String], index: i32) -> Option<String> {
+    string_at(values, index).map(str::to_string)
+}
+
+fn string_at(values: &[String], index: i32) -> Option<&str> {
     if index <= 0 {
         return None;
     }
     values
         .get(index as usize)
-        .cloned()
+        .map(String::as_str)
         .filter(|v| !v.is_empty())
 }
 
@@ -1239,6 +1294,7 @@ mod tests {
                 unit_strindex: 2,
             }),
             time_unix_nano: ok_ts_nano,
+            duration_nano: 5_000_000_000,
             samples: vec![Sample {
                 stack_index: 1,
                 // First observation is out of window; later ones must still be kept.
@@ -1265,6 +1321,89 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+        // The rejected observation must not swallow the profiled-time marker.
+        assert_eq!(
+            records[0]
+                .get(query::PROFILE_DURATION_COLUMN)
+                .and_then(|v| v.as_i64()),
+            Some(5_000_000_000)
+        );
+        assert!(!records[1].contains_key(query::PROFILE_DURATION_COLUMN));
+    }
+
+    #[test]
+    fn build_sample_records_marks_profiled_time_once_per_process() {
+        let pid_attr = |value_strindex: i32| KeyValueAndUnit {
+            key_strindex: 3,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(value_strindex)),
+            }),
+            ..Default::default()
+        };
+        let dictionary = ProfilesDictionary {
+            string_table: ["", "cpu", "nanoseconds", "process.pid", "11", "22"]
+                .map(String::from)
+                .to_vec(),
+            attribute_table: vec![KeyValueAndUnit::default(), pid_attr(4), pid_attr(5)],
+            ..Default::default()
+        };
+        let sample = |attr: i32, value: i64| Sample {
+            values: vec![value],
+            attribute_indices: vec![attr],
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            sample_type: Some(ValueType {
+                type_strindex: 1,
+                unit_strindex: 2,
+            }),
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            duration_nano: 5_000_000_000,
+            samples: vec![sample(1, 10), sample(1, 20), sample(2, 30)],
+            ..Default::default()
+        };
+        let build = |profile: &Profile| {
+            build_sample_records(
+                &ResourceProfiles::default(),
+                &ScopeProfiles::default(),
+                profile,
+                Some(&dictionary),
+                now - 3_600_000_000,
+                now + 3_600_000_000,
+            )
+            .0
+        };
+
+        let records = build(&profile);
+        let timed: Vec<(Option<&str>, Option<i64>)> = records
+            .iter()
+            .map(|r| {
+                (
+                    r.get("process_pid").and_then(|v| v.as_str()),
+                    r.get(query::PROFILE_DURATION_COLUMN)
+                        .and_then(|v| v.as_i64()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            timed,
+            vec![
+                (Some("11"), Some(5_000_000_000)),
+                (Some("11"), None),
+                (Some("22"), Some(5_000_000_000)),
+            ]
+        );
+
+        let untimed = Profile {
+            duration_nano: 0,
+            ..profile
+        };
+        assert!(
+            build(&untimed)
+                .iter()
+                .all(|r| !r.contains_key(query::PROFILE_DURATION_COLUMN))
         );
     }
 
@@ -1426,7 +1565,7 @@ mod tests {
 
         // rel = address - memory_start + file_offset = 0x1000 - 0x1000 + 0x100
         let (stack, frame_count) = resolve_stack(1, Some(&dictionary));
-        assert_eq!(stack, "deadbeefcafebabe+0x100/native");
+        assert_eq!(stack, "libexample.so@deadbeefcafebabe+0x100/native");
         assert_eq!(frame_count, 1);
 
         let (other, _) = resolve_stack(2, Some(&dictionary));
@@ -1434,7 +1573,10 @@ mod tests {
         assert_ne!(stack, other);
 
         let (combined, combined_count) = resolve_stack(3, Some(&dictionary));
-        assert_eq!(combined, "deadbeefcafebabe+0x100/native;libc.so.6+0x100");
+        assert_eq!(
+            combined,
+            "libexample.so@deadbeefcafebabe+0x100/native;libc.so.6+0x100"
+        );
         assert_eq!(combined_count, 2);
     }
 
@@ -1548,7 +1690,7 @@ mod tests {
         };
 
         let (stack, frame_count) = resolve_stack(1, Some(&dictionary));
-        assert_eq!(stack, "deadbeefcafebabe+0x100");
+        assert_eq!(stack, "libexample.so@deadbeefcafebabe+0x100");
         assert_eq!(frame_count, 1);
     }
 
@@ -2291,6 +2433,82 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+    }
+
+    fn service_name_for(resource_attrs: &[(&str, &str)]) -> Option<String> {
+        let resource = ResourceProfiles {
+            resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: resource_attrs
+                    .iter()
+                    .map(
+                        |(key, value)| opentelemetry_proto::tonic::common::v1::KeyValue {
+                            key: key.to_string(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue(value.to_string())),
+                            }),
+                            ..Default::default()
+                        },
+                    )
+                    .collect(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            samples: vec![Sample {
+                values: vec![1],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let (records, _) = build_sample_records(
+            &resource,
+            &ScopeProfiles::default(),
+            &profile,
+            Some(&ProfilesDictionary::default()),
+            now - 3600 * 1_000_000,
+            now + 3600 * 1_000_000,
+        );
+        assert_eq!(records.len(), 1);
+        records[0]
+            .get("service_name")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    }
+
+    #[test]
+    fn build_sample_records_keeps_the_sent_service_name() {
+        assert_eq!(
+            service_name_for(&[
+                ("service.name", "checkout"),
+                ("process.executable.name", "checkout-bin"),
+            ])
+            .as_deref(),
+            Some("checkout")
+        );
+    }
+
+    #[test]
+    fn build_sample_records_names_a_process_without_service_name_by_its_executable() {
+        assert_eq!(
+            service_name_for(&[("process.executable.name", "dockerd")]).as_deref(),
+            Some("unknown_service:dockerd")
+        );
+        assert_eq!(
+            service_name_for(&[("service.name", ""), ("process.executable.name", "dockerd")])
+                .as_deref(),
+            Some("unknown_service:dockerd")
+        );
+    }
+
+    #[test]
+    fn build_sample_records_falls_back_to_unknown_service_without_executable_name() {
+        assert_eq!(
+            service_name_for(&[("process.pid", "42")]).as_deref(),
+            Some("unknown_service")
         );
     }
 

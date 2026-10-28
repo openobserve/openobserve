@@ -136,6 +136,16 @@ export default defineComponent({
         id: "heatmap",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/state-timeline.svg"),
+        title: t("dashboard.stateTimelineLabel"),
+        id: "state-timeline",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/hostmap.svg"),
+        title: t("dashboard.hostmapLabel"),
+        id: "hostmap",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/table.svg"),
         title: t("dashboard.tableLabel"),
         id: "table",
@@ -187,6 +197,8 @@ export default defineComponent({
       "donut",
       "table",
       "heatmap",
+      "state-timeline",
+      "hostmap",
       "h-bar",
       "stacked",
       "h-stacked",

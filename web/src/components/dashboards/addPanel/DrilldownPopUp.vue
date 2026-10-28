@@ -273,6 +273,7 @@ import { makeDrilldownPopUpSchema, type DrilldownPopUpForm } from "./DrilldownPo
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
 import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
+import { hostmapLabelNames } from "@/utils/dashboard/convertHostmapData";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 export default defineComponent({
@@ -644,6 +645,25 @@ export default defineComponent({
         selectedValues = [
           { label: t("dashboard.seriesName"), value: "${series.__name}" },
           { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          ...variableListName,
+        ];
+      } else if (dashboardPanelData.data.type === "state-timeline") {
+        selectedValues = [
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.segmentStart"), value: "${series.__start}" },
+          { label: t("dashboard.segmentEnd"), value: "${series.__end}" },
+          ...variableListName,
+        ];
+      } else if (dashboardPanelData.data.type === "hostmap") {
+        selectedValues = [
+          { label: t("dashboard.hostmapCellName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.hostmapCellGroup"), value: "${series.__group}" },
+          ...hostmapLabelNames(dashboardPanelData.data).map((label) => ({
+            label,
+            value: "${series.labels." + label + "}",
+          })),
           ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "metric") {

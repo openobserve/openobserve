@@ -112,11 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="confirmRemoveOpen"
       :title="t('settings.domainOrgMappings.deleteTitle')"
-      :message="
-        t('settings.domainOrgMappings.confirmRemove', {
-          domain: pendingRemoveIndex !== null ? mappings[pendingRemoveIndex]?.domain : '',
-        })
-      "
+      message-keypath="settings.domainOrgMappings.confirmRemove"
+      :message-name="pendingRemoveIndex !== null ? mappings[pendingRemoveIndex]?.domain : ''"
+      ok-variant="destructive"
       @update:ok="doRemove"
       @update:cancel="pendingRemoveIndex = null"
     />

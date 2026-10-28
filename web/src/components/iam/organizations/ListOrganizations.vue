@@ -434,7 +434,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: button_txt,
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
           page: "Organizations",
         });
       }
@@ -466,7 +465,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Invite Member",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Organizations",
       });
     };
@@ -484,9 +482,11 @@ export default defineComponent({
     const deleteOrganization = async (row: any) => {
       const confirmed = await confirm({
         title: t("iam.listOrganizations.deleteOrganization"),
-        message: t("iam.listOrganizations.deleteConfirm", { name: row.name }),
+        messageKeypath: "iam.listOrganizations.deleteConfirm",
+        messageName: row.name,
         confirmLabel: t("iam.listOrganizations.delete"),
         cancelLabel: t("iam.listOrganizations.cancel"),
+        confirmVariant: "destructive",
       });
       if (!confirmed) return;
 

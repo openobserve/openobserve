@@ -184,7 +184,7 @@ describe("ONavbar", () => {
       // Data behaves like a link+subnav tile (click navigates, hover reveals).
       expect(data.attributes("data-mode")).toBe("link");
       expect(data.attributes("data-children")).toBe(
-        "logstreams,pipelines,functionList,enrichmentTables",
+        "logstreams,pipelines,functionList,enrichmentTables,fleet",
       );
       // The children `requires` removed still reach the group.
       expect(data.attributes("data-filtered")).toBe("workflows,ingestion");
@@ -645,6 +645,17 @@ describe("ONavbar", () => {
       await shortRouterInstance.push("/x4");
       await flushPromises();
       expect(nav.scrollTop).toBe(30);
+    });
+
+    it("a query-only replace after a rail click leaves the half-faded tile where the pointer is", async () => {
+      await mountShort();
+      clickTile("x4");
+      await shortRouterInstance.push("/x4");
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
+      await shortRouterInstance.replace({ path: "/x4", query: { period: "15m" } });
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
     });
 
     it("a flyout-item click marks through the injected function", async () => {

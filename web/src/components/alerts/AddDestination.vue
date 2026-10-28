@@ -140,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Additional Settings for Prebuilt Destinations -->
+            <!-- None of these settings apply to email destinations -->
             <div
-              v-if="showPrebuiltAdvancedSettings"
+              v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
               class="mt-3 w-full"
               data-test="prebuilt-additional-settings"
             >
@@ -150,8 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alert_destinations.additional_settings") }}
               </div>
 
-              <!-- Custom Headers (hidden for email destinations) -->
-              <div v-if="dtVal !== 'email'" class="py-2">
+              <!-- Custom Headers -->
+              <div class="py-2">
                 <div class="pb-1 text-sm font-medium">
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
@@ -479,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="showPreviewModal"
       :type="dtVal"
       :template-content="previewContent"
+      :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
   </OPageLayout>
@@ -510,7 +511,7 @@ import {
   usePrebuiltDestinations,
   type SlackSetupMetadata,
 } from "@/composables/usePrebuiltDestinations";
-import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
+import { detectPrebuiltType } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
@@ -543,8 +544,11 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const apiMethods = ["get", "post", "put"];
-const outputFormats = ["json", "ndjson"];
+const apiMethods = ["get", "post", "put"].map((m) => ({ label: raw(m.toUpperCase()), value: m }));
+const outputFormats = ["json", "ndjson"].map((f) => ({
+  label: raw(f.toUpperCase()),
+  value: f,
+}));
 const store = useStore();
 const { t } = useI18nTyped();
 
@@ -695,7 +699,6 @@ const {
   isTestInProgress,
   lastTestResult,
   clearTestResult,
-  detectPrebuiltType,
 } = usePrebuiltDestinations();
 
 // Prebuilt credentials sub-object (`credentials.*`), read reactively for the
@@ -706,6 +709,9 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+const previewRecipients = computed(() =>
+  Array.isArray(prebuiltCredentials.value.recipients) ? prebuiltCredentials.value.recipients : [],
+);
 
 // A test result is stale once anything it was sent with changes; an in-flight
 // test is discarded too.
@@ -895,7 +901,8 @@ const setupDestinationData = () => {
 
     const destHeaders: Record<string, any> = props.destination.headers || {};
 
-    // Set destination_type for prebuilt destinations in edit mode
+    setDestType(detectPrebuiltType(props.destination) ?? "custom");
+
     // Parse metadata if it's a string
     let parsedMetadata: any = null;
     if (props.destination.metadata) {
@@ -907,75 +914,6 @@ const setupDestinationData = () => {
       } catch (e) {
         console.error("Failed to parse destination metadata:", e);
       }
-    }
-
-    // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
-    if (parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)) {
-      setDestType(parsedMetadata.prebuilt_type);
-    }
-    // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
-    // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (props.destination.template?.startsWith("system-prebuilt-")) {
-      const templateType = props.destination.template.replace("system-prebuilt-", "");
-      // Only treat as prebuilt if structure matches the type
-      if (
-        templateType === "email" &&
-        props.destination.type === "email" &&
-        props.destination.emails
-      ) {
-        setDestType("email");
-      } else if (props.destination.type === "http" && props.destination.url) {
-        // Use URL-only detection here — detectPrebuiltType also checks the template
-        // name, which would always match since we're already inside the
-        // system-prebuilt-* branch. A custom destination can have any template,
-        // so the URL is the only reliable signal at this point.
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        if (urlType && isPrebuiltType(urlType)) {
-          setDestType(urlType);
-        } else {
-          // Has system template but URL doesn't match prebuilt patterns - it's custom
-          setDestType("custom");
-        }
-      } else {
-        setDestType("custom");
-      }
-    }
-    // Priority 3: Check if template starts with 'prebuilt_' (user templates)
-    // Also verify the URL matches the prebuilt type to avoid misclassifying custom
-    // destinations that happen to use a template with a prebuilt_ prefix.
-    else if (props.destination.template?.startsWith("prebuilt_")) {
-      const extractedType = props.destination.template.replace("prebuilt_", "");
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        setDestType(urlType === extractedType ? extractedType : "custom");
-      } else {
-        setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
-      }
-    }
-    // Priority 4: Check if template includes 'prebuilt' (legacy format)
-    // Also verify the URL matches the prebuilt type (same guard as Priority 3).
-    else if (props.destination.template?.includes("prebuilt")) {
-      const parts = props.destination.template.split("-");
-      const extractedType = parts[parts.length - 1];
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        setDestType(urlType === extractedType ? extractedType : "custom");
-      } else {
-        setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
-      }
-    }
-    // Priority 5: Fallback to URL-based detection (for destinations without metadata)
-    else if (props.destination.url) {
-      const detectedType = detectPrebuiltType(props.destination);
-      if (detectedType) {
-        setDestType(detectedType);
-      } else {
-        setDestType("custom");
-      }
-    }
-    // Priority 6: No indicators - this is a custom destination
-    else {
-      setDestType("custom");
     }
 
     // Edit-prefill: seed via a single form.reset(record), not a per-field
@@ -1147,7 +1085,8 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 const getFormattedTemplates = computed(() =>
   props.templates
     .filter((template) => {
-      if (typeVal.value === "email" && template.type === "email") return true;
+      if (typeVal.value === "email" && (template.type === "email" || template.kind === "content"))
+        return true;
       else if (typeVal.value !== "email") return true;
       return false;
     })
@@ -1168,13 +1107,13 @@ const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value))
 
 // Template choices for a prebuilt destination: the API-sourced prebuilt
 // template for this type as the first (default) option, followed by any
-// user-created custom templates of the matching kind (email vs http).
+// user-created templates that fit the channel (email or content for email).
 // Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
   const matching = props.templates.filter((template) => {
     if (template.isPrebuilt) return false;
-    if (isEmailType) return template.type === "email";
+    if (isEmailType) return template.type === "email" || template.kind === "content";
     return template.type !== "email";
   });
 

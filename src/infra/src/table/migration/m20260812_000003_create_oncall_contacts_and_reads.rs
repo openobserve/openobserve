@@ -54,7 +54,11 @@ impl MigrationTrait for Migration {
                             .big_integer()
                             .null(),
                     )
-                    .col(ColumnDef::new(OncallUserContacts::PushToken).string().null())
+                    .col(
+                        ColumnDef::new(OncallUserContacts::PushToken)
+                            .string()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(OncallUserContacts::PushVerifiedAt)
                             .big_integer()

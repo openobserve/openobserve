@@ -124,6 +124,21 @@ describe("OTime", () => {
     expect(input.element.value).toBe("09:30");
   });
 
+  it("adds zero seconds to a typed value when withSeconds is on", async () => {
+    wrapper = mount(OTime, { attachTo: document.body, props: { withSeconds: true } });
+    await wrapper.find('input[type="time"]').setValue("13:55");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["13:55:00"]);
+
+    await wrapper.find('input[type="time"]').setValue("13:55:07");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["13:55:07"]);
+  });
+
+  it("keeps a typed value as is without withSeconds", async () => {
+    wrapper = mount(OTime, { attachTo: document.body });
+    await wrapper.find('input[type="time"]').setValue("13:55");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["13:55"]);
+  });
+
   it("should render the clock face popup after opening", async () => {
     wrapper = mount(OTime, { attachTo: document.body });
     // Click the PopoverTrigger button (the clock icon button), not the role="group" div

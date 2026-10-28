@@ -986,10 +986,15 @@ export default defineComponent({
       // as a named handle so it can be flushed on the paths that consume the
       // query (blur, run) — otherwise they act on the previous query and the
       // parent re-renders the editor from that stale state, dropping the edit.
+
+      // Programmatic writes emit here too; a consumer reading one as a user edit wipes state the user never touched.
+      let pendingUserEdit = false;
       const commitModelChange = debounce((e: any) => {
         const newValue = editorObj?.getValue()?.trim();
-        emit("update-query", newValue, e);
-        emit("update:query", newValue, e);
+        const origin = { fromUser: pendingUserEdit };
+        pendingUserEdit = false;
+        emit("update-query", newValue, e, origin);
+        emit("update:query", newValue, e, origin);
 
         // Check for natural language after user stops typing (debounced)
         if (newValue) checkForNaturalLanguage(newValue);
@@ -1013,7 +1018,13 @@ export default defineComponent({
         chainState.spaceEnd = chainSpace
           ? { lineNumber: change.range.startLineNumber, column: change.range.startColumn + 1 }
           : null;
-        if (!e?.isFlush && !programmatic) emit("user-edit");
+        if (!e?.isFlush && !programmatic) {
+          pendingUserEdit = true;
+          emit("user-edit");
+        } else {
+          // The debounce emits the latest value, so a write landing on a typed one owns the origin.
+          pendingUserEdit = false;
+        }
         const quote = props.language === "promql" ? '"' : "'";
         if (e?.changes?.some((c: any) => c.text === quote || c.text === quote + quote)) {
           const version = editorObj.getModel()?.getVersionId?.();
@@ -1166,6 +1177,15 @@ export default defineComponent({
       }
       if (language === "javascript") {
         await import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js");
+      }
+      if (language === "yaml") {
+        await import("monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js");
+      }
+      if (language === "shell") {
+        await import("monaco-editor/esm/vs/basic-languages/shell/shell.contribution.js");
+      }
+      if (language === "powershell") {
+        await import("monaco-editor/esm/vs/basic-languages/powershell/powershell.contribution.js");
       }
     };
 

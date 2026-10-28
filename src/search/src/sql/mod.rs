@@ -36,7 +36,11 @@ use infra::{
 };
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
-use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
+use sqlparser::{
+    ast::{Statement, VisitMut},
+    dialect::PostgreSqlDialect,
+    parser::Parser,
+};
 
 use crate::sql::{
     rewriter::{
@@ -92,7 +96,7 @@ impl Sql {
         let search_event_type = req
             .search_event_type
             .as_ref()
-            .and_then(|s| SearchEventType::try_from(s.as_str()).ok());
+            .and_then(|s| s.parse::<SearchEventType>().ok());
         Self::resolve(
             query,
             &req.org_id,
@@ -181,7 +185,16 @@ impl Sql {
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                Error::ErrorCode(ErrorCodes::SearchSQLNotValid("empty sql".to_string()))
+            })?;
+
+        // Search is read-only: reject non-SELECT (e.g. COPY ... TO) that could write files.
+        if !is_read_only_sql_statement(&statement) {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "only SELECT queries are supported".to_string(),
+            )));
+        }
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -387,6 +400,14 @@ impl std::fmt::Display for Sql {
     }
 }
 
+fn is_read_only_sql_statement(statement: &Statement) -> bool {
+    match statement {
+        Statement::Query(_) => true,
+        Statement::Explain { statement, .. } => is_read_only_sql_statement(statement),
+        _ => false,
+    }
+}
+
 fn o2_id_is_needed(
     schemas: &HashMap<TableReference, Arc<SchemaCache>>,
     search_event_type: &Option<SearchEventType>,
@@ -470,6 +491,40 @@ fn parse_sampling_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_one(sql: &str) -> Statement {
+        Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_read_only_sql_statement_allows_select_and_explain() {
+        assert!(is_read_only_sql_statement(&parse_one("SELECT * FROM logs")));
+        assert!(is_read_only_sql_statement(&parse_one(
+            "EXPLAIN SELECT * FROM logs"
+        )));
+        assert!(is_read_only_sql_statement(&parse_one(
+            "WITH t AS (SELECT 1) SELECT * FROM t"
+        )));
+    }
+
+    #[test]
+    fn test_read_only_sql_statement_rejects_writes() {
+        for sql in [
+            "COPY (SELECT * FROM logs) TO 'file:///tmp/x.parquet'",
+            "COPY logs TO 'file:///tmp/x.parquet'",
+            "INSERT INTO logs VALUES (1)",
+            "CREATE TABLE t (a INT)",
+            "EXPLAIN COPY (SELECT 1) TO 'file:///tmp/x.parquet'",
+        ] {
+            assert!(
+                !is_read_only_sql_statement(&parse_one(sql)),
+                "should reject: {sql}"
+            );
+        }
+    }
 
     #[test]
     fn test_re_only_select_matches_star() {

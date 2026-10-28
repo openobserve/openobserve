@@ -87,6 +87,43 @@ const units: any = {
   ],
 };
 
+type UnitStep = { unit: string; divisor: number };
+
+const DECIMAL_STEPS = [1, 1e3, 1e6, 1e9, 1e12, 1e15];
+const SI_BYTE_LABELS = ["B", "kB", "MB", "GB", "TB", "PB"];
+const SI_BIT_LABELS = ["bit", "kbit", "Mbit", "Gbit", "Tbit", "Pbit"];
+
+// `own` is the step the input is in; its divisor must stay exactly 1 so zero keeps the panel's unit.
+const decimalLadder = (labels: string[], own = 0): UnitStep[] =>
+  labels.map((unit, index) => ({ unit, divisor: DECIMAL_STEPS[index] / DECIMAL_STEPS[own] }));
+
+const timeLadder = (ownSeconds: number): UnitStep[] =>
+  units.seconds.map(({ unit, divisor }: UnitStep) => ({ unit, divisor: divisor / ownSeconds }));
+
+// Named rates carry their leading space in the suffix because callers join value and unit with nothing between.
+const rateLadder = (suffix: string): UnitStep[] =>
+  units.numbers.map(({ unit, divisor }: UnitStep) => ({ unit: `${unit}${suffix}`, divisor }));
+
+Object.assign(units, {
+  "bytes-si": decimalLadder(SI_BYTE_LABELS),
+  "kilobytes-si": decimalLadder(SI_BYTE_LABELS, 1),
+  "megabytes-si": decimalLadder(SI_BYTE_LABELS, 2),
+  bits: decimalLadder(SI_BIT_LABELS),
+  "bps-si": decimalLadder(SI_BYTE_LABELS.map((label) => `${label}/s`)),
+  "bits-per-sec": decimalLadder(SI_BIT_LABELS.map((label) => `${label}/s`)),
+  "req-per-sec": rateLadder(" req/s"),
+  "ops-per-sec": rateLadder(" ops/s"),
+  "events-per-sec": rateLadder(" events/s"),
+  "req-per-min": rateLadder(" req/min"),
+  "ops-per-min": rateLadder(" ops/min"),
+  "events-per-min": rateLadder(" events/min"),
+  "per-sec": rateLadder("/s"),
+  "per-min": rateLadder("/min"),
+  minutes: timeLadder(60),
+  hours: timeLadder(3600),
+  days: timeLadder(86400),
+});
+
 /**
  * Converts a value to a specific unit of measurement.
  *
@@ -153,7 +190,24 @@ export const getUnitValue = (
     case "nanoseconds":
     case "kilobytes":
     case "bps":
-    case "megabytes": {
+    case "megabytes":
+    case "bytes-si":
+    case "kilobytes-si":
+    case "megabytes-si":
+    case "bits":
+    case "bps-si":
+    case "bits-per-sec":
+    case "req-per-sec":
+    case "ops-per-sec":
+    case "events-per-sec":
+    case "req-per-min":
+    case "ops-per-min":
+    case "events-per-min":
+    case "per-sec":
+    case "per-min":
+    case "minutes":
+    case "hours":
+    case "days": {
       // start with last index
       let unitIndex = units[unit].length - 1;
       // while the value is smaller than the divisor

@@ -13,18 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::{
-    RwHashMap,
-    meta::synthetics_variables::{SyntheticsVariableView, VariableValueView},
-};
+use config::meta::synthetics_variables::{SyntheticsVariableView, VariableValueView};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr};
 
-use super::entity::synthetics_variables::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::synthetics_variables::{ActiveModel, Column, Entity, Model},
+    ttl_cache::TtlCache,
+};
 use crate::errors::{self, DbError, Error};
 
 /// The stored `kind` for a write-only variable.
@@ -33,8 +30,7 @@ pub const KIND_SECRET: &str = "secret";
 pub const KIND_PLAIN: &str = "plain";
 
 /// `org_id` → every shared variable in the org, with the time it was loaded.
-static VARIABLE_CACHE: LazyLock<RwHashMap<String, (Vec<SyntheticsVariableRecord>, Instant)>> =
-    LazyLock::new(Default::default);
+static VARIABLE_CACHE: TtlCache<Vec<SyntheticsVariableRecord>> = TtlCache::new(VARIABLE_CACHE_TTL);
 
 const VARIABLE_CACHE_TTL: Duration = Duration::from_secs(15);
 
@@ -131,13 +127,11 @@ pub async fn list_cached<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
 ) -> Result<Vec<SyntheticsVariableRecord>, errors::Error> {
-    if let Some(entry) = VARIABLE_CACHE.get(org_id)
-        && entry.1.elapsed() < VARIABLE_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = VARIABLE_CACHE.get(org_id) {
+        return Ok(cached);
     }
     let rows = list(conn, org_id).await?;
-    VARIABLE_CACHE.insert(org_id.to_string(), (rows.clone(), Instant::now()));
+    VARIABLE_CACHE.insert(org_id.to_string(), rows.clone());
     Ok(rows)
 }
 
@@ -344,6 +338,19 @@ pub async fn delete_by_env<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(res.rows_affected)
+}
+
+/// Deletes every shared variable of an org and drops its cache entry on every node.
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    invalidate_and_publish(org_id).await;
+    Ok(())
 }
 
 /// Invalidates locally **and** tells every other node.

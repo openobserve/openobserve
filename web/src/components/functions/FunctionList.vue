@@ -256,7 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <ConfirmDialog
       :title="t('function.deleteTransformDialogTitle')"
-      :message="t('function.deleteTransformConfirmMessage')"
+      message-keypath="function.deleteTransformConfirmMessage"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -265,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('function.deleteFunctionsDialogTitle')"
       :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -595,7 +598,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
@@ -668,7 +670,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Function",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",

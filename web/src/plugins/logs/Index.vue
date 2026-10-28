@@ -663,6 +663,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   isSimpleSelectAllQuery,
@@ -757,6 +758,7 @@ import {
   noFtsRecoveryStreams,
   noFtsRecoveryTerm as recoveryTerm,
   planStreamsFilter,
+  loadPendingFreeTextSchemas,
   recoveryCardsFor,
   searchTextReplacement,
 } from "@/composables/useLogs/freeTextSearch";
@@ -808,16 +810,12 @@ export default defineComponent({
     searchData() {
       this.autoRun.engine.requestRun("run");
 
-      analytics.track("Button Click", {
-        button: "Search Data",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
+      analytics.track("logs_search_run", {
         stream_name: this.searchObj.data.stream.selectedStream.join(","),
         show_query: this.searchObj.meta.showQuery,
         show_histogram: this.searchObj.meta.showHistogram,
-        sqlMode: this.searchObj.meta.sqlMode,
-        showFields: this.searchObj.meta.showFields,
-        page: "Search Logs",
+        sql_mode: this.searchObj.meta.sqlMode,
+        show_fields: this.searchObj.meta.showFields,
       });
     },
     async getMoreDataRecordsPerPage() {
@@ -838,14 +836,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.aggs = null;
           await this.getJobData(false);
         }
-
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
-        });
       }
     },
     async getMoreData() {
@@ -871,12 +861,8 @@ export default defineComponent({
           }
         }
 
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
+        analytics.track("logs_more_rows_loaded", {
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
         });
       }
     },
@@ -901,7 +887,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Get Less Data",
           user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });
@@ -1782,6 +1767,14 @@ export default defineComponent({
       });
     };
 
+    const loadSchemasBeforeSqlToggle = async () => {
+      const query = searchObj.data.query ?? "";
+      if (!query.trim() || isAuthoredStatement(query)) return;
+      await loadPendingFreeTextSchemas(searchObj, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true),
+      );
+    };
+
     const setQuery = (sqlMode: boolean) => {
       if (!searchBarRef.value) {
         console.error("searchBarRef is null");
@@ -2119,7 +2112,7 @@ export default defineComponent({
       emit(
         "sendToAiChat",
         raw(
-          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod ? describePeriod(searchObj.data.datetime.relativeTimePeriod) : "custom"}. Can you help me adjust the filter to get results?`,
         ),
         false,
       );
@@ -4071,6 +4064,7 @@ export default defineComponent({
       onFirstDataDetected,
       refreshData,
       setQuery,
+      loadSchemasBeforeSqlToggle,
       verifyOrganizationStatus,
       collapseFieldList,
       areStreamsPresent,
@@ -4321,7 +4315,8 @@ export default defineComponent({
         if (this.searchObj.meta.sqlModeManualTrigger) {
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
-          this.setQuery(newVal);
+          await this.loadSchemasBeforeSqlToggle();
+          if (this.searchObj.meta.sqlMode) this.setQuery(newVal);
         }
       } else {
         this.searchObj.meta.sqlMode = false;

@@ -25,6 +25,9 @@ import { isUserDataStream } from "@/utils/internalStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
+// The "all" read fetches only these types; a profiles list is cached only when a page asks for that type.
+const ALL_STREAM_TYPES = ["logs", "metrics", "traces", "enrichment_tables", "index", "metadata"];
+
 // Keep the HTTP status on the rejection: callers need it to tell a denial (403)
 // apart from any other failure, and a bare Error would drop it.
 const withResponse = (err: Error, source: any): Error =>
@@ -32,7 +35,17 @@ const withResponse = (err: Error, source: any): Error =>
 
 // A cancelled fetch stays a CancelledError so callers can ignore superseded requests.
 const toStreamError = (e: any): Error =>
-  e instanceof CancelledError ? e : withResponse(new Error(e.message), e);
+  e instanceof CancelledError
+    ? e
+    : withResponse(
+        new Error(
+          e?.response?.data?.message ||
+            e?.message ||
+            (typeof e === "string" && e) ||
+            "Stream request failed",
+        ),
+        e,
+      );
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -56,6 +69,7 @@ const useStreams = (t: TranslateFn) => {
     enrichment_tables: computed(() => store.state.streams.enrichment_tables),
     index: computed(() => store.state.streams.index),
     metadata: computed(() => store.state.streams.metadata),
+    profiles: computed(() => store.state.streams.profiles),
   };
 
   const getStreams = async (
@@ -108,14 +122,7 @@ const useStreams = (t: TranslateFn) => {
             // As in RBAC there can be permission on certain types of streams
             // So here added some additional logic to handle those
 
-            const streamList = [
-              "logs",
-              "metrics",
-              "traces",
-              "enrichment_tables",
-              "index",
-              "metadata",
-            ];
+            const streamList = ALL_STREAM_TYPES;
 
             // Every type, every time: each is its own query, so a fresh one
             // resolves from cache and only an expired one reaches the server.
@@ -235,7 +242,7 @@ const useStreams = (t: TranslateFn) => {
     streamObject.name = "all";
     streamObject.schema = false;
 
-    Object.keys(streamsCache).forEach((key) => {
+    ALL_STREAM_TYPES.forEach((key) => {
       streamObject.list.push(...(streamsCache[key].value?.list || []));
     });
 
@@ -400,7 +407,7 @@ const useStreams = (t: TranslateFn) => {
   // "all" is one query per type, so its age is the oldest of them.
   const getStreamsFetchedAt = async (streamType: string = "all"): Promise<number | undefined> => {
     const org = store.state.selectedOrganization.identifier;
-    const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
+    const types = streamType === "all" ? ALL_STREAM_TYPES : [streamType];
     const times = types
       .map((type) => queryClient.getQueryState(streamKeys.nameList(org, type))?.dataUpdatedAt)
       .filter((t): t is number => !!t);

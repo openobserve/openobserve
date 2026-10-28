@@ -92,7 +92,7 @@ vi.mock("@/components/ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template: `<div data-test="confirm-dialog-mock"></div>`,
-    props: ["title", "message", "modelValue"],
+    props: ["title", "message", "modelValue", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
 }));
@@ -339,6 +339,15 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.deleteConformDialog.show).toBe(true);
       expect(wrapper.vm.deleteConformDialog.data).toEqual(testGroup);
     });
+
+    it("names the group and uses a destructive OK button", async () => {
+      wrapper.vm.showConfirmDialog({ group_name: "test-group" });
+      await wrapper.vm.$nextTick();
+      const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+      expect(dialog.props("messageKeypath")).toBe("iam.appGroups.deleteGroupConfirm");
+      expect(dialog.props("messageName")).toBe("test-group");
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
   });
 
   describe("Create flow auto-route", () => {
@@ -383,6 +392,12 @@ describe("AppGroups Component", () => {
       await wrapper.vm.openBulkDeleteDialog();
       await flushPromises();
       expect(wrapper.vm.bulkDeleteImpactMessage).toContain("2");
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("title") === i18n.global.t("iam.appGroups.bulkDeleteGroupsTitle"),
+        );
+      expect(dialog.props("okVariant")).toBe("destructive");
     });
 
     it("uses static copy (no fetch) when multiple groups are bulk-selected", async () => {

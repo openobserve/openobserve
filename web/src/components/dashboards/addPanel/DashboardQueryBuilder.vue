@@ -176,7 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'h-stacked' ||
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
-          dashboardPanelData.data.type == 'stacked'
+          dashboardPanelData.data.type == 'stacked' ||
+          dashboardPanelData.data.type == 'state-timeline' ||
+          dashboardPanelData.data.type == 'hostmap'
         "
       >
         <div
@@ -191,7 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               aria-hidden="true"
             ></span>
             {{
-              dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
+              dashboardPanelData.data.type == "table"
+                ? t("panel.pivotField")
+                : dashboardPanelData.data.type == "hostmap"
+                  ? t("panel.hostmapGroupBy")
+                  : t("panel.breakdown")
             }}
             <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip side="top" align="center">
@@ -206,6 +212,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
                 >
+                <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
+                  t("panel.breakdownTooltipStateTimeline")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'hostmap'">{{
+                  t("panel.breakdownTooltipHostmap")
+                }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
             </OTooltip>
@@ -637,6 +649,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <PromQLBuilderOptions :dashboardPanelData="dashboardPanelData" />
   </div>
+  <PromQLBuilderOptions
+    v-else-if="promqlMode && shouldShowPromQLQueryType(dashboardPanelData)"
+    :dashboardPanelData="dashboardPanelData"
+    query-type-only
+  />
 
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardMapsQueryBuilder :dashboardData="dashboardData" />
@@ -663,6 +680,7 @@ import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
+import { shouldShowPromQLQueryType } from "@/utils/dashboard/configUtils";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import {
   applyPromqlSeed,
@@ -680,6 +698,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 
 // Minimal shape of a dashboard panel query slot as read by the PromQL builder.
 interface DashboardQuerySlot {
@@ -754,6 +773,7 @@ export default defineComponent({
     // hardcoded English; recompute them here through t() so they respect the
     // active locale (mirrors the composable's type/pivot branching).
     const currentXLabel = computed(() => {
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapEntity");
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
       }
@@ -763,6 +783,7 @@ export default defineComponent({
     });
 
     const currentYLabel = computed(() => {
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapValue");
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
       }
@@ -992,6 +1013,9 @@ export default defineComponent({
                 case "metric":
                   maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
                   break;
+                case "hostmap":
+                  maxAllowedAxisFields = targetAxis === "breakdown" ? HOSTMAP_MAX_GROUP_LEVELS : 1;
+                  break;
                 case "table":
                   maxAllowedAxisFields = 0;
                   break;
@@ -1144,6 +1168,8 @@ export default defineComponent({
         case "scatter":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
+        case "state-timeline":
+        case "hostmap":
           return t("dashboard.oneFieldMessage");
         case "gauge":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
@@ -1158,6 +1184,8 @@ export default defineComponent({
         case "area-stacked":
         case "h-stacked":
           return t("dashboard.twoFieldsMessage");
+        case "hostmap":
+          return t("dashboard.hostmapGroupByHint");
         default:
           return t("dashboard.zeroOrOneFieldMessage");
       }
@@ -1172,6 +1200,8 @@ export default defineComponent({
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
+        case "state-timeline":
+        case "hostmap":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1520,6 +1550,7 @@ export default defineComponent({
     );
 
     return {
+      shouldShowPromQLQueryType,
       showXAxis,
       t,
       FIELD_FUNCTION_MENU_WIDTH,

@@ -66,13 +66,17 @@ const routes = ["logs", "metrics", "traces", "profiles", "recommended", "curl"].
   component: { template: "<div />" },
 }));
 
-const makeStore = (zoConfig: Record<string, unknown> = {}) =>
+const makeStore = (
+  zoConfig: Record<string, unknown> = {},
+  org: Record<string, unknown> = {},
+  organizations: unknown[] = [],
+) =>
   createStore({
     state: {
       API_ENDPOINT: "https://api.openobserve.ai",
       zoConfig: { cluster_name: "US1", ...zoConfig },
-      selectedOrganization: { identifier: "acme-prod" },
-      organizations: [],
+      selectedOrganization: { identifier: "acme-prod", ...org },
+      organizations,
       organizationData: {
         organizationPasscode: "secret-token-value",
         orgTokens: [{ name: "default", token: "secret-token-value" }],
@@ -84,13 +88,18 @@ let wrapper: VueWrapper;
 let router: ReturnType<typeof createRouter>;
 const mountBar = (
   props: Record<string, unknown> = {},
-  opts: { askAi?: (q: string) => void; zoConfig?: Record<string, unknown> } = {},
+  opts: {
+    askAi?: (q: string) => void;
+    zoConfig?: Record<string, unknown>;
+    org?: Record<string, unknown>;
+    organizations?: unknown[];
+  } = {},
 ) => {
   router = createRouter({ history: createMemoryHistory(), routes });
   wrapper = mount(FirstEventStatus, {
     props: { org: "acme-prod", guideName: "Kubernetes", ...props },
     global: {
-      plugins: [i18n, makeStore(opts.zoConfig), router],
+      plugins: [i18n, makeStore(opts.zoConfig, opts.org, opts.organizations), router],
       provide: opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {},
     },
   });
@@ -255,6 +264,31 @@ describe("FirstEventStatus — received", () => {
     expect(
       vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "first_event_detected"),
     ).toHaveLength(2);
+  });
+
+  it("reports seconds_since_signup from the org's creation time in microseconds", async () => {
+    mountBar({}, { org: { created_at: (NOW - 3_600_000) * 1000 } });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(analytics.track).toHaveBeenCalledWith("first_event_detected", {
+      stream_type: "logs",
+      seconds_since_signup: 3600,
+    });
+  });
+
+  it("falls back to the org list for the creation time", async () => {
+    mountBar(
+      {},
+      { organizations: [{ identifier: "acme-prod", created_at: (NOW - 90_000) * 1000 }] },
+    );
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(analytics.track).toHaveBeenCalledWith("first_event_detected", {
+      stream_type: "logs",
+      seconds_since_signup: 90,
+    });
   });
 
   it("opens Logs on the stream with the thirty minutes around the first record", async () => {

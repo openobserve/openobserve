@@ -61,6 +61,14 @@ impl ObjectStoreExt for CacheFS {
         storage::add_account(&key, acc).await;
     }
 
+    async fn remove_account(&self, key: &str) {
+        storage::accounts::remove_account(key).await;
+    }
+
+    fn has_account(&self, name: &str) -> bool {
+        storage::has_account(name)
+    }
+
     async fn put(
         &self,
         _account: &str,

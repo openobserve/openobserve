@@ -66,6 +66,62 @@ describe("usePanelAggregation", () => {
       expect(panelData.data.htmlContent).toBe("some html");
     });
 
+    describe("state-timeline chart type", () => {
+      it("drops a count y and keeps only the first other y, read with max", () => {
+        const panelData = makePanelData("state-timeline");
+        panelData.data.queries[0].fields.y = [
+          { functionName: "count", args: [{ type: "field" }] },
+          { functionName: null, args: [{ type: "field" }, { type: "extra" }] },
+          { functionName: "min", args: [{ type: "field" }] },
+        ];
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        const y = panelData.data.queries[0].fields.y;
+        expect(y.map((item: any) => item.functionName)).toEqual(["max"]);
+        expect(y[0].args).toHaveLength(1);
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+
+      it("clears PromQL time shifts too, though PromQL keeps its fields", () => {
+        const panelData = makePanelData("state-timeline", "promql");
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+    });
+
+    describe("hostmap chart type", () => {
+      it("drops a time-bucket entity, keeps one value and two group levels", () => {
+        const panelData: any = makePanelData("hostmap");
+        panelData.data.config = { color: { mode: "palette-classic-by-series", fixedColor: [] } };
+        const query = panelData.data.queries[0];
+        query.fields.x = [{ functionName: "histogram" }, { functionName: null, alias: "gpu" }];
+        query.fields.y = [
+          { functionName: null, args: [{ type: "field" }, { type: "extra" }] },
+          { functionName: "avg", args: [{ type: "field" }] },
+        ];
+        query.fields.breakdown = [{ alias: "a" }, { alias: "b" }, { alias: "c" }];
+        query.config.time_shift = [{ offSet: "1h" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(query.fields.x).toEqual([{ functionName: null, alias: "gpu" }]);
+        expect(query.fields.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(query.fields.breakdown.map((item: any) => item.alias)).toEqual(["a", "b"]);
+        expect(query.config.time_shift).toEqual([]);
+        expect(panelData.data.config.color.mode).toBe("continuous-green-yellow-red");
+      });
+
+      it("keeps a value scale the panel already chose, and PromQL fields untouched", () => {
+        const panelData: any = makePanelData("hostmap", "promql");
+        panelData.data.config = { color: { mode: "continuous-temperature", fixedColor: ["#fff"] } };
+        panelData.data.queries[0].fields.y = [{ functionName: "avg", args: [] }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.config.color.mode).toBe("continuous-temperature");
+        expect(panelData.data.queries[0].fields.y).toHaveLength(1);
+      });
+    });
+
     // ── heatmap ──────────────────────────────────────────────────────────
 
     describe("heatmap chart type", () => {

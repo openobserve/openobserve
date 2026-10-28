@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orders desk</title>
+  <!--O2_CONFIG-->
+  <script src="/sdk/openobserve-rum.js"></script>
+  <script src="/rum-init.js"></script>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <header class="bar" data-test="mt-heading"><strong>Orders desk</strong><span>Tab A</span></header>
+  <main>
+    <section class="panel">
+      <p data-test="mt-orders-count">Orders placed: 0</p>
+      <button data-test="mt-place-order-btn" type="button">Place order</button>
+    </section>
+    <section class="panel">
+      <h2>Recent orders</h2>
+      <ul data-test="mt-orders-list"></ul>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var count = 0;
+      var list = document.querySelector('[data-test="mt-orders-list"]');
+      var label = document.querySelector('[data-test="mt-orders-count"]');
+      document.querySelector('[data-test="mt-place-order-btn"]').addEventListener('click', function () {
+        count += 1;
+        label.textContent = 'Orders placed: ' + count;
+        var item = document.createElement('li');
+        item.setAttribute('data-test', 'mt-order-item');
+        item.textContent = 'Order #' + count + ' confirmed';
+        list.insertBefore(item, list.firstChild);
+        // Removals as well as additions, so a misdecoded tab has nodes to detach.
+        while (list.children.length > 3) list.removeChild(list.lastChild);
+      });
+    })();
+  </script>
+</body>
+</html>

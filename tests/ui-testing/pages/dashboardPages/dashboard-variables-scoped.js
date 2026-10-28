@@ -572,6 +572,17 @@ export default class DashboardVariablesScoped {
   }
 
   /**
+   * Assert the dashboard header Refresh button is visible, enabled, and carries
+   * the visible "Refresh" text label (the icon -> labelled change).
+   */
+  async expectDashboardRefreshLabel() {
+    const btn = this.getDashboardRefreshBtnLocator();
+    await expect(btn).toBeVisible();
+    await expect(btn).toContainText("Refresh");
+    await expect(btn).toBeEnabled();
+  }
+
+  /**
    * Get the Query Inspector dialog locator
    * @returns {import('@playwright/test').Locator}
    */

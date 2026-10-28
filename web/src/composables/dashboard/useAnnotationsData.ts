@@ -95,15 +95,15 @@ export const useAnnotationsData = (
   });
 
   const panelsList = ref<any[]>([]);
+  // h-bar and h-stacked never draw annotations, so they are not offered as targets.
   const chartTypes = [
     "area",
     "area-stacked",
     "bar",
-    "h-bar",
     "line",
     "scatter",
     "stacked",
-    "h-stacked",
+    "state-timeline",
   ];
   const processTabPanels = (dashboardData: any): any[] => {
     if (!dashboardData?.tabs || !Array.isArray(dashboardData.tabs)) {

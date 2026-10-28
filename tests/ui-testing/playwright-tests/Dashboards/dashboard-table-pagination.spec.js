@@ -1058,10 +1058,8 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     testLogger.info('Verified pagination works for PromQL table chart');
 
-    // The router guard (onBeforeRouteLeave) fires window.confirm when leaving with
-    // unsaved changes. Accept it so navigation to ViewDashboard completes.
-    page.once('dialog', dialog => dialog.accept());
-    await pm.dashboardPanelActions.discardPanelBtn.click();
+    // Discard opens the in-app leave dialog for an edited panel; discardPanel answers it.
+    await pm.dashboardPanelActions.discardPanel();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
@@ -1115,11 +1113,10 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const queryEditor = pm.chartTypeSelector.queryEditor;
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
-    // Focus on the editor and enter a PromQL query using keyboard.type for reliable Monaco input
+    // Fill the Monaco input directly; typing lets autocomplete corrupt the query
     await queryEditor.getByRole('code').click();
-    await page.keyboard.press('Control+a');
-    await page.keyboard.type('cpu_usage{}');
-    await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
+    // Each seeded cpu_usage series has only a few samples, so one legend's rows can fit a single page; the sum has a row per step.
+    await queryEditor.locator('.inputarea').fill('sum(cpu_usage)');
 
     // Apply
     await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
@@ -1133,6 +1130,10 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const rowsPerPageInput = pm.dashboardPanelConfigs.rowsPerPageWrapper;
     await pm.dashboardPanelConfigs.setRowsPerPage("10");
 
+    // The server's auto step can leave fewer than 12 rows on freshly seeded data; 1s guarantees more than one page.
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(pm.dashboardPanelConfigs.stepValue);
+    await pm.dashboardPanelConfigs.stepValue.locator('[data-test$="-field"]').fill("1s");
+
     // Apply changes and wait for table data to load
     await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
 
@@ -1143,7 +1144,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     // Rows render directly in tbody, keyed data-test="o2-table-row-<index>"; data is required for pagination to render
     const tableRows = tablePanel.locator('tbody tr[data-test^="o2-table-row-"]');
-    await expect(tableRows.first(), 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBeVisible({ timeout: 15000 });
+    await expect(tableRows.first(), 'PromQL query "sum(cpu_usage)" must return data rows for pagination test - check metrics ingestion').toBeVisible({ timeout: 15000 });
 
     // Wait for the table bottom container which holds all pagination controls
     // (PromQL with legend uses a custom bottom slot that also has this data-test)
@@ -1157,14 +1158,22 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const paginationInfo = pm.dashboardPanelConfigs.tableRowCount;
     await expect(paginationInfo).toHaveText(/^\s*\d+-\d+\s+of\s+\d+\s*$/, { timeout: 15000 });
 
-    // Only the footer's presence and range shape are checked; the page-size count is wrong today (#15544) and its fix adds the exact assertion.
-    const paginationText = await paginationInfo.textContent();
-    expect(paginationText.trim()).toMatch(/^\d+-\d+\s+of\s+\d+$/);
+    // The page size must bound the range: "1-10 of N" with N > 10, never "1-N of N" (#15544).
+    const paginationText = (await paginationInfo.textContent()).trim();
+    const match = paginationText.match(/^1-(\d+)\s+of\s+(\d+)$/);
+    expect(match, `unexpected footer text "${paginationText}"`).not.toBeNull();
+    const total = Number(match[2]);
+    // The run's cpu_usage series count varies, so the second page is only checked when one exists.
+    expect(Number(match[1])).toBe(Math.min(10, total));
 
-    // Verify we're on the first page (starts with "1-")
-    expect(paginationText.trim().startsWith('1-')).toBe(true);
+    if (total > 10) {
+      const nextPage = page.locator('[data-test="dashboard-table-pagination-next-page"]');
+      await expect(nextPage).toBeVisible();
+      await nextPage.click();
+      await expect(paginationInfo).toHaveText(new RegExp(`^\\s*11-\\d+\\s+of\\s+${total}\\s*$`));
+    }
 
-    testLogger.info(`Verified PromQL table pagination: ${paginationText.trim()}`);
+    testLogger.info(`Verified PromQL table pagination: ${paginationText}`);
 
     // Clean up - save panel first before navigating back
     await pm.dashboardPanelActions.savePanel();

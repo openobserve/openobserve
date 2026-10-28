@@ -11,6 +11,7 @@
  */
 
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const BASE = process.env.ZO_BASE_URL || 'http://localhost:5080';
 const STREAM = 'alerts_p0_stream';
@@ -25,7 +26,7 @@ const uniq = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36)
 
 function urls() {
   const org = getOrgIdentifier();
-  return { org, v1: `${BASE}/api/${org}`, v2: `${BASE}/api/v2/${org}` };
+  return { org, v1: `${BASE}/api/${org}`, v2: `${BASE}/api/v2/${org}`, ingest: `${ingestBase(BASE)}/api/${org}` };
 }
 
 /** page.request wrapper that always carries Basic auth. */
@@ -321,7 +322,7 @@ async function seedAlertFixtures(page) {
   await api(page, 'put', `${v1}/alerts/destinations/${DEST}`, destination).catch(() => {});
 
   // city = group key, latency = the measure; three groups so a multi-alert can fan out.
-  await api(page, 'post', `${v1}/${STREAM}/_json`, [
+  await api(page, 'post', `${urls().ingest}/${STREAM}/_json`, [
     { city: 'bangalore', latency: 890, status: 500 },
     { city: 'mumbai', latency: 950, status: 500 },
     { city: 'delhi', latency: 990, status: 500 },
@@ -336,7 +337,7 @@ async function createAlertFolder(page, name) {
 
 /** Ingest rows into a stream (creates it on first write). */
 async function ingest(page, stream, rows) {
-  return api(page, 'post', `${urls().v1}/${stream}/_json`, rows);
+  return api(page, 'post', `${urls().ingest}/${stream}/_json`, rows);
 }
 
 /**

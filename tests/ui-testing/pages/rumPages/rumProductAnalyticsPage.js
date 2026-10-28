@@ -1,6 +1,10 @@
 import { expect } from '@playwright/test';
 
 const SUB_TABS = ['overview', 'funnels', 'paths', 'retention', 'events'];
+// Only the Trends panel's renderer streams; every other analytics query uses _search.
+const TRENDS_STREAM = /\/api\/[^/]+\/_search_stream(\?|$)/;
+// PathsFlow.vue's sankey series box: the canvas holds no DOM per box or band, so they are found by these offsets.
+const PATHS_SANKEY = { left: 8, right: 180, nodeWidth: 10 };
 
 /** The analytics URL codec: base64url of the JSON definition with '.' padding (b64EncodeUnicode). */
 export function encodeDef(value) {
@@ -86,6 +90,8 @@ export class RumProductAnalyticsPage {
         this.retentionGrid = page.locator('[data-test="rum-analytics-retention-grid"]');
         this.retentionUnlock = page.locator('[data-test="rum-analytics-retention-unlock"]');
         this.retentionCellDrawer = page.locator('[data-test="rum-analytics-retention-cell-drawer"]');
+        // Cohort ids count periods from the range start, so a seed in the last few hours is not cohort 0.
+        this.firstRetentionCell = this.retentionGrid.locator('[data-test^="rum-analytics-retention-cell-"][aria-haspopup="dialog"]').first();
 
         this.namedEventsList = page.locator('[data-test="rum-analytics-events-list"]');
         this.eventEditor = page.locator('[data-test="rum-analytics-event-editor"]');
@@ -112,6 +118,8 @@ export class RumProductAnalyticsPage {
         this.kpiSessions = page.locator('[data-test="rum-analytics-kpi-sessions"]');
 
         this.trendsClearBtn = page.locator('[data-test="rum-analytics-trends-clear-btn"]');
+        this.trendsLoading = page.locator('[data-test="rum-analytics-trends-loading"]');
+        this.trendsCanvas = this.trends.locator('canvas');
 
         this.funnelAlertBtn = page.locator('[data-test="rum-analytics-funnel-alert-btn"]');
         this.funnelLeftOut = page.locator('[data-test="rum-analytics-funnel-left-out"]');
@@ -124,6 +132,7 @@ export class RumProductAnalyticsPage {
         this.funnelSavedName = page.locator('[data-test="rum-analytics-funnel-saved-name"]');
         this.funnelSaveBtn = page.locator('[data-test="rum-analytics-funnel-save-btn"]');
         this.funnelSaveBtnHolder = page.locator('span:has(> [data-test="rum-analytics-funnel-save-btn"])');
+        this.tooltipBubble = page.locator('[data-test="o-tooltip-content"]');
         this.saveFunnelDialog = page.locator('[data-test="rum-analytics-save-funnel-dialog"]');
         this.saveFunnelNameField = this.saveFunnelDialog.locator('[data-test="rum-analytics-save-funnel-name-field"]');
         this.saveFunnelPrimaryBtn = this.saveFunnelDialog.locator('[data-test="o-dialog-primary-btn"]');
@@ -135,12 +144,21 @@ export class RumProductAnalyticsPage {
         this.dropoffErrorDropped = page.locator('[data-test="rum-analytics-dropoff-error-dropped"]');
         this.dropoffErrorConverted = page.locator('[data-test="rum-analytics-dropoff-error-converted"]');
         this.dropoffSessionsCap = page.locator('[data-test="rum-analytics-dropoff-sessions-cap"]');
+        this.dropoffDurationCells = this.dropoffDrawer.locator('[data-test="o2-table-cell-duration"]');
 
         this.pathsEmpty = page.locator('[data-test="rum-analytics-paths-empty"]');
         this.pathsAnchorTrigger = page.locator('[data-test="rum-analytics-paths-anchor-select-trigger"]');
         this.pathsAnchorOptions = page.locator('[data-test="rum-analytics-paths-anchor-select-option"]');
         this.branchSessionsCap = page.locator('[data-test="rum-analytics-paths-branch-sessions-cap"]');
         this.branchSessionRow0Open = page.locator('[data-test="rum-analytics-paths-branch-sessions-row-0-open"]');
+        this.pathsFlowCanvas = this.pathsFlow.locator('canvas').first();
+        // Every box and band tooltip has a "N sessions" line, and nothing else in the chart is DOM text.
+        this.pathsTooltipCount = this.pathsFlow.getByText(/^[\d,]+ sessions?$/);
+        this.branchFunnelBtn = page.locator('[data-test="rum-analytics-paths-branch-funnel-btn"]');
+        this.branchUserCells = this.branchDrawer.locator(
+            '[data-test^="rum-analytics-paths-branch-sessions-row-"]:not([data-test$="-replay"]):not([data-test$="-open"])',
+        );
+        this.dropoffPathsBtn = page.locator('[data-test="rum-analytics-dropoff-paths-btn"]');
 
         this.retentionGranularityTrigger = page.locator('[data-test="rum-analytics-retention-granularity-trigger"]');
         this.retentionModeAfter = page.locator('[data-test="rum-analytics-retention-mode-after"]');
@@ -303,6 +321,10 @@ export class RumProductAnalyticsPage {
         return this.page.locator(`[data-test="rum-analytics-funnel-step-${i}"]`);
     }
 
+    stepDeletedTag(i) {
+        return this.page.locator(`[data-test="rum-analytics-funnel-step-${i}-deleted"]`);
+    }
+
     async funnelCounts(n) {
         const out = [];
         for (let i = 0; i < n; i++) {
@@ -377,6 +399,12 @@ export class RumProductAnalyticsPage {
         await expect(this.exclusionsDrawer).toBeVisible();
     }
 
+    /** Opens the Paths cohort chip's popover, which holds the drop-off condition and its session count. */
+    async openPathsCohort() {
+        await this.pathsSessionFilter.click();
+        await expect(this.pathsCohortPopover).toBeVisible();
+    }
+
     async openDropoff(i) {
         await expect(this.dropoffBtn(i)).toHaveAttribute('aria-haspopup', 'dialog');
         await this.dropoffBtn(i).click();
@@ -435,7 +463,7 @@ export class RumProductAnalyticsPage {
     /** Creates a page event from the list's New event and lands back on the list. */
     async createPageEvent(name, page) {
         await this.openNamedEvents();
-        await this.newEventBtn.click();
+        await this.clickNewEvent();
         await this.fillPageEvent(name, page);
         await this.eventSaveBtn.click();
         await expect(this.namedEventsList).toBeVisible({ timeout: 20000 });
@@ -621,6 +649,110 @@ export class RumProductAnalyticsPage {
         await expect(this.pathsTopTable).toBeVisible({ timeout: 30000 });
     }
 
+    /** Vertical pixel runs (CSS px from the canvas top) at x in the Paths chart: opaque boxes, or any band with `minAlpha`. */
+    async pathsRunsAt(x, minAlpha) {
+        return this.pathsFlowCanvas.evaluate((el, { x, minAlpha }) => {
+            const scale = el.width / el.getBoundingClientRect().width;
+            const { data } = el.getContext('2d').getImageData(Math.round(x * scale), 0, 1, el.height);
+            const runs = [];
+            let start = -1;
+            for (let y = 0; y <= el.height; y++) {
+                const on = y < el.height && data[y * 4 + 3] >= minAlpha;
+                if (on && start < 0) start = y;
+                if (!on && start >= 0) {
+                    if (y - start > 2) runs.push((start + y) / 2 / scale);
+                    start = -1;
+                }
+            }
+            return runs;
+        }, { x, minAlpha });
+    }
+
+    /** The x (CSS px) of a depth column's box centre and of the gap before it, for a chart `maxDepth` steps deep. */
+    async pathsColumnX(depth, maxDepth) {
+        const { width } = await this.pathsFlowCanvas.boundingBox();
+        const { left, right, nodeWidth } = PATHS_SANKEY;
+        const kx = (width - left - right - nodeWidth) / maxDepth;
+        return { box: left + depth * kx + nodeWidth / 2, gap: left + depth * kx - (kx - nodeWidth) / 2 };
+    }
+
+    /** First line of the tooltip the Paths chart shows with the pointer at (x, y), or '' when none appears. */
+    async pathsTooltipAt(x, y) {
+        const box = await this.pathsFlowCanvas.boundingBox();
+        await this.page.mouse.move(0, 0);
+        // A tooltip still showing for the previous point would be read as this one's.
+        await expect(this.pathsTooltipCount).toBeHidden({ timeout: 5000 });
+        await this.page.mouse.move(box.x + x, box.y + y);
+        const shown = await this.pathsTooltipCount.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false);
+        return shown ? (await this.pathsFlow.innerText()).split('\n')[0].trim() : '';
+    }
+
+    /** Clicks the first spot at x whose tooltip's first line passes `matches`; runs are probed top to bottom. */
+    async clickPathsWhere(x, runs, matches, what) {
+        const seen = [];
+        for (const y of runs) {
+            const line = await this.pathsTooltipAt(x, y);
+            seen.push(line);
+            if (matches(line)) {
+                const box = await this.pathsFlowCanvas.boundingBox();
+                await this.page.mouse.click(box.x + x, box.y + y);
+                return;
+            }
+        }
+        throw new Error(`The Paths chart shows no ${what}; tooltips seen: ${JSON.stringify(seen)}`);
+    }
+
+    /** Waits until the Paths chart has stopped animating, so its boxes are where they will stay. */
+    async waitForPathsSettled(maxDepth) {
+        let previous = '';
+        await expect
+            .poll(async () => {
+                const xs = await Promise.all([...Array(maxDepth + 1).keys()].map((d) => this.pathsColumnX(d, maxDepth)));
+                const now = JSON.stringify(await Promise.all(xs.map(({ box }) => this.pathsRunsAt(box, 200))));
+                const settled = now === previous && !now.includes('[]');
+                previous = now;
+                return settled;
+            }, { timeout: 15000, intervals: [400] })
+            .toBe(true);
+    }
+
+    /** Clicks the band from page `from` into page `to` at `depth`; `maxDepth` is the deepest column the chart draws. */
+    async clickPathsBand(from, to, depth, maxDepth) {
+        await this.waitForPathsSettled(maxDepth);
+        const { gap } = await this.pathsColumnX(depth, maxDepth);
+        const runs = await this.pathsRunsAt(gap, 40);
+        await this.clickPathsWhere(gap, runs, (line) => line === `${from} → ${to}`, `band ${from} → ${to}`);
+    }
+
+    /** The user label of every row in the open branch drawer, once it lists `count` rows. */
+    async branchUserLabels(count) {
+        await expect(this.branchUserCells).toHaveCount(count, { timeout: 30000 });
+        // The cell's first line is the user label; the second says when the session reached the step.
+        return this.branchUserCells.evaluateAll((cells) => cells.map((c) => c.firstElementChild?.textContent.trim() ?? ''));
+    }
+
+    /** From an open drop-off drawer, opens Paths filtered to the sessions that dropped there. */
+    async openDroppedSessionsPaths() {
+        await this.dropoffPathsBtn.click();
+        await expect(this.page).toHaveURL(/\/product-analytics\/paths/, { timeout: 30000 });
+        await expect(this.pathsSessionFilter).toBeVisible({ timeout: 30000 });
+    }
+
+    /** Builds a funnel from the open branch drawer's path and lands on the funnel builder. */
+    async buildFunnelFromBranch() {
+        await expect(this.branchFunnelBtn).toBeEnabled({ timeout: 30000 });
+        await this.branchFunnelBtn.click();
+        await expect(this.page).toHaveURL(/\/product-analytics\/funnels/, { timeout: 30000 });
+    }
+
+    /** Clicks the box of page `key` at `depth`; `maxDepth` is the deepest column the chart draws. */
+    async clickPathsBox(key, depth, maxDepth) {
+        await this.waitForPathsSettled(maxDepth);
+        const { box } = await this.pathsColumnX(depth, maxDepth);
+        const runs = await this.pathsRunsAt(box, 200);
+        await this.clickPathsWhere(box, runs, (line) => line.startsWith(`${key} · `), `box ${key} at depth ${depth}`);
+    }
+
     retentionGranularityOption(value) {
         return this.page.locator(`[data-test="rum-analytics-retention-granularity-option"][data-test-value="${value}"]`);
     }
@@ -659,11 +791,17 @@ export class RumProductAnalyticsPage {
         await this.page.keyboard.press('Tab');
     }
 
+    /** Clicks New event once the shell's loads settle: the URL re-sync they end with cancels a New event push still loading the editor. */
+    async clickNewEvent() {
+        await expect(this.newEventBtn).toBeEnabled({ timeout: 20000 });
+        await this.waitForNetworkQuiet();
+        await this.newEventBtn.click();
+    }
+
     /** Opens a new, empty named event from the list's New event button. */
     async openNewEventEditor() {
         await this.openNamedEvents();
-        await expect(this.newEventBtn).toBeEnabled({ timeout: 20000 });
-        await this.newEventBtn.click();
+        await this.clickNewEvent();
         await expect(this.eventEditor).toBeVisible({ timeout: 20000 });
         await expect(this.eventNameField).toBeVisible({ timeout: 20000 });
     }
@@ -696,9 +834,31 @@ export class RumProductAnalyticsPage {
     /** The tooltip the Save button's holder shows on hover. */
     async saveBtnTooltip() {
         await this.funnelSaveBtnHolder.hover();
-        const tip = this.page.getByRole('tooltip');
-        await expect(tip).toBeVisible({ timeout: 10000 });
-        return tip;
+        await expect(this.tooltipBubble).toBeVisible({ timeout: 10000 });
+        return this.tooltipBubble;
+    }
+
+    /** Holds the Trends query until `release()`; `sent` resolves once the panel has asked for its data. */
+    async holdTrendsQuery() {
+        let open;
+        const gate = new Promise((resolve) => {
+            open = resolve;
+        });
+        const handler = async (route) => {
+            await gate;
+            await route.continue().catch(() => {});
+        };
+        const sent = this.page.waitForRequest(TRENDS_STREAM, { timeout: 30000 });
+        // A caller that fails before awaiting `sent` must not leave an unhandled rejection behind.
+        sent.catch(() => {});
+        await this.page.route(TRENDS_STREAM, handler);
+        return {
+            sent,
+            release: async () => {
+                open();
+                await this.page.unroute(TRENDS_STREAM, handler);
+            },
+        };
     }
 
     /** The OTooltip `target` shows on hover; reka's role="tooltip" node is visually hidden, so match the content. */
@@ -725,6 +885,13 @@ export class RumProductAnalyticsPage {
 
     async kpiTextSeen() {
         return this.page.evaluate(() => window.__kpiTextSeen === true);
+    }
+
+    /** The value a KPI tile shows (e.g. `3`, `2.0`, `50.0%`), or null while it is a skeleton. */
+    async kpiValue(key) {
+        // The value and its label share one text node run ("3Sessions"), so the value is the leading number.
+        const text = await this.page.locator(`[data-test="rum-analytics-kpi-${key}"]`).textContent({ timeout: 5000 }).catch(() => '');
+        return (text || '').match(/^\s*([\d.,]+%?)/)?.[1] ?? null;
     }
 
     /** Text of the whole page; regression checks assert a raw server error never reaches it. */

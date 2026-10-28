@@ -153,3 +153,57 @@ describe("RealUserMonitoring tabs", () => {
     expect(wrapper!.find('[role="tab"]').exists()).toBe(false);
   });
 });
+
+describe("RealUserMonitoring without replay data", () => {
+  let wrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("loads the shell without an unhandled rejection when _sessionreplay is absent", async () => {
+    streamGate = Promise.resolve();
+    streams._rumdata = { name: "_rumdata", schema: [{ name: "application_id" }] };
+    streams._sessionreplay = undefined;
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    const router = makeRouter();
+    await router.push("/rum/sessions");
+    wrapper = mount({ template: "<router-view />" }, { global: { plugins: [router, store] } });
+    for (let i = 0; i < 4; i++) await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.name).toBe("Sessions");
+  });
+});
+
+describe("RealUserMonitoring with a failing _rumdata lookup", () => {
+  let wrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("loads the shell without an unhandled rejection when only _sessionreplay exists", async () => {
+    streamGate = Promise.resolve();
+    streams._rumdata = undefined;
+    streams._sessionreplay = { name: "_sessionreplay", schema: [{ name: "session_id" }] };
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    const router = makeRouter();
+    await router.push("/rum/sessions");
+    wrapper = mount({ template: "<router-view />" }, { global: { plugins: [router, store] } });
+    for (let i = 0; i < 4; i++) await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.name).toBe("Sessions");
+  });
+});

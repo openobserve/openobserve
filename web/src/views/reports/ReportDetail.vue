@@ -166,7 +166,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { reportByIdQuery } from "@/services/reports.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { isOverdue, lastRunChip } from "@/utils/reports/reportRun";
+import { RUN_TIME_FORMAT, isOverdue, lastRunChip } from "@/utils/reports/reportRun";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -232,7 +232,7 @@ const subtitle = computed<I18nText>(() => {
   if (r.next_run_at && r.enabled) {
     parts.push(
       t("reports.history.nextRunAt", {
-        time: raw(formatTimestampInTimezone(r.next_run_at, "ddd D MMM, HH:mm", tz)),
+        time: raw(formatTimestampInTimezone(r.next_run_at, RUN_TIME_FORMAT, tz)),
       }),
     );
   }

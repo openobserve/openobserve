@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { CLOSED_TOKEN_RE, OPEN_TOKEN_RE, openTokenAt, tokenAtCaret } from "./useTemplateSuggest";
+import {
+  CLOSED_TOKEN_RE,
+  OPEN_TOKEN_RE,
+  openTokenAt,
+  tokenAtCaret,
+  tokenFor,
+} from "./useTemplateSuggest";
 
 describe("CLOSED_TOKEN_RE", () => {
   function names(text: string) {
@@ -88,5 +94,64 @@ describe("tokenAtCaret", () => {
   it("is stateless across calls despite the global flag", () => {
     expect(tokenAtCaret("{{a}} {{b}}", 8)).toBe("b");
     expect(tokenAtCaret("{{a}} {{b}}", 1)).toBe("a");
+  });
+});
+
+describe("single-brace delimiter", () => {
+  it("opens on a lone `{`", () => {
+    expect(openTokenAt("{ser", 4, "single")).toEqual({ query: "ser", start: 0 });
+    expect(openTokenAt("x {", 3, "single")).toEqual({ query: "", start: 2 });
+  });
+
+  it("does not open inside `${` or `{{`", () => {
+    expect(openTokenAt("$${en", 5, "single")).toBeNull();
+    expect(openTokenAt("{{en", 4, "single")).toBeNull();
+  });
+
+  it("keeps the double-brace default unchanged", () => {
+    expect(openTokenAt("{ser", 4)).toBeNull();
+    expect(tokenFor("a")).toBe("{{a}}");
+  });
+
+  it("finds the `{name}` token under the caret, ignoring `{{name}}`", () => {
+    expect(tokenAtCaret("by {author}", 5, "single")).toBe("author");
+    expect(tokenAtCaret("{{author}}", 3, "single")).toBeNull();
+  });
+
+  it("formats the inserted token with one brace", () => {
+    expect(tokenFor("service", "single")).toBe("{service}");
+  });
+});
+
+describe("dollar delimiter", () => {
+  it("opens on a bare `$` and on `${`, marking the braced form", () => {
+    expect(openTokenAt("by $ra", 6, "dollar")).toEqual({ query: "ra", start: 3, braced: false });
+    expect(openTokenAt("$", 1, "dollar")).toEqual({ query: "", start: 0, braced: false });
+    expect(openTokenAt("by ${r", 6, "dollar")).toEqual({ query: "r", start: 3, braced: true });
+  });
+
+  it("takes a `:format` query only inside braces", () => {
+    expect(openTokenAt("${rack:cs", 9, "dollar")).toEqual({
+      query: "rack:cs",
+      start: 0,
+      braced: true,
+    });
+    expect(openTokenAt("$rack:cs", 8, "dollar")).toBeNull();
+  });
+
+  it("does not open past a closed token or a space", () => {
+    expect(openTokenAt("${rack}", 7, "dollar")).toBeNull();
+    expect(openTokenAt("$rack x", 7, "dollar")).toBeNull();
+  });
+
+  it("finds bare, braced and formatted tokens under the caret", () => {
+    expect(tokenAtCaret("in $rack now", 5, "dollar")).toBe("rack");
+    expect(tokenAtCaret("${rack:csv}", 3, "dollar")).toBe("rack");
+  });
+
+  it("inserts bare names bare unless braced, and formatted names always braced", () => {
+    expect(tokenFor("rack", "dollar")).toBe("$rack");
+    expect(tokenFor("rack", "dollar", true)).toBe("${rack}");
+    expect(tokenFor("rack:pipe", "dollar")).toBe("${rack:pipe}");
   });
 });

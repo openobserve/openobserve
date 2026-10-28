@@ -189,6 +189,8 @@ struct ConfigResponse<'a> {
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
+    max_dashboard_state_timeline_series: usize,
+    max_dashboard_hostmap_cells: usize,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
@@ -223,6 +225,7 @@ struct ConfigResponse<'a> {
     incidents_enabled: bool,
     incidents_rca_enabled: bool,
     downtimes_enabled: bool,
+    fleet_enabled: bool,
     alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
@@ -230,6 +233,10 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Hides the publish button and the Public links view when the feature is off.
+    public_dashboards_enabled: bool,
+    /// The clamped operator refresh floor; the share form shows each range's floor from it.
+    public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
@@ -339,7 +346,7 @@ impl Rum {
             site: cfg.rum.site.to_string(),
             service: cfg.rum.service.to_string(),
             env: cfg.rum.env.to_string(),
-            version: cfg.rum.version.to_string(),
+            version: config::VERSION.to_string(),
             organization_identifier: cfg.rum.organization_identifier.to_string(),
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
@@ -521,6 +528,7 @@ pub async fn zo_config(
         o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
     );
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
+    let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
     let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
@@ -617,6 +625,8 @@ pub async fn zo_config(
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
+        max_dashboard_state_timeline_series: cfg.limit.max_dashboard_state_timeline_series,
+        max_dashboard_hostmap_cells: cfg.limit.max_dashboard_hostmap_cells,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
@@ -643,6 +653,7 @@ pub async fn zo_config(
         incidents_enabled,
         incidents_rca_enabled,
         downtimes_enabled,
+        fleet_enabled,
         alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
@@ -650,6 +661,8 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        public_dashboards_enabled: cfg.public_dashboards.enabled,
+        public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
@@ -1211,7 +1224,6 @@ pub async fn redirect(
 
     match exchange_code(code).await {
         Ok(login_data) => {
-            let login_url;
             let access_token = login_data.access_token;
             let keys = get_dex_jwks().await;
             let token_ver = verify_decode_token(
@@ -1222,7 +1234,7 @@ pub async fn redirect(
                 true,
             );
             let id_token;
-            match token_ver {
+            let login_url = match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
@@ -1284,13 +1296,13 @@ pub async fn redirect(
                                 .unwrap();
                         }
                     };
-                    login_url = format!(
+                    format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
                         url_params.unwrap_or_default()
-                    );
+                    )
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 400;
@@ -1302,7 +1314,7 @@ pub async fn redirect(
                         .body(Body::from(format!("\"{e}\"")))
                         .unwrap();
                 }
-            }
+            };
 
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
@@ -2458,6 +2470,12 @@ mod tests {
         assert!(!rum.api_version.is_empty());
     }
 
+    #[test]
+    fn test_rum_from_cfg_uses_build_version() {
+        let rum = Rum::from_cfg(get_config());
+        assert_eq!(rum.version, config::VERSION);
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_login_state_matches() {
@@ -2532,6 +2550,19 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
+        assert_eq!(json["public_dashboards_enabled"], true);
     }
 
     #[tokio::test]

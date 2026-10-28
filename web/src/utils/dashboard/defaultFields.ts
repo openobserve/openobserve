@@ -15,6 +15,9 @@
 
 // Default builder fields shared by the Add Panel and Metrics pages.
 
+// The builder's last_value has no ORDER BY, so it is not the latest sample; max reads any column type.
+export const STATE_TIMELINE_Y_FUNCTION = "max";
+
 /** Default x-axis: histogram(_timestamp). */
 export const DEFAULT_SQL_X_FIELD = () => ({
   label: "",
@@ -116,5 +119,9 @@ export const buildDefaultBuilderFields = (
   const { x, y } = buildDefaultSqlFields(streamType, groupedFields, streamName);
   // metric has no x-axis — it renders a single measure.
   if (chartType === "metric") return { x: [], y };
+  // A count is not a state; the user picks the state column.
+  if (chartType === "state-timeline") return { x, y: [] };
+  // A time bucket is not an entity; the user picks the entity field.
+  if (chartType === "hostmap") return { x: [], y };
   return { x, y };
 };

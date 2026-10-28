@@ -92,6 +92,37 @@ describe("isDatetimeChanged — relative ranges", () => {
 // Absolute range — must compare raw startTime/endTime.
 // ===========================================================================
 
+describe("isDatetimeChanged — calendar periods", () => {
+  it("re-runs when the same calendar token resolves to another window", () => {
+    const prev = {
+      startTime: 100,
+      endTime: 200,
+      relativeTimePeriod: "calendar:day:-1",
+      type: "relative",
+    };
+    expect(
+      isDatetimeChanged(prev, {
+        startTime: 100,
+        endTime: 300,
+        relativeTimePeriod: "calendar:day:-1",
+      }),
+    ).toBe(false);
+    expect(
+      isDatetimeChanged(prev, {
+        startTime: 50,
+        endTime: 150,
+        relativeTimePeriod: "calendar:day:-1",
+      }),
+    ).toBe(true);
+    expect(
+      isDatetimeChanged(
+        { ...prev, startTime: undefined as unknown as number },
+        { startTime: 50, endTime: 150, relativeTimePeriod: "calendar:day:-1" },
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("isDatetimeChanged — absolute ranges", () => {
   // Mount-replay for absolute: same boundaries → no change.
   it("returns false when absolute start/end match", () => {

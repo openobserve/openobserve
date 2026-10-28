@@ -23,7 +23,10 @@ import {
 } from "./shared/axisBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { createSeriesOverrideLookup } from "../seriesOverrides";
 import { calculateWidthText } from "../chartDimensionUtils";
+import { buildSeriesMarkLine } from "./shared/markLines";
+import { barStyleSeriesProps, barTrackMax, pinBarTrackAxis } from "../barTrack";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -36,6 +39,8 @@ export class BarConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const isHorizontal = chartType.startsWith("h-");
     const isStacked = chartType.includes("stacked");
+    const markLine = isStacked ? buildSeriesMarkLine(panelSchema) : null;
+    const seriesOverrides = createSeriesOverrideLookup(config);
 
     const series: any[] = [];
     const categories: string[] = [];
@@ -66,25 +71,7 @@ export class BarConverter implements PromQLChartConverter {
       processedData.forEach((queryData) => {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
-          queryData.timestamps.forEach(([, formatted]) => {
-            // Extract just the time portion from the formatted timestamp
-            // formatted can be Date object or ISO string
-            let timeString: string;
-            if (formatted instanceof Date) {
-              // Format as HH:MM:SS
-              const hours = String(formatted.getHours()).padStart(2, "0");
-              const minutes = String(formatted.getMinutes()).padStart(2, "0");
-              const seconds = String(formatted.getSeconds()).padStart(2, "0");
-              timeString = `${hours}:${minutes}:${seconds}`;
-            } else {
-              // ISO string - extract time portion
-              const dateStr = formatted.toString();
-              // Try to extract time (HH:MM:SS) from datetime string
-              const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
-              timeString = timeMatch ? timeMatch[1] : dateStr;
-            }
-            categories.push(timeString);
-          });
+          categoryLabels(queryData.timestamps).forEach((label) => categories.push(label));
         }
 
         queryData.series.forEach((seriesData) => {
@@ -112,7 +99,8 @@ export class BarConverter implements PromQLChartConverter {
             _panelQueryIndex: queryData.queryIndex,
             _seriesRole: queryData.seriesRole,
             type: "bar",
-            stack: "total",
+            // A past period stacks on its own, or it would add to the current totals.
+            stack: queryData.nameSuffix ? `total (${queryData.nameSuffix})` : "total",
             data,
             ...(color && { color }),
             // Label configuration (same as SQL charts)
@@ -130,7 +118,8 @@ export class BarConverter implements PromQLChartConverter {
             emphasis: {
               focus: "series",
             },
-            ...(config.bar_width && { barWidth: config.bar_width }),
+            ...barStyleSeriesProps(config, { withTrack: false }),
+            ...(markLine && { markLine }),
           });
 
           extras.legends.push(seriesData.name);
@@ -142,11 +131,7 @@ export class BarConverter implements PromQLChartConverter {
       const dataItems: Array<{ value: number; itemStyle?: { color: string } }> = [];
 
       // First pass: calculate min/max and collect data
-      const seriesDataCollection: Array<{
-        name: string;
-        value: number;
-        rawValues: Array<[number, string]>;
-      }> = [];
+      const seriesDataCollection: Array<{ name: string; value: number }> = [];
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
@@ -155,11 +140,7 @@ export class BarConverter implements PromQLChartConverter {
           if (value < chartMin) chartMin = value;
           if (value > chartMax) chartMax = value;
 
-          seriesDataCollection.push({
-            name: seriesData.name,
-            value,
-            rawValues: seriesData.values,
-          });
+          seriesDataCollection.push({ name: seriesData.name, value });
 
           categories.push(seriesData.name);
         });
@@ -167,17 +148,18 @@ export class BarConverter implements PromQLChartConverter {
 
       // Second pass: apply colors
       seriesDataCollection.forEach((seriesData) => {
-        const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
-
-        const color = getSeriesColor(
-          config.color || null,
-          seriesData.name,
-          numericValues,
-          chartMin,
-          chartMax,
-          store.state.theme,
-          config.color?.colorBySeries,
-        );
+        // The palette must see the reduced value, the one the bar shows.
+        const color =
+          seriesOverrides.get(seriesData.name)?.color ??
+          getSeriesColor(
+            config.color || null,
+            seriesData.name,
+            [seriesData.value],
+            chartMin,
+            chartMax,
+            store.state.theme,
+            config.color?.colorBySeries,
+          );
 
         dataItems.push(
           color ? { value: seriesData.value, itemStyle: { color } } : { value: seriesData.value },
@@ -194,15 +176,16 @@ export class BarConverter implements PromQLChartConverter {
           rotate: config?.label_option?.rotate || 0,
           // Add unit formatting to labels
           formatter: (params: any) => {
+            const unit = seriesOverrides.unitArgs(params.name);
             return formatUnitValue(
-              getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+              getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
             );
           },
         },
         emphasis: {
           focus: "series",
         },
-        ...(config.bar_width && { barWidth: config.bar_width }),
+        ...barStyleSeriesProps(config, { withTrack: true }),
       });
     }
 
@@ -217,11 +200,23 @@ export class BarConverter implements PromQLChartConverter {
           yAxis: buildValueAxis(panelSchema, store),
         };
 
+    if (!isStacked && config.show_bar_track) {
+      const max = barTrackMax(config.y_axis_max, chartMax);
+      if (max !== undefined) pinBarTrackAxis(axisConfig.xAxis, max);
+    }
+
     if (isHorizontal) {
       axisConfig.yAxis.axisLabel = {
         ...axisConfig.yAxis.axisLabel,
         overflow: "truncate",
         width: config.axis_width || 150,
+      };
+    }
+    // Plain h-bar categories are the series names, so they take the display names.
+    if (!isStacked && categories.some((name) => seriesOverrides.get(name)?.displayName)) {
+      axisConfig.yAxis.axisLabel = {
+        ...axisConfig.yAxis.axisLabel,
+        formatter: (name: string) => String(seriesOverrides.displayName(name)),
       };
     }
 
@@ -247,9 +242,48 @@ export class BarConverter implements PromQLChartConverter {
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),
       },
-      tooltip: buildTooltip(panelSchema, "axis", store, extras?.hoveredSeriesState),
+      tooltip: buildTooltip(
+        panelSchema,
+        "axis",
+        store,
+        extras?.hoveredSeriesState,
+        isStacked ? "seriesName" : "name",
+        series,
+      ),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)
     };
   }
+}
+
+interface CategoryParts {
+  date: string;
+  time: string;
+}
+
+/** A step's YYYY-MM-DD date (empty when a string label carries none) and HH:MM:SS time; null without a time. */
+function categoryParts(formatted: Date | string): CategoryParts | null {
+  if (formatted instanceof Date) {
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return {
+      date: `${formatted.getFullYear()}-${pad(formatted.getMonth() + 1)}-${pad(formatted.getDate())}`,
+      time: `${pad(formatted.getHours())}:${pad(formatted.getMinutes())}:${pad(formatted.getSeconds())}`,
+    };
+  }
+  const match = formatted.toString().match(/(\d{4}-\d{2}-\d{2})?[T ]?(\d{2}:\d{2}:\d{2})/);
+  return match ? { date: match[1] ?? "", time: match[2] } : null;
+}
+
+/** Stacked category labels: HH:MM:SS, or MM-DD HH:MM[:SS] once the steps fall on more than one date. */
+function categoryLabels(stamps: Array<[number, Date | string]>): string[] {
+  const parts = stamps.map(([, formatted]) => categoryParts(formatted));
+  // Steps on different calendar days repeat HH:MM:SS, however short the span.
+  const withDate = new Set(parts.map((part) => part?.date).filter(Boolean)).size > 1;
+  // MM-DD and no zero seconds keep a dated label inside a narrow axis.
+  const withSeconds = !withDate || parts.some((part) => part && !part.time.endsWith(":00"));
+  return parts.map((part, index) => {
+    if (!part) return stamps[index][1].toString();
+    const time = withSeconds ? part.time : part.time.slice(0, 5);
+    return withDate && part.date ? `${part.date.slice(5)} ${time}` : time;
+  });
 }

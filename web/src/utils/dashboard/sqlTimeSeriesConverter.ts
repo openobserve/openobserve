@@ -19,6 +19,8 @@ import { calculateDynamicNameGap } from "./chartDimensionUtils";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { chartColor } from "../chartTheme";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "./seriesOverrides";
+import { stackTotalRows } from "./stackTotals";
 
 /**
  * Handles auto SQL time series conversion.
@@ -159,6 +161,7 @@ export const applyAutoSQLTimeSeries = (
         options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
 
+      const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
 
@@ -210,35 +213,28 @@ export const applyAutoSQLTimeSeries = (
             // if have than bold it
             if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
               hoverText.push(
-                `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                  formatUnitValue(
-                    getUnitValue(
-                      it.data[1],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  ),
+                `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                  seriesOverrides.formatValue(it.data[1], it.seriesName),
                 )} </strong>`,
               );
             // else normal text
             else
               hoverText.push(
-                `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                  formatUnitValue(
-                    getUnitValue(
-                      it.data[1],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  ),
+                `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                  seriesOverrides.formatValue(it.data[1], it.seriesName),
                 )}`,
               );
           }
         });
 
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        const totals = stackTotalRows(
+          panelSchema.type,
+          name,
+          options.series,
+          seriesOverrides,
+          (it: any) => it.data?.[1],
+        );
+        return `${formatDate(date)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
       };
 
       options.tooltip.axisPointer = {
@@ -398,6 +394,7 @@ export const applyCustomSQLTimeSeries = (
         options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
 
+      const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
       options.tooltip.formatter = function (name: any) {
         try {
           // if (
@@ -448,35 +445,28 @@ export const applyCustomSQLTimeSeries = (
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it?.marker} ${escapeHtml(it?.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it?.data?.[1],
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `<strong>${it?.marker} ${escapeHtml(seriesOverrides.displayName(it?.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it?.data?.[1], it?.seriesName),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it?.data?.[1],
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it?.data?.[1], it.seriesName),
                   )}`,
                 );
             }
           });
 
-          return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it?.data?.[1],
+          );
+          return `${formatDate(date)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }

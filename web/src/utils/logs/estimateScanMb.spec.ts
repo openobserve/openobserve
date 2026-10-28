@@ -377,6 +377,21 @@ describe("periods", () => {
     expect(relativeWindow("1h", NOW)).toEqual({ startUs: NOW - MICROS_PER_HOUR, endUs: NOW });
     expect(relativeWindow("x", NOW)).toBeNull();
   });
+
+  it("reads a calendar period as its resolved window, not a rolling one", () => {
+    localStorage.setItem("timezone", "UTC");
+    const now = Date.parse("2026-10-08T03:00:00Z") * 1000;
+    expect(relativeWindow("calendar:day:-1", now)).toEqual({
+      startUs: Date.parse("2026-10-07T00:00:00Z") * 1000,
+      endUs: Date.parse("2026-10-08T00:00:00.000Z") * 1000,
+    });
+    expect(relativeWindow("calendar:day:0", now)).toEqual({
+      startUs: Date.parse("2026-10-08T00:00:00Z") * 1000,
+      endUs: now,
+    });
+    expect(periodToMicros("calendar:week:-1")).toBe(7 * MICROS_PER_DAY);
+    localStorage.removeItem("timezone");
+  });
 });
 
 describe("shared tie comparator", () => {

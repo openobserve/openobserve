@@ -18,13 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
+    ref="dashboardScrollRef"
     :class="[
       'bg-surface-base',
       frame ? 'border-border-default rounded-default border' : '',
-      store.state.printMode ? '' : 'h-full overflow-y-auto',
+      store.state.printMode
+        ? ''
+        : fitToScreen
+          ? 'h-full overflow-hidden'
+          : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="px-page-edge render-dashboard-charts-container pt-2">
+    <div class="px-page-edge render-dashboard-charts-container" :class="kiosk ? 'pt-0' : 'pt-2'">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         class="hidden"
@@ -33,41 +38,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </span>
 
-      <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
-      <VariablesValueSelector
-        v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
-        :scope="'global'"
-        :tabId="selectedTabId"
-        :variablesConfig="{ list: globalVariables }"
-        :variablesManager="variablesManager"
-        :selectedTimeDate="currentTimeObj['__global']"
-        :initialVariableValues="initialVariableValues"
-        class="global-variables-selector"
-        data-test="global-variables-selector"
-      />
+      <!-- Kiosk folds tabs and variables into one row; `contents` leaves the normal layout untouched. -->
+      <div
+        :class="
+          kiosk
+            ? kioskControlsVisible
+              ? 'flex min-h-9 min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 py-1'
+              : 'hidden'
+            : 'contents'
+        "
+        :inert="readOnlySelectors || undefined"
+        :data-read-only="readOnlySelectors || undefined"
+        data-test="dashboard-kiosk-controls"
+      >
+        <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
+        <VariablesValueSelector
+          v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
+          :scope="'global'"
+          :tabId="selectedTabId"
+          :variablesConfig="{ list: globalVariables }"
+          :variablesManager="variablesManager"
+          :selectedTimeDate="currentTimeObj['__global']"
+          :initialVariableValues="initialVariableValues"
+          class="global-variables-selector"
+          :class="kiosk ? KIOSK_VARIABLES_CLASS : undefined"
+          data-test="global-variables-selector"
+        />
 
-      <!-- Tab List -->
-      <TabList
-        v-if="showTabs && selectedTabId !== null"
-        class="mt-2"
-        :dashboardData="dashboardData"
-        :viewOnly="viewOnly"
-        :layoutMode="layoutMode"
-        @refresh="refreshDashboard"
-        @layoutChange="$emit('layoutChange')"
-      />
+        <!-- Tab List -->
+        <TabList
+          v-if="showTabs && selectedTabId !== null"
+          :class="kiosk ? (kioskHasTabs ? 'order-first min-w-0 flex-1' : 'hidden') : 'mt-2'"
+          :dashboardData="dashboardData"
+          :viewOnly="viewOnly"
+          :layoutMode="layoutMode"
+          @refresh="refreshDashboard"
+          @layoutChange="$emit('layoutChange')"
+        />
 
-      <!-- Tab-scoped Variables (for active tab, if using manager) -->
-      <VariablesValueSelector
-        v-if="variablesManager && currentTabVariables.length > 0 && selectedTabId"
-        :scope="'tabs'"
-        :tabId="selectedTabId"
-        :variablesConfig="{ list: currentTabVariables }"
-        :variablesManager="variablesManager"
-        :selectedTimeDate="currentTimeObj['__global']"
-        :initialVariableValues="initialVariableValues"
-        data-test="tab-variables-selector"
-      />
+        <!-- Tab-scoped Variables (for active tab, if using manager) -->
+        <VariablesValueSelector
+          v-if="variablesManager && currentTabVariables.length > 0 && selectedTabId"
+          :scope="'tabs'"
+          :tabId="selectedTabId"
+          :variablesConfig="{ list: currentTabVariables }"
+          :variablesManager="variablesManager"
+          :selectedTimeDate="currentTimeObj['__global']"
+          :initialVariableValues="initialVariableValues"
+          :class="kiosk ? KIOSK_VARIABLES_CLASS : undefined"
+          data-test="tab-variables-selector"
+        />
+      </div>
 
       <slot name="before_panels" />
       <div class="displayDiv clear-both mt-2 h-auto min-h-0">
@@ -93,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
+            :kiosk="kiosk"
             :layoutMode="layoutMode"
             :data="panels[0] || {}"
             :dashboardId="dashboardData.dashboardId"
@@ -169,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- truncate has to sit on an inline child: on the flex parent the text
                      is an anonymous flex item and never picks up the ellipsis. -->
-                <OTruncatedText>{{ item.title }}</OTruncatedText>
+                <OTruncatedText>{{ getPanelTitle(item) }}</OTruncatedText>
               </h2>
               <!-- Off-screen panels render this lightweight placeholder; the
                    real panel mounts only when it comes near the viewport.
@@ -179,9 +201,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="drag-cancel flex h-full flex-col p-2"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
-                <span class="text-text-secondary truncate text-sm" :title="item.title">
-                  {{ item.title }}
-                </span>
+                <OTruncatedText
+                  class="text-text-secondary text-sm"
+                  :data-test="`dashboard-placeholder-title-${item.id}`"
+                >
+                  {{ getPanelTitle(item) }}
+                </OTruncatedText>
                 <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
               </div>
               <!-- Panel with Panel-Level Variables -->
@@ -192,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onDeletePanel="onDeletePanel"
                   @onViewPanel="onViewPanel"
                   :viewOnly="viewOnly"
+                  :kiosk="kiosk"
                   :layoutMode="layoutMode"
                   :data="item"
                   :dashboardId="dashboardData.dashboardId"
@@ -220,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :allowAlertCreation="allowAlertCreation"
                   :showLegendsButton="showLegendsButton"
                   :simplifiedPanelView="simplifiedPanelView"
+                  :injectedPanelData="injectedPanelData?.[item.id]"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
@@ -245,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <DateTimePickerDashboard
                           :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
                           :auto-apply-dashboard="true"
+                          calendar-presets
                           size="sm"
                           class="panel-time-picker-widget"
                           @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
@@ -268,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :initialVariableValues="initialVariableValues"
                         class="panel-variables-margin mb-2"
+                        :inert="readOnlySelectors || undefined"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -338,6 +367,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { getPanelDisplayTitle } from "@/utils/dashboard/panelTitle";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
@@ -354,8 +384,14 @@ import {
   useDashboardTimeGate,
   type DashboardTimeGate,
 } from "@/composables/dashboard/useDashboardTimeGate";
+import useStreams from "@/composables/useStreams";
+import {
+  DASHBOARD_ANNOTATION_SOURCES_KEY,
+  useDashboardAnnotationSources,
+} from "@/composables/dashboard/useDashboardAnnotationSources";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
+import { computeFitCellHeight } from "@/utils/dashboard/kiosk";
 import {
   arePickerValuesEqual,
   convertTimeObjToPickerFormat,
@@ -368,6 +404,12 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import type { LayoutMode } from "@/components/dashboards/layoutMode";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+
+// Must match the cellHeight GridStack is initialised with below.
+const DEFAULT_CELL_HEIGHT_PX = 17;
+const FIT_BOTTOM_GAP_PX = 8;
+// Drops the pickers' stacking margins so they sit in the one kiosk row.
+const KIOSK_VARIABLES_CLASS = "mt-0! [&_.mt-1]:mt-0!";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -446,10 +488,31 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    /** Pre-built results keyed by panel id; a panel with an entry renders it
+     *  instead of querying (public dashboards read materialized snapshots). */
+    injectedPanelData: {
+      type: Object,
+      default: undefined,
+    },
     /** "live" drags and saves at once; "view" locks the layout; "edit" unlocks it and emits layoutChange instead of saving. */
     layoutMode: {
       type: String as PropType<LayoutMode>,
       default: "live",
+    },
+    /** Wall-screen display: shows failed panels loudly and turns off drilldown and context menus. */
+    kiosk: {
+      type: Boolean,
+      default: false,
+    },
+    /** Shows the tab bar and variable pickers with their values but takes them out of interaction. */
+    readOnlySelectors: {
+      type: Boolean,
+      default: false,
+    },
+    /** Scales the grid's cell height so every row fits the visible height without scrolling. */
+    fitToScreen: {
+      type: Boolean,
+      default: false,
     },
   },
 
@@ -469,6 +532,7 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const gridStackContainer = ref(null);
+    const dashboardScrollRef = ref<HTMLElement | null>(null);
     // True while a panel is being dragged or resized — drives the grid backdrop.
     const isGridInteracting = ref(false);
     const isLayoutEditing = computed(() => props.layoutMode === "edit");
@@ -567,6 +631,20 @@ export default defineComponent({
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
 
+    const { getStream } = useStreams(t);
+    const annotationSources = useDashboardAnnotationSources({
+      dashboardData: () => props.dashboardData,
+      timeRange: () => props.currentTimeObj?.__global,
+      variables: () => variablesManager.committedVariablesData.global,
+      store,
+      folderId: () => props.folderId,
+      schemaFields: async (stream: string, streamType: string) =>
+        ((await getStream(stream, streamType, true))?.schema ?? []).map(
+          (field: { name: string }) => field.name,
+        ),
+    });
+    provide(DASHBOARD_ANNOTATION_SOURCES_KEY, annotationSources);
+
     const dashboardAutoRun = inject<Ref<boolean>>("dashboardAutoRun", ref(false));
     watch(dashboardAutoRun, (on) => variablesManager.setLiveMode(on === true), {
       immediate: true,
@@ -593,6 +671,17 @@ export default defineComponent({
         ) || []
       );
     });
+
+    const kioskHasTabs = computed(() => (props.dashboardData?.tabs?.length ?? 0) > 1);
+
+    const kioskControlsVisible = computed(
+      () =>
+        kioskHasTabs.value ||
+        !!props.dashboardData?.variables?.showDynamicFilters ||
+        [...globalVariables.value, ...currentTabVariables.value].some(
+          (v: any) => !v.hideOnDashboard,
+        ),
+    );
 
     // Helper to get panel-scoped variables
     const getPanelVariables = (panelId: string) => {
@@ -627,6 +716,14 @@ export default defineComponent({
         values: mergedVars,
       };
     };
+
+    const getPanelTitle = (panel: any) =>
+      getPanelDisplayTitle(
+        panel?.title,
+        getMergedVariablesForPanel(panel?.id),
+        { tabId: selectedTabId.value, panelId: panel?.id },
+        t("dashboard.variableQueryValueSelector.all"),
+      );
 
     // Helper to get LIVE (uncommitted) variables for a panel
     // Used for detecting changes and showing yellow refresh icon
@@ -718,9 +815,11 @@ export default defineComponent({
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
 
       // Check if every value in both variablesData and panels is false
+      // Annotation sources count too, so a captured report already has its markers drawn.
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
-        panelsValues.every((value) => value === false);
+        panelsValues.every((value) => value === false) &&
+        !annotationSources.loading.value;
 
       return isAllVariablesAndPanelsDataLoaded;
     });
@@ -1095,11 +1194,49 @@ export default defineComponent({
       grid.batchUpdate(false);
 
       gridStackUpdateInProgress = false;
+      applyFitToScreen();
       window.dispatchEvent(new Event("resize"));
 
       // Re-setup panel observers for the new panels
       await setupPanelObservers();
     };
+
+    // Only ever touches the grid once fit has been asked for, so a normal dashboard keeps GridStack's own sizing.
+    let fitApplied = false;
+    const applyFitToScreen = () => {
+      if (!props.fitToScreen && !fitApplied) return;
+      const grid = gridStackInstance;
+      const root = dashboardScrollRef.value;
+      const host = gridStackContainer.value;
+      if (!grid || !root || !(host instanceof HTMLElement)) return;
+      fitApplied = props.fitToScreen;
+      const target = props.fitToScreen
+        ? computeFitCellHeight(
+            root.clientHeight -
+              (host.getBoundingClientRect().top - root.getBoundingClientRect().top) -
+              FIT_BOTTOM_GAP_PX,
+            grid.getRow(),
+          )
+        : DEFAULT_CELL_HEIGHT_PX;
+      if (!target || grid.getCellHeight() === target) return;
+      grid.cellHeight(target);
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    let fitResizeObserver: ResizeObserver | null = null;
+    const observeFit = () => {
+      fitResizeObserver?.disconnect();
+      fitResizeObserver = null;
+      if (props.fitToScreen && dashboardScrollRef.value && typeof ResizeObserver !== "undefined") {
+        fitResizeObserver = new ResizeObserver(() => applyFitToScreen());
+        fitResizeObserver.observe(dashboardScrollRef.value);
+        // The tab bar and variable pickers above the grid can grow after load, which moves the grid down.
+        const content = dashboardScrollRef.value.firstElementChild;
+        if (content) fitResizeObserver.observe(content);
+      }
+      applyFitToScreen();
+    };
+    watch(() => props.fitToScreen, observeFit, { flush: "post" });
 
     // Add a method to reset grid layout
     const resetGridLayout = async () => {
@@ -1288,6 +1425,7 @@ export default defineComponent({
       await nextTick(); // Wait for DOM to be ready
       initGridStack(); // Initialize the grid system
       await nextTick(); // Wait for grid initialization to complete
+      if (props.fitToScreen) observeFit();
 
       // Set up IntersectionObserver for panel visibility (for lazy loading panel-scoped variables)
       await setupPanelObservers();
@@ -1472,6 +1610,8 @@ export default defineComponent({
 
     // Final cleanup when component is fully unmounted
     onUnmounted(() => {
+      fitResizeObserver?.disconnect();
+      fitResizeObserver = null;
       if (gridStackInstance) {
         gridStackInstance.destroy(false);
         gridStackInstance = null;
@@ -1832,7 +1972,11 @@ export default defineComponent({
     );
 
     return {
+      KIOSK_VARIABLES_CLASS,
+      kioskHasTabs,
+      kioskControlsVisible,
       store,
+      dashboardScrollRef,
       addPanelData,
       t,
       getPanelLayout,
@@ -1868,6 +2012,7 @@ export default defineComponent({
       currentTabVariables,
       getPanelVariables,
       getMergedVariablesForPanel,
+      getPanelTitle,
       getLiveVariablesForPanel,
       // Exposed methods for parent components
       commitAllVariables,

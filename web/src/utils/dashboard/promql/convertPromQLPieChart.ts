@@ -19,6 +19,8 @@ import { buildTooltip } from "./shared/axisBuilder";
 import { buildPieChartConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { createSeriesOverrideLookup } from "../seriesOverrides";
+import { MAX_SEATS_PRECISION, pieLegendPercentDecimals } from "../legendConfiguration";
 
 /**
  * Converter for pie and donut charts
@@ -36,10 +38,13 @@ export class PieConverter implements PromQLChartConverter {
   ) {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
+    const seriesOverrides = createSeriesOverrideLookup(config);
+    // ECharts computes no digits past its seat precision, so the label prints no more than that.
+    const percentDecimals = Math.min(
+      pieLegendPercentDecimals(config.decimals),
+      MAX_SEATS_PRECISION,
+    );
     const data: any[] = [];
-
-    // Get aggregation function (default: last)
-    const aggregation = config.aggregation || "last";
 
     // Calculate min/max for color scaling
     let chartMin = Infinity;
@@ -53,7 +58,11 @@ export class PieConverter implements PromQLChartConverter {
     }> = [];
 
     processedData.forEach((queryData) => {
+      const instant = queryData.queryConfig?.query_type === "instant";
       queryData.series.forEach((seriesData) => {
+        // A single instant sample would read 1 or 0 under count, range or diff; a range-vector selector still has many.
+        const aggregation =
+          instant && seriesData.values.length <= 1 ? "last" : config.aggregation || "last";
         const value = applyAggregation(seriesData.values, aggregation);
 
         if (value < chartMin) chartMin = value;
@@ -113,6 +122,8 @@ export class PieConverter implements PromQLChartConverter {
 
         data,
 
+        percentPrecision: percentDecimals,
+
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
@@ -124,27 +135,31 @@ export class PieConverter implements PromQLChartConverter {
         label: {
           show: config.show_label !== false,
           formatter: (params: any) => {
+            const name = seriesOverrides.displayName(params.name);
+            const unit = seriesOverrides.unitArgs(params.name);
+            // A slice with its own decimals gets its exact share from applySeriesOverrides, not ECharts' rounding.
+            const overrideDecimals = seriesOverrides.get(params.name)?.decimals;
+            const percent = params.percent.toFixed(
+              overrideDecimals === undefined
+                ? percentDecimals
+                : pieLegendPercentDecimals(overrideDecimals),
+            );
             // Custom formatter with unit support
             if (config.label_format) {
               // If custom format is provided, use it with unit formatting
               return config.label_format
-                .replace("{b}", params.name)
+                .replace("{b}", name)
                 .replace(
                   "{c}",
                   formatUnitValue(
-                    getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+                    getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
                   ),
                 )
-                .replace("{d}", params.percent.toFixed(1));
+                .replace("{d}", percent);
             }
             // Default format: name: value (percentage%)
-            const unitValue = getUnitValue(
-              params.value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals,
-            );
-            return `${params.name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(1)}%)`;
+            const unitValue = getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals);
+            return `${name}: ${formatUnitValue(unitValue)} (${percent}%)`;
           },
           fontSize: config.label_font_size || 12,
         },
@@ -167,7 +182,7 @@ export class PieConverter implements PromQLChartConverter {
 
     const result = {
       series,
-      tooltip: buildTooltip(panelSchema, "item", store),
+      tooltip: buildTooltip(panelSchema, "item", store, undefined, "name"),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts
     };

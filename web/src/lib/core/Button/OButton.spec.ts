@@ -28,6 +28,20 @@ describe("OButton", () => {
 
   // --- Props ---
 
+  it("cell variant keeps a visible focus ring and the control radius", () => {
+    const classes = mount(OButton, { props: { variant: "cell" } }).classes();
+    expect(classes).toContain("focus-visible:ring-3");
+    expect(classes).toContain("rounded-default");
+    expect(classes).toContain("h-auto!");
+  });
+
+  it("cell variant dims when unavailable but focusable, like the other variants", () => {
+    const classes = mount(OButton, {
+      props: { variant: "cell", disabled: true, focusableUnavailable: true },
+    }).classes();
+    expect(classes).toContain("opacity-60");
+  });
+
   it('defaults to type="button"', () => {
     const wrapper = mount(OButton);
     expect(wrapper.attributes("type")).toBe("button");
@@ -424,6 +438,10 @@ describe("OButton", () => {
     "outline-primary",
     "dashed",
     "pricing-chip",
+    "tint-teal",
+    "tint-purple",
+    "tint-blue",
+    "tint-orange",
   ] satisfies ButtonVariant[])(
     "preserves native disabled styling for %s when unavailable",
     (variant) => {

@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Profiles query HTTP APIs (meta / tag_values / series / merge).
+//! Profiles query HTTP APIs (meta / tag_values / series / merge / diff).
 
+pub mod diff;
 pub mod merge;
 pub mod meta;
 pub mod series;
@@ -30,17 +31,18 @@ use config::{
     },
     utils::json,
 };
+pub use diff::diff_profiles;
 use hashbrown::HashMap;
 pub use merge::{merge_profiles, merge_profiles_get};
 pub use meta::get_profiles_meta;
 use openobserve_core::profiles::query::{
-    is_filterable_column, is_safe_filter_key, normalize_tag_key,
+    INSTANCE_KEY_COLUMNS, is_filterable_column, is_safe_filter_key, normalize_tag_key,
 };
 use search_service as SearchService;
 use serde::{Deserialize, Serialize};
 pub use series::{profiles_series, profiles_series_get};
 pub use tag_values::get_profiles_tag_values;
-use tracing::{Instrument, Span};
+use tracing::{Instrument, Span, warn};
 use utoipa::ToSchema;
 
 use crate::{
@@ -48,7 +50,7 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
-const DEFAULT_RESULT_SIZE: i64 = 50_000;
+const DEFAULT_RESULT_SIZE: i64 = 99_999;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfileFilter {
@@ -82,6 +84,12 @@ pub struct ProfilesQueryBody {
     pub max_nodes: Option<usize>,
     #[serde(default)]
     pub timeout: Option<i64>,
+    /// Label column that splits `series` into `groups` (series endpoint only).
+    #[serde(default)]
+    pub group_by: Option<String>,
+    /// Groups returned before the rest fold into one `others` group: 1..=50, default 10.
+    #[serde(default)]
+    pub group_limit: Option<usize>,
 }
 
 pub(crate) async fn check_stream_permissions(
@@ -183,6 +191,8 @@ pub(crate) fn query_body_from_params(params: &HashMap<String, String>) -> Profil
         step: params.get("step").cloned().filter(|s| !s.is_empty()),
         max_nodes: params.get("max_nodes").and_then(|v| v.parse().ok()),
         timeout: params.get("timeout").and_then(|v| v.parse().ok()),
+        group_by: params.get("group_by").cloned().filter(|s| !s.is_empty()),
+        group_limit: params.get("group_limit").and_then(|v| v.parse().ok()),
     }
 }
 
@@ -253,32 +263,41 @@ pub(crate) fn build_where_clause(body: &ProfilesQueryBody) -> Result<String, Res
                 "only filter op '=' is supported",
             ));
         }
-        if !is_safe_filter_key(&filter.key) {
+        let Some(col) = label_column(&filter.key) else {
             return Err(MetaHttpResponse::bad_request(format!(
                 "invalid filter key: {}",
                 filter.key
             )));
-        }
-        let column_key = normalize_tag_key(&filter.key);
-        if !is_filterable_column(&filter.key) && !is_filterable_column(&column_key) {
-            return Err(MetaHttpResponse::bad_request(format!(
-                "invalid filter key: {}",
-                filter.key
-            )));
-        }
-        let col = if is_filterable_column(&filter.key) && !filter.key.contains('.') {
-            filter.key.as_str()
-        } else {
-            column_key.as_str()
         };
         parts.push(format!(
             "{} = {}",
-            quote_identifier(col),
+            quote_identifier(&col),
             quote_sql_string(&filter.value)
         ));
     }
 
     Ok(parts.join(" AND "))
+}
+
+/// Column behind a user-supplied label key (dotted keys map to snake_case), if filterable.
+pub(crate) fn label_column(key: &str) -> Option<String> {
+    // Check the normalized name so a dotted alias cannot reach a reserved column.
+    let column = normalize_tag_key(key);
+    (is_safe_filter_key(key) && is_filterable_column(&column)).then_some(column)
+}
+
+/// SQL naming one process from the stream's identity columns; `concat` reads NULL as "".
+pub(crate) fn instance_key_expr(schema_fields: &[String]) -> String {
+    let parts: Vec<String> = INSTANCE_KEY_COLUMNS
+        .iter()
+        .filter(|col| schema_fields.iter().any(|f| f == *col))
+        .map(|col| quote_identifier(col))
+        .collect();
+    if parts.is_empty() {
+        "''".to_string()
+    } else {
+        format!("concat({})", parts.join(", '|', "))
+    }
 }
 
 pub(crate) fn require_profile_type(body: &ProfilesQueryBody) -> Result<String, Response> {
@@ -370,6 +389,12 @@ pub(crate) fn merge_params_into_body(
     if body.filters.is_empty() {
         body.filters = parse_filters_param(params.get("filters").map(|s| s.as_str()));
     }
+    if body.group_by.is_none() {
+        body.group_by = params.get("group_by").cloned().filter(|s| !s.is_empty());
+    }
+    if body.group_limit.is_none() {
+        body.group_limit = params.get("group_limit").and_then(|s| s.parse().ok());
+    }
 }
 
 pub(crate) fn resolve_timeout(timeout: Option<i64>) -> Result<i64, Response> {
@@ -403,7 +428,6 @@ pub(crate) async fn run_profiles_sql(
             start_time: params.start_time,
             end_time: params.end_time,
             quick_mode: false,
-            query_type: String::new(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -487,6 +511,20 @@ pub(crate) fn default_result_size() -> i64 {
     DEFAULT_RESULT_SIZE
 }
 
+pub(crate) async fn load_schema_field_names(org_id: &str, stream_name: &str) -> Vec<String> {
+    match infra::schema::get(org_id, stream_name, StreamType::Profiles).await {
+        Ok(schema) => schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect(),
+        Err(e) => {
+            warn!("profiles schema lookup failed: {e}");
+            Vec::new()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -534,6 +572,31 @@ mod tests {
         };
         let where_clause = build_where_clause(&body).unwrap();
         assert_eq!(where_clause, r#""k8s_pod_name" = 'pod-a'"#);
+    }
+
+    #[test]
+    fn label_column_normalizes_dots_and_rejects_reserved_or_unsafe_keys() {
+        assert_eq!(
+            label_column("k8s.pod.name").as_deref(),
+            Some("k8s_pod_name")
+        );
+        assert_eq!(label_column("host_name").as_deref(), Some("host_name"));
+        assert_eq!(label_column("stack"), None);
+        assert_eq!(label_column("value"), None);
+        assert_eq!(label_column("event.id"), None);
+        assert_eq!(label_column("profile.duration.nanos"), None);
+        assert_eq!(label_column(r#"a" OR 1=1"#), None);
+        assert_eq!(label_column(""), None);
+    }
+
+    #[test]
+    fn instance_key_expr_uses_only_present_identity_columns() {
+        let fields = |names: &[&str]| names.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(instance_key_expr(&fields(&["value", "stack"])), "''");
+        assert_eq!(
+            instance_key_expr(&fields(&["process_pid", "value", "host_name"])),
+            r#"concat("host_name", '|', "process_pid")"#
+        );
     }
 
     #[test]

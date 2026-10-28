@@ -38,6 +38,8 @@ import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { stackTotalRows } from "../../stackTotals";
 
 /**
  * Finds the largest label in the given data array.
@@ -232,6 +234,8 @@ export function buildSQLContext(
 
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+
   const isHorizontalChart = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
   const defaultGrid = {
@@ -279,7 +283,13 @@ export function buildSQLContext(
       const lo = hasCfgMin ? Math.min(cfgMin, dataMin) : Math.min(0, dataMin);
       hi = hasCfgMax ? Math.max(cfgMax, hi) : Math.max(0, hi);
 
-      const ticks = calculateNiceTickValues(lo, hi);
+      const minInterval = Number(panelSchema?.config?.y_axis_min_interval);
+      const ticks = calculateNiceTickValues(
+        lo,
+        hi,
+        5,
+        Number.isFinite(minInterval) && !isHorizontalChart ? minInterval : 0,
+      );
       if (!ticks?.length) throw new Error("no ticks");
 
       let decimals = configured;
@@ -576,35 +586,28 @@ export function buildSQLContext(
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it.value, it.seriesName),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it.value, it.seriesName),
                   )}`,
                 );
             }
           });
 
-          return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it.value,
+          );
+          return `${escapeHtml(name?.[0]?.name)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }

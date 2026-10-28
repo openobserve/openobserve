@@ -84,18 +84,6 @@ export const discordConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => {
-    try {
-      const parsed = new URL(url);
-      const hostname = parsed.hostname.toLowerCase();
-      return (
-        (hostname === "discord.com" || hostname.endsWith(".discord.com")) &&
-        parsed.pathname.startsWith("/api/webhooks/")
-      );
-    } catch {
-      return false;
-    }
-  },
   credentialFields: [
     {
       key: "webhookUrl",

@@ -161,6 +161,31 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Public dashboard link state, derived server-side; only live is green so exceptions stand out.
+  publicLinkStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      live: { variant: "success-soft", labelKey: "components.badge.publicLinkStatus.live" },
+      paused: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.paused" },
+      notviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkStatus.notViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkStatus.needsAttention",
+      },
+      expired: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.expired" },
+      dashboarddeleted: {
+        variant: "error-soft",
+        labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
+      },
+      // The organization has public links turned off.
+      disabled: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.disabled" },
+    },
+  },
+
   // One chip per downtime target, plus the shared condition. The caller always supplies the label.
   downtimeTarget: {
     mode: "icon",
@@ -1792,14 +1817,11 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     class: "!bg-transparent !p-0 !ring-0",
+    // Keys are the Quality API `status` values (`no_data` normalises to `nodata`).
     values: {
+      attention: { variant: "error-soft", labelKey: "components.badge.qualityStatus.attention" },
       healthy: { variant: "success-soft", labelKey: "components.badge.qualityStatus.healthy" },
-      warn: { variant: "warning-soft", labelKey: "components.badge.qualityStatus.warn" },
-      unhealthy: { variant: "error-soft", labelKey: "components.badge.qualityStatus.unhealthy" },
-      nothreshold: {
-        variant: "default-soft",
-        labelKey: "components.badge.qualityStatus.nothreshold",
-      },
+      unset: { variant: "default-soft", labelKey: "components.badge.qualityStatus.unset" },
       nodata: { variant: "default-soft", labelKey: "components.badge.qualityStatus.nodata" },
     },
     fallback: { variant: "default-soft" },
@@ -1953,6 +1975,50 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+
+  // Fleet Manager rollout lifecycle — dot + soft colour, attention states run hot.
+  fleetRolloutStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
+      completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
+      halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
+      superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
+      rolledback: { variant: "warning-soft", labelKey: "fleet.badge.rolledBack" },
+      // A completed rollout of an empty fleet; not a status the server sends.
+      empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet rollout batching — a category, so plain with one hue per kind.
+  fleetBatching: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      one: { variant: "default-soft", labelKey: "fleet.rollouts.oneBatch" },
+      canary: { variant: "amber-soft", labelKey: "fleet.badge.canary" },
+      progressive: { variant: "blue-soft", labelKey: "fleet.badge.progressive" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager config delivery — the one vocabulary for a collector's config lifecycle.
+  fleetDelivery: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      assigned: { variant: "default-soft", labelKey: "fleet.delivery.assigned" },
+      sent: { variant: "blue-soft", labelKey: "fleet.delivery.sent" },
+      accepted: { variant: "teal-soft", labelKey: "fleet.delivery.accepted" },
+      running: { variant: "success-soft", labelKey: "fleet.delivery.running" },
+      rejected: { variant: "error-soft", labelKey: "fleet.delivery.rejected" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   slackInstallStatus: {
     mode: "dot",
     shape: "pill",

@@ -20,19 +20,17 @@ import { createStore } from "vuex";
 import type { Component } from "vue";
 import { DialogContent } from "reka-ui";
 import i18n from "@/locales";
+import { copyToClipboard } from "@/utils/clipboard";
 import store from "@/stores";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import K8sDetailsDrawer from "./K8sDetailsDrawer.vue";
 import { buildInventory, findRow, rowKey, type Inventory, type Series } from "./kubernetesModel";
 import type { DetailKind, QueryId } from "./kubernetesQueries";
 import type { DetailsRef } from "./kubernetesUrlState";
 import { joinObjects, parseObjects } from "./kubernetesObjects";
 import type { EventRow } from "./kubernetesEvents";
-import { resolvePodLogs } from "./podLogsLink";
 
 const renderer = vi.hoisted(() => ({ mounts: 0, props: [] as any[] }));
-const toastMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", async () => {
   const { defineComponent, h } = await import("vue");
@@ -62,6 +60,8 @@ vi.mock("reka-ui", async (importOriginal) => {
   };
 });
 
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
+
 // The chart's request transport, the last seam before the network, for the real-loader case.
 const streamMock = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/composables/useStreamingSearch", () => ({
@@ -71,9 +71,6 @@ vi.mock("@/composables/useStreamingSearch", () => ({
     resetAuthToken: vi.fn(),
   }),
 }));
-
-vi.mock("./podLogsLink", () => ({ resolvePodLogs: vi.fn() }));
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toastMock(...a) }));
 
 enableAutoUnmount(afterEach);
 
@@ -182,17 +179,18 @@ const mountDrawer = (ref: DetailsRef, extra: Record<string, unknown> = {}) =>
 
 type Wrapper = ReturnType<typeof mountDrawer>;
 
-const lastRenderer = () => renderer.props[renderer.props.length - 1];
+const chart = (id: string) =>
+  [...renderer.props].reverse().find((p) => p.panelSchema.id === `k8s2-drawer-${id}`);
 
-const queries = () => lastRenderer().panelSchema.queries.map((q: any) => q.query);
+const queries = (id = "cpu") => chart(id).panelSchema.queries.map((q: any) => q.query);
 
 const tabIds = (wrapper: Wrapper) =>
   wrapper
     .findAll('[data-test^="k8s2-drawer-tab-"]')
     .map((b) => b.attributes("data-test")!.replace("k8s2-drawer-tab-", ""));
 
-const clickTab = async (wrapper: Wrapper, id: string) => {
-  await wrapper.find(`[data-test="k8s2-drawer-tab-${id}"]`).trigger("click");
+const openMore = async (wrapper: Wrapper) => {
+  await wrapper.find('[data-test="k8s2-drawer-more-metrics"] button').trigger("click");
   await flushPromises();
 };
 
@@ -214,8 +212,6 @@ beforeEach(() => {
   inventory = buildFixture();
   renderer.mounts = 0;
   renderer.props = [];
-  toastMock.mockReset();
-  vi.mocked(resolvePodLogs).mockReset();
 });
 
 describe("K8sDetailsDrawer frame", () => {
@@ -262,6 +258,57 @@ describe("K8sDetailsDrawer frame", () => {
   });
 });
 
+describe("K8sDetailsDrawer header", () => {
+  const text = (wrapper: Wrapper, id: string) => wrapper.find(`[data-test="${id}"]`).text();
+  const pvcInventory = (phase: string) =>
+    buildInventory(results({ V1: [ksm({ persistentvolumeclaim: "data", phase })] }));
+  const pvcDrawer = (phase: string) => {
+    const ref = refOf("pvc", "data");
+    const inv = pvcInventory(phase);
+    return mountDrawer(ref, { inventory: inv, row: rowOf(inv, ref) });
+  };
+
+  it("shows the kind, the name, the status pill and the namespace and cluster subtitle", () => {
+    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
+    expect(text(wrapper, "k8s2-drawer-kind")).toBe("Pod");
+    expect(text(wrapper, "k8s2-drawer-name")).toBe("web-abc-1");
+    expect(text(wrapper, "k8s2-drawer-status")).toBe("Running");
+    expect(text(wrapper, "k8s2-drawer-subtitle")).toBe("shop · prod");
+  });
+
+  it("appends the age to the subtitle once the row has a creation time", () => {
+    const ref = refOf("pod", "web-abc-1");
+    const row = { ...rowOf(inventory, ref)!, createdAt: RANGE.end - 3_600_000_000 };
+    const wrapper = mountDrawer(ref, { row });
+    expect(text(wrapper, "k8s2-drawer-subtitle")).toMatch(/^shop · prod · .+ old$/);
+  });
+
+  it("copies the object name through the clipboard helper", async () => {
+    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
+    await wrapper.find('[data-test="k8s2-drawer-copy"]').trigger("click");
+    expect(copyToClipboard).toHaveBeenCalledWith("web-abc-1", expect.any(Function), {
+      successMessage: "Copied to clipboard",
+    });
+  });
+
+  it("shows no insight banner for a row without warnings", () => {
+    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
+    expect(wrapper.find('[data-test="k8s2-drawer-insight"]').exists()).toBe(false);
+  });
+
+  it.each([
+    ["Pending", "warning"],
+    ["Lost", "error"],
+  ])("raises a %s insight banner with the %s variant", (phase, variant) => {
+    const wrapper = pvcDrawer(phase);
+    const banner = wrapper.find('[data-test="k8s2-drawer-insight"]');
+    expect(banner.text()).toContain(`Phase is ${phase}`);
+    expect(wrapper.findComponent('[data-test="k8s2-drawer-insight"]').props("variant")).toBe(
+      variant,
+    );
+  });
+});
+
 describe("K8sDetailsDrawer sections", () => {
   const order = (wrapper: Wrapper) =>
     wrapper
@@ -277,10 +324,10 @@ describe("K8sDetailsDrawer sections", () => {
     ["replicaset", "web-abc"],
     ["namespace", "shop"],
     ["pvc", "data-db-0"],
-  ] as const)("renders a %s drawer as Metrics, Metadata, kind, Events", (kind, name) => {
+  ] as const)("renders a %s drawer as Properties, Metrics, kind, Events", (kind, name) => {
     expect(order(mountDrawer(refOf(kind, name)))).toEqual([
-      "metrics",
       "metadata",
+      "metrics",
       "kind",
       "events",
     ]);
@@ -298,29 +345,29 @@ describe("K8sDetailsDrawer sections", () => {
 describe("K8sDetailsDrawer metric tabs", () => {
   it("passes the renderer its contract props over the picker range, in a sized parent", () => {
     const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
-    const props = lastRenderer();
+    const props = chart("cpu");
     expect(props.selectedTimeObj.start_time).toEqual(new Date(RANGE.start));
     expect(props.selectedTimeObj.end_time).toEqual(new Date(RANGE.end));
     expect(props.variablesData).toEqual({});
     expect(props.forceLoad).toBe(true);
     expect(props.searchType).toBe("ui");
     expect(props.panelSchema).toMatchObject({ type: "area", queryType: "promql" });
-    expect(wrapper.find('[data-test="k8s2-drawer-chart"]').classes()).toContain("h-50");
+    expect(wrapper.find('[data-test="k8s2-drawer-chart-cpu"]').classes()).toContain("h-36");
     expect(wrapper.findComponent({ name: "OSparkline" }).exists()).toBe(false);
   });
 
-  it("builds the pod tabs from the row's matcher, with the uid only when its series had it", async () => {
+  it("stacks the pod charts from the row's matcher, with the uid only when its series had it", async () => {
     const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
+    expect(tabIds(wrapper)).toEqual(["cpu", "memory"]);
+    expect(renderer.mounts).toBe(2);
+    await openMore(wrapper);
     expect(tabIds(wrapper)).toEqual(["cpu", "memory", "network", "filesystem"]);
     const m =
       'k8s_cluster_name="prod",k8s_namespace_name="shop",k8s_pod_name="web-abc-1",k8s_pod_uid="web-abc-1-u"';
     expect(queries()).toEqual([`sum(k8s_pod_cpu_usage{${m}})`]);
-    await clickTab(wrapper, "memory");
-    expect(queries()).toEqual([`sum(k8s_pod_memory_working_set{${m}})`]);
-    await clickTab(wrapper, "network");
-    expect(queries()).toEqual([`sum by (direction) (rate(k8s_pod_network_io{${m}}[5m]))`]);
-    await clickTab(wrapper, "filesystem");
-    expect(queries()).toEqual([`sum(k8s_pod_filesystem_usage{${m}})`]);
+    expect(queries("memory")).toEqual([`sum(k8s_pod_memory_working_set{${m}})`]);
+    expect(queries("network")).toEqual([`sum by (direction) (rate(k8s_pod_network_io{${m}}[5m]))`]);
+    expect(queries("filesystem")).toEqual([`sum(k8s_pod_filesystem_usage{${m}})`]);
 
     mountDrawer(refOf("pod", "web-abc-2"));
     expect(queries()[0]).toBe(
@@ -328,23 +375,56 @@ describe("K8sDetailsDrawer metric tabs", () => {
     );
   });
 
-  it("builds the node tabs, with k8s_cluster on the KSM queries", async () => {
+  it("stacks the node charts, with k8s_cluster on the KSM queries", async () => {
     const wrapper = mountDrawer(refOf("node", "n1"));
+    expect(tabIds(wrapper)).toEqual(["cpu", "memory"]);
+    await openMore(wrapper);
     expect(tabIds(wrapper)).toEqual(["cpu", "memory", "disk", "pods"]);
     expect(queries()).toEqual([
       'sum(k8s_node_cpu_usage{k8s_cluster_name="prod",k8s_node_name="n1"})',
       'sum(kube_node_status_allocatable{k8s_cluster="prod",node="n1",resource="cpu"})',
     ]);
-    await clickTab(wrapper, "disk");
-    expect(queries()).toEqual([
+    expect(queries("disk")).toEqual([
       'sum(k8s_node_filesystem_usage{k8s_cluster_name="prod",k8s_node_name="n1"})',
       'sum(k8s_node_filesystem_capacity{k8s_cluster_name="prod",k8s_node_name="n1"})',
     ]);
-    await clickTab(wrapper, "pods");
-    expect(queries()).toEqual([
+    expect(queries("pods")).toEqual([
       'count(kube_pod_info{k8s_cluster="prod",node="n1"})',
       'sum(kube_node_status_allocatable{k8s_cluster="prod",node="n1",resource="pods"})',
     ]);
+  });
+
+  it("draws request and limit mark lines on the CPU and memory charts when every pod reports them", async () => {
+    const usage = (container: string, resource: string, v: number) =>
+      ksm({ pod: "web-abc-1", uid: "web-abc-1-u", container, resource }, v);
+    const withBounds = buildInventory(
+      results({
+        P1: [pod("web-abc-1", { phase: "Running" })],
+        P8: [usage("app", "cpu", 0.5), usage("app", "memory", 1000)],
+        P9: [usage("app", "cpu", 1), usage("app", "memory", 2000)],
+        K1: [kub({ k8s_namespace_name: "shop", k8s_pod_name: "web-abc-1" }, 0.2)],
+      }),
+    );
+    inventory = withBounds;
+    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
+    await openMore(wrapper);
+    const lines = (id: string) =>
+      chart(id).panelSchema.config.mark_line.map((m: any) => [m.name, m.value]);
+    expect(lines("cpu")).toEqual([
+      ["Request", 0.5],
+      ["Limit", 1],
+    ]);
+    expect(lines("memory")).toEqual([
+      ["Request", 1000],
+      ["Limit", 2000],
+    ]);
+    expect(lines("network")).toEqual([]);
+  });
+
+  it("omits the request and limit lines when the pod's bounds are unknown", () => {
+    mountDrawer(refOf("pod", "web-abc-1"));
+    expect(chart("cpu").panelSchema.config.mark_line).toEqual([]);
+    expect(chart("memory").panelSchema.config.mark_line).toEqual([]);
   });
 
   it("sums a deployment's pod tabs over exactly its current member pods, regex-escaped", () => {
@@ -365,31 +445,48 @@ describe("K8sDetailsDrawer metric tabs", () => {
     expect(tabIds(pvc)).toEqual(["disk"]);
     const p =
       'k8s_cluster="prod",k8s_persistentvolumeclaim_name="data-db-0",k8s_namespace_name="shop"';
-    expect(queries()).toEqual([
+    expect(queries("disk")).toEqual([
       `sum(k8s_volume_capacity{${p}}) - sum(k8s_volume_available{${p}})`,
       `sum(k8s_volume_capacity{${p}})`,
     ]);
   });
 
-  it("drops a tab whose stream is absent, and the block when none is left", () => {
+  it("drops a tab whose stream is absent, naming it and its metric inline", async () => {
     const wrapper = mountDrawer(refOf("pod", "web-abc-1"), {
       hasStream: (s: string) => s !== "k8s_pod_network_io",
     });
+    await openMore(wrapper);
     expect(tabIds(wrapper)).toEqual(["cpu", "memory", "filesystem"]);
+    expect(wrapper.find('[data-test="k8s2-drawer-metrics-unavailable"]').text()).toContain(
+      "k8s_pod_network_io",
+    );
+    expect(wrapper.find('[data-test="k8s2-drawer-metrics-unavailable"]').text()).toContain(
+      "the k8s_pod_network_io metric",
+    );
     const none = mountDrawer(refOf("pod", "web-abc-1"), { hasStream: () => false });
-    expect(none.find('[data-test="k8s2-drawer-section-metrics"]').exists()).toBe(false);
+    expect(tabIds(none)).toEqual([]);
+    expect(none.find('[data-test^="k8s2-drawer-chart-"]').exists()).toBe(false);
+    expect(none.find('[data-test="k8s2-drawer-metrics-unavailable"]').exists()).toBe(true);
   });
 
-  it("remounts the renderer on Refresh, on a new object and on a new tab", async () => {
+  it("mounts the extra metrics only once More metrics is opened", async () => {
     const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
-    expect(renderer.mounts).toBe(1);
-    await wrapper.setProps({ refreshNonce: 1 });
+    expect(wrapper.find('[data-test="k8s2-drawer-more-metrics"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="k8s2-drawer-chart-network"]').exists()).toBe(false);
     expect(renderer.mounts).toBe(2);
-    await clickTab(wrapper, "memory");
-    expect(renderer.mounts).toBe(3);
+    await openMore(wrapper);
+    expect(renderer.mounts).toBe(4);
+  });
+
+  it("remounts the renderer on Refresh and on a new object", async () => {
+    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
+    const initial = renderer.mounts;
+    expect(initial).toBe(2);
+    await wrapper.setProps({ refreshNonce: 1 });
+    expect(renderer.mounts).toBe(2 * initial);
     const next = refOf("pod", "web-abc-2");
     await wrapper.setProps({ details: next, row: rowOf(inventory, next) });
-    expect(renderer.mounts).toBe(4);
+    expect(renderer.mounts).toBe(3 * initial);
   });
 });
 
@@ -446,9 +543,9 @@ describe("K8sDetailsDrawer refresh (AC 13)", () => {
     await vi.waitFor(() => expect(streamMock.mock.calls.length).toBeGreaterThan(before), {
       timeout: 20_000,
     });
-    const payload: any = (streamMock.mock.calls.at(-1) as any[])[0];
-    expect(payload.type).toBe("promql");
-    expect(payload.queryReq.query).toBe(
+    const payloads = streamMock.mock.calls.map((c: any[]) => c[0]);
+    expect(payloads.every((p: any) => p.type === "promql")).toBe(true);
+    expect(payloads.map((p: any) => p.queryReq.query)).toContain(
       'sum(k8s_pod_cpu_usage{k8s_cluster_name="prod",k8s_namespace_name="shop",k8s_pod_name="web-abc-1",k8s_pod_uid="web-abc-1-u"})',
     );
   }, 30_000);
@@ -596,44 +693,73 @@ describe("K8sDetailsDrawer loading", () => {
 });
 
 describe("K8sDetailsDrawer actions", () => {
-  it("opens the pod's logs through resolvePodLogs, single-cluster", async () => {
-    await router.push("/");
-    const dispatch = vi.spyOn(store, "dispatch");
-    vi.mocked(resolvePodLogs).mockResolvedValue({
-      route: { path: "/logs", query: { stream: "default" } },
-      warnNoClusterField: false,
-    });
-    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
-    await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
-    await flushPromises();
-    expect(vi.mocked(resolvePodLogs).mock.calls[0].slice(0, 2)).toEqual([
-      { cluster: "prod", namespace: "shop", pod: "web-abc-1" },
-      { orgId: "org1", start: RANGE.start, end: RANGE.end, multiCluster: false },
-    ]);
-    expect(dispatch).toHaveBeenCalledWith("logs/setIsInitialized", false);
-    expect(router.currentRoute.value.path).toBe("/logs");
-    expect(toastMock).not.toHaveBeenCalled();
-  });
-
-  it("toasts when no log stream qualifies", async () => {
-    vi.mocked(resolvePodLogs).mockResolvedValue(null);
-    const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
-    await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
-    await flushPromises();
-    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
-  });
-
-  it.each(["node", "deployment", "cronjob", "namespace"] as const)(
-    "shows no action button on a %s drawer",
+  it.each(["node", "cronjob", "namespace"] as const)(
+    "shows no logs or traces button on a %s drawer",
     (kind) => {
-      const name = { node: "n1", deployment: "web", cronjob: "nightly-report", namespace: "shop" }[
-        kind
-      ];
+      const name = { node: "n1", cronjob: "nightly-report", namespace: "shop" }[kind];
       const wrapper = mountDrawer(refOf(kind, name));
       expect(wrapper.find('[data-test="k8s2-drawer-view-logs"]').exists()).toBe(false);
-      expect(wrapper.findAllComponents(OButton).some((b) => b.props("variant") === "outline")).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="k8s2-drawer-action-traces"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="k8s2-drawer-action-yaml"]').exists()).toBe(true);
     },
   );
+
+  it.each([
+    ["deployment", "web", "web-abc-1"],
+    ["daemonset", "agent", "agent-x"],
+    ["statefulset", "db", "db-0"],
+  ] as const)("acts on a %s's member pod for Logs and Traces", async (kind, name, podName) => {
+    const wrapper = mountDrawer(refOf(kind, name));
+    await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
+    await wrapper.find('[data-test="k8s2-drawer-action-traces"]').trigger("click");
+    const podRef = refOf("pod", podName);
+    expect(wrapper.emitted("action")).toEqual([
+      ["logs", podRef],
+      ["traces", podRef],
+    ]);
+  });
+
+  it("disables Logs and Traces on a workload with no loaded pods", async () => {
+    const wrapper = mountDrawer(refOf("deployment", "web"), {
+      inventory: { ...inventory, pods: [] },
+    });
+    const logs = wrapper.find('[data-test="k8s2-drawer-view-logs"]');
+    expect(logs.attributes("aria-disabled")).toBe("true");
+    await logs.trigger("click");
+    expect(wrapper.emitted("action")).toBeUndefined();
+    expect(
+      wrapper.find('[data-test="k8s2-drawer-action-traces"]').attributes("aria-disabled"),
+    ).toBe("true");
+  });
+
+  it("offers Pods on a node drawer and navigates to the pods list searching the node", async () => {
+    const wrapper = mountDrawer(refOf("node", "n1"));
+    await wrapper.find('[data-test="k8s2-drawer-action-pods"]').trigger("click");
+    expect(wrapper.emitted("navigate")).toEqual([[{ view: "pods", search: "n1" }]]);
+    expect(wrapper.find('[data-test="k8s2-drawer-action-pods"]').exists()).toBe(true);
+  });
+
+  it("emits action for YAML, Traces and Metrics, and leaves Explain disabled", async () => {
+    const ref = refOf("pod", "web-abc-1");
+    const wrapper = mountDrawer(ref);
+    for (const type of ["yaml", "traces", "metrics"]) {
+      await wrapper.find(`[data-test="k8s2-drawer-action-${type}"]`).trigger("click");
+    }
+    expect(wrapper.emitted("action")).toEqual([
+      ["yaml", ref],
+      ["traces", ref],
+      ["metrics", ref],
+    ]);
+    const explain = wrapper.find('[data-test="k8s2-drawer-action-explain"]');
+    expect(explain.attributes("aria-disabled")).toBe("true");
+    expect(explain.attributes("disabled")).toBeUndefined();
+    expect(wrapper.emitted("action")).toHaveLength(3);
+  });
+
+  it("emits action logs from the Logs button", async () => {
+    const ref = refOf("pod", "web-abc-1");
+    const wrapper = mountDrawer(ref);
+    await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
+    expect(wrapper.emitted("action")).toEqual([["logs", ref]]);
+  });
 });

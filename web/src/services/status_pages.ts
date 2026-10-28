@@ -37,6 +37,7 @@ export interface StatusPageListItem {
   brand_name: string;
   accent_color: string;
   logo_img: string;
+  favicon_img: string;
   tracking_since: number;
   owner: string;
   created_at: number;

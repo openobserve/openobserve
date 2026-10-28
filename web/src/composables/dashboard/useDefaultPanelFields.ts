@@ -80,8 +80,12 @@ const useDefaultPanelFields = (pageKey: string = "dashboard", t: TranslateFn) =>
     // Respect chart-type axis rules: metric/gauge etc. don't allow an x-axis, so
     // only seed x/y where the current chart type permits it (computed from the
     // now-empty field state after removeXYFilters).
-    query.fields.x = isAddXAxisNotAllowed.value ? [] : x;
-    query.fields.y = isAddYAxisNotAllowed.value ? [] : y;
+    // A time bucket is not an entity; the user picks the entity field.
+    query.fields.x =
+      isAddXAxisNotAllowed.value || dashboardPanelData.data.type === "hostmap" ? [] : x;
+    // A count is not a state; the user picks the state column.
+    query.fields.y =
+      isAddYAxisNotAllowed.value || dashboardPanelData.data.type === "state-timeline" ? [] : y;
     query.fields.breakdown = [];
     query.fields.filter = {
       filterType: "group",

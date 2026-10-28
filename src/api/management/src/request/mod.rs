@@ -41,6 +41,7 @@ pub mod downtimes;
 pub mod eval_jobs;
 #[cfg(feature = "enterprise")]
 pub mod experiments;
+pub mod fleet;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
@@ -63,7 +64,10 @@ pub mod profiling;
 pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_dashboards;
 pub mod public_rate_limit;
+#[cfg(feature = "enterprise")]
+pub mod quality;
 pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;

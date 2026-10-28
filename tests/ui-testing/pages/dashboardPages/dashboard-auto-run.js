@@ -24,10 +24,12 @@ export default class DashboardAutoRun {
     this.refreshOptionsBtn = page.locator('[data-test="dashboard-refresh-options-btn"]');
     this.refreshWithoutCacheItem = page.locator('[data-test="dashboard-refresh-without-cache-btn"]');
     this.autoRunToggle = page.locator('[data-test="dashboard-auto-run-toggle-btn"]');
+    this.cancelBtn = page.locator('[data-test="dashboard-cancel-btn"]');
     this.tooltip = page.locator('[data-test="o-tooltip-content"]');
     this.panelContainers = page.locator('[data-test="dashboard-panel-container"]');
     this.viewPanel = page.locator('[data-test="view-panel-screen"]');
     this.viewRefreshBtn = page.locator('[data-test="dashboard-viewpanel-refresh-data-btn"]');
+    this.viewCancelBtn = page.locator('[data-test="dashboard-viewpanel-cancel-btn"]');
     this.viewCloseBtn = page.locator('[data-test="dashboard-viewpanel-close-btn"]');
     this.viewTable = this.viewPanel.locator('[data-test="dashboard-panel-table"]');
     this.dashboardSetting = new DashboardSetting(page);
@@ -86,6 +88,14 @@ export default class DashboardAutoRun {
     const [first, second] = NAMESPACES.filter((ns) => ns !== initial);
     testLogger.info("Variable created from the UI", { variable, initial, first, second });
     return { initial, first, second };
+  }
+
+  // Dashboard + panels from the API with no variables — for the time-range apply spec.
+  async setupTimeRangeDashboard({ name, panels, period = '1h' }) {
+    const id = await createDashboard(`${name}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, { panels });
+    this.panelRuns = trackPanelRuns(this.page);
+    await this.openDashboard(ORG(), id, panels.map((p) => p.id), period);
+    return id;
   }
 
   async addVariablesFromSettings(variables) {
@@ -184,6 +194,13 @@ export default class DashboardAutoRun {
     await this.viewPanel.waitFor({ state: "visible", timeout: 15000 });
   }
 
+  async openFirstPanelFullscreen() {
+    const container = this.panelContainers.first();
+    await container.hover();
+    await container.locator('[data-test="dashboard-panel-fullscreen-btn"]').click();
+    await this.viewPanel.waitFor({ state: "visible", timeout: 15000 });
+  }
+
   async closeViewPanel() {
     await this.viewCloseBtn.click();
     await expect(this.viewPanel).toBeHidden({ timeout: 10000 });
@@ -237,6 +254,19 @@ export default class DashboardAutoRun {
     await expect(this.refreshBtn).toHaveAttribute("data-o2-variant", variant);
   }
 
+  async expectRefreshLabel(text) {
+    await expect(this.refreshBtn).toContainText(text);
+  }
+
+  async expectRefreshOptionsVariant(variant) {
+    await expect(this.refreshOptionsBtn).toHaveAttribute("data-o2-variant", variant);
+  }
+
+  async waitForRefreshIdle() {
+    // The Refresh button is :disabled="arePanelsLoading", so enabled means the dashboard settled.
+    await expect(this.refreshBtn).toBeEnabled({ timeout: 30000 });
+  }
+
   async expectRefreshNotPending() {
     await expect(this.refreshBtn).not.toHaveAttribute("data-o2-variant", "pending");
   }
@@ -260,6 +290,21 @@ export default class DashboardAutoRun {
 
   async expectViewPanelOpen() {
     await expect(this.viewPanel).toBeVisible();
+  }
+
+  async expectViewPanelRefreshLabel() {
+    await expect(this.viewRefreshBtn).toBeVisible();
+    await expect(this.viewRefreshBtn).toContainText("Refresh");
+  }
+
+  async expectDashboardCancelLabel() {
+    await expect(this.cancelBtn).toBeVisible();
+    await expect(this.cancelBtn).toContainText("Cancel");
+  }
+
+  async expectViewPanelCancelLabel() {
+    await expect(this.viewCancelBtn).toBeVisible();
+    await expect(this.viewCancelBtn).toContainText("Cancel");
   }
 
   async expectUrlVariable(name, value) {
