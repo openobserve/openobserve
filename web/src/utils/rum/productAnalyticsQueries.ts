@@ -371,7 +371,7 @@ export function scopeClause(scope: AnalyticsScope, sample: SampleRatio = 1): str
 }
 
 // Clicks, click pages, active users and identity tops filter identity rules row by row.
-const rowScope = (scope: AnalyticsScope): string => scopeWhere(scope, 1, true);
+export const rowScope = (scope: AnalyticsScope): string => scopeWhere(scope, 1, true);
 
 // One WHEN per app keeps compared apps' rules apart; MIN flags only sessions whose every row matches, as row filters drop them whole.
 const appFlag = (

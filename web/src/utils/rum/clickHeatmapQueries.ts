@@ -15,7 +15,7 @@
 
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { rumFieldNames } from "@/utils/rum/fields";
-import { scopeClause, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
+import { rowScope, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
 
 export type DeviceClass = "all" | "desktop" | "tablet" | "phone";
 export type DeviceBucket = Exclude<DeviceClass, "all"> | "unknown";
@@ -60,7 +60,7 @@ export function selectorExpr(scope: AnalyticsScope): string | null {
 }
 
 const clickRows = (scope: AnalyticsScope): string => {
-  const parts = [scopeClause(scope), "type = 'action'"];
+  const parts = [rowScope(scope), "type = 'action'"];
   if (has(scope, "action_type")) parts.push("action_type = 'click'");
   return parts.join(" AND ");
 };

@@ -88,7 +88,7 @@ const MIN_SPOT_RADIUS = 28;
 const MAX_SPOT_RADIUS = 90;
 const OUTLINE_LINE_WIDTH = 3;
 const OUTLINE_FILL_ALPHA = 0.08;
-const OUTLINE_FALLBACK_COLOR = "#3f7994";
+const OUTLINE_FALLBACK_COLOR = "currentColor";
 
 /** Positions are not fetched, so each element glows at its centre, brighter the more it was clicked. */
 export function placeGroup(
@@ -142,7 +142,7 @@ export function drawOutline(canvas: HTMLCanvasElement, rect: OutlineRect): void 
   ctx.restore();
 }
 
-/** Draws additive alpha blobs, then recolours by accumulated density (blue = few clicks, red = many). */
+/** Draws additive alpha blobs, then recolours by accumulated density (green = few clicks, red = many). */
 export function renderHeat(canvas: HTMLCanvasElement, spots: HeatSpot[], radius = 28): void {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return;

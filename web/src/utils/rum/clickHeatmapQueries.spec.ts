@@ -184,3 +184,22 @@ describe("request shape", () => {
     }
   });
 });
+
+describe("identity exclusions", () => {
+  const sc = scope({
+    schema: { ...FULL, usr_email: true },
+    exclusions: {
+      bots: false,
+      builtinBots: { families: [], devices: [] },
+      sessions: [{ field: "usr_email", op: "eq", values: ["qa@x.com"] }],
+      pages: [],
+    },
+  });
+  const RULE = "usr_email IS NULL OR usr_email <> 'qa@x.com'";
+
+  it("reaches the page list, totals and ranking", () => {
+    expect(pageListSql(sc)).toContain(RULE);
+    expect(totalsSql(sc, "/pricing", "all")).toContain(RULE);
+    expect(rankingSql(sc, "/pricing", "all")).toContain(RULE);
+  });
+});

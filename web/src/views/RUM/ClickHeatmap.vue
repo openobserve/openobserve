@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('rum.heatmap.noPages')"
       data-test="rum-heatmap-empty"
     />
-    <div v-else-if="!loading && !pageOptions.length" class="p-4">
+    <div v-else-if="loadError" class="p-4">
       <OBanner
         variant="warning"
         dense
@@ -113,6 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-show="snapshotReady"
                 ref="stageRef"
+                role="img"
+                :aria-label="t('rum.heatmap.stageLabel')"
                 class="origin-top-left [&_.replayer-mouse]:hidden [&_.replayer-mouse-tail]:hidden"
                 data-test="rum-heatmap-stage"
               />
@@ -121,13 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex w-136 shrink-0 flex-col gap-2 max-lg:w-full">
-          <OBanner
-            v-if="loadError"
-            variant="warning"
-            dense
-            :content="loadError"
-            data-test="rum-heatmap-load-error"
-          />
           <OBanner
             v-if="snapshotError"
             variant="info"
@@ -140,16 +135,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary text-xs"
             data-test="rum-heatmap-pages-limited"
           >
-            {{ t("rum.heatmap.pagesLimited", { count: PAGE_LIST_LIMIT }) }}
+            {{ t("rum.heatmap.pagesLimited", { count: PAGE_LIST_LIMIT }, PAGE_LIST_LIMIT) }}
           </span>
           <span
             v-if="rankingLimited"
             class="text-text-secondary text-xs"
             data-test="rum-heatmap-ranking-limited"
           >
-            {{ t("rum.heatmap.rankingLimited", { count: RANKING_LIMIT }) }}
+            {{ t("rum.heatmap.rankingLimited", { count: RANKING_LIMIT }, RANKING_LIMIT) }}
           </span>
-          <span class="text-text-secondary text-xs" data-test="rum-heatmap-placed">
+          <span
+            v-if="snapshotReady"
+            class="text-text-secondary text-xs"
+            data-test="rum-heatmap-placed"
+          >
             {{ t("rum.heatmap.placed", { placed: placedCount, total: groups.length }) }}
           </span>
           <span
@@ -157,7 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary text-xs"
             data-test="rum-heatmap-unknown-device"
           >
-            {{ t("rum.heatmap.unknownDevice", { count: addCommasToNumber(unknownDeviceClicks) }) }}
+            {{
+              t(
+                "rum.heatmap.unknownDevice",
+                { count: addCommasToNumber(unknownDeviceClicks) },
+                unknownDeviceClicks,
+              )
+            }}
           </span>
           <OTable
             :data="tableRows"
@@ -202,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-frustrated="{ row }">
               <span
+                v-if="row.clicks"
                 :title="
                   t('rum.heatmap.frustrationSplit', {
                     rage: row.rage,
@@ -269,7 +275,7 @@ import {
   type DeviceBucket,
   type DeviceClass,
 } from "@/utils/rum/clickHeatmapQueries";
-import { appProbeSql, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
+import { appProbeSql, rowScope, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
 
 interface ElementRow {
   selector: string;
@@ -289,6 +295,7 @@ const RANK_PANELS = ["devices", "totals", "ranking"] as const;
 const SNAPSHOT_LOOKBACK_HOURS = 720;
 const OUTLINE_SCROLL_MARGIN = 96;
 const MAX_UNUSED = 30;
+const MIN_PLACED_CLICK_SHARE = 0.9;
 const UNUSED_LABEL_MAX = 40;
 const INTERACTIVE_SELECTOR =
   'button, a[href], input:not([type="hidden"]), select, textarea, [role="button"]';
@@ -441,7 +448,7 @@ const statItems = computed<StatItem[]>(() => {
     items.push({
       key: "unused",
       label: t("rum.heatmap.statUnused"),
-      value: addCommasToNumber(unusedRows.value.length),
+      value: `${addCommasToNumber(unusedRows.value.length)}${unusedRows.value.length >= MAX_UNUSED ? "+" : ""}`,
       sub: t("rum.heatmap.statUnusedSub"),
       dataTest: "rum-heatmap-stat-unused",
     });
@@ -465,6 +472,8 @@ function windowMicros(hours: number) {
   return { start_time: end - hours * 3_600_000_000, end_time: end };
 }
 
+class ForbiddenError extends Error {}
+
 // A null result means a newer request replaced this one, so the caller must drop it.
 async function searchRows<T>(
   id: string,
@@ -481,9 +490,8 @@ async function searchRows<T>(
   };
   const res = await search.run<T>(id, spec, `${id}:${sql}`);
   if (res.status === "ok") return res.rows;
-  if (res.status === "error" || res.status === "forbidden") {
-    throw new Error(res.error?.message || res.status);
-  }
+  if (res.status === "forbidden") throw new ForbiddenError();
+  if (res.status === "error") throw new Error(res.error?.message || res.status);
   return null;
 }
 
@@ -501,7 +509,9 @@ async function ensureSchema() {
 
 function failLoad(label: string, error: unknown) {
   console.error(`Click heatmap: ${label} failed`, error);
-  loadError.value = t("rum.heatmap.loadFailed");
+  loadError.value = t(
+    error instanceof ForbiddenError ? "rum.heatmap.forbidden" : "rum.heatmap.loadFailed",
+  );
 }
 
 async function loadApps() {
@@ -573,6 +583,7 @@ async function loadPages() {
     }
   } catch (error) {
     if (token !== loadToken) return;
+    resetPage();
     failLoad("page list", error);
     pageOptions.value = [];
     loading.value = false;
@@ -655,7 +666,7 @@ async function pickReplayView(): Promise<string | null> {
   const hasActions = (stream?.schema ?? []).some((f: any) => f?.name === "view_action_count");
   const views = await replayRows(
     "replay-views",
-    `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE type = 'view' AND application_id = ${sqlLiteral(appId.value)} AND view_url = ${sqlLiteral(pageUrl.value)}${deviceClause(scope(), deviceClass.value)} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
+    `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE ${rowScope(scope())} AND type = 'view' AND view_url = ${sqlLiteral(pageUrl.value)}${deviceClause(scope(), deviceClass.value)} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
     30,
   );
   if (!views.length) return null;
@@ -705,7 +716,7 @@ async function loadSnapshotSource(): Promise<SnapshotSource | null> {
   const last = Number(events[events.length - 1].timestamp);
   const [lastClick] = await replayRows(
     "replay-click",
-    `SELECT max(date) AS d FROM "_rumdata" WHERE type = 'action' AND view_id = ${sqlLiteral(viewId)}`,
+    `SELECT max(date) AS d FROM "_rumdata" WHERE ${rowScope(scope())} AND type = 'action' AND view_id = ${sqlLiteral(viewId)}`,
     1,
   );
   const clickAt = Number(lastClick?.d);
@@ -833,6 +844,7 @@ function ensureOverlay(frame: { wrapper: HTMLElement }, width: number, height: n
   if (!overlay) {
     overlay = document.createElement("canvas");
     overlay.dataset.test = "rum-heatmap-canvas";
+    overlay.setAttribute("aria-hidden", "true");
     overlay.className = "pointer-events-none absolute left-0 top-0 z-10";
     frame.wrapper.appendChild(overlay);
   }
@@ -875,11 +887,19 @@ function drawHeat() {
     placed.add(g.selector);
   }
   placedSelectors.value = placed;
-  unusedRows.value = findUnusedControls(frame.doc, clickedEls, rects);
+  unusedRows.value = mostlyPlaced(placed) ? findUnusedControls(frame.doc, clickedEls, rects) : [];
   elementRects = rects;
   renderHeat(canvas, spots);
   const selected = elementRects.get(selectedSelector.value);
   if (selected) drawOutline(canvas, selected);
+}
+
+// Unplaced clicks may be on controls this snapshot lacks, so "never clicked" is only trustworthy when most clicks landed.
+function mostlyPlaced(placed: Set<string>): boolean {
+  const placedClicks = groups.value
+    .filter((g) => placed.has(g.selector))
+    .reduce((sum, g) => sum + g.clicks, 0);
+  return totals.value.clicks > 0 && placedClicks / totals.value.clicks >= MIN_PLACED_CLICK_SHARE;
 }
 
 function findUnusedControls(

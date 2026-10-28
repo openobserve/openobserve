@@ -124,4 +124,42 @@ describe("ClickHeatmap", () => {
 
     expect(ids().sort()).toEqual(["ranking", "replay-views", "totals"]);
   });
+
+  it("shows only the error banner with a retry when the clicks fail to load", async () => {
+    answer({ totals: () => ({ status: "error", error: { message: "boom" } }) });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="rum-heatmap-load-error"]').text()).toContain(
+      "Couldn't load the click data.",
+    );
+    expect(wrapper.find('[data-test="rum-heatmap-retry-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-heatmap-no-position"]').exists()).toBe(false);
+  });
+
+  it("supersedes the earlier panel request when the device changes again", async () => {
+    answer();
+    const wrapper = await mountPage();
+    let release: (v: unknown) => void = () => {};
+    answer({
+      totals: () => new Promise((r) => (release = r)),
+    });
+    h.run.mockClear();
+    const device = wrapper
+      .findAllComponents(OSelect)
+      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+
+    device?.vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+    const firstRelease = release;
+    answer();
+    device?.vm.$emit("update:modelValue", "tablet");
+    await flushPromises();
+    firstRelease(ok([{ clicks: 99, sessions: 9, frustrated: 0 }]));
+    await flushPromises();
+
+    expect(ids().filter((id) => id === "totals")).toHaveLength(2);
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("4");
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).not.toContain("99");
+  });
 });
