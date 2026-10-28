@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
+            :key="dateTimePickerKey"
             class="h-7.5"
             size="sm"
             :initialTimezone="initialTimezone"
@@ -131,7 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  nextTick,
+  watch,
+  type Ref,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getDashboard, updateDashboard } from "@/utils/commons";
@@ -157,6 +167,12 @@ import {
   generalSettingsDefaults,
   type GeneralSettingsForm,
 } from "./GeneralSettings.schema";
+import {
+  comparableDateTime,
+  useDashboardSettingsDraft,
+  type GeneralSettingsDraft,
+} from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -211,7 +227,55 @@ export default defineComponent({
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
 
+    const draftContext = useDashboardSettingsDraft();
+    // The picker reads its v-model only on mount, so a restored range remounts it.
+    const dateTimePickerKey = ref(0);
+    // What the server holds, taken once the picker settled its own copy of the range; null until loaded.
+    const loadedKey = ref<string | null>(null);
+    // Off from a load until its pending edits are back, so the picker's mount emit cannot clear them first.
+    let draftSyncOn = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const formValues = form.useStore((s) => s.values);
+    const generalSnapshot = (): GeneralSettingsDraft =>
+      JSON.parse(
+        JSON.stringify({ values: formValues.value, dateTime: dateTimeValue.value ?? null }),
+      );
+    const sectionKey = (draft: GeneralSettingsDraft) =>
+      stableStringify({ values: draft.values, dateTime: comparableDateTime(draft.dateTime) });
+
+    const syncDraftSection = () => {
+      if (!draftContext || !draftSyncOn || loadedKey.value === null) return;
+      const current = generalSnapshot();
+      draftContext.pending.general = sectionKey(current) === loadedKey.value ? null : current;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = draftContext?.pending.general;
+      if (!pending) return;
+      form.reset(pending.values);
+      dateTimeValue.value = pending.dateTime;
+      dateTimePickerKey.value++;
+      await nextTick();
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
+    const markLoaded = async () => {
+      // Two ticks: the picker emits its range on mount, then once more for an absolute range.
+      await nextTick();
+      await nextTick();
+      loadedKey.value = sectionKey(generalSnapshot());
+    };
+
     const getDashboardData = async () => {
+      draftSyncOn = false;
+      loadedKey.value = null;
       const data = await getDashboard(
         store,
         route.query.dashboard,
@@ -238,10 +302,35 @@ export default defineComponent({
         relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod,
         valueType: data?.defaultDatetimeDuration?.type,
       };
+      if (draftContext) await markLoaded();
     };
+    const reloadAfterConflict = async () => {
+      await getDashboardData();
+      draftSyncOn = true;
+      syncDraftSection();
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      if (!draftContext) return;
+      await applyPendingDraft();
+      draftSyncOn = true;
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("general", saveForDraft);
     });
+
+    watch([formValues, dateTimeValue], syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (!draftSyncOn) return;
+        draftSyncOn = false;
+        await applyPendingDraft();
+        draftSyncOn = true;
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => unregisterDraftSection?.());
 
     const saveDashboard = async (value: GeneralSettingsForm) => {
       let data: any;
@@ -291,6 +380,11 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
+        lastSaveSucceeded = true;
+        if (loadedKey.value !== null) {
+          loadedKey.value = sectionKey(generalSnapshot());
+          syncDraftSection();
+        }
         emit("save");
       } catch (error: any) {
         if (saveConflict.isConflict(error)) {
@@ -299,7 +393,7 @@ export default defineComponent({
             folderId: (route?.query?.folder as string) ?? "default",
             mine: data,
             change: t("dashboard.saveConflict.change.changedSettings"),
-            onResolved: getDashboardData,
+            onResolved: reloadAfterConflict,
           });
         } else {
           showErrorNotification(
@@ -332,6 +426,7 @@ export default defineComponent({
       closeBtn,
       initialTimezone,
       dateTimeValue,
+      dateTimePickerKey,
       formRef,
     };
   },

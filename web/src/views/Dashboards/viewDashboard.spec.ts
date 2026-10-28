@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { inject, nextTick, reactive, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
@@ -2270,6 +2271,29 @@ describe("ViewDashboard", () => {
       wrapper.vm.enterLayoutEdit();
       await flushPromises();
       expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
+    });
+
+    it("marks Settings with a dot while this dashboard has a settings draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      const settings = () => wrapper.find('[data-test="dashboard-setting-btn"]');
+      expect(settings().attributes("aria-label")).toBeUndefined();
+
+      const scope = {
+        kind: "dashboard_settings" as const,
+        org: "test-org",
+        userEmail: "",
+      };
+      writeEditorDraft({ ...scope, entityId: "another-dashboard" }, { data: {} });
+      await flushPromises();
+      expect(wrapper.vm.hasSettingsDraft).toBe(false);
+
+      writeEditorDraft({ ...scope, entityId: "test-dashboard-1" }, { data: {} });
+      await flushPromises();
+      expect(wrapper.vm.hasSettingsDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(settings().attributes("aria-label")).toBe("common.editorDraft.newDot");
       localStorage.clear();
     });
 

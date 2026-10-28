@@ -373,8 +373,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
+              :aria-label="hasSettingsDraft ? settingsButtonLabel : undefined"
             >
-              <OTooltip :content="t('dashboard.setting')" />
+              <OTooltip :content="settingsButtonLabel" />
+              <EditorDraftDot
+                v-if="hasSettingsDraft"
+                corner
+                :tooltip="false"
+                data-test="dashboard-setting-btn-draft-dot"
+              />
             </OButton>
             <OButton
               variant="outline"
@@ -715,6 +722,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
@@ -816,6 +825,7 @@ export default defineComponent({
     KioskStrip,
     KioskSetupPopover,
     PlaylistHoldingCard,
+    EditorDraftDot,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -1354,6 +1364,16 @@ export default defineComponent({
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
+
+    const settingsDrafts = useEditorDraftIds("dashboard_settings");
+    const hasSettingsDraft = computed(() =>
+      settingsDrafts.ids.has(String(route.query.dashboard ?? "")),
+    );
+    const settingsButtonLabel = computed(() =>
+      hasSettingsDraft.value
+        ? t("common.editorDraft.newDot", { label: t("dashboard.setting") })
+        : t("dashboard.setting"),
+    );
 
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
@@ -2860,6 +2880,8 @@ export default defineComponent({
       resolveSaveConflict,
       saveConflictState: dashboardSaveConflictState,
       openSettingsDialog,
+      hasSettingsDraft,
+      settingsButtonLabel,
       loadDashboard,
       refreshPanelRequest,
       updateRunId,
