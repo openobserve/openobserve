@@ -70,7 +70,13 @@
       "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
-      "dashboard-config-unit-locale.spec.js"
+      "dashboard-config-unit-locale.spec.js",
+      "dashboard-panel-time-config-behavior.spec.js",
+      "dashboard-panel-time-url-priority.spec.js",
+      "dashboard-panel-time-advanced-edge-cases.spec.js",
+      "dashboard-panel-time-apply-behavior.spec.js",
+      "dashboard-panel-time-variables-behavior.spec.js",
+      "dashboard-time-range-apply.spec.js"
     ],
     "disabled": []
   },
@@ -90,9 +96,15 @@
       "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
-      "dashboard-zoom-brush.spec.js"
+      "dashboard-zoom-brush.spec.js",
+      "visualize.spec.js",
+      "visualize-vrl.spec.js",
+      "dashboard-streaming.spec.js"
     ],
-    "disabled": []
+    "disabled": [],
+    "paths": [
+      "tests/ui-testing/pages/cloudPages/**"
+    ]
   },
   {
     "testfolder": "Dashboards-Core",
@@ -143,21 +155,8 @@
     "disabled": []
   },
   {
-    "testfolder": "Dashboards-Panel-Level-DateTime-Config",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "dashboard-panel-time-config-behavior.spec.js",
-      "dashboard-panel-time-url-priority.spec.js",
-      "dashboard-panel-time-advanced-edge-cases.spec.js",
-      "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js",
-      "dashboard-time-range-apply.spec.js"
-    ],
-    "disabled": []
-  },
-  {
     "testfolder": "Dashboards-Settings",
+    "_comment": "Owns the pagination and pivot-table specs (previously their own single-spec shards) \u2014 keep them here.",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
@@ -168,25 +167,7 @@
       "dashboard-join.spec.js",
       "dashboard-nested-functions.spec.js",
       "dashboard-legends-copy.spec.js",
-      "dashboard-raw-query.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Dashboards-Streaming",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "dashboard-streaming.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Dashboards-Tables",
-    "_comment": "Owns the pagination and pivot-table specs (previously their own single-spec shards) \u2014 keep them here.",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
+      "dashboard-raw-query.spec.js",
       "dashboard-table-chart.spec.js",
       "dashboard-table-copy-cell.spec.js",
       "dashboard-table-csv-download.spec.js",
@@ -220,19 +201,6 @@
       "dashboard-variables-auto-run.spec.js"
     ],
     "disabled": []
-  },
-  {
-    "testfolder": "Dashboards-Visualize",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "visualize.spec.js",
-      "visualize-vrl.spec.js"
-    ],
-    "disabled": [],
-    "paths": [
-      "tests/ui-testing/pages/cloudPages/**"
-    ]
   },
   {
     "testfolder": "Functions",

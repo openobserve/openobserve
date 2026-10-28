@@ -11,6 +11,7 @@ on:
     # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
     # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
     types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
+  push:
   merge_group:
 
 concurrency:

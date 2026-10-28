@@ -118,9 +118,9 @@ test("cross-folder consumers are routed, not dropped", () => {
   let folders = run(["tests/ui-testing/playwright-tests/Dashboards/utils/dashCreation.js"]);
   assert.ok(folders.includes("Metrics"), "Metrics imports dashCreation.js");
   assert.ok(folders.includes("Dashboards-Core"));
-  // cloudPages page objects are consumed by Dashboards-Visualize and Functions specs.
+  // cloudPages page objects are consumed by Dashboards-Charts (visualize) and Functions specs.
   folders = run(["tests/ui-testing/pages/cloudPages/cloud-env.js"]);
-  assert.ok(folders.includes("Dashboards-Visualize") && folders.includes("Functions"), folders.join(","));
+  assert.ok(folders.includes("Dashboards-Charts") && folders.includes("Functions"), folders.join(","));
   // correlation plugin is runtime-imported by logs, traces, and alerts components.
   folders = run(["web/src/plugins/correlation/CorrelationPanel.vue"]);
   for (const f of ["Logs-Core", "Traces", "Alerts"]) assert.ok(folders.includes(f), f);
