@@ -48,6 +48,7 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
   let teamId;
   let ready = false;
   let buildType;
+  let emptyOrg;
   let why = 'needs an enterprise build with Slack on and the Slack mock';
   const u = api.uniq();
   const names = {
@@ -195,15 +196,25 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     slack = new SlackPages(page);
   });
 
+  // The team goes first: while its channel names the room destination, deleting that is refused.
   test.afterAll(async () => {
-    if (apiContext && org) {
-      for (const name of Object.values(names)) {
-        await api.call(apiContext, 'delete', `/api/${org}/alerts/destinations/${encodeURIComponent(name)}`);
-      }
-      if (teamId) await api.call(apiContext, 'delete', `/api/${org}/oncall/teams/${teamId}`);
-    }
     await context?.close();
-    await apiContext?.dispose();
+    if (!apiContext) return;
+    const left = [];
+    const remove = async (path, { missingOk = false } = {}) => {
+      const r = await api.call(apiContext, 'delete', path);
+      if (r.status >= 300 && !(missingOk && r.status === 404)) left.push(`${path} -> ${r.status}: ${r.text}`);
+    };
+    if (org) {
+      if (teamId) await remove(`/api/${org}/oncall/teams/${teamId}`);
+      for (const name of Object.values(names)) {
+        // Not every test creates every name, so an absent one is fine.
+        await remove(`/api/${org}/alerts/destinations/${encodeURIComponent(name)}`, { missingOk: true });
+      }
+    }
+    for (const id of [org, emptyOrg].filter(Boolean)) await remove(`/api/organizations/${id}`);
+    await apiContext.dispose();
+    expect(left, 'cleanup left resources behind').toEqual([]);
   });
 
   test.beforeEach(() => {
@@ -338,6 +349,7 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
   test('connect from the form on self-hosted points to Settings; the Cloud popup path is a live check (Z)', async () => {
     test.skip(buildType === 'cloud', 'Cloud connects from the form; the Settings hint is self-hosted only');
     const other = (await api.createOrg(apiContext, 'slack_pw_app_empty')).id;
+    emptyOrg = other;
     await page.goto(`${api.BASE()}/web/alert-destinations?org_identifier=${encodeURIComponent(other)}`, {
       waitUntil: 'domcontentloaded',
     });
