@@ -677,6 +677,67 @@ describe("OverviewTab", () => {
       expect(visibleSkeletons()).toEqual([]);
     });
 
+    // o2-enterprise#3126: the card border must use the panel's scale, so 7% reads Warning and not Critical.
+    it("should border each service card by the error-rate tier the service panel shows", async () => {
+      const node = (id: string, error_rate: number) => ({
+        id,
+        label: id,
+        error_rate,
+        requests: 100,
+        stream_name: "default",
+      });
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [node("crit", 12), node("warn", 7), node("degr", 3), node("ok", 0.5)],
+          edges: [],
+        },
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const border = (id: string) =>
+        wrapper
+          .find(`[data-test="overview-service-card-${id}"]`)
+          .classes()
+          .filter((c) => c.startsWith("border-s-service-health-"));
+      expect(border("crit")).toEqual(["border-s-service-health-critical"]);
+      expect(border("warn")).toEqual(["border-s-service-health-warning"]);
+      expect(border("degr")).toEqual(["border-s-service-health-degraded"]);
+      expect(border("ok")).toEqual(["border-s-service-health-healthy"]);
+    });
+
+    it("should border a card at exactly 1% errors as degraded, as the legend's 1 – 5% band says", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "edge", label: "edge", error_rate: 1, requests: 100, stream_name: "default" },
+          ],
+          edges: [],
+        },
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-service-card-edge"]').classes()).toContain(
+        "border-s-service-health-degraded",
+      );
+    });
+
+    it("should border a healthy service card as degraded when only its latency is flagged", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: mockOverview.serviceGraphTopology,
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-service-card-payments"]').classes()).toContain(
+        "border-s-service-health-degraded",
+      );
+    });
+
     it("should render only the incidents skeleton when the incident list alone is in flight", async () => {
       const pending = deferred<{ data: { incidents: unknown[] } }>();
       vi.mocked(incidentsService.list).mockReturnValue(pending.promise as never);

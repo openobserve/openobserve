@@ -391,18 +391,25 @@ describe("ServiceGraphSidePanel.vue", () => {
   // -------------------------------------------------------------------------
 
   describe("Computed Properties - serviceHealth", () => {
-    it("should return healthy status when error_rate <= 5%", () => {
+    it("should return degraded status when error_rate > 1% and <= 5%", () => {
       wrapper = createWrapper(); // service-a: error_rate = 2.5
+      const health = wrapper.vm.serviceHealth;
+      expect(health.status).toBe("degraded");
+      expect(health.text).toBe("Degraded");
+    });
+
+    it("control: should return healthy status when error_rate <= 1%", () => {
+      wrapper = createWrapper({ selectedNode: { ...mockNodes[0], error_rate: 0.8 } });
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("healthy");
       expect(health.text).toBe("Healthy");
     });
 
-    it("should return degraded status when error_rate > 5% and <= 10%", () => {
+    it("should return warning status when error_rate > 5% and <= 10%", () => {
       wrapper = createWrapper({ selectedNode: mockNodes[1] }); // 7.8%
       const health = wrapper.vm.serviceHealth;
-      expect(health.status).toBe("degraded");
-      expect(health.text).toBe("Degraded");
+      expect(health.status).toBe("warning");
+      expect(health.text).toBe("Warning");
     });
 
     it("should return critical status when error_rate > 10%", () => {
@@ -426,11 +433,26 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(wrapper.vm.serviceHealth.status).toBe("healthy");
     });
 
-    it("should categorize error_rate=8 as degraded", () => {
+    it("should categorize error_rate=8 as warning", () => {
       wrapper = createWrapper({
         selectedNode: { ...mockNodes[0], error_rate: 8 },
       });
-      expect(wrapper.vm.serviceHealth.status).toBe("degraded");
+      expect(wrapper.vm.serviceHealth.status).toBe("warning");
+    });
+
+    // o2-enterprise#3126 B1: a node with no error_rate read as 0%, so a failing service showed Healthy.
+    it("should derive Critical from errors over requests when error_rate is missing", () => {
+      wrapper = createWrapper({
+        selectedNode: {
+          id: "service-c",
+          label: "Service C",
+          name: "Service C",
+          requests: 200,
+          errors: 30,
+        },
+      });
+      expect(wrapper.vm.serviceHealth.status).toBe("critical");
+      expect(wrapper.vm.serviceHealth.text).toBe("Critical");
     });
 
     it("should categorize error_rate=15 as critical", () => {

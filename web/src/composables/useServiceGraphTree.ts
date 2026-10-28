@@ -18,6 +18,7 @@ import type { I18nText } from "@/types/i18n";
 import { Ref, ref } from "vue";
 import { useTreeVisualization, TreeNode } from "@/composables/useTreeVisualization";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+import { serviceHealthFromErrorRate } from "@/utils/traces/serviceHealth";
 
 /**
  * Service graph data structure
@@ -184,12 +185,13 @@ export function useServiceGraphTree(
    * Get health-based color
    */
   const getHealthColor = (errorRate: number, isDarkMode: boolean): string => {
-    const green = isDarkMode ? "#10b981" : "#52c41a";
-
-    if (errorRate > 10) return isDarkMode ? "#ef4444" : "#f5222d"; // Red — critical
-    if (errorRate > 5) return isDarkMode ? "#f97316" : "#fa8c16"; // Orange — warning
-    if (errorRate > 1) return isDarkMode ? "#fbbf24" : "#faad14"; // Yellow — degraded
-    return green; // Green — healthy
+    const [dark, light] = {
+      critical: ["#ef4444", "#f5222d"],
+      warning: ["#f97316", "#fa8c16"],
+      degraded: ["#fbbf24", "#faad14"],
+      healthy: ["#10b981", "#52c41a"],
+    }[serviceHealthFromErrorRate(errorRate)];
+    return isDarkMode ? dark : light;
   };
 
   // Use the base tree visualization composable with service context
