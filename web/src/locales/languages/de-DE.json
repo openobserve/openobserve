@@ -1564,7 +1564,7 @@
     "calls": "Ruft auf",
     "self": "Eigen",
     "total": "Gesamt",
-    "shareOfCaller": "Anteil des Aufrufers",
+    "shareOfCaller": "Anteil am Aufrufer",
     "partialResult": "{percent} der Samples werden angezeigt. Seltenere Call Stacks fehlen in dieser Ansicht.",
     "otherFrameHint": "Kleinere Aufrufpfade, zusammengefasst, damit der Graph schnell bleibt.",
     "truncatedFrameHint": "Aufrufer jenseits von 1000 Frames wurden aus diesem Stack abgeschnitten.",

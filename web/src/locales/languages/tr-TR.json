@@ -1564,7 +1564,7 @@
     "calls": "Çağırdıkları",
     "self": "Kendi",
     "total": "Toplam",
-    "shareOfCaller": "Çağıranın payı",
+    "shareOfCaller": "Çağırandaki pay",
     "partialResult": "Örneklerin {percent} kadarı gösteriliyor. Daha az görülen çağrı yığınları bu görünümde yok.",
     "otherFrameHint": "Grafiği hızlı tutmak için birleştirilmiş daha küçük çağrı yolları.",
     "truncatedFrameHint": "1000 çerçevenin ötesindeki çağıranlar bu yığından çıkarıldı.",

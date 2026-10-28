@@ -22,9 +22,11 @@ describe("cssToken", () => {
   });
 
   it("returns a token set on body, where dark-mode presets are written", () => {
+    document.documentElement.style.setProperty("--color-preset-more", "#abcdef");
     document.body.style.setProperty("--color-preset-more", "#123456");
     expect(cssToken("--color-preset-more", "#000000")).toBe("#123456");
     document.body.style.removeProperty("--color-preset-more");
+    document.documentElement.style.removeProperty("--color-preset-more");
   });
 
   it("still returns a token set only on documentElement", () => {

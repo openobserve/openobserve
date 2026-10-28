@@ -1564,7 +1564,7 @@
     "calls": "Gọi tới",
     "self": "Riêng",
     "total": "Tổng",
-    "shareOfCaller": "Tỷ lệ của hàm gọi",
+    "shareOfCaller": "Tỷ lệ so với hàm gọi",
     "partialResult": "Đang hiển thị {percent} mẫu. Các ngăn xếp lời gọi ít gặp hơn không có trong chế độ xem này.",
     "otherFrameHint": "Các đường gọi nhỏ hơn, được gộp lại để biểu đồ chạy nhanh.",
     "truncatedFrameHint": "Các caller vượt quá 1000 frame đã bị cắt khỏi stack này.",
