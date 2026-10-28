@@ -115,7 +115,8 @@
     "browser": "chrome",
     "run_files": [
       "metrics-regression.spec.js",
-      "metrics-14238-stale-nodata.spec.js"
+      "metrics-14238-stale-nodata.spec.js",
+      "metrics-ent3122-promql-infinite-table.spec.js"
     ],
     "disabled": []
   },

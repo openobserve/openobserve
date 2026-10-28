@@ -1,4 +1,4 @@
-"""PromQL Prometheus-parity and result-cache fixes #15142, #15002, #15186, #15164, #15204 and #15187."""
+"""PromQL Prometheus-parity, query-API and result-cache fixes #5152, #14924, #14925, #15142, #15002, #15150, #15186, #15164, #15204 and #15187."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from support.wait import wait_until
 logger = logging.getLogger(__name__)
 
 STEP = 60
-# Samples sit off the evaluation grid: the WAL scan drops a sample stamped exactly at the evaluation time.
+# Samples sit off the evaluation grid so no expected value hinges on a window edge.
 HALF = 30
 # The largest value ingestion keeps finite; ingestion clamps Inf and drops NaN, so queries build those.
 NEAR_MAX = 1e308
@@ -449,3 +449,263 @@ def test_escaped_quote_matcher_survives_at_end_reserialization_15187(client, cre
     )
     assert [s["metric"]["path"] for s in pinned] == ["api.v1"]
     assert _values_of(pinned) == ["13"] * 4, "@ end() pins every step to the last sample"
+
+
+def test_instant_query_reads_the_sample_stamped_at_the_evaluation_time(client, created):
+    """an instant query at a sample's own timestamp reads that sample, and a range step landing there does too."""
+    metric = _metric_name("on_grid")
+    t = _anchor()
+    _ingest(client, _series(metric, {"job": "e2e"}, [(t + k * STEP, k) for k in range(4)]), created)
+    _wait_for_samples(client, metric, 4)
+    assert _instant_value(client, metric, t + 2 * STEP + 1) == "2", "Precondition: the sample is searchable"
+
+    assert _instant_value(client, metric, t + 2 * STEP) == "2"
+    assert _instant_value(client, f"count_over_time({metric}[2m])", t + 2 * STEP) == "2"
+    steps = _range_query(client, metric, start=t + STEP, end=t + 3 * STEP, use_cache=False)
+    assert _values_of(steps) == ["1", "2", "3"], "the last step lands on the last sample and must read it"
+
+
+@pytest.mark.parametrize(("step", "points"), [("1.5", 5), ("1.5s", 5), ("0.5", None), ("0.5s", None)])
+def test_range_query_reads_a_fractional_step_as_seconds(client, step, points):
+    """a fractional step such as 1.5 is read as seconds, as the endpoint documents, not rejected."""
+    start = _anchor(1)
+    params = {"query": "vector(1)", "start": start, "end": start + 6, "step": step}
+    status, body = _promql(client, "query_range", params)
+
+    assert status == 200, f"step={step} must be accepted: {body}"
+    assert body["data"]["resultType"] == "matrix"
+    values = body["data"]["result"][0]["values"]
+    if points is not None:
+        assert len(values) == points, f"6s at step {step} gives {points} points"
+    assert {value for _, value in values} == {"1"}
+
+
+def test_unreadable_step_and_reversed_range_get_a_clear_400(client):
+    """an unreadable step names the bad input, and a range ending before it starts says so."""
+    start = _anchor(1)
+    status, body = _promql(
+        client, "query_range", {"query": "vector(1)", "start": start, "end": start + 60, "step": "1.5.0"}
+    )
+    assert status == 400, body
+    assert body.get("errorType") == "bad_data"
+    assert '"1.5.0"' in body.get("error", ""), body
+
+    # 2e13 seconds in microseconds overflows an i64
+    huge = "20000000000000"
+    status, body = _promql(
+        client, "query_range", {"query": "vector(1)", "start": start, "end": start + 60, "step": huge}
+    )
+    assert status == 400, body
+    assert body.get("errorType") == "bad_data"
+    assert f'"{huge}"' in body.get("error", ""), body
+
+    reversed_windows = (
+        ({"start": start + 600, "end": start}, "end timestamp must not be before start time"),
+        (
+            {"start": 0, "end": 60},
+            "end timestamp must not be before start time, which is now when start is 0 or missing",
+        ),
+    )
+    for window, error in reversed_windows:
+        status, body = _promql(client, "query_range", {"query": "vector(1)", **window, "step": "60"})
+        assert status == 400, f"{window}: {body}"
+        assert body.get("error") == error, f"{window}: {body}"
+
+
+@pytest.mark.parametrize(("step", "same_as"), [("1m30", "60"), ("30m0", "1800"), ("0.0004", "1")])
+def test_step_ignores_a_trailing_bare_number_and_never_rounds_to_auto(client, step, same_as):
+    """a trailing bare number adds nothing, as saved panel steps expect, and a sub-millisecond step gets the 1s minimum, not auto-step."""
+    start = _anchor(1)
+    window = {"query": "vector(1)", "start": start - 3600, "end": start}
+
+    def values(step: str) -> list:
+        status, body = _promql(client, "query_range", {**window, "step": step})
+        assert status == 200, f"step={step}: {body}"
+        return body["data"]["result"][0]["values"]
+
+    assert values(step) == values(same_as), f"step={step} must read as step={same_as}"
+
+
+NAMELESS_SELECTORS = (
+    'topk(5, count by (__name__)({{env="dev"}}))',
+    'rate({{env="dev"}}[5m])',
+    'count by (__name__)({{__name__=~"{metric}.*", env="dev"}})',
+    'rate({{__name__=~"{metric}.*"}}[5m])',
+    '{{env="dev"}}',
+)
+
+
+@pytest.mark.parametrize("endpoint", ["query", "query_range"])
+@pytest.mark.parametrize("template", NAMELESS_SELECTORS)
+def test_selector_without_metric_name_is_a_400_not_a_panic_5152(client, endpoint, template):
+    """a selector with no metric name is answered with 400 "metric name is required" (#5152)."""
+    query = template.format(metric=_metric_name("nameless"))
+    at = _anchor(1)
+    params = (
+        {"query": query, "time": at}
+        if endpoint == "query"
+        else {"query": query, "start": at - 300, "end": at, "step": "60"}
+    )
+    status, body = _promql(client, endpoint, params)
+
+    assert status == 400, f"{query}: {body}"
+    assert body.get("errorType") == "bad_data", body
+    assert "metric name is required" in body.get("error", ""), body
+
+
+def test_same_selector_with_a_metric_name_returns_data_5152(client, created):
+    """the named form of the #5152 query returns the per-name count (#5152)."""
+    metric = _metric_name("named")
+    t = _anchor()
+    rows = [
+        row for inst in ("i1", "i2", "i3") for row in _series(metric, {"env": "dev", "inst": inst}, [(t + HALF, 1)])
+    ]
+    _ingest(client, rows, created)
+    _wait_for_samples(client, metric, 3)
+
+    result = _instant(client, f'topk(5, count by (__name__)({metric}{{env="dev"}}))', t + STEP)
+    assert [(s["metric"], s["value"][1]) for s in result] == [({"__name__": metric}, "3")]
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("day_of_week(vector(0))", "4"),
+        ("year(vector(4e10))", "3237"),
+        ("year(vector(-9e12))", "NaN"),
+        ("year(vector(-1e13))", "NaN"),
+        ("month(vector(-1e13))", "NaN"),
+        ("vector(1)/0", "+Inf"),
+        ("-vector(1)/0", "-Inf"),
+        ("vector(0)/0", "NaN"),
+        ("vector(1e21)", "1e+21"),
+        ("vector(1e-7)", "1e-07"),
+    ],
+)
+def test_date_functions_and_special_values_match_prometheus_14925(client, query, expected):
+    """date functions out of range give NaN, and +Inf, -Inf and exponents are written as Prometheus writes them (#14925)."""
+    assert _instant_value(client, query, _anchor(1)) == expected
+
+
+def test_count_values_labels_an_infinite_value_plus_inf_14925(client):
+    """count_values writes an infinite value into its label as +Inf (#14925)."""
+    result = _instant(client, 'count_values("v", vector(1)/0)', _anchor(1))
+    assert [(s["metric"], s["value"][1]) for s in result] == [({"v": "+Inf"}, "1")]
+
+
+def test_window_functions_return_prometheus_values_15150(client, created):
+    """mad_over_time, ts_of_*_over_time and histogram_fraction return Prometheus's values (#15150)."""
+    gauge = _metric_name("y")
+    hist = f"{_metric_name('frac')}_bucket"
+    t = _anchor(15)
+    rows = _series(gauge, {"job": "e2e"}, [(t + k * STEP + HALF, 10 * k) for k in range(6)])
+    for le, per_minute in (("0.5", 1), ("1", 3), ("+Inf", 4)):
+        rows += _series(hist, {"job": "e2e", "le": le}, [(t + k * STEP + HALF, per_minute * k) for k in range(6)])
+    _ingest(client, rows, created)
+    _wait_for_samples(client, gauge, 6)
+    _wait_for_samples(client, hist, 18)
+    # (t+40, t+340] holds 10, 20, 30, 40 and 50, at t+90 to t+330
+    at = t + 340
+
+    assert _instant_value(client, f"mad_over_time({gauge}[5m])", at) == "10"
+    assert _instant_value(client, f"ts_of_max_over_time({gauge}[5m])", at) == str(t + 330)
+    assert _instant_value(client, f"ts_of_min_over_time({gauge}[5m])", at) == str(t + 90)
+    assert _instant_value(client, f"ts_of_last_over_time({gauge}[5m])", at) == str(t + 330)
+    assert _instant_value(client, f"histogram_fraction(0, 1, rate({hist}[5m]))", at) == "0.75"
+
+
+def test_sort_by_label_and_limit_ratio_partition_series_15150(client, created):
+    """sort_by_label orders by the label, and limit_ratio(r) and limit_ratio(-(1-r)) split the series cleanly (#15150)."""
+    sorted_metric = _metric_name("sorted")
+    split_metric = _metric_name("split")
+    t = _anchor()
+    rows = [row for i in "dbac" for row in _series(sorted_metric, {"i": i}, [(t + HALF, 1)])]
+    rows += [row for i in range(40) for row in _series(split_metric, {"i": f"{i:02d}"}, [(t + HALF, i)])]
+    _ingest(client, rows, created)
+    _wait_for_samples(client, sorted_metric, 4)
+    _wait_for_samples(client, split_metric, 40)
+
+    def labels(query: str) -> list[str]:
+        return [s["metric"]["i"] for s in _instant(client, query, t + STEP)]
+
+    assert labels(f'sort_by_label({sorted_metric}, "i")') == ["a", "b", "c", "d"]
+    assert labels(f'sort_by_label_desc({sorted_metric}, "i")') == ["d", "c", "b", "a"]
+    for ratio in (0.1, 0.25, 0.5, 0.75, 0.9):
+        kept = set(labels(f"limit_ratio({ratio}, {split_metric})"))
+        rest = set(labels(f"limit_ratio(-(1 - {ratio}), {split_metric})"))
+        assert kept.isdisjoint(rest), f"ratio {ratio}: a series landed in both halves"
+        assert len(kept | rest) == 40, f"ratio {ratio}: the halves must cover every series"
+
+
+@pytest.mark.parametrize("name", ["double_exponential_smoothing", "holt_winters"])
+def test_smoothing_returns_the_prometheus_value_15187(client, created, name):
+    """both smoothing names give -1 on samples 5, 0 and 3 with factors 0.5 and 0.5 (#15187)."""
+    metric = _metric_name("smooth")
+    t = _anchor()
+    _ingest(
+        client,
+        _series(metric, {"job": "e2e"}, [(t + HALF, 5), (t + STEP + HALF, 0), (t + 2 * STEP + HALF, 3)]),
+        created,
+    )
+    _wait_for_samples(client, metric, 3)
+
+    assert _instant_value(client, f"{name}({metric}[5m], 0.5, 0.5)", t + 3 * STEP) == "-1"
+
+
+@pytest.mark.parametrize("name", ["double_exponential_smoothing", "holt_winters"])
+@pytest.mark.parametrize(
+    ("factors", "error"),
+    [
+        ("1.5, 0.5", "invalid smoothing factor. Expected: 0 < sf < 1, got: 1.500000"),
+        ("0, 0.5", "invalid smoothing factor. Expected: 0 < sf < 1, got: 0.000000"),
+        ("0.5, 0", "invalid trend factor. Expected: 0 < tf < 1, got: 0.000000"),
+        ("0.5, 1", "invalid trend factor. Expected: 0 < tf < 1, got: 1.000000"),
+    ],
+)
+def test_smoothing_rejects_a_factor_outside_zero_to_one_14924(client, created, name, factors, error):
+    """a smoothing or trend factor outside (0, 1) is an error once a series has samples, as in Prometheus (#14924 O10)."""
+    metric = _metric_name("smooth_bad")
+    t = _anchor()
+    _ingest(client, _series(metric, {"job": "e2e"}, [(t + HALF, 5), (t + STEP + HALF, 0)]), created)
+    _wait_for_samples(client, metric, 2)
+
+    status, body = _promql(client, "query", {"query": f"{name}({metric}[5m], {factors})", "time": t + 2 * STEP})
+    assert status == 400, body
+    assert body.get("errorType") == "bad_data", body
+    assert error in body.get("error", ""), body
+    # Prometheus checks the factors per series, so nothing selected means no error
+    assert _instant(client, f"{name}({_metric_name('absent')}[5m], {factors})", t + 2 * STEP) == []
+
+
+def test_variance_of_near_max_samples_is_zero_not_inf_14924(client, created):
+    """stdvar, stddev and their _over_time forms give 0 for two 1e308 samples, not +Inf (#14924 O8, O15)."""
+    over_time = _metric_name("var_over_time")
+    across = _metric_name("var_across")
+    t = _anchor()
+    rows = _series(over_time, {"job": "e2e"}, [(t + 30, NEAR_MAX), (t + 40, NEAR_MAX)])
+    rows += [row for i in ("1", "2") for row in _series(across, {"i": i}, [(t + HALF, NEAR_MAX)])]
+    _ingest(client, rows, created)
+    _wait_for_samples(client, over_time, 2)
+    _wait_for_samples(client, across, 2)
+
+    for func in ("stdvar", "stddev"):
+        assert _instant_value(client, f"{func}_over_time({over_time}[1m])", t + STEP) == "0", func
+        assert _instant_value(client, f"{func}({across})", t + STEP) == "0", func
+
+
+def test_instant_range_selector_reads_a_left_open_window_at_raw_times_14924(client, created):
+    """m[2m] at a sample's time reads (t-2m, t], and with an offset answers at the samples' own times (#14924 O19)."""
+    metric = _metric_name("window")
+    t = _anchor()
+    _ingest(client, _series(metric, {"job": "e2e"}, [(t + k * STEP, k) for k in range(1, 10)]), created)
+    _wait_for_samples(client, metric, 9)
+    at = t + 9 * STEP
+
+    def samples(query: str) -> list[tuple[int, str]]:
+        result = _instant(client, query, at)
+        assert len(result) == 1, f"{query}: {result}"
+        return [(int(ts), value) for ts, value in result[0]["values"]]
+
+    assert samples(f"{metric}[2m]") == [(t + 8 * STEP, "8"), (t + 9 * STEP, "9")]
+    assert samples(f"{metric}[2m] offset 1m") == [(t + 7 * STEP, "7"), (t + 8 * STEP, "8")]
+    assert _instant_value(client, f"count_over_time({metric}[2m])", at) == "2", "range functions read the same window"

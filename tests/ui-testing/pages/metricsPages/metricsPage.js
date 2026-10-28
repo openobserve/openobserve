@@ -111,6 +111,9 @@ export class MetricsPage {
         this.promqlTableValueHeader = page.locator(
             '[data-test="promql-table-chart"] [data-test="o2-table-th-value"]'
         );
+        this.promqlTableValueCells = page.locator(
+            '[data-test="promql-table-chart"] tbody td[data-test="o2-table-cell-value"]'
+        );
 
         // ===== ConfigPanel sidebar (PanelSidebar + Reka Collapsible sections) =====
         this.dashboardSidebarButton = page.locator('[data-test="dashboard-sidebar"]').first();
@@ -2502,6 +2505,35 @@ export class MetricsPage {
      */
     async isPromqlTableVisible() {
         return await this.promqlTableChart.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /** Enters a PromQL query and runs it until the query API answers 200 for that exact query. */
+    async runPromqlQuery(query, timeout = 30000) {
+        await this.enterMetricsQuery(query);
+        const isThisQuery = (resp) => {
+            const url = new URL(resp.url());
+            return (
+                /\/prometheus\/api\/v1\/query(_range)?$/.test(url.pathname) &&
+                url.searchParams.get('query') === query &&
+                resp.status() === 200
+            );
+        };
+        // The editor reaches the panel after a 500ms debounce, so an early Run can still send the previous query.
+        await expect(async () => {
+            const answered = this.page.waitForResponse(isThisQuery, { timeout: 5000 });
+            await this.clickApplyButton();
+            await answered;
+        }).toPass({ timeout });
+    }
+
+    /** Waits until every rendered Value cell of the PromQL table reads `expected`. */
+    async expectPromqlTableValues(expected, timeout = 20000) {
+        await expect
+            .poll(
+                async () => [...new Set((await this.promqlTableValueCells.allInnerTexts()).map((text) => text.trim()))],
+                { timeout, message: `every PromQL table Value cell should read ${expected}` }
+            )
+            .toEqual([expected]);
     }
 
     // ===== METRICS SHARE & DEEP-LINK METHODS =====
