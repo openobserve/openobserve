@@ -295,6 +295,15 @@ describe("FleetCollectorDrawer", () => {
     expect(text).toContain("from staging");
   });
 
+  it("labels the running event as the last confirmation, not a start time", async () => {
+    vi.mocked(fleet.getCollector).mockResolvedValue({
+      data: detail({ history: [{ at: 2, event: "running", detail: "edge v2" }] }),
+    } as any);
+    wrapper = mountDrawer("history");
+    await flushPromises();
+    expect(wrapper.find(sel("history")).text()).toContain("Last confirmed running");
+  });
+
   it("restarts and redelivers the collector", async () => {
     vi.mocked(fleet.restartCollector).mockResolvedValue({ data: { queued: true } } as any);
     vi.mocked(fleet.redeliverCollector).mockResolvedValue({ data: { revision: 8 } } as any);

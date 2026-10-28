@@ -38,6 +38,14 @@ const NETWORK_FAILURE_PATTERN = /network error|Load failed|Failed to fetch|Netwo
 const isNetworkFailure = (error: unknown): boolean =>
   error instanceof TypeError && NETWORK_FAILURE_PATTERN.test(error.message);
 
+// Status and message sit on prototypes of a Response or Error, which the error spread would drop.
+const withErrorFields = (error: unknown): unknown =>
+  error instanceof Response
+    ? { status: error.status, message: error.statusText || `HTTP ${error.status}` }
+    : error instanceof Error
+      ? { ...error, message: error.message }
+      : error;
+
 // Type definitions similar to WebSocket but for HTTP/2 streaming
 type StreamHandler = (data: any, traceId: string) => void;
 type ErrorHandler = (error: any, traceId: string) => void;
@@ -430,7 +438,7 @@ const useHttpStreaming = () => {
               // A dropped connection (offline, sleep, tab freeze) is not an app fault.
               if (isNetworkFailure(error)) console.warn("Error reading stream:", error);
               else console.error("Error reading stream:", error);
-              onError(traceId, error);
+              onError(traceId, withErrorFields(error));
             }
           } finally {
             // Always release the reader lock to prevent resource leaks
@@ -462,7 +470,7 @@ const useHttpStreaming = () => {
         sessionStorage.clear();
         window.location.reload();
       } else {
-        onError(traceId, error);
+        onError(traceId, withErrorFields(error));
       }
     }
   };

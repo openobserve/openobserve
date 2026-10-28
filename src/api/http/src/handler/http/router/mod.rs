@@ -3798,7 +3798,6 @@ mod tests {
                 "custom_logo_text",
                 "editor_suggest_mode",
                 "native_login_enabled",
-                "rum",
                 "sso_enabled",
                 "telemetry_enabled",
             ],
@@ -3876,6 +3875,10 @@ mod tests {
         assert!(
             payload.get("version").is_some(),
             "authenticated config carries the version"
+        );
+        assert!(
+            payload.get("rum").is_some_and(Value::is_object),
+            "the RUM SDK settings are served only to signed-in callers"
         );
         assert!(
             payload.get("instance").is_none(),
