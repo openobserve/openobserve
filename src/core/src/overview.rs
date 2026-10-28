@@ -224,7 +224,6 @@ pub struct LimitsData {
     pub days_over_limit: u8,
 }
 
-/// Clamps the requested top-N to `1..=MAX_TOP_N`, defaulting to `DEFAULT_TOP_N`.
 pub fn normalize_top_n(requested: Option<usize>) -> usize {
     requested.unwrap_or(DEFAULT_TOP_N).clamp(1, MAX_TOP_N)
 }
@@ -249,11 +248,12 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
     })
 }
 
-/// Overview for a caller whose grants could not be resolved; each scoped section reports an error.
-pub async fn scope_unavailable() -> Overview {
+/// Overview for a caller whose grants could not be resolved; alerts still load since they resolve
+/// their own permissions.
+pub async fn scope_unavailable(org_id: &str, user_id: &str) -> Overview {
     Overview {
         streams: Section::error("failed to resolve permissions"),
-        alerts: Section::error("failed to resolve permissions"),
+        alerts: Section::from_result(load_alerts(org_id, user_id).await, "alerts"),
         pipelines: Section::error("failed to resolve permissions"),
         limits: limits_section().await,
         generated_at: now_micros(),
@@ -490,19 +490,19 @@ fn build_pipelines_data(pipelines: &[Pipeline], errored: &HashSet<String>) -> Pi
         total: pipelines.len() as u64,
         enabled,
         disabled: pipelines.len() as u64 - enabled,
-        errored: pipelines.iter().filter(|p| errored.contains(&p.id)).count() as u64,
+        errored: pipelines
+            .iter()
+            .filter(|p| p.enabled && errored.contains(&p.id))
+            .count() as u64,
     }
 }
 
 #[cfg(feature = "enterprise")]
 async fn limits_section() -> Section<LimitsData> {
     use o2_enterprise::enterprise::license::{
-        get_license, ingestion_limit_exceeded_count, ingestion_used, license_expired,
+        ingestion_limit_exceeded_count, ingestion_used, license_expired,
     };
 
-    if get_license().await.is_none() {
-        return Section::locked("no license loaded");
-    }
     Section::ok(LimitsData {
         scope: "deployment",
         ingestion_used_percent: ingestion_used() * 100.0,
@@ -631,7 +631,8 @@ mod tests {
             pipeline("p2", false),
             pipeline("p3", true),
         ];
-        let errored: HashSet<String> = ["p2".to_string(), "hidden".to_string()].into();
+        let errored: HashSet<String> =
+            ["p1".to_string(), "p2".to_string(), "hidden".to_string()].into();
         let data = build_pipelines_data(&pipelines, &errored);
         assert_eq!(
             (data.total, data.enabled, data.disabled, data.errored),
