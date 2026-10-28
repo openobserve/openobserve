@@ -165,8 +165,7 @@ impl TraceListOptions {
         let mut size = query.get("size").map_or(DEFAULT_PAGE_SIZE, |v| {
             v.parse::<i64>().unwrap_or(DEFAULT_PAGE_SIZE)
         });
-        // Complete mode passes size <= 0 on, where the engine reads it as its default limit.
-        if mode == TraceListMode::Streaming && size <= 0 {
+        if size <= 0 {
             size = DEFAULT_PAGE_SIZE;
         }
         let mut options = Self {
@@ -365,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn parsing_preserves_defaults_and_unclamped_pagination() {
+    fn parsing_preserves_defaults_and_unclamped_offset() {
         for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
             let mut query = query();
             let defaults = TraceListOptions::parse(&query, mode).unwrap();
@@ -373,37 +372,32 @@ mod tests {
             query.insert("from".to_string(), "-2".to_string());
             query.insert("size".to_string(), "-1".to_string());
             let options = TraceListOptions::parse(&query, mode).unwrap();
-            let size = if mode == TraceListMode::Streaming {
-                10
-            } else {
-                -1
-            };
-            assert_eq!((options.from, options.size), (-2, size));
+            assert_eq!((options.from, options.size), (-2, 10));
             query.insert("size".to_string(), "invalid".to_string());
             assert_eq!(TraceListOptions::parse(&query, mode).unwrap().size, 10);
         }
     }
 
     #[test]
-    fn streamed_sizes_below_one_resolve_to_the_default_page() {
-        for (size, streamed, complete) in [
-            (None, 10, 10),
-            (Some("0"), 10, 0),
-            (Some("-1"), 10, -1),
-            (Some("-5"), 10, -5),
-            (Some("invalid"), 10, 10),
-            (Some("1"), 1, 1),
-            (Some("2"), 2, 2),
-            (Some("2000"), 2000, 2000),
+    fn sizes_below_one_resolve_to_the_default_page() {
+        for (size, expected) in [
+            (None, 10),
+            (Some("0"), 10),
+            (Some("-1"), 10),
+            (Some("-5"), 10),
+            (Some("invalid"), 10),
+            (Some("1"), 1),
+            (Some("2"), 2),
+            (Some("2000"), 2000),
         ] {
             let mut query = query();
             if let Some(size) = size {
                 query.insert("size".to_string(), size.to_string());
             }
-            let options = TraceListOptions::parse(&query, TraceListMode::Streaming).unwrap();
-            assert_eq!(options.size, streamed, "{size:?}");
-            let options = TraceListOptions::parse(&query, TraceListMode::Complete).unwrap();
-            assert_eq!(options.size, complete, "{size:?}");
+            for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+                let options = TraceListOptions::parse(&query, mode).unwrap();
+                assert_eq!(options.size, expected, "{size:?} {mode:?}");
+            }
         }
     }
 
