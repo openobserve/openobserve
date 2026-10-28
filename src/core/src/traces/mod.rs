@@ -51,7 +51,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::{Status, status::StatusCode},
 };
 use prost::Message;
-use schema::stream_schema_exists;
+use schema::{check_stream_key_len, stream_schema_exists};
 use serde_json::Map;
 
 pub mod agent_signals;
@@ -1773,6 +1773,9 @@ async fn write_traces_by_stream(
     user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        // before the new-stream hooks, since such a stream is never created
+        check_stream_key_len(org_id, StreamType::Traces, &traces_stream_name)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
         if crate::ingestion::checks_for_new_stream(org_id)
             && !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await
         {

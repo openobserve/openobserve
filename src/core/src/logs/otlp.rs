@@ -818,19 +818,29 @@ pub async fn handle_request(
     }
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let mut write_status = IngestionStatus::Record(stream_status.status);
     let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut IngestionStatus::Record(stream_status.status),
+        &mut write_status,
         json_data_by_stream,
         size_by_stream,
         derived_streams,
         None,
     )
     .await;
+    // the writer rejects rows too, such as a whole stream whose name is too long
+    if let IngestionStatus::Record(status) = write_status
+        && status.failed > 0
+    {
+        res.partial_success = Some(ExportLogsPartialSuccess {
+            rejected_log_records: status.failed as i64,
+            error_message: status.error,
+        });
+    }
 
     let status = match &write_result {
         Ok(_) => StatusCode::OK,

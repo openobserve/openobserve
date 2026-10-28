@@ -41,6 +41,7 @@ use crate::{
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
+pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 
 pub async fn ingest(
     thread_id: usize,

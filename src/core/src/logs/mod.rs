@@ -44,7 +44,9 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use ingestion_common::IngestionStatus;
-use schema::{get_future_discard_error, get_upto_discard_error, stream_schema_exists};
+use schema::{
+    check_stream_key_len, get_future_discard_error, get_upto_discard_error, stream_schema_exists,
+};
 
 use crate::{
     alerts::alert::AlertExt,
@@ -272,6 +274,12 @@ async fn write_logs_by_stream(
             log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             stream_skipped = true;
             continue; // skip
+        }
+        // before the new-stream hooks, since such a stream is never created
+        if let Err(e) = check_stream_key_len(org_id, StreamType::Logs, &stream_name) {
+            let columnar = columnar.take_if(|c| c.stream_name() == stream_name);
+            reject_stream_rows(&stream_name, status, json_data, columnar, &e.to_string());
+            continue;
         }
 
         if crate::ingestion::checks_for_new_stream(org_id)
@@ -637,6 +645,47 @@ async fn write_logs(
     Ok(req_stats)
 }
 
+/// Marks every row of a rejected stream failed, so each request kind reports it to the client.
+fn reject_stream_rows(
+    stream_name: &str,
+    status: &mut IngestionStatus,
+    json_data: Vec<(i64, Map<String, Value>)>,
+    columnar: Option<columnar::JsonColumnar>,
+    message: &str,
+) {
+    log::debug!("[LOGS] {message}");
+    match status {
+        IngestionStatus::Record(status) => {
+            let rows = json_data.len() + columnar.map_or(0, |c| c.rows());
+            status.failed += rows as u32;
+            status.error = message.to_string();
+        }
+        IngestionStatus::Bulk(bulk_res) => {
+            bulk_res.errors = true;
+            let columnar_ids = columnar.map(|mut c| c.take_bulk_ids()).unwrap_or_default();
+            let json_rows = json_data.into_iter().map(|(_, record)| {
+                let doc_id = record
+                    .get("_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                (doc_id, Some(Value::Object(record)))
+            });
+            let columnar_rows = columnar_ids.into_iter().map(|doc_id| (doc_id, None));
+            for (doc_id, value) in json_rows.chain(columnar_rows) {
+                bulk::add_record_status(
+                    stream_name.to_string(),
+                    doc_id,
+                    String::new(),
+                    value,
+                    bulk_res,
+                    Some(bulk::STREAM_NAME_TOO_LONG.to_string()),
+                    Some(message.to_string()),
+                );
+            }
+        }
+    }
+}
+
 fn columnar_entries(
     org_id: &str,
     status: &mut IngestionStatus,
@@ -910,5 +959,81 @@ mod tests {
 
         refresh_derived_columns(&before, &mut records);
         assert_eq!(records[0].1.len(), 2);
+    }
+
+    fn records(ids: &[Option<&str>]) -> Vec<(i64, Map<String, Value>)> {
+        ids.iter()
+            .map(|id| {
+                let mut record = Map::new();
+                if let Some(id) = id {
+                    record.insert("_id".to_string(), Value::from(*id));
+                }
+                (1, record)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_reject_stream_rows_record_status() {
+        let mut status = IngestionStatus::Record(Default::default());
+        reject_stream_rows("s", &mut status, records(&[None, None]), None, "too long");
+        let IngestionStatus::Record(status) = status else {
+            unreachable!()
+        };
+        assert_eq!((status.successful, status.failed), (0, 2));
+        assert_eq!(status.error, "too long");
+    }
+
+    /// A bulk client must see an error item per rejected row, not a silent success.
+    #[test]
+    fn test_reject_stream_rows_bulk_status() {
+        let mut status = IngestionStatus::Bulk(Default::default());
+        let rows = records(&[Some("a"), None]);
+        reject_stream_rows("s", &mut status, rows, None, "too long");
+        let IngestionStatus::Bulk(bulk) = status else {
+            unreachable!()
+        };
+        assert!(bulk.errors);
+        let items: Vec<_> = bulk.items.iter().flat_map(|item| item.values()).collect();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0]._id, "a");
+        let error = items[1].error.as_ref().unwrap();
+        assert_eq!(error.err_type, bulk::STREAM_NAME_TOO_LONG);
+        assert_eq!(error.reason, "too long");
+    }
+
+    /// One too-long stream is rejected on its own, so the request itself still succeeds.
+    #[tokio::test]
+    async fn test_write_logs_by_stream_rejects_too_long_stream() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
+        let stream_name = "s".repeat(schema::STREAM_KEY_MAX_LEN);
+        let data = HashMap::from([(stream_name.clone(), (records(&[None]), None))]);
+        let mut status = IngestionStatus::Record(Default::default());
+        let start = Instant::now();
+        write_logs_by_stream(
+            0,
+            "org",
+            "",
+            (0, &start),
+            UsageType::Json,
+            &mut status,
+            data,
+            HashMap::new(),
+            HashSet::new(),
+            None,
+        )
+        .await
+        .unwrap();
+        let IngestionStatus::Record(status) = status else {
+            unreachable!()
+        };
+        assert_eq!(status.failed, 1);
+        assert!(
+            status.error.starts_with("Stream name too long"),
+            "{}",
+            status.error
+        );
     }
 }
