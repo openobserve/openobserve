@@ -316,7 +316,6 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelectHeaderRow from "@/lib/forms/Select/OSelectHeaderRow.vue";
 import { useStreamPickerOptions, type PickerStream } from "@/composables/useStreamPickerOptions";
-import type { StreamListItem } from "@/services/stream";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
 import { saveLogsStreamType } from "@/utils/streamPersist";
 import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs/useSearchBar";
@@ -502,18 +501,10 @@ export default defineComponent({
       return searchObj.data.stream.streamLists;
     });
 
-    // Fallback for option lists built without the flag, e.g. by another page.
-    const internalStreamNames = computed(() => {
-      const list: StreamListItem[] | undefined = searchObj.data.streamResults?.list;
-      return new Set(
-        Array.isArray(list) ? list.filter((s) => s.is_internal).map((s) => s.name) : [],
-      );
-    });
-
     const pickerStreams = computed<PickerStream[]>(() =>
       (streamList.value || []).map((option: { value: string; internal?: boolean }) => ({
         name: option.value,
-        is_internal: option.internal ?? internalStreamNames.value.has(option.value),
+        is_internal: option.internal === true,
       })),
     );
 
@@ -574,6 +565,10 @@ export default defineComponent({
       const { user, internal } = quickPickOrdered.value;
       // Only while internal streams would win a slot, so Show always reveals a stream.
       const internalRow = internal.length > 0 && user.length < QUICK_PICK_LIMIT;
+      const internalListed = quickPickStreams.value.filter((s) => s.internal);
+      const internalGroupHeader = hideInternalStreams.value
+        ? internalHeader("hidden", internal.length)
+        : internalHeader("shown", internalListed.length);
       return [
         {
           id: "user",
@@ -583,11 +578,8 @@ export default defineComponent({
         },
         {
           id: "internal",
-          label: t("components.streamPicker.internalStreams"),
-          header: internalRow
-            ? internalHeader(hideInternalStreams.value ? "hidden" : "shown", internal.length)
-            : undefined,
-          streams: quickPickStreams.value.filter((s) => s.internal),
+          header: internalRow ? internalGroupHeader : undefined,
+          streams: internalListed,
         },
       ].filter((group) => group.header || group.streams.length > 0);
     });

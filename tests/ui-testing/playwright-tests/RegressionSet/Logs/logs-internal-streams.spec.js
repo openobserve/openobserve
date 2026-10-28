@@ -136,7 +136,7 @@ test.describe("Logs stream picker internal streams", () => {
     expect(below).not.toContain(other);
   });
 
-  test("the Hide/Show action is reached from the search box with Tab and toggles with Enter", {
+  test("the Hide/Show action is reached from the search box with Tab and toggles with Enter and Space", {
     tag: ['@P2', '@regression', '@logsRegression', '@logsRegressionInternalStreams'],
   }, async ({ page }) => {
     await pm.logsPage.pickStreamByTypedFilter(USER_STREAM, USER_STREAM);
@@ -162,5 +162,53 @@ test.describe("Logs stream picker internal streams", () => {
     expect(splitAtHeader(await pm.logsPage.getStreamPickerRows()).below).toEqual(
       expect.arrayContaining(INTERNAL_STREAMS)
     );
+
+    await action.focus();
+    await page.keyboard.press('Space');
+    await expect(action).toHaveAttribute('aria-label', SHOW_LABEL);
+    await expect(action).toBeFocused();
+
+    await page.keyboard.press('Space');
+    await expect(action).toHaveAttribute('aria-label', HIDE_LABEL);
+    await expect(action).toBeFocused();
+  });
+
+  test("the arrow keys reach the Hide/Show header in an org too large to render it up front", {
+    tag: ['@P2', '@regression', '@logsRegression', '@logsRegressionInternalStreams'],
+  }, async ({ page }) => {
+    const MOCK_COUNT = 45;
+    await pm.logsPage.mockExtraUserStreams(MOCK_COUNT, 'e2e_bulk_user_');
+    await pm.logsPage.navigateToLogs();
+    await pm.logsPage.openStreamPicker();
+    await expect(pm.logsPage.getStreamPickerOption('e2e_bulk_user_00')).toBeVisible();
+    const header = pm.logsPage.getStreamPickerHeader();
+    const action = pm.logsPage.getStreamPickerHeaderAction();
+    // The list renders only the rows near its top, so neither Tab nor a click can reach the header yet.
+    await expect(header).toHaveCount(0);
+
+    // Starts the walk on a user stream, so it cannot lean on where the opening highlight sits.
+    for (let i = 0; i < 3; i++) {
+      await pm.logsPage.pressInStreamPickerSearch('ArrowDown');
+    }
+    // Bounded by every row in the list, so the header is reached from any starting highlight.
+    const realStreams = (await pm.logsPage.getLogStreams()).length;
+    await pm.logsPage.arrowToStreamPickerHeader('ArrowUp', MOCK_COUNT + realStreams + 2);
+    await expect(header).toHaveAttribute('data-highlighted', '');
+    await expect(header).toBeInViewport();
+    await expect(action).toHaveAttribute('aria-label', HIDE_LABEL);
+
+    await pm.logsPage.pressInStreamPickerSearch('Enter');
+    await expect(action).toHaveAttribute('aria-label', SHOW_LABEL);
+    await expect(header).toHaveAttribute('data-highlighted', '');
+    await expect(header).toBeInViewport();
+    // The header is now the last row and in view, so a hidden row would be rendered right under it.
+    for (const name of INTERNAL_STREAMS) {
+      await expect(pm.logsPage.getStreamPickerOption(name)).toHaveCount(0);
+    }
+
+    await pm.logsPage.pressInStreamPickerSearch('Space');
+    await expect(action).toHaveAttribute('aria-label', HIDE_LABEL);
+    await expect(header).toHaveAttribute('data-highlighted', '');
+    await expect(page.locator(pm.logsPage.indexDropDownSearch)).toHaveValue('');
   });
 });

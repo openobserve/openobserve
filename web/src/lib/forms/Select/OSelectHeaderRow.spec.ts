@@ -56,4 +56,19 @@ describe("OSelectHeaderRow", () => {
     wrapper.find("button").element.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
   });
+
+  it("paints the option highlight and the action's hover fill while highlighted", async () => {
+    wrapper = mount(OSelectHeaderRow, {
+      props: { label: raw("Internal streams"), action: raw("Hide") },
+    });
+    expect(wrapper.classes()).toContain("bg-select-header-bg");
+    expect(wrapper.classes()).not.toContain("bg-select-item-hover-bg");
+    expect(wrapper.find("button").classes()).toContain("bg-transparent");
+    expect(wrapper.attributes("data-highlighted")).toBeUndefined();
+    await wrapper.setProps({ highlighted: true });
+    expect(wrapper.attributes("data-highlighted")).toBe("");
+    expect(wrapper.classes()).toContain("bg-select-item-hover-bg");
+    expect(wrapper.classes()).not.toContain("bg-select-header-bg");
+    expect(wrapper.find("button").classes()).toContain("bg-select-header-action-hover-bg");
+  });
 });

@@ -13381,8 +13381,53 @@ export class LogsPage {
         return this.page.locator(`${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header-action"]`);
     }
 
+    /** The "Internal streams" header row; carries `data-highlighted` while the arrow keys rest on it. */
+    getStreamPickerHeader() {
+        return this.page.locator(`${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header"]`);
+    }
+
     async filterStreamPicker(text) {
         await this.page.locator(this.indexDropDownSearch).fill(text);
+    }
+
+    /** Presses a key with focus in the picker's search box, where the list's keyboard navigation lives. */
+    async pressInStreamPickerSearch(key) {
+        await this.page.locator(this.indexDropDownSearch).press(key);
+    }
+
+    /** Presses `key` until the "Internal streams" header is highlighted, whatever row the highlight starts on. */
+    async arrowToStreamPickerHeader(key, maxPresses) {
+        const highlighted = this.page.locator(
+            `${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header"][data-highlighted]`
+        );
+        for (let presses = 1; presses <= maxPresses; presses++) {
+            await this.pressInStreamPickerSearch(key);
+            // The row renders a frame after the press, so each press waits briefly before judging it.
+            const reached = await highlighted.waitFor({ state: 'attached', timeout: 750 }).then(() => true, () => false);
+            if (reached) return presses;
+        }
+        throw new Error(`The Internal streams header was not highlighted within ${maxPresses} ${key} presses`);
+    }
+
+    /** Puts `count` made-up user streams ahead of the real ones in the logs stream list the page loads. */
+    async mockExtraUserStreams(count, prefix) {
+        const orgId = getOrgIdentifier();
+        await this.page.route(`**/api/${orgId}/streams?*`, async (route) => {
+            const url = new URL(route.request().url());
+            if (route.request().method() !== 'GET' || url.searchParams.get('type') !== 'logs') {
+                return route.continue();
+            }
+            const response = await route.fetch();
+            const body = await response.json();
+            const template = (body.list || []).find((s) => !s.is_internal) || {};
+            const extra = Array.from({ length: count }, (_, i) => ({
+                ...template,
+                name: `${prefix}${String(i).padStart(2, '0')}`,
+            }));
+            body.list = [...extra, ...(body.list || [])];
+            body.total = body.list.length;
+            await route.fulfill({ response, json: body });
+        });
     }
 
     /** Puts focus in the picker's search box and Tabs once out of it. */

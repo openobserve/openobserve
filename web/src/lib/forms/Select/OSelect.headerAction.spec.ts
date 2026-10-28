@@ -6,6 +6,8 @@ import OSelect from "./OSelect.vue";
 import type { SelectOption } from "./OSelect.types";
 import { raw } from "@/types/i18n";
 
+const { scrollToIndex } = vi.hoisted(() => ({ scrollToIndex: vi.fn() }));
+
 // JSDOM has no layout, so the real virtualizer renders no rows; render them all.
 vi.mock("@tanstack/vue-virtual", async () => {
   const { computed, unref } = await import("vue");
@@ -24,7 +26,7 @@ vi.mock("@tanstack/vue-virtual", async () => {
               lane: 0,
             })),
           getTotalSize: () => count * 28,
-          scrollToIndex: () => {},
+          scrollToIndex,
           measureElement: () => {},
         };
       }),
@@ -53,6 +55,7 @@ describe("OSelect header actions", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    scrollToIndex.mockClear();
   });
 
   const open = async (props: Record<string, unknown> = {}, attrs: Record<string, unknown> = {}) => {
@@ -122,21 +125,107 @@ describe("OSelect header actions", () => {
     expect(document.activeElement).toBe(actionButton());
   });
 
-  it("is skipped by arrow-key highlight", async () => {
+  const searchInput = () =>
+    document.body.querySelector<HTMLInputElement>('[data-test="unit-search"]')!;
+  const press = async (key: string, init: KeyboardEventInit = {}) => {
+    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
+    searchInput().dispatchEvent(event);
+    await flushPromises();
+    return event;
+  };
+  const highlighted = () => {
+    const header = document.body.querySelector<HTMLElement>('[data-test="unit-header"]');
+    if (header?.hasAttribute("data-highlighted")) return "header";
+    return document.body
+      .querySelector<HTMLElement>(".bg-select-item-hover-bg[data-test-value]")
+      ?.getAttribute("data-test-value");
+  };
+
+  it("lets the arrow keys land on an action header and still skip a plain one", async () => {
     await open();
-    const input = document.body.querySelector<HTMLInputElement>('[data-test="unit-search"]')!;
-    const press = async () => {
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      await flushPromises();
-    };
-    const highlighted = () =>
-      document.body
-        .querySelector<HTMLElement>(".bg-select-item-hover-bg[data-test-value]")
-        ?.getAttribute("data-test-value");
-    await press();
+    await press("ArrowDown");
     expect(highlighted()).toBe("default");
-    await press();
+    await press("ArrowDown");
+    expect(highlighted()).toBe("header");
+    expect(scrollToIndex).toHaveBeenLastCalledWith(2, { align: "auto" });
+    await press("ArrowDown");
     expect(highlighted()).toBe("_rumdata");
+    await press("ArrowUp");
+    expect(highlighted()).toBe("header");
+    await press("ArrowUp");
+    expect(highlighted()).toBe("default");
+  });
+
+  it("scrolls the virtual list to a row reached by wrapping around", async () => {
+    await open();
+    await press("ArrowUp");
+    expect(highlighted()).toBe("_rumlog");
+    expect(scrollToIndex).toHaveBeenLastCalledWith(4, { align: "auto" });
+  });
+
+  it.each([
+    ["Enter", "Enter"],
+    ["Space", " "],
+  ])("runs the action on %s and keeps the highlight on the swapped header", async (_, key) => {
+    const collapsed = { ...ACTION_HEADER, headerCount: raw("2 hidden"), headerAction: raw("Show") };
+    await open(
+      {},
+      { onHeaderAction: () => wrapper.setProps({ options: [OPTIONS[0], OPTIONS[1], collapsed] }) },
+    );
+    await press("ArrowDown");
+    await press("ArrowDown");
+    const event = await press(key);
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper.emitted("header-action")).toEqual([[ACTION_HEADER]]);
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    expect(actionButton()!.textContent!.trim()).toBe("Show");
+    expect(highlighted()).toBe("header");
+    expect(document.activeElement).toBe(searchInput());
+  });
+
+  it.each([
+    ["an IME commit with Enter", "Enter", { isComposing: true }],
+    ["an IME commit with Space", " ", { isComposing: true }],
+    ["Ctrl+Enter", "Enter", { ctrlKey: true }],
+    ["Meta+Enter", "Enter", { metaKey: true }],
+    ["Alt+Enter", "Enter", { altKey: true }],
+    ["Shift+Space", " ", { shiftKey: true }],
+  ])("ignores %s on a highlighted action header", async (_, key, init) => {
+    await open();
+    await press("ArrowDown");
+    await press("ArrowDown");
+    expect(highlighted()).toBe("header");
+    const event = await press(key, init);
+    expect(event.defaultPrevented).toBe(false);
+    expect(wrapper.emitted("header-action")).toBeUndefined();
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    expect(highlighted()).toBe("header");
+  });
+
+  it("neither lands on nor runs a header whose action label is empty", async () => {
+    await open({ options: [OPTIONS[1], { ...ACTION_HEADER, headerAction: raw("") }, OPTIONS[3]] });
+    await press("ArrowDown");
+    expect(highlighted()).toBe("default");
+    await press("ArrowDown");
+    expect(highlighted()).toBe("_rumdata");
+    await press("Enter");
+    expect(wrapper.emitted("header-action")).toBeUndefined();
+  });
+
+  it("leaves Space to the search input when an option row is highlighted", async () => {
+    await open();
+    await press("ArrowDown");
+    const event = await press(" ");
+    expect(event.defaultPrevented).toBe(false);
+    expect(wrapper.emitted("header-action")).toBeUndefined();
+  });
+
+  it("selects the highlighted option on Enter as before", async () => {
+    await open();
+    await press("ArrowDown");
+    await press("Enter");
+    expect(wrapper.emitted("header-action")).toBeUndefined();
+    expect(wrapper.emitted("update:modelValue")).toEqual([[["default"]]]);
   });
 
   it("drops an action header with no match while searching unless keepOnSearch is set", async () => {

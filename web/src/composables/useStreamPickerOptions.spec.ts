@@ -74,7 +74,7 @@ const labels = (options: StreamPickerOption[]) =>
   );
 
 describe("internalGroupHeader", () => {
-  it("offers Hide over the listed group, counting every internal stream", () => {
+  it("offers Hide over the listed group, counting its listed streams", () => {
     expect(internalGroupHeader("shown", 3, TEXT)).toEqual({
       label: "Internal streams",
       value: INTERNAL_GROUP_HIDE,
@@ -133,18 +133,17 @@ describe("buildStreamPickerOptions", () => {
   });
 
   it("collapses every hidden internal stream into one Show row", () => {
-    const { options, hiddenCount } = build({ hide: true });
+    const { options } = build({ hide: true });
     expect(labels(options)).toEqual([
       "default",
       "k8s_events",
       "nginx_access",
       "# Internal streams · 3 hidden [Show]",
     ]);
-    expect(hiddenCount).toBe(3);
   });
 
   it("keeps a selected internal stream under the collapsed row and leaves it out of the count", () => {
-    const { options, hiddenCount } = build({ hide: true, keep: new Set(["_rumlog"]) });
+    const { options } = build({ hide: true, keep: new Set(["_rumlog"]) });
     expect(labels(options)).toEqual([
       "default",
       "k8s_events",
@@ -152,13 +151,20 @@ describe("buildStreamPickerOptions", () => {
       "# Internal streams · 2 hidden [Show]",
       "_rumlog",
     ]);
-    expect(hiddenCount).toBe(2);
   });
 
   it("ignores kept names when the hide setting is off", () => {
-    const { options, hiddenCount } = build({ keep: new Set(["_rumlog"]) });
+    const { options } = build({ keep: new Set(["_rumlog"]) });
     expect(options).toHaveLength(7);
-    expect(hiddenCount).toBe(0);
+    expect(options.find((o) => o.header)?.headerCount).toBe("3");
+  });
+
+  it("counts only the listed internal streams the search matches, case-insensitively", () => {
+    const header = (search: string) => build({ search }).options.find((o) => o.header);
+    expect(header(" RUM ")).toMatchObject({ headerCount: "2", headerAction: "Hide" });
+    expect(header("anom")?.headerCount).toBe("1");
+    expect(header("  ")?.headerCount).toBe("3");
+    expect(header("rum")?.keepOnSearch).toBeUndefined();
   });
 
   it("turns the collapsed row into a match count when hidden streams match the search, case-insensitively", () => {
@@ -242,7 +248,6 @@ describe("useStreamPickerOptions", () => {
       "nginx_access",
       "# Internal streams · 3 hidden [Show]",
     ]);
-    expect(picker.hiddenCount.value).toBe(3);
   });
 
   it("keeps a stream deselected while the popover is open until it closes", async () => {
@@ -255,12 +260,34 @@ describe("useStreamPickerOptions", () => {
     selected.value = ["default"];
     await nextTick();
     expect(visible()).toContain("_rumdata");
-    expect(picker.hiddenCount.value).toBe(2);
+    expect(visible()).toContain("# Internal streams · 2 hidden [Show]");
 
     open.value = false;
     await nextTick();
     expect(visible()).not.toContain("_rumdata");
-    expect(picker.hiddenCount.value).toBe(3);
+    expect(visible()).toContain("# Internal streams · 3 hidden [Show]");
+  });
+
+  it("hands back the same options array when opening and closing change nothing kept", async () => {
+    selected.value = ["default"];
+    await nextTick();
+    const before = picker.options.value;
+    open.value = true;
+    await nextTick();
+    expect(picker.options.value).toBe(before);
+    open.value = false;
+    await nextTick();
+    expect(picker.options.value).toBe(before);
+  });
+
+  it("rebuilds the options when the kept set really changes", async () => {
+    picker.hideInternalStreams.value = true;
+    await nextTick();
+    const before = picker.options.value;
+    selected.value = ["_rumdata"];
+    await nextTick();
+    expect(picker.options.value).not.toBe(before);
+    expect(visible()).toContain("_rumdata");
   });
 
   it("hides and shows the group from its header action and persists the choice", async () => {
@@ -294,6 +321,12 @@ describe("useStreamPickerOptions", () => {
     search.value = "rum";
     await nextTick();
     expect(visible()).toContain("# Internal streams · 2 hidden matches [Show]");
+  });
+
+  it("counts the listed internal streams that match the search text", async () => {
+    search.value = "rum";
+    await nextTick();
+    expect(visible()).toContain("# Internal streams · 2 [Hide]");
   });
 
   it("builds the quick-pick header in the same words", () => {

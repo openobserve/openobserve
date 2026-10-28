@@ -99,7 +99,7 @@ describe("useHideInternalStreams", () => {
     const b = useSetting(composable, store);
     a.hideInternalStreams.value = true;
     expect(b.hideInternalStreams.value).toBe(true);
-    b.showInternalStreams();
+    b.hideInternalStreams.value = false;
     expect(a.hideInternalStreams.value).toBe(false);
     expect(localStorage.getItem(KEY)).toBe("false");
   });

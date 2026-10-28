@@ -787,19 +787,16 @@ const listboxScrollEl = ref<HTMLElement | null>(null);
 //
 // Strategy:
 //   - highlightedIndex tracks which filteredOptions entry is highlighted.
-//   - Up / Down move the index through selectable (non-header, non-disabled)
-//     items with wrap-around.
-//   - Enter commits the selection; Escape closes the dropdown.
 //   - The highlight class is applied reactively — no DOM focus juggling.
 //   - The search <input> retains browser focus the whole time the dropdown is
 //     open, so typing always goes straight to the filter.
 const highlightedIndex = ref(-1);
 
-// Indices into filteredOptions that are actual selectable items (no headers/disabled).
+// Indices into filteredOptions the arrow keys land on: selectable items, plus action headers.
 const navigableIndices = computed(() =>
   filteredOptions.value
     .map((opt, i) => ({ opt, i }))
-    .filter(({ opt }) => !opt.header && !opt.disabled)
+    .filter(({ opt }) => isActionHeader(opt) || (!opt.header && !opt.disabled))
     .map(({ i }) => i),
 );
 
@@ -881,6 +878,35 @@ function isRichHeader(opt: NormalizedOption): boolean {
   return opt.header && (opt.headerAction !== undefined || opt.headerCount !== undefined);
 }
 
+function isActionHeader(opt: NormalizedOption): boolean {
+  return opt.header && Boolean(opt.headerAction);
+}
+
+// Rows outside the virtual window are not in the DOM, so scrollIntoView alone cannot reach them.
+function highlightAndReveal(index: number) {
+  highlightedIndex.value = index;
+  virtualizer.value.scrollToIndex(index, { align: "auto" });
+  nextTick(scrollHighlightedIntoView);
+}
+
+// Enter or Space on a highlighted action header runs its action; the highlight follows the header across the swap.
+function handleHeaderActionKey(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" && e.key !== " ") return false;
+  const opt = filteredOptions.value[highlightedIndex.value];
+  if (!opt || !isActionHeader(opt)) return false;
+  // Reka's ListboxFilter guards: IME commits and modified keys do nothing, and must not fall through to select the header.
+  if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey || (e.key === " " && e.shiftKey))
+    return true;
+  e.preventDefault();
+  if (opt.source) emit("header-action", opt.source);
+  // Runs after the filteredOptions watcher has reset the highlight.
+  nextTick(() => {
+    const index = filteredOptions.value.findIndex((o) => o.header && o.value === opt.value);
+    if (index >= 0) highlightAndReveal(index);
+  });
+  return true;
+}
+
 // The consumer usually swaps this header's text in response; a keyboard user must stay on its action.
 function handleHeaderAction(opt: NormalizedOption, event: MouseEvent) {
   const hadFocus =
@@ -905,7 +931,7 @@ function handleDropdownKeydown(e: KeyboardEvent) {
     popoverOpen.value = false;
     return;
   }
-  if (handleExpandKey(e)) return;
+  if (handleExpandKey(e) || handleHeaderActionKey(e)) return;
 
   // Allow Enter to trigger create even when no options are visible.
   // Otherwise creatable=true with an empty filtered list silently swallows
@@ -921,13 +947,11 @@ function handleDropdownKeydown(e: KeyboardEvent) {
   if (e.key === "ArrowDown") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
-    highlightedIndex.value = cur < nav.length - 1 ? nav[cur + 1] : nav[0];
-    nextTick(scrollHighlightedIntoView);
+    highlightAndReveal(cur < nav.length - 1 ? nav[cur + 1] : nav[0]);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
-    highlightedIndex.value = cur > 0 ? nav[cur - 1] : nav[nav.length - 1];
-    nextTick(scrollHighlightedIntoView);
+    highlightAndReveal(cur > 0 ? nav[cur - 1] : nav[nav.length - 1]);
   } else if (e.key === "Enter") {
     e.preventDefault();
     if (highlightedIndex.value >= 0) {
@@ -1661,6 +1685,7 @@ const fieldWidthClass = computed(() => {
                         :count="filteredOptions[vRow.index].headerCount"
                         :action="filteredOptions[vRow.index].headerAction"
                         :action-aria-label="filteredOptions[vRow.index].headerActionAriaLabel"
+                        :highlighted="vRow.index === highlightedIndex"
                         :data-test="parentDataTest ? `${parentDataTest}-header` : undefined"
                         @action="handleHeaderAction(filteredOptions[vRow.index], $event)"
                       />

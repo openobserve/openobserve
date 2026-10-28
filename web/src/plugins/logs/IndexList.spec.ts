@@ -25,6 +25,31 @@ import { b64DecodeUnicode } from "@/utils/zincutils";
 import streamsMock from "@/test/unit/mockData/streams";
 import { useHideInternalStreams } from "@/composables/useHideInternalStreams";
 
+// JSDOM has no layout, so the real virtualizer renders no picker rows; render them all.
+vi.mock("@tanstack/vue-virtual", async () => {
+  const { computed, unref } = await import("vue");
+  return {
+    useVirtualizer: (options: any) =>
+      computed(() => {
+        const count = unref(options).count;
+        return {
+          getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+              index,
+              key: index,
+              start: index * 28,
+              size: 28,
+              end: (index + 1) * 28,
+              lane: 0,
+            })),
+          getTotalSize: () => count * 28,
+          scrollToIndex: () => {},
+          measureElement: () => {},
+        };
+      }),
+  };
+});
+
 // Define mock functions outside of the mock factory
 const mockExtractFields = vi.fn();
 const mockGetValuesPartition = vi.fn();
@@ -3051,6 +3076,7 @@ describe("Stream picker — internal streams", () => {
     wrapper.vm.searchObj.data.stream.streamLists = list.map((s) => ({
       label: s.name,
       value: s.name,
+      internal: s.is_internal === true,
     }));
     await flushPromises();
   };
@@ -3224,6 +3250,46 @@ describe("Stream picker — internal streams", () => {
     ]);
   });
 
+  it("keeps the current stream highlighted when the single-select picker opens", async () => {
+    await wrapper.setProps({ selectionMode: "single" });
+    wrapper.vm.searchObj.data.stream.selectedStream = ["k8s_events"];
+    await flushPromises();
+    const optionsBefore = select().props("options");
+
+    await wrapper
+      .find('[data-test="log-search-index-list-select-stream-trigger"]')
+      .trigger("click");
+    await flushPromises();
+
+    expect(select().props("options")).toBe(optionsBefore);
+    const highlighted = () =>
+      document.body
+        .querySelector(".bg-select-item-hover-bg[data-test-value]")
+        ?.getAttribute("data-test-value");
+    expect(highlighted()).toBe("k8s_events");
+
+    const search = document.body.querySelector<HTMLInputElement>(
+      '[data-test="log-search-index-list-select-stream-search"]',
+    )!;
+    search.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await flushPromises();
+    // The next navigable row after k8s_events is the internal header.
+    expect(
+      document.body
+        .querySelector('[data-test="log-search-index-list-select-stream-header"]')
+        ?.hasAttribute("data-highlighted"),
+    ).toBe(true);
+  });
+
+  it("takes the internal flag from the options alone", async () => {
+    wrapper.vm.searchObj.data.stream.streamLists = DEFAULT_LIST.map((s) => ({
+      label: s.name,
+      value: s.name,
+    }));
+    await flushPromises();
+    expect(pickerOptions().some((o) => o.header)).toBe(false);
+  });
+
   describe("quick pick", () => {
     it("lists internal streams last under a header row with a Hide action", () => {
       expect(quickPickLabels()).toEqual([
@@ -3271,6 +3337,18 @@ describe("Stream picker — internal streams", () => {
         "2",
       );
       expect(quickPickAction().exists()).toBe(false);
+    });
+
+    it("counts only the internal rows it lists while shown, and every hidden one while hidden", async () => {
+      const users = Array.from({ length: 6 }, (_, i) => stream(`app_${i}`, false, 10 + i));
+      const internal = ["_rumdata", "_rumlog", "_anomalies"].map((n, i) => stream(n, true, i));
+      await loadStreams([...users, ...internal]);
+      expect(quickPickLabels()).toContain("Internal streams · 2 Hide");
+      expect(quickPickLabels().slice(-2)).toEqual(["_anomalies", "_rumlog"]);
+
+      setting.hideInternalStreams.value = true;
+      await flushPromises();
+      expect(quickPickLabels()).toContain("Internal streams · 3 hidden Show");
     });
 
     it("leaves hidden streams out of the more count", async () => {

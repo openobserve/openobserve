@@ -69,29 +69,6 @@ pub fn is_internal_stream(stream_name: &str) -> bool {
         )
 }
 
-/// Streams O2 writes itself, matched by name for picker ordering; never use it for access control.
-pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
-    if stream_name.starts_with("_o2_") {
-        return true;
-    }
-    // Non-underscore names other than `triggers` are written only to `_meta`; users may reuse them.
-    if INTERNAL_STREAM_NAMES.contains(&stream_name) {
-        return stream_name.starts_with('_')
-            || stream_name == TRIGGERS_STREAM
-            || org_id == META_ORG_ID;
-    }
-    match stream_name {
-        "_rumdata"
-        | "_rumlog"
-        | "_sessionreplay"
-        | "synthetics_results"
-        | "synthetics_step_results"
-        | SLO_SLICES_STREAM => true,
-        "self_profiles" => org_id == META_ORG_ID,
-        _ => false,
-    }
-}
-
 /// Outcome of a single scheduled evaluation — "did it fire?".
 ///
 /// Part III of `alerts.md`. Replaces the former `TriggerDataStatus`, whose
@@ -1038,6 +1015,29 @@ impl From<FileMeta> for RequestStats {
             dashboard_info: None,
             peak_memory_usage: None,
         }
+    }
+}
+
+/// Streams O2 writes itself, matched by name for picker ordering; never use it for access control.
+pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
+    if stream_name.starts_with("_o2_") {
+        return true;
+    }
+    // Non-underscore names other than `triggers` are written only to `_meta`; users may reuse them.
+    if INTERNAL_STREAM_NAMES.contains(&stream_name) {
+        return stream_name.starts_with('_')
+            || stream_name == TRIGGERS_STREAM
+            || org_id == META_ORG_ID;
+    }
+    match stream_name {
+        "_rumdata"
+        | "_rumlog"
+        | "_sessionreplay"
+        | "synthetics_results"
+        | "synthetics_step_results"
+        | SLO_SLICES_STREAM => true,
+        "self_profiles" => org_id == META_ORG_ID,
+        _ => false,
     }
 }
 

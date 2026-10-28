@@ -56,9 +56,9 @@ export interface SelectOption {
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
   header?: boolean;
-  /** Header only: quieter text after the label, e.g. a count. */
+  /** Header only: secondary detail about the group, e.g. how many options it holds. */
   headerCount?: I18nText;
-  /** Header only: label of an action button on the header's end edge; clicking it emits `header-action`. */
+  /** Header only: label of an action on the header; activating it emits `header-action`, and an empty label means no action. */
   headerAction?: I18nText;
   /** Header only: accessible name of the header action when its label alone is ambiguous. */
   headerActionAriaLabel?: I18nText;

@@ -16,7 +16,11 @@ const actionDataTest = computed(() =>
 
 <template>
   <div
-    class="bg-select-header-bg text-select-item-text flex h-full min-h-8 w-full items-center justify-between gap-2 ps-3 pe-1.5 text-xs select-none"
+    :class="[
+      'text-select-item-text flex h-full min-h-8 w-full items-center justify-between gap-2 ps-3 pe-1.5 text-xs select-none',
+      highlighted ? 'bg-select-item-hover-bg' : 'bg-select-header-bg',
+    ]"
+    :data-highlighted="highlighted ? '' : undefined"
   >
     <span class="flex min-w-0 items-center gap-1">
       <OTruncatedText class="font-bold">{{ label }}</OTruncatedText>
@@ -32,7 +36,10 @@ const actionDataTest = computed(() =>
       :aria-label="actionAriaLabel"
       :data-test="actionDataTest"
       data-select-header-action
-      class="rounded-default text-select-header-action-text hover:bg-select-header-action-hover-bg focus-visible:ring-select-header-action-focus-ring h-6 shrink-0 cursor-pointer border-0 bg-transparent px-2 text-xs font-medium transition-colors duration-100 outline-none focus-visible:ring-2"
+      :class="[
+        'rounded-default text-select-header-action-text hover:bg-select-header-action-hover-bg focus-visible:ring-select-header-action-focus-ring h-6 shrink-0 cursor-pointer border-0 px-2 text-xs font-medium transition-colors duration-100 outline-none focus-visible:ring-2',
+        highlighted ? 'bg-select-header-action-hover-bg' : 'bg-transparent',
+      ]"
       @mousedown.prevent
       @click.stop="emit('action', $event)"
     >

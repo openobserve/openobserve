@@ -62,9 +62,5 @@ export function useHideInternalStreams() {
   );
   watch(storageKey, bindStorageKey, { immediate: true });
 
-  const showInternalStreams = () => {
-    hideInternalStreams.value = false;
-  };
-
-  return { hideInternalStreams, showInternalStreams };
+  return { hideInternalStreams };
 }

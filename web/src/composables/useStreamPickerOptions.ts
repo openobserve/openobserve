@@ -45,7 +45,7 @@ export interface InternalGroupText {
   showAriaLabel: I18nText;
 }
 
-/** `shown` counts every internal stream, `hidden` the ones left out, `match` the left-out ones the search hits. */
+/** `shown` counts the listed internal streams, `hidden` the ones left out, `match` the left-out ones the search hits. */
 export type InternalGroupMode = "shown" | "hidden" | "match";
 
 export interface StreamPickerInput {
@@ -59,7 +59,6 @@ export interface StreamPickerInput {
 
 export interface StreamPickerState {
   options: StreamPickerOption[];
-  hiddenCount: number;
 }
 
 export interface StreamPickerSources {
@@ -97,26 +96,34 @@ export function internalGroupHeader(
 export function buildStreamPickerOptions(input: StreamPickerInput): StreamPickerState {
   const user: StreamPickerOption[] = [];
   const internal: StreamPickerOption[] = [];
+  const listedNames: string[] = [];
   const hiddenNames: string[] = [];
   for (const stream of input.streams) {
     const option = { label: raw(stream.name), value: stream.name };
     if (!stream.is_internal) user.push(option);
     else if (input.hide && !input.keep.has(stream.name)) hiddenNames.push(stream.name);
-    else internal.push(option);
+    else {
+      internal.push(option);
+      listedNames.push(stream.name);
+    }
   }
+
+  // OSelect's own matching rule, so the header counts agree with the rows its search leaves.
+  const term = input.search.trim().toLowerCase();
+  const countMatching = (names: string[]) =>
+    term ? names.filter((name) => name.toLowerCase().includes(term)).length : names.length;
 
   if (!input.hide) {
-    const header = internalGroupHeader("shown", internal.length, input.text);
-    return { options: internal.length ? [...user, header, ...internal] : user, hiddenCount: 0 };
+    const header = internalGroupHeader("shown", countMatching(listedNames), input.text);
+    return { options: internal.length ? [...user, header, ...internal] : user };
   }
-  if (!internal.length && !hiddenNames.length) return { options: user, hiddenCount: 0 };
+  if (!internal.length && !hiddenNames.length) return { options: user };
 
-  const term = input.search.trim().toLowerCase();
-  const matches = term ? hiddenNames.filter((name) => name.toLowerCase().includes(term)).length : 0;
+  const matches = term ? countMatching(hiddenNames) : 0;
   const header = matches
     ? internalGroupHeader("match", matches, input.text)
     : internalGroupHeader("hidden", hiddenNames.length, input.text);
-  return { options: [...user, header, ...internal], hiddenCount: hiddenNames.length };
+  return { options: [...user, header, ...internal] };
 }
 
 /** Reactive stream-picker options over the shared hide setting; the kept set is frozen while the popover is open. */
@@ -144,10 +151,20 @@ export function useStreamPickerOptions(sources: StreamPickerSources) {
     { immediate: true },
   );
 
+  // A new options array resets OSelect's highlight, so an unchanged kept set keeps its instance.
+  const keep = computed<ReadonlySet<string>>((previous) => {
+    const next = new Set([...selectedAtOpen.value, ...toValue(sources.selected)]);
+    const unchanged =
+      previous !== undefined &&
+      previous.size === next.size &&
+      [...next].every((name) => previous.has(name));
+    return unchanged ? previous : next;
+  });
+
   const state = computed(() =>
     buildStreamPickerOptions({
       streams: toValue(sources.streams),
-      keep: new Set([...selectedAtOpen.value, ...toValue(sources.selected)]),
+      keep: keep.value,
       hide: hideInternalStreams.value,
       search: toValue(sources.search),
       text: text.value,
@@ -168,7 +185,6 @@ export function useStreamPickerOptions(sources: StreamPickerSources) {
 
   return {
     options: computed(() => state.value.options),
-    hiddenCount: computed(() => state.value.hiddenCount),
     hideInternalStreams,
     internalHeader: (mode: InternalGroupMode, count: number) =>
       internalGroupHeader(mode, count, text.value),
