@@ -251,7 +251,9 @@ describe("Profiles page", () => {
     await flushPromises();
     await nextTick();
 
-    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    // Once to learn the services, once more for the picked service's profile types.
+    expect(mocks.meta).toHaveBeenCalledTimes(2);
+    expect(mocks.meta.mock.calls[1][2]).toMatchObject({ service_name: "service-a" });
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
   });
@@ -265,7 +267,7 @@ describe("Profiles page", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "DateTime" }).exists()).toBe(true);
-    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    expect(mocks.meta).toHaveBeenCalledTimes(2);
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
   });
@@ -1063,7 +1065,8 @@ describe("Profiles page", () => {
       valueType: "relative",
     });
     await flushPromises();
-    expect(mocks.meta).toHaveBeenCalledTimes(2);
+    // Two on open, one for the new service's profile types, one for the new window.
+    expect(mocks.meta).toHaveBeenCalledTimes(4);
     expect(mocks.merge).toHaveBeenCalledTimes(4);
   });
 
@@ -1083,6 +1086,110 @@ describe("Profiles page", () => {
 
     expect(wrapper.find('[data-test="profiles-search-cancelled"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="profiles-no-results"]').exists()).toBe(false);
+  });
+
+  it("lists only the profile types of the selected service", async () => {
+    const typesByService: Record<string, Array<{ type: string; unit: string }>> = {
+      "service-a": [
+        { type: "cpu", unit: "nanoseconds" },
+        { type: "heap", unit: "bytes" },
+      ],
+      checkout: [{ type: "cpu", unit: "nanoseconds" }],
+    };
+    mocks.meta.mockImplementation(async (_org, _stream, payload) => ({
+      data: {
+        ...profileMetaResponse.data,
+        services: ["service-a", "checkout"],
+        profile_types: payload.service_name
+          ? typesByService[payload.service_name]
+          : Object.values(typesByService).flat(),
+      },
+    }));
+    const wrapper = mountPage();
+    await settle();
+    const typeOptions = () =>
+      wrapper
+        .findAll('[data-test="profiles-type-select"] option')
+        .map((option) => option.attributes("value"));
+    expect(typeOptions()).toEqual(["cpu\u0000nanoseconds", "heap\u0000bytes"]);
+
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("checkout");
+    await flushPromises();
+
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "checkout" });
+    expect(typeOptions()).toEqual(["cpu\u0000nanoseconds"]);
+    expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({
+      service_name: "checkout",
+      profile_type: "cpu",
+    });
+  });
+
+  it("keeps the chosen service through an empty window and says why Run query is off", async () => {
+    let empty = false;
+    mocks.meta.mockImplementation(async () => ({
+      data: empty
+        ? { ...profileMetaResponse.data, services: [], profile_types: [], label_names: [] }
+        : { ...profileMetaResponse.data, services: ["service-a", "payments"] },
+    }));
+    const wrapper = mountPage();
+    await settle();
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("payments");
+    await flushPromises();
+    const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    const pickWindow = async (relativeTimePeriod: string) => {
+      picker.vm.$emit("update:modelValue", {
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod,
+        valueType: "relative",
+      });
+      await flushPromises();
+    };
+
+    empty = true;
+    await pickWindow("5m");
+    const run = wrapper.find('[data-test="profiles-run-query"]');
+    expect(run.attributes("disabled")).toBeDefined();
+    expect(run.find("span[content]").attributes("content")).toBe(
+      "Pick a stream and a profile type with data in this time range",
+    );
+
+    empty = false;
+    await pickWindow("1h");
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "payments" });
+    expect(
+      (wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+        .value,
+    ).toBe("payments");
+    expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "payments" });
+  });
+
+  it("draws a lone point as a dot on an axis that spans the run's window", async () => {
+    const startMs = mocks.nowMs - 15 * 60 * 1000;
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: startMs * 1000, value: 6e9 }] },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const options = () =>
+      wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options().series[0].showSymbol).toBe(true);
+    expect(options().xAxis.min).toBe(startMs);
+    expect(options().xAxis.max).toBe(mocks.nowMs);
+
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        series: [0, 1, 2].map((step) => ({
+          timestamp: (startMs + step * 60_000) * 1000,
+          value: 6e9,
+        })),
+      },
+    });
+    await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+    await settle();
+    expect(options().series[0].showSymbol).toBe(false);
   });
 
   describe("URL and share link", () => {
@@ -1172,6 +1279,60 @@ describe("Profiles page", () => {
       await nextTick();
       await nextTick();
       expect(focusCalls).toHaveBeenCalledWith("root/0");
+    });
+
+    it("drops the flame graph focus when a new run returns another tree", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        view: "flame",
+        focus: "root/0",
+      };
+      focusCalls.mockClear();
+      const wrapper = mountWithFlame();
+      await settle();
+      expect(focusCalls).toHaveBeenCalledWith("root/0");
+      wrapper.findComponent({ name: "FlameGraphStub" }).vm.$emit("focus", "root/0/2");
+      await flushPromises();
+      expect(router.replace.mock.lastCall?.[0].query.focus).toBe("root/0/2");
+      focusCalls.mockClear();
+
+      await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+      await settle();
+
+      expect(wrapper.findComponent({ name: "FlameGraphStub" }).exists()).toBe(true);
+      expect(focusCalls).not.toHaveBeenCalled();
+      expect(router.replace.mock.lastCall?.[0].query).not.toHaveProperty("focus");
+      expect(Object.fromEntries(shareUrl(wrapper).searchParams)).not.toHaveProperty("focus");
+    });
+
+    it("drops a link's focus when metadata replaces the linked service and runs again", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        service_name: "service-gone",
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+        view: "flame",
+        focus: "root/0",
+      };
+      // The linked run answers only after the second run started, so it is superseded.
+      let answerLinkedRun!: (value: typeof mergeResponse) => void;
+      mocks.merge.mockReturnValueOnce(new Promise((resolve) => (answerLinkedRun = resolve)));
+      focusCalls.mockClear();
+      mountWithFlame();
+      await settle();
+      answerLinkedRun(mergeResponse);
+      await settle();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(2);
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "service-a" });
+      expect(focusCalls).not.toHaveBeenCalled();
+      expect(router.replace.mock.lastCall?.[0].query).not.toHaveProperty("focus");
     });
 
     it("shares the window of the last run, not of the first one", async () => {
@@ -1587,6 +1748,7 @@ describe("Profiles page", () => {
       expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-b", {
         start_time: FROM,
         end_time: TO,
+        service_name: "service-b",
       });
     });
 
@@ -1711,8 +1873,12 @@ describe("Profiles page", () => {
         (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
           .value,
       ).toBe("profiles-a");
-      expect(mocks.meta).toHaveBeenCalledTimes(1);
-      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-a", window);
+      expect(mocks.meta).toHaveBeenCalledTimes(2);
+      expect(mocks.meta).toHaveBeenNthCalledWith(1, orgIdentifier, "profiles-a", window);
+      expect(mocks.meta).toHaveBeenNthCalledWith(2, orgIdentifier, "profiles-a", {
+        ...window,
+        service_name: "service-a",
+      });
       expect(mocks.merge).toHaveBeenCalledTimes(1);
       expect(mocks.merge).toHaveBeenCalledWith(
         orgIdentifier,

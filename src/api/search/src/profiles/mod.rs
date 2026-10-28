@@ -66,7 +66,10 @@ fn default_eq_op() -> String {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfilesQueryBody {
+    /// Missing reads as 0 so `parse_required_time_range` reports it, not the JSON parser.
+    #[serde(default)]
     pub start_time: i64,
+    #[serde(default)]
     pub end_time: i64,
     #[serde(default)]
     pub data_source: Option<String>,
@@ -650,5 +653,22 @@ mod tests {
 
         let response = SearchResponse::default();
         assert!(reject_partial_search_response(response).is_ok());
+    }
+
+    #[tokio::test]
+    async fn post_body_without_time_range_gets_the_required_time_range_message() {
+        let body: ProfilesQueryBody =
+            json::from_str(r#"{"profile_type":"cpu","profile_unit":"nanoseconds"}"#).unwrap();
+        let body = resolve_query_body(&Method::POST, Ok(Json(body)), &HashMap::new()).unwrap();
+        let resp = parse_required_time_range(body.start_time, body.end_time).unwrap_err();
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(
+            text.contains("start_time and end_time are required (microseconds)"),
+            "{text}"
+        );
     }
 }

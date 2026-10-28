@@ -58,6 +58,7 @@
       "dashboard-series-color-multiwindow.spec.js",
       "dashboard-config-advanced.spec.js",
       "dashboard-config-axis.spec.js",
+      "dashboard-stacked-axis-bounds.spec.js",
       "dashboard-config-gauge-maps.spec.js",
       "dashboard-config-general.spec.js",
       "dashboard-config-heatmap.spec.js",
@@ -358,7 +359,9 @@
       "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
       "logs-search-around-multistream.spec.js",
-      "logs-default-columns.spec.js"
+      "logs-default-columns.spec.js",
+      "logsResultsToolbar.spec.js",
+      "logsSavedFunctionOverwrite.spec.js"
     ],
     "disabled": [
       {
@@ -386,7 +389,9 @@
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
       "logsToolbarPins.spec.js",
-      "logs-query-editor-keyboard.spec.js"
+      "logs-query-editor-keyboard.spec.js",
+      "logsCrossLinks.spec.js",
+      "logsFieldValuePaging.spec.js"
     ],
     "disabled": [
       {

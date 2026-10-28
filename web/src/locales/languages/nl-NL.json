@@ -1518,6 +1518,7 @@
     "searchNoMatches": "Geen overeenkomsten",
     "runQuery": "Query uitvoeren",
     "runOptions": "Uitvoeropties",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "Profielwaarden in de tijd",
     "breakdown": "Uitsplitsing",
     "breakdownNone": "Geen",

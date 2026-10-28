@@ -364,7 +364,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="date-time-apply-btn"
                 variant="primary"
                 size="xs"
-                class="element-box-shadow"
                 @click="applyAndClose"
               >
                 {{ t("common.apply") }}

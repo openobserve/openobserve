@@ -198,6 +198,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -247,6 +248,8 @@ export default defineComponent({
 
       // Fetch user's organizations
       await fetchOrganizations();
+      // RUM settings are instance-wide, so any org the user can read serves them.
+      void ensureBrowserRum(eligibleOrganizations.value[0]?.identifier);
     });
 
     const fetchOrganizations = async () => {
