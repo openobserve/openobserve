@@ -258,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
                   size="xs-grouped"
+                  class="h-8!"
                 >
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -339,6 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('search.createSavedView')"
               variant="ghost"
               size="icon-panel"
+              class="size-8!"
               :disabled="!!saveViewReason"
               focusable-unavailable
               @click="fnSavedView"
