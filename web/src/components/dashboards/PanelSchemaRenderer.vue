@@ -36,21 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
-          @row-click="
-            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
-          "
+          :empty-text="customNoDataText ? noDataTitle : null"
+          @row-click="onPanelClick"
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="
-            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
-          "
-          @explore-cell="
-            (params) =>
-              !store.state.kioskMode && exploreCellInLogs(params.columnId, params.value, params.row)
-          "
+          @row-click="onPanelClick"
+          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -61,12 +55,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-key-fields="tableRowKeyFields"
           :enable-column-format="enableColumnFormat"
           :drilldown-columns="
-            store.state.printMode || store.state.kioskMode ? [] : drilldownColumnAliases
+            store.state.printMode || store.state.kioskMode || !allowDrilldown
+              ? []
+              : drilldownColumnAliases
           "
           :drilldown-all-columns="
-            !store.state.printMode && !store.state.kioskMode && drilldownAllColumns
+            !store.state.printMode &&
+            !store.state.kioskMode &&
+            allowDrilldown &&
+            drilldownAllColumns
           "
-        />
+        >
+          <template v-if="customNoDataText" #empty>
+            <OEmptyState
+              size="inline"
+              icon="bar-chart"
+              :title="noDataTitle"
+              :backdrop="false"
+              data-test="no-data"
+            />
+          </template>
+        </TableRenderer>
         <div
           v-else-if="panelSchema.type == 'html'"
           class="column flex h-full w-full flex-1 flex-col"
@@ -103,13 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
-          :label="raw(panelSchema?.title)"
+          :label="raw(panelTitle)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="
-            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
-          "
+          @click="onPanelClick"
           @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
           @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
@@ -191,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         size="inline"
         icon="bar-chart"
-        :title="t('panel.noData')"
+        :title="noDataTitle"
         :backdrop="false"
         data-test="no-data"
         class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
@@ -329,6 +336,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import {
@@ -445,6 +453,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import { resolveNoDataText } from "@/utils/dashboard/noDataText";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
@@ -516,6 +525,12 @@ export default defineComponent({
     },
     allowAnnotationsAdd: {
       default: false,
+      required: false,
+      type: Boolean,
+    },
+    // Off where the viewer can't follow a drilldown, such as the anonymous public page.
+    allowDrilldown: {
+      default: true,
       required: false,
       type: Boolean,
     },
@@ -643,6 +658,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
+    const panelTitle = usePanelTitle({
+      title: () => props.panelSchema?.title,
+      variablesData: () => props.variablesData,
+      context: () => ({ tabId: props.tabId, panelId: props.panelSchema?.id }),
+    });
 
     // ============================================================================
     // Hidden Queries Feature Setup
@@ -812,6 +832,7 @@ export default defineComponent({
       allowAnnotationsAdd,
       allowAnnotationsAPI,
       allowAlertCreation,
+      allowDrilldown,
       alertSource,
       runId,
       tabId,
@@ -1414,7 +1435,8 @@ export default defineComponent({
     // ======= [END] dashboard PrintMode =======
 
     onMounted(async () => {
-      // fetch all panels
+      // The panel list only feeds annotation editing; injected-data panels have no live dashboard to fetch.
+      if (injectedPromqlData?.value) return;
       await fetchAllPanels();
     });
 
@@ -1959,7 +1981,7 @@ export default defineComponent({
       emit("series-data-update", panelData.value);
     });
 
-    // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's series warning.
     watch(
       limitNumberOfSeriesWarningMessage,
       () => {
@@ -1968,12 +1990,17 @@ export default defineComponent({
           limitNumberOfSeriesWarningMessage.value,
         );
       },
-      { deep: true },
+      { immediate: true },
     );
 
-    watch(seriesLimit, (value) => {
-      emit("series-limit-update", value);
-    });
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's series chip.
+    watch(
+      seriesLimit,
+      (value) => {
+        emit("series-limit-update", value);
+      },
+      { immediate: true },
+    );
 
     // Immediate, so a renderer remounted for a new chart type clears the previous type's chips.
     watch(
@@ -2111,6 +2138,17 @@ export default defineComponent({
       return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
     });
 
+    const customNoDataText = computed(() =>
+      resolveNoDataText(
+        panelSchema.value?.config,
+        props.currentVariablesData || variablesData.value,
+        { tabId: tabId.value, panelId: panelSchema.value?.id },
+      ),
+    );
+    const noDataTitle = computed(() =>
+      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
+    );
+
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
     // also get the transparent background instead of showing a skeleton.
@@ -2244,13 +2282,16 @@ export default defineComponent({
       onExemplarClick: exemplarInteraction.onExemplarClick,
     });
 
+    // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
+    const onPanelClick = (...args: Parameters<typeof onChartClick>) =>
+      allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
     // The copy hover zone covers its value, so a click there stands in for a click on that cell's series.
     const onMetricZoneClick = (
       m: { idx: number; layout?: { left?: number; top?: number } },
       event: MouseEvent,
     ) => {
       if ((event.target as HTMLElement | null)?.closest("button")) return;
-      onChartClick({
+      onPanelClick({
         componentType: "series",
         seriesType: "custom",
         seriesIndex: m.idx,
@@ -2488,7 +2529,9 @@ export default defineComponent({
     }
 
     // Called directly by the search icon so it works even with a panel drilldown config.
+    // Off with drilldowns, so the anonymous public page never opens the logs drawer.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
+      if (!allowDrilldown.value || store.state.kioskMode) return;
       const queries = props.panelSchema.queries ?? [];
       const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
       const query = queries[qi];
@@ -2529,6 +2572,7 @@ export default defineComponent({
       onChartMouseOut,
       failedAnnotationSources,
       truncatedAnnotationSources,
+      panelTitle,
       t,
       raw,
       store,
@@ -2541,6 +2585,8 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      noDataTitle,
+      customNoDataText,
       geoMapRendererData,
       isAwaitingFirstLoad,
       chartRendererData,
@@ -2548,6 +2594,7 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onPanelClick,
       onFormatColumn,
       onDataZoom,
       drilldownColumnAliases,
@@ -2585,12 +2632,12 @@ export default defineComponent({
         const csv = getPanelCsvString();
         if (!csv) return null;
         return {
-          title: title ?? panelSchema.value?.title ?? "panel",
+          title: title ?? panelTitle.value ?? "panel",
           csv,
         };
       },
       logDataAsJSON: (title: string) => {
-        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.group(`[oo] ${title ?? panelTitle.value ?? "panel"}`);
         console.groupEnd();
       },
       loadingProgressPercentage,

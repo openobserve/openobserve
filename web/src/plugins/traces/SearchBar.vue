@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"
@@ -437,6 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
+              calendar-presets
               class="h-8!"
               @on:date-change="updateDateTime"
             />
@@ -490,6 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
+              calendar-presets
               class="me-1.5 h-8!"
               @on:date-change="updateDateTime"
             />
@@ -1214,7 +1217,9 @@ export default defineComponent({
       savedViewsDialogOpen.value = false;
       const confirmed = await confirm({
         title: t("search.deleteSavedView"),
-        message: t("search.deleteSavedViewConfirm"),
+        messageKeypath: "search.deleteSavedViewConfirm",
+        messageName: view.view_name,
+        confirmVariant: "destructive",
       });
       if (!confirmed) return;
       try {

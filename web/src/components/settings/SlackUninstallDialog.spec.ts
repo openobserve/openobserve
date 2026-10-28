@@ -86,6 +86,24 @@ describe("SlackUninstallDialog: Disconnect this org (row 17)", () => {
   });
 });
 
+describe("SlackUninstallDialog: named confirm", () => {
+  it("names the org in bold when disconnecting", async () => {
+    mountDialog("disconnect");
+    await flushPromises();
+    const message = body().find('[data-test="slack-dialog-disconnect-message"]');
+    expect(message.find("span.font-semibold").text()).toBe("acme");
+    expect(primary()!.classes()).toContain("bg-button-destructive");
+  });
+
+  it("names the workspace in bold when uninstalling", async () => {
+    mountDialog("uninstall");
+    await flushPromises();
+    const message = body().find('[data-test="slack-dialog-uninstall-message"]');
+    expect(message.find("span.font-semibold").text()).toBe("Acme Corp");
+    expect(message.text()).toContain("Removes the app from Acme Corp for every connected org.");
+  });
+});
+
 describe("SlackUninstallDialog: Uninstall from workspace (row 19)", () => {
   it("AC-12.2 warns everyone must relink and counts other orgs without naming them", async () => {
     mountDialog("uninstall");

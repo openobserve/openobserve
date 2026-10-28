@@ -31,7 +31,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
-import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -39,6 +39,9 @@ import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
+import useStreams from "@/composables/useStreams";
+import { gt } from "@/types/i18n";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 
 import {
   isSkippedByPanelRefresh,
@@ -93,6 +96,7 @@ export const usePanelDataLoader = (
   let isVariablesTriggeredLoad = false;
 
   const store = useStore();
+  const { getStream } = useStreams(gt);
 
   const getRegionClusterParams = () => {
     if (regionClusterParams?.value?.regions || regionClusterParams?.value?.clusters) {
@@ -435,6 +439,27 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
+      // Injected-data path: the caller already fetched the PromQL results and
+      // owns the fetch lifecycle (the metrics explorer's preview queue —
+      // concurrency-capped, viewport-gated, cancellable, cached). Render those
+      // results directly instead of firing our own query_range. Skips the
+      // debounce, cache restore, visibility and variable waits — the caller
+      // already gated all of that. See MetricCard. Runs before the query check
+      // because injected callers (public dashboards) may carry no query text.
+      if (injectedPromqlData?.value != null) {
+        log("loadData: rendering injected PromQL data");
+        state.loading = false;
+        state.isOperationCancelled = false;
+        state.isPartialData = false;
+        state.data = markRaw(injectedPromqlData.value.data ?? []);
+        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
+        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
+        state.annotations = [];
+        state.errorDetail = injectedPromqlData.value.errorDetail ?? { message: "", code: "" };
+        runCount++;
+        return;
+      }
+
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -445,26 +470,6 @@ export const usePanelDataLoader = (
           queries: [],
         };
         state.resultMetaData = [];
-        return;
-      }
-
-      // Injected-data path: the caller already fetched the PromQL results and
-      // owns the fetch lifecycle (the metrics explorer's preview queue —
-      // concurrency-capped, viewport-gated, cancellable, cached). Render those
-      // results directly instead of firing our own query_range. Skips the
-      // debounce, cache restore, visibility and variable waits — the caller
-      // already gated all of that. See MetricCard.
-      if (injectedPromqlData?.value != null) {
-        log("loadData: rendering injected PromQL data");
-        state.loading = false;
-        state.isOperationCancelled = false;
-        state.isPartialData = false;
-        state.data = markRaw(injectedPromqlData.value.data ?? []);
-        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
-        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
-        state.annotations = [];
-        state.errorDetail = { message: "", code: "" };
-        runCount++;
         return;
       }
 
@@ -526,6 +531,13 @@ export const usePanelDataLoader = (
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
+      }
+
+      // Enrichment rows carry their upload time, so the dashboard range would hide them; Explore does the same.
+      const tableRange = await getEnrichmentTableRange(getStream, panelSchema.value);
+      if (tableRange) {
+        startISOTimestamp = tableRange.from;
+        endISOTimestamp = tableRange.to;
       }
 
       renderedTimeRange = { start: startISOTimestamp, end: endISOTimestamp };
@@ -931,10 +943,12 @@ export const usePanelDataLoader = (
         };
       }
 
-      // if selected time range is not matched with the cache time range
       if (
-        selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
+        cachedWindowDiffers(
+          cache?.cacheTimeRange,
+          selectedTimeObj?.value,
+          refreshAfterRestore.isCalendarRange(selectedTimeObj?.value),
+        )
       ) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }

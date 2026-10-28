@@ -91,8 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
-    :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
+    message-keypath="iam.appRoles.deleteConfirm"
+    :message-name="deleteConformDialog.data?.role_name"
     :warning-message="deleteImpactMessage"
+    ok-variant="destructive"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
@@ -100,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('iam.appRoles.bulkDeleteRoles')"
     :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
+    ok-variant="destructive"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"

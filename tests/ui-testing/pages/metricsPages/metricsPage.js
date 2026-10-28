@@ -342,6 +342,16 @@ export class MetricsPage {
         await expect(this.page.locator(this.datePicker)).toBeVisible();
     }
 
+    /** The auto-apply picker stays open after a pick, and its popover covers controls below it. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.datePicker).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
+    }
+
     async setAutoRefreshInterval() {
         await this.page.locator(this.autoRefresh).click();
     }
@@ -988,8 +998,7 @@ export class MetricsPage {
             // Portal element animation re-mount: fall back to dispatchEvent
             await last15Min.dispatchEvent('click').catch(() => {});
           }
-          // Wait for date picker popover to close (deterministic wait)
-          await last15Min.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+          await this.closeDateTimePickerIfOpen();
           return true;
         }
         // Dismiss the date picker via Escape if the option was not found
@@ -1390,7 +1399,7 @@ export class MetricsPage {
 
             if (await dateTimeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await dateTimeBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.closeDateTimePickerIfOpen();
                 return true;
             }
         }
@@ -1399,6 +1408,7 @@ export class MetricsPage {
         const rangeOption = this.page.locator(`[role="option"]:has-text("${range}"), button:has-text("${range}")`).first();
         if (await rangeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await rangeOption.click();
+            await this.closeDateTimePickerIfOpen();
             return true;
         }
 
@@ -1406,6 +1416,7 @@ export class MetricsPage {
         const relativeOption = this.page.locator('button').filter({ hasText: range }).first();
         if (await relativeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await relativeOption.click();
+            await this.closeDateTimePickerIfOpen();
             return true;
         }
 

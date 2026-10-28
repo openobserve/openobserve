@@ -64,7 +64,9 @@ export type ButtonVariant =
   | "tint-teal"
   | "tint-purple"
   | "tint-blue"
-  | "tint-orange";
+  | "tint-orange"
+  // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
+  | "cell";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

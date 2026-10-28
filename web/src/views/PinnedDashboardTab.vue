@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePicker"
           size="sm"
           v-model="selectedDate"
+          calendar-presets
           @hide="setTime"
           data-test="pinned-dashboard-date-time-picker"
         />
@@ -117,7 +118,9 @@ const dashboardData = ref<any>(null);
 // RenderDashboardCharts expects currentTimeObj keyed per-panel, falling back
 // to the "__global" key when no panel-specific override exists. We only
 // ever set the global time here (read-only embedded view, no per-panel UI).
-const currentTimeObj = ref<Record<string, { start_time?: Date; end_time?: Date }>>({});
+const currentTimeObj = ref<
+  Record<string, { start_time?: Date; end_time?: Date; relativeTimePeriod?: string | null }>
+>({});
 const refreshInterval = ref(0);
 const dateTimePicker = ref<any>(null);
 const renderRef = ref<any>(null);
@@ -162,7 +165,7 @@ const resolveWindow = (): { startTime: number; endTime: number } | null => {
   if (!d) return null;
   const type = d.valueType ?? d.type;
   if (type === "relative" && d.relativeTimePeriod) {
-    const rel = getConsumableRelativeTime(d.relativeTimePeriod);
+    const rel = getConsumableRelativeTime(d.relativeTimePeriod, store.state.timezone);
     if (rel?.startTime && rel?.endTime) {
       return { startTime: rel.startTime, endTime: rel.endTime };
     }
@@ -187,6 +190,7 @@ const setTime = () => {
       __global: {
         start_time: new Date(win.startTime),
         end_time: new Date(win.endTime),
+        relativeTimePeriod: selectedDate.value?.relativeTimePeriod,
       },
     };
   }

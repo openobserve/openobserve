@@ -285,6 +285,19 @@ describe("AddAnnotation", () => {
     expect(dialogs[1].props("open")).toBe(true);
   });
 
+  it("names the annotation in bold in the delete-confirm message", async () => {
+    wrapper.unmount();
+    wrapper = buildWrapper({ annotation: mockAnnotation });
+    await flushPromises();
+
+    const name = wrapper.find('[data-test="add-annotation-delete-confirm-name"]');
+    expect(name.text()).toBe("Test Annotation");
+    expect(name.classes()).toContain("font-semibold");
+    expect(wrapper.find('[data-test="add-annotation-delete-confirm-message"]').text()).toBe(
+      "Are you sure you want to delete the Test Annotation annotation?",
+    );
+  });
+
   it("closes the delete-confirm ODialog when its secondary button is clicked", async () => {
     wrapper.unmount();
     wrapper = buildWrapper({ annotation: mockAnnotation });

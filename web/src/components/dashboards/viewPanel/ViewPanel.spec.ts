@@ -490,6 +490,16 @@ describe("ViewPanel", () => {
       expect(titleElement.text()).toBe("Test Panel");
     });
 
+    it("should resolve variables in the panel title from the applied values", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.title = "Inlet temperature — $row";
+      wrapper.vm.currentVariablesDataRef.values = [{ name: "row", value: "C" }];
+      await wrapper.vm.$nextTick();
+
+      const titleElement = wrapper.find('[data-test="dashboard-viewpanel-title"]');
+      expect(titleElement.text()).toBe("Inlet temperature — C");
+    });
+
     it("should initialize with provided props", () => {
       wrapper = createWrapper();
 

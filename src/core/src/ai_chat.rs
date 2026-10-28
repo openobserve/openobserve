@@ -705,7 +705,6 @@ async fn search_window(
             // Inclusive of the last committed batch's timestamp.
             end_time: last_at + 1,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,

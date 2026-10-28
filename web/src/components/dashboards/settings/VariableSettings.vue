@@ -217,7 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <ConfirmDialog
           :title="t('dashboard.deleteVariable')"
-          :message="t('dashboard.deleteVariableMsg')"
+          message-keypath="dashboard.deleteVariableMsg"
+          :message-name="selectedDelete?.name"
+          ok-variant="destructive"
           @update:ok="deleteVariableFn"
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
@@ -614,6 +616,7 @@ export default defineComponent({
     };
 
     return {
+      selectedDelete,
       t,
       store,
       getDashboardData,

@@ -251,6 +251,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
+
+    <ODialog
+      :open="removeAsk !== null"
+      size="sm"
+      persistent
+      :title="t('rum.analytics.events.deleteTitle')"
+      :primary-button-label="t('rum.analytics.events.delete')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('common.cancel')"
+      data-test="rum-analytics-named-events-delete-dialog"
+      @update:open="(open: boolean) => !open && answerRemove(false)"
+      @click:primary="answerRemove(true)"
+      @click:secondary="answerRemove(false)"
+    >
+      <i18n-t
+        :keypath="
+          removeShown.funnels.length
+            ? 'rum.analytics.events.deleteInUseMessage'
+            : 'rum.analytics.events.deleteMessage'
+        "
+        :plural="removeShown.funnels.length || undefined"
+        tag="p"
+      >
+        <template #name>
+          <span
+            data-test="rum-analytics-named-events-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ removeShown.name }}</span
+          >
+        </template>
+        <template #names>{{ funnelNames(removeShown.funnels) }}</template>
+      </i18n-t>
+    </ODialog>
   </div>
 </template>
 
@@ -266,6 +299,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -470,20 +504,30 @@ const duplicate = (ev: NamedEvent) => {
 const funnelNames = (funnels: FunnelUsage[]) =>
   raw([...new Set(funnels.map((f) => f.name))].join(", "));
 
+const removeAsk = ref<{
+  name: string;
+  funnels: FunnelUsage[];
+  resolve: (ok: boolean) => void;
+} | null>(null);
+// Set on open only, so the message stays put while the dialog fades out.
+const removeShown = ref<{ name: string; funnels: FunnelUsage[] }>({ name: "", funnels: [] });
+
+const askRemove = (ev: NamedEvent, funnels: FunnelUsage[]) =>
+  new Promise<boolean>((resolve) => {
+    removeAsk.value?.resolve(false);
+    removeAsk.value = { name: ev.name, funnels, resolve };
+    removeShown.value = { name: ev.name, funnels };
+  });
+
+const answerRemove = (ok: boolean) => {
+  const ask = removeAsk.value;
+  removeAsk.value = null;
+  ask?.resolve(ok);
+};
+
 /** Resolves true only once the event is gone, so a cancel or a failure keeps the row's selection. */
 const confirmRemove = async (ev: NamedEvent, funnels: FunnelUsage[]): Promise<boolean> => {
-  const ok = await confirm({
-    title: t("rum.analytics.events.deleteTitle"),
-    message: funnels.length
-      ? t(
-          "rum.analytics.events.deleteInUseMessage",
-          { name: raw(ev.name), count: funnels.length, names: funnelNames(funnels) },
-          funnels.length,
-        )
-      : t("rum.analytics.events.deleteMessage", { name: raw(ev.name) }),
-    confirmLabel: t("rum.analytics.events.delete"),
-  });
-  if (!ok) return false;
+  if (!(await askRemove(ev, funnels))) return false;
   try {
     const inUse = await ne.remove(org(), app.value, ev.id, funnels.length > 0);
     // A funnel saved with this event after the usage check: ask again, naming it.
@@ -513,6 +557,7 @@ const confirmBulk = (count: number, inUse: InUse[]) =>
       ? t("rum.analytics.events.bulkDeleteInUseMessage", { count, names: inUseNames(inUse) }, count)
       : t("rum.analytics.events.bulkDeleteMessage", { count }, count),
     confirmLabel: t("rum.analytics.events.delete"),
+    confirmVariant: "destructive",
   });
 
 // A funnel saved with an event after the usage check refuses its delete: confirm those once more, then force.

@@ -190,6 +190,7 @@ struct ConfigResponse<'a> {
     query_default_limit: i64,
     max_dashboard_series: usize,
     max_dashboard_state_timeline_series: usize,
+    max_dashboard_hostmap_cells: usize,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
@@ -232,6 +233,10 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Hides the publish button and the Public links view when the feature is off.
+    public_dashboards_enabled: bool,
+    /// The clamped operator refresh floor; the share form shows each range's floor from it.
+    public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
@@ -621,6 +626,7 @@ pub async fn zo_config(
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         max_dashboard_state_timeline_series: cfg.limit.max_dashboard_state_timeline_series,
+        max_dashboard_hostmap_cells: cfg.limit.max_dashboard_hostmap_cells,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
@@ -655,6 +661,8 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        public_dashboards_enabled: cfg.public_dashboards.enabled,
+        public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
@@ -2542,6 +2550,19 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
+        assert_eq!(json["public_dashboards_enabled"], true);
     }
 
     #[tokio::test]
