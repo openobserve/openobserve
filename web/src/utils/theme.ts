@@ -89,7 +89,9 @@ export const cssToken = (token: string, fallback: string): string => {
     return fallback;
   }
   const name = token.startsWith("--") ? token : `--${token}`;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // Dark-mode presets are written to body; the root read covers engines that skip inheritance.
+  const read = (el: Element) => getComputedStyle(el).getPropertyValue(name).trim();
+  const value = (document.body && read(document.body)) || read(document.documentElement);
   return value || fallback;
 };
 

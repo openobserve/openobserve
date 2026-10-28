@@ -1055,7 +1055,7 @@ const seriesChartData = computed(() => {
         trigger: "axis",
         textStyle: { fontSize: 12 },
         axisPointer: { type: "cross", label: { show: true, fontSize: 12 } },
-        valueFormatter: (v: number) => formatSeriesValue(v as number),
+        valueFormatter: (v: number | null | undefined) => formatSeriesValue(v),
       },
       grid: { containLabel: true, left: 20, right: 20, top: 8, bottom: 5 },
       // Drag across the chart to pick a time range, as on the Logs histogram; the toolbox itself stays hidden.
@@ -1349,7 +1349,9 @@ const formatSeriesAxisLabel = (value: number) => {
   return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
-const formatSeriesValue = (value: number) => {
+const formatSeriesValue = (value: number | null | undefined) => {
+  // In-use gaps are null so the line breaks; formatting them would read as a real 0 B.
+  if (value === null || value === undefined) return "—";
   if (isCpuMetric.value) return formatCpuCore(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
   if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);

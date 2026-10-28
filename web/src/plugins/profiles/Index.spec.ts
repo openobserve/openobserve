@@ -643,6 +643,9 @@ describe("Profiles page", () => {
       [360_000, 300],
     ]);
     expect(series.showSymbol).toBe(true);
+    const { tooltip } = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(tooltip.valueFormatter(null)).toBe("—");
+    expect(tooltip.valueFormatter(200)).toBe("200 B");
   });
 
   it("leaves the series unfilled when the response has no step", async () => {
