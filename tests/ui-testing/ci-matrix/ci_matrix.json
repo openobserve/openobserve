@@ -312,23 +312,12 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
-      "streamsExploreLogsTypePersistence.spec.js",
       "logspage.spec.js",
       "logstable.spec.js",
-      "logsqueries.spec.js",
       "join.spec.js",
-      "shareLink.spec.js",
       "logsAnalyzeDimensions.spec.js",
-      "monaco-query-prefill.spec.js",
-      "logsqueries.matchall.spec.js",
-      "ftsDefaultColumn.spec.js",
       "logsVisualizePersistence.spec.js",
-      "streamNotFound.spec.js",
-      "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
-      "logs-search-around-multistream.spec.js",
-      "logs-default-columns.spec.js",
-      "logsResultsToolbar.spec.js",
       "logsSavedFunctionOverwrite.spec.js"
     ],
     "disabled": [
@@ -337,6 +326,25 @@
         "reason": "silently dead: manifest listed it under the wrong folder, so it never ran; revalidate before enabling"
       }
     ]
+  },
+  {
+    "testfolder": "Logs-Queries",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "run_files": [
+      "streamsExploreLogsTypePersistence.spec.js",
+      "logsqueries.spec.js",
+      "shareLink.spec.js",
+      "monaco-query-prefill.spec.js",
+      "logsqueries.matchall.spec.js",
+      "ftsDefaultColumn.spec.js",
+      "streamNotFound.spec.js",
+      "logsRefreshCacheDropdown.spec.js",
+      "logs-search-around-multistream.spec.js",
+      "logs-default-columns.spec.js",
+      "logsResultsToolbar.spec.js"
+    ],
+    "disabled": []
   },
   {
     "testfolder": "Logs-Features",
@@ -538,19 +546,27 @@
     "run_files": [
       "traces-autocomplete-filter-mode.spec.js",
       "service-catalog.spec.js",
-      "tracesSearch.spec.js",
-      "traceQueryEditor.spec.js",
-      "traceErrorFilter.spec.js",
       "traceDetails.spec.js",
       "traceDetailsPaging.spec.js",
-      "traceAdvancedFiltering.spec.js",
-      "tracesTriageLoop.spec.js",
-      "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
       "traces-jk-navigation.spec.js",
       "service-graph-side-panel.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Traces-Search",
+    "actual_folder": "Traces",
+    "browser": "chrome",
+    "run_files": [
+      "tracesSearch.spec.js",
+      "traceQueryEditor.spec.js",
+      "traceErrorFilter.spec.js",
+      "traceAdvancedFiltering.spec.js",
+      "tracesTriageLoop.spec.js",
+      "traces-autocomplete-suggestions.spec.js"
     ],
     "disabled": []
   },
