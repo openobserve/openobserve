@@ -190,6 +190,18 @@ describe("OnCallRecentPages", () => {
     expect(wrapper.emitted("view-all")).toHaveLength(1);
   });
 
+  /// The same state the Pages list shows, so a resolved page reads as resolved here too.
+  it("shows each page's state, and how long a closed one took", () => {
+    const wrapper = render([
+      page({ id: "open", state: "triggered", exhausted_at: OPENED + 20 * MINUTE }),
+      page({ id: "closed", state: "resolved", closed_at: OPENED + 42 * MINUTE }),
+    ]);
+
+    const state = (id: string) => wrapper.find(`[data-test="oncall-recent-pages-state-${id}"]`);
+    expect(state("open").text()).toBe("Nobody answered");
+    expect(state("closed").text()).toBe("Resolved after 42m");
+  });
+
   it("shows the empty state rather than a bare card when nothing fired", () => {
     expect(render([]).find('[data-test="o2-empty-state"]').exists()).toBe(true);
   });

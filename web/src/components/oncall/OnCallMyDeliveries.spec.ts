@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
@@ -52,6 +53,7 @@ const stubs = {
   // undeclared prop lands in attrs and `props("value")` reads undefined.
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
+  OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: "<span />" },
   OButton: {
     name: "OButton",
     emits: ["click"],
@@ -342,6 +344,38 @@ describe("OnCallMyDeliveries", () => {
         params: { responseId: "resp_1" },
       }),
     );
+  });
+
+  /// A failed first load is not "nothing was sent".
+  it("shows the error with a retry when the first load fails", async () => {
+    queryClient.clear();
+    service.myDeliveries.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-my-deliveries-empty"]').exists()).toBe(false);
+    const error = wrapper.findComponent('[data-test="oncall-my-deliveries-error"]');
+    expect(error.exists()).toBe(true);
+
+    error.vm.$emit("action");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-my-deliveries-error"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-my-deliveries-empty"]').exists()).toBe(true);
+  });
+
+  /// One date format across on-call: the one every other on-call list uses.
+  it("dates a row with the shared time cell", async () => {
+    queryClient.clear();
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 0, deliveries: [delivery()] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    const cell = wrapper.findComponent({ name: "OTimeCell" });
+    expect(cell.props("value")).toBe(AT);
+    expect(cell.props("unit")).toBe("us");
   });
 
   it("says which kind of empty it is", async () => {

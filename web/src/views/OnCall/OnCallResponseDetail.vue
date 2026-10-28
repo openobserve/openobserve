@@ -24,7 +24,16 @@
         data-test="oncall-response-subtitle"
       >
         <template #team>
+          <OTag
+            v-if="teamDeleted"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-response-team-deleted"
+          >
+            {{ t("oncall.deletedTeam") }}
+          </OTag>
           <router-link
+            v-else
             class="text-accent min-w-0 hover:underline"
             :to="teamRoute"
             data-test="oncall-response-team-link"
@@ -52,7 +61,7 @@
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <OTag type="oncallResponseState" :value="response.state" size="sm" />
+        <OTag type="oncallResponseState" :value="pageState(response)" size="sm" />
         <!-- How long it has been ringing, beside the word "ringing". The two
              were a stat tile apart, and the one people read first is the
              one that says how bad this already is. -->
@@ -259,7 +268,7 @@
           data-test="oncall-response-meta"
         >
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <OTag type="oncallResponseState" :value="response.state" size="sm" />
+          <OTag type="oncallResponseState" :value="pageState(response)" size="sm" />
           <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
             {{ elapsedLabel }}
           </span>
@@ -285,9 +294,19 @@
           :progress="escalation"
           :smtp-configured="smtpConfigured"
           :escalating="escalatingNow"
+          :team-deleted="teamDeleted"
           @escalate="escalateNow"
           @open-reachability="openReachability"
         />
+
+        <OBanner
+          v-if="exhaustedAtClock"
+          variant="error"
+          class="mb-3"
+          data-test="oncall-response-exhausted-banner"
+        >
+          {{ t("oncall.exhaustedBanner", { time: exhaustedAtClock }) }}
+        </OBanner>
 
         <!-- Snoozing does not assign the page, and the banner has to keep
              saying so — a quiet page that looks owned is how one gets dropped. -->
@@ -323,6 +342,27 @@
           >
             {{ t("oncall.liaisonOpenOrigin") }}
           </router-link>
+        </OBanner>
+
+        <!-- Acknowledge would take the page; Page now wakes rung 1 without waiting for triage. -->
+        <OBanner
+          v-if="holdSecondsLeft > 0"
+          variant="info"
+          class="mb-3"
+          data-test="oncall-response-hold-banner"
+        >
+          {{ t("oncall.holdBanner", { n: holdSecondsLeft }) }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :loading="escalatingNow"
+              data-test="oncall-response-hold-page-now"
+              @click="escalateNow"
+            >
+              {{ t("oncall.pageNow") }}
+            </OButton>
+          </template>
         </OBanner>
 
         <!-- The four facts a responder reads first, read once rather than
@@ -445,6 +485,7 @@
               :closed-at="response.closed_at"
               :acked-by="response.acked_by"
               :loading="onCallPositionsLoading"
+              :team-deleted="teamDeleted"
             />
 
             <OnCallWhatFired
@@ -456,6 +497,7 @@
               :org-id="orgId"
               :team-id="response.team_id"
               :team-name="teamName"
+              :team-deleted="teamDeleted"
               :subject-type="response.subject.subject_type"
               :source-id="response.subject.source_id"
               :routing-reason="routingReason"
@@ -471,7 +513,29 @@
 
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
-    <OEmptyState v-else size="hero" preset="no-data" data-test="oncall-response-detail-empty" />
+    <OContent v-else-if="loadError !== null" y>
+      <OEmptyState
+        size="hero"
+        variant="error"
+        illustration="broken-panel"
+        :title="t('oncall.loadResponseFailed')"
+        :description="raw(loadError)"
+        :action-label="t('oncall.retry')"
+        data-test="oncall-response-detail-error"
+        @action="refreshPage"
+      />
+    </OContent>
+
+    <!-- Reads return 404 for a deleted page, and "nothing here yet" would suggest it is still coming. -->
+    <OContent v-else y>
+      <OEmptyState
+        size="hero"
+        :title="t('oncall.responseNotFoundTitle')"
+        :action-label="t('oncall.openPagesList')"
+        data-test="oncall-response-detail-not-found"
+        @action="openPagesList"
+      />
+    </OContent>
 
     <!-- Handing a page to another team clears the ack and re-arms the ladder,
          so it gets room to say so rather than a menu. -->
@@ -660,7 +724,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -761,12 +825,15 @@ import {
   isEscalating,
   isSnoozed,
   isUnresolved,
+  pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
   routingReasonOf,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
+
+const HOLD_RECHECK_MS = 10_000;
 
 const { t } = useI18nTyped();
 const { lgUp } = useBreakpoint();
@@ -781,7 +848,14 @@ const systemActivityCount = computed(
   () => events.value.filter((e) => !DEFAULT_ACTIVITY_KINDS.includes(e.kind)).length,
 );
 const teamName = ref("");
+/// Ids of the teams that exist, `null` until the list has answered.
+const knownTeamIds = ref<string[] | null>(null);
+const teamDeleted = computed(
+  () => !!response.value && !!knownTeamIds.value?.every((id) => id !== response.value?.team_id),
+);
 const loading = ref(false);
+/// Set only when a load fails with nothing on screen; a 404 leaves it null and reads as not found.
+const loadError = ref<string | null>(null);
 const resolving = ref(false);
 const confirmRecoveryOpen = ref(false);
 const confirmingRecovery = ref(false);
@@ -1000,6 +1074,24 @@ const openedAtClock = computed(() => {
   return formatTimestampInTimezone(r.opened_at, "HH:mm", store.state.timezone);
 });
 
+// A bare clock time from yesterday reads as minutes ago, so the date shows unless it is today.
+const exhaustedAtClock = computed(() => {
+  const r = response.value;
+  if (!r || pageState(r) !== "exhausted") return "";
+  const at = r.exhausted_at as number;
+  const zone = store.state.timezone;
+  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
+  const format = day(at) === day(nowMicros.value) ? "HH:mm" : "MMM d, yyyy, HH:mm";
+  return formatTimestampInTimezone(at, format, zone);
+});
+
+/// Whole seconds until the triage hold releases the first page; 0 once it has, or when there is none.
+const holdSecondsLeft = computed(() => {
+  const until = escalation.value?.held_until_micros;
+  if (!until) return 0;
+  return Math.max(0, Math.ceil((until - nowMicros.value) / 1_000_000));
+});
+
 /// How long this has been somebody's problem. An open page reads as elapsed;
 /// a closed one stops at the moment it closed, rather than counting forever.
 const elapsedLabel = computed(() => {
@@ -1014,6 +1106,7 @@ const elapsedLabel = computed(() => {
 const ackLabel = computed(() => {
   const r = response.value;
   const openMicros = r ? nowMicros.value - r.opened_at : null;
+  if (r && !r.acked_at && r.closed_at) return t("oncall.neverAcknowledged");
   return r?.acked_at || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor");
 });
 
@@ -1021,6 +1114,7 @@ const ackValue = computed(() => {
   const r = response.value;
   const openMicros = r ? nowMicros.value - r.opened_at : null;
   if (r?.acked_at) return timeToAck.value;
+  if (r?.closed_at) return ABSENT;
   return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
 });
 
@@ -1049,7 +1143,9 @@ const resolveValue = computed(() => {
 /// more honest than nothing.
 const reachedRung = computed<I18nText | string>(() => {
   const micros = response.value?.reached_rung_micros;
-  if (micros === undefined || micros === null) return ABSENT;
+  if (micros === undefined || micros === null) {
+    return holdSecondsLeft.value > 0 ? t("oncall.statWaitingForTriage") : ABSENT;
+  }
   const steps = policy.value?.rungs.find(
     (rung) => rung.priority === response.value?.priority,
   )?.steps;
@@ -1082,7 +1178,7 @@ const topStats = computed<StatItem[]>(() => {
     },
     {
       key: "rung",
-      label: t("oncall.statReachedRung"),
+      label: r.closed_at ? t("oncall.statReachedStep") : t("oncall.statReachedRung"),
       value: reachedRung.value,
       icon: "trending-up",
       tone: "warning",
@@ -1154,6 +1250,7 @@ let latestResponseRead = 0;
 // `force` reaches the record alone — it is the only thing a promote conflict moved.
 async function fetchResponse(force = false) {
   loading.value = true;
+  loadError.value = null;
   const readId = ++latestResponseRead;
   try {
     const data = await read<{
@@ -1183,6 +1280,12 @@ async function fetchResponse(force = false) {
     }
   } catch (err: any) {
     if (readId !== latestResponseRead) return;
+    if (!response.value) {
+      if (err?.response?.status !== 404) {
+        loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+      }
+      return;
+    }
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
@@ -1342,10 +1445,12 @@ async function fetchHandoffTargets() {
   }
   try {
     const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
+    knownTeamIds.value = teams.map((tm) => tm.id);
     teamOptions.value = teams
       .filter((tm) => tm.id !== r.team_id)
       .map((tm) => ({ label: raw(tm.name), value: tm.id }));
   } catch {
+    knownTeamIds.value = null;
     teamOptions.value = [];
   }
 }
@@ -1563,6 +1668,22 @@ async function fetchEscalation(force = false) {
   }
 }
 
+/// A failed re-read keeps the last good progress, so the hold banner and its polling survive until the next tick.
+async function recheckHold() {
+  try {
+    escalation.value = await read<EscalationProgress | null>(
+      responseProgressQuery(orgId.value, responseId.value),
+      true,
+    );
+  } catch {
+    // The next tick retries.
+  }
+}
+
+function openPagesList() {
+  router.push({ name: "onCallResponses", query: { org_identifier: orgId.value } });
+}
+
 function openResponse(id: string) {
   router.push({
     name: "onCallResponseDetail",
@@ -1579,6 +1700,29 @@ watch(
   },
   (lapsed) => {
     if (lapsed) fetchEscalation(true);
+  },
+);
+
+// Triage may release the first page before the deadline, so the progress is re-read while held.
+let holdRecheck: ReturnType<typeof setInterval> | null = null;
+function stopHoldRecheck() {
+  if (holdRecheck !== null) clearInterval(holdRecheck);
+  holdRecheck = null;
+}
+watch(
+  () => holdSecondsLeft.value > 0,
+  (held) => {
+    stopHoldRecheck();
+    if (held) holdRecheck = setInterval(recheckHold, HOLD_RECHECK_MS);
+  },
+);
+onBeforeUnmount(stopHoldRecheck);
+
+// The hold ends at its deadline, so the progress is re-read for the first page it released.
+watch(
+  () => !!escalation.value?.held_until_micros && holdSecondsLeft.value === 0,
+  (released) => {
+    if (released) fetchEscalation(true);
   },
 );
 

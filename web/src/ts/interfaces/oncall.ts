@@ -543,6 +543,8 @@ export interface OnCallResponse {
   /** Quiet until this instant (micros). Not an acknowledgement. */
   snoozed_until?: number | null;
   ladder_anchor?: number | null;
+  /** When the ladder ran out with nobody answering; the state stays triggered. */
+  exhausted_at?: number | null;
   /** Which run of the ladder this record is on. Absent means the first run. */
   ladder_run?: number | null;
   /** Always on the wire — the server defaults it to `owner`. */
@@ -968,6 +970,8 @@ export interface EscalationProgress {
   exhausted: boolean;
   /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
   stopped_because?: string | null;
+  /** While the first page is held for AI triage, when the hold ends (micros). */
+  held_until_micros?: number | null;
 }
 
 export interface OnCallResponseEvent {

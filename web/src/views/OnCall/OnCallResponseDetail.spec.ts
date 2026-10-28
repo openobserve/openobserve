@@ -113,7 +113,7 @@ const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
-  OBanner: { name: "OBanner", template: "<div><slot /></div>" },
+  OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OnCallTimeline: { name: "OnCallTimeline", template: "<div />" },
   // `open`, not `modelValue`: ODialog has no `modelValue`, so a stub that
@@ -161,12 +161,20 @@ const stubs = {
   OnCallVerdictCard: { name: "OnCallVerdictCard", props: ["events"], template: "<div />" },
   OnCallReachAlarm: {
     name: "OnCallReachAlarm",
-    props: ["state", "deliveries", "deliveriesTotal", "progress", "smtpConfigured"],
+    props: ["state", "deliveries", "deliveriesTotal", "progress", "smtpConfigured", "teamDeleted"],
     template: "<div />",
   },
   OnCallWhoIsOn: {
     name: "OnCallWhoIsOn",
-    props: ["positions", "deliveries", "handoverAt", "handoverTo", "closedAt", "ackedBy"],
+    props: [
+      "positions",
+      "deliveries",
+      "handoverAt",
+      "handoverTo",
+      "closedAt",
+      "ackedBy",
+      "teamDeleted",
+    ],
     template: "<div />",
   },
   OnCallAboutPage: {
@@ -182,6 +190,7 @@ const stubs = {
       "incidentId",
       "cause",
       "causeNote",
+      "teamDeleted",
     ],
     template: "<div />",
   },
@@ -1475,6 +1484,239 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
       expect(wrapper.find('[data-test="oncall-response-more-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-response-meta"]').exists()).toBe(true);
+    });
+  });
+});
+
+/// Responding to a page (#3090): what the screen says when the ladder ran out,
+/// while triage holds the first page, once it closed, and when it cannot load.
+describe("OnCallResponseDetail — responding", () => {
+  const NOW = () => Date.now() * 1000;
+  const stats = (wrapper: any) => wrapper.findComponent({ name: "OStatStrip" }).props("items");
+  const stat = (wrapper: any, key: string) => stats(wrapper).find((s: any) => s.key === key);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient.clear();
+    service.getTeam.mockResolvedValue({ data: { name: "Platform" } } as any);
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    service.priorCauses.mockResolvedValue({ data: [] } as any);
+    service.responseHistory.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue({ data: [{ id: "team_1", name: "Platform" }] } as any);
+    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
+    service.escalationProgress.mockResolvedValue({
+      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
+    } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.getPolicy.mockResolvedValue({ data: null } as any);
+    service.teamReachability.mockResolvedValue({ data: { smtp_configured: true } } as any);
+    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
+  });
+
+  describe("a page nobody answered", () => {
+    it("tags it and says when the last step ran", async () => {
+      const wrapper = await renderWith({ exhausted_at: 1_700_000_000_000_000 + HOUR_MICROS });
+
+      expect(wrapper.find('[type="oncallResponseState"]').attributes("value")).toBe("exhausted");
+      const banner = wrapper.find('[data-test="oncall-response-exhausted-banner"]');
+      expect(banner.text()).toMatch(
+        /^Nobody answered\. Every step ran by [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}\. Acknowledge to take it, or hand it off\.$/,
+      );
+    });
+
+    it("drops the date when the ladder ran out today", async () => {
+      const wrapper = await renderWith({ exhausted_at: NOW() - 60_000_000 });
+
+      expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').text()).toMatch(
+        /^Nobody answered\. Every step ran by \d{2}:\d{2}\. Acknowledge/,
+      );
+    });
+
+    it("says nothing of the sort once somebody owns it", async () => {
+      const wrapper = await renderWith({
+        state: "acknowledged",
+        acked_by: "engineer@example.com",
+        acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
+        exhausted_at: 1_700_000_000_000_000,
+      });
+
+      expect(wrapper.find('[type="oncallResponseState"]').attributes("value")).toBe("acknowledged");
+      expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').exists()).toBe(false);
+    });
+  });
+
+  describe("the AI triage hold", () => {
+    const held = (heldUntil: number | null) =>
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [],
+          next_targets: [],
+          next_at: null,
+          exhausted: false,
+          held_until_micros: heldUntil,
+        },
+      } as any);
+
+    it("counts down to the first page and offers to page now", async () => {
+      held(NOW() + 54_500_000);
+      const wrapper = await renderWith();
+
+      const banner = wrapper.find('[data-test="oncall-response-hold-banner"]');
+      expect(banner.text()).toMatch(/^AI triage is checking first · paging within \d+s Page now$/);
+      expect(stat(wrapper, "rung").value).toBe("Waiting for AI triage");
+    });
+
+    it("pages rung 1 through the existing escalate action", async () => {
+      held(NOW() + 54_000_000);
+      service.escalateNow.mockResolvedValue({
+        data: { escalated_to: "rung", recipients: ["engineer@example.com"] },
+      } as any);
+      const wrapper = await renderWith();
+
+      await wrapper.find('[data-test="oncall-response-hold-page-now"]').trigger("click");
+      await flushPromises();
+
+      expect(service.escalateNow).toHaveBeenCalledTimes(1);
+    });
+
+    /// Triage can answer before the deadline, so the banner must not outlive the page it promised.
+    it("re-reads the progress while held, and drops the banner once paging started", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      held(NOW() + 80_000_000);
+      const wrapper = await renderWith();
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(true);
+      const reads = service.escalationProgress.mock.calls.length;
+
+      held(null);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(service.escalationProgress.mock.calls.length).toBe(reads + 1);
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      wrapper.unmount();
+      vi.useRealTimers();
+    });
+
+    /// A failed re-read is not the hold ending: the last good progress stays and the next tick retries.
+    it("keeps the banner and retries when a re-read while held fails", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      held(NOW() + 80_000_000);
+      const wrapper = await renderWith();
+      const reads = service.escalationProgress.mock.calls.length;
+
+      service.escalationProgress.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-hold-page-now"]').exists()).toBe(true);
+
+      held(null);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(service.escalationProgress.mock.calls.length).toBe(reads + 2);
+      expect(wrapper.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      wrapper.unmount();
+      vi.useRealTimers();
+    });
+
+    it("is gone once the deadline has passed or the field is absent", async () => {
+      held(NOW() - 1_000_000);
+      const lapsed = await renderWith();
+      expect(lapsed.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      lapsed.unmount();
+
+      queryClient.clear();
+      held(null);
+      const absent = await renderWith();
+      expect(absent.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
+      expect(stat(absent, "rung").value).toBe("—");
+    });
+  });
+
+  describe("a closed page", () => {
+    it("never runs an unacknowledged clock", async () => {
+      const wrapper = await renderWith({
+        state: "resolved",
+        closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
+      });
+
+      expect(stat(wrapper, "ack").label).toBe("Never acknowledged");
+      expect(stat(wrapper, "ack").value).toBe("—");
+    });
+
+    it("says how far the ladder got, in the past tense", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: {
+          rungs: [
+            {
+              priority: 1,
+              channels: ["email"],
+              steps: [
+                { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+                { after_micros: 300_000_000, targets: [{ kind: "next_on_call" }] },
+                { after_micros: 900_000_000, targets: [{ kind: "whole_team" }] },
+              ],
+            },
+          ],
+        },
+      } as any);
+      const wrapper = await renderWith({
+        state: "resolved",
+        closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
+        reached_rung_micros: 300_000_000,
+      });
+
+      expect(stat(wrapper, "rung").label).toBe("Reached step");
+      expect(stat(wrapper, "rung").value).toBe("2 of 3");
+    });
+  });
+
+  describe("a page that cannot be loaded", () => {
+    it("shows the error with a retry instead of an empty page", async () => {
+      service.getResponse.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      service.getResponse.mockResolvedValue({ data: { response: record(), events: [] } } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const error = wrapper.find('[data-test="oncall-response-detail-error"]');
+      expect(error.exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-detail-empty"]').exists()).toBe(false);
+
+      wrapper.findComponent('[data-test="oncall-response-detail-error"]').vm.$emit("action");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-response-detail-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+    });
+
+    it("says a deleted page no longer exists, and links to Pages", async () => {
+      service.getResponse.mockRejectedValue({ response: { status: 404, data: {} } });
+      const wrapper = render();
+      await flushPromises();
+
+      const gone = wrapper.findComponent('[data-test="oncall-response-detail-not-found"]');
+      expect(gone.attributes("title")).toBe("This page no longer exists");
+      gone.vm.$emit("action");
+
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
+    });
+  });
+
+  describe("a team that was deleted", () => {
+    it("says so instead of the id, without a link", async () => {
+      service.getTeam.mockRejectedValue({ response: { status: 404 } });
+      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-team-deleted"]').text()).toBe(
+        "Deleted team",
+      );
+      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamDeleted")).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("teamDeleted")).toBe(true);
     });
   });
 });

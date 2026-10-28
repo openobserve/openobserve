@@ -147,6 +147,13 @@ describe("OnCallAboutPage", () => {
   /// The id here IS the rule that woke somebody, and the trip to change it was
   /// a copy-paste into the alert list's search box. The editor lives on the
   /// list route behind `action=update` — `AlertDetail` navigates the same way.
+  it("says the team was deleted instead of linking to it", () => {
+    const wrapper = render({ teamName: "team_1", teamDeleted: true });
+
+    expect(wrapper.find('[data-test="oncall-about-team-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-deleted"]').text()).toBe("Deleted team");
+  });
+
   it("opens the alert's editor from its id", () => {
     const link = render()
       .findAllComponents({ name: "RouterLink" })

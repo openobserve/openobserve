@@ -83,6 +83,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
       </template>
 
+      <!-- A closed page says how long it took in its own tag, so "Resolved" is said once. -->
+      <template #cell-state="{ row }">
+        <OTag
+          type="oncallResponseState"
+          :value="pageState(row)"
+          :label="
+            row.closed_at
+              ? t('oncall.recentPagesResolvedAfter', {
+                  duration: raw(formatMicrosDuration(row.closed_at - row.opened_at)),
+                })
+              : undefined
+          "
+          size="sm"
+          :data-test="`oncall-recent-pages-state-${row.id}`"
+        />
+      </template>
+
       <template #cell-opened_at="{ value }">
         <OTimeCell :value="value" unit="us" />
       </template>
@@ -109,6 +126,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { pageState } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -158,6 +176,12 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     // A phone table scrolls instead of flexing, and the default width there leaves the alert name a few characters.
     ...(isMobile.value ? { size: 200 } : {}),
     meta: { isName: true, flex: true },
+  },
+  {
+    id: "state",
+    header: t("oncall.state"),
+    accessorFn: (page: OnCallResponse) => pageState(page),
+    size: 180,
   },
   {
     id: "responder",

@@ -345,6 +345,14 @@ export function isSnoozed(
   return !!record.snoozed_until && record.snoozed_until > nowMicros;
 }
 
+/** The state a page's tag shows: a triggered page whose ladder ran out reads as nobody answered. [pure] */
+export function pageState(record: {
+  state: ResponseState;
+  exhausted_at?: number | null;
+}): ResponseState | "exhausted" {
+  return record.state === "triggered" && record.exhausted_at ? "exhausted" : record.state;
+}
+
 /**
  * What a target reads as in the policy editor and on a page.
  *

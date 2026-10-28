@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.escalate") }}
         </OButton>
         <OButton
+          v-if="!teamDeleted"
           variant="outline"
           size="sm-action"
           data-test="oncall-reach-alarm-reachability"
@@ -104,6 +105,8 @@ const props = withDefaults(
      */
     smtpConfigured?: boolean | null;
     escalating?: boolean;
+    /** The team is gone, so there is no reachability screen to open. */
+    teamDeleted?: boolean;
   }>(),
   {
     deliveries: () => [],
@@ -111,6 +114,7 @@ const props = withDefaults(
     progress: null,
     smtpConfigured: null,
     escalating: false,
+    teamDeleted: false,
   },
 );
 

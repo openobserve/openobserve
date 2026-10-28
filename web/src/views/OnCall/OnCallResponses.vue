@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="teamOptions"
             :disabled="!teamsAvailable"
             :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
+            :aria-label="t('oncall.teamFilterLabel')"
             width="sm"
             data-test="oncall-responses-team-filter"
             @update:model-value="() => fetchResponses()"
@@ -189,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isMobile"
             v-model="priorityFilter"
             :options="priorityOptions"
+            :aria-label="t('oncall.priorityFilterLabel')"
             width="xs"
             data-test="oncall-responses-priority-filter"
           />
@@ -220,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="causeFilter"
             :options="causeOptions"
             :placeholder="t('oncall.causeFilterAny')"
+            :aria-label="t('oncall.causeFilterLabel')"
             width="sm"
             data-test="oncall-responses-cause-filter"
             @update:model-value="onCauseFilter"
@@ -247,12 +250,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="teamOptions"
                 :disabled="!teamsAvailable"
                 :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
+                :aria-label="t('oncall.teamFilterLabel')"
                 data-test="oncall-responses-team-filter"
                 @update:model-value="() => fetchResponses()"
               />
               <OSelect
                 v-model="priorityFilter"
                 :options="priorityOptions"
+                :aria-label="t('oncall.priorityFilterLabel')"
                 data-test="oncall-responses-priority-filter"
               />
               <OSelect
@@ -260,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="causeFilter"
                 :options="causeOptions"
                 :placeholder="t('oncall.causeFilterAny')"
+                :aria-label="t('oncall.causeFilterLabel')"
                 data-test="oncall-responses-cause-filter"
                 @update:model-value="onCauseFilter"
               />
@@ -394,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            like one escalating right now. -->
       <template #cell-state="{ row }">
         <span class="flex flex-wrap items-center gap-1">
-          <OTag type="oncallResponseState" :value="row.latest.state" size="sm" />
+          <OTag type="oncallResponseState" :value="pageState(row.latest)" size="sm" />
           <OTag v-if="isSnoozed(row.latest)" variant="warning-soft" size="sm">
             {{ t("oncall.snoozed") }}
           </OTag>
@@ -406,6 +412,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-team="{ row }">
         <OTag v-if="!row.latest.team_id" variant="error-soft" size="sm">
           {{ t("oncall.statUnrouted") }}
+        </OTag>
+        <OTag
+          v-else-if="isDeletedTeam(row.latest.team_id)"
+          variant="default-soft"
+          size="sm"
+          data-test="oncall-row-team-deleted"
+        >
+          {{ t("oncall.deletedTeam") }}
         </OTag>
         <!-- The team is a destination, not a label: "who else is on this
              rotation" is the question after "who owns this page", and it lives
@@ -481,8 +495,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- How far up the ladder this page has climbed, and what fires next.
            Loaded for the oldest open pages only — see ESCALATION_DETAIL_LIMIT. -->
+      <!-- Status is hidden by default, so a page nobody answered says so in this always-shown cell. -->
       <template #cell-escalation="{ row }">
+        <OTag
+          v-if="pageState(row.latest) === 'exhausted'"
+          type="oncallResponseState"
+          value="exhausted"
+          size="sm"
+          data-test="oncall-row-escalation-exhausted"
+        />
         <OnCallEscalationCell
+          v-else
           :response-id="row.latest.id"
           :state="row.latest.state"
           :progress="progressById[row.latest.id] ?? null"
@@ -966,6 +989,7 @@ import {
   isOnCallUnavailable,
   isSnoozed,
   nextHandover,
+  pageState,
   winningRule,
 } from "@/utils/oncall";
 
@@ -1032,6 +1056,8 @@ const expandedSystemActivityCount = computed(
   () => expandedEvents.value.filter((e) => !DEFAULT_ACTIVITY_KINDS.includes(e.kind)).length,
 );
 const teamsAvailable = ref(true);
+// False until the list has answered, so no row reads as a deleted team while it loads.
+const teamsLoaded = ref(false);
 const truncated = ref(false);
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
@@ -1119,6 +1145,8 @@ const viewerEmail = computed(() => String(store.state.userInfo?.email ?? "").toL
 const teamNameById = computed<Record<string, string>>(() =>
   Object.fromEntries(teams.value.map((team) => [team.id, team.name])),
 );
+
+const isDeletedTeam = (teamId: string) => teamsLoaded.value && !(teamId in teamNameById.value);
 
 // A ksuid asks the reader to look it up somewhere else, same as team_id
 // (`fetchTeamContext` below). There is no bulk "get these incidents" endpoint,
@@ -1295,7 +1323,8 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // kept for sorting and filtering, off by default.
     id: "state",
     header: t("oncall.state"),
-    size: 128,
+    // Wide enough for "Nobody answered", the longest state tag.
+    size: 160,
     accessorFn: (row: PageRow) => row.latest.state,
     sortable: true,
     hideable: true,
@@ -1888,6 +1917,7 @@ async function fetchContext(force = false) {
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";
+  teamsLoaded.value = teamsAvailable.value;
   teams.value = teamRes.status === "fulfilled" ? teamRes.value : [];
 
   const rules = ruleRes.status === "fulfilled" ? ruleRes.value : [];

@@ -1014,6 +1014,59 @@ describe("OnCallResponses", () => {
     );
   });
 
+  /// The stored state stays triggered; the screen says what it means.
+  it("tags a triggered page whose ladder ran out as nobody answered", async () => {
+    const wrapper = await withPages([page({ exhausted_at: 1_700_000_100_000_000 })]);
+
+    expect(wrapper.find('[type="oncallResponseState"]').attributes("value")).toBe("exhausted");
+  });
+
+  /// Status is hidden by default, so the always-visible Escalation cell carries the state.
+  it("says nobody answered in the escalation cell, which is always shown", async () => {
+    const wrapper = await withPages([page({ exhausted_at: 1_700_000_100_000_000 })]);
+
+    const tag = wrapper.find('[data-test="oncall-row-escalation-exhausted"]');
+    expect(tag.attributes("value")).toBe("exhausted");
+    expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).exists()).toBe(false);
+    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+    expect(columns.find((c) => c.id === "escalation").hideable).not.toBe(true);
+  });
+
+  it("sizes the status column to fit its longest state", async () => {
+    const wrapper = await withPages([page()]);
+    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+
+    expect(columns.find((c) => c.id === "state").size).toBeGreaterThanOrEqual(160);
+  });
+
+  it("names a team missing from the loaded list as deleted, without a link", async () => {
+    const wrapper = await withPages([page({ team_id: "team_gone" })]);
+
+    expect(wrapper.findAll('a[data-test^="oncall-row-team-"]')).toHaveLength(0);
+    const tag = wrapper.find('[data-test="oncall-row-team-deleted"]');
+    expect(tag.text()).toBe("Deleted team");
+  });
+
+  it("keeps the id when the team list could not be loaded", async () => {
+    service.listTeams.mockRejectedValue(new Error("down"));
+    service.listResponses.mockResolvedValue({ data: [page({ team_id: "team_gone" })] } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-row-team-deleted"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test^="oncall-row-team-"]').text()).toContain("team_gone");
+  });
+
+  it("names every filter for a screen reader", async () => {
+    const wrapper = await withPages([page()]);
+
+    for (const control of ["team-filter", "priority-filter", "cause-filter"]) {
+      expect(
+        wrapper.find(`[data-test="oncall-responses-${control}"]`).attributes("aria-label"),
+      ).toBeTruthy();
+    }
+  });
+
   describe("list view state", () => {
     const seed = () =>
       useListViewState("oncall-responses", {
@@ -1510,6 +1563,16 @@ describe("OnCallResponses", () => {
         expect(panel.find(`[data-test="oncall-responses-${control}"]`).exists()).toBe(true);
         // Moved, not duplicated: a second copy left inline would wrap the row again.
         expect(wrapper.findAll(`[data-test="oncall-responses-${control}"]`)).toHaveLength(1);
+      }
+    });
+
+    it("names the folded filters for a screen reader", async () => {
+      const wrapper = await withPages([page()]);
+
+      for (const control of ["team-filter", "priority-filter", "cause-filter"]) {
+        expect(
+          wrapper.find(`[data-test="oncall-responses-${control}"]`).attributes("aria-label"),
+        ).toBeTruthy();
       }
     });
 

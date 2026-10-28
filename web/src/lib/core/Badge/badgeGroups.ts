@@ -269,6 +269,7 @@ export const BADGE_GROUPS = {
       triaged: { variant: "amber-soft", labelKey: "oncall.state_triaged" },
       acknowledged: { variant: "blue-soft", labelKey: "oncall.state_acknowledged" },
       resolved: { variant: "success-soft", labelKey: "oncall.state_resolved" },
+      exhausted: { variant: "error-soft", labelKey: "oncall.state_exhausted" },
     },
     fallback: { variant: "default-soft" },
   },

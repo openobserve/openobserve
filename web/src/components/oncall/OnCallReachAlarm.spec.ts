@@ -49,6 +49,7 @@ function render(
     deliveriesTotal?: number | null;
     progress?: Partial<EscalationProgress> | null;
     smtpConfigured?: boolean | null;
+    teamDeleted?: boolean;
   } = {},
 ) {
   const deliveries = options.deliveries ?? [delivery()];
@@ -68,12 +69,25 @@ function render(
               ...options.progress,
             },
       smtpConfigured: options.smtpConfigured ?? null,
+      teamDeleted: options.teamDeleted ?? false,
     },
     global: { plugins: [i18n], stubs },
   });
 }
 
 describe("OnCallReachAlarm", () => {
+  /// The reachability check lives on the team, and a deleted team has no screen to open.
+  it("drops the reachability link for a deleted team", () => {
+    const deliveries = [delivery(), delivery({ recipient: "bo@o2.ai" })];
+    expect(
+      render({ deliveries }).find('[data-test="oncall-reach-alarm-reachability"]').exists(),
+    ).toBe(true);
+
+    const wrapper = render({ deliveries, teamDeleted: true });
+    expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-reach-alarm-reachability"]').exists()).toBe(false);
+  });
+
   it("says nobody has seen the page when every send failed", () => {
     const wrapper = render({ deliveries: [delivery(), delivery({ recipient: "bo@o2.ai" })] });
 

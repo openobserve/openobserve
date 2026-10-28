@@ -43,6 +43,7 @@ import {
   isRotationValid,
   isShiftRuleValid,
   isSnoozed,
+  pageState,
   isStaffed,
   isUnresolved,
   coverageHoursSummary,
@@ -476,6 +477,22 @@ describe("colorIndexFor", () => {
       const i = colorIndexFor(email, 5);
       expect(i).toBeGreaterThanOrEqual(0);
       expect(i).toBeLessThan(5);
+    }
+  });
+});
+
+describe("pageState", () => {
+  it("says nobody answered only for a triggered page whose ladder ran out", () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ state: "triggered", exhausted_at: 5 }, "exhausted"],
+      [{ state: "triggered", exhausted_at: null }, "triggered"],
+      [{ state: "triggered" }, "triggered"],
+      [{ state: "acknowledged", exhausted_at: 5 }, "acknowledged"],
+      [{ state: "resolved", exhausted_at: 5 }, "resolved"],
+      [{ state: "triaged", exhausted_at: 5 }, "triaged"],
+    ];
+    for (const [record, expected] of cases) {
+      expect(pageState(record as any)).toBe(expected);
     }
   });
 });

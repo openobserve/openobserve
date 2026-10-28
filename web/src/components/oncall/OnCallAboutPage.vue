@@ -87,7 +87,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem :label="t('oncall.team')">
+          <OTag
+            v-if="teamDeleted"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-about-team-deleted"
+          >
+            {{ t("oncall.deletedTeam") }}
+          </OTag>
           <router-link
+            v-else
             class="text-accent"
             :to="{
               name: 'onCallTeamDetail',
@@ -185,6 +194,7 @@ import { computed } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -203,6 +213,8 @@ const props = withDefaults(
     orgId: string;
     teamId: string;
     teamName: string;
+    /** The team is gone from the team list, so there is nothing to link to. */
+    teamDeleted?: boolean;
     subjectType: SubjectType;
     sourceId: string;
     /** The engine's sentence for why this team was picked. */
@@ -213,6 +225,7 @@ const props = withDefaults(
     causeNote?: string | null;
   }>(),
   {
+    teamDeleted: false,
     routingReason: null,
     subjectStream: null,
     incidentId: null,
