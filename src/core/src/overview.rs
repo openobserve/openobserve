@@ -224,27 +224,38 @@ pub fn normalize_top_n(requested: Option<usize>) -> usize {
 
 /// Resolves which streams and pipelines the caller may see; errors when the grant lookup fails.
 pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope, anyhow::Error> {
+    let [logs, metrics, traces, enrichment] = OVERVIEW_STREAM_TYPES.map(|t| t.to_string());
+    let (logs_grants, metrics_grants, traces_grants, enrichment_grants, pipeline_grants) = tokio::try_join!(
+        list_grants(org_id, user_id, &logs),
+        list_grants(org_id, user_id, &metrics),
+        list_grants(org_id, user_id, &traces),
+        list_grants(org_id, user_id, &enrichment),
+        list_grants(org_id, user_id, "pipelines"),
+    )?;
     let mut stream_grants = HashMap::new();
-    for stream_type in OVERVIEW_STREAM_TYPES {
-        let grants = crate::authz::list_objects_for_user(
-            org_id,
-            user_id,
-            "GET",
-            &ofga_object_type(&stream_type.to_string()),
-        )
-        .await?;
+    for (stream_type, grants) in OVERVIEW_STREAM_TYPES.into_iter().zip([
+        logs_grants,
+        metrics_grants,
+        traces_grants,
+        enrichment_grants,
+    ]) {
         if let Some(grants) = grants {
             stream_grants.insert(stream_type, grants);
         }
     }
-    let pipeline_grants =
-        crate::authz::list_objects_for_user(org_id, user_id, "GET", &ofga_object_type("pipelines"))
-            .await?;
     Ok(OverviewScope {
         user_id: user_id.to_string(),
         stream_grants,
         pipeline_grants,
     })
+}
+
+async fn list_grants(
+    org_id: &str,
+    user_id: &str,
+    resource: &str,
+) -> Result<Option<Vec<String>>, anyhow::Error> {
+    crate::authz::list_objects_for_user(org_id, user_id, "GET", &ofga_object_type(resource)).await
 }
 
 /// Overview for a caller whose grants could not be resolved; each scoped section reports an error.
