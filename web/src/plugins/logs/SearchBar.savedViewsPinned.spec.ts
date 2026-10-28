@@ -254,4 +254,25 @@ describe("SearchBar — pinned saved views", () => {
 
     expect(group().exists()).toBe(false);
   });
+
+  // 89px = 1px border + 54px list trigger + 1px separator + 32px create button + 1px border.
+  it.each([
+    [698, false],
+    [699, true],
+  ])(
+    "budgets the group at its rendered 89px width (toolbar %ipx → shown: %s)",
+    async (width, shown) => {
+      const otherPins = (["histogram", "sqlMode", "quickMode", "syntaxGuide"] as const).filter(
+        (key) => isPinned(key),
+      );
+      otherPins.forEach((key) => togglePin(key));
+      try {
+        wrapper = mountSearchBar(width);
+        await flushPromises();
+        expect(group().exists()).toBe(shown);
+      } finally {
+        otherPins.forEach((key) => togglePin(key));
+      }
+    },
+  );
 });
