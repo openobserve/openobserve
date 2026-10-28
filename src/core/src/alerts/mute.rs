@@ -176,11 +176,18 @@ pub async fn end_on_clear(org_id: &str, alert_id: &str, group_key: &str, cleared
     if candidates.is_empty() {
         return;
     }
-    let Some(firing) = firing_after_clear(alert_id, group_key).await else {
-        return;
+    let firing = match firing_after_clear(alert_id, group_key).await {
+        Ok(firing) => Some(firing),
+        Err(e) => {
+            log::error!(
+                "[ALERT_MUTE] could not list the firing groups of {org_id}/{alert_id}; only \
+                 one-group mutes end on this clear: {e}"
+            );
+            None
+        }
     };
     for row in candidates {
-        if !clear_ends(row, alert_id, group_key, &firing) {
+        if !clear_ends(row, alert_id, group_key, firing.as_deref()) {
             continue;
         }
         match downtimes::cancel_on_clear(org_id, &row.id, cleared_at).await {
@@ -216,8 +223,9 @@ pub fn source_of(ack_source: config::meta::alerts::ack::AckSource) -> MuteSource
     }
 }
 
-/// Whether a clear of `group_key` ends `row`, given the alert's groups still `firing`. [pure]
-fn clear_ends(row: &Downtime, alert_id: &str, group_key: &str, firing: &[String]) -> bool {
+/// Whether a clear of `group_key` ends `row`, given the alert's groups still `firing` (`None`
+/// when unknown, which ends only a one-group mute). [pure]
+fn clear_ends(row: &Downtime, alert_id: &str, group_key: &str, firing: Option<&[String]>) -> bool {
     let Some(end) = row
         .end_on_clear
         .as_ref()
@@ -228,24 +236,22 @@ fn clear_ends(row: &Downtime, alert_id: &str, group_key: &str, firing: &[String]
     match (end.group_key.as_deref(), row.alert_groups.as_deref()) {
         (Some(key), _) if !key.is_empty() => key == group_key,
         (_, Some(groups)) if !groups.is_empty() => {
-            !groups.iter().any(|g| firing.contains(&g.group_key))
+            firing.is_some_and(|firing| !groups.iter().any(|g| firing.contains(&g.group_key)))
         }
-        _ => firing.is_empty(),
+        _ => firing.is_some_and(<[String]>::is_empty),
     }
 }
 
-/// The alert's groups still firing after this clear; a rollup clear leaves none, `None` on error.
-async fn firing_after_clear(alert_id: &str, group_key: &str) -> Option<Vec<String>> {
+/// The alert's groups still firing after this clear; a rollup clear leaves none.
+async fn firing_after_clear(
+    alert_id: &str,
+    group_key: &str,
+) -> Result<Vec<String>, infra::errors::Error> {
     if group_key == ROLLUP_GROUP_KEY {
-        return Some(vec![]);
+        return Ok(vec![]);
     }
-    match infra::table::alert_states::firing_groups(alert_id, None).await {
-        Ok(rows) => Some(rows.into_iter().map(|(key, _)| key).collect()),
-        Err(e) => {
-            log::warn!("[ALERT_MUTE] could not list the firing groups of {alert_id}: {e}");
-            None
-        }
-    }
+    let rows = infra::table::alert_states::firing_groups(alert_id, None).await?;
+    Ok(rows.into_iter().map(|(key, _)| key).collect())
 }
 
 /// Exactly one of the three ends; Until it clears is a 24 h one-time row that the clear cuts short.
@@ -562,22 +568,26 @@ mod tests {
             Some(until_clear_of("a1", Some(&[group("k1")]))),
         );
         let still = ["k2".to_string()];
-        assert!(clear_ends(&one, "a1", "k1", &still));
+        assert!(clear_ends(&one, "a1", "k1", Some(&still)));
         assert!(
-            !clear_ends(&one, "a1", "k2", &still),
+            !clear_ends(&one, "a1", "k2", Some(&still)),
             "another group's clear leaves it"
         );
-        assert!(!clear_ends(&one, "a2", "k1", &[]));
+        assert!(!clear_ends(&one, "a2", "k1", Some(&[])));
+        assert!(
+            clear_ends(&one, "a1", "k1", None),
+            "its own clear ends it even when the firing groups cannot be read"
+        );
         let whole = row(None, Some(until_clear_of("a1", None)));
         assert!(
-            !clear_ends(&whole, "a1", "k1", &still),
+            !clear_ends(&whole, "a1", "k1", Some(&still)),
             "a group clears while another fires"
         );
-        assert!(clear_ends(&whole, "a1", "k1", &[]));
-        assert!(clear_ends(&whole, "a1", ROLLUP_GROUP_KEY, &[]));
+        assert!(clear_ends(&whole, "a1", "k1", Some(&[])));
+        assert!(clear_ends(&whole, "a1", ROLLUP_GROUP_KEY, Some(&[])));
         let timed = row(None, None);
         assert!(
-            !clear_ends(&timed, "a1", ROLLUP_GROUP_KEY, &[]),
+            !clear_ends(&timed, "a1", ROLLUP_GROUP_KEY, Some(&[])),
             "a timed mute outlives the clear"
         );
     }
@@ -591,12 +601,16 @@ mod tests {
         );
         let c = "c".to_string();
         assert!(
-            !clear_ends(&both, "a1", "a", &["b".to_string(), c.clone()]),
+            !clear_ends(&both, "a1", "a", Some(&["b".to_string(), c.clone()])),
             "b still fires"
         );
         assert!(
-            clear_ends(&both, "a1", "b", &[c]),
+            clear_ends(&both, "a1", "b", Some(&[c])),
             "an unmuted group firing does not hold the mute"
+        );
+        assert!(
+            !clear_ends(&both, "a1", "b", None),
+            "unknown firing groups keep it to its 24 h end"
         );
     }
 
