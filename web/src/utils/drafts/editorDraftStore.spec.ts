@@ -20,7 +20,9 @@ import {
   EDITOR_DRAFT_PREFIX,
   EDITOR_DRAFT_TTL_MS,
   cleanupEditorDrafts,
-  clearAllEditorDrafts,
+  clearEditorDraftsFor,
+  countEditorDraftsFor,
+  EDITOR_DRAFT_INDEX_KEY,
   countAllDraftsFor,
   editorDraftSessionEnded,
   endEditorDraftSession,
@@ -166,6 +168,35 @@ describe("editorDraftStore", () => {
       expect(draftKeyCount()).toBeLessThan(EDITOR_DRAFT_MAX_PER_KIND);
     });
 
+    it("makes room only among the writer's own drafts of that kind and org", () => {
+      const others = [
+        { ...scope, userEmail: "other@x.io" },
+        { ...scope, org: "org2" },
+        { ...scope, kind: "alert" as const },
+      ];
+      others.forEach((target, i) =>
+        storeRaw({ ...target, entityId: `keep${i}` }, Date.now() - 5000),
+      );
+      for (let i = 0; i < EDITOR_DRAFT_MAX_PER_KIND; i++) {
+        storeRaw({ ...scope, entityId: `old${i}` }, Date.now() - 1000 - i);
+      }
+      const original = Storage.prototype.setItem;
+      let failures = 1;
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+        value: string,
+      ) {
+        if (key === editorDraftKey(scope) && failures-- > 0) throw quotaError();
+        return original.call(this, key, value);
+      });
+
+      expect(writeEditorDraft(scope, { data: {} })).toBe(true);
+      others.forEach((target, i) =>
+        expect(readEditorDraft({ ...target, entityId: `keep${i}` })).not.toBeNull(),
+      );
+    });
+
     it("returns false when storage is still full after pruning", () => {
       vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         throw quotaError();
@@ -200,6 +231,18 @@ describe("editorDraftStore", () => {
       expect(readEditorDraft({ ...scope, kind: "alert", entityId: "a1" })).not.toBeNull();
     });
 
+    it("caps each user's drafts per kind and org, never evicting another user's or org's", () => {
+      for (let i = 0; i < 3; i++) storeRaw({ ...scope, entityId: `mine${i}` }, Date.now() - i);
+      storeRaw({ ...scope, userEmail: "other@x.io", entityId: "theirs" }, Date.now() - 100);
+      storeRaw({ ...scope, org: "org2", entityId: "elsewhere" }, Date.now() - 100);
+      expect(cleanupEditorDrafts(Date.now(), 2)).toBe(1);
+      expect(readEditorDraft({ ...scope, entityId: "mine2" })).toBeNull();
+      expect(
+        readEditorDraft({ ...scope, userEmail: "other@x.io", entityId: "theirs" }),
+      ).not.toBeNull();
+      expect(readEditorDraft({ ...scope, org: "org2", entityId: "elsewhere" })).not.toBeNull();
+    });
+
     it("removes expired, unreadable and malformed-key drafts", () => {
       storeRaw(scope, Date.now() - EDITOR_DRAFT_TTL_MS - 1);
       localStorage.setItem(`${EDITOR_DRAFT_PREFIX}broken`, JSON.stringify({ v: 1, savedAt: 1 }));
@@ -210,7 +253,7 @@ describe("editorDraftStore", () => {
 
     it("leaves panel drafts alone", () => {
       localStorage.setItem("o2_panel_draft:me@x.io:o:d:new", "{}");
-      clearAllEditorDrafts();
+      clearEditorDraftsFor("me@x.io");
       cleanupEditorDrafts();
       expect(localStorage.getItem("o2_panel_draft:me@x.io:o:d:new")).toBe("{}");
     });
@@ -312,10 +355,14 @@ describe("editorDraftStore", () => {
       expect(readEditorDraft(newScope)).not.toBeNull();
     });
 
-    it("ends the draft session: clears every draft and refuses writes until it resumes", () => {
+    it("ends the draft session: clears that user's drafts only, and refuses writes until it resumes", () => {
       writeEditorDraft(scope, { data: {} });
-      endEditorDraftSession();
-      expect(draftKeyCount()).toBe(0);
+      const other = { ...scope, userEmail: "other@x.io" };
+      writeEditorDraft(other, { data: {} });
+      endEditorDraftSession(scope.userEmail);
+      expect(readEditorDraft(scope)).toBeNull();
+      expect(readEditorDraft(other)).not.toBeNull();
+      localStorage.removeItem(editorDraftKey(other));
       expect(editorDraftSessionEnded.value).toBe(true);
       expect(writeEditorDraft(scope, { data: {} })).toBe(false);
       expect(draftKeyCount()).toBe(0);
@@ -333,7 +380,7 @@ describe("editorDraftStore", () => {
         sessionVariables: [],
         variablesWithCurrentPanel: [],
       };
-      endEditorDraftSession();
+      endEditorDraftSession(scope.userEmail);
       expect(writePanelDraft(panelScope, input)).toBe(false);
       resumeEditorDraftSession();
       expect(writePanelDraft(panelScope, input)).toBe(true);
@@ -351,12 +398,14 @@ describe("editorDraftStore", () => {
       expect(countAllDraftsFor("nobody@x.io")).toBe(0);
     });
 
-    it("clears every editor draft and nothing else", () => {
+    it("clears one user's editor drafts and nothing else", () => {
       writeEditorDraft(scope, { data: {} });
       writeEditorDraft({ ...scope, kind: "alert" }, { data: {} });
+      writeEditorDraft({ ...scope, userEmail: "other@x.io" }, { data: {} });
       localStorage.setItem("unrelated", "keep");
-      clearAllEditorDrafts();
-      expect(draftKeyCount()).toBe(0);
+      clearEditorDraftsFor(scope.userEmail);
+      expect(draftKeyCount()).toBe(1);
+      expect(readEditorDraft({ ...scope, userEmail: "other@x.io" })).not.toBeNull();
       expect(localStorage.getItem("unrelated")).toBe("keep");
     });
   });
@@ -369,6 +418,58 @@ describe("editorDraftStore", () => {
       expect(hashDraftValue({ a: 1, b: 2 })).toBe(hashDraftValue({ b: 2, a: 1 }));
       expect(hashDraftValue({ a: 1, b: 2 })).not.toBe(hashDraftValue({ a: 1, b: 3 }));
       expect(hashDraftValue("x")).toMatch(/^[0-9a-f]{8}$/);
+    });
+  });
+
+  describe("index", () => {
+    it("lists and counts without parsing any draft, once the index is built", () => {
+      writeEditorDraft(scope, { data: { big: "x".repeat(1000) } });
+      writeEditorDraft({ ...scope, entityId: "fn2" }, { data: {} });
+      listEditorDrafts("function", "org1", "me@x.io");
+      const getItem = vi.spyOn(Storage.prototype, "getItem");
+      expect(listEditorDrafts("function", "org1", "me@x.io")).toHaveLength(2);
+      expect(countEditorDraftsFor("me@x.io")).toBe(2);
+      const draftReads = getItem.mock.calls.filter(([key]) => key.startsWith(EDITOR_DRAFT_PREFIX));
+      expect(draftReads).toHaveLength(0);
+    });
+
+    it("keeps the index in step with writes and deletes", () => {
+      writeEditorDraft(scope, { data: {} });
+      const index = () => JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
+      expect(Object.keys(index())).toEqual([editorDraftKey(scope)]);
+      deleteEditorDraft(scope);
+      expect(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY)).toBeNull();
+      expect(localStorage.length).toBe(0);
+    });
+
+    it("picks up another tab's draft and index on its storage event", () => {
+      writeEditorDraft(scope, { data: {} });
+      expect(listEditorDrafts("function", "org1", "me@x.io")).toHaveLength(1);
+      const otherTab = { ...scope, entityId: "other-tab" };
+      storeRaw(otherTab, Date.now());
+      const index = JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}");
+      index[editorDraftKey(otherTab)] = Date.now();
+      localStorage.setItem(EDITOR_DRAFT_INDEX_KEY, JSON.stringify(index));
+      const start = editorDraftRevision.value;
+
+      window.dispatchEvent(new StorageEvent("storage", { key: EDITOR_DRAFT_INDEX_KEY }));
+
+      expect(editorDraftRevision.value).toBe(start + 1);
+      expect(listEditorDrafts("function", "org1", "me@x.io").map((d) => d.entityId)).toContain(
+        "other-tab",
+      );
+    });
+
+    it("rebuilds a missing or corrupt index from the drafts themselves", () => {
+      writeEditorDraft(scope, { data: {} });
+      localStorage.setItem(EDITOR_DRAFT_INDEX_KEY, "{not json");
+      expect(listEditorDrafts("function", "org1", "me@x.io")).toHaveLength(1);
+      localStorage.removeItem(EDITOR_DRAFT_INDEX_KEY);
+      storeRaw({ ...scope, entityId: "written-elsewhere" }, Date.now());
+      expect(listEditorDrafts("function", "org1", "me@x.io")).toHaveLength(2);
+      expect(JSON.parse(localStorage.getItem(EDITOR_DRAFT_INDEX_KEY) ?? "{}")).toHaveProperty(
+        editorDraftKey({ ...scope, entityId: "written-elsewhere" }),
+      );
     });
   });
 });

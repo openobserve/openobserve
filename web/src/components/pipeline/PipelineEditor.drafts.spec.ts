@@ -375,6 +375,24 @@ describe("PipelineEditor drafts", () => {
     expect(router.currentRoute.value.name).toBe("createPipeline");
   });
 
+  it("Discard on a route leave resets the shared pipeline state, so the next open starts clean", async () => {
+    await mountEditor("/pipeline/pipelines/add");
+    await addValidPipeline("dropped_pipe");
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    leaveButton("o-dialog-neutral-btn")?.click();
+    await navigation;
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(readEditorDraft(newScope)).toBeNull();
+    expect(pipelineObj.currentSelectedPipeline.name).toBe("");
+    expect(pipelineObj.currentSelectedPipeline.nodes).toEqual([]);
+    expect(pipelineObj.currentSelectedPipeline.edges).toEqual([]);
+    expect(pipelineObj.dirtyFlag).toBe(false);
+  });
+
   it("Keep draft lets a route leave go and keeps the work", async () => {
     await mountEditor("/pipeline/pipelines/add");
     await addValidPipeline("kept_pipe");
@@ -386,6 +404,7 @@ describe("PipelineEditor drafts", () => {
 
     expect(router.currentRoute.value.name).toBe("logs");
     expect(readEditorDraft<PipelineDraftData>(newScope)?.data.name).toBe("kept_pipe");
+    expect(pipelineObj.currentSelectedPipeline.name).toBe("");
   });
 
   it("a failed save shows the server's message and keeps the draft", async () => {

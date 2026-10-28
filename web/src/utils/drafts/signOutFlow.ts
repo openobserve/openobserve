@@ -14,45 +14,82 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { Router } from "vue-router";
-import { useLocalCurrentUser, useLocalUserInfo, invalidateLoginData } from "@/utils/zincutils";
+import {
+  getPath,
+  useLocalCurrentUser,
+  useLocalUserInfo,
+  invalidateLoginData,
+} from "@/utils/zincutils";
 import { forgetLinkRequest } from "@/utils/slackLink";
 import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
+import { stopSessionServices, type SessionServicesStore } from "@/utils/sessionServices";
 
-interface SignOutStore {
-  dispatch: (type: "logout") => unknown;
+interface SignOutStore extends SessionServicesStore {
+  state: SessionServicesStore["state"] & { userInfo?: { email?: string } };
+  dispatch: (type: "logout", payload?: { draftsOf?: string }) => unknown;
 }
 
 interface SignOutOptions {
-  beforeLogout?: () => void;
   /** The session can no longer save (forced password reset), so the leave dialogs offer only Discard. */
   discardOnly?: boolean;
+  /** The old session is already dead (password or own role changed): no guard can keep the user in it. */
+  forced?: boolean;
 }
 
-/** Signs out through the open editors' leave guards, so their Save still has a session; resolves false when one of them keeps the user. */
+// The guards have already been answered, so no editor's own "leave site?" prompt may ask again on the way out.
+const silenceUnloadPrompts = () => {
+  window.addEventListener("beforeunload", (event) => event.stopImmediatePropagation(), {
+    capture: true,
+  });
+};
+
+/** A full load, as the /logout route does, so nothing of the previous user's session stays in memory. */
+export const reloadToLogin = (): void => {
+  silenceUnloadPrompts();
+  window.location.assign(`${getPath()}login`);
+};
+
+/** Signs out through the open editors' leave guards, so their Save still has a session, then reloads to login; resolves false when one of them keeps the user. */
 export const signOutThroughLeaveGuards = (
   router: Router,
   store: SignOutStore,
-  { beforeLogout = () => {}, discardOnly = false }: SignOutOptions = {},
+  { discardOnly = false, forced = false }: SignOutOptions = {},
 ): Promise<boolean> => {
-  beginDraftSignOut(discardOnly);
-  // Global guards run after the leave guards; redirecting in place keeps the page, so no native unload prompt fires.
-  const removeGuard = router.beforeEach((to) => {
-    removeGuard();
-    if (to.path !== "/logout") return true;
-    beforeLogout();
+  beginDraftSignOut({ discardOnly, forced });
+  const userEmail = String(store.state.userInfo?.email ?? "");
+  let signedOut = false;
+  const endSession = () => {
+    if (signedOut) return;
+    signedOut = true;
+    stopSessionServices(store);
     invalidateLoginData();
-    store.dispatch("logout");
-    endEditorDraftSession();
+    store.dispatch("logout", { draftsOf: userEmail });
+    endEditorDraftSession(userEmail);
     useLocalCurrentUser("", true);
     useLocalUserInfo("", true);
     forgetLinkRequest();
+  };
+  // Global guards run after the leave guards; going to /login in place first unmounts the editors.
+  const removeGuard = router.beforeEach((to) => {
+    removeGuard();
+    if (to.path !== "/logout") return true;
+    endSession();
     return { path: "/login", replace: true };
   });
-  return router.push("/logout").then((failure) => {
-    if (!failure) return true;
+  const finish = (refused: boolean) => {
     removeGuard();
-    cancelDraftSignOut();
-    return false;
-  });
+    if (refused && !forced && !signedOut) {
+      cancelDraftSignOut();
+      return false;
+    }
+    endSession();
+    reloadToLogin();
+    return true;
+  };
+  // A guard that throws refuses like one that returns false, so the sign-out never hangs half-done.
+  return router.push("/logout").then(
+    (failure) => finish(!!failure),
+    () => finish(true),
+  );
 };

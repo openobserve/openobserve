@@ -770,8 +770,8 @@ export default defineComponent({
   },
   methods: {
     signout() {
-      // The open editors' leave guards run before the session ends, so their Save still works.
-      void signOutThroughLeaveGuards(this.$router, this.store);
+      // The user's own role changed, so the old session is over whatever an open editor answers.
+      void signOutThroughLeaveGuards(this.$router, this.store, { forced: true });
     },
   },
   computed: {

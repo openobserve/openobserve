@@ -262,6 +262,20 @@ export const countPanelDraftsFor = (userEmail: string, now: number = Date.now())
   }
 };
 
+/** Drops one user's panel drafts; run when that user signs out, so other users' drafts stay. */
+export const clearPanelDraftsFor = (userEmail: string) => {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    draftKeys(storage)
+      .filter((key) => key.startsWith(`${PANEL_DRAFT_PREFIX}${userEmail}:`))
+      .forEach((key) => storage.removeItem(key));
+  } catch {
+    return;
+  }
+  bumpRevision();
+};
+
 /** Runs on logout so no draft outlives the session that wrote it. */
 export const clearAllPanelDrafts = () => {
   const storage = getStorage();

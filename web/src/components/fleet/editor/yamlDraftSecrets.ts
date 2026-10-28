@@ -88,8 +88,97 @@ const mapFlowPairs = (flow: string, visit: (key: string, value: string) => strin
     },
   );
 
+const FLOW_KEY_BEFORE_COLLECTION =
+  /([{,]\s*)(["']?)([^"'{}[\],:\s][^"'{}[\],:]*?)\2(\s*:\s*)(?=[[{])/g;
+
+/** Where the bracketed collection starting at `start` ends (exclusive); quoted text is skipped. */
+const collectionEnd = (text: string, start: number): number => {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' || ch === "'") {
+      const close = text.indexOf(ch, i + 1);
+      if (close < 0) return text.length;
+      i = close;
+    } else if (ch === "[" || ch === "{") depth++;
+    else if (ch === "]" || ch === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return text.length;
+};
+
+// A secret key holding a list or map in flow style: the whole collection is the secret.
+const blankSecretFlowCollections = (flow: string): string => {
+  let out = "";
+  let from = 0;
+  FLOW_KEY_BEFORE_COLLECTION.lastIndex = 0;
+  for (
+    let m = FLOW_KEY_BEFORE_COLLECTION.exec(flow);
+    m;
+    m = FLOW_KEY_BEFORE_COLLECTION.exec(flow)
+  ) {
+    if (!isSecretKey(m[3])) continue;
+    const valueStart = m.index + m[0].length;
+    const end = collectionEnd(flow, valueStart);
+    if (flow.slice(valueStart, end).includes("${")) continue;
+    out += `${flow.slice(from, valueStart)}""`;
+    from = end;
+    FLOW_KEY_BEFORE_COLLECTION.lastIndex = end;
+  }
+  return out + flow.slice(from);
+};
+
 const redactFlow = (flow: string): string =>
-  mapFlowPairs(flow, (key, value) => (keepsValue(key, value) ? value : '""'));
+  mapFlowPairs(blankSecretFlowCollections(flow), (key, value) =>
+    keepsValue(key, value) ? value : '""',
+  );
+
+const LIST_SCALAR_LINE = /^(\s*-\s+)(.*)$/;
+
+const isLiteralSecret = (value: string) =>
+  value !== "" && !isBlankScalar(value) && !value.includes("${");
+
+/** Redacts the lines of a secret key's nested block (a list or map) from `start`; returns the index of its last line. */
+const redactSecretBlock = (
+  source: string[],
+  start: number,
+  keyIndent: number,
+  out: string[],
+  lines: number[],
+): number => {
+  let i = start;
+  while (i < source.length && (source[i].trim() === "" || indentOf(source[i]) > keyIndent)) {
+    const line = source[i];
+    const match = KEY_LINE.exec(line);
+    const item = match ? null : LIST_SCALAR_LINE.exec(line);
+    const prefix = match ? `${match[1]}${match[2]}${match[3]}${match[2]}${match[4]} ` : item?.[1];
+    const { scalar, comment } = splitComment((match ? match[6] : item?.[2]) ?? "");
+    const value = scalar.trim();
+    const continued = match && value === "" ? plainContinuation(source, i) : 0;
+    // A path or file setting under the block still names where a secret lives, not the secret.
+    const reference = !!match && REFERENCE_KEY.test(match[3]);
+    if (prefix === undefined || reference || (!isLiteralSecret(value) && !continued)) {
+      out.push(line);
+      i++;
+      continue;
+    }
+    lines.push(out.length);
+    out.push(`${prefix}""${comment}`);
+    const bodyIndent = indentOf(line);
+    i += 1 + continued;
+    if (!BLOCK_SCALAR.test(value)) continue;
+    while (i < source.length && (source[i].trim() === "" || indentOf(source[i]) > bodyIndent)) i++;
+  }
+  return i - 1;
+};
+
+const hasNestedBlock = (source: string[], i: number): boolean => {
+  const keyIndent = indentOf(source[i]);
+  const next = source.slice(i + 1).find((line) => line.trim() !== "");
+  return next !== undefined && indentOf(next) > keyIndent;
+};
 
 /** Each key's value in a flow collection; null for a key that occurs more than once, at any depth. */
 const flowValues = (flow: string): Map<string, string | null> => {
@@ -311,7 +400,7 @@ export const changedYamlSecretLines = (
       restoreYamlSecrets(redacted.text, [line], saved),
   );
 
-/** Blanks literal values under secret-looking YAML keys, including block scalars and flow maps, line by line. */
+/** Blanks literal values under secret-looking YAML keys, including block scalars, flow maps and every scalar of a list or map under such a key, line by line. */
 export const redactYamlSecrets = (yaml: string): RedactedYaml => {
   const out: string[] = [];
   const lines: number[] = [];
@@ -327,6 +416,18 @@ export const redactYamlSecrets = (yaml: string): RedactedYaml => {
       lines.push(out.length);
       out.push(`${match[1]}${match[2]}${match[3]}${match[2]}${match[4]} ""${comment}`);
       i += continued;
+      continue;
+    }
+    // A secret key holding a block list or map: every scalar under it is a secret.
+    if (
+      match &&
+      !continued &&
+      scalar.trim() === "" &&
+      isSecretKey(match[3]) &&
+      hasNestedBlock(source, i)
+    ) {
+      out.push(line);
+      i = redactSecretBlock(source, i + 1, indentOf(line), out, lines);
       continue;
     }
     if (!match || keepsValue(match[3], scalar)) {

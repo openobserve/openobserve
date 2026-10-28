@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import store from "@/test/unit/helpers/store";
@@ -23,10 +23,14 @@ import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSign
 import {
   editorDraftSessionEnded,
   editorDraftSigningOut,
+  countEditorDraftsFor,
   resumeEditorDraftSession,
   writeEditorDraft,
 } from "@/utils/drafts/editorDraftStore";
 import { invalidateLoginData } from "@/utils/zincutils";
+import { stopSessionServices } from "@/utils/sessionServices";
+
+const realLocation = window.location;
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -36,6 +40,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   invalidateLoginData: vi.fn(),
 }));
+
+vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
 
 import MainLayout from "./MainLayout.vue";
 
@@ -68,8 +74,16 @@ describe("MainLayout — sign out with drafts", () => {
   let wrapper: VueWrapper | undefined;
   const originalUserInfo = store.state.userInfo;
   const email = "drafts@x.io";
+  const logout = ["logout", { draftsOf: email }];
+  let assign: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+  });
 
   afterEach(async () => {
+    vi.stubGlobal("location", realLocation);
     await router.push("/");
     wrapper?.unmount();
     wrapper = undefined;
@@ -95,16 +109,22 @@ describe("MainLayout — sign out with drafts", () => {
     await flushPromises();
     const dialog = wrapper.findComponent(EditorDraftSignOutDialog);
     expect(dialog.props()).toMatchObject({ open: true, count: 2 });
-    expect(dispatch).not.toHaveBeenCalledWith("logout");
+    expect(dispatch).not.toHaveBeenCalledWith(...logout);
+    expect(assign).not.toHaveBeenCalled();
 
     dialog.vm.$emit("confirm");
     await flushPromises();
-    expect(dispatch).toHaveBeenCalledWith("logout");
+    expect(dispatch).toHaveBeenCalledWith(...logout);
+    expect(assign).toHaveBeenCalledTimes(1);
+    resumeEditorDraftSession();
+    expect(countEditorDraftsFor(email)).toBe(0);
+    expect(countEditorDraftsFor("other@x.io")).toBe(1);
   });
 
   it("runs the editors' leave guards before ending the session, and Stay aborts the sign-out", async () => {
     store.state.userInfo = { ...originalUserInfo, email };
     vi.mocked(invalidateLoginData).mockClear();
+    vi.mocked(stopSessionServices).mockClear();
     const dispatch = vi.spyOn(store, "dispatch");
     const seen: { loggedOut: boolean; signingOut: boolean }[] = [];
     let allow = false;
@@ -124,19 +144,22 @@ describe("MainLayout — sign out with drafts", () => {
       vm.signout();
       await flushPromises();
       expect(seen).toEqual([{ loggedOut: false, signingOut: true }]);
-      expect(dispatch).not.toHaveBeenCalledWith("logout");
+      expect(dispatch).not.toHaveBeenCalledWith(...logout);
       expect(invalidateLoginData).not.toHaveBeenCalled();
+      expect(stopSessionServices).not.toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
       expect(editorDraftSigningOut.value).toBe(false);
 
       allow = true;
       vm.signout();
       await flushPromises();
       expect(seen[1]).toEqual({ loggedOut: false, signingOut: true });
-      expect(dispatch).toHaveBeenCalledWith("logout");
+      expect(dispatch).toHaveBeenCalledWith(...logout);
       expect(invalidateLoginData).toHaveBeenCalledTimes(1);
+      expect(stopSessionServices).toHaveBeenCalledTimes(1);
       expect(editorDraftSessionEnded.value).toBe(true);
-      // In place, so a mounted editor unmounts and its native beforeunload prompt never fires.
       expect(router.currentRoute.value.path).toBe("/login");
+      expect(assign).toHaveBeenCalledTimes(1);
     } finally {
       removeGuard();
     }
@@ -151,6 +174,7 @@ describe("MainLayout — sign out with drafts", () => {
     (wrapper.vm as unknown as { signout: () => void }).signout();
     await flushPromises();
     expect(wrapper.findComponent(EditorDraftSignOutDialog).props("open")).toBe(false);
-    expect(dispatch).toHaveBeenCalledWith("logout");
+    expect(dispatch).toHaveBeenCalledWith(...logout);
+    expect(assign).toHaveBeenCalledTimes(1);
   });
 });

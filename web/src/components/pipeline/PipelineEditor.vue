@@ -667,6 +667,8 @@ const pipelineDraft = useEditorDraft<PipelineDraftData>({
   base: () => (editPipelineId ? serverPipeline : undefined),
   hasChanges: isPipelineDirty,
   save: () => savePipeline({ navigate: false }),
+  // The pipeline state is shared, so edits that leave without a save must not wait in it for the next open.
+  onLeaveWithoutSave: resetPipelineData,
 });
 
 const goToPipelines = () =>

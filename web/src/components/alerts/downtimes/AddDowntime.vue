@@ -855,7 +855,6 @@ const bannerCounts = computed(() =>
 
 const request = computed(() => buildDowntimeRequest(values.value));
 
-// ── Drafts ──────────────────────────────────────────────────────────────────
 // The stored settings only: status and match counts move on their own and must not read as a server edit.
 const storedDowntime = (row: DowntimeDetail | undefined) =>
   row

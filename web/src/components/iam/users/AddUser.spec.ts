@@ -75,10 +75,16 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
+vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
+
 import userServiece from "@/services/users";
 import { userKeys } from "@/services/users.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { invalidateLoginData } from "@/utils/zincutils";
+import { stopSessionServices } from "@/utils/sessionServices";
+import { resumeDraftSession } from "@/utils/drafts/draftSession";
+
+const realLocation = window.location;
 import config from "@/aws-exports";
 
 // ODialog stub: renders the default slot so the REAL OForm mounts. (The second
@@ -667,13 +673,19 @@ describe("AddUser", () => {
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
     });
 
-    it("signout() runs the leave guards, then clears auth state", async () => {
+    it("signout() runs the leave guards, then ends the session and reloads, even when an editor refuses", async () => {
       store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
       store.state.organizations = [];
+      const assign = vi.fn();
+      vi.stubGlobal("location", { ...window.location, assign });
       const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(undefined as any);
-      const guards: ((to: { path: string }) => unknown)[] = [];
+      const editorGuard = (to: { path: string }) => to.path !== "/logout";
+      const guards: ((to: { path: string }) => unknown)[] = [editorGuard];
       const push = vi.fn(async (path: string) => {
-        for (const guard of [...guards]) await guard({ path });
+        for (const guard of [...guards]) {
+          if ((await guard({ path })) === false) return { type: "aborted" };
+        }
+        return undefined;
       });
       const beforeEach = (guard: (to: { path: string }) => unknown) => {
         guards.push(guard);
@@ -702,11 +714,15 @@ describe("AddUser", () => {
       await flushPromises();
 
       expect(invalidateLoginData).toHaveBeenCalled();
-      expect(dispatchSpy).toHaveBeenCalledWith("logout");
+      expect(stopSessionServices).toHaveBeenCalledTimes(1);
+      expect(dispatchSpy).toHaveBeenCalledWith("logout", { draftsOf: ADMIN_EMAIL });
       expect(push).toHaveBeenCalledWith("/logout");
+      expect(assign).toHaveBeenCalledTimes(1);
 
       w.unmount();
       dispatchSpy.mockRestore();
+      vi.stubGlobal("location", realLocation);
+      resumeDraftSession();
     });
   });
 

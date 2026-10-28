@@ -1403,6 +1403,8 @@ const scorerDraft = useEditorDraft<ScorerDraft>({
   }),
   // A header name, not a secret, though its key matches the secret pattern.
   secretExemptKeys: ["authApiKeyHeaderName"],
+  // Any custom header can carry a credential, whatever its name, so no header value is drafted.
+  secretLists: ["/values/customHeaders"],
   apply: (data) => {
     form.reset({ ...initForm(null, props.scorerType), ...data.values });
     if (data.values.producesScoreConfigId) void prepareSelectedScoreConfigVersion(true);

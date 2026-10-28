@@ -96,7 +96,10 @@ export interface EditorDraftEntry {
 export const EDITOR_DRAFT_VERSION = 1;
 export const EDITOR_DRAFT_PREFIX = "o2_draft:";
 export const EDITOR_DRAFT_TTL_MS = 7 * 24 * 60 * 60_000;
+/** How many drafts one user keeps per kind in one org; older ones are pruned. */
 export const EDITOR_DRAFT_MAX_PER_KIND = 20;
+/** Key -> savedAt of every live draft, so lists and counts never parse the drafts themselves. */
+export const EDITOR_DRAFT_INDEX_KEY = "o2_draft_index";
 export const NEW_EDITOR_DRAFT_ID = "new";
 const NEW_VARIANT_PREFIX = `${NEW_EDITOR_DRAFT_ID}~`;
 
@@ -107,6 +110,7 @@ export {
   draftSessionEnded as editorDraftSessionEnded,
   draftSigningOut as editorDraftSigningOut,
   draftSignOutDiscardOnly as editorDraftSignOutDiscardOnly,
+  draftSignOutForced as editorDraftSignOutForced,
   beginDraftSignOut,
   cancelDraftSignOut,
 } from "@/utils/drafts/draftSession";
@@ -133,7 +137,14 @@ const getStorage = (): Storage | null => {
 
 const onStorageEvent = (event: StorageEvent) => {
   // A null key means another tab cleared the whole storage.
-  if (event.key === null || event.key.startsWith(EDITOR_DRAFT_PREFIX)) bumpRevision();
+  if (
+    event.key === null ||
+    event.key === EDITOR_DRAFT_INDEX_KEY ||
+    event.key.startsWith(EDITOR_DRAFT_PREFIX)
+  ) {
+    indexCache = null;
+    bumpRevision();
+  }
 };
 
 // Registered once at module load, so reading a draft never adds listeners.
@@ -199,6 +210,71 @@ const isLive = (draft: EditorDraft | null, now: number): draft is EditorDraft =>
   typeof draft.savedAt === "number" &&
   now - draft.savedAt <= EDITOR_DRAFT_TTL_MS;
 
+// The index is kept in step with every write and delete, and rebuilt from a full scan when missing or unreadable.
+let indexCache: Map<string, number> | null = null;
+let indexCacheRaw: string | null = null;
+
+// A key that is not a live draft is indexed at 0, which every list skips as expired until cleanup removes it.
+const scanIndex = (storage: Storage, now: number): Map<string, number> => {
+  const index = new Map<string, number>();
+  for (const key of draftKeys(storage)) {
+    const draft = parseDraft(storage.getItem(key));
+    index.set(key, parseKey(key) && isLive(draft, now) ? draft.savedAt : 0);
+  }
+  return index;
+};
+
+const persistIndex = (storage: Storage, index: Map<string, number>) => {
+  indexCache = index;
+  indexCacheRaw = index.size ? JSON.stringify(Object.fromEntries(index)) : null;
+  try {
+    // No drafts leaves no index behind, so a browser without drafts holds no draft key at all.
+    if (indexCacheRaw === null) storage.removeItem(EDITOR_DRAFT_INDEX_KEY);
+    else storage.setItem(EDITOR_DRAFT_INDEX_KEY, indexCacheRaw);
+  } catch {
+    // Storage is full: the index stays in memory, and the next cleanup scan rewrites it.
+    indexCacheRaw = null;
+  }
+};
+
+// Listing keys reads no values, so this stays cheap; a draft key added or removed behind the store's back forces a rebuild.
+const coversKeys = (index: Map<string, number>, keys: string[]) =>
+  index.size === keys.length && keys.every((key) => index.has(key));
+
+const parseIndex = (raw: string | null): Map<string, number> | null => {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (!entries.every(([, at]) => typeof at === "number")) return null;
+    return new Map(entries as [string, number][]);
+  } catch {
+    return null;
+  }
+};
+
+const readIndex = (storage: Storage): Map<string, number> => {
+  const raw = storage.getItem(EDITOR_DRAFT_INDEX_KEY);
+  const keys = draftKeys(storage);
+  if (indexCache && raw === indexCacheRaw && coversKeys(indexCache, keys)) return indexCache;
+  const stored = parseIndex(raw);
+  if (stored && coversKeys(stored, keys)) {
+    indexCache = stored;
+    indexCacheRaw = raw;
+    return stored;
+  }
+  const rebuilt = scanIndex(storage, Date.now());
+  persistIndex(storage, rebuilt);
+  return rebuilt;
+};
+
+const updateIndex = (storage: Storage, change: (index: Map<string, number>) => void) => {
+  const index = new Map(readIndex(storage));
+  change(index);
+  persistIndex(storage, index);
+};
+
 const isQuotaError = (error: unknown) =>
   error instanceof DOMException &&
   (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED");
@@ -249,7 +325,11 @@ export const isEditorDraftStorageAvailable = (): boolean => {
   }
 };
 
-/** Drops expired, unreadable and old-format drafts, then keeps only the newest `maxPerKind` of each kind. */
+// One user's drafts of one kind in one org: the unit a cap applies to, so nobody else's draft is ever evicted.
+const capGroup = (parsed: ParsedKey) =>
+  [parsed.kind, parsed.org, parsed.userEmail].map(encodeURIComponent).join(":");
+
+/** Drops expired, unreadable and old-format drafts, then keeps only the newest `maxPerKind` of each kind per user and org. */
 export const cleanupEditorDrafts = (
   now: number = Date.now(),
   maxPerKind: number = EDITOR_DRAFT_MAX_PER_KIND,
@@ -258,31 +338,51 @@ export const cleanupEditorDrafts = (
   if (!storage) return 0;
   let removed = 0;
   try {
-    const liveByKind = new Map<string, { key: string; savedAt: number }[]>();
+    const live = new Map<string, number>();
+    const byGroup = new Map<string, { key: string; savedAt: number }[]>();
     for (const key of draftKeys(storage)) {
       const parsed = parseKey(key);
       const draft = parseDraft(storage.getItem(key));
       if (parsed && isLive(draft, now)) {
-        const list = liveByKind.get(parsed.kind) ?? [];
+        live.set(key, draft.savedAt);
+        const list = byGroup.get(capGroup(parsed)) ?? [];
         list.push({ key, savedAt: draft.savedAt });
-        liveByKind.set(parsed.kind, list);
+        byGroup.set(capGroup(parsed), list);
       } else {
         storage.removeItem(key);
         removed++;
       }
     }
-    for (const list of liveByKind.values()) {
+    for (const list of byGroup.values()) {
       list.sort((a, b) => b.savedAt - a.savedAt);
       for (const { key } of list.slice(Math.max(0, maxPerKind))) {
         storage.removeItem(key);
+        live.delete(key);
         removed++;
       }
     }
+    persistIndex(storage, live);
   } catch {
     return removed;
   }
   if (removed) bumpRevision();
   return removed;
+};
+
+/** Keeps the newest `keep` drafts of the scope's own kind, user and org, to make room for its next write. */
+const pruneScopeGroup = (storage: Storage, scope: EditorDraftScope, keep: number) => {
+  const own = parseKey(editorDraftKey(scope));
+  if (!own) return;
+  const group = capGroup(own);
+  const list = [...readIndex(storage)]
+    .filter(([key]) => {
+      const parsed = parseKey(key);
+      return !!parsed && capGroup(parsed) === group;
+    })
+    .sort((a, b) => b[1] - a[1]);
+  const dropped = list.slice(Math.max(0, keep)).map(([key]) => key);
+  dropped.forEach((key) => storage.removeItem(key));
+  if (dropped.length) updateIndex(storage, (index) => dropped.forEach((key) => index.delete(key)));
 };
 
 export const readEditorDraft = <T = unknown>(
@@ -298,6 +398,7 @@ export const readEditorDraft = <T = unknown>(
     const draft = parseDraft(raw);
     if (isLive(draft, now)) return draft as EditorDraft<T>;
     storage.removeItem(key);
+    updateIndex(storage, (index) => index.delete(key));
     bumpRevision();
   } catch {
     return null;
@@ -324,11 +425,12 @@ export const writeEditorDraft = <T>(
   const storage = getStorage();
   if (!storage) return false;
   const key = editorDraftKey(scope);
+  const savedAt = Date.now();
   let payload: string;
   try {
     const draft: EditorDraft<T> = {
       v: EDITOR_DRAFT_VERSION,
-      savedAt: Date.now(),
+      savedAt,
       data: input.data,
       ...(input.baseHash ? { baseHash: input.baseHash } : {}),
       ...(input.redactedPaths?.length ? { redactedPaths: input.redactedPaths } : {}),
@@ -345,6 +447,7 @@ export const writeEditorDraft = <T>(
   }
   const attempt = () => {
     storage.setItem(key, payload);
+    updateIndex(storage, (index) => index.set(key, savedAt));
     bumpRevision();
   };
   try {
@@ -352,7 +455,8 @@ export const writeEditorDraft = <T>(
   } catch (error) {
     if (!isQuotaError(error)) return false;
     try {
-      cleanupEditorDrafts(Date.now(), Math.floor(EDITOR_DRAFT_MAX_PER_KIND / 2));
+      // Room is made only among this user's drafts of this kind in this org.
+      pruneScopeGroup(storage, scope, Math.floor(EDITOR_DRAFT_MAX_PER_KIND / 2));
       attempt();
     } catch {
       return false;
@@ -368,6 +472,7 @@ export const deleteEditorDraft = (scope: EditorDraftScope): void => {
     const key = editorDraftKey(scope);
     if (storage.getItem(key) === null) return;
     storage.removeItem(key);
+    updateIndex(storage, (index) => index.delete(key));
     bumpRevision();
   } catch {
     /* storage blocked: nothing to delete */
@@ -386,18 +491,12 @@ export const listEditorDrafts = (
   if (!storage) return [];
   const entries: EditorDraftEntry[] = [];
   try {
-    for (const key of draftKeys(storage)) {
+    for (const [key, savedAt] of readIndex(storage)) {
+      if (now - savedAt > EDITOR_DRAFT_TTL_MS) continue;
       const parsed = parseKey(key);
       if (!parsed || parsed.kind !== kind || parsed.org !== org) continue;
       if (parsed.userEmail !== userEmail) continue;
-      const draft = parseDraft(storage.getItem(key));
-      if (isLive(draft, now)) {
-        entries.push({
-          entityId: parsed.entityId,
-          variant: parsed.variant,
-          savedAt: draft.savedAt,
-        });
-      }
+      entries.push({ entityId: parsed.entityId, variant: parsed.variant, savedAt });
     }
   } catch {
     return entries;
@@ -421,9 +520,9 @@ export const countEditorDraftsFor = (userEmail: string, now: number = Date.now()
   const storage = getStorage();
   if (!storage) return 0;
   try {
-    return draftKeys(storage).filter(
-      (key) =>
-        parseKey(key)?.userEmail === userEmail && isLive(parseDraft(storage.getItem(key)), now),
+    return [...readIndex(storage)].filter(
+      ([key, savedAt]) =>
+        now - savedAt <= EDITOR_DRAFT_TTL_MS && parseKey(key)?.userEmail === userEmail,
     ).length;
   } catch {
     return 0;
@@ -460,38 +559,42 @@ export const deleteEditorDraftsFor = (target: {
 }): number => {
   const storage = getStorage();
   if (!storage) return 0;
-  let removed = 0;
+  const dropped: string[] = [];
   try {
     for (const key of draftKeys(storage)) {
       const parsed = parseKey(key);
       if (!parsed || parsed.kind !== target.kind || parsed.org !== target.org) continue;
       if (!matchesDeleteTarget(parsed, target)) continue;
       storage.removeItem(key);
-      removed++;
+      dropped.push(key);
     }
+    if (dropped.length)
+      updateIndex(storage, (index) => dropped.forEach((key) => index.delete(key)));
   } catch {
-    return removed;
+    return dropped.length;
   }
-  if (removed) bumpRevision();
-  return removed;
+  if (dropped.length) bumpRevision();
+  return dropped.length;
 };
 
-/** Runs on logout so no draft outlives the session that wrote it. */
-export const clearAllEditorDrafts = (): void => {
+/** Drops every draft of one user in this browser; other users' drafts stay. */
+export const clearEditorDraftsFor = (userEmail: string): void => {
   const storage = getStorage();
   if (!storage) return;
   try {
-    draftKeys(storage).forEach((key) => storage.removeItem(key));
+    const dropped = draftKeys(storage).filter((key) => parseKey(key)?.userEmail === userEmail);
+    dropped.forEach((key) => storage.removeItem(key));
+    updateIndex(storage, (index) => dropped.forEach((key) => index.delete(key)));
   } catch {
     return;
   }
   bumpRevision();
 };
 
-/** Runs on an explicit sign-out: drops every draft and refuses writes until `resumeEditorDraftSession`, so an editor still open cannot write one back. */
-export const endEditorDraftSession = (): void => {
+/** Runs on an explicit sign-out: drops that user's drafts and refuses writes until `resumeEditorDraftSession`, so an editor still open cannot write one back. */
+export const endEditorDraftSession = (userEmail: string): void => {
   markDraftSessionEnded();
-  clearAllEditorDrafts();
+  clearEditorDraftsFor(userEmail);
 };
 
 /** Runs on login. */

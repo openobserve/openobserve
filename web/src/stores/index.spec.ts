@@ -81,6 +81,29 @@ describe("root store", () => {
       localStorage.removeItem("unrelated");
     });
 
+    it("clears only the named user's panel drafts on an explicit sign-out", async () => {
+      const draft = {
+        tabId: "t",
+        data: {},
+        layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+        sessionVariables: [],
+        variablesWithCurrentPanel: [],
+      };
+      const mine = { userEmail: "me@x.io", org: "o", dashboardId: "d", panelId: "p" };
+      const theirs = { ...mine, userEmail: "other@x.io" };
+      writePanelDraft(mine, draft);
+      writePanelDraft(theirs, draft);
+
+      await store.dispatch("logout", { draftsOf: "me@x.io" });
+
+      expect(readPanelDraft(mine)).toBeNull();
+      expect(readPanelDraft(theirs)).not.toBeNull();
+
+      await store.dispatch("logout", { draftsOf: "" });
+      expect(readPanelDraft(theirs)).not.toBeNull();
+      localStorage.clear();
+    });
+
     it("keeps editor drafts on a session-expiry logout, so the open editor's work survives re-login", async () => {
       const scope = {
         kind: "function" as const,

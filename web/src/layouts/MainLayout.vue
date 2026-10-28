@@ -397,27 +397,7 @@ export default defineComponent({
       this.performSignout();
     },
     performSignout() {
-      void signOutThroughLeaveGuards(this.$router, this.store, {
-        beforeLogout: () => this.stopSessionServices(),
-      });
-    },
-    stopSessionServices() {
-      this.closeSocket();
-
-      // AI chat streams outlive their component by design, so navigating away
-      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
-      // they keep streaming and writing chat history after sign-out.
-      window.dispatchEvent(new Event("o2:abort-ai-streams"));
-
-      // Clear any open notifications so they don't carry over past logout.
-      dismissAll();
-
-      // Stop session replay recording on logout
-      if (this.store.state.zoConfig?.rum?.enabled) {
-        openobserveRum.stopSessionReplayRecording();
-        openobserveRum.clearUser();
-        openobserveRum.clearAccount();
-      }
+      void signOutThroughLeaveGuards(this.$router, this.store);
     },
     goToHome() {
       this.$router.push({
@@ -466,7 +446,7 @@ export default defineComponent({
     );
 
     const { getStreams, resetStreams } = useStreams(t);
-    const { closeSocket } = useSearchWebSocket();
+    useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
 
@@ -1762,7 +1742,6 @@ export default defineComponent({
       slackIcon: markRaw(SlackIcon),
       openSlack,
       settings: "settings",
-      closeSocket,
       splitterModel,
       toggleAIChat,
       closeChat,

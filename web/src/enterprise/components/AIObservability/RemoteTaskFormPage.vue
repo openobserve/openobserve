@@ -1087,6 +1087,8 @@ const taskDraft = useEditorDraft<RemoteTaskFormValues>({
     return run.saved;
   },
   describeRedacted,
+  // Any header can carry a credential (Cookie, X-Auth, …), so no header value is drafted.
+  secretLists: ["/headers"],
 });
 
 onMounted(async () => {

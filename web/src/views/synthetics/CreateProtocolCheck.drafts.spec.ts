@@ -156,17 +156,27 @@ describe("CreateProtocolCheck drafts", () => {
       name: "Checkout",
       auth: { type: "basic", username: "bot", password: "hunter2" },
       headers: [{ id: "h1", key: "X-Session", value: "abc" }],
+      http: {
+        method: "GET",
+        headers: [{ name: "Cookie", value: "sid=plain" }],
+        body: "",
+        follow_redirects: true,
+        timeout_ms: 10000,
+        assertions: [],
+      },
     });
     window.dispatchEvent(new Event("pagehide"));
 
     const draft = readEditorDraft<ProtocolCheck>(httpScope);
+    expect(JSON.stringify(draft)).not.toContain("sid=plain");
+    expect(draft?.data.http?.headers).toEqual([{ name: "Cookie", value: "" }]);
     expect(draft?.data).toMatchObject({
       name: "Checkout",
       auth: { username: "bot", password: "" },
       headers: [{ key: "X-Session", value: "" }],
     });
     expect(draft?.redactedPaths).toEqual(
-      expect.arrayContaining(["/auth/password", "/headers/0/value"]),
+      expect.arrayContaining(["/auth/password", "/headers/0/value", "/http/headers/0/value"]),
     );
   });
 

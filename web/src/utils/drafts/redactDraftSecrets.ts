@@ -153,6 +153,22 @@ export const redactDraftSecrets = <T>(
   return { data: copy, paths };
 };
 
+/** Blanks every entry's `value` in the lists at `pointers` (in place) and reports where, for lists whose values are secrets whatever their names. */
+export const blankSecretLists = (data: unknown, pointers: string[]): string[] => {
+  const paths: string[] = [];
+  for (const listPointer of pointers) {
+    const segments = parsePointer(listPointer);
+    const list = segments ? valueAt(data, segments) : undefined;
+    if (!Array.isArray(list)) continue;
+    list.forEach((entry, index) => {
+      if (!isRecord(entry) || typeof entry.value !== "string" || entry.value === "") return;
+      entry.value = "";
+      paths.push(`${listPointer}/${index}/value`);
+    });
+  }
+  return paths;
+};
+
 /** The label of the list entry each path sits in, read from the unredacted data; paths outside a list are skipped. */
 export const redactedEntryLabels = (data: unknown, paths: string[]): Record<string, string> => {
   const labels: Record<string, string> = {};

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="dismissible ? t('common.cancel') : undefined"
     :primary-button-label="t('passwordReset.submit')"
     form-id="update-password-form"
-    @click:neutral="signOut"
+    @click:neutral="signOut()"
     @click:secondary="close"
     @update:open="(open: boolean) => !open && close()"
   >
@@ -156,9 +156,10 @@ watch(
   { immediate: true },
 );
 
-// The server refuses every save until the password changes, and a changed one leaves the cookie stale, so editors offer only Discard.
-const signOut = async () => {
-  if (await signOutThroughLeaveGuards(router, store, { discardOnly: true })) close();
+// The server refuses every save until the password changes, so editors offer only Discard; once it has changed the old session is dead and cannot be kept.
+const signOut = async ({ passwordChanged = false } = {}) => {
+  const options = passwordChanged ? { forced: true } : { discardOnly: true };
+  if (await signOutThroughLeaveGuards(router, store, options)) close();
 };
 
 const submit = async (values: UpdatePasswordForm) => {
@@ -188,6 +189,6 @@ const submit = async (values: UpdatePasswordForm) => {
 
   // The session cookie IS the password, so the browser's credential went stale the moment the change landed.
   toast({ variant: "success", message: t("passwordReset.updated") });
-  void signOut();
+  void signOut({ passwordChanged: true });
 };
 </script>

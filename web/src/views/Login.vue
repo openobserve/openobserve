@@ -76,6 +76,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
+import { stopSessionServices } from "@/utils/sessionServices";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { capturePrefill } from "@/components/login/firstSourceOptions";
@@ -246,9 +247,11 @@ export default defineComponent({
         invalidateLoginData();
       }
 
-      store.dispatch("logout");
+      const userEmail = String(store.state.userInfo?.email ?? "");
+      stopSessionServices(store);
+      store.dispatch("logout", { draftsOf: userEmail });
       // No editor is open on the login page, so there are no leave guards to run first.
-      endEditorDraftSession();
+      endEditorDraftSession(userEmail);
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 

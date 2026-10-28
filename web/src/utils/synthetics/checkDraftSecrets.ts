@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BrowserCheck } from "@/types/synthetics";
+import type { BrowserCheck, HttpCheckConfig } from "@/types/synthetics";
 import type { RedactedDraft } from "@/utils/drafts/redactDraftSecrets";
 
 type ValueEntry = { value: string };
 
-/** Blanks the Auth & network header and cookie values, the secrets and the secure variables of a check. */
+/** Blanks the Auth & network and HTTP request header values, the cookie values, the secrets and the secure variables of a check. */
 export const redactCheckDraftSecrets = <T extends BrowserCheck>(
   check: T,
   pointerPrefix = "",
@@ -41,6 +41,14 @@ export const redactCheckDraftSecrets = <T extends BrowserCheck>(
   if (check.cookies) data.cookies = blank("cookies", check.cookies);
   if (check.secrets) data.secrets = blank("secrets", check.secrets);
   if (check.variables) data.variables = blank("variables", check.variables, (v) => !!v.secure);
+  // An HTTP check's own request headers carry credentials just as often, whatever they are named.
+  const http = (check as { http?: HttpCheckConfig }).http;
+  if (http?.headers?.length) {
+    (data as { http?: HttpCheckConfig }).http = {
+      ...http,
+      headers: blank("http/headers", http.headers),
+    };
+  }
   return { data, paths };
 };
 

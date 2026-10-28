@@ -23,7 +23,7 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
-import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
+import { clearAllPanelDrafts, clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
@@ -452,12 +452,14 @@ const store = createStore({
       context.commit("login", payload);
       if (payload?.loginState) resumeEditorDraftSession();
     },
-    logout(context) {
+    logout(context, payload?: { draftsOf?: string }) {
       context.commit("logout");
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
-      clearAllPanelDrafts();
+      // An explicit sign-out names its user, so other users' panel drafts in this browser stay.
+      if (payload?.draftsOf !== undefined) clearPanelDraftsFor(payload.draftsOf);
+      else clearAllPanelDrafts();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);

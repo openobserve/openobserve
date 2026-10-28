@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import type { BrowserCheck } from "@/types/synthetics";
+import type { BrowserCheck, HttpCheckConfig } from "@/types/synthetics";
 import { redactCheckDraftSecrets } from "./checkDraftSecrets";
 
 const check = (over: Partial<BrowserCheck> = {}): BrowserCheck => ({
@@ -55,6 +55,28 @@ describe("redactCheckDraftSecrets", () => {
       "/check/secrets/0/value",
       "/check/variables/1/value",
     ]);
+  });
+
+  it("blanks every HTTP request header value, whatever the header is named", () => {
+    const http: HttpCheckConfig = {
+      method: "GET",
+      headers: [
+        { name: "Cookie", value: "sid=plain" },
+        { name: "X-Team", value: "t-1" },
+      ],
+      body: "",
+      follow_redirects: true,
+      timeout_ms: 10000,
+      assertions: [],
+    };
+    const input = { ...check(), http };
+    const { data, paths } = redactCheckDraftSecrets(input, "/check");
+    expect(data.http.headers).toEqual([
+      { name: "Cookie", value: "" },
+      { name: "X-Team", value: "" },
+    ]);
+    expect(paths).toEqual(["/check/http/headers/0/value", "/check/http/headers/1/value"]);
+    expect(input.http.headers[0].value).toBe("sid=plain");
   });
 
   it("leaves the input untouched and skips empty values and absent lists", () => {

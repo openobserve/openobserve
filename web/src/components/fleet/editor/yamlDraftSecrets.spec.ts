@@ -91,13 +91,15 @@ describe("redactYamlSecrets", () => {
 });
 
 describe("redactYamlSecrets multi-line plain scalars", () => {
-  it("blanks a plain value on the lines under a secret key, and keeps nested maps", () => {
+  it("blanks a plain value on the lines under a secret key", () => {
     const result = redactYamlSecrets(
       yaml("auth:", "  password:", "    sekret", "    more", "  basic:", "    user: u", "x: 1"),
     );
     expect(result.text).toBe(yaml("auth:", '  password: ""', "  basic:", "    user: u", "x: 1"));
     expect(result.lines).toEqual([1]);
-    expect(redactYamlSecrets(yaml("token:", "  inner: v")).lines).toEqual([]);
+    expect(redactYamlSecrets(yaml("token:", "  inner: v")).text).toBe(
+      yaml("token:", '  inner: ""'),
+    );
   });
 });
 
@@ -260,5 +262,67 @@ describe("restoreYamlSecrets", () => {
   it("leaves a blanked line blank when the saved YAML has no value at that path", () => {
     const redacted = redactYamlSecrets(yaml("receivers:", "  new:", "    token: typed"));
     expect(restoreYamlSecrets(redacted.text, redacted.lines, source)).toBe(redacted.text);
+  });
+});
+
+describe("redactYamlSecrets: lists and maps under a secret key", () => {
+  it("blanks every scalar of a block list, a nested map and a block scalar under a secret key", () => {
+    const result = redactYamlSecrets(
+      yaml(
+        "auth:",
+        "  api_keys:",
+        "    - key-one",
+        "    - key-two # second",
+        "    - ${env:KEY_THREE}",
+        "  credentials:",
+        "    user: bot",
+        "    nested:",
+        "      deep: value",
+        "    pem: |",
+        "      -----BEGIN-----",
+        "    key_file: /etc/key",
+        "  endpoint: https://o2",
+      ),
+    );
+    expect(result.text).toBe(
+      yaml(
+        "auth:",
+        "  api_keys:",
+        '    - ""',
+        '    - "" # second',
+        "    - ${env:KEY_THREE}",
+        "  credentials:",
+        '    user: ""',
+        "    nested:",
+        '      deep: ""',
+        '    pem: ""',
+        "    key_file: /etc/key",
+        "  endpoint: https://o2",
+      ),
+    );
+    expect(result.text).not.toContain("key-one");
+    expect(result.text).not.toContain("BEGIN");
+  });
+
+  it("blanks a flow list or map held by a secret key, also nested in a flow map", () => {
+    const result = redactYamlSecrets(
+      yaml(
+        "api_keys: [k1, k2]",
+        "auth: {tokens: [t1, t2], mode: basic}",
+        "opts: {headers: {a: b}}",
+      ),
+    );
+    expect(result.text).toBe(
+      yaml('api_keys: ""', 'auth: {tokens: "", mode: basic}', "opts: {headers: {a: b}}"),
+    );
+    expect(result.lines).toEqual([0, 1]);
+  });
+
+  it("restores a nested map's secrets by key path and leaves list items blank", () => {
+    const saved = yaml("auth:", "  credentials:", "    user: bot", "  api_keys:", "    - k1");
+    const redacted = redactYamlSecrets(saved);
+    expect(restoreYamlSecrets(redacted.text, redacted.lines, saved)).toBe(
+      yaml("auth:", "  credentials:", "    user: bot", "  api_keys:", '    - ""'),
+    );
   });
 });

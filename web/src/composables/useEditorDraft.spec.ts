@@ -557,7 +557,7 @@ describe("useEditorDraft", () => {
       expect(form.name).toBe("saved");
     });
 
-    it("escape keeps the draft and autosave does not overwrite it", async () => {
+    it("escape keeps the draft until the first edit, then autosave saves this session's work", async () => {
       seed(editScope, { name: "kept" });
       const draft = await mountHost();
       const started = draft.start();
@@ -566,9 +566,15 @@ describe("useEditorDraft", () => {
       await started;
 
       userInput();
-      await edit({ name: "new work" });
       flushAutosave();
       expect(readEditorDraft<Form>(editScope)?.data.name).toBe("kept");
+
+      await edit({ name: "new work" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("new work");
+      await edit({ name: "more work" });
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("more work");
     });
 
     it("discard leaves a draft kept by escape, keep draft replaces it", async () => {
@@ -864,7 +870,7 @@ describe("useEditorDraft", () => {
       const draft = await startHost();
       userInput();
       await edit({ name: "typed" });
-      beginDraftSignOut(true);
+      beginDraftSignOut({ discardOnly: true });
       try {
         const result = leaveGuard()({ path: "/logout" }, { path: "/editor" });
         await flushPromises();
@@ -1123,6 +1129,131 @@ describe("useEditorDraft", () => {
       await draft.start();
       draft.discard();
       expect(draft.hasUnsavedChanges()).toBe(false);
+    });
+  });
+
+  describe("forced sign-out", () => {
+    it("treats closing the leave dialog as Discard, so the sign-out goes on", async () => {
+      const draft = await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      flushAutosave();
+      beginDraftSignOut({ forced: true });
+      try {
+        const result = leaveGuard()({ path: "/logout" }, { path: "/editor" });
+        await flushPromises();
+        expect(leaveDialogButton("editor-draft-leave-save")).toBeNull();
+        expect(leaveDialogButton("o-dialog-secondary-btn")).toBeNull();
+        draft.chooseLeave("stay");
+        expect(await result).toBe(true);
+        expect(readEditorDraft(editScope)).toBeNull();
+      } finally {
+        cancelDraftSignOut();
+      }
+    });
+  });
+
+  describe("contentOf and rebaselineOnInputAfterDiscard", () => {
+    it("counts only the content as a change, while the whole snapshot is drafted", async () => {
+      overrides = { contentOf: ({ tab: _tab, ...rest }) => rest };
+      const draft = await startHost();
+      userInput();
+      await edit({ tab: "b" });
+      expect(draft.hasUnsavedChanges()).toBe(false);
+      await edit({ name: "typed" });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+      flushAutosave();
+      expect(readEditorDraft<Form>(editScope)?.data).toMatchObject({ name: "typed", tab: "b" });
+    });
+
+    it("after a discard, a load landing before the next input is not an edit", async () => {
+      overrides = { rebaselineOnInputAfterDiscard: true };
+      const draft = await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      const result = leave();
+      await flushPromises();
+      draft.chooseLeave("discard");
+      expect(await result).toBe(true);
+
+      await edit({ name: "late load" });
+      userInput();
+      expect(draft.hasUnsavedChanges()).toBe(false);
+      await edit({ name: "real edit" });
+      expect(draft.hasUnsavedChanges()).toBe(true);
+    });
+
+    it("runs onLeaveWithoutSave on Discard and on Keep, but not on Stay", async () => {
+      const onLeaveWithoutSave = vi.fn();
+      overrides = { onLeaveWithoutSave };
+      const draft = await startHost();
+      userInput();
+      await edit({ name: "typed" });
+      const stay = leave();
+      await flushPromises();
+      draft.chooseLeave("stay");
+      expect(await stay).toBe(false);
+      expect(onLeaveWithoutSave).not.toHaveBeenCalled();
+
+      const discard = leave();
+      await flushPromises();
+      draft.chooseLeave("discard");
+      expect(await discard).toBe(true);
+      expect(onLeaveWithoutSave).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("secretLists", () => {
+    it("blanks every value of a listed list whatever its name, and restores it by label", async () => {
+      type Req = { headers: { key: string; value: string }[] };
+      const req = reactive<Req>({
+        headers: [
+          { key: "Cookie", value: "sid=1" },
+          { key: "X-Team", value: "core" },
+        ],
+      });
+      let host!: EditorDraftController;
+      const Host = defineComponent({
+        setup() {
+          host = useEditorDraft<Req>({
+            kind: "function",
+            entityLabel: () => raw("function"),
+            entityId: () => "fn1",
+            snapshot: () => JSON.parse(JSON.stringify(req)) as Req,
+            apply: (data) => Object.assign(req, data),
+            base: () => ({ saved: true }),
+            save: async () => true,
+            secretLists: ["/headers"],
+          });
+          return () => h(EditorDraftDialogs, { draft: host });
+        },
+      });
+      wrapper = mount(Host, { attachTo: document.body, global: { plugins: [store] } });
+      await host.start();
+      userInput();
+      req.headers = [...req.headers.reverse()];
+      await nextTick();
+      flushAutosave();
+      const stored = readEditorDraft<Req>(editScope);
+      expect(JSON.stringify(stored)).not.toContain("sid=1");
+      expect(JSON.stringify(stored)).not.toContain("core");
+      expect(stored?.redactedPaths).toEqual(["/headers/0/value", "/headers/1/value"]);
+      expect(stored?.changedRedactedPaths).toEqual([]);
+      wrapper.unmount();
+
+      req.headers = [
+        { key: "Cookie", value: "sid=1" },
+        { key: "X-Team", value: "core" },
+      ];
+      wrapper = mount(Host, { attachTo: document.body, global: { plugins: [store] } });
+      const started = host.start();
+      await flushPromises();
+      host.chooseRestore("continue");
+      await started;
+      expect(req.headers).toEqual([
+        { key: "X-Team", value: "core" },
+        { key: "Cookie", value: "sid=1" },
+      ]);
     });
   });
 

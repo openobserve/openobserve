@@ -524,7 +524,7 @@ describe("OnlineEvals editor drafts", () => {
       expect(byTest("editor-draft-restore-dialog")).toBeNull();
     });
 
-    it("never stores a remote scorer's token or secret header, but keeps the API-key header name", async () => {
+    it("never stores a remote scorer's token or any custom header value, but keeps the API-key header name", async () => {
       await mountAt("tab=scorers&action=add&scorer_type=remote");
       await edit("name", "remote judge");
       await edit("authType", "api_key");
@@ -532,7 +532,7 @@ describe("OnlineEvals editor drafts", () => {
       await edit("authApiKeyHeaderName", "X-Judge-Key");
       await edit("customHeaders", [
         { key: "X-Api-Key", value: "hdr-secret" },
-        { key: "X-Team", value: "search" },
+        { key: "X-Auth", value: "plain-cred" },
       ]);
       window.dispatchEvent(new Event("pagehide"));
 
@@ -541,7 +541,11 @@ describe("OnlineEvals editor drafts", () => {
       expect(stored).not.toContain("hdr-secret");
       const draft = readEditorDraft<ScorerDraftData>(scope("eval_scorer", null, "remote"));
       expect(draft?.data.values.authApiKeyHeaderName).toBe("X-Judge-Key");
-      expect(draft?.data.values.customHeaders[1].value).toBe("search");
+      expect(stored).not.toContain("plain-cred");
+      expect(draft?.data.values.customHeaders.map((header) => header.key)).toEqual([
+        "X-Api-Key",
+        "X-Auth",
+      ]);
     });
 
     it("a changed secret header comes back blank, is named, and blocks Save until retyped", async () => {

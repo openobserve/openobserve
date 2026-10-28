@@ -37,6 +37,7 @@ import {
   editorDraftSessionEnded,
   editorDraftSigningOut,
   editorDraftSignOutDiscardOnly,
+  editorDraftSignOutForced,
   hashDraftValue,
   isEditorDraftStorageAvailable,
   listEditorDrafts,
@@ -49,6 +50,7 @@ import {
 } from "@/utils/drafts/editorDraftStore";
 import {
   blankRedactedPaths,
+  blankSecretLists,
   changedRedactedPaths,
   redactDraftSecrets,
   redactedEntryLabels,
@@ -80,10 +82,18 @@ export interface UseEditorDraftOptions<T> {
   base?: () => unknown;
   /** The editor's own dirty rule, applied on top of "the snapshot differs from the baseline". */
   hasChanges?: () => boolean;
+  /** The part of the snapshot that counts as a change (e.g. without the open tab); the whole snapshot is still drafted. */
+  contentOf?: (snapshot: T) => unknown;
+  /** After a discard, take the baseline again at the next user input, so a load landing after it is not an edit. */
+  rebaselineOnInputAfterDiscard?: boolean;
+  /** Runs when a leave takes the edits out of the editor (Discard, or Keep into a draft), e.g. to reset shared editor state. */
+  onLeaveWithoutSave?: () => void;
   /** Runs the editor's save without navigating; resolves true on success. */
   save: () => boolean | Promise<boolean>;
   /** Extra redaction after the built-in one; a path into a string (e.g. "/yaml/3") is noted but never restored. */
   redact?: (data: T) => { data: T; paths: string[]; changedPaths?: string[] };
+  /** JSON pointers to lists of `{ key|name, value }` entries (e.g. request headers) whose every value is a secret, whatever its name. */
+  secretLists?: string[];
   /** Keys the built-in redaction never blanks, for a non-secret field whose name matches the secret pattern (e.g. `authApiKeyHeaderName`). */
   secretExemptKeys?: string[];
   /** Extra elements whose fields count as this editor's, for fields rendered outside its own component tree. */
@@ -174,7 +184,7 @@ const EDIT_EVENTS = ["input", "change"] as const;
 const signingOutNow = () => editorDraftSigningOut.value || editorDraftSessionEnded.value;
 
 // A control inside `aria-hidden` (reka's native select or checkbox mirror) changes when code sets a value, not the user.
-export const isEditable = (target: EventTarget | null): target is HTMLElement =>
+const isEditable = (target: EventTarget | null): target is HTMLElement =>
   target instanceof HTMLElement &&
   (target.isContentEditable || target.matches("input, textarea, select")) &&
   !target.closest('[aria-hidden="true"]');
@@ -210,7 +220,7 @@ const teleportedElements = (vnode: VNode): Element[] => {
 };
 
 /** The editor component's own root elements. */
-export const rootElements = (instance: ComponentInternalInstance | null): Element[] =>
+const rootElements = (instance: ComponentInternalInstance | null): Element[] =>
   instance?.subTree ? vnodeElements(instance.subTree) : [];
 
 // Never equal to a snapshot's JSON, so the form counts as changed until the next rebaseline.
@@ -246,7 +256,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     paths: [],
     labels: {},
   });
-  // Set when Escape kept the stored draft: autosave leaves that draft alone until it is gone.
+  // Set when Escape kept the stored draft: a save or discard with no edit leaves it; the first edit's autosave replaces it.
   let keptSavedAt: number | null = null;
   let restoreResolver: ((choice: EditorDraftRestoreChoice) => void) | null = null;
   let leaveResolver: ((choice: EditorDraftLeaveChoice) => void) | null = null;
@@ -286,9 +296,16 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
 
   const currentJson = () => stableStringify(options.snapshot());
 
+  const changeKey = (json: string): string =>
+    options.contentOf ? stableStringify(options.contentOf(JSON.parse(json) as T)) : json;
+
   const hasUnsavedChanges = (): boolean => {
     if (!started || disposed || baselineJson === null) return false;
-    if (currentJson() === baselineJson) return false;
+    if (
+      baselineJson !== CHANGED_BEFORE_START &&
+      changeKey(currentJson()) === changeKey(baselineJson)
+    )
+      return false;
     return options.hasChanges ? options.hasChanges() : true;
   };
 
@@ -309,10 +326,9 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     return hashDraftValue(redacted.data);
   };
 
-  /** Writes this session's draft; false when a kept draft is protected or storage refused it. */
-  const writeSessionDraft = (replaceKept: boolean): boolean => {
+  /** Writes this session's draft over any kept one (it only runs once there is an edit); false when storage refused it. */
+  const writeSessionDraft = (): boolean => {
     if (!storageAvailable) return false;
-    if (!replaceKept && keptDraftStillStored()) return false;
     keptSavedAt = null;
     const snapshot = options.snapshot();
     // An editor with its own redaction knows which fields of its secret containers are safe to keep.
@@ -320,9 +336,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       containers: !options.redact,
       exemptKeys: options.secretExemptKeys,
     });
+    const listPaths = blankSecretLists(redacted.data, options.secretLists ?? []);
     const extra = options.redact ? options.redact(redacted.data) : null;
     const base = options.base?.();
-    const redactedPaths = [...redacted.paths, ...(extra?.paths ?? [])];
+    const redactedPaths = [...new Set([...redacted.paths, ...listPaths, ...(extra?.paths ?? [])])];
     const changed = changedRedactedPaths(snapshot, baselineSnapshot(), redactedPaths);
     return writeEditorDraft(scope(), {
       data: extra ? extra.data : redacted.data,
@@ -343,7 +360,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   const autosave = usePanelDraftAutosave({
     isReady: () => storageAvailable && started && !disposed && !leaving && baselineJson !== null,
     hasChanges: hasUnsavedChanges,
-    write: () => writeSessionDraft(false),
+    write: () => writeSessionDraft(),
     remove: () => deleteEditorDraft(scope()),
   });
 
@@ -355,6 +372,13 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
 
   const rebaseline = () => {
     if (started) baselineJson = currentJson();
+  };
+
+  const rebaselineAfterDiscard = () => {
+    if (!options.rebaselineOnInputAfterDiscard) return rebaseline();
+    if (!started) return;
+    baselineJson = null;
+    addBaselineListeners();
   };
 
   const captureBaselineOnFirstInput = () => {
@@ -496,7 +520,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   const discard = () => {
     notKept.value = { paths: [], labels: {} };
     discardSessionDraft();
-    rebaseline();
+    rebaselineAfterDiscard();
   };
 
   const askLeave = () =>
@@ -505,7 +529,9 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       state.leaveOpen = true;
     });
 
-  const chooseLeave = (choice: EditorDraftLeaveChoice) => {
+  const chooseLeave = (requested: EditorDraftLeaveChoice) => {
+    // A forced sign-out cannot be cancelled: closing the dialog discards and the sign-out goes on.
+    const choice = requested === "stay" && editorDraftSignOutForced.value ? "discard" : requested;
     if (state.leaveSaving || (choice === "save" && !state.canSave)) return;
     const resolve = leaveResolver;
     leaveResolver = null;
@@ -541,7 +567,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       return true;
     }
     // An explicit Keep draft replaces a kept older draft; a refused write must not lose the edits silently.
-    if (!writeSessionDraft(true)) {
+    if (!writeSessionDraft()) {
       toast({
         variant: "error",
         message: t("common.editorDraft.keepFailed", { entity: state.entityLabel }),
@@ -557,9 +583,15 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
   const resolveLeave = async (choice: EditorDraftLeaveChoice): Promise<boolean> => {
     if (choice === "stay") return false;
     if (choice === "save") return saveFromLeave();
-    if (choice === "keep") return keepWork();
+    if (choice === "keep") {
+      if (!keepWork()) return false;
+      options.onLeaveWithoutSave?.();
+      rebaseline();
+      return true;
+    }
     discardSessionDraft();
-    rebaseline();
+    options.onLeaveWithoutSave?.();
+    rebaselineAfterDiscard();
     return true;
   };
 

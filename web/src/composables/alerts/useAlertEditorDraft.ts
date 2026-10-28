@@ -13,16 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { getCurrentInstance, nextTick, onBeforeUnmount, ref, type Ref } from "vue";
+import { nextTick, ref, type Ref } from "vue";
 import type { RouteLocationNormalized } from "vue-router";
-import {
-  isEditable,
-  rootElements,
-  useEditorDraft,
-  type EditorDraftController,
-} from "@/composables/useEditorDraft";
+import { useEditorDraft, type EditorDraftController } from "@/composables/useEditorDraft";
 import type { useAlertForm } from "@/composables/useAlertForm";
-import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import {
   ALERT_DRAFT_KIND,
   ANOMALY_DRAFT_VARIANT,
@@ -59,14 +53,6 @@ export interface AlertEditorDraft {
   handleSaved: (folderId?: string) => void;
 }
 
-const BASELINE_EVENTS = ["pointerdown", "keydown"] as const;
-
-// Autofill, password managers and Playwright's fill() insert text with no key or pointer event; these fire before it lands.
-const FIELD_BASELINE_EVENTS = ["focusin", "beforeinput"] as const;
-
-// Never equal to the content's JSON, so the form counts as changed until the next rebaseline.
-const CHANGED_BEFORE_START = "\u0000changed-before-start";
-
 // The list hosts the editor on its own path, so opening or closing it only changes these query keys.
 const leavesEditor = (to: RouteLocationNormalized, from: RouteLocationNormalized) =>
   to.path !== from.path ||
@@ -84,10 +70,6 @@ export const useAlertEditorDraft = ({
   let serverAnomaly: Record<string, unknown> | null = null;
   // Set while the leave dialog's Save runs, so a successful save does not navigate.
   let leaveSave: { saved: boolean } | null = null;
-  // The open tab alone is not an unsaved change, so the editor's own rule compares everything else.
-  let contentBaseline: string | null = null;
-  // Set while asking the foundation whether it saw an edit before start, so this editor's own rule does not veto it.
-  let probingPreStartEdit = false;
 
   const anomalyId = (): string | null => {
     const id = form.router.currentRoute.value.params.anomaly_id;
@@ -110,30 +92,6 @@ export const useAlertEditorDraft = ({
     anomaly: anomalyDraftConfig(form.anomalyConfig.value),
   });
 
-  const contentJson = () => stableStringify(content());
-
-  const instance = getCurrentInstance();
-
-  const captureContentBaselineOnField = (event: Event) => {
-    const target = event.target;
-    if (isEditable(target) && rootElements(instance).some((root) => root.contains(target)))
-      captureContentBaseline();
-  };
-
-  const removeBaselineListeners = () => {
-    BASELINE_EVENTS.forEach((name) =>
-      window.removeEventListener(name, captureContentBaseline, true),
-    );
-    FIELD_BASELINE_EVENTS.forEach((name) =>
-      window.removeEventListener(name, captureContentBaselineOnField, true),
-    );
-  };
-
-  const captureContentBaseline = () => {
-    if (contentBaseline === null) contentBaseline = contentJson();
-    removeBaselineListeners();
-  };
-
   const reloadStreams = async () => {
     const values = form.form.state.values;
     if (values.is_real_time === "composite") return;
@@ -149,7 +107,6 @@ export const useAlertEditorDraft = ({
   };
 
   const apply = async (data: AlertDraftData) => {
-    contentBaseline = contentJson();
     form.resetForm(data.values);
     form.activeFolderId.value = data.folderId;
     form.isAggregationEnabled.value = data.aggregationEnabled;
@@ -180,46 +137,22 @@ export const useAlertEditorDraft = ({
     return run.saved;
   };
 
-  const foundation = useEditorDraft<AlertDraftData>({
+  const draft = useEditorDraft<AlertDraftData>({
     kind: ALERT_DRAFT_KIND,
     entityLabel: () => form.t("common.editorDraft.entities.alert"),
     entityId,
     newVariant: () =>
       form.router.currentRoute.value.name === "addAnomalyDetection" ? ANOMALY_DRAFT_VARIANT : null,
     snapshot: () => ({ ...content(), tab: form.activeTab.value }),
+    // The open tab alone is not an unsaved change.
+    contentOf: ({ tab: _tab, ...rest }) => rest,
+    // A load landing after Discard must not count as an edit, or autosave writes the discarded draft back.
+    rebaselineOnInputAfterDiscard: true,
     apply,
     base,
-    hasChanges: () =>
-      probingPreStartEdit || (contentBaseline !== null && contentJson() !== contentBaseline),
     save,
     leaveOnRouteUpdate: leavesEditor,
   });
-
-  const addContentBaselineListeners = () => {
-    BASELINE_EVENTS.forEach((name) => window.addEventListener(name, captureContentBaseline, true));
-    FIELD_BASELINE_EVENTS.forEach((name) =>
-      window.addEventListener(name, captureContentBaselineOnField, true),
-    );
-  };
-
-  // A load landing after Discard must not count as an edit, or autosave writes the discarded draft back.
-  const forgetContent = () => {
-    contentBaseline = null;
-    removeBaselineListeners();
-    addContentBaselineListeners();
-  };
-
-  const draft: EditorDraftController = {
-    ...foundation,
-    discard: () => {
-      forgetContent();
-      foundation.discard();
-    },
-    chooseLeave: (choice) => {
-      if (choice === "discard") forgetContent();
-      foundation.chooseLeave(choice);
-    },
-  };
 
   const start = async () => {
     await form.formReady;
@@ -231,13 +164,6 @@ export const useAlertEditorDraft = ({
         ? anomalyDraftConfig(form.anomalyConfig.value)
         : null;
     await draft.start();
-    if (contentBaseline === null) {
-      probingPreStartEdit = true;
-      // Only the foundation's never-matching pre-start baseline makes a fresh start report changes.
-      if (foundation.hasUnsavedChanges()) contentBaseline = CHANGED_BEFORE_START;
-      probingPreStartEdit = false;
-    }
-    if (contentBaseline === null) addContentBaselineListeners();
   };
 
   const handleSaved = (folderId?: string) => {
@@ -247,11 +173,8 @@ export const useAlertEditorDraft = ({
       return;
     }
     draft.markSaved();
-    contentBaseline = contentJson();
     onSaved(folderId, { navigate: true });
   };
-
-  if (instance) onBeforeUnmount(removeBaselineListeners);
 
   return { draft, formKey, start, handleSaved };
 };

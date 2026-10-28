@@ -212,7 +212,7 @@ describe("RemoteTaskFormPage drafts", () => {
     expect(readEditorDraft<RemoteTaskFormValues>(newScope)?.data.name).toBe("old");
   });
 
-  it("never stores the token, the signing key or a secret header value", async () => {
+  it("never stores the token, the signing key or any header value, whatever the header's name", async () => {
     await mountAt("/ai/remote-tasks/new");
     await edit("name", "signed");
     await edit("authType", "bearer");
@@ -221,7 +221,7 @@ describe("RemoteTaskFormPage drafts", () => {
     await flushPromises();
     await edit("headers", [
       { key: "Authorization", value: "Bearer abc", usesSecret: false },
-      { key: "X-Team", value: "search", usesSecret: false },
+      { key: "Cookie", value: "sid=s3cr3t", usesSecret: false },
     ]);
     const generated = form().state.values.signingKey;
     expect(generated).not.toBe("");
@@ -231,7 +231,9 @@ describe("RemoteTaskFormPage drafts", () => {
     expect(stored).not.toContain("tok-123");
     expect(stored).not.toContain(generated);
     expect(stored).not.toContain("Bearer abc");
-    expect(readEditorDraft<RemoteTaskFormValues>(newScope)?.data.headers[1].value).toBe("search");
+    expect(stored).not.toContain("sid=s3cr3t");
+    const headers = readEditorDraft<RemoteTaskFormValues>(newScope)?.data.headers;
+    expect(headers?.map((header) => header.key)).toEqual(["Authorization", "Cookie"]);
   });
 
   it("a continued signed draft gets a fresh signing key and says so beside it", async () => {

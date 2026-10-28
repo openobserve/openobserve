@@ -286,6 +286,20 @@ describe("AddAlert drafts", () => {
     expect(readEditorDraft(newScope)).toBeNull();
   });
 
+  it("takes its change detection from the shared draft hook, with no first-input listeners of its own", async () => {
+    const added = vi.spyOn(window, "addEventListener");
+    try {
+      await mountEditor();
+      const captured = (name: string) =>
+        added.mock.calls.filter(([type, , opts]) => type === name && opts === true).length;
+      for (const name of ["pointerdown", "keydown", "focusin", "beforeinput"]) {
+        expect(captured(name)).toBe(1);
+      }
+    } finally {
+      added.mockRestore();
+    }
+  });
+
   it("continues a draft into a fresh editor with its values, tab and folder", async () => {
     await mountEditor();
     await edit("name", "checkout_errors");

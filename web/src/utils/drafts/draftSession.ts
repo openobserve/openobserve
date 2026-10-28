@@ -24,24 +24,34 @@ export const draftSigningOut = ref(false);
 /** True while a sign-out runs with a session that can no longer save (a forced password reset): only Discard is offered. */
 export const draftSignOutDiscardOnly = ref(false);
 
-export const beginDraftSignOut = (discardOnly = false): void => {
+/** True while a sign-out cannot be cancelled (password or own role changed): closing the leave dialog discards. */
+export const draftSignOutForced = ref(false);
+
+export const beginDraftSignOut = ({
+  discardOnly = false,
+  forced = false,
+}: { discardOnly?: boolean; forced?: boolean } = {}): void => {
   draftSigningOut.value = true;
-  draftSignOutDiscardOnly.value = discardOnly;
+  draftSignOutDiscardOnly.value = discardOnly || forced;
+  draftSignOutForced.value = forced;
+};
+
+const clearSignOutFlags = () => {
+  draftSigningOut.value = false;
+  draftSignOutDiscardOnly.value = false;
+  draftSignOutForced.value = false;
 };
 
 export const cancelDraftSignOut = (): void => {
-  draftSigningOut.value = false;
-  draftSignOutDiscardOnly.value = false;
+  clearSignOutFlags();
 };
 
 export const markDraftSessionEnded = (): void => {
-  draftSigningOut.value = false;
-  draftSignOutDiscardOnly.value = false;
+  clearSignOutFlags();
   draftSessionEnded.value = true;
 };
 
 export const resumeDraftSession = (): void => {
-  draftSigningOut.value = false;
-  draftSignOutDiscardOnly.value = false;
+  clearSignOutFlags();
   draftSessionEnded.value = false;
 };

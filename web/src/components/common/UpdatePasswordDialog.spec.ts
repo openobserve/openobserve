@@ -43,6 +43,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: unknown[]) => toastMock(...args),
 }));
 
+vi.mock("@/utils/sessionServices", () => ({ stopSessionServices: vi.fn() }));
+
 const pushMock = vi.fn();
 // Runs the global guards like vue-router does, so the shared sign-out flow can finish.
 const routerGuards: ((to: { path: string }) => unknown)[] = [];
@@ -77,7 +79,14 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 import passwordPolicyService from "@/services/passwordPolicy";
-import { draftSignOutDiscardOnly } from "@/utils/drafts/draftSession";
+import {
+  draftSignOutDiscardOnly,
+  draftSignOutForced,
+  resumeDraftSession,
+} from "@/utils/drafts/draftSession";
+import { stopSessionServices } from "@/utils/sessionServices";
+
+const realLocation = window.location;
 import userService from "@/services/users";
 
 const STRICT_COMPLEXITY = {
@@ -115,8 +124,11 @@ const mountDialog = () => {
 const { open, close, isOpen } = usePasswordReset();
 
 describe("UpdatePasswordDialog", () => {
+  const assign = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("location", { ...window.location, assign });
     resetPasswordComplexityCache();
     close();
     (passwordPolicyService.getComplexity as any).mockResolvedValue({ data: STRICT_COMPLEXITY });
@@ -127,6 +139,8 @@ describe("UpdatePasswordDialog", () => {
     wrappers.forEach((wrapper) => wrapper.unmount());
     wrappers = [];
     close();
+    vi.stubGlobal("location", realLocation);
+    resumeDraftSession();
   });
 
   it("renders nothing until the user is flagged", async () => {
@@ -309,6 +323,8 @@ describe("UpdatePasswordDialog", () => {
     expect(sawDiscardOnly).toBe(true);
     expect(draftSignOutDiscardOnly.value).toBe(false);
     expect(invalidateLoginDataMock).not.toHaveBeenCalled();
+    expect(stopSessionServices).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
     expect(isOpen.value).toBe(true);
   });
 
@@ -325,7 +341,38 @@ describe("UpdatePasswordDialog", () => {
     await flushPromises();
 
     expect(invalidateLoginDataMock).toHaveBeenCalled();
+    expect(stopSessionServices).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith("/logout");
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(isOpen.value).toBe(false);
+  });
+
+  it("cannot be kept in the old session once the password has changed", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+    let sawForced = false;
+    const editorGuard = (to: { path: string }) => {
+      if (to.path !== "/logout") return true;
+      sawForced = draftSignOutForced.value;
+      return false;
+    };
+    routerGuards.unshift(editorGuard);
+    try {
+      await (wrapper.vm as any).submit({
+        old_password: "old-secret",
+        new_password: "New-Secret-1!",
+        confirm_password: "New-Secret-1!",
+      });
+      await flushPromises();
+    } finally {
+      routerGuards.splice(routerGuards.indexOf(editorGuard), 1);
+    }
+
+    expect(sawForced).toBe(true);
+    expect(invalidateLoginDataMock).toHaveBeenCalled();
+    expect(stopSessionServices).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledTimes(1);
     expect(isOpen.value).toBe(false);
   });
 
