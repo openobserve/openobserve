@@ -389,8 +389,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-activity="{ row }">
                   <SessionActivitySparkline
                     :session-id="row.session_id"
-                    :start-time="row.start_time"
-                    :end-time="row.end_time"
+                    :start-time="row.start_time ?? row.rum_start_time"
+                    :end-time="row.end_time ?? row.rum_end_time"
                     :is-bounce="row.is_bounce"
                     :has-frustration-field="!!schemaMapping['action_frustration_type']"
                   />
@@ -1016,7 +1016,8 @@ const getSessions = () => {
       "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS has_replay";
   }
 
-  let whereClause = "1 = 1";
+  // SDK telemetry rows carry no session_id and must not group into a phantom session.
+  let whereClause = "session_id IS NOT NULL AND session_id <> ''";
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1091,6 +1092,8 @@ const getSessions = () => {
           // _rumdata-derived fallback (us → ms) for sessions with no replay recording;
           // getSessionTimeFromReplay overwrites it with the replay-authoritative value.
           time_spent: (hit.zo_sql_end_timestamp - hit.zo_sql_timestamp) / 1000,
+          rum_start_time: Math.floor(hit.zo_sql_timestamp / 1000),
+          rum_end_time: Math.ceil(hit.zo_sql_end_timestamp / 1000),
         };
       });
 
@@ -1736,8 +1739,10 @@ const handleCellClick = (payload: any) => {
     name: "SessionViewer",
     params: { id: payload.row.session_id },
     query: {
-      start_time: payload.row.start_time * 1000,
-      end_time: payload.row.end_time * 1000,
+      // A session without a replay recording has only its _rumdata bounds.
+      start_time: (payload.row.start_time ?? payload.row.rum_start_time) * 1000,
+      end_time: (payload.row.end_time ?? payload.row.rum_end_time) * 1000,
+      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };
