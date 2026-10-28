@@ -412,6 +412,48 @@ describe("AnalyticsOverview", () => {
     );
   });
 
+  it("keeps only the Users KPI loading until identity resolves, fills the summary KPIs at once, and shows no chip counts before the lists answer (ENT#2809 G)", async () => {
+    const { performanceState } = usePerformance();
+    performanceState.data.streams._rumdata = {
+      name: "_rumdata",
+      schema: { usr_email: { name: "usr_email" }, env: { name: "env" } },
+    };
+    const facets = held();
+    const pages = held();
+    routes = [[/AS value, COUNT/, facets.fn], ...withRoute(/AS views/, pages.fn)];
+    respond();
+    await mountOverview();
+    await settle();
+
+    const kpi = (key: string) => wrapper!.find(`[data-test="rum-analytics-kpi-${key}"]`);
+    const loading = (key: string) =>
+      kpi(key).find('[data-test="o-stat-card-value-skeleton"]').exists();
+    const allChip = () => wrapper!.find('[data-test="rum-analytics-overview-chip-all"]');
+    expect(facets.pending()).toBeGreaterThan(0);
+    expect(wrapper!.find('[data-test="rum-analytics-kpi-strip"]').text()).not.toContain(
+      "No user id set",
+    );
+    expect(loading("users")).toBe(true);
+    expect(loading("sessions")).toBe(false);
+    expect(kpi("sessions").text()).toContain("200");
+    expect(loading("pages-per-session")).toBe(false);
+    expect(kpi("pages-per-session").text()).toContain("3.0");
+    expect(loading("identity-coverage")).toBe(false);
+    expect(kpi("identity-coverage").text()).not.toContain("0.0%");
+    expect(allChip().text().trim()).toBe("All");
+
+    facets.release([{ value: "prod", sessions: 200 }]);
+    await settle();
+    expect(loading("users")).toBe(false);
+    expect(kpi("users").text()).toContain("usr_email");
+    expect(kpi("identity-coverage").text()).toContain("75.0%");
+    expect(allChip().text().trim()).toBe("All");
+
+    pages.release(PAGES);
+    await settle();
+    expect(allChip().text()).toMatch(/^All · \d+$/);
+  });
+
   it("chips filter both lists and Not used shows previous-window values (AC-5)", async () => {
     await mountOverview();
     await wrapper!.find('[data-test="rum-analytics-overview-chip-rising"]').trigger("click");
