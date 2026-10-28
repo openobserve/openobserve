@@ -1518,6 +1518,7 @@
     "searchNoMatches": "لا توجد نتائج مطابقة",
     "runQuery": "تشغيل الاستعلام",
     "runOptions": "خيارات التشغيل",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "قيم التوصيف عبر الزمن",
     "breakdown": "التفصيل",
     "breakdownNone": "بدون",

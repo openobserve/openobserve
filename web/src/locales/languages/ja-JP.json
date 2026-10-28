@@ -1518,6 +1518,7 @@
     "searchNoMatches": "一致なし",
     "runQuery": "クエリを実行",
     "runOptions": "実行オプション",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "プロファイル値の推移",
     "breakdown": "内訳",
     "breakdownNone": "なし",

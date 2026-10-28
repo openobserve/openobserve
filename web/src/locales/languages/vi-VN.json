@@ -1518,6 +1518,7 @@
     "searchNoMatches": "Không có kết quả khớp",
     "runQuery": "Chạy truy vấn",
     "runOptions": "Tùy chọn chạy",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "Giá trị profile theo thời gian",
     "breakdown": "Phân tách",
     "breakdownNone": "Không có",
