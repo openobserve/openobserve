@@ -60,16 +60,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         preset="no-access"
         :data-test="`overview-${section}-forbidden`"
       />
-      <button
+      <OButton
         v-else-if="view === 'locked'"
-        type="button"
-        class="border-border-default bg-surface-subtle rounded-default flex w-full cursor-pointer items-center gap-3 border px-4 py-5 text-left"
+        variant="outline"
+        block
+        icon-left="lock"
+        class="justify-start text-left"
         :data-test="`overview-${section}-locked`"
         @click="emit('unlock')"
       >
-        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
-        <span class="text-text-secondary text-sm">{{ t("overview.state.lockedMessage") }}</span>
-      </button>
+        {{ lockedMessage ?? t("overview.state.lockedMessage") }}
+      </OButton>
       <slot v-else-if="view === 'empty'" name="empty" />
       <slot v-else />
     </OCardSection>
@@ -81,7 +82,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { OverviewView } from "./overviewFormat";
@@ -91,6 +91,7 @@ defineProps<{
   title: I18nText;
   view: OverviewView;
   linkLabel?: I18nText;
+  lockedMessage?: I18nText;
 }>();
 
 const emit = defineEmits<{ retry: []; viewAll: []; unlock: [] }>();

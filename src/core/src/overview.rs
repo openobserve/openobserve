@@ -155,7 +155,6 @@ pub struct Overview {
     pub alerts: Section<AlertsData>,
     pub pipelines: Section<PipelinesData>,
     pub limits: Section<LimitsData>,
-    /// Microseconds since the epoch.
     pub generated_at: i64,
     pub cached: bool,
 }
@@ -248,8 +247,8 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
     })
 }
 
-/// Overview for a caller whose grants could not be resolved; alerts still load since they resolve
-/// their own permissions.
+/// Overview when grants cannot be resolved; alerts still load because they check their own
+/// permissions.
 pub async fn scope_unavailable(org_id: &str, user_id: &str) -> Overview {
     Overview {
         streams: Section::error("failed to resolve permissions"),
@@ -331,7 +330,6 @@ async fn build_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> Ov
     }
 }
 
-/// True when the caller holds an empty grant list for every overview stream type.
 fn streams_forbidden(scope: &OverviewScope) -> bool {
     OVERVIEW_STREAM_TYPES
         .iter()

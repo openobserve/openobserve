@@ -9219,7 +9219,7 @@
       "lockedMessage": "Available with an enterprise license. Select to learn more."
     },
     "sections": {
-      "alertsAndIncidents": "Alerts and incidents",
+      "alerts": "Alerts",
       "dataHealth": "Data health",
       "streams": "Streams",
       "topStreams": "Largest streams by stored size",
@@ -9228,12 +9228,12 @@
     "alerts": {
       "firing": "Firing",
       "pending": "Pending",
-      "failing": "Failing to evaluate"
+      "failing": "Failing rules"
     },
     "dataHealth": {
       "pipelinesErrored": "Pipelines with errors",
       "errorCount": "{errored} of {total}",
-      "allHealthy": "None",
+      "allHealthy": "No errors",
       "noPipelines": "No pipelines yet."
     },
     "streams": {
@@ -9249,8 +9249,12 @@
       "daysOver": "Days over the limit",
       "license": "License",
       "expired": "Expired",
-      "valid": "Valid"
-    }
+      "valid": "Valid",
+      "nearLimit": "Near limit",
+      "overLimit": "Over limit",
+      "lockedMessage": "Track ingestion against your license limit with an enterprise license."
+    },
+    "freshness": "Alerts, pipelines, streams and limits show the current state, not the selected time range. Updated {time}."
   },
   "chatHistory": {
     "title": "Chats",

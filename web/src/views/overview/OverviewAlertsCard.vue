@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OverviewSectionCard
     section="alerts"
-    :title="t('overview.sections.alertsAndIncidents')"
+    :title="t('overview.sections.alerts')"
     :link-label="t('overview.viewAll')"
     :view="view"
     @retry="emit('retry')"
@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <ul class="flex flex-col" data-test="overview-alerts-rows">
       <li v-for="row in rows" :key="row.key">
-        <button
-          type="button"
-          class="hover:bg-table-row-hover-bg rounded-default flex w-full cursor-pointer items-center justify-between gap-3 px-2 py-1.5 text-left"
+        <OButton
+          variant="ghost"
+          block
+          class="justify-between"
           :data-test="`overview-alerts-row-${row.key}`"
           @click="emit('open')"
         >
@@ -33,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" :value="row.count > 0 ? row.tone : 'neutral'">{{
             row.count
           }}</OTag>
-        </button>
+        </OButton>
       </li>
     </ul>
   </OverviewSectionCard>
@@ -41,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { OverviewAlertsData, OverviewSection } from "@/ts/interfaces/overview";

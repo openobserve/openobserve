@@ -65,6 +65,12 @@ const sectionTile = <T,>(
   return { value: pick(section.data), ok: true };
 };
 
+const pipelinesSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
+  if (!tile.ok) return tile.note;
+  const total = props.overview?.pipelines.data?.total ?? 0;
+  return total > 0 ? t("overview.cards.pipelinesOf", { total }) : undefined;
+};
+
 const items = computed<StatItem[]>(() => {
   const o = props.overview;
   const firing = sectionTile(o?.alerts, (d) => d.by_state.firing ?? 0);
@@ -111,9 +117,7 @@ const items = computed<StatItem[]>(() => {
       key: "pipelines",
       label: t("overview.cards.pipelineErrors"),
       value: pipelines.value,
-      sub: pipelines.ok
-        ? t("overview.cards.pipelinesOf", { total: o?.pipelines.data?.total ?? 0 })
-        : pipelines.note,
+      sub: pipelinesSub(pipelines),
       icon: "database",
       tone: pipelines.ok && Number(pipelines.value) > 0 ? "error" : "neutral",
       dataTest: "overview-headline-pipelines",
@@ -126,7 +130,7 @@ const items = computed<StatItem[]>(() => {
         ? raw(formatSizeFromMB(o?.streams.data?.total_storage_size_mb ?? 0))
         : streams.note,
       icon: "storage",
-      tone: "info",
+      tone: "neutral",
       dataTest: "overview-headline-streams",
     },
   ];
