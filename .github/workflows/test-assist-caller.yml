@@ -55,7 +55,7 @@ jobs:
   dispatch-test-assist:
     # Two doors:
     #   - workflow_dispatch (manual): GitHub already restricts dispatch to users with repo write.
-    #   - issue_comment: exact `/verify-bug` on an ISSUE (NOT a PR) by an org member/collaborator.
+    #   - issue_comment: a `/verify-bug`-prefixed comment on an ISSUE (NOT a PR) by an org member/collaborator.
     #     The `.issue.pull_request == null` filter excludes /verify-bug typed on a PR — test-assist
     #     verifies bug ISSUES, and a PR number would confuse the engine downstream. The
     #     org-member gate is the trust boundary for the PAT — a stranger's comment fails this
@@ -71,7 +71,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        !github.event.issue.pull_request &&
-       github.event.comment.body == '/verify-bug' &&
+       startsWith(github.event.comment.body, '/verify-bug') &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 10   # dispatch is a quick API call; bound it as defense-in-depth
@@ -83,22 +83,38 @@ jobs:
           IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
           DISPATCH_FIXTURE: ${{ inputs.fixture_mode }}
           DISPATCH_WRITE: ${{ inputs.write_mode }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
           COMMENT_LOGIN: ${{ github.event.comment.user.login }}
           DISPATCH_ACTOR: ${{ github.actor }}
         run: |
           ISSUE="$IN_ISSUE"
           [[ "$ISSUE" =~ ^[0-9]+$ ]] || { echo "::error::invalid issue number: $ISSUE"; exit 1; }
           if [ "$IS_DISPATCH" = "true" ]; then
-            FIXTURE="$DISPATCH_FIXTURE"; WRITE="$DISPATCH_WRITE"; ACTOR="$DISPATCH_ACTOR"
+            OK=true; FIXTURE="$DISPATCH_FIXTURE"; WRITE="$DISPATCH_WRITE"; ACTOR="$DISPATCH_ACTOR"
           else
-            # Comment door defaults: fixture OFF (use the real issue), write OFF (dry-run).
-            # WRITE flip happens via manual dispatch until we trust verdict accuracy.
-            FIXTURE="false"; WRITE="false"; ACTOR="$COMMENT_LOGIN"
+            # The job `if:` only prefix-matches, so the exact command is parsed here where a near-miss can answer back.
+            CMD=$(printf '%s' "$COMMENT_BODY" | head -n1 | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            if [ "$CMD" = "/verify-bug" ]; then OK=true; else OK=false; fi
+            # Comment door: fixture OFF (the real issue), write ON — the engine's TEST_ASSIST_AUTO_POST is the second key.
+            FIXTURE="false"; WRITE="true"; ACTOR="$COMMENT_LOGIN"
           fi
           ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
-          { echo "issue=$ISSUE"; echo "fixture=$FIXTURE"; echo "write=$WRITE"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
+          { echo "ok=$OK"; echo "issue=$ISSUE"; echo "fixture=$FIXTURE"; echo "write=$WRITE"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
+
+      - name: Answer a mistyped command on the source issue
+        # Run token, not the PAT: a near-miss must not stay silent just because the PAT is broken.
+        if: github.event_name == 'issue_comment' && steps.ctx.outputs.ok != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+        run: |
+          gh issue comment "$ISSUE" --repo openobserve/openobserve --body \
+          "### 🤖 Test-Assist — command not recognised
+
+          Use \`/verify-bug\` on its own, as the first line of the comment, with no arguments. It verifies **this** issue."
 
       - name: Dispatch the Test-Assist engine (o2-enterprise) via the org-admin PAT
+        if: steps.ctx.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           ISSUE: ${{ steps.ctx.outputs.issue }}
@@ -121,7 +137,7 @@ jobs:
       - name: Acknowledge on the source issue
         # success() => only ack if the dispatch actually succeeded (don't mislead the commenter if
         # the dispatch 403'd on a missing PAT permission, etc.). Only on a human /verify-bug comment.
-        if: github.event_name == 'issue_comment' && success()
+        if: github.event_name == 'issue_comment' && steps.ctx.outputs.ok == 'true' && success()
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
           ISSUE: ${{ steps.ctx.outputs.issue }}
