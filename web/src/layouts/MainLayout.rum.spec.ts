@@ -22,6 +22,8 @@ import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useLocalOrganization } from "@/utils/zincutils";
+import configService from "@/services/config";
+import { initBrowserRum } from "@/utils/rum/initBrowserRum";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -31,6 +33,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   invalidateLoginData: vi.fn(),
 }));
+
+vi.mock("@/utils/rum/initBrowserRum", () => ({ initBrowserRum: vi.fn() }));
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: {
@@ -288,6 +292,22 @@ describe("MainLayout — RUM identity and account", () => {
       name: "Acme",
       subscription_type: "",
     });
+  });
+
+  it("starts RUM from the authenticated full config", async () => {
+    const rum = { enabled: true, client_token: "token", application_id: "app", site: "rum" };
+    vi.mocked(configService.get_config_full).mockResolvedValueOnce({
+      data: { version: "v1", rum },
+    } as any);
+    store.state.zoConfig = { ...originalZoConfig, version: "" };
+    wrapper = mountMainLayout();
+    await flushPromises();
+
+    store.state.selectedOrganization = { label: "Rum", identifier: "rum-start" };
+    await flushPromises();
+
+    expect(configService.get_config_full).toHaveBeenCalledWith("rum-start");
+    expect(initBrowserRum).toHaveBeenCalledWith(rum, store.state.API_ENDPOINT);
   });
 
   it("does not set the RUM account when RUM is disabled", async () => {
