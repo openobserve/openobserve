@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "her hedefin gerektirdiği mesaj şablonunu seçmek için",
       "companionReasonDashboardStreams": "panel verilerini yüklemek için",
       "presetsTitle": "Ön Ayarlar",
+      "presetsClose": "Ön Ayarları Kapat",
+      "presetsShow": "Ön Ayarları Göster",
       "presetsSubtitle": "Bir ön ayarın yetkilerini bu role ekleyin. Hiçbir şey kaldırılmaz.",
       "presetsSectionBuiltin": "Yerleşik",
       "presetsSectionJob": "İşe Göre",

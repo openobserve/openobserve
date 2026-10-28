@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "để chọn mẫu tin nhắn mà mọi đích đều yêu cầu",
       "companionReasonDashboardStreams": "để tải dữ liệu bảng",
       "presetsTitle": "Cấu hình sẵn",
+      "presetsClose": "Đóng cấu hình sẵn",
+      "presetsShow": "Hiện cấu hình sẵn",
       "presetsSubtitle": "Thêm các quyền của một cấu hình sẵn vào vai trò này. Không có gì bị xóa.",
       "presetsSectionBuiltin": "Tích hợp sẵn",
       "presetsSectionJob": "Theo công việc",

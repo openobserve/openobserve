@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "um die Nachrichtenvorlage auszuwählen, die jedes Ziel benötigt",
       "companionReasonDashboardStreams": "um Panel-Daten zu laden",
       "presetsTitle": "Voreinstellungen",
+      "presetsClose": "Voreinstellungen schließen",
+      "presetsShow": "Voreinstellungen anzeigen",
       "presetsSubtitle": "Fügen Sie dieser Rolle die Berechtigungen einer Voreinstellung hinzu. Es wird nichts entfernt.",
       "presetsSectionBuiltin": "Integriert",
       "presetsSectionJob": "Nach Tätigkeit",

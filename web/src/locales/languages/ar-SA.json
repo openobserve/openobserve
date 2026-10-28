@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "لاختيار قالب الرسالة الذي تتطلبه كل وجهة",
       "companionReasonDashboardStreams": "لتحميل بيانات اللوحات",
       "presetsTitle": "الإعدادات المسبقة",
+      "presetsClose": "إغلاق الإعدادات المسبقة",
+      "presetsShow": "إظهار الإعدادات المسبقة",
       "presetsSubtitle": "أضف منح إعداد مسبق إلى هذا الدور. لا تتم إزالة أي شيء.",
       "presetsSectionBuiltin": "مضمّنة",
       "presetsSectionJob": "حسب الوظيفة",

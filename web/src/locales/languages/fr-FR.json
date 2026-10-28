@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "pour choisir le modèle de message, requis par chaque destination",
       "companionReasonDashboardStreams": "pour charger les données des panneaux",
       "presetsTitle": "Préréglages",
+      "presetsClose": "Fermer les préréglages",
+      "presetsShow": "Afficher les préréglages",
       "presetsSubtitle": "Ajoutez les autorisations d'un préréglage à ce rôle. Rien n'est retiré.",
       "presetsSectionBuiltin": "Intégrés",
       "presetsSectionJob": "Par métier",

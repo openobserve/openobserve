@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "모든 대상에 필요한 메시지 템플릿을 선택하기 위해",
       "companionReasonDashboardStreams": "패널 데이터를 로드하기 위해",
       "presetsTitle": "프리셋",
+      "presetsClose": "프리셋 닫기",
+      "presetsShow": "프리셋 표시",
       "presetsSubtitle": "프리셋의 권한 부여를 이 역할에 추가합니다. 제거되는 항목은 없습니다.",
       "presetsSectionBuiltin": "기본 제공",
       "presetsSectionJob": "직무별",

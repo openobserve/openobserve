@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "чтобы выбрать шаблон сообщения, который нужен каждому получателю",
       "companionReasonDashboardStreams": "чтобы загружать данные панелей",
       "presetsTitle": "Пресеты",
+      "presetsClose": "Закрыть пресеты",
+      "presetsShow": "Показать пресеты",
       "presetsSubtitle": "Добавьте разрешения из пресета в эту роль. Ничего не удаляется.",
       "presetsSectionBuiltin": "Встроенные",
       "presetsSectionJob": "По должности",

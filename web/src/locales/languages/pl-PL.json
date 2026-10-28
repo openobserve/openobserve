@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "aby wybrać szablon wiadomości, którego wymaga każde miejsce docelowe",
       "companionReasonDashboardStreams": "aby wczytać dane paneli",
       "presetsTitle": "Presety",
+      "presetsClose": "Zamknij presety",
+      "presetsShow": "Pokaż presety",
       "presetsSubtitle": "Dodaj uprawnienia z presetu do tej roli. Nic nie zostanie usunięte.",
       "presetsSectionBuiltin": "Wbudowane",
       "presetsSectionJob": "Według stanowiska",

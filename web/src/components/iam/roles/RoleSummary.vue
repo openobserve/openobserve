@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="root"
     data-test="edit-role-summary"
     class="@container/role-overview flex min-h-0 min-w-0 flex-1 flex-col"
   >
@@ -30,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageHeader>
 
     <!-- Stacks when the rails squeeze the overview, which a viewport breakpoint cannot see. -->
-    <div class="flex min-h-0 flex-1 @max-[38rem]/role-overview:flex-col">
+    <div class="relative flex min-h-0 flex-1 @max-[38rem]/role-overview:flex-col">
       <div class="@container/role-cards flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
         <div v-if="loading" class="flex flex-1 items-center justify-center p-6">
           <OSpinner size="md" data-test="edit-role-summary-loading" />
@@ -47,8 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OContent v-else class="flex flex-col gap-3 py-4">
+          <!-- The end gutter keeps the top card clear of the floating Show Presets button. -->
           <div
             class="grid auto-rows-fr grid-cols-1 gap-4 @min-[30rem]/role-cards:grid-cols-2 @min-[46rem]/role-cards:grid-cols-3"
+            :class="{ 'pe-10': presetsCollapsed }"
           >
             <button
               v-for="module in modules"
@@ -127,7 +130,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OContent>
       </div>
 
+      <OButton
+        v-if="presetsCollapsed"
+        variant="outline"
+        size="icon-sm"
+        class="absolute end-3 top-3 z-10"
+        :aria-label="t('iam.editRole.presetsShow')"
+        data-test="edit-role-presets-open"
+        @click="setPresetsCollapsed(false)"
+      >
+        <OIcon name="library-add" size="sm" />
+        <OTooltip :content="t('iam.editRole.presetsShow')" side="left" />
+      </OButton>
+
       <RolePresetsPanel
+        v-else
         class="border-border-default w-85 shrink-0 border-s @max-[38rem]/role-overview:max-h-[55%] @max-[38rem]/role-overview:w-auto @max-[38rem]/role-overview:border-s-0 @max-[38rem]/role-overview:border-t"
         :presets="presets"
         :preview-preset="previewPreset"
@@ -138,20 +155,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :summary-actions="summaryActions"
         @apply="(presetId) => emit('preset', presetId)"
         @load-streams="emit('load-streams')"
+        @close="setPresetsCollapsed(true)"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { nextTick, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import RolePresetsPanel from "@/components/iam/roles/RolePresetsPanel.vue";
 import { groupTone } from "@/components/iam/roles/roleGroupTone";
@@ -195,4 +216,25 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const grouped = (count: number) => raw(count.toLocaleString());
+
+const PRESETS_COLLAPSED_KEY = "iam:editRolePresetsCollapsed";
+const root = ref<HTMLElement | null>(null);
+const presetsCollapsed = ref(false);
+try {
+  presetsCollapsed.value = localStorage.getItem(PRESETS_COLLAPSED_KEY) === "1";
+} catch {
+  // localStorage unavailable (private mode): the panel stays open.
+}
+
+// Focus follows the toggle so a keyboard user is not dropped to the page when the clicked button unmounts.
+const setPresetsCollapsed = (collapsed: boolean) => {
+  presetsCollapsed.value = collapsed;
+  try {
+    localStorage.setItem(PRESETS_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    // Nothing to persist to: the choice still holds for this visit.
+  }
+  const target = collapsed ? "edit-role-presets-open" : "edit-role-presets-close";
+  nextTick(() => root.value?.querySelector<HTMLElement>(`[data-test="${target}"]`)?.focus());
+};
 </script>

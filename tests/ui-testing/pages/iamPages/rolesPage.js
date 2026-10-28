@@ -99,6 +99,9 @@ export class RolesPage {
         this.presetDetail = page.locator('[data-test="edit-role-preset-detail"]');
         this.presetBack = page.locator('[data-test="edit-role-preset-back"]');
         this.presetApply = page.locator('[data-test="edit-role-preset-apply"]');
+        // A viewer can close the panel; the floating button reopens it and the choice persists in localStorage.
+        this.presetsClose = page.locator('[data-test="edit-role-presets-close"]');
+        this.presetsOpen = page.locator('[data-test="edit-role-presets-open"]');
 
         // ---------- pane pagination (OTable's own controls, scoped to the pane) ----------
         // MUST be scoped. GroupUsers and GroupServiceAccounts stay MOUNTED under
@@ -301,8 +304,16 @@ export class RolesPage {
         return this.page.locator(`[data-test="edit-role-preset-${id}-status"]`);
     }
 
+    /** Reopens the Presets panel if it was closed, since the closed state can carry over in the browser context. */
+    async ensurePresetsOpen() {
+        await expect(this.presetsPanel.or(this.presetsOpen)).toBeVisible({ timeout: 15000 });
+        if (await this.presetsOpen.isVisible()) await this.presetsOpen.click();
+        await expect(this.presetsPanel).toBeVisible();
+    }
+
     /** Opens a preset's detail in the panel. */
     async openPreset(id) {
+        await this.ensurePresetsOpen();
         await this.presetRow(id).click();
         await expect(this.presetDetail).toBeVisible({ timeout: 15000 });
     }

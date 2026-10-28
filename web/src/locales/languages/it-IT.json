@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "per scegliere il template del messaggio, richiesto da ogni destinazione",
       "companionReasonDashboardStreams": "per caricare i dati dei pannelli",
       "presetsTitle": "Preset",
+      "presetsClose": "Chiudi preset",
+      "presetsShow": "Mostra preset",
       "presetsSubtitle": "Aggiungi a questo ruolo le concessioni di un preset. Non viene rimosso nulla.",
       "presetsSectionBuiltin": "Integrati",
       "presetsSectionJob": "Per mansione",

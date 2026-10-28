@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "om het berichtsjabloon te kiezen, dat elke bestemming vereist",
       "companionReasonDashboardStreams": "om paneelgegevens te laden",
       "presetsTitle": "Voorinstellingen",
+      "presetsClose": "Voorinstellingen sluiten",
+      "presetsShow": "Voorinstellingen tonen",
       "presetsSubtitle": "Voeg de toekenningen van een voorinstelling toe aan deze rol. Er wordt niets verwijderd.",
       "presetsSectionBuiltin": "Ingebouwd",
       "presetsSectionJob": "Per functie",

@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "すべての宛先に必要なメッセージテンプレートを選択するため",
       "companionReasonDashboardStreams": "パネルデータを読み込むため",
       "presetsTitle": "プリセット",
+      "presetsClose": "プリセットを閉じる",
+      "presetsShow": "プリセットを表示",
       "presetsSubtitle": "プリセットの付与をこのロールに追加します。削除されるものはありません。",
       "presetsSectionBuiltin": "組み込み",
       "presetsSectionJob": "職務別",

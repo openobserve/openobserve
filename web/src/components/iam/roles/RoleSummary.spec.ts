@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -48,8 +48,10 @@ async function mountSummary(
     loading: boolean;
     previewPreset: (id: string) => PresetPreview;
   }> = {},
+  attachTo?: HTMLElement,
 ) {
   const wrapper = mount(RoleSummary, {
+    attachTo,
     global: { plugins: [i18n, store, router] },
     props: {
       modules: [],
@@ -154,5 +156,61 @@ describe("RoleSummary - module cards", () => {
     expect(dot.exists()).toBe(true);
     expect(dot.text()).toBe(String(i18n.global.t("iam.editRole.summaryPendingTitle")));
     expect(wrapper.find('[data-test="edit-role-summary-unsaved-dfolder"]').exists()).toBe(false);
+  });
+});
+
+describe("RoleSummary - presets panel toggle", () => {
+  const COLLAPSED_KEY = "iam:editRolePresetsCollapsed";
+  const openButton = '[data-test="edit-role-presets-open"]';
+  const closeButton = '[data-test="edit-role-presets-close"]';
+  let wrapper: VueWrapper | undefined;
+
+  beforeEach(() => localStorage.removeItem(COLLAPSED_KEY));
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    localStorage.removeItem(COLLAPSED_KEY);
+  });
+
+  it("shows the panel by default, with no reopen button", async () => {
+    wrapper = await mountSummary({ modules: [makeModule("stream")] });
+
+    expect(wrapper.find(panel).exists()).toBe(true);
+    expect(wrapper.find(openButton).exists()).toBe(false);
+  });
+
+  it("closes from the X, moves focus to the reopen button and remembers it", async () => {
+    wrapper = await mountSummary({ modules: [makeModule("stream")] }, document.body);
+
+    await wrapper.find(closeButton).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(panel).exists()).toBe(false);
+    const reopen = wrapper.find(openButton);
+    expect(reopen.attributes("aria-label")).toBe(String(i18n.global.t("iam.editRole.presetsShow")));
+    expect(document.activeElement).toBe(reopen.element);
+    expect(localStorage.getItem(COLLAPSED_KEY)).toBe("1");
+
+    wrapper.unmount();
+    wrapper = await mountSummary({ modules: [makeModule("stream")] });
+    expect(wrapper.find(panel).exists()).toBe(false);
+    expect(wrapper.find(openButton).exists()).toBe(true);
+  });
+
+  it("reopens from the button, moves focus to the X and remembers it", async () => {
+    localStorage.setItem(COLLAPSED_KEY, "1");
+    wrapper = await mountSummary({ modules: [makeModule("stream")] }, document.body);
+
+    await wrapper.find(openButton).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(panel).exists()).toBe(true);
+    expect(wrapper.find(openButton).exists()).toBe(false);
+    expect(document.activeElement).toBe(wrapper.find(closeButton).element);
+    expect(localStorage.getItem(COLLAPSED_KEY)).toBe("0");
+
+    wrapper.unmount();
+    wrapper = await mountSummary({ modules: [makeModule("stream")] });
+    expect(wrapper.find(panel).exists()).toBe(true);
   });
 });

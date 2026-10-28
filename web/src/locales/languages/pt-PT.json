@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "para escolher o modelo de mensagem, que todos os destinos exigem",
       "companionReasonDashboardStreams": "para carregar os dados dos painéis",
       "presetsTitle": "Predefinições",
+      "presetsClose": "Fechar predefinições",
+      "presetsShow": "Mostrar predefinições",
       "presetsSubtitle": "Adicione as concessões de uma predefinição a esta função. Nada é removido.",
       "presetsSectionBuiltin": "Integradas",
       "presetsSectionJob": "Por cargo",

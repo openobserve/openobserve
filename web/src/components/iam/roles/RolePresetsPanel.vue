@@ -38,6 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("iam.editRole.presetsSubtitle") }}
           </span>
         </span>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          class="ms-auto"
+          :aria-label="t('iam.editRole.presetsClose')"
+          data-test="edit-role-presets-close"
+          @click="emit('close')"
+        >
+          <OIcon name="close" size="sm" />
+        </OButton>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
@@ -134,6 +144,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(detail.descriptionKey) }}
           </span>
         </span>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          class="ms-auto"
+          :aria-label="t('iam.editRole.presetsClose')"
+          data-test="edit-role-presets-close"
+          @click="emit('close')"
+        >
+          <OIcon name="close" size="sm" />
+        </OButton>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
@@ -298,6 +318,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   apply: [presetId: string];
   "load-streams": [];
+  close: [];
 }>();
 
 const { t, locale } = useI18nTyped();

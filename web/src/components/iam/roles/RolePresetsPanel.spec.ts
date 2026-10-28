@@ -437,3 +437,19 @@ describe("RolePresetsPanel - detail", () => {
     );
   });
 });
+
+describe("RolePresetsPanel - close", () => {
+  it("offers a named close button on the list and in a preset's detail", async () => {
+    const w = await mountPanel({ alert_manager: ALERT_MANAGER });
+    const close = () => w.find('[data-test="edit-role-presets-close"]');
+
+    expect(close().attributes("aria-label")).toBe(t("iam.editRole.presetsClose"));
+    await close().trigger("click");
+    expect(w.emitted("close")).toHaveLength(1);
+
+    await openDetail(w, "alert_manager");
+    expect(close().exists()).toBe(true);
+    await close().trigger("click");
+    expect(w.emitted("close")).toHaveLength(2);
+  });
+});

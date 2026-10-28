@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "选择消息模板，每个目标都需要模板",
       "companionReasonDashboardStreams": "加载面板数据",
       "presetsTitle": "预设",
+      "presetsClose": "关闭预设",
+      "presetsShow": "显示预设",
       "presetsSubtitle": "将预设中的授权添加到此角色。不会移除任何内容。",
       "presetsSectionBuiltin": "内置",
       "presetsSectionJob": "按职责",

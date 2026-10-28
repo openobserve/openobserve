@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "to pick the message template, which every destination requires",
       "companionReasonDashboardStreams": "to load panel data",
       "presetsTitle": "Presets",
+      "presetsClose": "Close Presets",
+      "presetsShow": "Show Presets",
       "presetsSubtitle": "Add a preset's grants to this role. Nothing is removed.",
       "presetsSectionBuiltin": "Built-In",
       "presetsSectionJob": "By Job",

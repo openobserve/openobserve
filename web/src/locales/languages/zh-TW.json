@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "選擇訊息範本，每個目標都需要範本",
       "companionReasonDashboardStreams": "載入面板資料",
       "presetsTitle": "預設集",
+      "presetsClose": "關閉預設集",
+      "presetsShow": "顯示預設集",
       "presetsSubtitle": "將預設集的授權新增至此角色。不會移除任何項目。",
       "presetsSectionBuiltin": "內建",
       "presetsSectionJob": "依職務",

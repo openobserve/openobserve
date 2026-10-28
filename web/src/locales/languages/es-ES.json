@@ -3448,6 +3448,8 @@
       "companionReasonDestinationTemplates": "para elegir la plantilla del mensaje, que todo destino requiere",
       "companionReasonDashboardStreams": "para cargar los datos de los paneles",
       "presetsTitle": "Preajustes",
+      "presetsClose": "Cerrar preajustes",
+      "presetsShow": "Mostrar preajustes",
       "presetsSubtitle": "Añade a este rol las concesiones de un preajuste. No se quita nada.",
       "presetsSectionBuiltin": "Integrados",
       "presetsSectionJob": "Por puesto",
