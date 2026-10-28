@@ -484,6 +484,33 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.queryReq.query.per_query_response).toBe(true);
     });
 
+    it("shows the multi-query stream's averaged progress on the panel", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+        {
+          query: "SELECT * FROM metrics",
+          vrlFunctionQuery: "",
+          fields: { stream: "metrics", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+      ]);
+
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      const [[payload, stream]] = fetchQueryDataWithHttpStream.mock.calls;
+      stream.data(payload, { type: "event_progress", content: { percent: 35 } });
+
+      expect(state.loadingProgressPercentage).toBe(35);
+      expect(state.isPartialData).toBe(true);
+    });
+
     it("initializes state arrays for all queries before fetch", async () => {
       const panelSchema = makePanelSchema([
         {
