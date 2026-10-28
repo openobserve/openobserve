@@ -182,7 +182,9 @@ const subStream = (text?: string, variant?: RichCardStepVariant): string | undef
   for (const inp of allInputs.value) {
     if (inp.flag || inp.helmSet) continue;
     if (inp.cliFlag)
-      out = out.replaceAll(`{flag:${inp.id}}`, () => cliFlagArg(inp, inputValue(inp.id)));
+      out = out.replaceAll(`{flag:${inp.id}}`, () =>
+        cliFlagArg(inp, inputValue(inp.id), inputValue),
+      );
     const value = sanitizeInput(inp, inputValues.value[inp.id] ?? inp.default);
     // A function replacement keeps typed `$&`, `$$` etc. literal.
     out = out.replaceAll(`{${inp.id}}`, () => value);

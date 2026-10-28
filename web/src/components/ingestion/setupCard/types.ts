@@ -366,6 +366,8 @@ export interface RichCardInput {
   cliFlag?: string;
   /** "slug" lowercases the value and turns anything outside [a-z0-9-] into "-", as the install scripts do. */
   sanitize?: "slug";
+  /** Value `{flag:<id>}` uses while the field is blank, computed from the other inputs' trimmed values. */
+  fallback?: (get: (id: string) => string) => string;
 }
 
 export interface RichCardContent {

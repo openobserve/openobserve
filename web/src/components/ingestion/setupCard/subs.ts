@@ -63,8 +63,12 @@ export const sanitizeInput = (inp: RichCardInput, value: string): string =>
         .replace(/^-|-$/g, "")
     : value;
 
-/** The `{flag:<id>}` expansion; a blank value drops the flag so the script's own default applies. */
-export const cliFlagArg = (inp: RichCardInput, value: string): string => {
-  const v = sanitizeInput(inp, value.trim());
+/** The `{flag:<id>}` expansion; a blank value uses the input's `fallback`, else drops the flag so the script's own default applies. */
+export const cliFlagArg = (
+  inp: RichCardInput,
+  value: string,
+  get: (id: string) => string = () => "",
+): string => {
+  const v = sanitizeInput(inp, value.trim()) || sanitizeInput(inp, inp.fallback?.(get) ?? "");
   return v && inp.cliFlag ? ` \\\n  ${inp.cliFlag}=${shellQuote(v)}` : "";
 };

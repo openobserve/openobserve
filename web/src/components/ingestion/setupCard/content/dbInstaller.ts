@@ -124,10 +124,12 @@ const stepInputs = (opts: DbQuickInstallOptions): RichCardInput[] => [
   {
     id: SERVICE_INPUT,
     cliFlag: "--name",
-    // Shown as the script will name the service, so the uninstall command matches it.
     sanitize: "slug",
     labelKey: "ingestion.setupCard.dbInstallerServiceNameLabel",
     default: "",
+    // Spelled out so uninstall (which needs a name) targets what install created; mirrors install.sh's `<db>-<host>-<port>`.
+    fallback: (get) =>
+      `${opts.db}-${get(opts.hostInputId ?? "host") || "localhost"}-${get("port") || opts.defaultPort}`,
     placeholder: raw(`${opts.db}-<host>-<port>`),
     helpKey: "ingestion.setupCard.dbInstallerServiceNameHelp",
   },

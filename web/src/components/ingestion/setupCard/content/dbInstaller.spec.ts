@@ -48,11 +48,13 @@ const variant = (step: RichCardStep, id: string) =>
 const metricsCode = (step: RichCardStep) =>
   step.variants ? variant(step, "metrics").code : step.code!;
 /** Expands `{flag:<id>}` the way the renderer does, from defaults unless a value is given. */
-const fill = (text: string, inputs: RichCardInput[], values: Record<string, string> = {}) =>
-  inputs.reduce(
-    (out, i) => out.replaceAll(`{flag:${i.id}}`, () => cliFlagArg(i, values[i.id] ?? i.default)),
+const fill = (text: string, inputs: RichCardInput[], values: Record<string, string> = {}) => {
+  const get = (id: string) => (values[id] ?? inputs.find((i) => i.id === id)?.default ?? "").trim();
+  return inputs.reduce(
+    (out, i) => out.replaceAll(`{flag:${i.id}}`, () => cliFlagArg(i, get(i.id), get)),
     text,
   );
+};
 
 describe("dbQuickInstallStep", () => {
   it("builds the installer contract's command with the org's endpoint and token", () => {
@@ -188,10 +190,10 @@ describe("command values", () => {
 
   it("omits the flag of a cleared field so the script's default applies", () => {
     const out = command({ host: "", port: "  ", user: "", database: "", serviceName: "" });
-    for (const flag of ["--host", "--port", "--db-user", "--database", "--name"]) {
+    for (const flag of ["--host", "--port", "--db-user", "--database"]) {
       expect(out).not.toContain(flag);
     }
-    expect(out).toContain("--db=postgres \\\n  --o2-url=");
+    expect(out).toContain("--db=postgres \\\n  --name=");
   });
 
   it("names the service the way the script will, in install and uninstall alike", () => {
@@ -202,26 +204,37 @@ describe("command values", () => {
     expect(uninstall).toContain("--name='my-pg-main'");
   });
 
-  it("drops --name from uninstall too when the service name is cleared", () => {
-    const uninstall = fill(dbUninstallExtra().code.raw, step.inputs!, { serviceName: "" });
-    expect(uninstall).not.toContain("--name");
-    expect(gt("ingestion.setupCard.dbUninstallDesc")).toContain("the name the installer printed");
+  it("names an empty Service Name <db>-<host>-<port>, in install and uninstall alike", () => {
+    const empty = { serviceName: "" };
+    expect(command(empty)).toContain("--name='postgres-localhost-5432'");
+    expect(fill(dbUninstallExtra().code.raw, step.inputs!, empty)).toContain(
+      "sudo bash o2-db-uninstall.sh \\\n  --name='postgres-localhost-5432'",
+    );
   });
 
-  it.each([
-    ["My  DB", "--name='my-db'"],
-    ["--db--", "--name='db'"],
-    ["a__b", "--name='a-b'"],
-  ])("mirrors install.sh sanitize_name: %s", (typed, flag) => {
-    expect(command({ serviceName: typed })).toContain(flag);
+  it("gives two host/port combos two different names, matched by their uninstall", () => {
+    const names = [
+      { host: "10.0.0.5", port: "5432", name: "postgres-10-0-0-5-5432" },
+      { host: "db2.internal", port: "5433", name: "postgres-db2-internal-5433" },
+    ].map(({ host, port, name }) => {
+      const values = { serviceName: "", host, port };
+      expect(command(values)).toContain(`--name='${name}'`);
+      expect(fill(dbUninstallExtra().code.raw, step.inputs!, values)).toContain(`--name='${name}'`);
+      return name;
+    });
+    expect(new Set(names).size).toBe(2);
   });
 
-  it("drops --name when nothing is left after sanitizing", () => {
-    expect(command({ serviceName: "!!!" })).not.toContain("--name");
+  it("falls back to the defaults when host and port are cleared too", () => {
+    expect(command({ serviceName: "", host: " ", port: "" })).toContain(
+      "--name='postgres-localhost-5432'",
+    );
   });
 
-  it("derives the name in the installer when left empty, so two instances never collide", () => {
-    expect(command({ serviceName: "" })).not.toContain("--name");
+  it("lets a typed name win over the derived one", () => {
+    const values = { serviceName: "Prod PG", host: "h", port: "1" };
+    expect(command(values)).toContain("--name='prod-pg'");
+    expect(fill(dbUninstallExtra().code.raw, step.inputs!, values)).toContain("--name='prod-pg'");
   });
 
   it("is shown in the automatic mode only", () => {
@@ -292,7 +305,7 @@ describe("the six database cards (defaults)", () => {
       expect(step.inputs!.map((i) => i.id)).toEqual(inputs);
       const command = fill(metricsCode(step).raw, step.inputs!);
       for (const flag of flags) expect(command).toContain(flag);
-      expect(command).not.toContain("--name");
+      expect(command).toContain(`--name='${db}-localhost-`);
       for (const flag of absent) expect(command).not.toContain(flag);
       expect(!!step.variants).toBe(dbm);
     },
@@ -338,6 +351,18 @@ describe("the six database cards (defaults)", () => {
       const defaults = new Map<string, Set<string>>();
       for (const i of all) defaults.set(i.id, (defaults.get(i.id) ?? new Set()).add(i.default));
       for (const [id, values] of defaults) expect([id, values.size]).toEqual([id, 1]);
+    },
+  );
+
+  it.each(Object.keys(CARDS) as (keyof typeof CARDS)[])(
+    "%s: the default uninstall carries the derived name, never a bare command",
+    (db) => {
+      const card = CARDS[db];
+      const install = fill(metricsCode(quick(card)).raw, quick(card).inputs!);
+      const name = /--name='([^']+)'/.exec(install)![1];
+      expect(fill(card.extras!.uninstall!.code.raw, quick(card).inputs!)).toContain(
+        `--name='${name}'`,
+      );
     },
   );
 
