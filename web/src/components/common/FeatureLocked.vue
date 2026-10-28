@@ -33,13 +33,15 @@ import { useRoute } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useFeatureLockActions } from "@/composables/useFeatureLock";
+import { useFeatureLockActions, useFeatureNames } from "@/composables/useFeatureLock";
 import { LOCKED_FEATURES } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const route = useRoute();
 const { openContactSales } = useFeatureLockActions();
+const { featureName } = useFeatureNames();
 
-const meta = computed(() => LOCKED_FEATURES[String(route.params.feature ?? "")]);
-const label = computed(() => (meta.value ? t(meta.value.labelKey) : t("featureLock.thisFeature")));
+const key = computed(() => String(route.params.feature ?? ""));
+const meta = computed(() => LOCKED_FEATURES[key.value]);
+const label = computed(() => featureName(key.value) ?? t("featureLock.thisFeature"));
 </script>

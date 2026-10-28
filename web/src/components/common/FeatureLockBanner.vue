@@ -42,16 +42,13 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useFeatureLockActions } from "@/composables/useFeatureLock";
-import { LOCKED_FEATURES } from "@/utils/featureGate";
+import { useFeatureLockActions, useFeatureNames } from "@/composables/useFeatureLock";
 
 const props = defineProps<{ feature: string }>();
 
 const { t } = useI18nTyped();
 const { openContactSales } = useFeatureLockActions();
+const { featureName } = useFeatureNames();
 
-const label = computed(() => {
-  const labelKey = LOCKED_FEATURES[props.feature]?.labelKey;
-  return labelKey ? t(labelKey) : null;
-});
+const label = computed(() => featureName(props.feature) ?? null);
 </script>

@@ -37,7 +37,7 @@
           :title="t('featureLock.toastTitle')"
           :description="
             forbidden.length
-              ? t('featureLock.toastMessage', { features: raw(forbidden.join(', ')) })
+              ? t('featureLock.toastMessage', { features: raw(featureNames(forbidden)) })
               : t('featureLock.toastMessageGeneric')
           "
           data-test="llm-providers-license-denied"
@@ -230,9 +230,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
+const { featureNames } = useFeatureNames();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();

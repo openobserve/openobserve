@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-body" data-test="license-denied-dialog-message">
         {{
           features?.length
-            ? t("featureLock.toastMessage", { features: raw(features.join(", ")) })
+            ? t("featureLock.toastMessage", { features: raw(featureNames(features)) })
             : t("featureLock.toastMessageGeneric")
         }}
       </p>
@@ -44,8 +44,10 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLicenseDeniedDialog } from "@/composables/useUnauthorizedErrorGrouper";
 import { siteURL } from "@/constants/config";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
+const { featureNames } = useFeatureNames();
 const { features, close } = useLicenseDeniedDialog();
 
 const openContactSales = () => {

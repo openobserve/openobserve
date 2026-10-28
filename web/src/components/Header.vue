@@ -273,7 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               side="bottom"
               align="center"
-              :content="t('featureLock.title', { feature: t('menu.aiAssistant') })"
+              :content="
+                t('featureLock.title', {
+                  feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
+                })
+              "
             />
           </OButton>
 
@@ -532,6 +536,7 @@ import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateConte
 
 import { getImageURL } from "@/utils/zincutils";
 import { featureLockedPath, menuState } from "@/utils/featureGate";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
@@ -634,6 +639,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    const { featureName } = useFeatureNames();
     const router = useRouter();
     const { isDark } = useTheme();
 
@@ -875,6 +881,7 @@ export default defineComponent({
       isDark,
       t,
       raw,
+      featureName,
       getImageURL,
       enterpriseButtonText,
       ingestionQuotaPercentage,

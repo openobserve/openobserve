@@ -14,6 +14,7 @@ import {
   watchEffect,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
@@ -65,6 +66,7 @@ import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
+const { featureNames } = useFeatureNames();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -1787,7 +1789,9 @@ defineExpose({
             :title="t('featureLock.toastTitle')"
             :description="
               props.forbidden.length
-                ? t('featureLock.toastMessage', { features: raw(props.forbidden.join(', ')) })
+                ? t('featureLock.toastMessage', {
+                    features: raw(featureNames(props.forbidden)),
+                  })
                 : t('featureLock.toastMessageGeneric')
             "
             data-test="o2-table-license-denied"

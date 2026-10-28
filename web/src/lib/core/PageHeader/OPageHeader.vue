@@ -242,7 +242,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useFeatureLock } from "@/composables/useFeatureLock";
+import { useFeatureLock, useFeatureNames } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
@@ -294,10 +294,15 @@ const ROW_CLASS =
 const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
+const { featureName } = useFeatureNames();
 const { isMobile } = useBreakpoint();
 const { locked, feature: lockedFeature } = useFeatureLock();
 const lockedLabel = computed(() =>
-  t("featureLock.headerLocked", { feature: raw(lockedFeature.value ?? "") }),
+  t("featureLock.headerLocked", {
+    feature: raw(
+      lockedFeature.value ? (featureName(lockedFeature.value) ?? lockedFeature.value) : "",
+    ),
+  }),
 );
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.

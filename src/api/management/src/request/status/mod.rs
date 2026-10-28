@@ -78,6 +78,7 @@ use {
     },
     o2_enterprise::enterprise::license::{
         block_feature_for_report_failure, check_features, last_reported_timestamp,
+        runtime_definition,
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -267,6 +268,7 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
     features: HashMap<Feature, FeatureState>,
+    feature_names: HashMap<String, String>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -633,6 +635,14 @@ pub async fn zo_config(
     .into_iter()
     .map(|variant| (variant, FeatureState::Locked))
     .collect();
+    #[cfg(feature = "enterprise")]
+    let feature_names: HashMap<String, String> = runtime_definition()
+        .features
+        .iter()
+        .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let feature_names: HashMap<String, String> = HashMap::new();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -747,6 +757,7 @@ pub async fn zo_config(
         #[cfg(feature = "enterprise")]
         workflows_enabled,
         features: featuremap,
+        feature_names,
     })
 }
 
@@ -2679,6 +2690,19 @@ mod tests {
             json["online_evals_enabled"],
             o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_feature_names_come_from_the_embedded_definition() {
+        let json = zo_config_json().await;
+        for (key, gate) in &runtime_definition().features {
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                gate.display_name.as_deref(),
+                "{key}"
+            );
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]

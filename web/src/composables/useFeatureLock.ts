@@ -24,6 +24,7 @@ import {
   type InjectionKey,
   type Ref,
 } from "vue";
+import { useStore } from "vuex";
 import { siteURL } from "@/constants/config";
 
 export interface FeatureLock {
@@ -90,4 +91,14 @@ export const useFeatureLockActions = () => {
     window.open(siteURL.contactSales, "_blank", "noopener");
   };
   return { openContactSales };
+};
+
+/** Display names from the build's feature definition (`feature_names` in the org config). */
+export const useFeatureNames = () => {
+  const store = useStore();
+  const featureName = (key: string): string | undefined =>
+    store?.state.zoConfig?.feature_names?.[key];
+  const featureNames = (keys: readonly string[]): string =>
+    keys.map((key) => featureName(key) ?? key).join(", ");
+  return { featureName, featureNames };
 };

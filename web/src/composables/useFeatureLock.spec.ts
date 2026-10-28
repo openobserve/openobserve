@@ -136,7 +136,12 @@ describe("FeatureLockBanner", () => {
       ],
     });
     await router.push("/");
-    const store = createStore({ state: () => ({ selectedOrganization: { identifier: "acme" } }) });
+    const store = createStore({
+      state: () => ({
+        selectedOrganization: { identifier: "acme" },
+        zoConfig: { feature_names: { workflows: "Workflows", ai_assistant: "AI Assistant" } },
+      }),
+    });
     wrapper = mount(FeatureLockBanner, {
       props: { feature },
       global: { plugins: [i18n, router, store] },
@@ -144,7 +149,7 @@ describe("FeatureLockBanner", () => {
     return router;
   };
 
-  it("names the missing feature by its label, not its key", async () => {
+  it("names the missing feature by its display name, not its key", async () => {
     await mountBanner(true);
     expect(wrapper!.text()).toContain("This feature is locked. It needs the Workflows feature");
     expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').element.tagName).toBe(
@@ -155,7 +160,7 @@ describe("FeatureLockBanner", () => {
     expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').text()).toBe("AI Assistant");
   });
 
-  it("says a generic sentence for a key it has no label for, naming nothing", async () => {
+  it("says a generic sentence for a key with no display name, naming nothing", async () => {
     await mountBanner(true, "some_new_feature");
     expect(wrapper!.get('[data-test="feature-lock-banner-generic"]').text()).toBe(
       "This page needs a feature that is not in your license.",

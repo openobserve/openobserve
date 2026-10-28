@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('featureLock.toastTitle')"
         :description="
           forbidden.length
-            ? t('featureLock.toastMessage', { features: raw(forbidden.join(', ')) })
+            ? t('featureLock.toastMessage', { features: raw(featureNames(forbidden)) })
             : t('featureLock.toastMessageGeneric')
         "
         data-test="discovered-services-license-denied"
@@ -530,12 +530,14 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 
 defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
 
 const { t } = useI18nTyped();
+const { featureNames } = useFeatureNames();
 
 interface ServiceRecord {
   id: string;
