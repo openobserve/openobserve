@@ -10503,6 +10503,7 @@
         "leadsNotEvidence": "Pistas, não provas",
         "working": "A processar. As mensagens enviadas agora serão lidas após este turno.",
         "finalNote": "Este relatório é final e não será alterado. Para reorientar o agente, utilize Reanalisar. Isto cria uma nova versão no Histórico de relatórios.",
+        "resumableNote": "Esta execução parou antes de terminar. Retomar execução continua a partir do último passo concluído.",
         "copy": "Copiar conversa",
         "copied": "Conversa copiada para a área de transferência",
         "copyFailed": "Falha ao copiar a thread",

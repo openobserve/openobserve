@@ -10503,6 +10503,7 @@
         "leadsNotEvidence": "İpuçları, kanıt değil",
         "working": "Çalışıyor. Şimdi gönderilen mesajlar bu turdan sonra okunur.",
         "finalNote": "Bu rapor nihaidir ve değişmez. Ajanı yönlendirmek için Yeniden Analiz Et'i kullanın. Bu işlem, Rapor geçmişinde yeni bir sürüm oluşturur.",
+        "resumableNote": "Bu çalıştırma bitmeden durdu. Çalıştırmayı sürdür, son tamamlanan adımdan devam eder.",
         "copy": "İnceleme dizisini kopyala",
         "copied": "İnceleme dizisi panoya kopyalandı",
         "copyFailed": "İleti dizisi kopyalanamadı",

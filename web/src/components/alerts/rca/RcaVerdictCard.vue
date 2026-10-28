@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-verdict-headline"
       class="text-text-heading m-0 max-w-215 text-2xl leading-tight font-bold [text-wrap:pretty]"
     >
-      {{ headline }}
+      <RcaInlineText :text="headline" />
     </h2>
 
     <p
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-verdict-below"
       class="text-text-secondary text-compact m-0 font-semibold"
     >
-      {{ belowHeadline }}
+      <RcaInlineText :text="belowHeadline" />
     </p>
 
     <!-- Several root causes: each with its onset and its own band. -->
@@ -69,7 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="m-0 flex max-w-225 list-none flex-col gap-1 p-0"
     >
       <li v-for="cause in causes" :key="cause.id" data-test="rca-verdict-cause" class="text-sm">
-        <span class="text-text-heading font-semibold">{{ cause.statement }}</span>
+        <span class="text-text-heading font-semibold">
+          <RcaInlineText :text="cause.statement" />
+        </span>
         <span data-test="rca-verdict-cause-meta" class="text-text-secondary text-xs">
           · {{ causeMeta(cause) }}
         </span>
@@ -182,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="max-w-95 min-w-0">
         <dt class="text-text-secondary text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
         <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
-          {{ impactText }}
+          <RcaInlineText :text="impactText" />
         </dd>
       </div>
       <div v-if="impactedServices.length" class="max-w-105 min-w-0">
@@ -465,6 +467,7 @@ import type { RcaCardState } from "@/utils/incidents/rcaThread";
 import type { RcaUnblockedLine } from "@/utils/incidents/rcaSteering";
 import type { RcaRefusal } from "@/composables/useIncidentRca";
 import RcaBlockedBanner from "./RcaBlockedBanner.vue";
+import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 import RcaStageStepper from "./RcaStageStepper.vue";
 

@@ -10503,6 +10503,7 @@
         "leadsNotEvidence": "Hinweise, keine Beweise",
         "working": "In Arbeit. Jetzt gesendete Nachrichten werden erst nach diesem Durchlauf gelesen.",
         "finalNote": "Dieser Bericht ist endgültig und ändert sich nicht mehr. Um den Agenten umzulenken, erneut analysieren. Dabei wird eine neue Version im Berichtsverlauf erstellt.",
+        "resumableNote": "Dieser Lauf wurde vor dem Abschluss beendet. „Lauf fortsetzen“ macht beim letzten abgeschlossenen Schritt weiter.",
         "copy": "Thread kopieren",
         "copied": "Thread in die Zwischenablage kopiert",
         "copyFailed": "Kopieren des Threads fehlgeschlagen",

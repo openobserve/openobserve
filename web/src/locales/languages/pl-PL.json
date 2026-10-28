@@ -10503,6 +10503,7 @@
         "leadsNotEvidence": "Tropy, nie dowody",
         "working": "Trwa praca. Wiadomości wysłane teraz zostaną odczytane po zakończeniu tej tury.",
         "finalNote": "Ten raport jest ostateczny i nie zmieni się. Aby zmienić kierunek pracy agenta, wybierz Analizuj ponownie. Spowoduje to utworzenie nowej wersji w historii raportów.",
+        "resumableNote": "To uruchomienie zatrzymało się przed zakończeniem. Wznów uruchomienie kontynuuje od ostatniego ukończonego kroku.",
         "copy": "Kopiuj wątek",
         "copied": "Skopiowano wątek do schowka",
         "copyFailed": "Nie udało się skopiować wątku",

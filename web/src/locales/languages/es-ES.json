@@ -10503,6 +10503,7 @@
         "leadsNotEvidence": "Pistas, no pruebas",
         "working": "En curso. Los mensajes enviados ahora se leen después de este turno.",
         "finalNote": "Este informe es definitivo y no cambiará. Para redirigir al agente, usa Volver a analizar. Se crea una nueva versión en el Historial de informes.",
+        "resumableNote": "Esta ejecución se detuvo antes de terminar. Reanudar ejecución continúa desde el último paso terminado.",
         "copy": "Copiar hilo",
         "copied": "Hilo copiado al portapapeles",
         "copyFailed": "No se pudo copiar el hilo",
