@@ -669,6 +669,7 @@
     "dateRangeCopied": "Datumsbereich kopiert",
     "dateRangePasted": "Datumsbereich eingefügt",
     "dateRangePasteError": "Datumsbereich konnte nicht geparst werden",
+    "dateRangePasteBlocked": "Dieser Browser hat das Lesen der Zwischenablage blockiert. Drücken Sie {shortcut} bei geöffnetem Auswahlfeld, um einzufügen.",
     "pastSecond": "Letzte {count} Sekunde | Letzte {count} Sekunden",
     "pastMinute": "Letzte {count} Minute | Letzte {count} Minuten",
     "pastHour": "Letzte {count} Stunde | Letzte {count} Stunden",

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Intervallo di date copiato",
     "dateRangePasted": "Intervallo di date incollato",
     "dateRangePasteError": "Impossibile analizzare l'intervallo di date",
+    "dateRangePasteBlocked": "Questo browser ha bloccato la lettura degli appunti. Premi {shortcut} con il selettore aperto per incollare.",
     "pastSecond": "Ultimo {count} secondo | Ultimi {count} secondi",
     "pastMinute": "Ultimo {count} minuto | Ultimi {count} minuti",
     "pastHour": "Ultima {count} ora | Ultime {count} ore",

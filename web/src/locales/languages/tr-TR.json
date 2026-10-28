@@ -669,6 +669,7 @@
     "dateRangeCopied": "Tarih aralığı kopyalandı",
     "dateRangePasted": "Tarih aralığı yapıştırıldı",
     "dateRangePasteError": "Tarih aralığı ayrıştırılamadı",
+    "dateRangePasteBlocked": "Bu tarayıcı panoyu okumayı engelledi. Yapıştırmak için seçici açıkken {shortcut} tuşlarına basın.",
     "pastSecond": "Son {count} Saniye | Son {count} Saniye",
     "pastMinute": "Son {count} Dakika | Son {count} Dakika",
     "pastHour": "Son {count} Saat | Son {count} Saat",

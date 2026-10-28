@@ -669,6 +669,7 @@
     "dateRangeCopied": "日期范围已复制",
     "dateRangePasted": "日期范围已粘贴",
     "dateRangePasteError": "无法解析日期范围",
+    "dateRangePasteBlocked": "此浏览器禁止了读取剪贴板。在选取器打开时按 {shortcut} 即可粘贴。",
     "pastSecond": "过去 {count} 秒 | 过去 {count} 秒",
     "pastMinute": "过去 {count} 分钟 | 过去 {count} 分钟",
     "pastHour": "过去 {count} 小时 | 过去 {count} 小时",

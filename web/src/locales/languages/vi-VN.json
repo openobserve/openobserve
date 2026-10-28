@@ -669,6 +669,7 @@
     "dateRangeCopied": "Đã sao chép khoảng thời gian",
     "dateRangePasted": "Đã dán khoảng thời gian",
     "dateRangePasteError": "Không thể phân tích khoảng thời gian",
+    "dateRangePasteBlocked": "Trình duyệt này đã chặn việc đọc clipboard. Nhấn {shortcut} khi trình chọn đang mở để dán.",
     "pastSecond": "Trong {count} giây qua | Trong {count} giây qua",
     "pastMinute": "Trong {count} phút qua | Trong {count} phút qua",
     "pastHour": "Trong {count} giờ qua | Trong {count} giờ qua",

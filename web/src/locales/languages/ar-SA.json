@@ -669,6 +669,7 @@
     "dateRangeCopied": "نطاق التاريخ المنسوخ",
     "dateRangePasted": "نطاق التاريخ المطبع",
     "dateRangePasteError": "لم أتمكن من تحليل نطاق التاريخ",
+    "dateRangePasteBlocked": "حظر هذا المتصفح قراءة الحافظة. اضغط {shortcut} مع فتح المنتقي للصق.",
     "pastSecond": "آخر {count} ثانية | الثواني الـ {count} الماضية",
     "pastMinute": "آخر {count} دقيقة | الدقائق الـ {count} الماضية",
     "pastHour": "آخر {count} ساعة | الساعات الـ {count} الماضية",

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Zakres dat skopiowany",
     "dateRangePasted": "Zakres dat wklejony",
     "dateRangePasteError": "Nie można przetworzyć zakresu dat",
+    "dateRangePasteBlocked": "Ta przeglądarka zablokowała odczyt schowka. Naciśnij {shortcut} przy otwartym selektorze, aby wkleić.",
     "pastSecond": "W ciągu ostatniej {count} sekundy | W ciągu ostatnich {count} s",
     "pastMinute": "W ciągu ostatniej {count} minuty | W ciągu ostatnich {count} min",
     "pastHour": "W ciągu ostatniej {count} godziny | W ciągu ostatnich {count} godz.",

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Диапазон дат скопирован",
     "dateRangePasted": "Диапазон дат вставлен",
     "dateRangePasteError": "Не удалось разобрать диапазон дат",
+    "dateRangePasteBlocked": "Этот браузер заблокировал чтение буфера обмена. Нажмите {shortcut} при открытом средстве выбора, чтобы вставить.",
     "pastSecond": "Последняя {count} секунда | Последние {count} с",
     "pastMinute": "Последняя {count} минута | Последние {count} мин",
     "pastHour": "Последний {count} час | Последние {count} ч",
