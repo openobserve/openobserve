@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 
@@ -59,7 +59,8 @@ vi.mock("@/utils/rum/clickHeatmapQueries", async (importOriginal) => {
     rankingSql: stub(actual.rankingSql, "SELECT ranking"),
     totalsSql: stub(actual.totalsSql, "SELECT totals"),
     deviceSplitSql: stub(actual.deviceSplitSql, "SELECT devices"),
-    pageListSql: stub(actual.pageListSql, "SELECT pages"),
+    pageListSql: (...a: Parameters<typeof actual.pageListSql>) =>
+      h.real || a[1] ? actual.pageListSql(...a) : "SELECT pages",
   };
 });
 vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => {
@@ -604,52 +605,168 @@ describe("ClickHeatmap", () => {
     wrapper.unmount();
   });
 
-  it("searches the page picker, marks the current page and reloads on pick", async () => {
-    answer({
-      pages: () =>
-        ok([
-          { view_url: "https://x.test/home", clicks: 5, sessions: 2 },
-          { view_url: "https://x.test/pricing", clicks: 3, sessions: 1 },
-        ]),
-    });
-    const wrapper = await mountPage({ OTable: true });
-    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
-    await flushPromises();
-    const query = (v: string) => {
+  describe("page picker search", () => {
+    const home = { view_url: "https://x.test/home", clicks: 5, sessions: 2 };
+    const deep = { view_url: "https://x.test/deep/pricing", clicks: 1, sessions: 1 };
+    const opened = async (searched: () => unknown = () => ok([deep])) => {
+      answer({ pages: () => ok([home]), "page-search": searched });
+      const wrapper = await mountPage({ OTable: true });
+      await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    };
+    const type = async (v: string) => {
       const input = document.body.querySelector(
         '[data-test="rum-heatmap-page-search"] input',
       ) as HTMLInputElement;
       input.value = v;
       input.dispatchEvent(new Event("input"));
-      return flushPromises();
+      await flushPromises();
+    };
+    const settle = async () => {
+      await vi.advanceTimersByTimeAsync(300);
+      await flushPromises();
     };
     const option = (u: string) =>
       document.body.querySelector(
         `[data-test="rum-heatmap-page-option-${u}"]`,
       ) as HTMLElement | null;
+    const searchCalls = () => h.run.mock.calls.filter((c) => c[0] === "page-search");
 
-    expect(option("https://x.test/home")?.getAttribute("aria-current")).toBe("true");
-    expect(option("https://x.test/pricing")?.getAttribute("aria-current")).toBeNull();
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
 
-    await query("nomatch");
-    expect(
-      document.body.querySelector('[data-test="rum-heatmap-page-none"]')?.textContent,
-    ).toContain("No pages match");
-    await query("pric");
-    h.run.mockClear();
-    option("https://x.test/pricing")!.click();
-    await flushPromises();
+    it("marks the current page and lists the initial pages with no text", async () => {
+      const wrapper = await opened();
 
-    expect(ids()).toContain("totals");
-    expect(wrapper.find('[data-test="rum-heatmap-page-current"]').text()).toBe(
-      "https://x.test/pricing",
+      expect(option("https://x.test/home")?.getAttribute("aria-current")).toBe("true");
+      expect(searchCalls()).toHaveLength(0);
+      wrapper.unmount();
+    });
+
+    it("queries the server once after the debounce, with the term, and shows its rows", async () => {
+      const wrapper = await opened();
+
+      await type("pric");
+      expect(searchCalls()).toHaveLength(0);
+      expect(
+        document.body.querySelector('[data-test="rum-heatmap-page-searching"]'),
+      ).not.toBeNull();
+      await settle();
+
+      expect(searchCalls()).toHaveLength(1);
+      expect(searchCalls()[0][1].sql).toContain("strpos(lower(view_url), 'pric') > 0");
+      expect(option("https://x.test/deep/pricing")).not.toBeNull();
+      expect(option("https://x.test/home")).toBeNull();
+      expect(document.body.querySelector('[data-test="rum-heatmap-page-searching"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("sends the typed term to the page list query", async () => {
+      const wrapper = await opened();
+
+      await type("Pric");
+      await settle();
+
+      expect(searchCalls()[0][1].sql).toContain("strpos(lower(view_url), 'pric') > 0");
+      wrapper.unmount();
+    });
+
+    it("supersedes a pending search when typing again", async () => {
+      const wrapper = await opened();
+
+      await type("pr");
+      await vi.advanceTimersByTimeAsync(200);
+      await type("pri");
+      await settle();
+
+      expect(searchCalls()).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("drops a stale answer when a newer search started", async () => {
+      let first: (v: unknown) => void = () => {};
+      let calls = 0;
+      const wrapper = await opened(() =>
+        ++calls === 1 ? new Promise((r) => (first = r)) : ok([deep]),
+      );
+
+      await type("pr");
+      await settle();
+      await type("pri");
+      await settle();
+      first(ok([{ view_url: "https://x.test/stale", clicks: 1, sessions: 1 }]));
+      await flushPromises();
+
+      expect(option("https://x.test/stale")).toBeNull();
+      expect(option("https://x.test/deep/pricing")).not.toBeNull();
+      wrapper.unmount();
+    });
+
+    it("says no pages match only after the server answered empty", async () => {
+      const wrapper = await opened(() => ok([]));
+      const none = () => document.body.querySelector('[data-test="rum-heatmap-page-none"]');
+
+      await type("nomatch");
+      expect(none()).toBeNull();
+      await settle();
+
+      expect(none()?.textContent).toContain("No pages match");
+      wrapper.unmount();
+    });
+
+    it("loads a page picked from the search and keeps it in the trigger", async () => {
+      const wrapper = await opened();
+      await type("pric");
+      await settle();
+      h.run.mockClear();
+
+      option("https://x.test/deep/pricing")!.click();
+      await flushPromises();
+
+      expect(ids()).toContain("totals");
+      expect(wrapper.find('[data-test="rum-heatmap-page-current"]').text()).toBe(
+        "https://x.test/deep/pricing",
+      );
+      await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
+      await flushPromises();
+      const input = document.body.querySelector(
+        '[data-test="rum-heatmap-page-search"] input',
+      ) as HTMLInputElement;
+      expect(input.value).toBe("");
+      expect(option("https://x.test/home")).not.toBeNull();
+      wrapper.unmount();
+    });
+
+    it("cancels a pending search on unmount", async () => {
+      const wrapper = await opened();
+      await type("pric");
+      wrapper.unmount();
+      await settle();
+
+      expect(searchCalls()).toHaveLength(0);
+      expect(h.hold).toHaveBeenCalledWith("page-search", "idle");
+    });
+  });
+
+  it("shows 50+ pages in the trigger when the list is capped", async () => {
+    const pages = Array.from({ length: PAGE_LIST_LIMIT }, (_, i) => ({
+      view_url: `https://x.test/p${i}`,
+    }));
+    answer({ pages: () => ok(pages) });
+    const wrapper = await mountPage({ OTable: true });
+
+    expect(wrapper.find('[data-test="rum-heatmap-page-count"]').text()).toBe(
+      `${PAGE_LIST_LIMIT}+ pages`,
     );
-    await wrapper.find('[data-test="rum-heatmap-page-select"]').trigger("click");
-    await flushPromises();
-    const input = document.body.querySelector(
-      '[data-test="rum-heatmap-page-search"] input',
-    ) as HTMLInputElement;
-    expect(input.value).toBe("");
+    wrapper.unmount();
+  });
+
+  it("shows the exact page count when the list is not capped", async () => {
+    answer();
+    const wrapper = await mountPage({ OTable: true });
+
+    expect(wrapper.find('[data-test="rum-heatmap-page-count"]').text()).toBe("1 page");
     wrapper.unmount();
   });
 

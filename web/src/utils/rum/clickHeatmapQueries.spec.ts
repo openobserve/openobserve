@@ -52,6 +52,21 @@ describe("pageListSql", () => {
     );
   });
 
+  it("filters by a lowercased substring of the URL when given a term", () => {
+    expect(pageListSql(scope(), "  Pric ")).toBe(
+      `SELECT view_url, COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${BASE} AND ${CLICKS} AND view_url IS NOT NULL AND view_url <> '' AND strpos(lower(view_url), 'pric') > 0 GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT 50`,
+    );
+  });
+
+  it("ignores a blank term", () => {
+    expect(pageListSql(scope(), "   ")).toBe(pageListSql(scope()));
+  });
+
+  it("doubles quotes and leaves LIKE wildcards literal in the term", () => {
+    expect(pageListSql(scope(), "o'x")).toContain("strpos(lower(view_url), 'o''x') > 0");
+    expect(pageListSql(scope(), "50%_off")).toContain("strpos(lower(view_url), '50%_off') > 0");
+  });
+
   it("reuses the product analytics app filter and bot exclusion", () => {
     const sc = scope({
       schema: { ...FULL, user_agent_user_agent_family: true, env: true },

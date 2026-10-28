@@ -83,9 +83,12 @@ export function deviceClause(scope: AnalyticsScope, device: DeviceClass): string
 const pageRows = (scope: AnalyticsScope, url: string, device: DeviceClass): string =>
   `${clickRows(scope)} AND view_url = ${sqlLiteral(url)}${deviceClause(scope, device)}`;
 
-/** Clicks and sessions per page, for the page picker. */
-export function pageListSql(scope: AnalyticsScope): string {
-  return `SELECT view_url, COUNT(DISTINCT ${clickKey(scope)}) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${clickRows(scope)} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT ${PAGE_LIST_LIMIT}`;
+/** Clicks and sessions per page, for the page picker; a term keeps only URLs containing it. */
+export function pageListSql(scope: AnalyticsScope, term = ""): string {
+  const needle = term.trim().toLowerCase();
+  // strpos is a literal substring test, so % and _ in the term need no LIKE escaping.
+  const match = needle ? ` AND strpos(lower(view_url), ${sqlLiteral(needle)}) > 0` : "";
+  return `SELECT view_url, COUNT(DISTINCT ${clickKey(scope)}) AS clicks, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${clickRows(scope)} AND view_url IS NOT NULL AND view_url <> ''${match} GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT ${PAGE_LIST_LIMIT}`;
 }
 
 /** Clicks per device class on one page; clicks without a width land in `unknown`. */

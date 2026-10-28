@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-secondary text-xs font-normal"
                   data-test="rum-heatmap-page-count"
                 >
-                  {{ t("rum.heatmap.pageCount", { count: pageRows.length }, pageRows.length) }}
+                  {{ pageCountText }}
                 </span>
                 <template #icon-right><OIcon name="unfold-more" size="sm" /></template>
               </OButton>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-secondary grid grid-cols-[minmax(0,1fr)_4.5rem_5rem] gap-2 px-3 py-1.5 text-xs font-semibold"
               >
                 <span>{{ t("rum.heatmap.pageColPage") }}</span>
-                <span class="text-right">{{ t("rum.heatmap.colClicks") }}</span>
+                <span class="text-right">{{ t("rum.heatmap.pageColClicksAll") }}</span>
                 <span class="text-right">{{ t("rum.heatmap.colSessions") }}</span>
               </div>
               <div class="max-h-72 overflow-auto">
@@ -135,7 +135,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </OButton>
                 <p
-                  v-if="!visiblePages.length"
+                  v-if="pageSearchState === 'loading'"
+                  class="text-text-secondary px-3 py-4 text-center text-xs"
+                  data-test="rum-heatmap-page-searching"
+                >
+                  {{ t("rum.heatmap.pageSearching") }}
+                </p>
+                <p
+                  v-else-if="pageSearchState === 'error'"
+                  class="text-text-secondary px-3 py-4 text-center text-xs"
+                  data-test="rum-heatmap-page-search-failed"
+                >
+                  {{ t("rum.heatmap.pageSearchFailed") }}
+                </p>
+                <p
+                  v-else-if="!visiblePages.length"
                   class="text-text-secondary px-3 py-4 text-center text-xs"
                   data-test="rum-heatmap-page-none"
                 >
@@ -143,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </p>
               </div>
               <p
-                v-if="pagesLimited"
+                v-if="pickerLimited"
                 class="border-border-default text-text-secondary border-t px-3 py-2 text-xs"
                 data-test="rum-heatmap-page-limited"
               >
@@ -539,6 +553,8 @@ const INTERACTIVE_SELECTOR =
 const SNAPSHOT_WAIT_MS = 8000;
 const MAX_REPLAY_SEGMENTS = 80;
 const SETTLE_MS = 400;
+const PAGE_SEARCH_DEBOUNCE_MS = 300;
+const PAGE_SEARCH_PANEL = "page-search";
 const FULL_SNAPSHOT = 2;
 const META = 4;
 const RANGE_HOURS: Record<string, number> = { "1h": 1, "24h": 24, "7d": 168, "30d": 720 };
@@ -556,6 +572,8 @@ const pageUrl = ref("");
 const pageRows = ref<PageRow[]>([]);
 const pageOpen = ref(false);
 const pageQuery = ref("");
+const searchedPages = ref<PageRow[]>([]);
+const pageSearchState = ref<"idle" | "loading" | "done" | "error">("idle");
 const elementQuery = ref("");
 const onlyMissing = ref(false);
 const onlyFrustrated = ref(false);
@@ -587,6 +605,8 @@ const selectedSelector = ref("");
 const pagesLimited = ref(false);
 const rankingLimited = ref(false);
 let settingsKey = "";
+let pageSearchTimer: ReturnType<typeof setTimeout> | undefined;
+let pageSearchToken = 0;
 
 type Row = Record<string, unknown>;
 
@@ -709,10 +729,20 @@ const chips = computed<FilterChip[]>(() => [
     toggle: () => (showUnused.value = !showUnused.value),
   },
 ]);
-const visiblePages = computed(() => {
-  const q = pageQuery.value.trim().toLowerCase();
-  return pageRows.value.filter((p) => p.url.toLowerCase().includes(q));
-});
+const searching = computed(() => pageQuery.value.trim() !== "");
+const visiblePages = computed(() =>
+  searching.value ? (pageSearchState.value === "done" ? searchedPages.value : []) : pageRows.value,
+);
+const pickerLimited = computed(() =>
+  searching.value
+    ? pageSearchState.value === "done" && searchedPages.value.length >= PAGE_LIST_LIMIT
+    : pagesLimited.value,
+);
+const pageCountText = computed(() =>
+  pagesLimited.value
+    ? t("rum.heatmap.pageCountLimited", { count: PAGE_LIST_LIMIT }, PAGE_LIST_LIMIT)
+    : t("rum.heatmap.pageCount", { count: pageRows.value.length }, pageRows.value.length),
+);
 const limitedText = computed(() => {
   const pages = pagesLimited.value ? PAGE_LIST_LIMIT : 0;
   const elements = rankingLimited.value ? RANKING_LIMIT : 0;
@@ -1348,6 +1378,47 @@ function onPagePick(url: string) {
   loadPage();
 }
 
+function stopPageSearch() {
+  clearTimeout(pageSearchTimer);
+  pageSearchToken++;
+  search.hold(PAGE_SEARCH_PANEL, "idle");
+}
+
+async function runPageSearch(term: string, token: number) {
+  try {
+    const rows = await searchRows<{ view_url: string; clicks?: unknown; sessions?: unknown }>(
+      PAGE_SEARCH_PANEL,
+      pageListSql(scope(), term),
+      PAGE_LIST_LIMIT,
+      windowMicros(RANGE_HOURS[rangeKey.value]),
+    );
+    if (token !== pageSearchToken || !rows) return;
+    searchedPages.value = rows.map((r) => ({
+      url: r.view_url,
+      clicks: Number(r.clicks) || 0,
+      sessions: Number(r.sessions) || 0,
+    }));
+    pageSearchState.value = "done";
+  } catch (error) {
+    if (token !== pageSearchToken) return;
+    console.error("Click heatmap: page search failed", error);
+    pageSearchState.value = "error";
+  }
+}
+
+watch(pageQuery, (value) => {
+  stopPageSearch();
+  const term = value.trim();
+  if (!term) {
+    pageSearchState.value = "idle";
+    searchedPages.value = [];
+    return;
+  }
+  pageSearchState.value = "loading";
+  const token = pageSearchToken;
+  pageSearchTimer = setTimeout(() => runPageSearch(term, token), PAGE_SEARCH_DEBOUNCE_MS);
+});
+
 watch(pageOpen, (open) => {
   if (!open) pageQuery.value = "";
 });
@@ -1403,6 +1474,7 @@ function cancelLoads() {
 }
 
 onBeforeUnmount(() => {
+  stopPageSearch();
   cancelLoads();
   resizeObserver?.disconnect();
   destroyPlayer();
