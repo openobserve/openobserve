@@ -153,6 +153,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
+  { titleKey: "shortcuts.modules.kubernetes", pages: ["shortcuts.pages.kubernetes"] },
   {
     titleKey: "shortcuts.modules.fleet",
     pages: ["shortcuts.pages.fleetOverview", "shortcuts.pages.fleetConfigEditor"],
@@ -199,6 +200,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.onlineEvals",
     pages: [
       "shortcuts.pages.evalTemplates",
+      "shortcuts.pages.quality",
       "shortcuts.pages.scorers",
       "shortcuts.pages.evalJobs",
       "shortcuts.pages.scoreConfigs",
@@ -657,6 +659,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Kubernetes ──────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.kubernetes",
+    scope: "kubernetes",
+    shortcuts: [
+      {
+        id: "k8sPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.k8sPalette",
+        allowInInput: true,
+      },
+    ],
+  },
+
   // ── Functions ───────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.functions",
@@ -1062,6 +1079,16 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.evalTemplatesRefresh",
       },
+    ],
+  },
+
+  // ── Online Evals — Quality ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.quality",
+    scope: "quality",
+    visible: onlineEvals,
+    shortcuts: [
+      { id: "qualityBack", key: "escape", descriptionKey: "shortcuts.actions.qualityBack" },
     ],
   },
 

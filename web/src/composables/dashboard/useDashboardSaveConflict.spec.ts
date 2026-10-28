@@ -400,10 +400,6 @@ describe("save helpers do nothing when the id is not found", () => {
   it.each([
     ["deletePanel, unknown panel", () => deletePanel(store, DASH, "nope", FOLDER, "default")],
     ["deletePanel, unknown tab", () => deletePanel(store, DASH, "p1", FOLDER, "nope")],
-    [
-      "updatePanel, unknown panel",
-      () => updatePanel(store, DASH, panel("nope", "x"), FOLDER, "default"),
-    ],
     ["deleteTab, unknown tab", () => commons.deleteTab(store, DASH, FOLDER, "nope")],
     [
       "deleteTab, unknown target tab",
@@ -430,6 +426,13 @@ describe("save helpers do nothing when the id is not found", () => {
     expect(service.save).not.toHaveBeenCalled();
     expect(JSON.stringify(store.state.organizationData.allDashboardData[DASH])).toBe(before);
     expect(titles()).toEqual(["p1", "p2"]);
+  });
+
+  it("updatePanel, unknown panel: rejects without saving or touching the copy", async () => {
+    const before = JSON.stringify(store.state.organizationData.allDashboardData[DASH]);
+    await expect(updatePanel(store, DASH, panel("nope", "x"), FOLDER, "default")).rejects.toThrow();
+    expect(service.save).not.toHaveBeenCalled();
+    expect(JSON.stringify(store.state.organizationData.allDashboardData[DASH])).toBe(before);
   });
 
   it("addPanel replaces a panel that is already pending instead of adding a twin", async () => {

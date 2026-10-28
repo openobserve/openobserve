@@ -824,32 +824,33 @@ describe("usePrebuiltDestinations", () => {
   // detectPrebuiltType
   // -------------------------------------------------------------------------
   describe("detectPrebuiltType", () => {
-    it("returns type from metadata.prebuilt_type when present", () => {
+    it.each([
+      ["slack", { type: "http", destination_type_name: "slack" }],
+      ["pagerduty", { type: "http", destination_type_name: "pagerduty", metadata: {} }],
+      ["email", { type: "email", template: "prebuilt_email", metadata: {} }],
+    ])("returns %s for a destination the server treats as prebuilt", (expected, destination) => {
       const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({
-        metadata: { prebuilt_type: "slack" },
-      });
-      expect(result).toBe("slack");
+      expect(detectPrebuiltType(destination)).toBe(expected);
     });
 
-    it("returns type from system-prebuilt- template prefix", () => {
+    it.each([
+      ["no indicators", { name: "custom-destination" }],
+      ["a system-prebuilt- template", { type: "http", template: "system-prebuilt-discord" }],
+      ["a prebuilt_ template", { type: "http", template: "prebuilt_msteams" }],
+      ["only prebuilt_type metadata", { type: "http", metadata: { prebuilt_type: "slack" } }],
+      ["an unknown destination_type_name", { type: "http", destination_type_name: "custom" }],
+      ["a custom email template", { type: "email", template: "ops_mail" }],
+      [
+        "a prebuilt service URL",
+        {
+          type: "http",
+          url: "https://acme.service-now.com/api/now/table/incident",
+          metadata: {},
+        },
+      ],
+    ])("returns null for a custom destination with %s", (_, destination) => {
       const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({
-        template: "system-prebuilt-discord",
-      });
-      expect(result).toBe("discord");
-    });
-
-    it("returns type from prebuilt_ template prefix", () => {
-      const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({ template: "prebuilt_msteams" });
-      expect(result).toBe("msteams");
-    });
-
-    it("returns null when no indicators are present", () => {
-      const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({ name: "custom-destination" });
-      expect(result).toBeNull();
+      expect(detectPrebuiltType(destination)).toBeNull();
     });
   });
 
@@ -901,6 +902,53 @@ describe("usePrebuiltDestinations", () => {
       const { convertToPrebuilt, isLoading } = usePrebuiltDestinations();
       await convertToPrebuilt("dest", "slack");
       expect(isLoading.value).toBe(false);
+    });
+  });
+
+  // The http interceptor already shows "Access Required" on a 403.
+  describe("save on 403", () => {
+    const forbidden = { response: { status: 403, data: { message: "Forbidden" } } };
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+      ["convertToPrebuilt", (inst: any) => inst.convertToPrebuilt("s", "slack")],
+    ])("%s rethrows without its own error toast", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(forbidden);
+      mockDestUpdate.mockRejectedValue(forbidden);
+      mockDestGetByName.mockResolvedValue({
+        data: { name: "s", url: "", headers: {}, metadata: {} },
+      });
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBe(forbidden);
+
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+    ])("%s still toasts and rethrows a non-object rejection", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(undefined);
+      mockDestUpdate.mockRejectedValue(undefined);
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBeUndefined();
+
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
   });
 

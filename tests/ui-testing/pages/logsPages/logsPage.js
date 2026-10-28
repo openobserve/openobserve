@@ -8306,8 +8306,7 @@ export class LogsPage {
         const relativeBtn = this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
         await relativeBtn.waitFor({ state: 'visible', timeout: 5000 });
         await relativeBtn.click();
-        // Wait for the date-time button to remain visible (popup closed); selection complete
-        await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible' });
+        await this.closeDateTimePickerIfOpen();
         testLogger.info(`Relative time range set: ${suffix}`);
     }
 
@@ -11695,6 +11694,17 @@ export class LogsPage {
             return widget.classList.contains('visible') || widget.classList.contains('focused');
         }, { timeout });
         testLogger.info('Suggestion widget became visible');
+    }
+
+    /**
+     * Wait until the open suggestion widget lists a row; value suggestions load from the server, so it first opens empty on "Loading...".
+     * @param {number} timeout - Timeout in ms (default: 10000)
+     */
+    async waitForSuggestionRows(timeout = 10000) {
+        await expect.poll(
+            () => this.page.locator('.suggest-widget.visible .monaco-list-row').count(),
+            { timeout, message: 'Suggestion widget never listed any rows' },
+        ).toBeGreaterThan(0);
     }
 
     /**

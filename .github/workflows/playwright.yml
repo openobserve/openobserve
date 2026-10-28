@@ -85,6 +85,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          # Blobless: the diff needs commits and trees only, never file contents.
+          filter: blob:none
 
       # One shared classification for every suite (see .github/actions/classify-changes); a change to
       # this workflow file re-tests itself on top of it.
@@ -199,7 +201,7 @@ jobs:
         with:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           cache-on-failure: true
           shared-key: playwright-release-ci
@@ -278,6 +280,7 @@ jobs:
         with:
           # Full history only where the selection diff needs it; merge_group never diffs.
           fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+          filter: blob:none
       - name: Selection contract tests
         run: node --test .github/scripts/build-ci-matrix.test.js
       - id: gen
@@ -571,11 +574,6 @@ jobs:
             "chromium/${CHROMIUM_REV}/chromium-linux.zip"
           install_browser "chromium_headless_shell" "headless_shell" \
             "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
-
-          # ffmpeg is required for video recording (video: retain-on-failure in playwright.config.js)
-          # The custom install_browser uses CHROMIUM_REV which doesn't match ffmpeg's own revision,
-          # so use the local playwright binary (pinned via package-lock.json) to install ffmpeg only.
-          ./node_modules/.bin/playwright install ffmpeg
 
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"

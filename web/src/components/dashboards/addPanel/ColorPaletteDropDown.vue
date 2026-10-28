@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
-        v-model="dashboardPanelData.data.config.color.mode"
+        :model-value="shownMode"
         :label="t('dashboard.colorPalette')"
         class="showLabelOnTop flex-1"
         @update:model-value="onColorModeChange"
@@ -69,12 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OSelectItem>
 
-          <OSelectItem value="fixed" :label="t('dashboard.colorSingleColor')" />
-          <OSelectItem value="shades" :label="t('dashboard.colorShadesOfSpecificColor')" />
+          <template v-if="!categoricalOnly">
+            <OSelectItem value="fixed" :label="t('dashboard.colorSingleColor')" />
+            <OSelectItem value="shades" :label="t('dashboard.colorShadesOfSpecificColor')" />
+          </template>
         </OSelectGroup>
 
         <!-- By Value group -->
-        <OSelectGroup :label="t('dashboard.colorByValue')">
+        <OSelectGroup v-if="!categoricalOnly" :label="t('dashboard.colorByValue')">
           <OSelectItem
             v-for="opt in colorOptionsByGroup.byValue"
             :key="opt.value"
@@ -96,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- color picker for fixed and shades typed color mode -->
       <div
-        v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
+        v-if="['fixed', 'shades'].includes(shownMode)"
         class="relative ms-1.5 mt-7.5 inline-flex flex-shrink-0 items-center"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
@@ -123,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- color by button group -->
-    <div class="pt-3" v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')">
+    <div class="pt-3" v-if="showSeriesBy">
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
@@ -148,6 +150,7 @@ import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { HOSTMAP_DEFAULT_COLOR } from "@/utils/dashboard/convertHostmapData";
 
 interface ColorOption {
   label: I18nText;
@@ -176,7 +179,12 @@ export default defineComponent({
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
-      if (!dashboardPanelData?.data?.config?.color) {
+      if (!dashboardPanelData?.data?.config?.color && dashboardPanelData.data.type === "hostmap") {
+        dashboardPanelData.data.config.color = {
+          ...HOSTMAP_DEFAULT_COLOR,
+          fixedColor: [...HOSTMAP_DEFAULT_COLOR.fixedColor],
+        };
+      } else if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
           mode: "palette-classic-by-series",
           fixedColor: [],
@@ -186,6 +194,9 @@ export default defineComponent({
     });
 
     const store = useStore();
+
+    // Sankey nodes have no series value, so only the categorical palettes apply.
+    const categoricalOnly = computed(() => dashboardPanelData.data.type === "sankey");
 
     const colorOptions: ColorOption[] = [
       {
@@ -263,18 +274,24 @@ export default defineComponent({
       },
     ];
 
+    // A mode carried over from another chart type renders as the by-series palette on a sankey.
+    const shownMode = computed(() => {
+      const mode = dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series";
+      return categoricalOnly.value && mode !== "palette-classic"
+        ? "palette-classic-by-series"
+        : mode;
+    });
+
     const selectedOptionLabel = computed(() => {
-      const selectedOption = colorOptions.find(
-        (option) =>
-          option.value ===
-          (dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series"),
-      );
+      const selectedOption = colorOptions.find((option) => option.value === shownMode.value);
       return selectedOption ? selectedOption.label : t("dashboard.colorPaletteClassicBySeries");
     });
 
     const colorOptionsByGroup = computed(() => ({
+      // A host map has one value per cell and no series to colour by.
       bySeries: colorOptions.filter(
         (o): o is SelectableColorOption =>
+          dashboardPanelData.data.type !== "hostmap" &&
           !o.header &&
           !!o.value &&
           !o.value.startsWith("continuous") &&
@@ -287,7 +304,7 @@ export default defineComponent({
     }));
 
     const selectedOptionPalette = computed<string[]>(() => {
-      const mode = dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series";
+      const mode = shownMode.value;
       if (["fixed", "shades"].includes(mode)) {
         const fixed = dashboardPanelData?.data?.config?.color?.fixedColor?.[0];
         return fixed ? [fixed] : [];
@@ -295,6 +312,13 @@ export default defineComponent({
       const option = colorOptions.find((o) => o.value === mode);
       return option?.colorPalette ?? [];
     });
+
+    // A PromQL h-bar is coloured by the reduced value it shows, so last/min/max does not apply.
+    const showSeriesBy = computed(
+      () =>
+        shownMode.value.startsWith("continuous") &&
+        !(promqlMode.value && dashboardPanelData.data.type === "h-bar"),
+    );
 
     const onColorModeChange = (modelValue: SelectModelValue) => {
       // Single-string select: OSelect always emits a string mode value here.
@@ -319,9 +343,12 @@ export default defineComponent({
       promqlMode,
       colorOptions,
       colorOptionsByGroup,
+      categoricalOnly,
+      shownMode,
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,
+      showSeriesBy,
     };
   },
 });

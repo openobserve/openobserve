@@ -16,5 +16,12 @@ ignore = [
   "RUSTSEC-2026-0194", # from quick-xml (0.26/0.38/0.39), transitive deps; fixed in >=0.41.0 but upstreams have not yet migrated
   "RUSTSEC-2026-0195", # from quick-xml (0.26/0.38/0.39), transitive deps; fixed in >=0.41.0 but upstreams have not yet migrated
   "RUSTSEC-2026-0189", # from rmcp (0.12/0.13), transitive deps; fix requires 1.4.0 (major bump), no upgrade path yet
+  "RUSTSEC-2026-0310", # from domain 0.11, transitive dep of vrl 0.31; fixed in domain 0.12 which vrl has not adopted yet
+  "RUSTSEC-2026-0367", # from zip 0.6 (chromiumoxide_fetcher, unpacks the Chromium download) and zip 3 (utoipa-swagger-ui build script); fix requires zip 9, no upgrade path upstream
+  "RUSTSEC-2026-0368", # from zip 0.6/3, same sources as RUSTSEC-2026-0367; only trusted archives are extracted
+  "RUSTSEC-2026-0369", # from zip 0.6/3, same sources as RUSTSEC-2026-0367; only trusted archives are extracted
+  "RUSTSEC-2026-0391", # from zstd 0.13, used by arrow, parquet, datafusion and tonic; the fix is in zstd 0.14, which they have not adopted
+  "RUSTSEC-2026-0398", # from zstd-safe 7, the zstd 0.13 line above; fixed in zstd-safe 8, which needs zstd 0.14
+  "RUSTSEC-2026-0403", # from zstd-safe 7, the zstd 0.13 line above; fixed in zstd-safe 8, which needs zstd 0.14
 ]
 informational_warnings = ["unmaintained"] # warn for categories of informational advisories

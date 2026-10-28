@@ -29,14 +29,10 @@ use config::VortexCompression;
 use datafusion::{common::stats::Precision, datasource::listing::PartitionedFile};
 use tokio::runtime::Runtime;
 use vortex::{
-    array::{
-        ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray,
-        session::ArraySessionExt,
-    },
+    array::{ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray},
     buffer::Buffer,
     compressor::{BtrBlocksCompressor, BtrBlocksCompressorBuilder},
     dtype::DType,
-    editions::{ComponentKind, EditionSessionExt},
     encodings::zstd::Zstd,
     error::VortexResult,
     file::WriteStrategyBuilder,
@@ -185,20 +181,16 @@ fn build_vortex_write_strategy(
     session: &VortexSession,
     compression: VortexCompression,
 ) -> Arc<dyn LayoutStrategy> {
-    // Custom strategies must filter editions because they bypass the writer's defaults.
-    let arrays = session.arrays();
-    let allowed = session
-        .enabled_component_ids(ComponentKind::Array)
-        .iter()
-        .filter_map(|id| arrays.registry().get(id))
-        .map(|plugin| plugin.id())
-        .collect();
     let btrblocks = match compression {
-        VortexCompression::Compact => BtrBlocksCompressorBuilder::default().with_compact(),
-        VortexCompression::O2 | VortexCompression::Native => BtrBlocksCompressorBuilder::default(),
-    }
-    .retain_allowed_encodings(&allowed);
-    let builder = WriteStrategyBuilder::default().with_btrblocks_builder(btrblocks.clone());
+        VortexCompression::Compact => {
+            BtrBlocksCompressorBuilder::from_session(session).with_compact()
+        }
+        VortexCompression::O2 | VortexCompression::Native => {
+            BtrBlocksCompressorBuilder::from_session(session)
+        }
+    };
+    let builder =
+        WriteStrategyBuilder::from_session(session).with_btrblocks_builder(btrblocks.clone());
     match compression {
         VortexCompression::Native | VortexCompression::Compact => builder.build(),
         VortexCompression::O2 => {
@@ -318,7 +310,9 @@ mod tests {
 
     #[test]
     fn test_long_utf8_uses_zstd() {
-        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
         let strings = (0..1024)
             .map(|i| Some(format!("long log message {i}: {}", "x".repeat(192))))
             .collect::<Vec<_>>();
@@ -333,7 +327,9 @@ mod tests {
 
     #[test]
     fn test_short_utf8_delegates_to_btrblocks() {
-        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
         let strings: Vec<_> = (0..8192)
             .map(|i| Some(format!("node-{}", i % 32)))
             .collect();
@@ -349,7 +345,9 @@ mod tests {
     fn test_non_utf8_uses_btrblocks() {
         use vortex::array::arrays::PrimitiveArray;
 
-        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
         let array: PrimitiveArray = vec![1i32, 2, 3, 4, 5].into_iter().collect();
 
         let mut ctx = ExecutionCtx::new(VortexSession::default());
@@ -359,7 +357,9 @@ mod tests {
 
     #[test]
     fn test_empty_string_array() {
-        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
+            &VortexSession::default(),
+        ));
 
         let strings: Vec<Option<&str>> = vec![];
         let array =

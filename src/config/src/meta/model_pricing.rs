@@ -116,10 +116,7 @@ impl MatchKind {
     }
 }
 
-/// A user-defined model pricing definition that maps model names (via regex) to pricing tiers.
-/// Org and meta-org definitions always take priority over the compiled-in pricing in
-/// `pricing.rs`; built-in definitions do too, unless only the compiled-in table matches the model
-/// name exactly (see [`MatchKind`]).
+/// A model pricing definition that maps model names (via regex) to pricing tiers.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 pub struct ModelPricingDefinition {

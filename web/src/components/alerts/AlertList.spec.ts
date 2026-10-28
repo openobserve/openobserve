@@ -84,6 +84,9 @@ import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
+// Every test mounts the full list; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -227,7 +230,7 @@ async function mountAlertList() {
         ODrawer: ODrawerStub,
         ConfirmDialog: {
           name: "ConfirmDialog",
-          props: ["modelValue", "title", "message"],
+          props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
@@ -804,6 +807,11 @@ describe("AlertList - row actions", () => {
     // Open delete via method
     await wrapper.vm.showDeleteDialogFn({ row });
     expect(wrapper.vm.confirmDelete).toBe(true);
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("messageKeypath") === "alerts.deleteAlertMessage");
+    expect(dialog.props("messageName")).toBe(row.name);
+    expect(dialog.props("okVariant")).toBe("destructive");
 
     (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
@@ -821,6 +829,15 @@ describe("AlertList - row actions", () => {
     if (Array.isArray(cached)) {
       expect(cached.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
     }
+  });
+
+  it("uses a destructive confirm for bulk delete", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("title") === i18n.global.t("alerts.deleteAlertsTitle"));
+    expect(dialog.props("okVariant")).toBe("destructive");
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {

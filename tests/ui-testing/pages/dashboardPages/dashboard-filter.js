@@ -172,23 +172,11 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      // Use .last() to target the most recently opened portal — when a filter
-      // condition is re-edited, the tab from the previous popover may still
-      // exist in the DOM mid-transition.
-      const conditionLocator = this.page
-        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
-        .last();
-      await conditionLocator.waitFor({ state: "visible", timeout: 10000 });
-      // Reka UI tabs may re-mount during portal transition; retry click with force
-      // to bypass detached-element instability.
-      await conditionLocator.click({ force: true, timeout: 10000 });
-      // Wait deterministically for the operator dropdown (Step 4's target) to
-      // appear instead of a fixed-ms buffer.
-      await this.page
-        .locator('[data-test="dashboard-add-condition-operator"]')
-        .first()
-        .waitFor({ state: "visible", timeout: 10000 })
-        .catch(() => {});
+      // The label text changes once a field/operator is set, so reopen by index prefix.
+      const labelLocator = this.page
+        .locator(`[data-test^="dashboard-add-condition-label-${idx}-"]`)
+        .first();
+      await this.openConditionTab(labelLocator, idx);
     }
 
     // Step 4: Operator dropdown
@@ -219,7 +207,7 @@ export default class DashboardFilter {
         .catch(() => {});
       // The virtualizer renders items asynchronously; search then select
       // Type into the search filter to narrow results, then click
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const searchInput = operatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
@@ -235,15 +223,11 @@ export default class DashboardFilter {
       const optionByValue = operatorPopover.locator(
         `[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`,
       ).first();
-      if (await optionByValue.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await optionByValue.click();
-      } else {
-        // Fallback to first visible option in the popover (post-filter only one should remain).
-        await operatorPopover
-          .locator('[data-test="dashboard-add-condition-operator-option"]')
-          .first()
-          .click();
-      }
+      // No fallback to the first option: a near-match (e.g. "!=" for "=") would silently set the wrong operator.
+      await optionByValue.waitFor({ state: "visible", timeout: 5000 }).catch(() => {
+        throw new Error(`Operator option "${operator}" not found in the operator dropdown`);
+      });
+      await optionByValue.click();
       // Wait for the operator dropdown portal to fully close before step 5.
       await operatorPopover
         .waitFor({ state: "hidden", timeout: 5000 })
@@ -408,7 +392,7 @@ export default class DashboardFilter {
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const searchInput = operatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
@@ -522,7 +506,7 @@ export default class DashboardFilter {
       const nestedOperatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await nestedOperatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const nestedHasSearch = await nestedSearchInput.count() > 0;
       if (nestedHasSearch) {
         await nestedSearchInput.fill(operator);

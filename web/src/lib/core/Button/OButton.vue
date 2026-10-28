@@ -284,12 +284,45 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
+  // cell: table-cell content that is itself the action; overrides the size box so the lines stack.
+  cell: [
+    "bg-transparent border-0 text-inherit text-left font-normal rounded-default",
+    "h-auto! w-full p-0! flex-col! items-stretch! justify-center! gap-1! whitespace-normal!",
+    "enabled:hover:opacity-80",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
+    "disabled:opacity-60",
+  ].join(" "),
+  // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
+  "tint-teal": [
+    "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-purple": [
+    "bg-badge-purple-soft-bg text-badge-purple-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-blue": [
+    "bg-badge-blue-soft-bg text-badge-blue-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-orange": [
+    "bg-badge-orange-soft-bg text-badge-orange-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
 };
@@ -328,6 +361,11 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
+  "tint-teal": "opacity-60",
+  "tint-purple": "opacity-60",
+  "tint-blue": "opacity-60",
+  "tint-orange": "opacity-60",
+  cell: "opacity-60",
 };
 
 const unavailableClasses = computed(() => {

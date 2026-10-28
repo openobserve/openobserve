@@ -1033,6 +1033,8 @@ export const useStreamFields = () => {
           );
           return;
         }
+        // A page that stays mounted keeps an earlier link's not-found message until a readable URL stream replaces it.
+        if (pick.source === "url") searchObj.data.filterErrMsg = "";
         const current = searchObj.data.stream.selectedStream;
         if (
           !Array.isArray(current) ||

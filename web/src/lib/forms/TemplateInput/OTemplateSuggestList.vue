@@ -43,6 +43,8 @@ const { lgUp } = useBreakpoint();
 
 const scrollEl = ref<HTMLElement | null>(null);
 
+const hasDescriptions = computed(() => props.matches.some((match) => match.description));
+
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: props.matches.length,
@@ -90,7 +92,8 @@ function onSelect(event: Event, name: string) {
         :collision-padding="lgUp ? 0 : 8"
         :data-test="dataTest ? `${dataTest}-suggest` : undefined"
         :class="[
-          'z-10001 flex w-56 flex-col overflow-hidden',
+          'z-10001 flex flex-col overflow-hidden',
+          hasDescriptions ? 'w-72' : 'w-56',
           'rounded-default shadow-md',
           'bg-select-content-bg border-select-content-border border',
         ]"
@@ -129,7 +132,21 @@ function onSelect(event: Event, name: string) {
                     name="suggestion"
                     :suggestion="matches[row.index]"
                     :active="row.index === highlightedIndex"
-                    >{{ tokenFor(matches[row.index].name) }}</slot
+                    ><span v-if="matches[row.index].description" class="flex min-w-0 flex-col">
+                      <span>{{ (format ?? tokenFor)(matches[row.index].name) }}</span>
+                      <span
+                        class="text-text-secondary text-2xs font-sans"
+                        :data-test="
+                          dataTest
+                            ? `${dataTest}-suggest-item-${matches[row.index].name}-description`
+                            : undefined
+                        "
+                        >{{ matches[row.index].description }}</span
+                      >
+                    </span>
+                    <template v-else>{{
+                      (format ?? tokenFor)(matches[row.index].name)
+                    }}</template></slot
                   >
                 </ListboxItem>
               </div>

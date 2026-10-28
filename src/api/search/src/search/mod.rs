@@ -61,11 +61,11 @@ use utils::{StreamPermissionResourceType, check_cipher_key_permissions, check_st
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse,
     utils::http::{
-        get_clear_cache_from_request, get_dashboard_info_from_request,
+        get_clear_cache_from_request, get_client_search_type, get_dashboard_info_from_request,
         get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
         get_is_ui_histogram_from_request, get_or_create_trace_id,
-        get_search_event_context_from_request, get_search_type_from_request,
-        get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+        get_search_event_context_from_request, get_stream_type_from_request,
+        get_use_cache_from_request, get_work_group,
     },
 };
 
@@ -286,11 +286,9 @@ pub async fn search(
     }
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&url_query) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
+    req.search_type = match get_client_search_type(req.search_type, &url_query) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
@@ -1766,11 +1764,9 @@ pub async fn result_schema(
     };
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&url_query) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
+    req.search_type = match get_client_search_type(req.search_type, &url_query) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req

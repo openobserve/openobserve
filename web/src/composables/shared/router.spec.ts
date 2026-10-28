@@ -1704,6 +1704,16 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("public dashboard route", () => {
+    it("serves the anonymous viewer outside the layout and marks it public", () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const route = findRoute(parentRoutes, "publicDashboard");
+      expect(route.path).toBe("/public/dashboards/:slug");
+      expect(route.meta.public).toBe(true);
+      expect(homeChildRoutes.some((r: any) => r.name === "publicDashboard")).toBe(false);
+    });
+  });
+
   describe("AI shared chat routes", () => {
     it("serves org shares inside the main layout with the token as a prop", () => {
       const { homeChildRoutes } = useRoutes();
@@ -1917,13 +1927,6 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it("passes the workload prop to the kubernetes page", () => {
-      const { homeChildRoutes } = useRoutes();
-      expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
-        workload: "kubernetes",
-      });
-    });
-
     // A menu entry whose workload has no registered pack can only render a dead
     // end, so the route must not come back while `curatedPacks` lacks an AWS pack.
     it("registers NO aws route, by name or by path", () => {
@@ -1932,29 +1935,21 @@ describe("useRoutes (router.ts)", () => {
       expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
     });
 
-    it("keeps exactly the curated infra workload routes plus Kubernetes 2", () => {
+    it("serves Kubernetes from the redesigned page and keeps the curated page on the hidden kubernetes-2 route", () => {
       const { homeChildRoutes } = useRoutes();
-      const infraWorkloads = homeChildRoutes
-        .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
-        .map((r: any) => r.path)
-        .sort();
-      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes", "infra/kubernetes-2"]);
-    });
-
-    it("registers Kubernetes 2 right after Kubernetes, lazily loading its own page", () => {
-      const { homeChildRoutes } = useRoutes();
-      const index = homeChildRoutes.findIndex((r: any) => r.name === "infraKubernetes");
-      const route = homeChildRoutes[index + 1] as any;
-      expect(route.name).toBe("infraKubernetes2");
-      expect(route.meta?.titleKey).toBe("menu.kubernetes2");
-      expect(route.props).toBeUndefined();
-      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const current = findRoute(homeChildRoutes, "infraKubernetes") as any;
+      expect(current.meta?.titleKey).toBe("menu.kubernetes");
+      expect(current.props).toBeUndefined();
+      expect(String(current.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const hidden = findRoute(homeChildRoutes, "infraKubernetes2") as any;
+      expect(hidden.props).toEqual({ workload: "kubernetes" });
+      expect(String(hidden.component)).toMatch(/curated\/CuratedPageView\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
     // two rows. Which chunk they load is an implementation detail and deliberately
     // NOT asserted; what must survive is the deep-link contract below.
-    it.each(["infraKubernetes"])(
+    it.each(["infraKubernetes", "infraKubernetes2"])(
       "%s keeps its titleKey and a lazily-imported component across the component swap",
       (name) => {
         const { homeChildRoutes } = useRoutes();
@@ -1964,7 +1959,7 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it.each(["infraKubernetes"])(
+    it.each(["infraKubernetes2"])(
       "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
       (name) => {
         // The chunk NAME stays unasserted; which MODULE the loader targets is what
@@ -2318,9 +2313,20 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 9 parentRoutes", () => {
+    it("should have exactly these 10 parentRoutes, the anonymous public pages included", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(9);
+      expect(parentRoutes.map((r: any) => r.path)).toEqual([
+        "/login",
+        "/signup",
+        "/logout",
+        "/cb",
+        "/ai/public/:token",
+        "/slack/oauth/callback",
+        "/slack/link",
+        "/slack/link/callback",
+        "/slack/connect/callback",
+        "/public/dashboards/:slug",
+      ]);
     });
 
     it("should have unique paths in parentRoutes", () => {
@@ -2521,7 +2527,11 @@ describe("useRoutes (router.ts)", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       previousZoConfig = store.state.zoConfig;
-      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), database_monitoring_enabled: true };
+      store.state.zoConfig = {
+        ...(store.state.zoConfig ?? {}),
+        database_monitoring_enabled: true,
+        public_dashboards_enabled: true,
+      };
     });
 
     afterEach(() => {

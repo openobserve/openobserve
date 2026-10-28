@@ -266,6 +266,7 @@ const onSubmit = async (value: BackfillForm) => {
       title: t("pipeline.confirmDataDeletion"),
       message: t("pipeline.editBackfillDeleteConfirmMessage"),
       confirmLabel: t("pipeline.yesDeleteAndBackfill"),
+      confirmVariant: "destructive",
     });
     if (ok) {
       await updateBackfillJobRequest(value);

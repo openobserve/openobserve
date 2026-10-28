@@ -31,7 +31,9 @@
       "alerts-destinations-usage.spec.js",
       "alerts-save-query-mode.spec.js",
       "alerts-no-destination.spec.js",
-      "alerts-from-panel.spec.js"
+      "alerts-from-panel.spec.js",
+      "alertCalibration.spec.js",
+      "alerts-content-templates.spec.js"
     ],
     "disabled": [
       {
@@ -58,6 +60,7 @@
       "dashboard-config-axis.spec.js",
       "dashboard-config-gauge-maps.spec.js",
       "dashboard-config-general.spec.js",
+      "dashboard-config-heatmap.spec.js",
       "dashboard-config-legends.spec.js",
       "dashboard-config-line-style.spec.js",
       "dashboard-config-panel-time.spec.js",
@@ -83,6 +86,7 @@
       "dashboard-html-chart.spec.js",
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
+      "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
       "dashboard-zoom-brush.spec.js"
@@ -132,7 +136,8 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-favorites.spec.js"
+      "dashboard-favorites.spec.js",
+      "dashboard-tv-playlist.spec.js"
     ],
     "disabled": []
   },
@@ -262,9 +267,19 @@
       "ai-toolsets-form-validation.spec.js",
       "annotationQueueInputPreview.spec.js",
       "login-form-validation.spec.js",
-      "runningQueriesCancel.spec.js"
+      "runningQueriesCancel.spec.js",
+      "navRailHeaderKeyboard.spec.js"
     ],
-    "disabled": []
+    "disabled": [
+      {
+        "file": "organizationStatusSteps.spec.js",
+        "reason": "cloud-only: the \"Synthetics Status Steps Quota (Organization Management)\" describe calls test.skip(!isCloudEnvironment()), so an OSS shard would report 5 permanent skips. Its home is the enterprise repo's ci_matrix_cloud.json"
+      },
+      {
+        "file": "navRailLocale.spec.js",
+        "reason": "10 of 12 cases pass on a live env; the two that fail are \"Logs keeps a typed, unrun query and the time range across the language reload\" and \"a dirty pipeline editor asks before the language reload\", both undiagnosed"
+      }
+    ]
   },
   {
     "testfolder": "Management",
@@ -343,7 +358,9 @@
       "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
       "logs-search-around-multistream.spec.js",
-      "logs-default-columns.spec.js"
+      "logs-default-columns.spec.js",
+      "logsResultsToolbar.spec.js",
+      "logsSavedFunctionOverwrite.spec.js"
     ],
     "disabled": [
       {
@@ -371,7 +388,9 @@
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
       "logsToolbarPins.spec.js",
-      "logs-query-editor-keyboard.spec.js"
+      "logs-query-editor-keyboard.spec.js",
+      "logsCrossLinks.spec.js",
+      "logsFieldValuePaging.spec.js"
     ],
     "disabled": [
       {
@@ -490,7 +509,8 @@
       "rum-onboarding-snippets.spec.js",
       "sourcemap-ui.spec.js",
       "sourcemap-upload-pretty.spec.js",
-      "rum-form-validation.spec.js"
+      "rum-form-validation.spec.js",
+      "app-performance.spec.js"
     ],
     "disabled": []
   },
@@ -533,6 +553,7 @@
       "ingestion-config.spec.js",
       "ingestionTokens.spec.js",
       "ingestion-passcode-forbidden.spec.js",
+      "ingestion-passcode-loading.spec.js",
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",

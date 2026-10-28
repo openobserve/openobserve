@@ -139,6 +139,30 @@ describe("SlackLinkingSection (row 11)", () => {
     expect(errorHandler).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      domains: [],
+      skipped: 3,
+      warning:
+        "On, but no domains: nobody is linked automatically · 3 members skipped: their email domain is not listed",
+    },
+    { domains: [], skipped: 0, warning: "On, but no domains: nobody is linked automatically" },
+    { domains: ["acme.example"], skipped: 3, warning: null },
+  ])("warns when linking is on with no domains: $domains, $skipped skipped", async (c) => {
+    const counts = {
+      email: 0,
+      oidc: 0,
+      admin_bulk: 0,
+      matches_not_linked: 0,
+      skipped_domain: c.skipped,
+    };
+    const w = await mountSection(linkingView({ domains: c.domains, counts }));
+    const warning = w.find('[data-test="slack-linking-no-domains"]');
+    expect(warning.exists() ? warning.text().replace(/\s+/g, " ") : null).toBe(c.warning);
+    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(!c.warning);
+    expect(w.find('[data-test="slack-linking-edit"]').exists()).toBe(true);
+  });
+
   it("hides Link all when no member is waiting", async () => {
     const w = await mountSection(
       linkingView({

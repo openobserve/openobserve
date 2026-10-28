@@ -190,10 +190,15 @@ async function mountView({
   transitions = [] as AlertGroupTransition[],
   evaluations = [] as any[],
   groupsResponse = { list: [], capped: false, group_cap: 100 } as Record<string, any>,
+  alertRequest = undefined as Promise<any> | undefined,
 } = {}) {
-  vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
-    data: alert,
-  } as any);
+  if (alertRequest) {
+    vi.mocked(alertsService.get_by_alert_id).mockReturnValue(alertRequest);
+  } else {
+    vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+      data: alert,
+    } as any);
+  }
   vi.mocked(alertsService.list_groups).mockResolvedValue({
     data: groupsResponse,
   } as any);
@@ -403,6 +408,23 @@ describe("AlertDetail — History tab", () => {
       expect(wrapper.find('[data-test="alerts-alertdetail-tab-groups-count"]').exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("page title", () => {
+    it("never shows the alert id while the alert is loading", async () => {
+      let resolveAlert: (value: any) => void = () => {};
+      const alertRequest = new Promise((resolve) => {
+        resolveAlert = resolve;
+      });
+      wrapper = await mountView({ alertRequest });
+      const title = () => wrapper.find('[data-test="alerts-alertdetail-title"]');
+      expect(title().exists()).toBe(true);
+      expect(title().text()).not.toContain("alert-1");
+
+      resolveAlert({ data: makeSimpleAlert() });
+      await flushPromises();
+      expect(title().text()).toContain("cpu-high");
     });
   });
 

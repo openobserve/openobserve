@@ -49,6 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="justify-start py-0 capitalize"
                 data-test="dashboard-settings-tab-tab"
               />
+              <OTab
+                name="annotationSettings"
+                icon="flag"
+                :label="t('dashboard.annotationSources.tab')"
+                class="justify-start py-0 capitalize"
+                data-test="dashboard-settings-annotation-tab"
+              />
             </OTabs>
           </div>
         </template>
@@ -69,6 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OTabPanel name="tabSettings" class="!p-0" data-test="tab-tab-panels-default">
                 <TabsSettings @refresh="refreshRequired" />
+              </OTabPanel>
+
+              <OTabPanel
+                name="annotationSettings"
+                class="!p-0"
+                data-test="annotation-tab-panels-default"
+              >
+                <AnnotationSettings @save="refreshRequired" />
               </OTabPanel>
             </OTabPanels>
           </div>
@@ -92,6 +107,7 @@ import { useI18nTyped } from "@/types/i18n";
 import GeneralSettings from "../../components/dashboards/settings/GeneralSettings.vue";
 import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue";
 import TabsSettings from "../../components/dashboards/settings/TabsSettings.vue";
+import AnnotationSettings from "../../components/dashboards/settings/AnnotationSettings.vue";
 import { getImageURL } from "../../utils/zincutils";
 import useBreakpoint from "@/composables/useBreakpoint";
 
@@ -107,6 +123,7 @@ export default defineComponent({
     VariableSettings,
     GeneralSettings,
     TabsSettings,
+    AnnotationSettings,
   },
   emits: ["refresh", "close", "update:open"],
   props: {

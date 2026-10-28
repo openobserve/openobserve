@@ -14,6 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+import {
+  HOSTMAP_DEFAULT_COLOR,
+  HOSTMAP_MAX_GROUP_LEVELS,
+} from "@/utils/dashboard/convertHostmapData";
+
+const BY_SERIES_COLOR_MODES = ["palette-classic-by-series", "palette-classic"];
+
+/** A host map colours cells by value, so a by-series palette left from another type becomes its scale. */
+const applyHostmapColorScale = (dashboardPanelData: any) => {
+  const config = dashboardPanelData.data.config;
+  if (!config) return;
+  if (!config.color?.mode || BY_SERIES_COLOR_MODES.includes(config.color.mode)) {
+    config.color = { ...HOSTMAP_DEFAULT_COLOR, fixedColor: [...HOSTMAP_DEFAULT_COLOR.fixedColor] };
+  }
+};
 
 export const usePanelAggregation = ({
   dashboardPanelData,
@@ -28,13 +43,48 @@ export const usePanelAggregation = ({
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
       // A state timeline has no comparison window; a shift left over from another type must not run.
-      if (dashboardPanelData.data.type === "state-timeline") {
+      if (["state-timeline", "hostmap"].includes(dashboardPanelData.data.type)) {
         dashboardPanelData.data.queries?.forEach((query: any) => (query.config.time_shift = []));
       }
+      if (dashboardPanelData.data.type === "hostmap") applyHostmapColorScale(dashboardPanelData);
       return;
     }
 
     switch (dashboardPanelData.data.type) {
+      case "hostmap":
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          // A time bucket cannot name a cell, so only a plain field stays as the entity.
+          query.fields.x = query.fields.x
+            .filter((itemX: any) => itemX.functionName !== "histogram")
+            .slice(0, 1);
+          query.fields.y = query.fields.y.slice(0, 1);
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.breakdown = (query.fields.breakdown ?? []).slice(
+            0,
+            HOSTMAP_MAX_GROUP_LEVELS,
+          );
+          query.fields.z = [];
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        applyHostmapColorScale(dashboardPanelData);
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        break;
+
       case "heatmap":
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.y.forEach((itemY: any) => {

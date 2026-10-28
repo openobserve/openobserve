@@ -39,6 +39,7 @@ import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { stackTotalRows } from "../../stackTotals";
 
 /**
  * Finds the largest label in the given data array.
@@ -282,7 +283,13 @@ export function buildSQLContext(
       const lo = hasCfgMin ? Math.min(cfgMin, dataMin) : Math.min(0, dataMin);
       hi = hasCfgMax ? Math.max(cfgMax, hi) : Math.max(0, hi);
 
-      const ticks = calculateNiceTickValues(lo, hi);
+      const minInterval = Number(panelSchema?.config?.y_axis_min_interval);
+      const ticks = calculateNiceTickValues(
+        lo,
+        hi,
+        5,
+        Number.isFinite(minInterval) && !isHorizontalChart ? minInterval : 0,
+      );
       if (!ticks?.length) throw new Error("no ticks");
 
       let decimals = configured;
@@ -593,7 +600,14 @@ export function buildSQLContext(
             }
           });
 
-          return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
+          const totals = stackTotalRows(
+            panelSchema.type,
+            name,
+            options.series,
+            seriesOverrides,
+            (it: any) => it.value,
+          );
+          return `${escapeHtml(name?.[0]?.name)} <br/> ${[...totals, ...hoverText].join("<br/>")}`;
         } catch (error) {
           return "";
         }
