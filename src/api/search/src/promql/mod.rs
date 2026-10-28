@@ -490,6 +490,11 @@ async fn query_range(
         }
     }
 
+    // the shared timestamp parser reads a start of 0 as now
+    let start_is_now = req
+        .start
+        .as_deref()
+        .is_none_or(|v| v.parse::<i64>() == Ok(0));
     let start = match req.start {
         None => now_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
@@ -524,16 +529,31 @@ async fn query_range(
             }
         },
     };
+    if end < start {
+        let message = if start_is_now {
+            "end timestamp must not be before start time, which is now when start is 0 or missing"
+        } else {
+            "end timestamp must not be before start time"
+        };
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                message.to_string(),
+                Some(trace_id),
+            )),
+        )
+            .into_response();
+    }
     let mut step = match req.step {
         None => 0,
-        Some(v) => match parse_milliseconds(&v) {
-            Ok(v) => (v * 1_000) as i64,
+        Some(v) => match parse_step_micros(&v) {
+            Ok(v) => v,
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return (
                     StatusCode::BAD_REQUEST,
                     axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
-                        e.to_string(),
+                        e,
                         Some(trace_id),
                     )),
                 )
@@ -1352,6 +1372,15 @@ fn series_metric_names(selector: Option<&parser::VectorSelector>) -> Vec<String>
         .collect()
 }
 
+/// Parses a `step` into microseconds, rejecting one whose microseconds overflow an i64.
+fn parse_step_micros(step: &str) -> Result<i64, String> {
+    let ms = parse_milliseconds(step).map_err(|e| e.to_string())?;
+    i64::try_from(ms)
+        .ok()
+        .and_then(|ms| ms.checked_mul(1_000))
+        .ok_or_else(|| format!("Invalid time format: {step:?}, the step is too large"))
+}
+
 fn search_timeout(timeout: Option<String>) -> i64 {
     match timeout {
         None => 0,
@@ -1789,6 +1818,56 @@ mod tests {
             .unwrap();
         let body = String::from_utf8_lossy(&body);
         assert!(body.contains("public_dashboard"), "{body}");
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn a_reversed_range_or_an_overflowing_step_is_a_clear_400() {
+        for (start, end, step, error) in [
+            (
+                "1793167080",
+                "1793166480",
+                "60",
+                "end timestamp must not be before start time",
+            ),
+            (
+                "0",
+                "60",
+                "60",
+                "end timestamp must not be before start time, which is now when start is 0 or missing",
+            ),
+            (
+                "1793166480",
+                "1793167080",
+                "20000000000000",
+                "Invalid time format: \"20000000000000\", a duration must be from 0 to 285616 years",
+            ),
+        ] {
+            let req: config::meta::promql::RequestRangeQuery =
+                serde_json::from_value(serde_json::json!({
+                    "query": "vector(1)", "start": start, "end": end, "step": step
+                }))
+                .unwrap();
+            let resp = query_range("org", req, "u@example.com", &HeaderMap::new(), false).await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "{start}..{end}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body["errorType"], "bad_data");
+            assert_eq!(body["error"], error, "{start}..{end} step {step}");
+        }
+    }
+
+    #[test]
+    fn test_parse_step_micros_never_overflows() {
+        assert_eq!(parse_step_micros("1.5"), Ok(1_500_000));
+        assert_eq!(parse_step_micros("1m30"), Ok(60_000_000));
+        assert_eq!(
+            parse_step_micros("9007199254740"),
+            Ok(9_007_199_254_740_000_000)
+        );
+        assert!(parse_step_micros("20000000000000").is_err());
     }
 
     #[test]

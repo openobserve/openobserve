@@ -44,6 +44,8 @@ static TIME_UNITS: [(char, u64); 7] = [
     ('w', 7 * 24 * 3600 * 1000),
     ('y', 365 * 24 * 3600 * 1000),
 ];
+// below 2^53 every whole millisecond count is exact in f64 and fits an i64 of microseconds
+const MAX_DURATION_MS: u64 = 1 << 53;
 
 #[inline(always)]
 pub fn now() -> DateTime<Utc> {
@@ -215,54 +217,72 @@ pub fn parse_timestamp_micro_from_integer(ts: i64) -> (i64, bool) {
     (new_ts, ts > 0 && new_ts == ts)
 }
 
+/// Parses seconds (`30`, `1.5`) or a duration (`1m30s`, `0.5s`) into milliseconds.
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
     let chars = s.chars().collect::<Vec<char>>();
 
     // without unit, default is second
     if chars.iter().all(|c| c.is_ascii_digit()) {
-        return Ok(s.parse::<u64>().unwrap_or(0) * 1000);
+        let seconds = match s {
+            "" => Some(0),
+            s => s.parse::<u64>().ok(),
+        };
+        return seconds
+            .and_then(|seconds| seconds.checked_mul(1000))
+            .filter(|ms| *ms < MAX_DURATION_MS)
+            .ok_or_else(|| duration_out_of_range(s));
+    }
+    // a fractional number of seconds is what Prometheus clients send as `step`
+    if let Ok(seconds) = s.parse::<f64>() {
+        return checked_milliseconds(s, seconds * 1000.0);
     }
 
     let mut unit_pos = TIME_UNITS.len();
     let mut start = 0;
-    let mut total = 0;
+    let mut total = 0.0;
+    let mut after_ms = false;
 
     let chars_count = chars.len();
     let mut i = 0;
     while i < chars_count {
         let c = chars.get(i).unwrap();
-        if c.is_ascii_digit() {
+        if c.is_ascii_digit() || *c == '.' {
             i += 1;
             continue;
         }
         if i == 0 {
-            return Err(anyhow::anyhow!("Invalid time format: {c}"));
+            return Err(invalid_duration(s));
         }
-        let step_value = chars[start..i]
-            .iter()
-            .collect::<String>()
-            .parse::<u64>()
-            .unwrap_or(0);
-        start = i + 1;
+        let number = &chars[start..i];
         // check unit
         let pos = TIME_UNITS[..unit_pos].iter().position(|&x| x.0 == *c);
         if pos.is_none() && *c != 'm' {
-            return Err(anyhow::anyhow!("Invalid time format: {c}"));
+            return Err(invalid_duration(s));
         }
+        // stored durations rely on a number right after a two-letter `ms` adding nothing
+        let step_value = if after_ms {
+            ignored_number(number, s)?
+        } else {
+            duration_number(number, s)?
+        };
         // check unit: ms
-        let cur_unit = if *c == 'm' && i + 1 < chars_count && chars.get(i + 1).unwrap() == &'s' {
+        after_ms = *c == 'm' && i + 1 < chars_count && chars.get(i + 1).unwrap() == &'s';
+        let cur_unit = if after_ms {
             i += 1;
             unit_pos = 0;
             &TIME_UNITS[unit_pos]
         } else {
-            unit_pos = pos.unwrap();
+            unit_pos = pos.ok_or_else(|| invalid_duration(s))?;
             &TIME_UNITS[unit_pos]
         };
+        start = i + 1;
         // calc
-        total += step_value * cur_unit.1;
+        total += step_value * cur_unit.1 as f64;
         i += 1;
     }
-    Ok(total)
+    // saved panel steps such as 1m30 rely on a trailing unitless number adding nothing
+    ignored_number(&chars[start..], s)?;
+    checked_milliseconds(s, total)
 }
 
 /// Parses a fixed timezone offset into seconds east of UTC; `None` on unsupported input.
@@ -381,6 +401,47 @@ pub fn validate_time_range(start_time: i64, end_time: i64) -> Result<(), &'stati
         return Err("start_time must be before end_time");
     }
     Ok(())
+}
+
+fn invalid_duration(s: &str) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Invalid time format: {s:?}, expected seconds such as 1.5 or a duration such as 1m30s"
+    )
+}
+
+fn duration_out_of_range(s: &str) -> anyhow::Error {
+    anyhow::anyhow!("Invalid time format: {s:?}, a duration must be from 0 to 285616 years")
+}
+
+fn duration_number(number: &[char], s: &str) -> Result<f64, anyhow::Error> {
+    if number.is_empty() {
+        return Ok(0.0);
+    }
+    let number = number.iter().collect::<String>();
+    number.parse::<f64>().map_err(|_| invalid_duration(s))
+}
+
+fn ignored_number(number: &[char], s: &str) -> Result<f64, anyhow::Error> {
+    if number.iter().all(char::is_ascii_digit) {
+        Ok(0.0)
+    } else {
+        Err(invalid_duration(s))
+    }
+}
+
+fn checked_milliseconds(s: &str, ms: f64) -> Result<u64, anyhow::Error> {
+    if ms.is_nan() {
+        return Err(invalid_duration(s));
+    }
+    if !(0.0..MAX_DURATION_MS as f64).contains(&ms) {
+        return Err(duration_out_of_range(s));
+    }
+    // callers read 0 as "not set", so a positive duration must not round down to it
+    Ok(if ms > 0.0 {
+        ms.round().max(1.0) as u64
+    } else {
+        0
+    })
 }
 
 #[cfg(test)]
@@ -726,6 +787,70 @@ mod tests {
         assert_eq!(parse_milliseconds("2d3h4m5s").unwrap(), 183845000);
         assert_eq!(parse_milliseconds("1w1d").unwrap(), 691200000);
         assert_eq!(parse_milliseconds("1y1w1d").unwrap(), 32227200000);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_reads_fractional_seconds() {
+        assert_eq!(parse_milliseconds("1.5").unwrap(), 1500);
+        assert_eq!(parse_milliseconds("0.5").unwrap(), 500);
+        assert_eq!(parse_milliseconds(".25").unwrap(), 250);
+        assert_eq!(parse_milliseconds("1e1").unwrap(), 10_000);
+        assert_eq!(parse_milliseconds("0.5s").unwrap(), 500);
+        assert_eq!(parse_milliseconds("1.5m").unwrap(), 90_000);
+        assert_eq!(parse_milliseconds("1h0.5m").unwrap(), 3_630_000);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_rounds_a_positive_sub_millisecond_up_to_one() {
+        assert_eq!(parse_milliseconds("0.0004").unwrap(), 1);
+        assert_eq!(parse_milliseconds("0.0004s").unwrap(), 1);
+        assert_eq!(parse_milliseconds("0.4ms").unwrap(), 1);
+        assert_eq!(parse_milliseconds("0.0").unwrap(), 0);
+        assert_eq!(parse_milliseconds("0s").unwrap(), 0);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_ignores_numbers_without_a_unit_as_saved_steps_expect() {
+        assert_eq!(parse_milliseconds("1m30").unwrap(), 60_000);
+        assert_eq!(parse_milliseconds("30m0").unwrap(), 1_800_000);
+        assert_eq!(parse_milliseconds("1h30m15").unwrap(), 5_400_000);
+        assert_eq!(parse_milliseconds("1ms5").unwrap(), 1);
+        assert_eq!(parse_milliseconds("1ms1ms").unwrap(), 1);
+        assert_eq!(parse_milliseconds("1!1ms").unwrap(), 2);
+        assert_eq!(parse_milliseconds("1hm").unwrap(), 3_600_000);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_caps_durations_below_2_pow_53_ms() {
+        assert_eq!(
+            parse_milliseconds("9007199254740").unwrap(),
+            9_007_199_254_740_000
+        );
+        assert_eq!(
+            parse_milliseconds("9007199254740991ms").unwrap(),
+            9_007_199_254_740_991
+        );
+        for input in [
+            "9007199254741",
+            "20000000000000",
+            "18446744073709551616",
+            "9007199254740992ms",
+            "300000y",
+        ] {
+            let err = parse_milliseconds(input).expect_err(input).to_string();
+            assert!(err.contains("285616 years"), "{input}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_parse_milliseconds_rejects_unusable_numbers_with_the_input() {
+        for input in [
+            "-1", "-0.5s", "inf", "NaN", "1e300", "1.2.3s", "1.5.0", "1m0.5", "1ms1.5ms", "1ms1m",
+            "10z", ".s",
+        ] {
+            let err = parse_milliseconds(input).expect_err(input).to_string();
+            assert!(err.contains(&format!("{input:?}")), "{input}: {err}");
+        }
     }
 
     #[test]
