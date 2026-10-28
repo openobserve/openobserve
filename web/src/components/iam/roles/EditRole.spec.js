@@ -1805,6 +1805,7 @@ describe("EditRole - module navigation", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
   });
@@ -1819,6 +1820,7 @@ describe("EditRole - module navigation", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
   });
@@ -2385,11 +2387,17 @@ async function loadStreamType(wrapper, type) {
 }
 
 describe("EditRole - loaded rows through the tree [characterization]", () => {
-  it("getStreamsTypes builds four type rows", async () => {
+  it("getStreamsTypes builds five type rows", async () => {
     const wrapper = await mountEditRole();
     const stream = await loadResource(wrapper, "stream");
 
-    expect(stream.entities.map((e) => e.name)).toEqual(["logs", "traces", "metrics", "index"]);
+    expect(stream.entities.map((e) => e.name)).toEqual([
+      "logs",
+      "traces",
+      "metrics",
+      "profiles",
+      "index",
+    ]);
     expect(stream.entities[0]).toMatchObject({
       name: "logs",
       type: "Type",
@@ -3629,6 +3637,7 @@ describe("EditRole - all modules", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
     expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
