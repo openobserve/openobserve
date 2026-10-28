@@ -186,7 +186,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
 
     it("keeps a license-locked Downtimes entry, though its flag is off, pointing at its page", async () => {
       store.state.zoConfig.downtimes_enabled = false;
-      store.state.zoConfig.features = { downtimes: "locked" };
+      store.state.zoConfig.features = { alerts: "locked" };
       const downtimes = (await railItems()).find((l) => l.name === "downtimes");
       expect(downtimes).toMatchObject({ link: "/downtimes", licenseLocked: true });
       delete store.state.zoConfig.downtimes_enabled;

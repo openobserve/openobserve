@@ -29,7 +29,7 @@ describe("whether a page leaves because alert calibration is off", () => {
 
   it("stays on a license-locked page, which renders locked, but leaves a hidden one", () => {
     const off = { version: "v1", alert_calibration_enabled: false };
-    expect(isAlertCalibrationOff({ ...off, features: { alert_insights: "locked" } })).toBe(false);
-    expect(isAlertCalibrationOff({ ...off, features: { alert_insights: "hidden" } })).toBe(true);
+    expect(isAlertCalibrationOff({ ...off, features: { alerts: "locked" } })).toBe(false);
+    expect(isAlertCalibrationOff({ ...off, features: { alerts: "hidden" } })).toBe(true);
   });
 });

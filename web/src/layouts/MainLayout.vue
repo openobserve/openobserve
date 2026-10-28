@@ -900,7 +900,7 @@ export default defineComponent({
     // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
     const downtimesMenuState = computed<FeatureState>(() =>
       isEnterpriseOrCloud
-        ? menuState(features.value, "downtimes", store.state.zoConfig?.downtimes_enabled === true)
+        ? menuState(features.value, "alerts", store.state.zoConfig?.downtimes_enabled === true)
         : "hidden",
     );
     const updateDowntimesMenu = () => {

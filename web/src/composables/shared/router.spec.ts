@@ -2461,10 +2461,10 @@ describe("useRoutes (router.ts)", () => {
     });
 
     it.each([
-      ["downtimes", "downtimes", { downtimes_enabled: false }],
-      ["editDowntime", "downtimes", { downtimes_enabled: false }],
-      ["alertCalibration", "alert_insights", { alert_calibration_enabled: false }],
-      ["alertCalibrationRuns", "alert_insights", { alert_calibration_enabled: false }],
+      ["downtimes", "alerts", { downtimes_enabled: false }],
+      ["editDowntime", "alerts", { downtimes_enabled: false }],
+      ["alertCalibration", "alerts", { alert_calibration_enabled: false }],
+      ["alertCalibrationRuns", "alerts", { alert_calibration_enabled: false }],
     ])("opens a locked %s page, tagged %s, though its flag is off", (name, feature, flags) => {
       const { route, next } = enter(name, { ...flags, features: { [feature]: "locked" } });
       expect(route.meta.licenseFeature).toBe(feature);
@@ -2474,7 +2474,7 @@ describe("useRoutes (router.ts)", () => {
     it("still sends a hidden downtimes page with its flag off to Alerts", () => {
       const { next } = enter("downtimes", {
         downtimes_enabled: false,
-        features: { downtimes: "hidden" },
+        features: { alerts: "hidden" },
       });
       expect(next).toHaveBeenCalledWith({ name: "alertList", query: { org_identifier: "acme" } });
     });

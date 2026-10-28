@@ -851,8 +851,8 @@ describe("GATE_PREDICATES", () => {
   });
 
   it.each([
-    ["downtimes", "downtimes"],
-    ["alertCalibration", "alert_insights"],
+    ["downtimes", "alerts"],
+    ["alertCalibration", "alerts"],
   ])("%s stays open while the license locks %s, though its flag is off", (gate, feature) => {
     const ent = { isEnterprise: true };
     expect(GATE_PREDICATES[gate](ctx({ ...ent, features: { [feature]: "locked" } }))).toBe(true);

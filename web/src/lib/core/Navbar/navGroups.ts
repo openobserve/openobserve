@@ -60,11 +60,11 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard; a locked license keeps the entry to show the lock.
   downtimes: (c) =>
     (c.isEnterprise || c.isCloud) &&
-    (c.downtimesEnabled || featureState(c.features, "downtimes") === "locked"),
+    (c.downtimesEnabled || featureState(c.features, "alerts") === "locked"),
   // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard; a locked license keeps the entry.
   alertCalibration: (c) =>
     (c.isEnterprise || c.isCloud) &&
-    (c.alertCalibrationEnabled || featureState(c.features, "alert_insights") === "locked"),
+    (c.alertCalibrationEnabled || featureState(c.features, "alerts") === "locked"),
 };
 
 /**
@@ -213,7 +213,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "downtimes",
         requires: "downtimes",
         gate: "downtimes",
-        feature: "downtimes",
+        feature: "alerts",
         activeOnRoutes: ["addDowntime", "editDowntime", "downtimeDetail"],
         beta: true,
       },
@@ -223,7 +223,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertCalibration",
         requires: "alertList",
         gate: "alertCalibration",
-        feature: "alert_insights",
+        feature: "alerts",
         activeOnRoutes: [
           "alertCalibrationRuns",
           "alertCalibrationDigest",

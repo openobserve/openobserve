@@ -137,7 +137,7 @@ const downtimesRouteGuard = (to: any, from: any, next: any) => {
   if (
     isOss ||
     (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-    (zoConfig?.downtimes_enabled === false && !isLicenseLocked("downtimes"))
+    (zoConfig?.downtimes_enabled === false && !isLicenseLocked("alerts"))
   ) {
     next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
     return;
@@ -151,7 +151,7 @@ const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
   if (
     zoConfig?.build_type === "opensource" ||
     (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-    (zoConfig?.alert_calibration_enabled === false && !isLicenseLocked("alert_insights"))
+    (zoConfig?.alert_calibration_enabled === false && !isLicenseLocked("alerts"))
   ) {
     next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
     return;
@@ -996,21 +996,21 @@ const useRoutes = () => {
       path: "alert-calibration",
       name: "alertCalibration",
       component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
-      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alerts" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
       path: "alert-calibration/runs",
       name: "alertCalibrationRuns",
       component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
-      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alerts" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
       path: "alert-calibration/settings",
       name: "alertCalibrationSettings",
       component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
-      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alerts" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
@@ -1018,7 +1018,7 @@ const useRoutes = () => {
       name: "alertCalibrationDigest",
       component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
       props: true,
-      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alerts" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
@@ -1027,7 +1027,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/DowntimeList.vue"),
       meta: {
         titleKey: "menu.downtimes",
-        licenseFeature: "downtimes",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);
@@ -1040,7 +1040,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
       meta: {
         titleKey: "alerts.downtimes.newTitle",
-        licenseFeature: "downtimes",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);
@@ -1052,7 +1052,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
       meta: {
         titleKey: "alerts.downtimes.editTitle",
-        licenseFeature: "downtimes",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);
@@ -1064,7 +1064,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/DowntimeDetail.vue"),
       meta: {
         titleKey: "alerts.downtimes.detailTitle",
-        licenseFeature: "downtimes",
+        licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);

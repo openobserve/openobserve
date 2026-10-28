@@ -44,7 +44,7 @@ export function useLeaveIfAlertCalibrationOff(routeName: "general" | "alertList"
 export const isAlertCalibrationOff = (zoConfig: Record<string, unknown> | undefined): boolean =>
   !!zoConfig?.version &&
   !isAlertCalibrationEnabled(zoConfig) &&
-  featureState(zoConfig.features as FeatureStates | undefined, "alert_insights") !== "locked";
+  featureState(zoConfig.features as FeatureStates | undefined, "alerts") !== "locked";
 
 export function isAlertCalibrationEnabled(zoConfig: Record<string, unknown> | undefined): boolean {
   return (
