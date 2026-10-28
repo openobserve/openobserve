@@ -389,9 +389,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-thread-final-note"
       class="border-border-default bg-surface-base text-text-secondary flex flex-none items-start gap-2 border-t px-4 py-3 text-xs"
     >
-      <OIcon :name="canResume ? 'info' : 'lock'" size="sm" class="mt-px shrink-0" />
+      <OIcon :name="resumable ? 'info' : 'lock'" size="sm" class="mt-px shrink-0" />
       <span>{{
-        canResume
+        resumable
           ? t("alerts.incidents.rcaThread.resumableNote")
           : t("alerts.incidents.rcaThread.finalNote")
       }}</span>
@@ -581,6 +581,13 @@ const unfinishedSteps = computed(() => {
   }
   return new Set(thread.steps.filter((step, idx) => !isFinishedStep(thread, step, idx)));
 });
+
+/** Resume can continue the run and keeps a step (0 kept answers `nothing_to_resume`); with no thread the server's hint decides. */
+const resumable = computed(
+  () =>
+    props.canResume &&
+    (!props.thread || props.thread.steps.some((step) => !unfinishedSteps.value.has(step))),
+);
 
 const STEER_PILL_VARIANT: Record<RcaSteerRecord["status"], BadgeVariant> = {
   queued: "default-outline",

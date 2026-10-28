@@ -302,10 +302,17 @@ describe("RcaThreadColumn", () => {
       expect(wrapper.text()).not.toContain("final");
     });
 
-    it("a cancelled run Resume cannot continue keeps the final note", () => {
-      const wrapper = mountColumn(CANCELLED);
-
-      expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
+    it("a cancelled run Resume cannot continue, or that kept no step, keeps the final note", () => {
+      expect(byTest(mountColumn(CANCELLED), "rca-thread-final-note").text()).toContain(
+        "This report is final",
+      );
+      // Cancelled before a step finished: Resume answers nothing_to_resume.
+      const noneKept = mountColumn({
+        ...CANCELLED,
+        thread: { ...ENDED_THREAD, reusable_steps: 0 },
+        canResume: true,
+      });
+      expect(byTest(noneKept, "rca-thread-final-note").text()).toContain("This report is final");
     });
   });
 
