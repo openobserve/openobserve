@@ -39,8 +39,7 @@ use stream::try_get_streams;
 
 const DEFAULT_TOP_N: usize = 5;
 const MAX_TOP_N: usize = 20;
-/// User-facing stream types only; profiles, service graph, filelist and internal streams are left
-/// out.
+/// User-facing stream types; derived and internal streams are left out.
 const OVERVIEW_STREAM_TYPES: [StreamType; 4] = [
     StreamType::Logs,
     StreamType::Metrics,
@@ -97,6 +96,9 @@ pub struct Section<T> {
     pub data: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Why a section is locked, so the UI can pick the right message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 impl<T> Section<T> {
@@ -105,6 +107,7 @@ impl<T> Section<T> {
             status: SectionStatus::Ok,
             data: Some(data),
             error: None,
+            reason: None,
         }
     }
 
@@ -113,6 +116,7 @@ impl<T> Section<T> {
             status: SectionStatus::Error,
             data: None,
             error: Some(message.to_string()),
+            reason: None,
         }
     }
 
@@ -121,14 +125,16 @@ impl<T> Section<T> {
             status: SectionStatus::Forbidden,
             data: None,
             error: None,
+            reason: None,
         }
     }
 
-    fn locked() -> Self {
+    fn locked(reason: &str) -> Self {
         Self {
             status: SectionStatus::Locked,
             data: None,
             error: None,
+            reason: Some(reason.to_string()),
         }
     }
 
@@ -196,6 +202,7 @@ pub struct AlertsData {
     pub by_state: BTreeMap<String, u64>,
     /// Enabled rules by the severity level of their last classification.
     pub by_level: BTreeMap<String, u64>,
+    /// Same count as `by_state.error`; do not add the two together.
     pub failed_evaluation: u64,
 }
 
@@ -240,14 +247,6 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
         stream_grants,
         pipeline_grants,
     })
-}
-
-async fn list_grants(
-    org_id: &str,
-    user_id: &str,
-    resource: &str,
-) -> Result<Option<Vec<String>>, anyhow::Error> {
-    crate::authz::list_objects_for_user(org_id, user_id, "GET", &ofga_object_type(resource)).await
 }
 
 /// Overview for a caller whose grants could not be resolved; each scoped section reports an error.
@@ -295,6 +294,14 @@ pub async fn get_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> 
         cache_put(key, overview.clone(), ttl_micros);
     }
     overview
+}
+
+async fn list_grants(
+    org_id: &str,
+    user_id: &str,
+    resource: &str,
+) -> Result<Option<Vec<String>>, anyhow::Error> {
+    crate::authz::list_objects_for_user(org_id, user_id, "GET", &ofga_object_type(resource)).await
 }
 
 async fn build_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> Overview {
@@ -494,7 +501,7 @@ async fn limits_section() -> Section<LimitsData> {
     };
 
     if get_license().await.is_none() {
-        return Section::locked();
+        return Section::locked("no license loaded");
     }
     Section::ok(LimitsData {
         scope: "deployment",
@@ -506,7 +513,7 @@ async fn limits_section() -> Section<LimitsData> {
 
 #[cfg(not(feature = "enterprise"))]
 async fn limits_section() -> Section<LimitsData> {
-    Section::locked()
+    Section::locked("not available in this edition")
 }
 
 #[cfg(test)]
@@ -634,8 +641,11 @@ mod tests {
 
     #[test]
     fn test_section_serialization_carries_status_and_omits_empty_fields() {
-        let locked = serde_json::to_value(Section::<PipelinesData>::locked()).unwrap();
-        assert_eq!(locked, serde_json::json!({"status": "locked"}));
+        let locked = serde_json::to_value(Section::<PipelinesData>::locked("no license")).unwrap();
+        assert_eq!(
+            locked,
+            serde_json::json!({"status": "locked", "reason": "no license"})
+        );
         let err = serde_json::to_value(Section::<PipelinesData>::error("boom")).unwrap();
         assert_eq!(err, serde_json::json!({"status": "error", "error": "boom"}));
     }
@@ -643,7 +653,12 @@ mod tests {
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_limits_locked_without_enterprise() {
-        assert_eq!(limits_section().await.status, SectionStatus::Locked);
+        let limits = limits_section().await;
+        assert_eq!(limits.status, SectionStatus::Locked);
+        assert_eq!(
+            limits.reason.as_deref(),
+            Some("not available in this edition")
+        );
     }
 
     #[tokio::test]
@@ -756,9 +771,9 @@ mod tests {
                 vec![stream("only_for_admin", StreamType::Logs, 7.0, 1)],
                 5,
             )),
-            alerts: Section::locked(),
-            pipelines: Section::locked(),
-            limits: Section::locked(),
+            alerts: Section::locked("test"),
+            pipelines: Section::locked("test"),
+            limits: Section::locked("test"),
             generated_at: now_micros(),
             cached: false,
         };

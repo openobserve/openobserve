@@ -397,7 +397,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("top" = Option<u32>, Query, description = "Top streams per stream type by size. Default 5, max 20."),
-        ("refresh" = Option<bool>, Query, description = "Set true to skip the short-lived cache and rebuild now."),
+        ("refresh" = Option<bool>, Query, description = "Set true (or 1) to skip the short-lived cache and rebuild now."),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -414,17 +414,19 @@ pub async fn org_overview(
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let top = match query.get("top").map(|v| v.parse::<u32>()) {
+    let top = match query.get("top").map(|v| v.parse::<usize>()) {
         Some(Err(_)) => {
-            return MetaHttpResponse::bad_request("'top' must be an integer, clamped to 1..20");
+            return MetaHttpResponse::bad_request(
+                "'top' must be a non-negative integer; it is clamped to 1..20",
+            );
         }
-        Some(Ok(n)) => Some(n as usize),
+        Some(Ok(n)) => Some(n),
         None => None,
     };
     let top_n = overview::normalize_top_n(top);
     let refresh = query
         .get("refresh")
-        .is_some_and(|v| v == "true" || v == "1");
+        .is_some_and(|v| v.eq_ignore_ascii_case("true") || v == "1");
     if !refresh && let Some(hit) = overview::cached_overview(&org_id, &user_email.user_id, top_n) {
         return Json(hit).into_response();
     }
