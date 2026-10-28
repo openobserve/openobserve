@@ -516,6 +516,8 @@ export interface OnCallPolicy {
   final_action?: PolicyFinalAction;
   /** Absent on a PUT means UNCHANGED — only send when the user touched it. */
   l0?: L0Policy;
+  /** Read-only. The ladder still has the shape the server generated, so removing a rotation rewrites it rather than being refused. */
+  ladder_is_generated?: boolean;
 }
 
 export interface SubjectRef {

@@ -157,10 +157,95 @@ describe("OnCallEscalationLadder", () => {
   it("offers every priority, including the ones that wake nobody", () => {
     const wrapper = render();
 
-    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 rungs");
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 steps");
     expect(wrapper.find('[data-test="oncall-ladder-priority-p4"]').text()).toContain(
       "Pages nobody",
     );
+  });
+
+  // S3: what each priority sends, said once on its chip.
+  it("names each priority's channels once, on its chip", () => {
+    const wrapper = render({
+      priorities: [{ ...priorities[0], channels: ["email", "sms", "voice"] }, priorities[1]],
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain(
+      "Email, SMS, Voice call · 3 steps",
+    );
+  });
+
+  // S3: two priorities that send differently are two ladders, whatever their steps.
+  it("does not fold priorities whose channels differ", () => {
+    const policy = {
+      ...sharedPolicy,
+      rungs: sharedPolicy.rungs.map((rung) =>
+        rung.priority === 3 ? { ...rung, channels: ["email" as const, "sms" as const] } : rung,
+      ),
+    };
+    const wrapper = render({ priorities: fivePriorities, policy });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p2-p4"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p3"]').exists()).toBe(true);
+  });
+
+  // S3: words only where the priority sends something nobody here can receive.
+  describe("a channel nobody can receive", () => {
+    const reachOf = (deliverable: string[][]) => ({
+      members: deliverable.map((channels, i) => ({
+        user_email: `p${i}@o2.ai`,
+        deliverable_channels: channels,
+      })),
+    });
+    const sending = [{ ...priorities[0], channels: ["email", "sms", "voice"] }, priorities[1]];
+
+    it("warns per channel nobody on the team can get", () => {
+      const wrapper = render({
+        priorities: sending,
+        reachability: reachOf([["email"], ["email"]]),
+      });
+      // L3: the warnings sit on their own line, led by the priority they are about.
+      const line = wrapper.find('[data-test="oncall-ladder-unreceivable"]');
+      expect(line.text()).toMatch(/^P1/);
+      expect(line.find('[data-test="oncall-ladder-no-sms"]').exists()).toBe(true);
+
+      // F2: the same channel words the chip beside it uses.
+      expect(wrapper.find('[data-test="oncall-ladder-no-sms"]').text()).toBe(
+        "Nobody here can receive SMS",
+      );
+      expect(wrapper.find('[data-test="oncall-ladder-no-voice"]').text()).toBe(
+        "Nobody here can receive voice calls",
+      );
+    });
+
+    it("stays quiet when one member can receive it, or when reach is unknown", () => {
+      const reached = render({
+        priorities: sending,
+        reachability: reachOf([["email"], ["email", "sms", "voice"]]),
+      });
+      const unknown = render({ priorities: sending, reachability: null });
+
+      for (const wrapper of [reached, unknown]) {
+        expect(wrapper.find('[data-test="oncall-ladder-no-sms"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="oncall-ladder-no-voice"]').exists()).toBe(false);
+      }
+    });
+  });
+
+  // S4: a test page is a configuration act, so only those who can configure see it.
+  // L3: Send test and Edit are one action group, so neither wraps away from the other.
+  it("keeps Send test and Edit together", () => {
+    const actions = render({ canConfigure: true }).find('[data-test="oncall-ladder-actions"]');
+
+    expect(actions.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(true);
+    expect(actions.find('[data-test="oncall-policy-edit"]').exists()).toBe(true);
+  });
+
+  it("offers Send test only to someone who can configure", async () => {
+    expect(render().find('[data-test="oncall-ladder-send-test"]').exists()).toBe(false);
+
+    const wrapper = render({ canConfigure: true });
+    await wrapper.find('[data-test="oncall-ladder-send-test"]').trigger("click");
+    expect(wrapper.emitted("send-test")).toHaveLength(1);
   });
 
   it("asks the caller to switch priority", async () => {

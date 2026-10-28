@@ -23,9 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the transports and the verification state.
 
   One line per rung, and the ending is the rail's last rung rather than a panel
-  beside it. Channels and per-person verdicts are spent only where something is
-  wrong: a healthy ladder is read to check its SHAPE, and listing every address
-  and transport on it buried the one rung that would reach nobody.
+  beside it. Channels are said once per priority, on its chip, because they
+  belong to the priority and never to a step or a person. Per-person verdicts
+  are spent only where something is wrong: a healthy ladder is read to check its
+  SHAPE, and listing every address on it buried the one rung that would reach
+  nobody.
 -->
 <template>
   <div class="relative flex flex-col gap-4" data-test="oncall-escalation-ladder">
@@ -45,15 +47,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ group.label }}
         <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
       </OButton>
-      <OButton
-        variant="outline"
-        size="xs"
-        class="ms-auto"
-        data-test="oncall-policy-edit"
-        @click="emit('edit')"
+      <!-- One group, so a narrow strip wraps the pair together rather than stranding Edit on its own line. -->
+      <span class="ms-auto flex shrink-0 items-center gap-2" data-test="oncall-ladder-actions">
+        <OButton
+          v-if="canConfigure"
+          variant="outline"
+          size="xs"
+          :disabled="!preview?.pages_anyone"
+          data-test="oncall-ladder-send-test"
+          @click="emit('send-test')"
+        >
+          {{ t("oncall.ladderSendTest") }}
+        </OButton>
+        <OButton variant="outline" size="xs" data-test="oncall-policy-edit" @click="emit('edit')">
+          {{ t("oncall.edit") }}
+        </OButton>
+      </span>
+    </span>
+
+    <!-- Led by the priority it is about, so a warning about P1 is never read as one about the whole strip. -->
+    <span
+      v-if="unreceivable.length"
+      class="-mt-2 flex flex-wrap items-center gap-2"
+      data-test="oncall-ladder-unreceivable"
+    >
+      <span class="text-text-secondary text-xs">{{ raw(selected) }}</span>
+      <OTag
+        v-for="channel in unreceivable"
+        :key="channel"
+        variant="warning-soft"
+        size="sm"
+        :data-test="`oncall-ladder-no-${channel}`"
       >
-        {{ t("oncall.edit") }}
-      </OButton>
+        {{
+          channel === "sms" ? t("oncall.ladderNobodyGetsTexts") : t("oncall.ladderNobodyGetsCalls")
+        }}
+      </OTag>
     </span>
 
     <OInnerLoading v-if="loading" showing />
@@ -192,15 +221,17 @@ import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
+  Channel,
   EscalationPreview,
   OnCallPolicy,
   PreviewRung,
   Rotation,
+  TeamReachability,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { rungProblem, speakTarget } from "@/utils/oncall";
+import { channelList, rungProblem, speakTarget } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -215,6 +246,10 @@ const props = withDefaults(
     selected?: string;
     preview?: EscalationPreview | null;
     loading?: boolean;
+    /** Who on the team can receive what; absent means unknown, which raises no warning. */
+    reachability?: Pick<TeamReachability, "members"> | null;
+    /** May send a test page, which needs config access. */
+    canConfigure?: boolean;
   }>(),
   {
     priorities: () => [],
@@ -223,6 +258,8 @@ const props = withDefaults(
     selected: "P1",
     preview: null,
     loading: false,
+    reachability: null,
+    canConfigure: false,
   },
 );
 
@@ -230,6 +267,7 @@ const emit = defineEmits<{
   (e: "update:selected", priority: string): void;
   (e: "edit"): void;
   (e: "open-members"): void;
+  (e: "send-test"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -249,15 +287,33 @@ const numberOf = (entry: TeamRungSummary) => Number(entry.priority.slice(1));
 
 /// What makes two priorities the same ladder. `null` means UNKNOWN — without
 /// the policy we cannot claim two ladders match, so nothing folds. `p1_parallel`
-/// is part of the shape: the same steps fired at once are a different ladder.
+/// is part of the shape: the same steps fired at once are a different ladder,
+/// and the same steps sent on other channels are too.
 function ladderKey(entry: TeamRungSummary): string | null {
   if (!entry.pages_anyone) return "silent";
   if (!props.policy) return null;
   const priority = numberOf(entry);
   const rung = props.policy.rungs.find((candidate) => candidate.priority === priority);
   if (!rung) return null;
-  return JSON.stringify([priority === 1 && props.policy.p1_parallel === true, rung.steps]);
+  return JSON.stringify([
+    priority === 1 && props.policy.p1_parallel === true,
+    rung.steps,
+    [...rung.channels].sort(),
+  ]);
 }
+
+/// The selected priority's phone channels that no team member can receive.
+const unreceivable = computed<Channel[]>(() => {
+  const members = props.reachability?.members;
+  if (!members) return [];
+  const entry = props.priorities.find((candidate) => candidate.priority === props.selected);
+  if (!entry?.pages_anyone) return [];
+  return (["sms", "voice"] as Channel[]).filter(
+    (channel) =>
+      (entry.channels ?? []).includes(channel) &&
+      !members.some((member) => member.deliverable_channels.includes(channel)),
+  );
+});
 
 interface PriorityGroup {
   key: string;
@@ -307,15 +363,15 @@ const groups = computed<PriorityGroup[]>(() => {
   });
 });
 
-/// "3 rungs · 20m" for one priority, and for a folded run the only fact that is
-/// still true of every member of it.
+/// "Email, SMS · 3 steps · 20m" for one priority; a folded run keeps the channels, which the fold guarantees they share.
 function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
   if (!entry.pages_anyone) return t("oncall.reachPagesNobody");
-  if (folded > 1) return t("oncall.ladderSameLadder");
-  const rungs = String(t("oncall.reachRungs", { count: entry.rungs }, entry.rungs));
-  return entry.nobody_after_micros
-    ? raw(`${rungs} · ${formatMicrosDuration(entry.nobody_after_micros)}`)
-    : raw(rungs);
+  const channels = channelList(entry.channels, t);
+  const parts = channels ? [channels] : [];
+  if (folded > 1) return raw([...parts, String(t("oncall.ladderSameLadder"))].join(" · "));
+  parts.push(String(t("oncall.policyChipSteps", { count: entry.rungs }, entry.rungs)));
+  if (entry.nobody_after_micros) parts.push(formatMicrosDuration(entry.nobody_after_micros));
+  return raw(parts.join(" · "));
 }
 
 /// Kept to a few characters — this is a rail, not a column. "0m" rather than

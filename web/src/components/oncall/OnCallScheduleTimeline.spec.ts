@@ -627,7 +627,8 @@ describe("OnCallScheduleTimeline", () => {
       const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
       const cover = wrapper.find('[data-test="oncall-timeline-request-cover"]');
 
-      expect(cover.text()).toBe("Request cover");
+      // S14: one name for the action everywhere.
+      expect(cover.text()).toBe("Cover a shift");
       expect(presets.element.nextElementSibling).toBe(cover.element);
 
       await cover.trigger("click");

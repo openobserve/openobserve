@@ -24,6 +24,7 @@ import type {
   DeliveryStatus,
   EscalationTarget,
   L0Policy,
+  OnCallPolicy,
   ResponseState,
   ResolvedSegment,
   Rotation,
@@ -47,6 +48,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
+import { localeFileMap } from "@/locales";
 
 /**
  * Who holds `rule` at `atMicros`.
@@ -528,6 +530,41 @@ export function rungProblem(
   // Nothing is hidden: the badge is the summary, the sentence is the answer.
   if (short) return { label: short, tip: raw(why) };
   return { label: raw(why) || t("oncall.contactNoChannel"), tip: null };
+}
+
+/// The order a priority's channels are said in, whatever order they are stored in.
+const CHANNEL_ORDER: Channel[] = ["email", "sms", "voice", "webhook"];
+
+/** A priority's channels as one phrase, "Email, SMS, Voice call". [pure] */
+export function channelList(channels: readonly Channel[] | undefined, t: TranslateFn): string {
+  return CHANNEL_ORDER.filter((channel) => (channels ?? []).includes(channel))
+    .map((channel) => String(t(`oncall.channel_${channel}`)))
+    .join(", ");
+}
+
+/** Names as prose in the reader's language ("A, B, and C"); `locale` is the app's i18n code, e.g. `zh-cn`. [pure] */
+export function listInLocale(items: readonly string[], locale: string): string {
+  return new Intl.ListFormat(localeFileMap[locale] ?? locale, { type: "conjunction" }).format(
+    items,
+  );
+}
+
+/** Every escalation step that pages `rotationId`, numbered by delay within its priority. [pure] */
+export function stepsNamingRotation(
+  policy: Pick<OnCallPolicy, "rungs"> | null,
+  rotationId: string,
+): { priority: number; step: number }[] {
+  return (policy?.rungs ?? []).flatMap((rung) =>
+    [...rung.steps]
+      .sort((a, b) => a.after_micros - b.after_micros)
+      .flatMap((step, index) =>
+        step.targets.some(
+          (target) => target.kind === "rotation" && target.rotation_id === rotationId,
+        )
+          ? [{ priority: rung.priority, step: index + 1 }]
+          : [],
+      ),
+  );
 }
 
 /**
@@ -2003,6 +2040,12 @@ export function phoneRefusalText(t: TranslateFn, body: VerificationRefusalBody):
 export function samePhone(a: string, b: string): boolean {
   const compact = (p: string) => p.replace(/[\s\-().]/g, "");
   return compact(a) !== "" && compact(a) === compact(b);
+}
+
+/** Whether the server's `to_e164` would take this: `+`, 7 to 15 digits, no leading 0, once spaces and `-().` go. [pure] */
+export function isInternationalPhone(typed: string): boolean {
+  const compact = typed.trim().replace(/[ \-().]/g, "");
+  return /^\+[1-9]\d{6,14}$/.test(compact);
 }
 
 /** Seconds as `m:ss`, or `h:mm:ss` from an hour up. [pure] */

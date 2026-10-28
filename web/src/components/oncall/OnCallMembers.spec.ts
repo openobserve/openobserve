@@ -28,12 +28,16 @@ vi.mock("@/services/oncall", () => ({
     addMembers: vi.fn(),
     setSchedule: vi.fn(),
     removeMember: vi.fn(),
+    whoIsOnCall: vi.fn(),
     listUnavailability: vi.fn(),
     createUnavailability: vi.fn(),
     deleteUnavailability: vi.fn(),
     resolvedSchedule: vi.fn(),
+    getSchedule: vi.fn(),
   },
 }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
 const push = vi.fn();
@@ -193,6 +197,7 @@ describe("OnCallMembers", () => {
     oncall.resolvedSchedule.mockResolvedValue({ data: [] } as any);
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
     oncall.addMembers.mockResolvedValue({ data: [] } as any);
+    oncall.getSchedule.mockResolvedValue({ data: null } as any);
   });
 
   // An empty roster with no way back to the picker reads as a dead end — the
@@ -270,6 +275,230 @@ describe("OnCallMembers", () => {
     );
   });
 
+  // S2: an add says where the person went, and that the current shift did not move.
+  describe("after adding people", () => {
+    const WEEK = 604_800_000_000;
+    const rotation = (id: string, name: string, members: string[]) => ({
+      id,
+      name,
+      shift_rules: [{ name: "Base", members, shift_micros: WEEK, anchor_micros: 0 }],
+    });
+
+    async function addBob(before: any[], after: any[]) {
+      oncall.getSchedule.mockResolvedValue({ data: { timezone: "UTC", rotations: after } } as any);
+      const wrapper = render({ members: [member("ana@o2.ai")], rotations: before });
+      await flushPromises();
+      const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+      const bob = picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!;
+      bob.element.selected = true;
+      await picker.trigger("change");
+      await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("names the rotations they joined the end of, from the refreshed schedule", async () => {
+      const wrapper = await addBob(
+        [rotation("r1", "Primary", ["ana@o2.ai"]), rotation("r2", "Secondary", ["ana@o2.ai"])],
+        [
+          rotation("r1", "Primary", ["ana@o2.ai", "bob@o2.ai"]),
+          rotation("r2", "Secondary", ["ana@o2.ai", "bob@o2.ai"]),
+        ],
+      );
+
+      expect(oncall.getSchedule).toHaveBeenCalled();
+      const shown = toast.mock.calls.at(-1)![0];
+      expect(shown.variant).toBe("success");
+      // L4: a natural "and" join, no Oxford comma.
+      expect(shown.message).toBe(
+        "Bob joins the end of Primary and Secondary. Who is on call now is unchanged.",
+      );
+      expect(shown.action.label).toBe("Open schedule");
+      shown.action.handler();
+      expect(wrapper.emitted("open-schedule")).toHaveLength(1);
+    });
+
+    // F1: a team whose rotations the server cannot extend leaves the person on no rotation; say so and where to fix it.
+    it("warns when the refreshed schedule has them on no rotation", async () => {
+      const restricted = rotation("r1", "Primary", ["ana@o2.ai"]);
+      await addBob([restricted], [restricted]);
+
+      const shown = toast.mock.calls.at(-1)![0];
+      expect(shown.variant).toBe("warning");
+      expect(shown.message).toBe(
+        "Bob added to the team, but not to a rotation yet. Add them in Schedule.",
+      );
+      expect(shown.action.label).toBe("Open schedule");
+    });
+
+    it("claims nothing about placement when the schedule cannot be re-read", async () => {
+      oncall.getSchedule.mockRejectedValue(new Error("boom"));
+      const wrapper = render({ members: [member("ana@o2.ai")], rotations: [] });
+      await flushPromises();
+      const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+      picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!.element.selected =
+        true;
+      await picker.trigger("change");
+      await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({ variant: "success", message: "Bob added." }),
+      );
+    });
+
+    it("does not claim a shift stayed put when no existing rotation took them", async () => {
+      await addBob([], [rotation("r1", "Primary", ["ana@o2.ai", "bob@o2.ai"])]);
+
+      expect(toast.mock.calls.at(-1)![0].message).toBe("Bob added.");
+    });
+  });
+
+  // S2: removing the holder says who takes the shift they were holding.
+  describe("removing the person on call", () => {
+    const now = [
+      {
+        rotation_id: "r1",
+        rotation_name: "Primary",
+        rule: "Base",
+        user_email: "ana@o2.ai",
+        next_user_email: "bob@o2.ai",
+      },
+    ];
+
+    async function confirmFor(email: string, onCallNow = now) {
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow,
+      });
+      await flushPromises();
+      await wrapper.find(`[data-test="oncall-members-remove-${email}"]`).trigger("click");
+      await flushPromises();
+      return wrapper.find('[data-test="dialog-box"]').text();
+    }
+
+    it("names who takes over the current shift", async () => {
+      expect(await confirmFor("ana@o2.ai")).toContain(
+        "Bob takes over the current shift in Primary.",
+      );
+    });
+
+    // L5: the button says what it does.
+    it("confirms with a destructive Remove", async () => {
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
+
+      expect(confirm.props("okLabel")).toBe("Remove");
+      expect(confirm.props("okVariant")).toBe("destructive");
+    });
+
+    // L5: after the remove, who is on call now per rotation, read back from the server.
+    it("reports who is on call per rotation after the remove", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockResolvedValue({
+        data: [
+          { rotation_id: "r1", rotation_name: "Primary", rule: "Base", user_email: "bob@o2.ai" },
+          { rotation_id: "r2", rotation_name: "Secondary", rule: "Base", user_email: "cara@o2.ai" },
+        ],
+      } as any);
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow: now,
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(oncall.whoIsOnCall).toHaveBeenCalled();
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({
+          variant: "success",
+          message: "Ana Sharma removed. On call now: Bob (Primary), cara@o2.ai (Secondary).",
+        }),
+      );
+    });
+
+    // F1 (round 3): a rotation the remove left empty is named, as a warning.
+    it("names a rotation left with nobody on call", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockResolvedValue({
+        data: [
+          { rotation_id: "r1", rotation_name: "Primary", rule: "Base", user_email: "bob@o2.ai" },
+        ],
+      } as any);
+      const rule = {
+        name: "Base",
+        members: ["bob@o2.ai"],
+        shift_micros: 604_800_000_000,
+        anchor_micros: 0,
+      };
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow: now,
+        rotations: [
+          { id: "r1", name: "Primary", shift_rules: [rule] },
+          { id: "r2", name: "Secondary", shift_rules: [rule] },
+        ],
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({
+          variant: "warning",
+          message:
+            "Ana Sharma removed. On call now: Bob (Primary). Nobody is on call in Secondary.",
+        }),
+      );
+    });
+
+    // F2 (round 3): a failed re-read makes no claim about who is on call.
+    it("says only that the person was removed when the re-read fails", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockRejectedValue(new Error("boom"));
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({ variant: "success", message: "Ana Sharma removed." }),
+      );
+    });
+
+    it("warns when nobody is on call after the remove", async () => {
+      oncall.removeMember.mockResolvedValue({ data: {} } as any);
+      oncall.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(toast.mock.calls.at(-1)![0]).toEqual(
+        expect.objectContaining({
+          variant: "warning",
+          message: "Ana Sharma removed. Nobody is on call now.",
+        }),
+      );
+    });
+
+    it("says nothing about a shift the person does not hold", async () => {
+      expect(await confirmFor("bob@o2.ai")).not.toContain("takes over");
+    });
+
+    it("says the shift goes uncovered when nobody is next", async () => {
+      const text = await confirmFor("ana@o2.ai", [{ ...now[0], next_user_email: null }]);
+      expect(text).toContain("Nobody will be on call in Primary.");
+    });
+  });
+
   // Membership answers "who is on the team". Which rung they cover is a
   // property of the rotation, so no level is chosen here.
   it("asks for no level", async () => {
@@ -318,13 +547,31 @@ describe("OnCallMembers", () => {
     vi.setSystemTime(new Date("2026-09-18T10:30:00Z"));
     oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
 
-    const first = render([member("ana@o2.ai")]);
+    // One rotation: the schedule is resolved per rotation, and a team with none has nothing to resolve.
+    const opts = {
+      members: [member("ana@o2.ai")],
+      rotations: [
+        {
+          id: "r1",
+          name: "Primary",
+          shift_rules: [
+            {
+              name: "Base",
+              members: ["ana@o2.ai"],
+              shift_micros: 604_800_000_000,
+              anchor_micros: 0,
+            },
+          ],
+        },
+      ],
+    };
+    const first = render(opts);
     await flushPromises();
     expect(oncall.listUnavailability).toHaveBeenCalledTimes(1);
     expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
     first.unmount();
 
-    const second = render([member("ana@o2.ai")]);
+    const second = render(opts);
     await flushPromises();
     expect(oncall.listUnavailability).toHaveBeenCalledTimes(1);
     expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
@@ -454,6 +701,54 @@ describe("OnCallMembers", () => {
       expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-email"]').exists()).toBe(true);
     });
 
+    // S5: the earliest shift across every rotation, named by its own rotation.
+    it("shows the earliest next shift across all rotations, with that rotation's name", async () => {
+      const DAY = 86_400_000_000;
+      const nowMicros = Date.now() * 1000;
+      oncall.resolvedSchedule.mockImplementation((async (args: any) => ({
+        data:
+          args.rotation_id === "r2"
+            ? [
+                {
+                  rotation_id: "r2",
+                  from: nowMicros + DAY,
+                  to: nowMicros + 2 * DAY,
+                  user_email: "ana@o2.ai",
+                },
+              ]
+            : [
+                {
+                  rotation_id: "r1",
+                  from: nowMicros + 3 * DAY,
+                  to: nowMicros + 4 * DAY,
+                  user_email: "ana@o2.ai",
+                },
+              ],
+      })) as any);
+      const rule = {
+        name: "Base",
+        members: ["ana@o2.ai"],
+        shift_micros: 7 * DAY,
+        anchor_micros: 0,
+      };
+      const wrapper = render({
+        members: [ana],
+        rotations: [
+          { id: "r1", name: "Primary", shift_rules: [rule] },
+          { id: "r2", name: "Secondary", shift_rules: [rule] },
+        ],
+      });
+      await flushPromises();
+
+      const asked = oncall.resolvedSchedule.mock.calls.map((c: any) => c[0].rotation_id).sort();
+      expect(asked).toEqual(["r1", "r2"]);
+      const cell = wrapper.find('[data-test="oncall-members-shift-ana@o2.ai"]');
+      expect(cell.text()).toContain("From");
+      expect(wrapper.find('[data-test="oncall-members-shift-rotation-ana@o2.ai"]').text()).toBe(
+        "Secondary",
+      );
+    });
+
     /// A failed schedule fetch must cost the shift column, not the table.
     it("still names the rotation when the schedule cannot be resolved", async () => {
       oncall.resolvedSchedule.mockRejectedValue(new Error("boom"));
@@ -534,6 +829,7 @@ describe("OnCallMembers", () => {
         "tip",
         "oncall-channel-bob@o2.ai-voice",
         "tip",
+        "oncall-channels-word-bob@o2.ai",
       ]);
     });
 
@@ -566,6 +862,7 @@ describe("OnCallMembers", () => {
         "tip",
         `oncall-channel-${own}-voice-link`,
         "tip",
+        `oncall-channels-word-${own}`,
       ]);
       expect(tipsOf(wrapper, own).slice(1)).toEqual([
         "no phone on file. Add your phone on My on-call",
@@ -582,6 +879,58 @@ describe("OnCallMembers", () => {
         name: "onCallMine",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+    });
+
+    // S8: one muted word after the icons, only when something is blocked.
+    it.each([
+      ["no phone", noPhone, "No phone"],
+      [
+        "an unverified phone",
+        [
+          ready("email"),
+          { ...blocked("sms", "phone not verified"), configured_but_unverified: true },
+          { ...blocked("voice", "phone not verified"), configured_but_unverified: true },
+        ],
+        "Not verified",
+      ],
+      [
+        "email that cannot land",
+        [
+          {
+            channel: "email" as const,
+            deliverable: false,
+            configured_but_unverified: false,
+            blocked_because: "SMTP is not configured",
+          },
+          ready("sms"),
+          ready("voice"),
+        ],
+        "Email won't arrive",
+      ],
+    ])("says %s in one word", async (_case, channels, word) => {
+      const wrapper = renderReach([reach("bob@o2.ai", true, channels as ChannelReadiness[])]);
+      await flushPromises();
+
+      const shown = wrapper.find('[data-test="oncall-channels-word-bob@o2.ai"]');
+      expect(shown.text()).toBe(word);
+      // L2: the word takes its own line under the icons, so a narrow column cannot cut it.
+      expect(shown.classes()).toContain("basis-full");
+      expect(shown.classes()).not.toContain("whitespace-nowrap");
+    });
+
+    it("stays quiet on a healthy row and on a cause it cannot name in one word", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, [ready("email"), ready("sms"), ready("voice")]),
+        reach("cara@o2.ai", true, [
+          ready("email"),
+          blocked("sms", "no phone provider for this organisation"),
+          blocked("voice", "no phone provider for this organisation"),
+        ]),
+      ]);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-channels-word-bob@o2.ai"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-channels-word-cara@o2.ai"]').exists()).toBe(false);
     });
 
     it("never turns a member red for a missing phone while email lands", async () => {

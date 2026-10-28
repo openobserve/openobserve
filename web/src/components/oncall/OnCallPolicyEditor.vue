@@ -497,35 +497,24 @@
                 </span>
                 <OTag
                   v-if="teamChannel"
-                  :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
+                  :variant="channelFromTeam ? 'primary-soft' : 'default-soft'"
                   size="xs"
                   data-test="oncall-team-channel-source"
                 >
                   {{
-                    teamChannel.source === "team"
+                    channelFromTeam
                       ? t("oncall.teamChannelFromTeam")
                       : t("oncall.teamChannelFromPolicy")
                   }}
                 </OTag>
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :loading="savingChannel"
-                  :disabled="!teamChannelDirty"
-                  data-test="oncall-team-channel-save"
-                  @click="saveTeamChannel(teamChannelDraft)"
-                >
-                  {{ t("oncall.teamChannelSave") }}
-                </OButton>
                 <!-- Clearing is its own verb because null and [] are different
                        facts on the wire: back-to-policy versus silence-on-purpose. -->
                 <OButton
-                  v-if="teamChannel?.source === 'team'"
+                  v-if="channelFromTeam"
                   variant="ghost"
                   size="sm-action"
-                  :loading="savingChannel"
                   data-test="oncall-team-channel-clear"
-                  @click="saveTeamChannel(null)"
+                  @click="usePolicyChannel"
                 >
                   {{ t("oncall.teamChannelUsePolicy") }}
                 </OButton>
@@ -533,8 +522,9 @@
                        HTTP destination, which cannot edit what it already sent. Said
                        here so nobody designs an expectation the engine cannot meet. -->
                 <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
+                <!-- Only the team's own empty list is a choice; an empty list inherited from the policy is the policy's. -->
                 <span
-                  v-if="teamChannel && !teamChannel.destinations.length"
+                  v-if="channelFromTeam && !teamChannelDraft.length"
                   class="text-status-warning-text text-xs"
                   data-test="oncall-team-channel-silent"
                 >
@@ -667,6 +657,8 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   saved: [];
+  /** The policy was written but the drawer stays open, so the page behind it should re-read the ladder. */
+  "policy-written": [];
   "update:open": [boolean];
   "open-members": [];
 }>();
@@ -751,13 +743,30 @@ const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, p
 /// The team's room, read whole with its provenance.
 const teamChannel = ref<TeamChannel | null>(null);
 const teamChannelDraft = ref<string[]>([]);
-const savingChannel = ref(false);
+/// "Use the policy's list" pressed: Save sends `null`, which is a different fact from an empty list.
+const channelBackToPolicy = ref(false);
 
-const teamChannelDirty = computed(
-  () =>
-    JSON.stringify([...teamChannelDraft.value].sort()) !==
-    JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+/// Whether the draft is the team's own list, as Save would leave it.
+const channelFromTeam = computed(
+  () => teamChannel.value?.source === "team" && !channelBackToPolicy.value,
 );
+
+const teamChannelDirty = computed(() =>
+  channelBackToPolicy.value
+    ? teamChannel.value?.source === "team"
+    : JSON.stringify([...teamChannelDraft.value].sort()) !==
+      JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+);
+
+// Picking a destination after "Use the policy's list" makes the list the team's own again.
+watch(teamChannelDraft, (draft) => {
+  if (draft.length) channelBackToPolicy.value = false;
+});
+
+function usePolicyChannel() {
+  teamChannelDraft.value = [];
+  channelBackToPolicy.value = true;
+}
 
 // Uncached read-modify-write: a stale entry would seed the draft and be saved back.
 async function fetchTeamChannel() {
@@ -768,27 +777,27 @@ async function fetchTeamChannel() {
     });
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
+    channelBackToPolicy.value = false;
   } catch {
     teamChannel.value = null;
   }
 }
 
-/// `null` clears the override; an array (even empty) is the team's own list.
-async function saveTeamChannel(destinations: string[] | null) {
-  savingChannel.value = true;
+/// The channel after the policy, only if it changed; false keeps the drawer open so Save retries it.
+async function saveChannelAfterPolicy(): Promise<boolean> {
+  if (!teamChannelDirty.value) return true;
   try {
-    const res = await saveChannelWrite.mutateAsync(destinations);
-    // The drawer stays open on this answer, and an invalidation cannot repaint a ref.
+    const res = await saveChannelWrite.mutateAsync(
+      channelBackToPolicy.value ? null : teamChannelDraft.value,
+    );
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
-    toast({ variant: "success", message: t("oncall.teamChannelSaved") });
+    channelBackToPolicy.value = false;
+    return true;
   } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.teamChannelSaveFailed"),
-    });
-  } finally {
-    savingChannel.value = false;
+    noteConfigurationDenied(err);
+    toast({ variant: "error", message: t("oncall.teamChannelNotSavedAfterPolicy") });
+    return false;
   }
 }
 
@@ -1186,6 +1195,10 @@ async function save() {
       final_action: finalAction.value,
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
+    if (!(await saveChannelAfterPolicy())) {
+      emit("policy-written");
+      return;
+    }
     toast({ variant: "success", message: t("oncall.policySaved") });
     emit("saved");
   } catch (err: any) {

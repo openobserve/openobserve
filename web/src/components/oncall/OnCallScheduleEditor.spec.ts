@@ -137,6 +137,12 @@ const stubs = {
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: "<div v-if='modelValue'>{{ title }} {{ message }}</div>",
   },
+  OnCallRemoveRotationDialog: {
+    name: "OnCallRemoveRotationDialog",
+    props: ["open", "title", "messageKeypath", "messageName", "rotationId", "policy"],
+    emits: ["confirm", "update:open", "open-policy"],
+    template: "<div v-if='open'>{{ title }}</div>",
+  },
   OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
@@ -719,27 +725,40 @@ describe("OnCallScheduleEditor", () => {
       return wrapper;
     }
 
+    const removeDialog = (wrapper: any) =>
+      wrapper.findComponent({ name: "OnCallRemoveRotationDialog" });
+
     it("asks first, naming the rotation, and writes nothing on cancel", async () => {
       const wrapper = await askToRemove();
-      const confirm = confirmFor(wrapper, "oncall-rotation-remove-confirm");
+      const confirm = removeDialog(wrapper);
       expect(confirm.text()).toBe("Remove Primary?");
       expect(confirm.props("messageKeypath")).toBe("oncall.removeRotationMessage");
       expect(confirm.props("messageName")).toBe("Primary");
-      expect(confirm.props("okVariant")).toBe("destructive");
+      expect(confirm.props("rotationId")).toBe(rota("Primary").id);
 
-      confirm.vm.$emit("update:modelValue", false);
-      confirm.vm.$emit("update:cancel");
+      confirm.vm.$emit("update:open", false);
       await flushPromises();
 
       expect(service.setSchedule).not.toHaveBeenCalled();
       expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
     });
 
+    // S11: the dialog's link to a hand-edited policy closes this drawer and hands over.
+    it("closes the drawer and asks for the policy when the dialog sends there", async () => {
+      const wrapper = await askToRemove();
+      removeDialog(wrapper).vm.$emit("open-policy");
+      await flushPromises();
+
+      expect(wrapper.emitted("open-policy")).toHaveLength(1);
+      expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
+      expect(service.setSchedule).not.toHaveBeenCalled();
+    });
+
     it("writes the schedule without the rotation once confirmed", async () => {
       const wrapper = await askToRemove();
       expect(service.setSchedule).not.toHaveBeenCalled();
 
-      confirmFor(wrapper, "oncall-rotation-remove-confirm").vm.$emit("update:ok");
+      removeDialog(wrapper).vm.$emit("confirm");
       await flushPromises();
 
       expect(service.setSchedule).toHaveBeenCalledTimes(1);
