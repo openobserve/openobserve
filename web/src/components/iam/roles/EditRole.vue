@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :activeTab="activeTab"
             :added-users="addedUsers"
             :removed-users="removedUsers"
+            :disabled="isSaving"
             context="role"
           />
           <GroupServiceAccounts
@@ -59,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :activeTab="activeTab"
             :added-users="addedServiceAccounts"
             :removed-users="removedServiceAccounts"
+            :disabled="isSaving"
           />
 
           <div
@@ -84,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :count="selectedPermissionsHash.size"
                   :loading="isFetchingInitialRoles"
                   :model-value="permissionsUiType"
-                  @update:model-value="updatePermissionsUi"
+                  @update:model-value="switchPermissionsUi"
                 />
               </div>
 
@@ -110,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon="isAllModules ? ALL_MODULES_ICON : activeRailModule?.icon"
                   :added="activeRailModule?.added"
                   :removed="activeRailModule?.removed"
-                  @change="(change) => handlePermissionBatchChange([change])"
+                  @change="changeFromPane"
                   @open="openPaneRow"
                   @navigate="navigateTrail"
                 >
@@ -119,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :count="selectedPermissionsHash.size"
                       :loading="isFetchingInitialRoles"
                       :model-value="permissionsUiType"
-                      @update:model-value="updatePermissionsUi"
+                      @update:model-value="switchPermissionsUi"
                     />
                   </template>
                 </ModulePane>
@@ -128,15 +130,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="h-full"
                   :modules="summaryModules"
                   :loading="isFetchingInitialRoles"
+                  :presets="presets"
+                  :preview-preset="previewPreset"
+                  :applying="applyingPreset || isSaving"
+                  :module-label="moduleLabel"
+                  :entity-label="entityLabel"
+                  :summary-actions="summaryActions"
                   @open="(moduleKey) => (activeModule = moduleKey)"
-                  @preset="applyPreset"
+                  @preset="(presetId) => applyPreset(presetId, { announce: true })"
+                  @load-streams="loadPresetStreams()"
                 >
                   <template #actions>
                     <PermissionsViewSwitch
                       :count="selectedPermissionsHash.size"
                       :loading="isFetchingInitialRoles"
                       :model-value="permissionsUiType"
-                      @update:model-value="updatePermissionsUi"
+                      @update:model-value="switchPermissionsUi"
                     />
                   </template>
                 </RoleSummary>
@@ -196,23 +205,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-card-glass-bg border-border-default flex w-full items-center justify-end gap-2 border-t px-3 py-2"
           >
             <!-- Table view only: JSON edits stage when the view switches back, which would overwrite an undo made here. -->
-            <OButton
-              v-if="pendingChanges.length && permissionsUiType === 'table'"
-              variant="outline"
-              size="sm-action"
-              data-test="edit-role-review-changes-btn"
-              @click="unsavedDrawerOpen = true"
+            <OTooltip
+              v-if="permissionsUiType === 'table'"
+              :content="
+                t(
+                  'iam.editRole.reviewMissingTooltip',
+                  { count: companionGaps.length },
+                  companionGaps.length,
+                )
+              "
+              :disabled="!companionGaps.length"
             >
-              {{ t("iam.editRole.reviewChanges") }}
-              <OBadge
-                variant="warning-soft"
-                size="sm"
-                class="ms-1.5"
-                data-test="edit-role-unsaved-count"
+              <OButton
+                variant="outline"
+                size="sm-action"
+                :disabled="!pendingChanges.length && !companionGaps.length"
+                data-test="edit-role-review-changes-btn"
+                @click="unsavedDrawerOpen = true"
               >
-                {{ raw(String(pendingChanges.length)) }}
-              </OBadge>
-            </OButton>
+                <template #icon-left>
+                  <OIcon
+                    v-if="companionGaps.length"
+                    name="warning"
+                    size="sm"
+                    class="text-badge-warning-soft-text"
+                    data-test="edit-role-review-missing-icon"
+                  />
+                </template>
+                {{ t("iam.editRole.reviewChanges") }}
+                <OBadge
+                  v-if="pendingChanges.length"
+                  variant="default-soft"
+                  size="sm"
+                  class="ms-1.5"
+                  data-test="edit-role-unsaved-count"
+                >
+                  {{ raw(String(pendingChanges.length)) }}
+                </OBadge>
+              </OButton>
+            </OTooltip>
             <OButton
               data-test="edit-role-cancel-btn"
               variant="outline"
@@ -236,12 +267,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
   <UnsavedChangesDrawer
     v-model:open="unsavedDrawerOpen"
-    :changes="pendingChanges"
-    @undo="(keys) => keys.forEach(updatePermissionMappings)"
+    :groups="pendingGroups"
+    :gaps="companionGaps"
+    :org-id="store.state.selectedOrganization.identifier"
+    :module-label="moduleLabel"
+    :summary-actions="summaryActions"
+    :saving="isSaving"
+    @undo="undoKeys"
+    @add="grantKeys"
+    @open-module="openModuleFromDrawer"
+    @save="saveFromDrawer"
   />
   <ConfirmDialog
     :title="t('iam.editRole.leaveConfirm.title')"
     :message="t('iam.editRole.leaveConfirm.message')"
+    :ok-label="t('iam.editRole.leaveConfirm.discard')"
+    :cancel-label="t('iam.editRole.leaveConfirm.keepEditing')"
+    focus-cancel
     @update:ok="onLeaveConfirm(true)"
     @update:cancel="onLeaveConfirm(false)"
     v-model="leaveConfirm.show"
@@ -254,17 +296,18 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { resourcesQuery } from "@/services/iam.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, watch, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import useRoleGrants, { buildGrantKey } from "@/composables/iam/useRoleGrants";
 import ModuleRail, { type RailModule } from "@/components/iam/roles/ModuleRail.vue";
-import ModulePane from "@/components/iam/roles/ModulePane.vue";
+import ModulePane, { type PermissionChange } from "@/components/iam/roles/ModulePane.vue";
 import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.vue";
 import UnsavedChangesDrawer from "@/components/iam/roles/UnsavedChangesDrawer.vue";
 import RoleSummary from "@/components/iam/roles/RoleSummary.vue";
@@ -610,7 +653,17 @@ const getOrgId = () => {
   return store.state.selectedOrganization.identifier;
 };
 
-const { summaryModules, pendingChanges, innerGrants, moduleInnerGrants } = useRoleSummary({
+const {
+  summaryModules,
+  pendingChanges,
+  pendingGroups,
+  companionGaps,
+  moduleKeyOf,
+  entityLabel,
+  summaryActions,
+  innerGrants,
+  moduleInnerGrants,
+} = useRoleSummary({
   selectedPermissionsHash,
   addedPermissions,
   removedPermissions,
@@ -685,6 +738,12 @@ const handlePermissionBatchChange = (
 
 const updatePermissionMappings = (permissionHash: string) => grants.toggle(permissionHash);
 
+const openModuleFromDrawer = (moduleKey: string) => {
+  unsavedDrawerOpen.value = false;
+  activeTab.value = "permissions";
+  activeModule.value = moduleKey;
+};
+
 const expandPermission = async (resource: any) => {
   const expand = !resource.expand;
 
@@ -698,18 +757,29 @@ const expandPermission = async (resource: any) => {
   }
 };
 
-const { seedReadonlyPreset, seedDbmViewerPreset, seedK8sViewerPreset, seedRumPreset, applyPreset } =
-  useRolePresets({
-    permissionsState,
-    resourceMapper,
-    heavyResourceEntities,
-    grants,
-    permissionHashFor,
-    handlePermissionChange,
-    handlePermissionBatchChange,
-    expandPermission,
-    t,
-  });
+const {
+  seedReadonlyPreset,
+  seedDbmViewerPreset,
+  seedK8sViewerPreset,
+  seedRumPreset,
+  applyPreset,
+  presets,
+  previewPreset,
+  loadPresetStreams,
+  applyingPreset,
+} = useRolePresets({
+  permissionsState,
+  resourceMapper,
+  heavyResourceEntities,
+  grants,
+  permissionHashFor,
+  handlePermissionBatchChange,
+  expandPermission,
+  // A lambda: the loaders are declared below, and the panel loads streams only after mount.
+  getResourceEntities: (resource) => getResourceEntities(resource),
+  getStreams,
+  t,
+});
 
 const getPermissionHash = (resourceName: string, permission: string, entity?: string) => {
   if (!entity) entity = "_all_" + store.state.selectedOrganization.identifier;
@@ -818,7 +888,18 @@ const { updatePermissionsUi, updateJsonInTable } = useRoleJsonView({
   getOrgId,
 });
 
-const { saveRole } = useRoleSave({
+// Resolves at once when no preset is staging, else when the running one finishes.
+const presetSettled = () =>
+  new Promise<void>((resolve) => {
+    if (!applyingPreset.value) return resolve();
+    const stop = watch(applyingPreset, (busy) => {
+      if (busy) return;
+      stop();
+      resolve();
+    });
+  });
+
+const { saveRole, isSaving } = useRoleSave({
   editingRole,
   permissionsUiType,
   updateJsonInTable,
@@ -829,8 +910,35 @@ const { saveRole } = useRoleSave({
   removedServiceAccounts,
   roleUsers,
   updateRoleOne,
+  moduleKeyOf,
+  presetSettled,
   t,
 });
+
+// A change staged after the save built its payload would be committed as saved without being sent, so edits wait for the PUT.
+const changeFromPane = (change: PermissionChange) => {
+  if (!isSaving.value) handlePermissionBatchChange([change]);
+};
+
+const undoKeys = (keys: string[]) => {
+  if (!isSaving.value) keys.forEach(updatePermissionMappings);
+};
+
+// Toggle revokes a held key, so Add from the drawer only ever adds, however often it is clicked.
+const grantKeys = (keys: string[]) => {
+  if (!isSaving.value) keys.filter((key) => !grants.has(key)).forEach(updatePermissionMappings);
+};
+
+// Leaving JSON stages what was typed, so the view holds still until the PUT settles.
+const switchPermissionsUi = (value: string) => {
+  if (!isSaving.value) updatePermissionsUi(value);
+};
+
+// The drawer would otherwise stay open on the companion list after the save it was opened for.
+const saveFromDrawer = () => {
+  unsavedDrawerOpen.value = false;
+  saveRole();
+};
 
 const toggleHelpSection = async () => {
   isHelpOpen.value = !isHelpOpen.value;

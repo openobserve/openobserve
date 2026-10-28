@@ -57,12 +57,15 @@ const ctl = vi.hoisted(() => ({
   // Mutable so a spec can shrink the org's metric streams (the zero-match case).
   metricStreams: null,
   logStreams: null,
+  // Every stream list the page reads, in order, so a test can tell an eager load from a lazy one.
+  streamCalls: [],
 }));
 
 // Mock composable useStreams
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn(async (type) => {
+      ctl.streamCalls.push(type);
       const map = {
         logs: { list: ctl.logStreams ?? [{ name: "app" }, { name: "sys" }] },
         metrics: {
@@ -623,6 +626,7 @@ beforeEach(() => {
   ctl.resources = RESOURCE_CATALOG;
   ctl.metricStreams = null;
   ctl.logStreams = null;
+  ctl.streamCalls = [];
   router.currentRoute.value.query = {};
 });
 
@@ -920,8 +924,10 @@ describe("EditRole - save and cancel", () => {
     await wrapper.vm.saveRole();
     await flushPromises();
 
-    // toast is called with variant: "success" after a successful update
-    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "success",
+      message: "Saved 1 permission change in 1 module.",
+    });
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
   });
 });
@@ -3659,5 +3665,364 @@ describe("EditRole - all modules", () => {
       "traces",
     ]);
     expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
+  });
+});
+
+describe("EditRole - Review Changes footer", () => {
+  const reviewButton = (wrapper) => wrapper.find('[data-test="edit-role-review-changes-btn"]');
+
+  it("disables Review Changes with no change and nothing missing", async () => {
+    const wrapper = await mountEditRole();
+
+    expect(reviewButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="edit-role-unsaved-count"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-review-missing-icon"]').exists()).toBe(false);
+  });
+
+  it("counts the staged changes on the badge", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    await flushPromises();
+
+    expect(reviewButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="edit-role-unsaved-count"]').text()).toBe("1");
+  });
+
+  // A saved dashboard folder with no stream grant cannot load panels, so the role is flagged with nothing staged.
+  it("enables Review Changes with a warning when a module is missing and nothing is staged", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    await flushPromises();
+
+    expect(reviewButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="edit-role-review-missing-icon"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-unsaved-count"]').exists()).toBe(false);
+    expect(
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .some(
+          (tooltip) =>
+            tooltip.props("content") ===
+            i18n.global.t("iam.editRole.reviewMissingTooltip", { count: 1 }, 1),
+        ),
+    ).toBe(true);
+  });
+
+  // A missing module is advice, not an edit, so it must not hold the user on the page.
+  it("does not count a missing module as unsaved", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+
+    expect(wrapper.vm.companionGaps.length).toBe(1);
+    expect(wrapper.vm.isAnyDirty).toBe(false);
+  });
+});
+
+describe("EditRole - review drawer wiring", () => {
+  const drawer = (wrapper) => wrapper.findComponent({ name: "UnsavedChangesDrawer" });
+
+  it("hands the drawer the grouped changes and the missing modules", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    await flushPromises();
+
+    expect(
+      drawer(wrapper)
+        .props("groups")
+        .map((group) => group.key),
+    ).toEqual(["stream"]);
+    expect(
+      drawer(wrapper)
+        .props("gaps")
+        .map((gap) => gap.module),
+    ).toEqual(["stream"]);
+  });
+
+  // Toggle revokes a held key, so a second Add must not take the grant back off.
+  it("adds a companion grant once, however often Add is clicked", async () => {
+    const wrapper = await mountEditRole();
+    const key = `stream:${ALL}:AllowList`;
+
+    drawer(wrapper).vm.$emit("add", [key]);
+    drawer(wrapper).vm.$emit("add", [key]);
+    await flushPromises();
+
+    expect([...wrapper.vm.selectedPermissionsHash]).toEqual([key]);
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([key]);
+  });
+
+  it("restores a grant staged for removal rather than adding it twice", async () => {
+    const key = `stream:${ALL}:AllowList`;
+    const wrapper = await mountWithSaved([{ object: `stream:${ALL}`, permission: "AllowList" }]);
+    wrapper.vm.updatePermissionMappings(key);
+
+    drawer(wrapper).vm.$emit("add", [key]);
+    await flushPromises();
+
+    expect(wrapper.vm.removedPermissions).toEqual({});
+    expect(wrapper.vm.addedPermissions).toEqual({});
+    expect(wrapper.vm.selectedPermissionsHash.has(key)).toBe(true);
+  });
+
+  it("closes the drawer and opens the module for Open Streams", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    wrapper.vm.activeTab = "users";
+    wrapper.vm.unsavedDrawerOpen = true;
+
+    drawer(wrapper).vm.$emit("open-module", "stream");
+    await flushPromises();
+
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(false);
+    expect(wrapper.vm.activeTab).toBe("permissions");
+    expect(wrapper.vm.activeModule).toBe("stream");
+  });
+
+  it("keeps the drawer open after Undo All while a module is still missing", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    wrapper.vm.unsavedDrawerOpen = true;
+    await flushPromises();
+
+    drawer(wrapper).vm.$emit("undo", ["logs:app:AllowGet"]);
+    await flushPromises();
+
+    expect(wrapper.vm.pendingChanges).toEqual([]);
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(true);
+  });
+
+  it("saves through the page's save path and closes the drawer", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    wrapper.vm.unsavedDrawerOpen = true;
+
+    drawer(wrapper).vm.$emit("save");
+    await flushPromises();
+
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(false);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
+      { object: "logs:app", permission: "AllowGet" },
+    ]);
+  });
+});
+
+describe("EditRole - save toast", () => {
+  useNavigationFixture();
+
+  const toastAfterSave = async (vm) => {
+    mockToast.mockClear();
+    await vm.saveRole();
+    await flushPromises();
+    return mockToast.mock.calls.map(([arg]) => arg);
+  };
+
+  it("names the permission changes and modules a save touched", async () => {
+    const vm = await mountEditRoleVm();
+    withSaved(vm, ["dfolder:f1:AllowGet"]);
+    vm.updatePermissionMappings("logs:app:AllowGet");
+    vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    vm.updatePermissionMappings("dfolder:f1:AllowGet");
+
+    expect(await toastAfterSave(vm)).toEqual([
+      { variant: "success", message: "Saved 3 permission changes in 2 modules." },
+    ]);
+  });
+
+  it("keeps the plain success message for a members-only save", async () => {
+    const vm = await mountEditRoleVm();
+    vm.addedUsers.add("new@example.com");
+
+    expect(await toastAfterSave(vm)).toEqual([
+      { variant: "success", message: i18n.global.t("iam.editRole.updateSuccess") },
+    ]);
+  });
+});
+
+describe("EditRole - leave dialog labels", () => {
+  // Discard stays the primary button, which the leave E2E clicks; Keep Editing is the safe default.
+  it("labels the primary button Discard and the secondary Keep Editing", async () => {
+    const wrapper = await mountEditRole();
+    const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+
+    expect(dialog.props("okLabel")).toBe(i18n.global.t("iam.editRole.leaveConfirm.discard"));
+    expect(dialog.props("cancelLabel")).toBe(
+      i18n.global.t("iam.editRole.leaveConfirm.keepEditing"),
+    );
+    expect(dialog.props("okVariant") ?? "primary").toBe("primary");
+    expect(dialog.props("focusCancel")).toBe(true);
+  });
+});
+
+describe("EditRole - presets panel wiring", () => {
+  it("announces a preset added from the panel", async () => {
+    const wrapper = await mountEditRole();
+    mockToast.mockClear();
+
+    wrapper.findComponent({ name: "RoleSummary" }).vm.$emit("preset", "readonly");
+    await flushPromises();
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "success",
+        message: expect.stringContaining(i18n.global.t("iam.editRole.presetReadonlyTitle")),
+      }),
+    );
+  });
+
+  it("hands the panel the presets and a preview of each", async () => {
+    const wrapper = await mountEditRole();
+    const summary = wrapper.findComponent({ name: "RoleSummary" });
+
+    expect(summary.props("presets").map((preset) => preset.id)).toContain("readonly");
+    expect(summary.props("previewPreset")("readonly").status).toBe("ready");
+    expect(summary.props("applying")).toBe(false);
+  });
+});
+
+describe("EditRole - presets panel stream lists", () => {
+  // Every visit would otherwise fetch the metrics and logs lists just to count the stream presets.
+  it("reads no stream list when the page opens", async () => {
+    await mountEditRole();
+    await flushPromises();
+
+    expect(ctl.streamCalls).toEqual([]);
+  });
+
+  it("reads the metrics and logs lists once the panel asks for them", async () => {
+    const wrapper = await mountEditRole();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "RoleSummary" }).vm.$emit("load-streams");
+    await flushPromises();
+
+    expect([...new Set(ctl.streamCalls)].sort()).toEqual(["logs", "metrics"]);
+    expect(wrapper.vm.previewPreset("dbm").status).toBe("ready");
+  });
+});
+
+describe("EditRole - save while a preset is staging", () => {
+  // DBM waits on the metrics list; a save built before it lands would commit its grants unsent.
+  it("sends the preset's grants when Save is clicked mid-apply", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+
+    const applying = wrapper.vm.applyPreset("dbm");
+    expect(wrapper.vm.applyingPreset).toBe(true);
+    const saving = wrapper.vm.saveRole();
+    await Promise.all([applying, saving]);
+    await flushPromises();
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual(
+      expect.arrayContaining([{ object: "metrics:postgresql_backends", permission: "AllowGet" }]),
+    );
+    expect(wrapper.vm.addedPermissions).toEqual({});
+  });
+
+  it("holds preset Add off while a save is in flight", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    const summary = () => wrapper.findComponent({ name: "RoleSummary" });
+    let finish;
+    vi.mocked(updateRole).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+
+    const saving = wrapper.vm.saveRole();
+    await flushPromises();
+    expect(summary().props("applying")).toBe(true);
+
+    finish({ data: { code: 200 } });
+    await saving;
+    await flushPromises();
+    expect(summary().props("applying")).toBe(false);
+  });
+});
+
+describe("EditRole - nothing stages while a save is in flight", () => {
+  // The payload is built before the PUT, so a key staged after it would be committed as saved unsent.
+  it("ignores Add All, Undo, pane clicks and a view switch until the PUT settles", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    const drawer = () => wrapper.findComponent({ name: "UnsavedChangesDrawer" });
+    const pane = () => wrapper.findComponent({ name: "ModulePane" });
+    const sent = `afolder:${ALL}:AllowAll`;
+    const streamsList = `stream:${ALL}:AllowList`;
+    let finish;
+    vi.mocked(updateRole).mockClear();
+    vi.mocked(updateRole).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const metrics = wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics");
+    wrapper.vm.updatePermissionMappings(sent);
+
+    const saving = wrapper.vm.saveRole();
+    await flushPromises();
+    expect(drawer().props("saving")).toBe(true);
+    drawer().vm.$emit("add", [streamsList, `destination:${ALL}:AllowList`]);
+    drawer().vm.$emit("undo", [sent]);
+    pane().vm.$emit("change", { row: metrics, permission: "AllowList", newValue: true });
+    wrapper.findComponent({ name: "PermissionsViewSwitch" }).vm.$emit("update:modelValue", "json");
+    await flushPromises();
+
+    finish({ data: { code: 200 } });
+    await saving;
+    await flushPromises();
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
+      { object: `afolder:${ALL}`, permission: "AllowAll" },
+    ]);
+    expect([...wrapper.vm.selectedPermissionsHash]).toEqual([sent]);
+    expect(wrapper.vm.addedPermissions).toEqual({});
+    expect(wrapper.vm.removedPermissions).toEqual({});
+    expect(wrapper.vm.permissionsUiType).toBe("table");
+
+    drawer().vm.$emit("add", [streamsList]);
+    expect(drawer().props("saving")).toBe(false);
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([streamsList]);
+  });
+});
+
+describe("EditRole - members while a save is in flight", () => {
+  // The save clears every staged member once the PUT lands; GroupUsers.spec covers the real tabs under this lock.
+  it("locks both member tabs until the PUT settles", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const memberTab = (name) => ({ name, props: ["disabled"], template: "<div />" });
+    const wrapper = await mountEditRole({
+      GroupUsers: memberTab("GroupUsers"),
+      GroupServiceAccounts: memberTab("GroupServiceAccounts"),
+    });
+    const locked = () =>
+      ["GroupUsers", "GroupServiceAccounts"].map((name) =>
+        wrapper.findComponent({ name }).props("disabled"),
+      );
+    let finish;
+    vi.mocked(updateRole).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    wrapper.vm.addedUsers.add("alice@example.com");
+    expect(locked()).toEqual([false, false]);
+
+    const saving = wrapper.vm.saveRole();
+    await flushPromises();
+    expect(locked()).toEqual([true, true]);
+
+    finish({ data: { code: 200 } });
+    await saving;
+    await flushPromises();
+    expect(locked()).toEqual([false, false]);
   });
 });

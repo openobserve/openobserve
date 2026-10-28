@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { Ref } from "vue";
+import { readonly, ref, type Ref } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
-import type { I18nText } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 type Staged = { object: string; permission: string };
 
@@ -35,7 +35,11 @@ type SaveDeps = {
   updateRoleOne: {
     mutateAsync: (vars: { role_id: string; payload: Record<string, unknown> }) => Promise<unknown>;
   };
-  t: (key: string) => I18nText;
+  /** The rail module a resource is counted under, so "in 2 modules" matches the rail. */
+  moduleKeyOf: (resource: string) => string;
+  /** Resolves once a preset still staging has finished, so the save carries its grants. */
+  presetSettled: () => Promise<void>;
+  t: TranslateFn;
 };
 
 /** Sends the staged grant and membership changes, then makes them the new baseline. */
@@ -51,10 +55,23 @@ export const useRoleSave = (deps: SaveDeps) => {
     removedServiceAccounts,
     roleUsers,
     updateRoleOne,
+    moduleKeyOf,
+    presetSettled,
     t,
   } = deps;
 
-  const saveRole = () => {
+  // Counted before commit() clears the staging: two keys on `logs:app` and one on `dashboard:f1/d1` -> 3 changes in 2 modules.
+  const savedMessage = (changed: Staged[]) => {
+    const count = changed.length;
+    if (!count) return t("iam.editRole.updateSuccess");
+    const modules = new Set(changed.map(({ object }) => moduleKeyOf(object.split(":")[0]))).size;
+    return t("iam.editRole.saveSuccessCounts", {
+      changes: t("iam.editRole.permissionChangeCount", { count }, count),
+      modules: t("iam.editRole.presetModuleCount", { count: modules }, modules),
+    });
+  };
+
+  const send = () => {
     if (permissionsUiType.value === "json") updateJsonInTable();
 
     // Users and service accounts are both sent as users; merge the two staging
@@ -83,8 +100,10 @@ export const useRoleSave = (deps: SaveDeps) => {
       return;
     }
 
+    const message = savedMessage([...payload.add, ...payload.remove]);
+
     // Was: invalidate, then update — the refetch raced the write.
-    updateRoleOne
+    return updateRoleOne
       .mutateAsync({ role_id: editingRole.value, payload })
       .then(async () => {
         analytics.track("role_updated", {
@@ -93,10 +112,7 @@ export const useRoleSave = (deps: SaveDeps) => {
         });
         // combine permissionsHash and selectedPermissionsHash
 
-        toast({
-          variant: "success",
-          message: t("iam.editRole.updateSuccess"),
-        });
+        toast({ variant: "success", message });
 
         // Resetting permissions state on save
 
@@ -133,7 +149,24 @@ export const useRoleSave = (deps: SaveDeps) => {
       });
   };
 
+  const isSaving = ref(false);
+
+  // A preset staging past the payload would be absorbed by commit() unsent, so the save waits for it.
+  const saveRole = async () => {
+    // A second click while the PUT is in flight would send the same changes twice.
+    if (isSaving.value) return;
+    isSaving.value = true;
+    try {
+      await presetSettled();
+      await send();
+    } finally {
+      isSaving.value = false;
+    }
+  };
+
   return {
     saveRole,
+    /** True from the click until the PUT settles; preset Add stays off meanwhile. */
+    isSaving: readonly(isSaving),
   };
 };

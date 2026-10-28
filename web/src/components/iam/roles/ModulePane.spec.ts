@@ -677,7 +677,7 @@ describe("ModulePane - column select all", () => {
 
     expect(bulkBox(wrapper, "AllowList").attributes("disabled")).toBeDefined();
     expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').text()).toContain(
-      String(i18n.global.t("iam.editRole.noModuleMatch")),
+      String(i18n.global.t("iam.editRole.noModuleMatchQuery", { query: "nothing" })),
     );
   });
 
@@ -687,7 +687,7 @@ describe("ModulePane - column select all", () => {
     expect(wrapper.text()).toContain(String(i18n.global.t("iam.editRole.moduleColumn")));
     expect(
       wrapper.find('[data-test="edit-role-module-pane-search"] input').attributes("placeholder"),
-    ).toBe(String(i18n.global.t("iam.editRole.filterModules")));
+    ).toBe(String(i18n.global.t("iam.editRole.filterModulesTasks")));
   });
 
   // All Modules can open before the grants load; its rows never change, so the order must follow the load.
@@ -757,5 +757,135 @@ describe("ModulePane - column select all", () => {
     await wrapper.find('[data-test="edit-role-module-pane-open-search_jobs"]').trigger("click");
 
     expect(wrapper.emitted("open")?.at(-1)?.[0]).toStrictEqual(searchJobs);
+  });
+});
+
+describe("ModulePane - All Modules filter by group and task word", () => {
+  const t = (key: string, named: Record<string, unknown> = {}) => String(i18n.global.t(key, named));
+
+  const moduleRow = (name: string, label: string, granted: string[] = []) => ({
+    ...makeNode(name, granted, name),
+    display_name: label,
+  });
+
+  const mountModules = (entities: any[]) =>
+    mountPane([], entities, [raw("All Modules")], { listsModules: true });
+
+  const modules = () => [
+    moduleRow("stream", "Streams"),
+    moduleRow("destination", "Destinations"),
+    moduleRow("afolder", "Alert Folders"),
+  ];
+
+  const search = (wrapper: any, value: string) =>
+    wrapper.find('[data-test="edit-role-module-pane-search"] input').setValue(value);
+
+  const row = (wrapper: any, name: string) =>
+    wrapper.find(`[data-test="edit-role-module-pane-open-${name}"]`);
+
+  const pill = (wrapper: any) => wrapper.find('[data-test^="edit-role-module-match-"]');
+
+  it("keeps module rows matched by group, without a pill", async () => {
+    const wrapper = await mountModules(modules());
+
+    await search(wrapper, "alerting");
+
+    expect(row(wrapper, "destination").exists()).toBe(true);
+    expect(row(wrapper, "afolder").exists()).toBe(true);
+    expect(row(wrapper, "stream").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+  });
+
+  it("keeps module rows matched by task word, without a pill", async () => {
+    const wrapper = await mountModules([
+      ...modules(),
+      moduleRow("rum_analytics", "Product Analytics"),
+    ]);
+
+    await search(wrapper, "slack");
+
+    expect(row(wrapper, "destination").exists()).toBe(true);
+    expect(row(wrapper, "stream").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+
+    await search(wrapper, "funnel");
+
+    expect(row(wrapper, "rum_analytics").exists()).toBe(true);
+    expect(row(wrapper, "destination").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+  });
+
+  it("shows a matched module name as plain text, without a pill", async () => {
+    const wrapper = await mountModules(modules());
+
+    await search(wrapper, "dest");
+
+    expect(row(wrapper, "destination").exists()).toBe(true);
+    expect(wrapper.find("mark").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+  });
+
+  // An unknown resource would read as group "Other", so "other" would keep it if module matching leaked in.
+  it("matches resource names only inside a module, never groups or task words", async () => {
+    const wrapper = await mountPane(
+      [makeScope("destination", [], ["destination"])],
+      [makeNode("pagerduty-prod", [], "destination")],
+      [raw("Destinations")],
+    );
+
+    await search(wrapper, "other");
+
+    expect(entityBox(wrapper, "pagerduty-prod", "AllowGet").exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').text()).toContain(
+      t("iam.editRole.noMatchingResources"),
+    );
+  });
+
+  it("ticks only the modules a task word keeps from the column header", async () => {
+    const wrapper = await mountModules(modules());
+
+    await search(wrapper, "slack");
+    await wrapper
+      .find('[data-test="edit-role-module-pane-bulk-AllowList"] button[role="checkbox"]')
+      .trigger("click");
+
+    expect((wrapper.emitted("change") ?? []).map(([change]: any) => change.row.name)).toEqual([
+      "destination",
+    ]);
+  });
+
+  it("echoes an HTML query as text and adds the search hint", async () => {
+    const query = "<img src=x onerror=alert(1)>";
+    const wrapper = await mountModules(modules());
+
+    await search(wrapper, query);
+
+    const noMatch = wrapper.find('[data-test="edit-role-module-pane-no-match"]');
+    expect(noMatch.find("img").exists()).toBe(false);
+    expect(noMatch.text()).toContain(t("iam.editRole.noModuleMatchQuery", { query }));
+    expect(noMatch.text()).toContain(t("iam.editRole.noModuleMatchHint"));
+  });
+
+  it("says no module is selected yet under Selected with no query", async () => {
+    const wrapper = await mountModules(modules());
+
+    await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').text()).toContain(
+      t("iam.editRole.noGrantedModule"),
+    );
+  });
+
+  it("combines the query with Selected", async () => {
+    const wrapper = await mountModules([
+      moduleRow("destination", "Destinations", ["AllowList"]),
+      moduleRow("template", "Templates"),
+    ]);
+
+    await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
+    await search(wrapper, "alerting");
+
+    expect(row(wrapper, "destination").exists()).toBe(true);
+    expect(row(wrapper, "template").exists()).toBe(false);
   });
 });

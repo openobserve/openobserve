@@ -13,10 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { Ref } from "vue";
+import { computed, readonly, ref, type ComputedRef, type Ref } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { Resource, Entity } from "@/ts/interfaces";
-import type { I18nText } from "@/types/i18n";
+import type { Resource, Entity, PermissionType } from "@/ts/interfaces";
+import { raw, type TranslateFn } from "@/types/i18n";
+import { useRoleScopes } from "@/composables/iam/useRoleScopes";
+import { splitGrantKey } from "@/composables/iam/useRoleGrants";
+import { STREAM_PARENT_KEY } from "@/components/iam/roles/roleModules";
+import { findCompanionGaps, type CompanionGap } from "@/components/iam/roles/roleCompanions";
+import { JOB_PRESETS, type JobPreset } from "@/components/iam/roles/jobPresets";
 import {
   DBM_MODULE_RESOURCE,
   DBM_VIEWER_STREAM_ROW_PERMS,
@@ -40,28 +45,123 @@ import {
   type RumPreset,
 } from "@/components/iam/roles/rumPresets";
 
+export type PresetSection = "builtin" | "job";
+
+export type PresetInfo = {
+  id: string;
+  section: PresetSection;
+  titleKey: string;
+  descriptionKey: string;
+  icon: string;
+  tone: string;
+};
+
+export type PresetPreview = {
+  status: "ready" | "loading" | "failed";
+  /** Grant keys Add will stage, including saved keys now staged for removal. */
+  adds: string[];
+  /** The part of `adds` that undoes a staged removal of a saved grant, so it is no change to the payload. */
+  restores: string[];
+  /** Grants already effective, directly or through a wider scope. */
+  skipped: number;
+  stillMissing: CompanionGap[];
+  noMatchingStreams?: boolean;
+};
+
+type Row = Resource | Entity;
+type Grant = { row: Row; permission: PermissionType };
+
+const READONLY_PERMS: readonly PermissionType[] = ["AllowList", "AllowGet"];
+
 // db_monitoring is checked as a plain GET (never LIST), and has no child
 // entities for a wildcard relation to reach — unlike the `metrics` type node,
 // AllowGet on it grants nothing beyond the module itself.
-const DBM_MODULE_PERMS = ["AllowList", "AllowGet"] as const;
+const DBM_MODULE_PERMS: readonly PermissionType[] = ["AllowList", "AllowGet"];
+
+const ACTION_ORDER = ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"];
+
+// The ids AddRole's "Start from" and the `?preset=` link send.
+const BUILTIN_PRESETS: Omit<JobPreset, "grants">[] = [
+  {
+    id: "readonly",
+    titleKey: "iam.editRole.presetReadonlyTitle",
+    descriptionKey: "iam.editRole.presetReadonlyDescription",
+    icon: "visibility",
+    tone: "other",
+  },
+  {
+    id: "dbm",
+    titleKey: "iam.editRole.presetDbmTitle",
+    descriptionKey: "iam.editRole.presetDbmDescription",
+    icon: "database",
+    tone: "monitoring",
+  },
+  {
+    id: "k8s",
+    titleKey: "iam.editRole.presetK8sTitle",
+    descriptionKey: "iam.editRole.presetK8sDescription",
+    icon: "cloud",
+    tone: "monitoring",
+  },
+  {
+    id: "rum_viewer",
+    titleKey: "iam.editRole.presetRumViewerTitle",
+    descriptionKey: "iam.editRole.presetRumViewerDescription",
+    icon: "devices",
+    tone: "monitoring",
+  },
+  {
+    id: "rum_editor",
+    titleKey: "iam.editRole.presetRumEditorTitle",
+    descriptionKey: "iam.editRole.presetRumEditorDescription",
+    icon: "insights",
+    tone: "data",
+  },
+];
+
+// The stream type whose curated names each stream preset ticks; its list alone decides the preset's status.
+const STREAM_TYPE_OF = new Map([
+  ["dbm", "metrics"],
+  ["k8s", "metrics"],
+  ["rum_viewer", "logs"],
+  ["rum_editor", "logs"],
+]);
+
+const toInfo = (preset: Omit<JobPreset, "grants">, section: PresetSection): PresetInfo => ({
+  id: preset.id,
+  section,
+  titleKey: preset.titleKey,
+  descriptionKey: preset.descriptionKey,
+  icon: preset.icon,
+  tone: preset.tone,
+});
 
 type PresetDeps = {
   permissionsState: { permissions: Resource[] };
   resourceMapper: Ref<{ [key: string]: Resource }>;
   heavyResourceEntities: Ref<{ [key: string]: Entity[] }>;
-  /** Presets skip a grant the role already holds, since staging it again would revoke it. */
-  grants: { has: (key: string) => boolean };
-  permissionHashFor: (row: any, permission: string) => string;
-  handlePermissionChange: (row: any, permission: string) => void;
+  /** Presets judge "already held" on the live grants, since staging a held key again would revoke it. */
+  grants: {
+    has: (key: string) => boolean;
+    current: Ref<Set<string>>;
+    removed: Ref<Record<string, unknown>>;
+  };
+  permissionHashFor: (row: Row, permission: string) => string;
+  /** Unused since presets stage in one batch; optional so EditRole can stop passing it. */
+  handlePermissionChange?: (row: Row, permission: string) => void;
   handlePermissionBatchChange: (
-    changes: { row: any; permission: string; newValue: boolean }[],
+    changes: { row: Row; permission: string; newValue: boolean }[],
   ) => void;
-  /** Loads a node's children, which the stream presets need before they can tick a stream. */
-  expandPermission: (resource: any) => Promise<unknown>;
-  t: (key: string, named?: Record<string, unknown>) => I18nText;
+  /** Opens a node and loads its children, which the `?preset=` link needs before it can tick a stream. */
+  expandPermission: (resource: Row) => Promise<unknown>;
+  /** Loads a node's children without opening it, so the panel can count the stream presets. */
+  getResourceEntities?: (resource: Row) => Promise<unknown>;
+  /** Reads a stream list with or without the loading toast. */
+  getStreams?: (type: string, schema: boolean, notify?: boolean) => Promise<unknown>;
+  t: TranslateFn;
 };
 
-/** The starting points a new role can be seeded from, staged exactly as clicking would. */
+/** The starting points a role can be built from, previewed and staged exactly as clicking would. */
 export const useRolePresets = (deps: PresetDeps) => {
   const {
     permissionsState,
@@ -69,86 +169,199 @@ export const useRolePresets = (deps: PresetDeps) => {
     heavyResourceEntities,
     grants,
     permissionHashFor,
-    handlePermissionChange,
     handlePermissionBatchChange,
     expandPermission,
+    getResourceEntities,
+    getStreams,
     t,
   } = deps;
 
-  // Seed AllowList + AllowGet on every visible top-level resource. Mirrors a
-  // user manually checking those two columns, so the changes flow through the
-  // normal added/removed-permission bookkeeping and the Save payload.
-  const seedReadonlyPreset = () => {
-    const readonlyPerms = ["AllowList", "AllowGet"];
-    permissionsState.permissions.forEach((resource: Resource) => {
-      readonlyPerms.forEach((perm) => {
-        const permDetail = resource.permission?.[perm as "AllowList"];
-        // Held grants are the source of truth: `value` survives an undo and would make the preset a no-op.
-        if (!permDetail || !permDetail.show || grants.has(permissionHashFor(resource, perm)))
-          return;
-        permDetail.value = true;
-        handlePermissionChange(resource, perm);
-      });
-    });
+  const isGranted = (node: Row, action: string) =>
+    grants.current.value.has(permissionHashFor(node, action));
+
+  // model.fga defines every action as `ALLOW_ALL or ALLOW_<ACTION>`.
+  const holds = (node: Row, action: string) =>
+    isGranted(node, action) || isGranted(node, "AllowAll");
+
+  // Only each scope's `covers` and `node` are read here, so its labels are never shown.
+  const { moduleScopes, streamTypeScopes } = useRoleScopes({
+    resourceMapper,
+    isGranted,
+    resourceLabel: (key) => key,
+    moduleLabel: raw,
+    t,
+    ACTION_ORDER,
+  });
+
+  // permissionHashFor writes `_all_<org>` on every catalogue node, so the org id is read back from the same source.
+  const orgId = () => {
+    const [node] = Object.values(resourceMapper.value);
+    return node ? splitGrantKey(permissionHashFor(node, "")).entity.slice("_all_".length) : "";
   };
 
-  const collectVisibleReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
-    perms
-      .filter((perm) => {
-        const permDetail = row.permission?.[perm];
-        return (
-          !!permDetail && permDetail.show && !grants.has(permissionHashFor(row, perm as string))
-        );
-      })
-      .map((perm) => ({ row, permission: perm as string, newValue: true }));
+  const streamTypeNodes = () => resourceMapper.value[STREAM_PARENT_KEY]?.entities ?? [];
 
-  // Stream rows are lazily loaded CHILDREN of the `stream` resource, so both the
-  // `stream` node and its `metrics` child must be expanded (which fetches the
-  // org's streams) before any row exists to tick. `db_monitoring` is a separate,
-  // module-level toggle resource with no entities of its own — it is ticked
-  // directly off resourceMapper, no expand needed.
-  const seedDbmViewerPreset = async () => {
-    const changes: { row: any; permission: string; newValue: boolean }[] = [];
+  const streamTypeNode = (type: string) => streamTypeNodes().find((node) => node.name === type);
 
-    const dbMonitoringResource = resourceMapper.value[DBM_MODULE_RESOURCE];
-    if (dbMonitoringResource) {
-      changes.push(...collectVisibleReadGrants(dbMonitoringResource, DBM_MODULE_PERMS));
-    }
+  // Stream types and streams are the only preset rows under a wider scope; a module row has none.
+  const widerScopes = (row: Row) => {
+    if (streamTypeNodes().some((node) => node === row)) return moduleScopes(STREAM_PARENT_KEY);
+    const typeNode = streamTypeNode(row.resourceName);
+    return typeNode ? streamTypeScopes(typeNode) : [];
+  };
 
-    const streamResource = resourceMapper.value["stream"];
-    let matched = 0;
-    if (streamResource) {
-      if (!streamResource.expand) await expandPermission(streamResource);
+  // The pane's lock rule (ModulePane isInherited) on the live grants, so a wider grant staged for removal no longer counts.
+  const isEffective = ({ row, permission }: Grant) =>
+    holds(row, permission) ||
+    widerScopes(row).some(
+      (scope) =>
+        !!scope.node && scope.covers.includes(row.resourceName) && holds(scope.node, permission),
+    );
 
-      const metricsEntity = streamResource.entities?.find(
-        (entity: Entity) => entity.name === "metrics",
+  // A hidden checkbox is an action FGA rejects, and one rejected tuple fails the whole save.
+  const visible = (row: Row | undefined, perms: readonly PermissionType[]): Grant[] =>
+    row
+      ? perms
+          .filter((permission) => row.permission?.[permission]?.show)
+          .map((permission) => ({ row, permission }))
+      : [];
+
+  const collectVisibleReadGrants = (row: Entity, perms: readonly PermissionType[]) =>
+    visible(row, perms)
+      .filter((grant) => !grants.has(permissionHashFor(grant.row, grant.permission)))
+      .map((grant) => ({ ...grant, newValue: true }));
+
+  // `typeNode.entities` holds only rows under the current filter, so curated names are matched on the full list.
+  const curatedStreamGrants = (
+    type: string,
+    streams: string[],
+    rowPerms: readonly PermissionType[],
+    typePerms: readonly PermissionType[],
+  ) => {
+    const typeNode = streamTypeNode(type);
+    const curated = new Set(streams);
+    const rows = typeNode
+      ? (heavyResourceEntities.value[type] ?? []).filter((row) => curated.has(row.name))
+      : [];
+    // GET /{org}/streams is checked against the type node and LIST rejects ALLOW_GET there; ALLOW_GET would wildcard every stream of the type, so the node is LIST-only and only after a match.
+    return {
+      matched: rows.length,
+      grants: [
+        ...rows.flatMap((row) => visible(row, rowPerms)),
+        ...(rows.length ? visible(typeNode, typePerms) : []),
+      ],
+    };
+  };
+
+  // Module grants are staged even with no matching stream; the matched count feeds the toast.
+  const resolvePreset = (presetId: string): { grants: Grant[]; matched?: number } | null => {
+    if (presetId === "readonly")
+      return {
+        grants: permissionsState.permissions.flatMap((resource) =>
+          visible(resource, READONLY_PERMS),
+        ),
+      };
+    if (presetId === "dbm") {
+      const streams = curatedStreamGrants(
+        "metrics",
+        DBM_VIEWER_STREAMS,
+        DBM_VIEWER_STREAM_ROW_PERMS,
+        DBM_VIEWER_TYPE_NODE_PERMS,
       );
-      if (metricsEntity) {
-        if (!metricsEntity.expand) await expandPermission(metricsEntity);
-
-        // `metrics.entities` only holds rows visible under the current filter, so seeding off it would silently miss streams.
-        const rows = heavyResourceEntities.value["metrics"] ?? [];
-        const curated = new Set(DBM_VIEWER_STREAMS);
-        const matchedRows = rows.filter((row: Entity) => curated.has(row.name));
-        matched = matchedRows.length;
-        changes.push(
-          ...matchedRows.flatMap((row: Entity) =>
-            collectVisibleReadGrants(row, DBM_VIEWER_STREAM_ROW_PERMS),
+      return {
+        matched: streams.matched,
+        grants: [
+          ...visible(resourceMapper.value[DBM_MODULE_RESOURCE], DBM_MODULE_PERMS),
+          ...streams.grants,
+        ],
+      };
+    }
+    if (presetId === "k8s")
+      return curatedStreamGrants(
+        "metrics",
+        K8S_VIEWER_STREAMS,
+        K8S_VIEWER_STREAM_ROW_PERMS,
+        K8S_VIEWER_TYPE_NODE_PERMS,
+      );
+    if (presetId === "rum_viewer" || presetId === "rum_editor") {
+      const streams = curatedStreamGrants(
+        "logs",
+        RUM_STREAMS,
+        RUM_STREAM_ROW_PERMS,
+        RUM_TYPE_NODE_PERMS,
+      );
+      return {
+        matched: streams.matched,
+        grants: [
+          ...visible(resourceMapper.value[RUM_SOURCEMAPS_RESOURCE], RUM_SOURCEMAPS_PERMS),
+          ...(RUM_PRESETS[presetId].withWrite
+            ? visible(resourceMapper.value[RUM_ANALYTICS_RESOURCE], RUM_ANALYTICS_WRITE_PERMS)
+            : []),
+          ...streams.grants,
+        ],
+      };
+    }
+    const job = JOB_PRESETS.find((preset) => preset.id === presetId);
+    return job
+      ? {
+          grants: Object.entries(job.grants).flatMap(([key, perms]) =>
+            visible(resourceMapper.value[key], perms),
           ),
-        );
-
-        // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
-        if (matchedRows.length) {
-          changes.push(...collectVisibleReadGrants(metricsEntity, DBM_VIEWER_TYPE_NODE_PERMS));
         }
-      }
-    }
+      : null;
+  };
 
-    if (changes.length) {
-      handlePermissionBatchChange(changes);
-    }
+  // Toggle revokes a held key and a repeated key cancels itself, so only new keys reach it, once each.
+  const pendingGrants = (list: Grant[]) => {
+    const seen = new Set<string>();
+    const adds = list.filter((grant) => {
+      const key = permissionHashFor(grant.row, grant.permission);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return !isEffective(grant);
+    });
+    return { adds, unique: seen.size };
+  };
 
-    reportDbmViewerSeeding(matched, DBM_VIEWER_STREAMS.length);
+  const isRestore = (key: string) => key in grants.removed.value;
+
+  const stage = (list: Grant[]) => {
+    const { adds } = pendingGrants(list);
+    // Read before staging, since the toggle clears the removal.
+    const restored = adds.filter((grant) =>
+      isRestore(permissionHashFor(grant.row, grant.permission)),
+    ).length;
+    if (adds.length)
+      handlePermissionBatchChange(adds.map((grant) => ({ ...grant, newValue: true })));
+    return { added: adds.length - restored, restored };
+  };
+
+  const applying = ref(false);
+
+  // A double click or a panel Add racing the `?preset=` seed must not run a second apply over the first.
+  const locked = async (run: () => Promise<void> | void) => {
+    if (applying.value) return;
+    applying.value = true;
+    try {
+      await run();
+    } finally {
+      applying.value = false;
+    }
+  };
+
+  // Respects the lock but never takes it: it is synchronous, so nothing can race it.
+  const seedReadonlyPreset = () => {
+    if (applying.value) return;
+    stage(resolvePreset("readonly")?.grants ?? []);
+  };
+
+  // The `?preset=` link opens the nodes so the ticked rows show; expandPermission toggles, so only a collapsed node is opened.
+  const openStreamType = async (type: string) => {
+    const streamResource = resourceMapper.value[STREAM_PARENT_KEY];
+    if (!streamResource) return;
+    if (!streamResource.expand) await expandPermission(streamResource);
+    const typeNode = streamTypeNode(type);
+    if (typeNode && !typeNode.expand) await expandPermission(typeNode);
   };
 
   const reportDbmViewerSeeding = (matched: number, total: number) => {
@@ -159,41 +372,6 @@ export const useRolePresets = (deps: PresetDeps) => {
     );
   };
 
-  // Stream rows are lazily loaded CHILDREN of the `stream` resource, so both the `stream` node and its `metrics` child must be expanded (which fetches the org's streams) before any row exists to tick.
-  const seedK8sViewerPreset = async () => {
-    const streamResource = resourceMapper.value["stream"];
-    if (!streamResource) return;
-
-    // expandPermission toggles, so only call it on a node that is still collapsed.
-    if (!streamResource.expand) await expandPermission(streamResource);
-
-    const metricsEntity = streamResource.entities?.find(
-      (entity: Entity) => entity.name === "metrics",
-    );
-    if (!metricsEntity) return;
-
-    if (!metricsEntity.expand) await expandPermission(metricsEntity);
-
-    // `metrics.entities` only holds rows visible under the current filter, so seeding off it would silently miss streams.
-    const rows = heavyResourceEntities.value["metrics"] ?? [];
-    const curated = new Set(K8S_VIEWER_STREAMS);
-    const matched = rows.filter((row: Entity) => curated.has(row.name));
-    const changes = matched.flatMap((row: Entity) =>
-      collectVisibleReadGrants(row, K8S_VIEWER_STREAM_ROW_PERMS),
-    );
-
-    // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
-    if (matched.length) {
-      changes.push(...collectVisibleReadGrants(metricsEntity, K8S_VIEWER_TYPE_NODE_PERMS));
-    }
-
-    if (changes.length) {
-      handlePermissionBatchChange(changes);
-    }
-
-    reportK8sViewerSeeding(matched.length, K8S_VIEWER_STREAMS.length);
-  };
-
   const reportK8sViewerSeeding = (matched: number, total: number) => {
     toast(
       matched
@@ -202,67 +380,134 @@ export const useRolePresets = (deps: PresetDeps) => {
     );
   };
 
-  // Module grants are staged even before RUM ingestion; the logs type node only when a RUM stream matched, like DBM.
-  const seedRumPreset = async (preset: RumPreset) => {
-    const changes: { row: any; permission: string; newValue: boolean }[] = [];
-    const modules: [string, readonly (keyof Entity["permission"])[]][] = [
-      [RUM_SOURCEMAPS_RESOURCE, RUM_SOURCEMAPS_PERMS],
-      ...(RUM_PRESETS[preset].withWrite
-        ? [
-            [RUM_ANALYTICS_RESOURCE, RUM_ANALYTICS_WRITE_PERMS] as [
-              string,
-              typeof RUM_ANALYTICS_WRITE_PERMS,
-            ],
-          ]
-        : []),
-    ];
-    for (const [name, perms] of modules) {
-      const resource = resourceMapper.value[name];
-      if (resource) changes.push(...collectVisibleReadGrants(resource, perms));
-    }
+  const seedDbmViewerPreset = () =>
+    locked(async () => {
+      await openStreamType("metrics");
+      const resolved = resolvePreset("dbm");
+      stage(resolved?.grants ?? []);
+      reportDbmViewerSeeding(resolved?.matched ?? 0, DBM_VIEWER_STREAMS.length);
+    });
 
-    let matched = 0;
-    const streamResource = resourceMapper.value["stream"];
-    if (streamResource) {
-      if (!streamResource.expand) await expandPermission(streamResource);
-      const logsEntity = streamResource.entities?.find((entity: Entity) => entity.name === "logs");
-      if (logsEntity) {
-        if (!logsEntity.expand) await expandPermission(logsEntity);
-        const rows = heavyResourceEntities.value["logs"] ?? [];
-        const curated = new Set(RUM_STREAMS);
-        const matchedRows = rows.filter((row: Entity) => curated.has(row.name));
-        matched = matchedRows.length;
-        changes.push(
-          ...matchedRows.flatMap((row: Entity) =>
-            collectVisibleReadGrants(row, RUM_STREAM_ROW_PERMS),
-          ),
-        );
-        if (matched) changes.push(...collectVisibleReadGrants(logsEntity, RUM_TYPE_NODE_PERMS));
+  const seedK8sViewerPreset = () =>
+    locked(async () => {
+      await openStreamType("metrics");
+      // With no metrics node there is no stream list to match, so there is nothing to report.
+      if (!streamTypeNode("metrics")) return;
+      const resolved = resolvePreset("k8s");
+      stage(resolved?.grants ?? []);
+      reportK8sViewerSeeding(resolved?.matched ?? 0, K8S_VIEWER_STREAMS.length);
+    });
+
+  const seedRumPreset = (preset: RumPreset) =>
+    locked(async () => {
+      await openStreamType("logs");
+      const resolved = resolvePreset(preset);
+      stage(resolved?.grants ?? []);
+      const total = RUM_STREAMS.length;
+      toast(
+        resolved?.matched
+          ? {
+              variant: "info",
+              message: t("iam.editRole.rumPresetSeeded", { matched: resolved.matched, total }),
+            }
+          : { variant: "warning", message: t("iam.editRole.rumPresetNoMatch", { total }) },
+      );
+    });
+
+  const applyPreset = (presetId: string, opts: { announce?: boolean } = {}): Promise<void> => {
+    if (presetId === "dbm") return seedDbmViewerPreset();
+    if (presetId === "k8s") return seedK8sViewerPreset();
+    if (presetId === "rum_viewer" || presetId === "rum_editor") return seedRumPreset(presetId);
+    return locked(() => {
+      const resolved = resolvePreset(presetId);
+      if (!resolved) return;
+      const { added, restored } = stage(resolved.grants);
+      const preset = [...BUILTIN_PRESETS, ...JOB_PRESETS].find((item) => item.id === presetId);
+      const count = added || restored;
+      if (!opts.announce || !count || !preset) return;
+      // An undone removal is no change to the saved role, so it is never counted as added.
+      toast({
+        variant: "success",
+        message: t(added ? "iam.editRole.presetApplied" : "iam.editRole.presetRestored", {
+          title: t(preset.titleKey),
+          permissions: t("iam.editRole.presetPermissionCount", { count }, count),
+        }),
+      });
+    });
+  };
+
+  // A job preset needing a module this org lacks would stage a tuple FGA rejects, so it is not offered.
+  const presets: ComputedRef<PresetInfo[]> = computed(() => [
+    ...BUILTIN_PRESETS.map((preset) => toInfo(preset, "builtin")),
+    ...JOB_PRESETS.filter((preset) =>
+      Object.keys(preset.grants).every((key) => resourceMapper.value[key]),
+    ).map((preset) => toInfo(preset, "job")),
+  ]);
+
+  // Per stream type, so a 403 on logs leaves the metrics presets usable.
+  const streamStatus = ref<Record<string, "loading" | "loaded" | "failed">>({});
+  const streamLoads = new Map<string, Promise<void>>();
+
+  const loadStreamType = async (type: string) => {
+    streamStatus.value[type] = "loading";
+    try {
+      const streamResource = resourceMapper.value[STREAM_PARENT_KEY];
+      if (streamResource) {
+        if (!getResourceEntities) throw new Error("No entity loader to read the stream lists");
+        await getResourceEntities(streamResource);
+        // A cold read toasts "Please wait while loading streams"; a quiet read first lets the loader answer from cache.
+        await getStreams?.(type, false, false);
+        const typeNode = streamTypeNode(type);
+        if (typeNode) await getResourceEntities(typeNode);
       }
+      streamStatus.value[type] = "loaded";
+    } catch {
+      // A 403 on stream List lands here too: the badge shows nothing and the next call retries.
+      streamStatus.value[type] = "failed";
     }
+  };
 
-    if (changes.length) {
-      handlePermissionBatchChange(changes);
-    }
-
-    toast(
-      matched
-        ? {
-            variant: "info",
-            message: t("iam.editRole.rumPresetSeeded", { matched, total: RUM_STREAMS.length }),
-          }
-        : {
-            variant: "warning",
-            message: t("iam.editRole.rumPresetNoMatch", { total: RUM_STREAMS.length }),
-          },
+  /** Loads the metrics and logs lists the stream presets match against, once each and without a toast; a failed one loads again. */
+  const loadPresetStreams = async () => {
+    await Promise.all(
+      [...new Set(STREAM_TYPE_OF.values())].map((type) => {
+        let load = streamLoads.get(type);
+        if (!load || streamStatus.value[type] === "failed") {
+          load = loadStreamType(type);
+          streamLoads.set(type, load);
+        }
+        return load;
+      }),
     );
   };
 
-  const applyPreset = async (presetId: string) => {
-    if (presetId === "readonly") seedReadonlyPreset();
-    else if (presetId === "dbm") await seedDbmViewerPreset();
-    else if (presetId === "k8s") await seedK8sViewerPreset();
-    else if (presetId === "rum_viewer" || presetId === "rum_editor") await seedRumPreset(presetId);
+  // Computed on call, never cached, so a grant changed elsewhere shows on the next render.
+  const previewPreset = (presetId: string): PresetPreview => {
+    const streamType = STREAM_TYPE_OF.get(presetId);
+    const listStatus = streamType ? streamStatus.value[streamType] : "loaded";
+    if (listStatus !== "loaded")
+      return {
+        status: listStatus === "failed" ? "failed" : "loading",
+        adds: [],
+        restores: [],
+        skipped: 0,
+        stillMissing: [],
+      };
+    const resolved = resolvePreset(presetId);
+    const { adds, unique } = pendingGrants(resolved?.grants ?? []);
+    const addKeys = adds.map((grant) => permissionHashFor(grant.row, grant.permission));
+    return {
+      status: "ready",
+      adds: addKeys,
+      restores: addKeys.filter(isRestore),
+      skipped: unique - addKeys.length,
+      stillMissing: findCompanionGaps(
+        new Set([...grants.current.value, ...addKeys]),
+        new Set(Object.keys(resourceMapper.value)),
+        orgId(),
+      ),
+      ...(streamType ? { noMatchingStreams: !resolved?.matched } : {}),
+    };
   };
 
   return {
@@ -274,5 +519,10 @@ export const useRolePresets = (deps: PresetDeps) => {
     reportK8sViewerSeeding,
     seedRumPreset,
     applyPreset,
+    presets,
+    previewPreset,
+    loadPresetStreams,
+    /** True while a preset is being staged; Add stays disabled meanwhile. */
+    applyingPreset: readonly(applying),
   };
 };

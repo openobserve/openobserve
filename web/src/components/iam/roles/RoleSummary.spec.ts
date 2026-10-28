@@ -4,6 +4,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { raw } from "@/types/i18n";
+import type { PresetInfo, PresetPreview } from "@/composables/iam/useRolePresets";
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
@@ -22,41 +23,97 @@ const makeModule = (moduleKey: string, overrides: Partial<SummaryModule> = {}): 
   ...overrides,
 });
 
-async function mountSummary(props: Partial<{ modules: SummaryModule[]; loading: boolean }> = {}) {
+const PRESETS: PresetInfo[] = [
+  {
+    id: "readonly",
+    section: "builtin",
+    titleKey: "iam.editRole.presetReadonlyTitle",
+    descriptionKey: "iam.editRole.presetReadonlyDescription",
+    icon: "visibility",
+    tone: "other",
+  },
+];
+
+const preview = (): PresetPreview => ({
+  status: "ready",
+  adds: ["stream:_all_default:AllowList", "stream:_all_default:AllowGet"],
+  restores: [],
+  skipped: 0,
+  stillMissing: [],
+});
+
+async function mountSummary(
+  props: Partial<{
+    modules: SummaryModule[];
+    loading: boolean;
+    previewPreset: (id: string) => PresetPreview;
+  }> = {},
+) {
   const wrapper = mount(RoleSummary, {
     global: { plugins: [i18n, store, router] },
-    props: { modules: [], loading: false, ...props },
+    props: {
+      modules: [],
+      loading: false,
+      applying: false,
+      presets: PRESETS,
+      previewPreset: preview,
+      moduleLabel: (key: string) => raw(key),
+      entityLabel: (_resource: string, entity: string) => raw(entity),
+      summaryActions: (actions: string[]) =>
+        actions.map((action) => ({ action, label: raw(action) })),
+      ...props,
+    },
   });
   await flushPromises();
   return wrapper;
 }
 
+const panel = '[data-test="edit-role-presets-panel"]';
+
 describe("RoleSummary - empty role", () => {
-  it("offers the presets when the role grants nothing", async () => {
+  // The presets moved to the panel, so the empty state no longer repeats them as tiles.
+  it("shows the empty state without preset tiles, next to the presets panel", async () => {
     const wrapper = await mountSummary();
 
     expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="edit-role-summary-empty"] button')).toHaveLength(0);
+    expect(wrapper.find(panel).exists()).toBe(true);
   });
 
-  it("emits the preset the user picks", async () => {
+  it("passes the preset the user adds from the panel up as `preset`", async () => {
     const wrapper = await mountSummary();
-    const readonly = wrapper
-      .findAll('[data-test="edit-role-summary-empty"] button')
-      .find((button) =>
-        button.text().includes(String(i18n.global.t("iam.editRole.presetReadonlyTitle"))),
-      );
 
-    await readonly!.trigger("click");
+    await wrapper.find('[data-test="edit-role-preset-readonly"]').trigger("click");
+    await wrapper.find('[data-test="edit-role-preset-apply"]').trigger("click");
 
-    expect(wrapper.emitted("preset")?.at(-1)).toEqual(["readonly"]);
+    expect(wrapper.emitted("preset")).toEqual([["readonly"]]);
   });
 
-  // Presets must not flash while the saved grants are still loading.
-  it("shows a spinner instead of the presets while loading", async () => {
+  // Presets must not show counts while the saved grants are still loading.
+  it("shows a spinner and no preset counts while loading", async () => {
     const wrapper = await mountSummary({ loading: true });
 
     expect(wrapper.find('[data-test="edit-role-summary-loading"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-preset-readonly-status"]').text()).toBe("");
+    expect(wrapper.emitted("load-streams")).toBeUndefined();
+  });
+
+  it("passes the panel's stream list request up only when a stream preset opens", async () => {
+    const wrapper = await mountSummary({
+      previewPreset: () => ({
+        status: "loading",
+        adds: [],
+        restores: [],
+        skipped: 0,
+        stillMissing: [],
+      }),
+    });
+    expect(wrapper.emitted("load-streams")).toBeUndefined();
+
+    await wrapper.find('[data-test="edit-role-preset-readonly"]').trigger("click");
+
+    expect(wrapper.emitted("load-streams")).toHaveLength(1);
   });
 });
 
@@ -81,9 +138,21 @@ describe("RoleSummary - module cards", () => {
     expect(wrapper.emitted("open")?.at(-1)).toEqual(["stream"]);
   });
 
-  it("does not offer the presets once the role holds a grant", async () => {
+  it("keeps the presets panel once the role holds a grant", async () => {
     const wrapper = await mountSummary({ modules: [makeModule("stream")] });
 
     expect(wrapper.find('[data-test="edit-role-summary-empty"]').exists()).toBe(false);
+    expect(wrapper.find(panel).exists()).toBe(true);
+  });
+
+  it("marks only a card with unsaved changes, with text for screen readers", async () => {
+    const wrapper = await mountSummary({
+      modules: [makeModule("stream", { added: 2, removed: 0 }), makeModule("dfolder")],
+    });
+
+    const dot = wrapper.find('[data-test="edit-role-summary-unsaved-stream"]');
+    expect(dot.exists()).toBe(true);
+    expect(dot.text()).toBe(String(i18n.global.t("iam.editRole.summaryPendingTitle")));
+    expect(wrapper.find('[data-test="edit-role-summary-unsaved-dfolder"]').exists()).toBe(false);
   });
 });

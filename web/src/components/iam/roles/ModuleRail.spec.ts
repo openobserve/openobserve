@@ -157,6 +157,116 @@ describe("ModuleRail - filter", () => {
   });
 });
 
+describe("ModuleRail - filter by group and task word", () => {
+  const t = (key: string, named: Record<string, unknown> = {}) => String(i18n.global.t(key, named));
+
+  const alerting = { groupId: "alerting", groupLabel: raw("Alerting") };
+
+  const modules = () => [
+    makeModule("stream", { label: raw("Streams") }),
+    makeModule("destination", { label: raw("Destinations"), ...alerting }),
+    makeModule("template", { label: raw("Templates"), ...alerting }),
+  ];
+
+  const search = (wrapper: any, value: string) =>
+    wrapper.find('[data-test="edit-role-module-rail-search"] input').setValue(value);
+
+  const pill = (wrapper: any) => wrapper.find('[data-test^="edit-role-module-match-"]');
+
+  it("asks for modules, groups or tasks in the search box", async () => {
+    const wrapper = await mountRail(modules());
+
+    expect(
+      wrapper.find('[data-test="edit-role-module-rail-search"] input').attributes("placeholder"),
+    ).toBe(t("iam.editRole.filterModulesTasks"));
+  });
+
+  it("keeps a whole group when the query matches its name", async () => {
+    const wrapper = await mountRail(modules());
+
+    await search(wrapper, "alert");
+
+    expect(item(wrapper, "destination").exists()).toBe(true);
+    expect(item(wrapper, "template").exists()).toBe(true);
+    expect(item(wrapper, "stream").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+  });
+
+  it("keeps a module matched by a task word, without a pill", async () => {
+    const wrapper = await mountRail(modules());
+
+    await search(wrapper, "slack");
+
+    expect(item(wrapper, "destination").exists()).toBe(true);
+    expect(item(wrapper, "template").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+  });
+
+  it("shows a matched name as plain text, with no highlight", async () => {
+    const wrapper = await mountRail([makeModule("dfolder", { label: raw("Dashboard Folders") })]);
+
+    await search(wrapper, "FOLD");
+
+    expect(wrapper.find("mark").exists()).toBe(false);
+    expect(item(wrapper, "dfolder").find(".o-tab__label").text()).toBe("Dashboard Folders");
+  });
+
+  // "k" is inside "slack"; one letter must not keep a module by its task words.
+  it("ignores task words for a 1-character query", async () => {
+    const wrapper = await mountRail(modules());
+
+    await search(wrapper, "k");
+
+    expect(item(wrapper, "destination").exists()).toBe(false);
+    expect(pill(wrapper).exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-module-rail-no-match"]').text()).toContain(
+      t("iam.editRole.noModuleMatchQuery", { query: "k" }),
+    );
+  });
+
+  it("renders a < in a module label as text, not markup", async () => {
+    const wrapper = await mountRail([makeModule("odd", { label: raw("<b>Odd</b>") })]);
+
+    await search(wrapper, "<b>");
+
+    expect(item(wrapper, "odd").find("b").exists()).toBe(false);
+    expect(item(wrapper, "odd").find(".o-tab__label").text()).toBe("<b>Odd</b>");
+  });
+
+  it("echoes an HTML query as text in the no-match message", async () => {
+    const query = "<img src=x onerror=alert(1)>";
+    const wrapper = await mountRail(modules());
+
+    await search(wrapper, `  ${query}  `);
+
+    const empty = wrapper.find('[data-test="edit-role-module-rail-no-match"]');
+    expect(empty.find("img").exists()).toBe(false);
+    expect(empty.text()).toContain(t("iam.editRole.noModuleMatchQuery", { query }));
+    expect(empty.text()).toContain(t("iam.editRole.noModuleMatchHint"));
+  });
+
+  it("shows the no-match text, not 'No Module Is Selected Yet', with Selected on and an unmatched query", async () => {
+    const wrapper = await mountRail([makeModule("stream", { label: raw("Streams"), granted: 2 })]);
+
+    await wrapper.find('[data-test="edit-role-module-rail-scope-granted"]').trigger("click");
+    await search(wrapper, "zzz");
+
+    const empty = wrapper.find('[data-test="edit-role-module-rail-no-match"]');
+    expect(empty.text()).toContain(t("iam.editRole.noModuleMatchQuery", { query: "zzz" }));
+    expect(empty.text()).not.toContain(t("iam.editRole.noGrantedModule"));
+  });
+
+  it("still shows 'No Module Is Selected Yet' with Selected on and no query", async () => {
+    const wrapper = await mountRail(modules());
+
+    await wrapper.find('[data-test="edit-role-module-rail-scope-granted"]').trigger("click");
+
+    const empty = wrapper.find('[data-test="edit-role-module-rail-no-match"]');
+    expect(empty.text()).toContain(t("iam.editRole.noGrantedModule"));
+    expect(empty.text()).not.toContain(t("iam.editRole.noModuleMatchHint"));
+  });
+});
+
 describe("ModuleRail - granted scope", () => {
   const modules = [makeModule("metrics", { granted: 3 }), makeModule("templates")];
 
