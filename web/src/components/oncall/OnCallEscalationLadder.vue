@@ -35,20 +35,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          from this strip is one nobody would think to check. The edit button
          rides along on the same row rather than a title above it — this
          strip already says what is being edited. -->
-    <span class="flex flex-wrap items-center gap-2">
-      <OButton
-        v-for="group in groups"
-        :key="group.key"
-        :variant="group.variant"
-        size="xs"
-        :data-test="`oncall-ladder-priority-${group.key}`"
-        @click="emit('update:selected', group.selects)"
+    <!-- One line: only the chips wrap, inside their own group, so the buttons never drop below them. -->
+    <span class="flex items-start gap-2" data-test="oncall-ladder-strip">
+      <span
+        class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+        data-test="oncall-ladder-priorities"
       >
-        {{ group.label }}
-        <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
-      </OButton>
-      <!-- One group, so a narrow strip wraps the pair together rather than stranding Edit on its own line. -->
-      <span class="ms-auto flex shrink-0 items-center gap-2" data-test="oncall-ladder-actions">
+        <OButton
+          v-for="group in groups"
+          :key="group.key"
+          :variant="group.variant"
+          size="xs"
+          :data-test="`oncall-ladder-priority-${group.key}`"
+          @click="emit('update:selected', group.selects)"
+        >
+          {{ group.label }}
+          <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
+        </OButton>
+      </span>
+      <span class="flex shrink-0 items-center gap-2" data-test="oncall-ladder-actions">
         <OButton
           v-if="canConfigure"
           variant="outline"
@@ -63,26 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.edit") }}
         </OButton>
       </span>
-    </span>
-
-    <!-- Led by the priority it is about, so a warning about P1 is never read as one about the whole strip. -->
-    <span
-      v-if="unreceivable.length"
-      class="-mt-2 flex flex-wrap items-center gap-2"
-      data-test="oncall-ladder-unreceivable"
-    >
-      <span class="text-text-secondary text-xs">{{ raw(selected) }}</span>
-      <OTag
-        v-for="channel in unreceivable"
-        :key="channel"
-        variant="warning-soft"
-        size="sm"
-        :data-test="`oncall-ladder-no-${channel}`"
-      >
-        {{
-          channel === "sms" ? t("oncall.ladderNobodyGetsTexts") : t("oncall.ladderNobodyGetsCalls")
-        }}
-      </OTag>
     </span>
 
     <OInnerLoading v-if="loading" showing />
@@ -221,12 +206,10 @@ import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
-  Channel,
   EscalationPreview,
   OnCallPolicy,
   PreviewRung,
   Rotation,
-  TeamReachability,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -246,8 +229,6 @@ const props = withDefaults(
     selected?: string;
     preview?: EscalationPreview | null;
     loading?: boolean;
-    /** Who on the team can receive what; absent means unknown, which raises no warning. */
-    reachability?: Pick<TeamReachability, "members"> | null;
     /** May send a test page, which needs config access. */
     canConfigure?: boolean;
   }>(),
@@ -258,7 +239,6 @@ const props = withDefaults(
     selected: "P1",
     preview: null,
     loading: false,
-    reachability: null,
     canConfigure: false,
   },
 );
@@ -301,19 +281,6 @@ function ladderKey(entry: TeamRungSummary): string | null {
     [...rung.channels].sort(),
   ]);
 }
-
-/// The selected priority's phone channels that no team member can receive.
-const unreceivable = computed<Channel[]>(() => {
-  const members = props.reachability?.members;
-  if (!members) return [];
-  const entry = props.priorities.find((candidate) => candidate.priority === props.selected);
-  if (!entry?.pages_anyone) return [];
-  return (["sms", "voice"] as Channel[]).filter(
-    (channel) =>
-      (entry.channels ?? []).includes(channel) &&
-      !members.some((member) => member.deliverable_channels.includes(channel)),
-  );
-});
 
 interface PriorityGroup {
   key: string;

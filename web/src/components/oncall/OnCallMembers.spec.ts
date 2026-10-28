@@ -147,6 +147,7 @@ function render(arg: OnCallTeamMember[] | RenderOpts = []) {
   return mount(OnCallMembers, {
     props: {
       teamId: "team_1",
+      teamName: "Payments",
       members: opts.members ?? [],
       rotations: opts.rotations ?? [],
       timezone: "UTC",
@@ -378,8 +379,31 @@ describe("OnCallMembers", () => {
     }
 
     it("names who takes over the current shift", async () => {
-      expect(await confirmFor("ana@o2.ai")).toContain(
-        "Bob takes over the current shift in Primary.",
+      expect(await confirmFor("ana@o2.ai")).toBe(
+        "They will no longer be paged for this team. Bob takes over Ana Sharma's current shift in Primary.",
+      );
+    });
+
+    // F1 (round 7): before the team name loads, the title names the person alone rather than "from ?".
+    it("names only the person while the team name is unknown", async () => {
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await wrapper.setProps({ teamName: "" });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("title")).toBe(
+        "Remove Ana Sharma?",
+      );
+    });
+
+    // Owner: the title names the person and the team.
+    it("names the person and the team in the title", async () => {
+      const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("title")).toBe(
+        "Remove Ana Sharma from Payments?",
       );
     });
 
@@ -495,7 +519,7 @@ describe("OnCallMembers", () => {
 
     it("says the shift goes uncovered when nobody is next", async () => {
       const text = await confirmFor("ana@o2.ai", [{ ...now[0], next_user_email: null }]);
-      expect(text).toContain("Nobody will be on call in Primary.");
+      expect(text).toContain("Nobody takes over Ana Sharma's current shift in Primary.");
     });
   });
 
@@ -610,16 +634,14 @@ describe("OnCallMembers", () => {
 
     const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
     expect(confirm.props("modelValue")).toBe(true);
-    expect(confirm.props("messageKeypath")).toBe("oncall.removeMemberMessage");
-    expect(confirm.props("messageName")).toBe("ana@o2.ai");
+    expect(confirm.props("title")).toBe("Remove Ana Sharma from Payments?");
     expect(confirm.props("okVariant")).toBe("destructive");
 
     confirm.vm.$emit("update:cancel");
     await flushPromises();
     expect(confirm.props("modelValue")).toBe(false);
-    expect(confirm.props("messageName")).toBeUndefined();
     // The real ConfirmDialog keeps what it showed while open, so the fade-out still reads right.
-    expect((confirm.vm as any).shown.messageName).toBe("ana@o2.ai");
+    expect((confirm.vm as any).shown.title).toBe("Remove Ana Sharma from Payments?");
   });
 
   describe("absences", () => {

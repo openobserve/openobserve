@@ -47,17 +47,18 @@ const pagesR2 = (generated: boolean | undefined) => ({
   ],
 });
 
-function render(policy: unknown, rotationId = "r2") {
+const ROTATIONS = [
+  { id: "r1", name: "Primary", shift_rules: [] },
+  { id: "r2", name: "Secondary", shift_rules: [] },
+];
+const HOLDERS = [
+  { rotation_id: "r1", name: "Carol Nguyen" },
+  { rotation_id: "r2", name: "Riya Root" },
+];
+
+function render(policy: unknown, rotationId = "r2", holders = HOLDERS) {
   return mount(OnCallRemoveRotationDialog, {
-    props: {
-      open: true,
-      title: "Remove Secondary?",
-      messageKeypath: "oncall.removeRotationMessage",
-      messageName: "Secondary",
-      okLabel: "Remove rotation",
-      rotationId,
-      policy: policy as any,
-    },
+    props: { open: true, rotationId, rotations: ROTATIONS, holders, policy: policy as any },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -66,11 +67,39 @@ const dialog = (wrapper: ReturnType<typeof render>) => wrapper.findComponent({ n
 
 // S11: removing a rotation says what it does to the escalation policy before it happens.
 describe("OnCallRemoveRotationDialog", () => {
+  // Owner: the title names the rotation; the body says, with names, who holds it and that nobody takes its shifts.
+  it("names the rotation in the title and the people in the body", () => {
+    const wrapper = render(null);
+
+    expect(dialog(wrapper).props("title")).toBe("Delete the Secondary rotation?");
+    expect(dialog(wrapper).props("primaryButtonLabel")).toBe("Delete rotation");
+    expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').text()).toBe(
+      "Riya Root is on call in Secondary now. Once it's deleted, nobody takes over its shifts; Primary (Carol Nguyen) keeps its own.",
+    );
+  });
+
+  it("says when nobody holds it now and no other rotation exists", () => {
+    const wrapper = mount(OnCallRemoveRotationDialog, {
+      props: {
+        open: true,
+        rotationId: "r2",
+        rotations: [ROTATIONS[1]],
+        holders: [],
+        policy: null,
+      },
+      global: { plugins: [i18n], stubs },
+    });
+
+    expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').text()).toBe(
+      "Nobody is on call in Secondary now. Once it's deleted, nobody takes over its shifts.",
+    );
+  });
+
   it("lists the generated steps that go with the rotation", async () => {
     const wrapper = render(pagesR2(true));
 
     expect(wrapper.find('[data-test="oncall-remove-rotation-steps"]').text()).toBe(
-      "P1 step 2 is removed from the escalation policy too.",
+      "The escalation step that pages Secondary is removed too: P1 step 2.",
     );
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
     // Removing a rotation is destructive, so its button is red like every other delete.
@@ -83,7 +112,7 @@ describe("OnCallRemoveRotationDialog", () => {
     const wrapper = render(pagesR2(false));
 
     expect(wrapper.find('[data-test="oncall-remove-rotation-blocked"]').text()).toBe(
-      "P1 step 2 of the escalation policy pages this rotation. Edit the policy first.",
+      "P1 step 2 of the escalation policy pages Secondary. Edit the policy first.",
     );
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
     await wrapper.find('[data-test="oncall-remove-rotation-open-policy"]').trigger("click");
@@ -95,7 +124,7 @@ describe("OnCallRemoveRotationDialog", () => {
     const wrapper = render(pagesR2(undefined));
 
     expect(wrapper.find('[data-test="oncall-remove-rotation-may-refuse"]').text()).toBe(
-      "P1 step 2 of the escalation policy pages this rotation. If the policy was edited by hand, the remove is refused until the policy stops paging it.",
+      "P1 step 2 of the escalation policy pages Secondary. If the policy was edited by hand, the delete is refused until it stops paging Secondary.",
     );
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
     await wrapper.find('[data-test="oncall-remove-rotation-open-policy"]').trigger("click");
@@ -112,9 +141,7 @@ describe("OnCallRemoveRotationDialog", () => {
       expect(wrapper.find('[data-test="oncall-remove-rotation-blocked"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-remove-rotation-may-refuse"]').exists()).toBe(false);
       expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
-      expect(wrapper.text()).toContain("It is deleted now, for everyone on this team.");
-      // Named in bold, the way every delete confirm names its item.
-      expect(wrapper.find('[data-test="oncall-remove-rotation-name"]').text()).toBe("Secondary");
+      expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').exists()).toBe(true);
     }
   });
 });

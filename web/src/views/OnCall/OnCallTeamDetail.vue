@@ -227,6 +227,7 @@
           <OnCallMembers
             ref="membersRef"
             :team-id="teamId"
+            :team-name="team?.name ?? ''"
             :members="members"
             :rotations="schedule?.rotations ?? []"
             :timezone="team?.timezone ?? 'UTC'"
@@ -339,7 +340,6 @@
               :rotations="teamRotations"
               :preview="preview"
               :loading="previewLoading"
-              :reachability="reachability"
               :can-configure="canConfigure"
               @edit="openPolicyEditor"
               @open-members="activeTab = 'members'"
@@ -378,11 +378,9 @@
          rotations in one team routinely differ by one word. -->
     <OnCallRemoveRotationDialog
       :open="!!rotationToDelete"
-      :title="t('oncall.laneDeleteTitle')"
-      message-keypath="oncall.laneDeleteMessage"
-      :message-name="rotationNameToDelete"
-      :ok-label="t('oncall.removeRotation')"
       :rotation-id="rotationToDelete ?? ''"
+      :rotations="teamRotations"
+      :holders="holdersByName"
       :policy="policy"
       @update:open="(v: boolean) => (v ? null : (rotationToDelete = null))"
       @confirm="deleteRotation"
@@ -447,6 +445,7 @@ import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OnCallRemoveRotationDialog from "@/components/oncall/OnCallRemoveRotationDialog.vue";
 import OnCallTeamDetailSkeleton from "@/views/OnCall/OnCallTeamDetailSkeleton.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -590,11 +589,13 @@ const presetsOpen = ref(false);
 /// up rather than carried: a name is renameable and two rotations may share
 /// one, so it cannot say which row the reader picked.
 const rotationToDelete = ref<string | null>(null);
-const rotationNameToDelete = computed(() =>
-  raw(
-    (schedule.value?.rotations ?? []).find((rotation) => rotation.id === rotationToDelete.value)
-      ?.name ?? "",
-  ),
+const { nameOf } = useOrgUserNames();
+/// Who each rotation puts on call now, by name, for the delete confirm.
+const holdersByName = computed(() =>
+  onCallNow.value.map((position) => ({
+    rotation_id: position.rotation_id,
+    name: nameOf(position.user_email),
+  })),
 );
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);

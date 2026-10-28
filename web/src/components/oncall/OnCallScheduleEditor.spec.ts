@@ -139,9 +139,9 @@ const stubs = {
   },
   OnCallRemoveRotationDialog: {
     name: "OnCallRemoveRotationDialog",
-    props: ["open", "title", "messageKeypath", "messageName", "rotationId", "policy"],
+    props: ["open", "rotationId", "rotations", "holders", "policy"],
     emits: ["confirm", "update:open", "open-policy"],
-    template: "<div v-if='open'>{{ title }}</div>",
+    template: "<div v-if='open' />",
   },
   OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
@@ -714,6 +714,18 @@ describe("OnCallScheduleEditor", () => {
     expect(rows[0].shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
   });
 
+  // F2 (round 7): the row's icon button is named what the drawer button says.
+  it("names the row delete button Delete rotation", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await flushPromises();
+
+    expect(
+      wrapper
+        .find(`[data-test="oncall-schedule-remove-${rota("Primary").id}"]`)
+        .attributes("aria-label"),
+    ).toBe("Delete rotation");
+  });
+
   // C2: removing saves at once for everyone, so it is confirmed first.
   describe("removing a rotation", () => {
     async function askToRemove() {
@@ -731,10 +743,14 @@ describe("OnCallScheduleEditor", () => {
     it("asks first, naming the rotation, and writes nothing on cancel", async () => {
       const wrapper = await askToRemove();
       const confirm = removeDialog(wrapper);
-      expect(confirm.text()).toBe("Remove Primary?");
-      expect(confirm.props("messageKeypath")).toBe("oncall.removeRotationMessage");
-      expect(confirm.props("messageName")).toBe("Primary");
+      expect(confirm.props("open")).toBe(true);
       expect(confirm.props("rotationId")).toBe(rota("Primary").id);
+      // The dialog names rotations and holders itself; it is handed every rotation and who holds each now.
+      expect(confirm.props("rotations").map((r: any) => r.name)).toEqual(["Primary", "Secondary"]);
+      expect(confirm.props("holders")).toEqual([
+        { rotation_id: rota("Primary").id, name: "ana@o2.ai" },
+        { rotation_id: rota("Secondary").id, name: "ana@o2.ai" },
+      ]);
 
       confirm.vm.$emit("update:open", false);
       await flushPromises();

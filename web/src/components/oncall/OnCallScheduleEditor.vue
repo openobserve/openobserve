@@ -88,7 +88,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="delete-outline"
-            :aria-label="t('oncall.removeRotation')"
+            :aria-label="t('oncall.laneDelete')"
             :data-test="`oncall-schedule-remove-${row.id}`"
             @click.stop="removeRotation(row)"
           />
@@ -346,7 +346,7 @@
             data-test="oncall-rotation-delete"
             @click="confirmRemove = true"
           >
-            {{ t("oncall.removeRotation") }}
+            {{ t("oncall.laneDelete") }}
           </OButton>
           <OButton variant="outline" size="sm-action" class="ms-auto" @click="cancelDrawer">
             {{ t("oncall.cancel") }}
@@ -378,11 +378,9 @@
     <OnCallRemoveRotationDialog
       v-model:open="confirmRemove"
       data-test="oncall-rotation-remove-confirm"
-      :title="t('oncall.removeRotationTitle', { name: raw(active?.name ?? '') })"
-      message-keypath="oncall.removeRotationMessage"
-      :message-name="active?.name"
-      :ok-label="t('oncall.removeRotation')"
       :rotation-id="active?.id ?? ''"
+      :rotations="draft"
+      :holders="removeHolders"
       :policy="policy ?? null"
       @confirm="confirmDelete"
       @open-policy="openPolicy"
@@ -1034,6 +1032,14 @@ watch(editing, (isOpen) => {
   }
   if (abandoned) draft.value = draft.value.filter((r) => r !== abandoned);
 });
+
+/// Who each rotation puts on call now, by name, for the delete confirm.
+const removeHolders = computed(() =>
+  draft.value
+    .map((rotation) => ({ rotation_id: rotation.id, email: holderOf(rotation) }))
+    .filter((holder) => holder.email)
+    .map((holder) => ({ rotation_id: holder.rotation_id, name: nameOf(holder.email) })),
+);
 
 function confirmDelete() {
   confirmRemove.value = false;

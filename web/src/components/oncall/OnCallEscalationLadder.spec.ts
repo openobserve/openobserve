@@ -188,56 +188,29 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.find('[data-test="oncall-ladder-priority-p3"]').exists()).toBe(true);
   });
 
-  // S3: words only where the priority sends something nobody here can receive.
-  describe("a channel nobody can receive", () => {
-    const reachOf = (deliverable: string[][]) => ({
-      members: deliverable.map((channels, i) => ({
-        user_email: `p${i}@o2.ai`,
-        deliverable_channels: channels,
-      })),
-    });
-    const sending = [{ ...priorities[0], channels: ["email", "sms", "voice"] }, priorities[1]];
-
-    it("warns per channel nobody on the team can get", () => {
-      const wrapper = render({
-        priorities: sending,
-        reachability: reachOf([["email"], ["email"]]),
-      });
-      // L3: the warnings sit on their own line, led by the priority they are about.
-      const line = wrapper.find('[data-test="oncall-ladder-unreceivable"]');
-      expect(line.text()).toMatch(/^P1/);
-      expect(line.find('[data-test="oncall-ladder-no-sms"]').exists()).toBe(true);
-
-      // F2: the same channel words the chip beside it uses.
-      expect(wrapper.find('[data-test="oncall-ladder-no-sms"]').text()).toBe(
-        "Nobody here can receive SMS",
-      );
-      expect(wrapper.find('[data-test="oncall-ladder-no-voice"]').text()).toBe(
-        "Nobody here can receive voice calls",
-      );
-    });
-
-    it("stays quiet when one member can receive it, or when reach is unknown", () => {
-      const reached = render({
-        priorities: sending,
-        reachability: reachOf([["email"], ["email", "sms", "voice"]]),
-      });
-      const unknown = render({ priorities: sending, reachability: null });
-
-      for (const wrapper of [reached, unknown]) {
-        expect(wrapper.find('[data-test="oncall-ladder-no-sms"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="oncall-ladder-no-voice"]').exists()).toBe(false);
-      }
-    });
-  });
-
-  // S4: a test page is a configuration act, so only those who can configure see it.
   // L3: Send test and Edit are one action group, so neither wraps away from the other.
   it("keeps Send test and Edit together", () => {
-    const actions = render({ canConfigure: true }).find('[data-test="oncall-ladder-actions"]');
+    const wrapper = render({ canConfigure: true });
+    const actions = wrapper.find('[data-test="oncall-ladder-actions"]');
 
     expect(actions.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(true);
     expect(actions.find('[data-test="oncall-policy-edit"]').exists()).toBe(true);
+    // Owner: one line. Only the chip group may wrap; the strip itself never moves the buttons down.
+    const strip = wrapper.find('[data-test="oncall-ladder-strip"]');
+    const chips = wrapper.find('[data-test="oncall-ladder-priorities"]');
+    expect(strip.classes()).not.toContain("flex-wrap");
+    expect(chips.classes()).toEqual(expect.arrayContaining(["flex-wrap", "min-w-0", "flex-1"]));
+    expect(actions.classes()).toContain("shrink-0");
+    expect(chips.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(false);
+  });
+
+  // Owner: the "nobody here can receive" chips are gone; the rail's unreachable badge already says it.
+  it("draws no channel warning chips", () => {
+    const wrapper = render({
+      priorities: [{ ...priorities[0], channels: ["email", "sms", "voice"] }, priorities[1]],
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-unreceivable"]').exists()).toBe(false);
   });
 
   it("offers Send test only to someone who can configure", async () => {

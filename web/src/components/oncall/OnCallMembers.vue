@@ -282,10 +282,8 @@
 
     <ConfirmDialog
       :model-value="!!memberToRemove"
-      :title="t('oncall.removeMemberTitle')"
-      message-keypath="oncall.removeMemberMessage"
-      :message-name="memberToRemove?.user_email"
-      :warning-message="handoverWarning"
+      :title="removeTitle"
+      :message="removeMessage"
       :ok-label="t('oncall.removeMemberConfirm')"
       ok-variant="destructive"
       focus-cancel
@@ -352,6 +350,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 const props = withDefaults(
   defineProps<{
     teamId: string;
+    /** Named in the remove confirm's title. */
+    teamName?: string;
     members: OnCallTeamMember[];
     rotations?: Rotation[];
     timezone: string;
@@ -885,19 +885,28 @@ function placementMessage(emails: string[], before: Rotation[], after: Rotation[
 
 const memberToRemove = ref<OnCallTeamMember | null>(null);
 
+// The title names who and from where, so the body can spend its words on what happens next.
+const removeTitle = computed<I18nText>(() => {
+  const name = raw(nameOf(memberToRemove.value?.user_email ?? ""));
+  return props.teamName
+    ? t("oncall.removeMemberTitleNamed", { name, team: raw(props.teamName) })
+    : t("oncall.removeMemberTitlePerson", { name });
+});
+
 /// Who takes the shift the removed person holds now. A cover is skipped: it is not the roster handing over.
-const handoverWarning = computed<I18nText | undefined>(() => {
+const removeMessage = computed<I18nText>(() => {
   const email = memberToRemove.value?.user_email.toLowerCase();
+  const leaving = raw(nameOf(memberToRemove.value?.user_email ?? ""));
   const handovers = props.onCallNow
     .filter((position) => position.user_email.toLowerCase() === email && !position.override_id)
     .map((position) => {
       const next = position.next_user_email;
       const rotation = raw(position.rotation_name);
       return next && next.toLowerCase() !== email
-        ? t("oncall.removeMemberHandsOver", { name: raw(nameOf(next)), rotation })
-        : t("oncall.removeMemberLeavesGap", { rotation });
+        ? t("oncall.removeMemberHandsOver", { name: raw(nameOf(next)), leaving, rotation })
+        : t("oncall.removeMemberLeavesGap", { leaving, rotation });
     });
-  return handovers.length ? raw(handovers.join(" ")) : undefined;
+  return raw([t("oncall.removeMemberBody"), ...handovers].join(" "));
 });
 
 async function confirmRemoveMember() {

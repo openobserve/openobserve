@@ -859,11 +859,11 @@ describe("OnCallTeamDetail", () => {
       // Named in the prompt: two rotations in one team routinely differ by one
       // word, and deleting the wrong one silently stops paging.
       expect(confirm!.props("open")).toBe(true);
-      expect(confirm!.props("messageKeypath")).toBe("oncall.laneDeleteMessage");
-      expect(confirm!.props("messageName")).toBe("Primary");
-      const name = document.body.querySelector('[data-test="oncall-remove-rotation-name"]');
-      expect(name?.textContent).toBe("Primary");
-      expect(name?.className).toContain("font-semibold");
+      // Owner: the title names the rotation; the body says who holds it now, by name.
+      expect(document.body.textContent).toContain("Delete the Primary rotation?");
+      expect(
+        document.body.querySelector('[data-test="oncall-remove-rotation-body"]')?.textContent,
+      ).toBe("Nobody is on call in Primary now. Once it's deleted, nobody takes over its shifts.");
       // S11: the dialog reads the policy to say which escalation steps go with it.
       expect(confirm!.props("rotationId")).toBe("rot_primary");
       expect(confirm!.props("policy")).toEqual({ rungs: [] });

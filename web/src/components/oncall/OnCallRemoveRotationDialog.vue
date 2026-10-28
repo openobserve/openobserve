@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="sm"
-    :title="title"
-    :primary-button-label="okLabel"
+    :title="t('oncall.removeRotationTitleNamed', { rotation: rotationName })"
+    :primary-button-label="t('oncall.laneDelete')"
     primary-button-variant="destructive"
     :primary-button-disabled="blocked"
     :secondary-button-label="t('oncall.cancel')"
@@ -31,16 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-2 text-sm">
-      <!-- Names the rotation the way every delete confirm names its item. -->
-      <i18n-t :keypath="messageKeypath" tag="p">
-        <template #name>
-          <span
-            data-test="oncall-remove-rotation-name"
-            class="text-text-heading font-semibold break-all"
-            >{{ messageName }}</span
-          >
-        </template>
-      </i18n-t>
+      <p data-test="oncall-remove-rotation-body">{{ body }}</p>
       <p v-if="generatedSteps" data-test="oncall-remove-rotation-steps">{{ generatedSteps }}</p>
       <span v-if="blocked || mayBeRefused" class="flex flex-col items-start gap-1">
         <p
@@ -48,10 +39,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-status-warning-text"
           data-test="oncall-remove-rotation-blocked"
         >
-          {{ t("oncall.removeRotationBlocked", { steps: stepList }, steps.length) }}
+          {{
+            t(
+              "oncall.removeRotationBlocked",
+              { steps: stepList, rotation: rotationName },
+              steps.length,
+            )
+          }}
         </p>
         <p v-else class="text-status-warning-text" data-test="oncall-remove-rotation-may-refuse">
-          {{ t("oncall.removeRotationMayBeRefused", { steps: stepList }, steps.length) }}
+          {{
+            t(
+              "oncall.removeRotationMayBeRefused",
+              { steps: stepList, rotation: rotationName },
+              steps.length,
+            )
+          }}
         </p>
         <OButton
           variant="ghost-primary"
@@ -71,19 +74,18 @@ import { computed } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import type { OnCallPolicy } from "@/ts/interfaces/oncall";
-import type { I18nKey, I18nText } from "@/types/i18n";
+import type { OnCallPolicy, Rotation } from "@/ts/interfaces/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { stepsNamingRotation } from "@/utils/oncall";
+import { listInLocale, stepsNamingRotation } from "@/utils/oncall";
 
 const props = defineProps<{
   open: boolean;
-  title: I18nText;
-  /** A key with a `{name}` placeholder, filled with `messageName` in bold. */
-  messageKeypath: I18nKey;
-  messageName?: string;
-  okLabel: I18nText;
   rotationId: string;
+  /** The team's rotations, so the body can name the ones that stay. */
+  rotations: Pick<Rotation, "id" | "name">[];
+  /** Who holds each rotation right now, by display name; a rotation absent here has nobody on call. */
+  holders: { rotation_id: string; name: string }[];
   policy: Pick<OnCallPolicy, "rungs" | "ladder_is_generated"> | null;
 }>();
 
@@ -93,7 +95,36 @@ const emit = defineEmits<{
   "open-policy": [];
 }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
+
+const rotationName = computed(() =>
+  raw(props.rotations.find((rotation) => rotation.id === props.rotationId)?.name ?? ""),
+);
+
+const holderOf = (rotationId: string) =>
+  props.holders.find((holder) => holder.rotation_id === rotationId)?.name;
+
+/// Rotations resolve independently (`resolve_on_call`), so the deleted one's shifts go to nobody and every other keeps its own.
+const body = computed<I18nText>(() => {
+  const holder = holderOf(props.rotationId);
+  const now = holder
+    ? t("oncall.removeRotationHeldBy", { name: raw(holder), rotation: rotationName.value })
+    : t("oncall.removeRotationHeldByNobody", { rotation: rotationName.value });
+  const others = props.rotations
+    .filter((rotation) => rotation.id !== props.rotationId)
+    .map((rotation) => {
+      const who = holderOf(rotation.id);
+      return who ? `${rotation.name} (${who})` : rotation.name;
+    });
+  const after = others.length
+    ? t(
+        "oncall.removeRotationOthersKeep",
+        { others: raw(listInLocale(others, locale.value)) },
+        others.length,
+      )
+    : t("oncall.removeRotationNobodyTakesOver");
+  return raw(`${now} ${after}`);
+});
 
 const steps = computed(() => stepsNamingRotation(props.policy, props.rotationId));
 
@@ -119,7 +150,11 @@ const mayBeRefused = computed(
 
 const generatedSteps = computed<I18nText | null>(() =>
   steps.value.length && props.policy?.ladder_is_generated === true
-    ? t("oncall.removeRotationStepsGo", { steps: stepList.value }, steps.value.length)
+    ? t(
+        "oncall.removeRotationStepsGo",
+        { steps: stepList.value, rotation: rotationName.value },
+        steps.value.length,
+      )
     : null,
 );
 </script>
