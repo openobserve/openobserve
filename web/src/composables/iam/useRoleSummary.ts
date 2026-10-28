@@ -116,14 +116,8 @@ export const useRoleSummary = (deps: SummaryDeps) => {
   const resourceParent = (resource: string) =>
     permissionsState.resources.find((candidate: any) => candidate.key === resource)?.parent;
 
-  // Names come from entities the role load already fetched; an unloaded id shows as itself.
-  const entityLabel = (resource: string, entity: string) => {
-    if (entity === `_all_${getOrgId()}`) {
-      return resource === STREAM_PARENT_KEY
-        ? t("iam.editRole.scopeEveryStream")
-        : t("iam.editRole.scopeAllOf", { module: resourceLabel(resource) });
-    }
-
+  // An item's row from the lists the role load already fetched, or undefined while unloaded.
+  const loadedRow = (resource: string, entity: string): any => {
     const parent = resourceParent(resource);
     const pools = [
       heavyResourceEntities.value[resource],
@@ -134,9 +128,19 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     ];
     for (const pool of pools) {
       const match = pool?.find((candidate: any) => candidate.name === entity);
-      if (match) return raw(match.display_name ?? entity);
+      if (match) return match;
     }
-    return raw(entity);
+    return undefined;
+  };
+
+  // Names come from entities the role load already fetched; an unloaded id shows as itself.
+  const entityLabel = (resource: string, entity: string) => {
+    if (entity === `_all_${getOrgId()}`) {
+      return resource === STREAM_PARENT_KEY
+        ? t("iam.editRole.scopeEveryStream")
+        : t("iam.editRole.scopeAllOf", { module: resourceLabel(resource) });
+    }
+    return raw(loadedRow(resource, entity)?.display_name ?? entity);
   };
 
   type GrantState = "saved" | "added" | "removed";
@@ -312,11 +316,17 @@ export const useRoleSummary = (deps: SummaryDeps) => {
   const listOf = (items: string[]) =>
     raw(new Intl.ListFormat(getIntlLocale(), { type: "conjunction" }).format(items));
 
+  // All grants only the actions the row shows, so All on logs_cache means delete; an unknown row reads as every action.
+  const actionsOfAll = (resource: string, entity: string) => {
+    const row =
+      (isWideEntity(entity) ? undefined : loadedRow(resource, entity)) ??
+      resourceMapper.value[resource];
+    const each = ACTION_ORDER.filter((action) => action !== "AllowAll");
+    const shown = each.filter((action) => row?.permission?.[action]?.show);
+    return shown.length ? shown : each;
+  };
+
   const verbsOf = (actions: string[]) => {
-    if (actions.includes("AllowAll"))
-      return listOf(
-        ["iam.editRole.verbView", ...WRITE_VERB_KEYS.map(([, key]) => key)].map((key) => t(key)),
-      );
     const list = actions.includes("AllowList");
     const get = actions.includes("AllowGet");
     const verbs: string[] = [];
@@ -391,9 +401,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     const current = selectedPermissionsHash.value;
     const holders = [{ resource, entity }, ...widerObjects(resource, entity)];
     // model.fga defines every action as `ALLOW_ALL or ALLOW_<ACTION>`, so a removed AllowAll loses only what nothing else allows.
-    const each = actions.includes("AllowAll")
-      ? ACTION_ORDER.filter((action) => action !== "AllowAll")
-      : actions;
+    const each = actions.includes("AllowAll") ? actionsOfAll(resource, entity) : actions;
     const lost = each.filter(
       (action) =>
         !holders.some((holder) =>
@@ -412,7 +420,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     if (filtered && isWideEntity(entity) && actions.length === 1 && actions[0] === "AllowList")
       return t(state === "added" ? filtered.can : filtered.cannot);
     return t(state === "added" ? "iam.editRole.effectCan" : "iam.editRole.effectCannot", {
-      actions: verbsOf(actions),
+      actions: verbsOf(actions.includes("AllowAll") ? actionsOfAll(resource, entity) : actions),
       target: targetOf(resource, entity),
     });
   };

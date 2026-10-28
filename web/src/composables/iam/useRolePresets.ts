@@ -19,6 +19,7 @@ import type { Resource, Entity, PermissionType } from "@/ts/interfaces";
 import { raw, type TranslateFn } from "@/types/i18n";
 import { useRoleScopes } from "@/composables/iam/useRoleScopes";
 import { splitGrantKey } from "@/composables/iam/useRoleGrants";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { STREAM_PARENT_KEY } from "@/components/iam/roles/roleModules";
 import { findCompanionGaps, type CompanionGap } from "@/components/iam/roles/roleCompanions";
 import { JOB_PRESETS, type JobPreset } from "@/components/iam/roles/jobPresets";
@@ -156,8 +157,13 @@ type PresetDeps = {
   expandPermission: (resource: Row) => Promise<unknown>;
   /** Loads a node's children without opening it, so the panel can count the stream presets. */
   getResourceEntities?: (resource: Row) => Promise<unknown>;
-  /** Reads a stream list with or without the loading toast. */
-  getStreams?: (type: string, schema: boolean, notify?: boolean) => Promise<unknown>;
+  /** Reads a stream list with or without the loading toast; `force` skips the cached list. */
+  getStreams?: (
+    type: string,
+    schema: boolean,
+    notify?: boolean,
+    force?: boolean,
+  ) => Promise<unknown>;
   t: TranslateFn;
 };
 
@@ -355,6 +361,10 @@ export const useRolePresets = (deps: PresetDeps) => {
     stage(resolvePreset("readonly")?.grants ?? []);
   };
 
+  // Per stream type, so a 403 on logs leaves the metrics presets usable.
+  const streamStatus = ref<Record<string, "loading" | "loaded" | "failed">>({});
+  const streamLoads = new Map<string, { load: Promise<void>; at: number }>();
+
   // The `?preset=` link opens the nodes so the ticked rows show; expandPermission toggles, so only a collapsed node is opened.
   const openStreamType = async (type: string) => {
     const streamResource = resourceMapper.value[STREAM_PARENT_KEY];
@@ -380,29 +390,33 @@ export const useRolePresets = (deps: PresetDeps) => {
     );
   };
 
+  // A loaded list is the one the panel previewed, so Add stages from it before opening the type, whose reload could add streams the button never counted; the link has no list yet, so it opens first.
+  const stageStreamPreset = async (presetId: string, type: string) => {
+    const previewed = streamStatus.value[type] === "loaded";
+    if (!previewed) await openStreamType(type);
+    const resolved = resolvePreset(presetId);
+    stage(resolved?.grants ?? []);
+    if (previewed) await openStreamType(type);
+    return resolved;
+  };
+
   const seedDbmViewerPreset = () =>
     locked(async () => {
-      await openStreamType("metrics");
-      const resolved = resolvePreset("dbm");
-      stage(resolved?.grants ?? []);
+      const resolved = await stageStreamPreset("dbm", "metrics");
       reportDbmViewerSeeding(resolved?.matched ?? 0, DBM_VIEWER_STREAMS.length);
     });
 
   const seedK8sViewerPreset = () =>
     locked(async () => {
-      await openStreamType("metrics");
+      const resolved = await stageStreamPreset("k8s", "metrics");
       // With no metrics node there is no stream list to match, so there is nothing to report.
       if (!streamTypeNode("metrics")) return;
-      const resolved = resolvePreset("k8s");
-      stage(resolved?.grants ?? []);
       reportK8sViewerSeeding(resolved?.matched ?? 0, K8S_VIEWER_STREAMS.length);
     });
 
   const seedRumPreset = (preset: RumPreset) =>
     locked(async () => {
-      await openStreamType("logs");
-      const resolved = resolvePreset(preset);
-      stage(resolved?.grants ?? []);
+      const resolved = await stageStreamPreset(preset, "logs");
       const total = RUM_STREAMS.length;
       toast(
         resolved?.matched
@@ -444,11 +458,7 @@ export const useRolePresets = (deps: PresetDeps) => {
     ).map((preset) => toInfo(preset, "job")),
   ]);
 
-  // Per stream type, so a 403 on logs leaves the metrics presets usable.
-  const streamStatus = ref<Record<string, "loading" | "loaded" | "failed">>({});
-  const streamLoads = new Map<string, Promise<void>>();
-
-  const loadStreamType = async (type: string) => {
+  const loadStreamType = async (type: string, fresh: boolean) => {
     streamStatus.value[type] = "loading";
     try {
       const streamResource = resourceMapper.value[STREAM_PARENT_KEY];
@@ -456,8 +466,10 @@ export const useRolePresets = (deps: PresetDeps) => {
         if (!getResourceEntities) throw new Error("No entity loader to read the stream lists");
         await getResourceEntities(streamResource);
         // A cold read toasts "Please wait while loading streams"; a quiet read first lets the loader answer from cache.
-        await getStreams?.(type, false, false);
+        await getStreams?.(type, false, false, fresh);
         const typeNode = streamTypeNode(type);
+        // The loader skips a node that already has rows, so a fresh read empties it first.
+        if (typeNode && fresh) typeNode.entities = [];
         if (typeNode) await getResourceEntities(typeNode);
       }
       streamStatus.value[type] = "loaded";
@@ -467,15 +479,24 @@ export const useRolePresets = (deps: PresetDeps) => {
     }
   };
 
-  /** Loads the metrics and logs lists the stream presets match against, once each and without a toast; a failed one loads again. */
+  // Streams ingested after a lookup that matched none, or after the stream list query went stale, show only on a fresh read.
+  const needsFreshRead = (type: string, at: number) =>
+    Date.now() - at >= MEDIUM_STALE_TIME ||
+    [...STREAM_TYPE_OF].some(([id, of]) => of === type && !resolvePreset(id)?.matched);
+
+  /** Loads the metrics and logs lists the stream presets match against, without a toast; a failed one loads again, a stale or matchless one reads fresh. */
   const loadPresetStreams = async () => {
     await Promise.all(
       [...new Set(STREAM_TYPE_OF.values())].map((type) => {
-        let load = streamLoads.get(type);
-        if (!load || streamStatus.value[type] === "failed") {
-          load = loadStreamType(type);
-          streamLoads.set(type, load);
-        }
+        const last = streamLoads.get(type);
+        const status = streamStatus.value[type];
+        if (
+          last &&
+          (status === "loading" || (status === "loaded" && !needsFreshRead(type, last.at)))
+        )
+          return last.load;
+        const load = loadStreamType(type, status === "loaded");
+        streamLoads.set(type, { load, at: Date.now() });
         return load;
       }),
     );

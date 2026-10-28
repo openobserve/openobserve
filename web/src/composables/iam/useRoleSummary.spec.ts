@@ -415,6 +415,23 @@ describe("useRoleSummary - review drawer model", () => {
     expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([effect]);
   });
 
+  it.each([
+    ["added", "Can delete all logs_cache, including new ones."],
+    ["removed", "Can no longer delete all logs_cache, including new ones."],
+  ])("describes All (%s) by the actions the resource shows", (state, effect) => {
+    const summary = setup();
+    const hidden = ["AllowList", "AllowGet", "AllowPost", "AllowPut"];
+    summary.resourceMapper.value.logs_cache = {
+      permission: Object.fromEntries(
+        ACTION_ORDER.map((action) => [action, { show: !hidden.includes(action), value: false }]),
+      ),
+    };
+    const key = `logs_cache:${ALL}:AllowAll`;
+    summary.seed(state === "added" ? { added: [key] } : { saved: [key], removed: [key] });
+
+    expect(summary.pendingChanges.value.map((change) => change.effect)).toEqual([effect]);
+  });
+
   it("joins List and a write action without reading as view", () => {
     const summary = setup();
     summary.seed({ added: ["dfolder:f1:AllowList", "dfolder:f1:AllowPost"] });

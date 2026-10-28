@@ -152,6 +152,19 @@ describe("RolePresetsPanel - list", () => {
     expect(w.find('[data-test="edit-role-preset-loading"]').exists()).toBe(true);
   });
 
+  // A lookup that matched nothing must not stick: streams ingested since then show on the next open.
+  it("asks for the stream lists each time a stream preset opens, even once ready", async () => {
+    const w = await mountPanel({ dbm: ready({ noMatchingStreams: true }), readonly: ready() });
+
+    await openDetail(w, "dbm");
+    await w.find('[data-test="edit-role-preset-back"]').trigger("click");
+    await openDetail(w, "dbm");
+    await w.find('[data-test="edit-role-preset-back"]').trigger("click");
+    await openDetail(w, "readonly");
+
+    expect(w.emitted("load-streams")).toHaveLength(2);
+  });
+
   it("shows a skeleton once the lists are asked for, and nothing when they fail", async () => {
     const w = await mountPanel({
       dbm: ready({ status: "loading" }),
@@ -332,12 +345,40 @@ describe("RolePresetsPanel - detail", () => {
           permissions: t("iam.editRole.presetPermissionCount", { count: 2 }, 2),
           modules: t("iam.editRole.presetModuleCount", { count: 2 }, 2),
         }),
-        t("iam.editRole.presetSummaryWrite", { modules: "Destinations" }),
+        t("iam.editRole.presetSummaryWrite", { modules: "Alert Folders and Destinations" }),
         t("iam.editRole.presetSummaryRestores", { count: 1 }, 1),
       ].join(" "),
     );
     expect(w.find('[data-test="edit-role-preset-apply"]').text()).toBe(
       t("iam.editRole.presetAddButton", { count: 2 }, 2),
+    );
+  });
+
+  it("names a restored write grant instead of saying view only", async () => {
+    const w = await mountPanel({
+      alert_manager: ready({
+        adds: [
+          `afolder:${ORG_WIDE}:AllowAll`,
+          `stream:${ORG_WIDE}:AllowList`,
+          `stream:${ORG_WIDE}:AllowGet`,
+        ],
+        restores: [`afolder:${ORG_WIDE}:AllowAll`],
+      }),
+    });
+
+    const summary = (await openDetail(w, "alert_manager")).find(
+      '[data-test="edit-role-preset-summary"]',
+    );
+
+    expect(summary.text()).toContain(
+      t("iam.editRole.presetSummaryWrite", { modules: "Alert Folders" }),
+    );
+    expect(summary.text()).not.toContain(t("iam.editRole.presetSummaryViewOnly"));
+    expect(summary.text()).toContain(
+      t("iam.editRole.presetSummaryAdds", {
+        permissions: t("iam.editRole.presetPermissionCount", { count: 2 }, 2),
+        modules: t("iam.editRole.presetModuleCount", { count: 1 }, 1),
+      }),
     );
   });
 

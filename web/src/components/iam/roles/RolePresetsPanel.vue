@@ -432,9 +432,11 @@ const summary = computed(() => {
   const count = newGrants.value.length;
   if (count) {
     const modules = new Set(newGrants.value.map((grant) => grant.resource)).size;
+    // A restored write is staged like a new one, so it still makes the preset more than view only.
     const written = [
       ...new Set(
-        newGrants.value
+        preview.adds
+          .map(splitGrantKey)
           .filter((grant) => WRITE_ACTIONS.has(grant.permission))
           .map((grant) => String(props.moduleLabel(grant.resource))),
       ),
@@ -475,7 +477,9 @@ const focusTest = (dataTest: string) =>
 
 const openPreset = (id: string) => {
   selected.value = id;
-  if (previews.value.get(id)?.status !== "ready") requestStreams();
+  const preview = previews.value.get(id);
+  // A stream preset asks on every open, so streams ingested since its lookup can show; a fresh matched list is reused.
+  if (preview?.status !== "ready" || preview.noMatchingStreams !== undefined) requestStreams();
   focusTest("edit-role-preset-back");
 };
 

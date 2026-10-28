@@ -21,6 +21,7 @@ import type { Entity, Resource } from "@/ts/interfaces";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import { useRoleGrants } from "@/composables/iam/useRoleGrants";
 import { useRolePresets } from "@/composables/iam/useRolePresets";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { DBM_VIEWER_STREAMS } from "@/components/iam/roles/dbmViewerPreset";
 import { K8S_VIEWER_STREAMS } from "@/components/iam/roles/k8sViewerPreset";
 
@@ -363,8 +364,8 @@ describe("useRolePresets - stream presets", () => {
     await Promise.all([ctx.loadPresetStreams(), ctx.loadPresetStreams()]);
     await ctx.loadPresetStreams();
     expect(ctx.getStreams.mock.calls).toEqual([
-      ["metrics", false, false],
-      ["logs", false, false],
+      ["metrics", false, false, false],
+      ["logs", false, false, false],
     ]);
     expect(ctx.getResourceEntities.mock.calls.map(([resource]) => resource.name)).toEqual([
       "stream",
@@ -373,6 +374,39 @@ describe("useRolePresets - stream presets", () => {
       "logs",
     ]);
     expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it("reads a list that matched no curated stream fresh on the next call, and finds streams ingested since", async () => {
+    const metrics = ["cpu"];
+    const ctx = setup({ metrics });
+    await ctx.loadPresetStreams();
+    expect(ctx.previewPreset("k8s").noMatchingStreams).toBe(true);
+
+    metrics.push("system_cpu_time");
+    await ctx.loadPresetStreams();
+
+    expect(ctx.getStreams).toHaveBeenLastCalledWith("metrics", false, false, true);
+    expect(ctx.previewPreset("k8s")).toMatchObject({
+      status: "ready",
+      noMatchingStreams: false,
+      adds: ["metrics:system_cpu_time:AllowGet", `metrics:${ALL}:AllowList`],
+    });
+  });
+
+  it("reads a matched list fresh once it is older than the stream list cache", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(0);
+    const ctx = setup();
+    await ctx.loadPresetStreams();
+    await ctx.loadPresetStreams();
+    expect(ctx.getStreams).toHaveBeenCalledTimes(2);
+
+    now.mockReturnValue(MEDIUM_STALE_TIME);
+    await ctx.loadPresetStreams();
+    expect(ctx.getStreams.mock.calls.slice(2)).toEqual([
+      ["metrics", false, false, true],
+      ["logs", false, false, true],
+    ]);
+    now.mockRestore();
   });
 
   it("reports failed when a list does not load, and the next call retries only that list", async () => {
@@ -486,6 +520,22 @@ describe("useRolePresets - stream presets", () => {
       `rum_analytics:${ALL}:AllowPut`,
       `sourcemaps:${ALL}:AllowList`,
     ]);
+  });
+
+  it("stages only what the preview counted when opening the type reloads more streams", async () => {
+    const metrics: string[] = [];
+    const ctx = setup({ metrics });
+    await ctx.loadPresetStreams();
+    const { adds } = ctx.previewPreset("dbm");
+    expect([...adds].sort()).toEqual([
+      `db_monitoring:${ALL}:AllowGet`,
+      `db_monitoring:${ALL}:AllowList`,
+    ]);
+
+    metrics.push("postgresql_backends");
+    await ctx.applyPreset("dbm", { announce: true });
+
+    expect(added(ctx)).toEqual([...adds].sort());
   });
 
   it("readonly stages List and Get on every visible top-level resource, minus hidden actions", () => {
