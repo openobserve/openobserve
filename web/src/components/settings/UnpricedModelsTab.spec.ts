@@ -147,6 +147,14 @@ describe("UnpricedModelsTab", () => {
     expect(wrapper.find('[data-test="model-pricing-unpriced-banner"]').exists()).toBe(false);
   });
 
+  it("names every marked model in the banner when the server listed only the top ones", async () => {
+    wrapper = mountTab(unpricedResponse.models, { truncatedOf: 140 });
+    await waitForRow(wrapper, "acme-internal-llm");
+    const banner = wrapper.find('[data-test="model-pricing-unpriced-banner"]').text();
+    expect(banner).toContain("140 models");
+    expect(banner).toContain("top 2 by tokens");
+  });
+
   it("shows the load error, not the all-priced state, and Retry asks for a new read", async () => {
     wrapper = mountTab([], { error: true, loaded: false });
     await vi.waitFor(() =>

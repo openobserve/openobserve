@@ -516,10 +516,19 @@ const {
   fetchSamples,
 } = useLLMDataHealth();
 const unpriced = computed(() => unpricedSummary(dataHealth.value));
-const unpricedModelNames = computed(
-  () =>
-    unpriced.value?.models.map((m) => m.model ?? t("llmDataTrust.noModelName")).join(", ") ?? "",
-);
+// The server lists the top 20 unpriced models; the tile and chart notes say so when there are more.
+const unpricedModelNames = computed(() => {
+  const u = unpriced.value;
+  if (!u) return "";
+  const names = u.models.map((m) => m.model ?? t("llmDataTrust.noModelName")).join(", ");
+  return u.truncated
+    ? t("llmDataTrust.topModels", {
+        models: names,
+        shown: u.models.length,
+        total: u.modelCount.toLocaleString(),
+      })
+    : names;
+});
 function loadDataHealth(refresh = false, start = props.startTime, end = props.endTime) {
   const agent = effectiveAgent.value;
   fetchHealth(store.state.selectedOrganization?.identifier ?? "", {

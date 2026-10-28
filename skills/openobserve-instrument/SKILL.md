@@ -43,8 +43,9 @@ python3 -c "import re;print(', '.join(m.group(1) for l in open('.env') if (m:=re
 
 Print `✓ .env found: <names>`. If a required name is missing, stop and tell the user to download
 the `.env` from the integration card (Data Sources → AI Integrations → *their SDK* → *With a coding
-agent*). If the user named a stream, add `OPENOBSERVE_TRACES_STREAM_NAME=<stream>` to `.env` (the
-SDK reads this name). Make sure `.env` is listed in `.gitignore`; add it if not.
+agent*). If the user named an org or a stream, set `OPENOBSERVE_ORG=<org>` or
+`OPENOBSERVE_TRACES_STREAM_NAME=<stream>` in `.env` (the SDK reads these names). Make sure `.env`
+is listed in `.gitignore`; add it if not.
 
 ## 2. Read the project
 
@@ -66,29 +67,38 @@ Find and print one line, e.g. `Python 3.12 · openai 1.54 · entry point app/mai
 
 ### Python, supported SDK — use the OpenObserve installer
 
-Run the same installer the integration card uses. It installs the packages into the interpreter it
-finds and merges `.env`; it does not print the token. Read the values from `.env` inside the
-command so they never appear in what you show. Do not `source` the `.env`: the token value
-`Basic <base64>` contains an unquoted space, which a shell reads as a command.
+Run the installer the integration card uses, pinned to a reviewed commit: download it to a temp
+directory and run it from there, never pipe a URL into a shell. It installs the packages into the
+interpreter it finds and verifies the imports. It takes the token only as a command-line argument,
+which other local processes can read, so it never gets the real one: the project's `.env` already
+holds the token. Give it a placeholder and point its env file into the temp directory, so it
+cannot overwrite the project's `.env`. The URL is not a secret; read it from `.env` inside the
+command. Do not `source` the `.env`: the token value `Basic <base64>` contains an unquoted space,
+which a shell reads as a command.
 
 ```bash
 env_get() { python3 -c 'import sys
 for l in open(".env"):
     k, _, v = l.strip().removeprefix("export ").partition("=")
     if k.strip() == sys.argv[1]: print(v.strip().strip("\"'\''")); break' "$1"; }
-curl -fsSL https://raw.githubusercontent.com/openobserve/o2-datasource/main/ai/frameworks/setup.sh | bash -s -- \
+O2_INSTALLER_RAW=https://raw.githubusercontent.com/openobserve/o2-datasource/9fdf2ca60b03a43273677a875140cfd19e29262b/ai
+O2_INSTALLER_DIR="$(mktemp -d)"
+mkdir "$O2_INSTALLER_DIR/frameworks"
+curl -fsSL "$O2_INSTALLER_RAW/frameworks/setup.sh" -o "$O2_INSTALLER_DIR/frameworks/setup.sh"
+REPO_RAW="$O2_INSTALLER_RAW" bash "$O2_INSTALLER_DIR/frameworks/setup.sh" \
   --integration=<integration> \
   --url="$(env_get OPENOBSERVE_URL)" \
   --org=<org> \
-  --traces-stream=<stream> \
-  --token="$(env_get OPENOBSERVE_AUTH_TOKEN)" \
+  --token="Bearer placeholder" \
+  --env-file="$O2_INSTALLER_DIR/.env" \
   --quiet
 ```
 
-`<integration>` is one of `openai`, `anthropic`, `gemini`, `langchain`, `crewai`, `google-adk`,
-`claude-agent-sdk`, `openai-agents`, `openrouter`, `litellm`. If the project uses a virtualenv,
-uv, poetry or pipenv, install into that environment instead and add the packages to the project's
-dependency file. Packages and init lines per integration:
+`REPO_RAW` makes the installer fetch its helper library and integration list from the same
+commit. `<integration>` is one of `openai`, `anthropic`, `gemini`, `langchain`, `crewai`,
+`google-adk`, `claude-agent-sdk`, `openai-agents`, `openrouter`, `litellm`. If the project uses a
+virtualenv, uv, poetry or pipenv, install into that environment instead and add the packages to
+the project's dependency file. Packages and init lines per integration:
 
 | Integration | Packages (plus `openobserve-telemetry-sdk python-dotenv`) | Instrumentor |
 |---|---|---|
@@ -101,9 +111,33 @@ dependency file. Packages and init lines per integration:
 | openai-agents | `openinference-instrumentation-openai-agents` | `from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor` |
 | openrouter | `openinference-instrumentation-openai` | `from openinference.instrumentation.openai import OpenAIInstrumentor` |
 | litellm | `openinference-instrumentation-litellm` | `from openinference.instrumentation.litellm import LiteLLMInstrumentor` |
-| claude-agent-sdk | — | wrap each `query()` in a span (see the installer's printed snippet) |
+| claude-agent-sdk | — | wrap each `query()` in a span (see the snippet the installer saves, below) |
 
-Print `✓ setup.sh --integration=<integration> --org=<org> --traces-stream=<stream>` (no token).
+The installer's env file holds the placeholder token; never copy its `OPENOBSERVE_*` lines.
+Merge only the integration's extra variables (for example `CREWAI_TELEMETRY_OPT_OUT`) into the
+project's `.env`, keep the snippet it saved (`paste_me_<integration>.py`) if you need it, then
+remove the temp directory:
+
+```bash
+python3 - "$O2_INSTALLER_DIR/.env" <<'PY'
+import sys
+def name(line):
+    return line.strip().removeprefix("export ").partition("=")[0].strip()
+text = open(".env").read()
+have = {name(l) for l in text.splitlines() if "=" in l}
+extra = [l.strip() for l in open(sys.argv[1])
+         if "=" in l and not l.lstrip().startswith("#")
+         and not name(l).startswith("OPENOBSERVE_") and name(l) not in have]
+if extra:
+    with open(".env", "a") as f:
+        f.write(("" if not text or text.endswith("\n") else "\n") + "\n".join(extra) + "\n")
+print("extra env:", ", ".join(name(x) for x in extra) or "none")
+PY
+cat "$O2_INSTALLER_DIR/paste_me_<integration>.py"
+rm -rf "$O2_INSTALLER_DIR"
+```
+
+Print `✓ setup.sh@9fdf2ca --integration=<integration>` and the extra env names (no values).
 
 ### Anything else — plain OTLP/HTTP
 

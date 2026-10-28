@@ -54,6 +54,18 @@ export interface UnpricedModel {
   matched: PricingMatch | null;
 }
 
+/** GET /llm/models/unpriced: the listed models and the uncapped totals behind them. */
+export interface UnpricedModelsResponse {
+  /** The models with the most tokens, minus those an exact price covers today. */
+  models: UnpricedModel[];
+  /** Distinct models ingest marked in the window, before today's prices apply. */
+  model_count: number;
+  /** Tokens on every span ingest marked in the window. */
+  tokens: number;
+  /** The server listed only the models with the most tokens. */
+  models_truncated: boolean;
+}
+
 export interface BuiltInPricingResponse {
   models: PricingMatch[];
   source_url: string;
@@ -90,7 +102,7 @@ const modelPricing = {
     org_identifier: string,
     params: { stream_name: string; start_time: number; end_time: number },
   ) => {
-    return http().get<{ models: UnpricedModel[] }>(`/api/${org_identifier}/llm/models/unpriced`, {
+    return http().get<UnpricedModelsResponse>(`/api/${org_identifier}/llm/models/unpriced`, {
       params,
     });
   },

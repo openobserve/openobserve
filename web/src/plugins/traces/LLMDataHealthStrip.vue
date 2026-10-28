@@ -34,7 +34,7 @@ import type {
   DataHealthCheckId,
   DataHealthResponse,
 } from "@/services/gen-ai-data-health.service";
-import { fixTarget, healthCounts, sortChecks } from "./llmDataTrust.utils";
+import { fixTarget, healthCounts, sortChecks, unpricedTotals } from "./llmDataTrust.utils";
 import type { DataHealthSamples } from "./composables/useLLMDataHealth";
 import { formatTokens } from "@/utils/llmUtils";
 
@@ -87,7 +87,7 @@ const LABELS: Record<DataHealthCheckId, I18nText> = {
 function chipCount(check: DataHealthCheck): string {
   switch (check.id) {
     case "unpriced_models":
-      return String(check.models?.length || check.affected);
+      return String(unpricedTotals(check).modelCount || check.affected);
     case "missing_agent_identity":
     case "missing_session_id":
       return pct(check);
@@ -116,15 +116,15 @@ function detail(check: DataHealthCheck): I18nText {
   };
   switch (check.id) {
     case "unpriced_models": {
-      const models = check.models ?? [];
+      const { modelCount, tokens } = unpricedTotals(check);
       return t(
         "llmDataTrust.health.checks.unpriced_models.detail",
         {
-          count: models.length,
+          count: modelCount.toLocaleString(),
           spans: check.affected.toLocaleString(),
-          tokens: formatTokens(models.reduce((s, m) => s + (Number(m.tokens) || 0), 0)),
+          tokens: formatTokens(tokens),
         },
-        models.length,
+        modelCount,
       );
     }
     case "missing_agent_identity":
@@ -134,6 +134,16 @@ function detail(check: DataHealthCheck): I18nText {
     case "missing_session_id":
       return t("llmDataTrust.health.checks.missing_session_id.detail", params);
   }
+}
+
+/** "Top 20 of 25 by tokens" when the server lists only part of the unpriced models. */
+function truncatedNote(check: DataHealthCheck): I18nText | null {
+  const { truncated, models, modelCount } = unpricedTotals(check);
+  if (!truncated) return null;
+  return t("llmDataTrust.health.checks.unpriced_models.truncated", {
+    shown: models.length,
+    total: modelCount.toLocaleString(),
+  });
 }
 
 function fixLabel(id: DataHealthCheckId): I18nText {
@@ -313,6 +323,12 @@ function viewTrace(traceId: string) {
             >{{
               raw(`${m.model ?? t("llmDataTrust.noModelName")} · ${formatTokens(m.tokens)}`)
             }}</OBadge
+          >
+          <span
+            v-if="truncatedNote(check)"
+            class="text-2xs text-text-secondary self-center"
+            data-test="llm-data-health-unpriced-truncated"
+            >{{ truncatedNote(check) }}</span
           >
         </div>
         <div

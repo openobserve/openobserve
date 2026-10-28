@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTab === 'unpriced'"
           v-model:stream="unpricedStream"
           :models="unpricedModels"
+          :truncated-of="unpricedTruncatedOf"
           :loading="unpricedQuery.isLoading.value"
           :fetching="unpricedQuery.isFetching.value"
           :error="unpricedQuery.isError.value"
@@ -857,7 +858,11 @@ const unpricedQuery = useQuery(() =>
     { enabled: !!orgIdentifier.value && !!unpricedStream.value },
   ),
 );
-const unpricedModels = computed(() => unpricedQuery.data.value ?? []);
+const unpricedModels = computed(() => unpricedQuery.data.value?.models ?? []);
+// The server lists the models with the most tokens; the banner names the full count then.
+const unpricedTruncatedOf = computed(() =>
+  unpricedQuery.data.value?.models_truncated ? unpricedQuery.data.value.model_count : null,
+);
 
 function refreshUnpriced() {
   unpricedWindow.value = lastDayWindow();

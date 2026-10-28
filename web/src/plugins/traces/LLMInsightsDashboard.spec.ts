@@ -789,4 +789,43 @@ describe("LLMInsightsDashboard — Total Cost tile", () => {
     expect(text).not.toContain("≥");
     expect(text).toContain("1.50");
   });
+
+  it("reads the server's uncapped unpriced tokens, not the sum of the listed models", async () => {
+    mockKpi.value = {
+      ...mockKpi.value,
+      requestCount: 10,
+      traceCount: 5,
+      totalCost: 1.5,
+      totalTokens: 1000,
+    };
+    // The listed top models hold 400 tokens; models past the list cap hold the other 600.
+    mockHealth.value = {
+      checked_at: 1,
+      checks: [
+        {
+          id: "unpriced_models",
+          status: "warning",
+          affected: 30,
+          total: 40,
+          models: [{ model: "mystery-model", spans: 3, tokens: 400 }],
+          model_count: 25,
+          unpriced_tokens: 1000,
+          models_truncated: true,
+        },
+      ],
+    };
+    mockHasLoadedOnce.value = true;
+    const wrapper = mountDashboard();
+    // Exposed by the component for tests; the cast names only the method used here.
+    const vm = wrapper.vm as unknown as { refresh: (...args: unknown[]) => Promise<void> };
+    await vm.refresh(undefined, undefined, false);
+    await flushPromises();
+    expect(wrapper.find("[data-test='llm-insights-kpi-value']").text()).toContain(
+      "llmDataTrust.cost.unknown",
+    );
+    // The tooltip names the listed models as the top ones of all 25.
+    const tooltip = wrapper.find("[data-test='llm-insights-cost-unpriced']").attributes("title");
+    expect(tooltip).toContain("llmDataTrust.topModels");
+    expect(tooltip).toContain('\\"shown\\":1,\\"total\\":\\"25\\"');
+  });
 });
