@@ -39,8 +39,9 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
   // FirstDataPanel never reports a stream O2 writes itself, so a list of only those ends it here
   const onlyInternalLogs = () => {
     const list =
-      queryClient.getQueryData<{ name?: string }[]>(streamKeys.nameList(toValue(org), "logs")) ??
-      [];
+      queryClient.getQueryData<{ name?: string }[]>(
+        streamKeys.hasDataProbe(toValue(org), "logs"),
+      ) ?? [];
     return list.length > 0 && !list.some((s) => isUserDataStream(s?.name ?? "", "logs"));
   };
   // a cached empty list can predate the first stream, which FirstDataPanel's watch then never reports
@@ -70,11 +71,14 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let polling = false;
   const hidden = () => document.visibilityState === "hidden";
+  // the probe re-reads; the page's list goes stale too, so the selector shown next lists the stream
   const refresh = () =>
-    void queryClient.invalidateQueries({
-      queryKey: streamKeys.nameList(toValue(org), "logs"),
-      exact: true,
-    });
+    void Promise.all(
+      [
+        streamKeys.hasDataProbe(toValue(org), "logs"),
+        streamKeys.nameList(toValue(org), "logs"),
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey, exact: true })),
+    );
   const poll = () => {
     clearTimeout(timer);
     timer = undefined;

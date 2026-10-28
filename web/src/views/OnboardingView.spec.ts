@@ -528,7 +528,7 @@ describe("OnboardingView", () => {
 
   // the org's last stream was deleted elsewhere: the cached list still has it, the server not
   it("waits for a stale cached stream list to refresh before sending the user Home", async () => {
-    queryClient.setQueryData(streamKeys.nameList("default", "logs"), [listed("default")], {
+    queryClient.setQueryData(streamKeys.hasDataProbe("default", "logs"), [listed("default")], {
       updatedAt: 1,
     });
     const { router } = await mountAt("/onboarding");

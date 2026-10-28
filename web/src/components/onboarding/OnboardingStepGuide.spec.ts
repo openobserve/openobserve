@@ -54,6 +54,15 @@ vi.mock("@/composables/useOrgCredential", () => ({
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn(async () => true) }));
 vi.mock("@/utils/dom", () => ({ downloadFile: vi.fn(() => true) }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+// The AI catalog and its card content are fetched at build time and git-ignored, so CI has neither.
+vi.mock("@/components/ingestion/ai/content/manifest", () => ({
+  manifestIntegrations: [{ slug: "openai", name: "OpenAI", category: "model-providers" }],
+  manifestCategories: [],
+}));
+vi.mock("@/components/ingestion/ai/content", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/ingestion/ai/content")>()),
+  getAICardRaw: (slug?: string) => (slug === "openai" ? "# OpenAI" : undefined),
+}));
 
 // The real status runs on this watch where a test mounts it; the rest stub the status.
 const watch = {

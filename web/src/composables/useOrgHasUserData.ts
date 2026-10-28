@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, type MaybeRefOrGetter, toValue } from "vue";
-import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, type MaybeRefOrGetter, onScopeDispose, toValue } from "vue";
+import { hashKey, queryOptions, useQuery, useQueryClient } from "@tanstack/vue-query";
 
 import { detectedStream } from "@/composables/firstEvent/useFirstDataNotice";
 import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
@@ -24,6 +24,10 @@ import { streamKeys } from "@/services/stream.querykeys";
 import { USER_DATA_STREAM_TYPES, isUserDataStream } from "@/utils/internalStreams";
 
 type ListedStream = { name?: string; stats?: { doc_num?: number; doc_time_max?: number } };
+
+// the same read in its own cache entry: a page's list keeps its usual freshness and lists a stream made since
+const probeQuery = (org: string, type: string) =>
+  queryOptions({ ...streamNameListQuery(org, type), queryKey: streamKeys.hasDataProbe(org, type) });
 
 const userStreams = (list: ListedStream[] | undefined, type: string) =>
   (list ?? []).filter(
@@ -54,13 +58,25 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
   const client = useQueryClient();
   const cachedData = () =>
     USER_DATA_STREAM_TYPES.some((type) =>
-      userStreams(client.getQueryData(streamKeys.nameList(toValue(org), type)), type).some(
+      userStreams(client.getQueryData(streamKeys.hasDataProbe(toValue(org), type)), type).some(
         hasRecords,
       ),
     );
+  // a page's own read of a list is as good an answer; nothing flows the other way
+  const stopFollowing = client.getQueryCache().subscribe((e) => {
+    if (e.type !== "updated" || e.action.type !== "success") return;
+    const type = USER_DATA_STREAM_TYPES.find(
+      (t) => e.query.queryHash === hashKey(streamKeys.nameList(toValue(org), t)),
+    );
+    if (!type) return;
+    client.setQueryData(streamKeys.hasDataProbe(toValue(org), type), e.query.state.data, {
+      updatedAt: e.query.state.dataUpdatedAt,
+    });
+  });
+  onScopeDispose(stopFollowing);
   const queries = USER_DATA_STREAM_TYPES.map((type) =>
     useQuery(() => {
-      const options = streamNameListQuery(toValue(org), type);
+      const options = probeQuery(toValue(org), type);
       const usual = options.staleTime as number;
       // While the org has no data a later mount asks again, as data can arrive with nothing watching.
       return Object.assign(options, {
@@ -97,7 +113,7 @@ export async function orgHasUserData(org: string | undefined): Promise<boolean |
   if (!org) return undefined;
   try {
     const lists = await Promise.all(
-      USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(streamNameListQuery(org, type))),
+      USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(probeQuery(org, type))),
     );
     return userDataIn(lists, true, org);
   } catch {
@@ -106,15 +122,17 @@ export async function orgHasUserData(org: string | undefined): Promise<boolean |
 }
 
 /**
- * Marks the org's logs, metrics and traces stream lists stale, after onboarding sees the first
- * data. The lists were cached while the org was empty, and the first-data watch refreshes only the
- * type it detected, so a data page opened next would read "no streams" from the cache.
+ * Marks the org's logs, metrics and traces stream lists stale, and the probe's own copies, after
+ * onboarding sees the first data. The lists were cached while the org was empty, and the first-data
+ * watch refreshes only the type it detected, so a data page opened next would read "no streams".
  */
 export async function refreshUserStreamLists(org: string): Promise<void> {
   if (!org) return;
   await Promise.all([
-    ...USER_DATA_STREAM_TYPES.map((type) =>
-      queryClient.invalidateQueries({ queryKey: streamKeys.nameList(org, type), exact: true }),
+    ...USER_DATA_STREAM_TYPES.flatMap((type) =>
+      [streamKeys.nameList(org, type), streamKeys.hasDataProbe(org, type)].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey, exact: true }),
+      ),
     ),
     queryClient.invalidateQueries({ queryKey: streamKeys.pagesAll(org) }),
   ]);

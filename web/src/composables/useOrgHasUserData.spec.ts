@@ -300,4 +300,36 @@ describe("useOrgHasUserData", () => {
     expect(await read("metrics")).toEqual(["up"]);
     expect(await read("traces")).toEqual(["default"]);
   });
+
+  it("re-reads its own copies when the first data arrives", async () => {
+    const lists: Lists = {};
+    listsFor({ org1: lists });
+    const { result, wrapper } = setup("org1");
+    await flushPromises();
+    expect(result.hasUserData.value).toBe(false);
+
+    lists.metrics = ["up"];
+    await refreshUserStreamLists("org1");
+    await flushPromises();
+    expect(result.hasUserData.value).toBe(true);
+    wrapper.unmount();
+  });
+
+  // its early read must not stand in for a page's list, which then misses a stream made since
+  it("keeps its own copy of the lists, and follows a page's own fresher read", async () => {
+    const lists: Lists = {};
+    const spy = listsFor({ org1: lists });
+    const { result, wrapper } = setup("org1");
+    await flushPromises();
+    expect(result.hasLogsStream.value).toBe(false);
+    expect(queryClient.getQueryData(streamNameListQuery("org1", "logs").queryKey)).toBeUndefined();
+
+    lists.logs = ["default"];
+    await queryClient.fetchQuery({ ...streamNameListQuery("org1", "logs"), staleTime: 0 });
+    await flushPromises();
+    expect(result.hasLogsStream.value).toBe(true);
+    expect(result.hasUserData.value).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(4);
+    wrapper.unmount();
+  });
 });

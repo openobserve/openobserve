@@ -14,11 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { CancelledError } from "@tanstack/vue-query";
+import { CancelledError, VueQueryPlugin } from "@tanstack/vue-query";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
 import useStreams from "@/composables/useStreams";
+import { orgHasUserData, useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import StreamService from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
-import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
@@ -252,20 +254,36 @@ describe("useStreams Composable", () => {
       expect(result.list).toEqual([{ name: "from-query" }]);
     });
 
-    // the empty list cached at sign-in must not hide the stream a first record created since
-    it("reads an empty list again once it is a few seconds old, and keeps a listed one", async () => {
+    // the org-data probe reads the same endpoint at sign-in and on Home, before the stream exists
+    it.each([
+      ["a stream created after Home's probe read", ["a"], ["a", "b"]],
+      ["the first stream, sent after the sign-in probe read none", [], ["a"]],
+    ])("lists %s", async (_, before, after) => {
       queryClient.clear();
-      const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
-      const updatedAt = Date.now() - EMPTY_LIST_STALE_TIME - 1;
-      queryClient.setQueryData(key("logs"), [], { updatedAt });
-      queryClient.setQueryData(key("metrics"), [{ name: "up" }], { updatedAt });
+      const answer = (names: string[]) =>
+        ({
+          data: {
+            list: names.map((name) => ({ name, stream_type: "logs", stats: { doc_num: 1 } })),
+          },
+        }) as any;
+      vi.mocked(StreamService.nameList).mockResolvedValue(answer(before));
+      const probe = mount(
+        defineComponent({
+          setup() {
+            useOrgHasUserData("test-org");
+            return () => h("div");
+          },
+        }),
+        { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
+      );
+      await flushPromises();
+      await orgHasUserData("test-org");
+      vi.mocked(StreamService.nameList).mockResolvedValue(answer(after));
 
-      const logs: any = await streamsInstance.getStreams("logs", false, false);
-      const metrics: any = await streamsInstance.getStreams("metrics", false, false);
+      const result: any = await streamsInstance.getStreams("logs", false, false);
 
-      expect(logs.list).toEqual([{ name: "test-stream", stream_type: "logs" }]);
-      expect(metrics.list).toEqual([{ name: "up" }]);
-      expect(StreamService.nameList).toHaveBeenCalledTimes(1);
+      expect(result.list.map((s: any) => s.name)).toEqual(after);
+      probe.unmount();
     });
 
     it("rejects with the CancelledError itself when the fetch is cancelled", async () => {

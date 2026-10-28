@@ -193,7 +193,8 @@ describe("useNoDataIntro", () => {
     expect(showIntro.value).toBe(true);
 
     lists(["usage"]);
-    await queryClient.refetchQueries();
+    // the watch re-reads the page's list, not the probe's
+    await queryClient.fetchQuery({ ...streamNameListQuery(ORG, "logs"), staleTime: 0 });
     await flushPromises();
 
     expect(showIntro.value).toBe(false);
@@ -206,7 +207,7 @@ describe("useNoDataIntro", () => {
     store.state.zoConfig.restricted_routes_on_empty_data = true;
     queryClient.clear();
     for (const type of USER_DATA_STREAM_TYPES) {
-      queryClient.setQueryData(streamNameListQuery(ORG, type).queryKey, []);
+      queryClient.setQueryData(streamKeys.hasDataProbe(ORG, type), []);
     }
     lists(["default"], { docNum: 0 });
     const { showIntro, wrapper } = setup();
@@ -224,7 +225,7 @@ describe("useNoDataIntro", () => {
     store.state.zoConfig.restricted_routes_on_empty_data = true;
     queryClient.clear();
     for (const type of USER_DATA_STREAM_TYPES) {
-      queryClient.setQueryData(streamNameListQuery(ORG, type).queryKey, []);
+      queryClient.setQueryData(streamKeys.hasDataProbe(ORG, type), []);
     }
     lists([]);
     const { showIntro, wrapper } = setup();
@@ -242,7 +243,7 @@ describe("useNoDataIntro", () => {
   it("never shows the intro from a stale cached 'no data' that refetches to data", async () => {
     queryClient.clear();
     for (const type of USER_DATA_STREAM_TYPES) {
-      queryClient.setQueryData(streamNameListQuery(ORG, type).queryKey, [], {
+      queryClient.setQueryData(streamKeys.hasDataProbe(ORG, type), [], {
         updatedAt: Date.now() - 60 * 60 * 1000,
       });
     }
@@ -276,7 +277,10 @@ describe("useNoDataIntro", () => {
 
     let answer!: (v: unknown) => void;
     vi.spyOn(stream, "nameList").mockReturnValue(new Promise((r) => (answer = r)) as never);
-    void queryClient.invalidateQueries({ queryKey: streamKeys.nameList(ORG, "logs"), exact: true });
+    void queryClient.invalidateQueries({
+      queryKey: streamKeys.hasDataProbe(ORG, "logs"),
+      exact: true,
+    });
     await flushPromises();
     expect(queryClient.isFetching()).toBe(1);
     expect(opens()).toBe("onboarding");
