@@ -3186,7 +3186,7 @@ describe("Stream picker — internal streams", () => {
     select().vm.$emit("open");
     select().vm.$emit("search", "_r");
     await flushPromises();
-    expect(header()).toMatchObject({ headerCount: "1 match", keepOnSearch: true });
+    expect(header()).toMatchObject({ headerCount: "1 hidden match", keepOnSearch: true });
 
     select().vm.$emit("close");
     await flushPromises();
@@ -3199,6 +3199,29 @@ describe("Stream picker — internal streams", () => {
     setting.hideInternalStreams.value = true;
     await flushPromises();
     expect(optionLabels()).toEqual(["# Internal streams · 2 hidden [Show]"]);
+  });
+
+  it("groups streams by the option's own internal flag while the stream results are empty", async () => {
+    wrapper.vm.searchObj.data.streamResults = { list: [] };
+    wrapper.vm.searchObj.data.stream.streamLists = [
+      { label: "_rumdata", value: "_rumdata", internal: true },
+      { label: "default", value: "default", internal: false },
+      { label: "_anomalies", value: "_anomalies", internal: true },
+    ];
+    await flushPromises();
+    expect(optionLabels()).toEqual([
+      "default",
+      "# Internal streams · 2 [Hide]",
+      "_rumdata",
+      "_anomalies",
+    ]);
+    expect(quickPickLabels()).toEqual([
+      "Recently active streams",
+      "default",
+      "Internal streams · 2 Hide",
+      "_rumdata",
+      "_anomalies",
+    ]);
   });
 
   describe("quick pick", () => {

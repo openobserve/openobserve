@@ -620,7 +620,6 @@
   --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-700);
   --color-select-item-disabled: var(--color-text-disabled);
-  /* Group header that carries an action: an accent tint between the item hover and selected fills. */
   --color-select-header-bg: color-mix(
     in srgb,
     var(--color-accent) 10%,

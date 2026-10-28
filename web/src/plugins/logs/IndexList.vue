@@ -502,7 +502,7 @@ export default defineComponent({
       return searchObj.data.stream.streamLists;
     });
 
-    // The selector's options carry only names; the internal flag lives on the list API rows.
+    // Fallback for option lists built without the flag, e.g. by another page.
     const internalStreamNames = computed(() => {
       const list: StreamListItem[] | undefined = searchObj.data.streamResults?.list;
       return new Set(
@@ -511,9 +511,9 @@ export default defineComponent({
     });
 
     const pickerStreams = computed<PickerStream[]>(() =>
-      (streamList.value || []).map((option: { value: string }) => ({
+      (streamList.value || []).map((option: { value: string; internal?: boolean }) => ({
         name: option.value,
-        is_internal: internalStreamNames.value.has(option.value),
+        is_internal: option.internal ?? internalStreamNames.value.has(option.value),
       })),
     );
 

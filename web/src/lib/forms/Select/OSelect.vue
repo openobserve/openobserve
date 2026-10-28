@@ -946,7 +946,7 @@ const virtualizer = useVirtualizer(
     estimateSize: (index: number) => {
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
-      // min-h-8 on OSelectHeaderRow: room for its action button and focus ring.
+      // Must equal the min-h-8 of OSelectHeaderRow or the virtual rows drift.
       if (isRichHeader(opt)) return 32;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;

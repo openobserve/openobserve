@@ -293,7 +293,7 @@ describe("useStreamPickerOptions", () => {
     picker.hideInternalStreams.value = true;
     search.value = "rum";
     await nextTick();
-    expect(visible()).toContain("# Internal streams · 2 match [Show]");
+    expect(visible()).toContain("# Internal streams · 2 hidden matches [Show]");
   });
 
   it("builds the quick-pick header in the same words", () => {

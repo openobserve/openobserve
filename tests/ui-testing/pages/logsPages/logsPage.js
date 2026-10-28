@@ -12745,6 +12745,17 @@ export class LogsPage {
         return false;
     }
 
+    /** Every logs stream in the org as `{ name, internal }`, read from the streams API. */
+    async getLogStreams() {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams?type=logs`;
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(`Listing streams failed: HTTP ${res.status}`);
+        const body = await res.json();
+        return (body.list || []).map((s) => ({ name: s.name, internal: s.is_internal === true }));
+    }
+
     /**
      * Deselects a stream from the logs stream selector's checkbox zone.
      *
@@ -13363,6 +13374,62 @@ export class LogsPage {
                 text: (n.textContent || '').trim(),
             }))
         );
+    }
+
+    /** The Hide/Show button on the "Internal streams" header row. */
+    getStreamPickerHeaderAction() {
+        return this.page.locator(`${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header-action"]`);
+    }
+
+    async filterStreamPicker(text) {
+        await this.page.locator(this.indexDropDownSearch).fill(text);
+    }
+
+    /** Puts focus in the picker's search box and Tabs once out of it. */
+    async tabFromStreamPickerSearch() {
+        const search = this.page.locator(this.indexDropDownSearch);
+        await search.focus();
+        await search.press('Tab');
+    }
+
+    /** Every row of the open picker in order; scrolls because the list renders only rows in view. */
+    async getStreamPickerRows() {
+        const firstRow = this.getStreamPickerPopover().locator('[data-vrow]').first();
+        await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+        return await firstRow.evaluate(async (row) => {
+            const scroller = row.parentElement.parentElement;
+            const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const words = (el) => {
+                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+                const parts = [];
+                while (walker.nextNode()) parts.push(walker.currentNode.textContent.trim());
+                return parts.filter(Boolean).join(' ');
+            };
+            const rows = new Map();
+            const read = () => {
+                scroller.querySelectorAll('[data-vrow]').forEach((r) => {
+                    const header = r.querySelector('[data-test="log-search-index-list-select-stream-header"]');
+                    const option = r.querySelector('[data-test="log-search-index-list-select-stream-option"]');
+                    const entry = header
+                        ? { kind: 'header', text: words(header) }
+                        : { kind: option ? 'option' : 'other', value: option?.getAttribute('data-test-value') ?? null };
+                    rows.set(Number(r.getAttribute('data-vrow')), entry);
+                });
+            };
+            scroller.scrollTop = 0;
+            await frame();
+            read();
+            while (scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight) {
+                const before = scroller.scrollTop;
+                scroller.scrollTop += Math.max(1, Math.floor(scroller.clientHeight / 2));
+                await frame();
+                read();
+                if (scroller.scrollTop === before) break;
+            }
+            scroller.scrollTop = 0;
+            await frame();
+            return [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([, entry]) => entry);
+        });
     }
 
     // -----------------------------------------------------------------------

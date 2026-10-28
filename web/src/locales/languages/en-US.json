@@ -21225,7 +21225,7 @@
     "streamPicker": {
       "internalStreams": "Internal streams",
       "hiddenCount": "{count} hidden",
-      "matchCount": "{count} match",
+      "matchCount": "{count} hidden match | {count} hidden matches",
       "hide": "Hide",
       "show": "Show",
       "hideInternal": "Hide internal streams",
