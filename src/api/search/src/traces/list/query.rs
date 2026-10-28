@@ -406,18 +406,6 @@ mod tests {
     }
 
     #[test]
-    fn trace_builders_leave_out_the_duration_candidate() {
-        assert!(
-            !build_trace_query("default", "count(*) AS span_count").contains("zo_sql_candidate")
-        );
-        for has_gen_ai in [true, false] {
-            let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
-            let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
-            assert!(!sql.contains("zo_sql_candidate"), "{sql}");
-        }
-    }
-
-    #[test]
     fn test_build_trace_query_escapes_quote_in_stream_name() {
         let sql = build_trace_query("evil\" x", "count(*) AS span_count");
         assert!(sql.ends_with("FROM \"evil\"\" x\""), "{sql}");

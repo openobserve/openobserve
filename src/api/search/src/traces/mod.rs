@@ -314,7 +314,7 @@ pub async fn get_latest_traces(
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("from" = i64, Query, description = "from"),
-        ("size" = i64, Query, description = "size"),
+        ("size" = i64, Query, description = "page size: -1 returns every matching trace after from, 0 or omitted returns 10"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),

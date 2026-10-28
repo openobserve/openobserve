@@ -29,6 +29,9 @@ use super::{
 };
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
 
+const DEFAULT_PAGE_SIZE: i64 = 10;
+const UNLIMITED_PAGE_SIZE: i64 = -1;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraceListMode {
     Complete,
@@ -160,14 +163,19 @@ impl TraceListOptions {
         if end == 0 {
             return Err("end_time is empty".to_string());
         }
+        let mut size = query.get("size").map_or(DEFAULT_PAGE_SIZE, |v| {
+            v.parse::<i64>().unwrap_or(DEFAULT_PAGE_SIZE)
+        });
+        // The complete endpoint passes 0 on, where the engine reads it as ZO_QUERY_DEFAULT_LIMIT.
+        if mode == TraceListMode::Streaming && size == 0 {
+            size = DEFAULT_PAGE_SIZE;
+        }
         let mut options = Self {
             filter,
             from: query
                 .get("from")
                 .map_or(0, |v| v.parse::<i64>().unwrap_or(0)),
-            size: query
-                .get("size")
-                .map_or(10, |v| v.parse::<i64>().unwrap_or(10)),
+            size,
             range: (start, end),
             timeout: query
                 .get("timeout")
@@ -192,6 +200,18 @@ impl TraceListOptions {
             .unwrap_or(0);
         options.apply_trace_time(trace_time, mode, now_micros());
         Ok(options)
+    }
+
+    pub fn page_size(&self) -> PageSize {
+        match self.size {
+            UNLIMITED_PAGE_SIZE => PageSize::Unlimited,
+            // Other negative sizes have no streamed contract and keep returning an empty page.
+            size => PageSize::Bounded(usize::try_from(size).unwrap_or(0)),
+        }
+    }
+
+    pub fn skip(&self) -> usize {
+        usize::try_from(self.from).unwrap_or(0)
     }
 
     pub fn restrict_range(&mut self, max_hours: i64) {
@@ -219,6 +239,30 @@ impl TraceListOptions {
                 self.range = (timestamp - 60 * 1_000_000, timestamp + 3600 * 1_000_000);
             }
             TraceListMode::Complete => {}
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PageSize {
+    Unlimited,
+    Bounded(usize),
+}
+
+impl PageSize {
+    /// Rows a ranking must keep to serve the page after `skip`; `None` keeps every row.
+    pub fn retain(self, skip: usize) -> Option<usize> {
+        match self {
+            Self::Unlimited => None,
+            Self::Bounded(size) => Some(skip.saturating_add(size)),
+        }
+    }
+
+    /// Rows still owed after `delivered`; `None` when every matching trace is owed.
+    pub fn remaining(self, delivered: usize) -> Option<usize> {
+        match self {
+            Self::Unlimited => None,
+            Self::Bounded(size) => Some(size.saturating_sub(delivered)),
         }
     }
 }
@@ -257,8 +301,7 @@ impl TraceSort {
 
     pub fn sql(self, mode: TraceListMode) -> String {
         if self.ranks_by_candidate(mode) {
-            // Same tiebreaker as the merge, so a per-partition LIMIT cuts ties the same way on
-            // every page.
+            // Same tiebreaker as the merge, so every page's per-partition LIMIT cuts ties alike.
             return "zo_sql_candidate DESC, trace_id ASC".to_string();
         }
         let field = if self.by_duration {
@@ -374,6 +417,34 @@ mod tests {
     }
 
     #[test]
+    fn streamed_sizes_resolve_to_unlimited_the_default_or_the_request() {
+        for (size, streamed, complete) in [
+            (None, PageSize::Bounded(10), 10),
+            (Some("0"), PageSize::Bounded(10), 0),
+            (Some("-1"), PageSize::Unlimited, -1),
+            (Some("2"), PageSize::Bounded(2), 2),
+            (Some("2000"), PageSize::Bounded(2000), 2000),
+            (Some("invalid"), PageSize::Bounded(10), 10),
+            (Some("-5"), PageSize::Bounded(0), -5),
+        ] {
+            let mut query = query();
+            if let Some(size) = size {
+                query.insert("size".to_string(), size.to_string());
+            }
+            let options = TraceListOptions::parse(&query, TraceListMode::Streaming).unwrap();
+            assert_eq!(options.page_size(), streamed, "{size:?}");
+            let options = TraceListOptions::parse(&query, TraceListMode::Complete).unwrap();
+            assert_eq!(options.size, complete, "{size:?}");
+        }
+        assert_eq!(PageSize::Unlimited.retain(2), None);
+        assert_eq!(PageSize::Unlimited.remaining(1_000_000), None);
+        assert_eq!(PageSize::Bounded(10).retain(2), Some(12));
+        assert_eq!(PageSize::Bounded(10).remaining(4), Some(6));
+        assert_eq!(PageSize::Bounded(10).remaining(11), Some(0));
+        assert_eq!(PageSize::Bounded(usize::MAX).retain(2), Some(usize::MAX));
+    }
+
+    #[test]
     fn trace_time_keeps_distinct_window_rules() {
         let mut complete = TraceListOptions::parse(&query(), TraceListMode::Complete).unwrap();
         let mut streaming = TraceListOptions::parse(&query(), TraceListMode::Streaming).unwrap();
@@ -486,15 +557,22 @@ mod tests {
             let mut query = query();
             query.insert("sort_by".to_string(), "duration".to_string());
             query.insert("sort_order".to_string(), sort_order.to_string());
-            for (mode, expected) in [TraceListMode::Complete, TraceListMode::Streaming]
+            let llm_schemas = [
+                None,
+                Some(schema_compat::ValidatedLlmSchema::fallback(true)),
+                Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+            ];
+            let modes = [TraceListMode::Complete, TraceListMode::Streaming];
+            for ((mode, expected), llm_schema) in modes
                 .into_iter()
                 .zip(expected)
+                .flat_map(|mode| llm_schemas.clone().map(|llm| (mode, llm)))
             {
                 let plan = TraceListPlan {
                     options: TraceListOptions::parse(&query, mode).unwrap(),
                     sort: TraceSort::parse(&query).unwrap(),
                     columns: TraceColumns::default(),
-                    llm_schema: None,
+                    llm_schema,
                     mode,
                 };
                 let sql = plan.sql("traces");

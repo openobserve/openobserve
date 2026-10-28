@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use axum::response::Response;
 use config::{
-    get_config,
+    QUERY_WITH_NO_LIMIT, get_config,
     meta::{
         search::{Request, SearchPartitionRequest, StreamResponses, TimeOffset},
         stream::StreamType,
@@ -30,22 +30,23 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
 use super::{
-    plan::TraceListPlan,
+    plan::{PageSize, TraceListPlan},
     query::{TraceSearchContext, build_partition_query},
     response::TraceBatch,
 };
 use crate::search::error_utils::map_error_to_http_response;
 
-#[derive(Clone)]
+#[cfg_attr(test, derive(Clone))]
 struct CandidateMerge {
-    cap: usize,
+    // `None` keeps every trace, for a request with no row limit.
+    cap: Option<usize>,
     // Largest candidate per trace id, kept for pruned ids too, so a smaller row cannot re-enter.
     candidates: HashMap<String, i64>,
     rows: HashMap<String, json::Value>,
 }
 
 impl CandidateMerge {
-    fn new(cap: usize) -> Self {
+    fn new(cap: Option<usize>) -> Self {
         Self {
             cap,
             candidates: HashMap::new(),
@@ -78,16 +79,16 @@ impl CandidateMerge {
 
     // Dropping past the cap is safe: candidates never shrink, so the cap-th key never falls.
     fn prune(&mut self) {
-        if self.rows.len() <= self.cap {
+        let Some(cap) = self.cap.filter(|cap| self.rows.len() > *cap) else {
             return;
-        }
+        };
         let mut keys: Vec<(i64, String)> = self
             .rows
             .iter()
             .map(|(id, row)| (candidate_of(row), id.clone()))
             .collect();
         keys.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
-        for (_, id) in keys.drain(self.cap..) {
+        for (_, id) in keys.drain(cap..) {
             self.rows.remove(&id);
         }
     }
@@ -96,17 +97,18 @@ impl CandidateMerge {
         self.candidates.len()
     }
 
-    fn into_page(self, from: i64, size: i64) -> Vec<json::Value> {
+    fn into_page(self, skip: usize, page: PageSize) -> Vec<json::Value> {
         let mut rows: Vec<json::Value> = self.rows.into_values().collect();
         rows.sort_by(|a, b| {
             candidate_of(b)
                 .cmp(&candidate_of(a))
                 .then_with(|| trace_id_of(a).cmp(&trace_id_of(b)))
         });
-        rows.into_iter()
-            .skip(from.max(0) as usize)
-            .take(size.max(0) as usize)
-            .collect()
+        let rows = rows.into_iter().skip(skip);
+        match page.remaining(0) {
+            Some(size) => rows.take(size).collect(),
+            None => rows.collect(),
+        }
     }
 }
 
@@ -159,8 +161,8 @@ async fn run(
     let trace_id = ctx.trace_id.clone();
     let stream_type = StreamType::Traces;
     let (start_time, end_time) = plan.options.range;
-    let from = plan.options.from;
-    let size = plan.options.size;
+    let skip = plan.options.skip();
+    let page = plan.options.page_size();
     let use_cache = plan.options.use_cache;
     let range_error = plan.options.range_error.clone();
     if sender
@@ -241,25 +243,22 @@ async fn run(
         partitions
     };
 
-    let heap_k = if from + size > 0 {
-        (from + size) as usize
-    } else {
-        get_config().limit.query_default_limit as usize
-    };
+    let retain = page.retain(skip);
     let non_ts_col = "zo_sql_duration".to_string();
     let non_ts_is_desc = !plan.sort.ascending;
-    let mut candidate_merge = ranks_by_candidate.then(|| CandidateMerge::new(heap_k));
+    let mut candidate_merge = ranks_by_candidate.then(|| CandidateMerge::new(retain));
     let mut topk_heap: Option<TopKHeap> = if is_non_ts_order_by && !ranks_by_candidate {
-        Some(TopKHeap::new(heap_k, &[(non_ts_col, non_ts_is_desc)]))
+        Some(TopKHeap::new(
+            retain.unwrap_or(usize::MAX),
+            &[(non_ts_col, non_ts_is_desc)],
+        ))
     } else {
         None
     };
 
     // Partition boundaries follow the querier count, so a global `from` can shift between pages.
-    let mut hits_seen: i64 = 0;
-    let hits_to_skip = from;
-    let hits_to_deliver = size;
-    let mut hits_delivered: i64 = 0;
+    let mut hits_seen: usize = 0;
+    let mut hits_delivered: usize = 0;
     let mut total_across_partitions: usize = 0;
     let mut range_error_sent = false;
     let mut seen_trace_ids: HashSet<String> = HashSet::new();
@@ -269,26 +268,25 @@ async fn run(
         if sender.is_closed() {
             break;
         }
-        if hits_delivered >= hits_to_deliver {
+        let remaining_needed = page.remaining(hits_delivered);
+        if remaining_needed == Some(0) {
             break;
         }
 
         let p_start = partition[0];
         let p_end = partition[1];
 
-        let remaining_to_skip = (hits_to_skip - hits_seen).max(0);
-        let remaining_needed = hits_to_deliver - hits_delivered;
-        let fetch_size = if is_non_ts_order_by {
-            heap_k as i64
+        let fetch_rows = if is_non_ts_order_by {
+            retain
         } else {
-            (remaining_to_skip + remaining_needed).min(get_config().limit.query_default_limit)
+            remaining_needed.map(|need| need.saturating_add(skip.saturating_sub(hits_seen)))
         };
 
         let mut req1 = base_req.clone();
         req1.query.start_time = p_start;
         req1.query.end_time = p_end;
         req1.query.from = 0;
-        req1.query.size = fetch_size;
+        req1.query.size = query_size(fetch_rows);
 
         let agg_res = match ctx.search(&req1).await {
             Ok(res) => res,
@@ -302,7 +300,8 @@ async fn run(
         };
 
         let raw_hit_count = agg_res.hits.len();
-        if !is_non_ts_order_by {
+        // An unlimited request must read every partition, so only a bounded page stops at a gap.
+        if !is_non_ts_order_by && remaining_needed.is_some() {
             if raw_hit_count == 0 {
                 consecutive_empty_partitions += 1;
                 if consecutive_empty_partitions >= 3 {
@@ -324,8 +323,8 @@ async fn run(
                 !tid.is_empty() && !seen_trace_ids.contains(tid)
             })
             .collect();
-        let partition_total = deduped_hits.len() as i64;
-        total_across_partitions += deduped_hits.len();
+        let partition_total = deduped_hits.len();
+        total_across_partitions += partition_total;
         hits_seen += partition_total;
 
         if deduped_hits.is_empty() {
@@ -363,8 +362,9 @@ async fn run(
         let deliverable_q1 = select_timestamp_page(
             deduped_hits,
             &mut seen_trace_ids,
-            hits_to_skip - hits_seen_before,
-            (hits_to_deliver - hits_delivered) as usize,
+            skip.saturating_sub(hits_seen_before),
+            remaining_needed.unwrap_or(usize::MAX),
+            plan.sort.ascending,
         );
 
         if deliverable_q1.is_empty() {
@@ -375,7 +375,7 @@ async fn run(
             continue;
         }
 
-        let Some(batch) = load_batch(
+        let Some(deliverable) = load_page(
             &ctx,
             &plan,
             deliverable_q1,
@@ -388,13 +388,7 @@ async fn run(
             return;
         };
 
-        let deliverable: Vec<serde_json::Value> = batch
-            .into_sorted_items(plan.sort)
-            .iter()
-            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
-            .collect();
-
-        hits_delivered += deliverable.len() as i64;
+        hits_delivered += deliverable.len();
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
@@ -434,12 +428,12 @@ async fn run(
 
     if is_non_ts_order_by {
         let (total, deliverable_q1) = match candidate_merge.take() {
-            Some(merge) => (merge.len(), merge.into_page(from, size)),
+            Some(merge) => (merge.len(), merge.into_page(skip, page)),
             None => (
                 total_across_partitions,
                 topk_heap
                     .take()
-                    .map(|h| h.into_sorted_vec(from as usize))
+                    .map(|h| h.into_sorted_vec(skip))
                     .unwrap_or_default(),
             ),
         };
@@ -449,7 +443,7 @@ async fn run(
             return;
         }
 
-        let Some(batch) = load_batch(
+        let Some(deliverable) = load_page(
             &ctx,
             &plan,
             deliverable_q1,
@@ -461,12 +455,6 @@ async fn run(
         else {
             return;
         };
-
-        let deliverable: Vec<serde_json::Value> = batch
-            .into_sorted_items(plan.sort)
-            .iter()
-            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
-            .collect();
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
@@ -493,6 +481,37 @@ async fn run(
     }
 
     let _ = sender.send(Ok(StreamResponses::Done)).await;
+}
+
+// Chunks bound each `IN` list; together they still enrich every selected trace.
+async fn load_page(
+    ctx: &TraceSearchContext,
+    plan: &TraceListPlan,
+    hits: Vec<json::Value>,
+    range: (i64, i64),
+    base_request: &Request,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) -> Option<Vec<json::Value>> {
+    let chunk_size = usize::try_from(get_config().limit.query_default_limit)
+        .unwrap_or(0)
+        .max(1);
+    let mut items = Vec::with_capacity(hits.len());
+    let mut hits = hits.into_iter().peekable();
+    while hits.peek().is_some() {
+        if sender.is_closed() {
+            return None;
+        }
+        let chunk: Vec<json::Value> = hits.by_ref().take(chunk_size).collect();
+        let batch = load_batch(ctx, plan, chunk, range, base_request, sender).await?;
+        items.extend(batch.traces.into_values());
+    }
+    plan.sort.sort(&mut items);
+    Some(
+        items
+            .iter()
+            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
+            .collect(),
+    )
 }
 
 async fn load_batch(
@@ -536,13 +555,19 @@ async fn load_batch(
 fn select_timestamp_page(
     mut hits: Vec<json::Value>,
     seen_trace_ids: &mut HashSet<String>,
-    skip: i64,
+    skip: usize,
     need: usize,
+    ascending: bool,
 ) -> Vec<json::Value> {
+    // The offset is taken in the requested direction, since ascending partitions run oldest first.
     hits.sort_by(|a, b| {
         let a_t = json::get_int_value(a.get("trace_start_time").unwrap_or_default());
         let b_t = json::get_int_value(b.get("trace_start_time").unwrap_or_default());
-        b_t.cmp(&a_t)
+        if ascending {
+            a_t.cmp(&b_t)
+        } else {
+            b_t.cmp(&a_t)
+        }
     });
     // Skipped IDs must also be remembered because their spans can appear in later partitions.
     for item in &hits {
@@ -552,8 +577,14 @@ fn select_timestamp_page(
             seen_trace_ids.insert(tid.to_string());
         }
     }
-    let skip = skip.max(0).min(hits.len() as i64);
-    hits.into_iter().skip(skip as usize).take(need).collect()
+    hits.into_iter().skip(skip).take(need).collect()
+}
+
+// The engine reads a non-positive size as ZO_QUERY_DEFAULT_LIMIT, so no limit has its own value.
+fn query_size(rows: Option<usize>) -> i64 {
+    rows.map_or(QUERY_WITH_NO_LIMIT, |rows| {
+        i64::try_from(rows).unwrap_or(i64::MAX)
+    })
 }
 
 fn trace_id_of(hit: &json::Value) -> Option<&str> {
@@ -594,16 +625,16 @@ mod tests {
 
     fn page(
         partitions: &[Vec<json::Value>],
-        from: i64,
-        size: i64,
+        from: usize,
+        size: usize,
         ids_ascending: bool,
     ) -> Vec<String> {
-        let heap_k = (from + size) as usize;
-        let mut merge = CandidateMerge::new(heap_k);
+        let heap_k = from + size;
+        let mut merge = CandidateMerge::new(Some(heap_k));
         for hits in partitions {
             merge.push_hits(sql_cut(hits.clone(), heap_k, ids_ascending));
         }
-        ids(&merge.into_page(from, size))
+        ids(&merge.into_page(from, PageSize::Bounded(size)))
             .into_iter()
             .map(str::to_string)
             .collect()
@@ -618,32 +649,41 @@ mod tests {
             vec![row("A", 5), row("C", 2)],
             vec![row("A", 12)],
         ];
-        let mut merge = CandidateMerge::new(10);
+        let mut merge = CandidateMerge::new(Some(10));
         for hits in partitions {
             merge.push_hits(hits);
         }
         merge.push_hits(vec![row("A", 1), row("", 99)]);
         assert_eq!(merge.len(), 5);
         assert_eq!(merge.rows["A"], row("A", 12));
-        assert_eq!(ids(&merge.clone().into_page(0, 2)), ["A", "B"]);
-        assert_eq!(ids(&merge.clone().into_page(2, 2)), ["D", "E"]);
-        assert_eq!(ids(&merge.into_page(-1, 10)), ["A", "B", "D", "E", "C"]);
+        assert_eq!(
+            ids(&merge.clone().into_page(0, PageSize::Bounded(2))),
+            ["A", "B"]
+        );
+        assert_eq!(
+            ids(&merge.clone().into_page(2, PageSize::Bounded(2))),
+            ["D", "E"]
+        );
+        assert_eq!(
+            ids(&merge.into_page(0, PageSize::Bounded(10))),
+            ["A", "B", "D", "E", "C"]
+        );
     }
 
     #[test]
     fn candidate_merge_ranks_the_issue_example_by_its_root_span() {
         // Issue 15507: A = 9 s root span in the older partition plus a 1 s span in the newer one.
-        let mut merge = CandidateMerge::new(1);
+        let mut merge = CandidateMerge::new(Some(1));
         merge.push_hits(vec![row("B", 2_000_000), row("A", 1_000_000)]);
         merge.push_hits(vec![row("A", 9_000_000)]);
         assert_eq!(merge.len(), 2);
-        assert_eq!(ids(&merge.into_page(0, 1)), ["A"]);
+        assert_eq!(ids(&merge.into_page(0, PageSize::Bounded(1))), ["A"]);
     }
 
     #[test]
     fn candidate_merge_keeps_at_most_cap_rows_and_readmits_a_pruned_id_that_grows() {
         // from=1&size=1 keeps two rows: C is pruned, ignored while smaller, back once larger.
-        let mut merge = CandidateMerge::new(2);
+        let mut merge = CandidateMerge::new(Some(2));
         merge.push_hits(vec![row("A", 5), row("B", 4), row("C", 3)]);
         assert_eq!(merge.rows.len(), 2);
         assert!(!merge.rows.contains_key("C"));
@@ -652,8 +692,42 @@ mod tests {
         merge.push_hits(vec![row("C", 10), row("B", 4)]);
         assert_eq!(merge.rows.len(), 2);
         assert_eq!(merge.len(), 3);
-        assert_eq!(ids(&merge.clone().into_page(0, 2)), ["C", "A"]);
-        assert_eq!(ids(&merge.into_page(1, 1)), ["A"]);
+        assert_eq!(
+            ids(&merge.clone().into_page(0, PageSize::Bounded(2))),
+            ["C", "A"]
+        );
+        assert_eq!(ids(&merge.into_page(1, PageSize::Bounded(1))), ["A"]);
+    }
+
+    #[test]
+    fn an_unlimited_merge_keeps_every_trace_once_and_skips_only_the_offset() {
+        // Two partitions each report 15 traces A..O, the older one with larger candidates.
+        let names: Vec<String> = ('A'..='O').map(String::from).collect();
+        let mut merge = CandidateMerge::new(None);
+        for bump in [0, 100] {
+            merge.push_hits(
+                names
+                    .iter()
+                    .enumerate()
+                    .map(|(i, id)| row(id, bump + 50 - i as i64))
+                    .collect(),
+            );
+        }
+        assert_eq!((merge.len(), merge.rows.len()), (15, 15));
+        assert_eq!(merge.rows["A"], row("A", 150));
+        assert_eq!(ids(&merge.clone().into_page(0, PageSize::Unlimited)), names);
+        assert_eq!(
+            ids(&merge.clone().into_page(2, PageSize::Unlimited)),
+            names[2..]
+        );
+        assert!(merge.into_page(15, PageSize::Unlimited).is_empty());
+    }
+
+    #[test]
+    fn unlimited_fetches_ask_the_engine_for_no_limit_and_bounded_ones_for_their_rows() {
+        assert_eq!(query_size(None), QUERY_WITH_NO_LIMIT);
+        assert_eq!(query_size(Some(12)), 12);
+        assert_eq!(query_size(Some(usize::MAX)), i64::MAX);
     }
 
     #[test]
@@ -680,7 +754,7 @@ mod tests {
             json::json!({"trace_id": "middle", "trace_start_time": 2}),
         ];
         let mut seen = HashSet::new();
-        let page = select_timestamp_page(hits, &mut seen, 1, 1);
+        let page = select_timestamp_page(hits.clone(), &mut seen, 1, 1, false);
         assert_eq!(
             page,
             [json::json!({"trace_id": "middle", "trace_start_time": 2})]
@@ -692,10 +766,17 @@ mod tests {
         let later = select_timestamp_page(
             vec![json::json!({"trace_id": "later", "trace_start_time": 0})],
             &mut seen,
-            -1,
+            0,
             1,
+            false,
         );
         assert_eq!(later.len(), 1);
         assert!(seen.contains("later"));
+        let oldest_first = select_timestamp_page(hits, &mut HashSet::new(), 1, usize::MAX, true);
+        assert_eq!(
+            ids(&oldest_first),
+            ["middle", "new"],
+            "an ascending offset skips the oldest trace"
+        );
     }
 }
