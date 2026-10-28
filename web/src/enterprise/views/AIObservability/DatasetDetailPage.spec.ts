@@ -328,4 +328,16 @@ describe("DatasetDetailPage item detail", () => {
     expect(mockRemoveItem).not.toHaveBeenCalled();
     expect(wrapper.find(".item-detail").exists()).toBe(true);
   });
+
+  it("asks to delete an item with a destructive confirm button", async () => {
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+
+    await state.deleteFromDetail(state.items[0]);
+    await flushPromises();
+
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmVariant: "destructive" }),
+    );
+  });
 });

@@ -319,7 +319,7 @@ const alerts = {
     return http().delete(`/api/${org_identifier}/alerts/deduplication/config`);
   },
   get_dedup_summary: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/alerts/dedup/summary`);
+    return http().get(`/api/v2/${org_identifier}/alerts/dedup/summary`);
   },
   // Semantic field groups management
   getSemanticGroups: (org_identifier: string) => {

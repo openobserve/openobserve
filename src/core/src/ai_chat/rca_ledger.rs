@@ -197,16 +197,15 @@ fn ack_of(call: &ToolPart<'_>) -> Option<TranscriptAck> {
     })
 }
 
-fn is_sentinel(call: &ToolPart<'_>) -> bool {
-    matches!(call.kind(), ThreadPart::Step(_))
-        || [
-            RECORD_HYPOTHESIS,
-            RECORD_BLIND_SPOT,
-            SUBMIT_REPORT,
-            ASK_RESPONDERS,
-            ACKNOWLEDGE_STEERING,
-        ]
-        .contains(&call.tool)
+/// Only a hypothesis, blind spot, report or new question closes an open question.
+fn closes_question(call: &ToolPart<'_>) -> bool {
+    [
+        RECORD_HYPOTHESIS,
+        RECORD_BLIND_SPOT,
+        SUBMIT_REPORT,
+        ASK_RESPONDERS,
+    ]
+    .contains(&call.tool)
 }
 
 /// Decode the committed events of an RCA session.
@@ -228,7 +227,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
     let mut unread: Vec<usize> = Vec::new();
     let mut unanswered_user: Option<usize> = None;
     let mut last_read_user: Option<usize> = None;
-    // The last completed sentinel: its seq, message position and question, if one.
+    // The last completed closing sentinel: its seq, message position and question, if one.
     let mut last_sentinel: Option<(i64, usize, Option<TranscriptQuestion>)> = None;
     let empty = Map::new();
     for (position, (msg_id, info)) in folded.infos.iter().enumerate() {
@@ -315,7 +314,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
                 }
             }
             if call.status == "completed"
-                && is_sentinel(&call)
+                && closes_question(&call)
                 && last_sentinel.as_ref().is_none_or(|(last, ..)| seq >= *last)
             {
                 last_sentinel = Some((seq, position, question));
@@ -1419,6 +1418,31 @@ pub(crate) mod tests {
             open(&visible_after).as_deref(),
             Some("call_prt_q1"),
             "a visible tool call is no sentinel"
+        );
+
+        let mut stepped = base();
+        stepped.tool(
+            "msg_02",
+            "prt_s2",
+            "record_step",
+            "completed",
+            json!({"title": "Await flag change actor"}),
+            json!({"output": "{}"}),
+            300,
+            301,
+        );
+        assert_eq!(
+            open(&stepped).as_deref(),
+            Some("call_prt_q1"),
+            "a step marker after the ask keeps it open"
+        );
+
+        let mut acked = base();
+        ack(&mut acked, "msg_02", "prt_a1", S1, "applied", "ok", 300);
+        assert_eq!(
+            open(&acked).as_deref(),
+            Some("call_prt_q1"),
+            "a steering ack after the ask keeps it open"
         );
 
         let mut submitted = base();

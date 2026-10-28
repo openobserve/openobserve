@@ -441,6 +441,32 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.queryReq.query.sql).toHaveLength(2);
     });
 
+    it("shows the time-shift stream's progress and clears partial data on completion", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [{ offSet: "1d" }] },
+        },
+      ]);
+
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [[payload, stream]] = fetchQueryDataWithHttpStream.mock.calls;
+      stream.data(payload, { type: "event_progress", content: { percent: 60 } });
+
+      expect(state.loadingProgressPercentage).toBe(60);
+      expect(state.isPartialData).toBe(true);
+
+      await stream.complete(payload, {});
+
+      expect(state.loading).toBe(false);
+      expect(state.isPartialData).toBe(false);
+    });
+
     it("propagates errors from applyDynamicVariables", async () => {
       const { ctx } = makeCtx();
       ctx.applyDynamicVariables = vi.fn(async () => {
@@ -482,6 +508,38 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.queryReq.query.sql[0].sql).toBe("SELECT * FROM logs");
       expect(payload.queryReq.query.sql[1].sql).toBe("SELECT * FROM metrics");
       expect(payload.queryReq.query.per_query_response).toBe(true);
+    });
+
+    it("shows the multi-query stream's averaged progress on the panel", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+        {
+          query: "SELECT * FROM metrics",
+          vrlFunctionQuery: "",
+          fields: { stream: "metrics", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+      ]);
+
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      const [[payload, stream]] = fetchQueryDataWithHttpStream.mock.calls;
+      stream.data(payload, { type: "event_progress", content: { percent: 35 } });
+
+      expect(state.loadingProgressPercentage).toBe(35);
+      expect(state.isPartialData).toBe(true);
+
+      await stream.complete(payload, {});
+
+      expect(state.loading).toBe(false);
+      expect(state.isPartialData).toBe(false);
     });
 
     it("initializes state arrays for all queries before fetch", async () => {

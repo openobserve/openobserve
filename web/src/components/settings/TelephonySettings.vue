@@ -141,12 +141,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="confirmingDisconnect"
       :title="t('telephony.disconnectTitle', { provider: PROVIDER })"
-      :message="
+      :message-keypath="
         view?.deployment_account_present
-          ? t('telephony.disconnectToDeployment')
-          : t('telephony.disconnectToEmail')
+          ? 'telephony.disconnectToDeployment'
+          : 'telephony.disconnectToEmail'
       "
+      :message-name="view?.org ? shortSid(view.org.account_sid) : ''"
       :ok-label="t('telephony.disconnect')"
+      ok-variant="destructive"
       @update:ok="disconnect"
     />
   </OPageLayout>

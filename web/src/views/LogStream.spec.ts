@@ -678,6 +678,27 @@ describe("LogStream Component", () => {
       expect(dialog.props("primaryButtonVariant")).toBe("destructive");
     });
 
+    it("shows the number of selected streams in the message", () => {
+      const message = wrapper.find('[data-test="log-stream-batch-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete 2 streams?");
+    });
+
+    it("uses the singular form for one selected stream", async () => {
+      wrapper.vm.confirmBatchDelete = false;
+      wrapper.vm.selectedIds = ["stream1-logs"];
+      await wrapper.vm.confirmBatchDeleteAction();
+      await wrapper.vm.$nextTick();
+      const message = wrapper.find('[data-test="log-stream-batch-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete 1 stream?");
+    });
+
+    it("keeps the count while the selection is cleared after confirming", async () => {
+      wrapper.vm.selectedIds = [];
+      await wrapper.vm.$nextTick();
+      const message = wrapper.find('[data-test="log-stream-batch-delete-dialog-message"]');
+      expect(message.text()).toBe("Are you sure you want to delete 2 streams?");
+    });
+
     it("should close batch-delete ODialog without deleting when secondary is emitted", async () => {
       const dialog = wrapper
         .findAllComponents({ name: "ODialog" })

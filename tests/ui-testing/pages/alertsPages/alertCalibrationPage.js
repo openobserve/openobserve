@@ -11,6 +11,7 @@ export class AlertCalibrationPage {
     // Page containers (OPageLayout forwards data-test to its root)
     this.dashboardPage = '[data-test="alert-calibration-dashboard-page"]';
     this.settingsPage = '[data-test="alert-calibration-settings"]';
+    this.dashboardRuns = '[data-test="alert-calibration-dashboard"]';
 
     // Settings form — the enabled toggle. OFormSwitch forwards data-test to the
     // OSwitch button as `<data-test>-btn`; the button exposes role="switch".
@@ -49,11 +50,13 @@ export class AlertCalibrationPage {
     await expect(switchBtn).toHaveAttribute('aria-checked', 'true');
   }
 
-  async expectEmptyRunsStateInsteadOfEnablePrompt() {
-    // The empty "no runs yet" state proves the org's config resolved to enabled
-    // (a disabled org would render the enable prompt), and that no digest exists yet.
+  async expectRunsViewInsteadOfEnablePrompt() {
+    // An enabled org shows the empty state or, once the scheduler has run, the latest digest.
     await expect(
-      this.page.getByText(this.dashboardEmptyTitle, { exact: false }),
+      this.page
+        .getByText(this.dashboardEmptyTitle, { exact: false })
+        .or(this.page.locator(this.dashboardRuns))
+        .first(),
     ).toBeVisible({ timeout: 20000 });
     await expect(
       this.page.getByText(this.notEnabledTitle, { exact: true }),

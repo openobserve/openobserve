@@ -35,6 +35,7 @@ import {
   type GaugeDialSeries,
 } from "./gaugeDial";
 import { applySeriesOverrides } from "./seriesOverrides";
+import { applyChartStyleOptions } from "./seriesStyleOverrides";
 import {
   HEATMAP_MAX_CELLS,
   addHeatmapWarning,
@@ -740,6 +741,7 @@ export const convertMultiSQLData = async (
     }
     // Override colours first: a threshold step outranks them and recolours on top.
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    applyChartStyleOptions(options[0].options, panelSchema);
     fitStackedAxisBounds(chartType, options[0].options);
     applyLineAreaThresholds(options[0].options, panelSchema);
   }

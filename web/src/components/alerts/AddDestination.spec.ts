@@ -711,11 +711,11 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
-      // prebuilt_type drives type resolution (Priority 1); credential_* metadata
-      // + the url are restored by extractPrebuiltCredentials.
+      // credential_* metadata and the url refill the form.
       metadata: {
         prebuilt_type: "slack",
         credential_channel: "#ops",
@@ -761,12 +761,74 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
   });
 
+  it("EDIT mode: a custom webhook to a ServiceNow URL stays custom and keeps its token header", async () => {
+    const headers = { Authorization: "Bearer tok" };
+    const customServiceNow: any = {
+      name: "snow-token",
+      url: "https://acme.service-now.com/api/now/table/incident",
+      type: "http",
+      method: "post",
+      template: "prebuilt_servicenow",
+      skip_tls_verify: false,
+      headers,
+      metadata: {},
+    };
+    wrapper = mountComp({ isAlerts: true, destination: customServiceNow });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    expect(form.state.values.destination_type).toBe("custom");
+    expect(form.state.values.apiHeaders).toEqual([{ key: "Authorization", value: "Bearer tok" }]);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).not.toHaveBeenCalled();
+    expect((destinationService.update as any).mock.calls[0][0].data.headers).toEqual(headers);
+  });
+
+  it.each([
+    [
+      "email",
+      // The server does not store metadata for email, so the template is its only marker.
+      {
+        name: "ops-mail",
+        type: "email",
+        emails: ["ops@acme.co"],
+        template: "prebuilt_email",
+        metadata: {},
+      },
+    ],
+    [
+      "pagerduty",
+      {
+        name: "pd-api",
+        type: "http",
+        method: "post",
+        url: "https://events.pagerduty.com/v2/enqueue",
+        destination_type_name: "pagerduty",
+        skip_tls_verify: false,
+        headers: {},
+        metadata: {},
+      },
+    ],
+  ])(
+    "EDIT mode: a %s destination the server treats as prebuilt opens as prebuilt",
+    async (type, destination: any) => {
+      wrapper = mountComp({ isAlerts: true, destination });
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.destination_type).toBe(type);
+    },
+  );
+
   it("restores PagerDuty severity from its substitution metadata on edit", async () => {
     const existingPagerDuty = {
       name: "pagerduty-alerts",
       url: "https://events.pagerduty.com/v2/enqueue",
       type: "http",
       method: "post",
+      destination_type_name: "pagerduty",
       template: "prebuilt_pagerduty",
       skip_tls_verify: false,
       headers: {},
@@ -1062,6 +1124,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1095,6 +1158,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1116,6 +1180,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1160,6 +1225,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1199,6 +1265,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},

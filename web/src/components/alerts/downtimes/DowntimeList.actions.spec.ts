@@ -90,7 +90,7 @@ const ROWS = [
   row("active", "active"),
 ];
 
-const mountList = async () => {
+const mountList = async (stubs: Record<string, unknown> = {}) => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -103,7 +103,7 @@ const mountList = async () => {
   await router.push({ name: "downtimes", query: { org_identifier: "default", folder: "default" } });
   await router.isReady();
   const wrapper = mount(DowntimeList, {
-    global: { plugins: [store, router] },
+    global: { plugins: [store, router], stubs },
     attachTo: document.body,
   });
   // The rows land a variable number of ticks after mount, so wait for every one of them.
@@ -191,6 +191,25 @@ describe("DowntimeList row actions", () => {
     ok.click();
     await flushPromises();
     expect(downtimes.cancel).toHaveBeenCalledWith("default", "active", "default");
+    wrapper.unmount();
+  });
+
+  it("names the downtime in the delete confirm and makes it destructive", async () => {
+    const wrapper = await mountList({
+      ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        emits: ["select"],
+        template: "<button @click='$emit(\"select\")'><slot /></button>",
+      },
+    });
+    await wrapper.get('[data-test="downtime-list-ended-delete"]').trigger("click");
+    await flushPromises();
+    const confirm = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c) => c.props("messageKeypath") === "alerts.downtimes.confirmDelete.message");
+    expect(confirm!.props("modelValue")).toBe(true);
+    expect(confirm!.props("messageName")).toBe("ended window");
+    expect(confirm!.props("okVariant")).toBe("destructive");
     wrapper.unmount();
   });
 

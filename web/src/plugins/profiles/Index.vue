@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
           <OTooltip
-            v-if="!queryLoading && (runPending || isAutoRunOn)"
-            :content="runPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')"
+            v-if="!queryLoading && (!canQuery || runPending || isAutoRunOn)"
+            :content="runButtonTooltip"
           />
         </OButton>
         <ODropdown
@@ -892,6 +892,8 @@ let initRunSeq = 0;
 // Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
 let lastRunSeeded = false;
+// The focus from a link belongs to the first run's tree; any later run draws a tree its index path may not match.
+let keepSeededFocus = false;
 // Set while a watcher reloads meta, which can pick a new service or type: the select watcher must not run a second query.
 let reloadingMeta = false;
 // Set by a drag on the chart: that is a direct action on the results, so it runs even with Auto Run off.
@@ -939,6 +941,10 @@ const currentProfileType = computed(() => {
 const canQuery = computed(
   () => !!orgIdentifier.value && !!selectedStream.value && !!currentProfileType.value,
 );
+const runButtonTooltip = computed(() => {
+  if (!canQuery.value) return t("profiles.runNeedsProfileType");
+  return runPending.value ? t("search.autoRunPendingDot") : t("search.autoRunEnabled");
+});
 const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
 // The server keeps the most common stacks only; say how much of the data the views show.
 const sampledPercent = computed(() => {
@@ -1011,6 +1017,7 @@ const seriesChartData = computed(() => {
     line.points.map((point) => [Math.floor(point.timestamp / 1000), seriesDisplayValue(point)]),
   );
   const seriesData = lineData.flat();
+  const runRange = lastRun.value?.range;
   return {
     options: {
       // Tooltip, grid and y axis follow the Logs histogram (utils/logs/convertLogData.ts).
@@ -1034,7 +1041,13 @@ const seriesChartData = computed(() => {
           dataZoom: { brushStyle: dataZoomBrushStyle(), show: true, yAxisIndex: "none" },
         },
       },
-      xAxis: { type: "time", axisLabel: { hideOverlap: true } },
+      // The axis spans the run's window, so one bucket is not stretched to fill the chart.
+      xAxis: {
+        type: "time",
+        min: runRange ? Math.floor(runRange.startTime / 1000) : undefined,
+        max: runRange ? Math.floor(runRange.endTime / 1000) : undefined,
+        axisLabel: { hideOverlap: true },
+      },
       yAxis: {
         type: "value",
         axisLine: { show: true },
@@ -1053,7 +1066,8 @@ const seriesChartData = computed(() => {
         type: "line",
         name: line.label,
         smooth: true,
-        showSymbol: false,
+        // With symbols off, a lone point draws nothing, and two read as a bare segment.
+        showSymbol: line.points.length < 3,
         color: line.color || undefined,
         lineStyle: { width: 2 },
         // An area under one line reads as volume; under several it hides the lines below.
@@ -1411,6 +1425,7 @@ const resetProfilesState = () => {
   sandwichFunction.value = null;
   detailsName.value = null;
   flameFocus.value = null;
+  keepSeededFocus = false;
   errorMessage.value = "";
 };
 
@@ -1558,26 +1573,33 @@ const loadMeta = async () => {
   if (!org || !stream || !range) return;
   const requestSeq = ++metaRequestSeq;
   const run = initRunSeq;
-  try {
-    const response = await profilesService.meta(org, stream, {
+  const isStale = () => requestSeq !== metaRequestSeq || isStaleRun(run, org);
+  // The server scopes only profile_types to service_name; services always lists every service.
+  const fetchMeta = (service: string | null) =>
+    profilesService.meta(org, stream, {
       start_time: range.startTime,
       end_time: range.endTime,
+      ...(service ? { service_name: service } : {}),
     });
-    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
+  try {
+    let service = selectedService.value;
+    let response = await fetchMeta(service);
+    if (isStale()) return;
+    const services: string[] = response.data.services ?? [];
+    // An empty window lists no services; keep the chosen one for when data comes back.
+    if (services.length && (!service || !services.includes(service))) {
+      service = services[0];
+      response = await fetchMeta(service);
+      if (isStale()) return;
+    }
     metaResponse.value = response.data;
-    const firstService = serviceOptions.value[0]?.value ?? null;
     // CPU first, as the Traces "View Profile" link does; the server lists types alphabetically (alloc_objects first).
     const firstProfileType =
       profileTypeOptions.value.find((option) => option.value.startsWith("cpu\u0000"))?.value ??
       profileTypeOptions.value[0]?.value ??
       null;
 
-    if (
-      !selectedService.value ||
-      !serviceOptions.value.some((item) => item.value === selectedService.value)
-    ) {
-      selectedService.value = firstService;
-    }
+    selectedService.value = service;
     if (
       !selectedProfileType.value ||
       !profileTypeOptions.value.some((item) => item.value === selectedProfileType.value)
@@ -1597,7 +1619,7 @@ const loadMeta = async () => {
       breakdownLabel.value = null;
     }
   } catch (error) {
-    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
+    if (isStale()) return;
     errorMessage.value = buildErrorMessage(error);
   }
 };
@@ -1640,6 +1662,9 @@ const runQuery = async () => {
   const range = resolveTimeRange();
   const payload = queryPayload(range);
   if (!org || !stream || !payload || !range) return;
+  // Only the run started with the link's inputs may keep its focus, even if it is superseded or fails.
+  const keepFocus = keepSeededFocus;
+  keepSeededFocus = false;
   const runState = { query: pageQuery(), range, payload };
   const requestSeq = ++queryRequestSeq;
   const run = initRunSeq;
@@ -1660,6 +1685,7 @@ const runQuery = async () => {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     seriesResponse.value = seriesResult.data;
     mergeResult.value = mergeResponseValue.data;
+    if (!keepFocus) flameFocus.value = null;
     lastRun.value = runState;
     resetStackExpansion(mergeResponseValue.data.root);
     syncUrl();
@@ -1862,6 +1888,7 @@ const initPage = async () => {
       sandwichFunction.value = seed.sandwichFunction;
       detailsName.value = seed.details;
       flameFocus.value = seed.focus;
+      keepSeededFocus = !!seed.focus;
       breakdownLabel.value = seed.breakdown;
       compareState.value = seed.compare;
     }
@@ -1896,8 +1923,10 @@ const reloadMeta = async () => {
 };
 
 // A new service or profile type runs the query (Auto Run) or marks Run query pending.
-watch([selectedService, selectedProfileType], async () => {
+watch([selectedService, selectedProfileType], async ([service], [previousService]) => {
   if (seeding || reloadingMeta) return;
+  // Profile types are scoped to the service; reloadMeta holds this watcher, so it cannot loop.
+  if (service !== previousService) await reloadMeta();
   if (draftTagKey.value) {
     draftTagValue.value = null;
     await loadTagValues();

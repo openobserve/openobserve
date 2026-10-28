@@ -523,6 +523,18 @@ describe("RenderDashboardCharts", () => {
       }
     });
 
+    it("resolves an off-screen placeholder's title from the panel's applied variables", () => {
+      wrapper = createWrapper();
+      wrapper.vm.currentVariablesDataRef = {
+        __global: {},
+        "panel-1": { values: [{ name: "row", value: ["B", "C"] }] },
+      };
+      expect(wrapper.vm.getPanelTitle({ id: "panel-1", title: "Inlet — $row" })).toBe(
+        "Inlet — B, C",
+      );
+      expect(wrapper.vm.getPanelTitle({ id: "panel-1", title: "Cost $100" })).toBe("Cost $100");
+    });
+
     it("should pass correct props to PanelContainer components", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);

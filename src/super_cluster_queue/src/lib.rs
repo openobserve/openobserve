@@ -44,6 +44,7 @@ mod org_ingestion_token;
 mod org_user;
 mod organization;
 mod pipelines;
+mod public_dashboards;
 mod ratelimit;
 mod re_pattern;
 mod reports;
@@ -103,6 +104,14 @@ async fn incident_msg(msg: Message) -> infra::errors::Result<()> {
     }
 }
 
+/// The `dashboard` key carries two payloads; older regions skip byte 96, a public link row.
+async fn dashboard_msg(msg: Message) -> infra::errors::Result<()> {
+    match msg.message_type {
+        MessageType::PublicDashboardsTable => public_dashboards::process(msg).await,
+        _ => dashboards::process(msg).await,
+    }
+}
+
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -150,7 +159,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_search_job_msg: search_job::process,
     };
     let dashboards_queue = DashboardsQueue {
-        on_dashboard_msg: dashboards::process,
+        on_dashboard_msg: dashboard_msg,
         on_report_msg: reports::process,
     };
     let pipelines_queue = PipelinesQueue {

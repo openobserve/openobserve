@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
+            calendar-presets
             @update:modelValue="timeGate.onPick"
             @show="timeGate.onShow"
             @hide="onTimePickerHide"
@@ -331,6 +332,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-toolbar"
               data-test="dashboard-share-btn"
+            />
+            <span
+              v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
+              v-show="store.state.printMode !== true"
+              class="inline-flex items-center"
+              data-test="dashboard-publish-public"
+            >
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="dashboard-publish-public-btn"
+                icon-left="public"
+                :aria-label="t('dashboard.publicDashboard.shareTooltip')"
+                @click="showPublicLinksPanel = true"
+              >
+                <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+              </OButton>
+            </span>
+            <PublicLinksPanel
+              v-if="
+                currentDashboardData.data?.dashboardId &&
+                store.state.zoConfig?.public_dashboards_enabled
+              "
+              v-model="showPublicLinksPanel"
+              :dashboard-id="currentDashboardData.data.dashboardId"
+              :dashboard-title="currentDashboardData.data?.title"
+              :variables-config="currentDashboardData.data?.variables"
+              :time-obj="currentTimeObj"
+              :current-values="variablesData"
+              :dashboard-data="currentDashboardData.data"
+              :dashboard-variables="variablesManager"
+              :folder-id="(route.query.folder as string) ?? 'default'"
             />
             <OButton
               v-if="!isFullscreen"
@@ -636,7 +669,8 @@ import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel } from "../../utils/date";
+import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { useRoute } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
@@ -646,6 +680,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
+import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
 import {
@@ -689,6 +724,7 @@ import {
   arePickerValuesEqual,
   hasPanelTime,
   isEffectivePanelTimeRelative,
+  isEffectivePanelTimeCalendar,
   pickerValueToTimeObj,
   queryChangeAffectsPanelTimes,
   toPickerSavedDate,
@@ -723,6 +759,7 @@ import {
   resolveKioskRefresh,
   stripKioskParams,
 } from "@/utils/dashboard/kiosk";
+import { minAutoRefreshSeconds, resolveOpenRefreshInterval } from "@/utils/dashboard/autoRefresh";
 import {
   PLAYLIST_VIEW_PATH,
   isPlaylistEmbed,
@@ -758,6 +795,7 @@ export default defineComponent({
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
+    PublicLinksPanel,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -919,6 +957,10 @@ export default defineComponent({
 
     // refresh interval v-model
     const refreshInterval = ref(0);
+    // The URL's refresh as a dashboard opens; null once applied, so reloading the same dashboard keeps the viewer's choice.
+    let openingUrlRefresh: { value: typeof route.query.refresh } | null = {
+      value: route.query.refresh,
+    };
 
     // initial timezone, which will come from the route query
     const initialTimezone = ref(route.query.timezone ?? null);
@@ -986,6 +1028,8 @@ export default defineComponent({
       isAutoRunOn: () => isAutoRunOn.value,
       isRelativeRange: (panel) =>
         isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
+      isCalendarRange: (panel) =>
+        isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value),
     });
     provide(DASHBOARD_FRESH_ON_OPEN, freshOnOpen);
     // A cross-dashboard drilldown keeps this view mounted, so each dashboard it opens is a new visit.
@@ -996,6 +1040,7 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+    const showPublicLinksPanel = ref(false);
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
@@ -1077,13 +1122,18 @@ export default defineComponent({
       return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
 
+    // Panel calendar windows a zone change moved while Auto Run was off; Refresh or Auto Run applies them.
+    const zonePendingPanels = ref<Record<string, { start_time: Date; end_time: Date }>>({});
+    const zoneRefreshPending = computed(
+      () => !isAutoRunOn.value && Object.keys(zonePendingPanels.value).length > 0,
+    );
     const isRefreshPending = computed(
-      () => isVariablesChanged.value || timeGate.needsRefresh.value,
+      () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
     );
 
     const refreshTooltip = computed(() => {
       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
-      if (timeGate.needsRefresh.value) {
+      if (timeGate.needsRefresh.value || zoneRefreshPending.value) {
         return isVariablesChanged.value
           ? t("dashboard.refreshToApplyTimeRangeAndVariables")
           : t("dashboard.refreshToApplyTimeRange");
@@ -1157,6 +1207,7 @@ export default defineComponent({
     const isInternalUrlUpdate = ref(false);
 
     const loadDashboard = async (onlyIfRequired = false) => {
+      zonePendingPanels.value = {};
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
         // if current dashboard id and tab is same,  skip loading
@@ -1216,6 +1267,7 @@ export default defineComponent({
 
       // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
+      applyOpeningRefresh(dashboard);
 
       // set selected tab from query params
       const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
@@ -1260,6 +1312,23 @@ export default defineComponent({
       if (previousAppliedDate && !arePickerValuesEqual(previousAppliedDate, selectedDate.value)) {
         showAppliedDateInPicker();
       }
+    };
+
+    const applyOpeningRefresh = (dashboard: any) => {
+      if (!openingUrlRefresh) return;
+      const urlRefresh = openingUrlRefresh.value;
+      openingUrlRefresh = null;
+      const configuredMin = store.state?.zoConfig?.min_auto_refresh_interval;
+      // A TV must keep refreshing: a too-low value is raised to the server minimum, not turned off.
+      if (urlRefresh !== undefined && kioskMode.value) {
+        refreshInterval.value = resolveKioskRefresh(urlRefresh, configuredMin);
+        return;
+      }
+      refreshInterval.value = resolveOpenRefreshInterval({
+        urlRefresh,
+        savedDefault: dashboard?.defaultRefreshInterval,
+        minSeconds: minAutoRefreshSeconds(configuredMin),
+      });
     };
 
     // The mounted picker reads its v-model only once, so a range applied by another dashboard's URL is pushed in.
@@ -1514,14 +1583,14 @@ export default defineComponent({
       );
     };
 
-    const spanOf = (time: any) =>
-      time?.start_time && time?.end_time
-        ? time.end_time.getTime() - time.start_time.getTime()
-        : null;
+    // Compared instead of the span because a calendar period's span grows with now.
+    let globalRelativePeriod: string | null = null;
 
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
+      // A forced recompute resolves every panel in the current zone, so nothing is left waiting from a zone change.
+      if (forceRefresh) zonePendingPanels.value = {};
       const globalTime = getAppliedGlobalTime();
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value || !globalTime) {
         return;
@@ -1530,10 +1599,14 @@ export default defineComponent({
       // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
       const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const relativePeriod = isRelativeGlobal
+        ? (selectedDate.value?.relativeTimePeriod ?? null)
+        : null;
       const globalTimeChanged = isRelativeGlobal
-        ? spanOf(existingGlobalTime) !== spanOf(globalTime)
+        ? globalRelativePeriod !== relativePeriod
         : !areTimesEqual(existingGlobalTime, globalTime);
       const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
+      if (shouldUpdateGlobal) globalRelativePeriod = relativePeriod;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1584,6 +1657,56 @@ export default defineComponent({
         }
       });
     };
+
+    // A zone change from any picker (header, panel, ViewPanel) moves every calendar window, which no single picker re-emits.
+    const reResolveCalendarRanges = () => {
+      const applied = selectedDate.value;
+      const picked = timeGate.picked.value;
+      // A header pick still waiting for Refresh is the range the user chose, so it is the one to keep or move.
+      const held = picked && !arePickerValuesEqual(picked, applied) ? picked : applied;
+      if (held?.valueType === "relative" && parseCalendarToken(held.relativeTimePeriod)) {
+        const window = getConsumableRelativeTime(held.relativeTimePeriod);
+        if (window)
+          timeGate.onPick({ ...held, startTime: window.startTime, endTime: window.endTime });
+      }
+      const globalTime = getAppliedGlobalTime();
+      if (!globalTime) return;
+      const moved: [string, { start_time: Date; end_time: Date }][] = [];
+      for (const tab of currentDashboardData.data?.tabs ?? []) {
+        for (const panel of tab.panels ?? []) {
+          if (!hasPanelTime(panel)) continue;
+          if (!isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value)) continue;
+          const next = computePanelTime(panel, globalTime);
+          const current = currentTimeObjPerPanel.value[panel.id];
+          // Only a moved start counts; a "so far" end always differs by the moment it was read.
+          if (next && current?.start_time?.getTime() !== next.start_time?.getTime()) {
+            moved.push([panel.id, next]);
+          }
+        }
+      }
+      if (!isAutoRunOn.value) {
+        zonePendingPanels.value = Object.fromEntries(moved);
+        return;
+      }
+      zonePendingPanels.value = {};
+      for (const [id, next] of moved) currentTimeObjPerPanel.value[id] = next;
+    };
+    watch(
+      () => store.state.timezone,
+      async () => {
+        // A panel picker re-applies its own panel a tick after the zone changes; waiting lets that path win, so it loads once.
+        await nextTick();
+        await nextTick();
+        reResolveCalendarRanges();
+      },
+    );
+    watch(isAutoRunOn, (isOn) => {
+      if (!isOn) return;
+      for (const [id, next] of Object.entries(zonePendingPanels.value)) {
+        currentTimeObjPerPanel.value[id] = next;
+      }
+      zonePendingPanels.value = {};
+    });
 
     // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
@@ -1644,6 +1767,7 @@ export default defineComponent({
         // loadDashboard() is already called during onMounted setup.
         if (!oldDashboardId) return;
         if (newDashboardId && newDashboardId !== oldDashboardId) {
+          openingUrlRefresh = { value: route.query.refresh };
           isDashboardLoading.value = true;
           try {
             await loadDashboard();
@@ -1960,15 +2084,12 @@ export default defineComponent({
           params.refresh,
           store.state?.zoConfig?.min_auto_refresh_interval,
         );
-      } else if (params.refresh) {
-        const refreshInSecs = parseDuration(params.refresh);
-        if (store.state?.zoConfig?.min_auto_refresh_interval) {
-          if (refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval) {
-            refreshInterval.value = 0;
-          } else {
-            refreshInterval.value = refreshInSecs;
-          }
-        }
+      } else if (params.refresh !== undefined) {
+        refreshInterval.value = resolveOpenRefreshInterval({
+          urlRefresh: params.refresh,
+          savedDefault: undefined,
+          minSeconds: minAutoRefreshSeconds(store.state?.zoConfig?.min_auto_refresh_interval),
+        });
       }
 
       // check if timezone query params exist
@@ -2710,6 +2831,9 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      computeAllPanelTimes,
+      reResolveCalendarRanges,
+      zoneRefreshPending,
       shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
@@ -2728,6 +2852,8 @@ export default defineComponent({
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
+      variablesManager,
+      showPublicLinksPanel,
       variablesDataUpdated,
       showDashboardSettingsDialog,
       hasUnsavedConflict,

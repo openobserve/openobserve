@@ -152,7 +152,7 @@ afterEach(() => {
 });
 
 describe("SlackChannelDefaults (rows 21-22)", () => {
-  it("lists each channel with its answer mode, who set it and a dash for Phase 2 alert routes", async () => {
+  it("lists each channel with its answer mode, who set it and a dash when no alert routes", async () => {
     const w = await mountDefaults();
     expect(slack.listChannelDefaults).toHaveBeenCalledWith("acme", "inst-1");
     const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
@@ -193,6 +193,12 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const w = await mountDefaults();
     await w.find('[data-test="slack-channel-remove-C1"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-title"]').text()).toContain("#sre-prod");
+    const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
+    expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.channels.removeMessage");
+    expect(confirmDialog.attributes("message-name")).toBe("#sre-prod");
+    expect(i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod" })).toBe(
+      "Questions in #sre-prod then go to each person's default org (they can change it with /o2 org).",
+    );
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.deleteChannelDefault).toHaveBeenCalledWith("acme", "inst-1", "C1");
@@ -316,6 +322,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     await w.find('[data-test="slack-channel-set-default"]').trigger("click");
     await flushPromises();
     expect(slack.listChannels).toHaveBeenCalledWith("acme", "inst-1", { q: "", cursor: "" });
+    expect(body().text()).toContain("can take up to 10 minutes");
     await body().find("form").trigger("submit");
     await vi.waitFor(() => expect(body().text()).toContain("Pick a channel"));
     expect(slack.putChannelDefault).not.toHaveBeenCalled();
@@ -324,6 +331,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
   it("explains an empty list", async () => {
     const w = await mountDefaults([]);
     expect(w.text()).toContain("No channel has a default org yet");
+    expect(w.text()).toContain("go to each person's default org");
   });
 
   it("W-S7 shows no empty state while the defaults load", async () => {

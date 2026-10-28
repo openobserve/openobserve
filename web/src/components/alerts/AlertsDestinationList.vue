@@ -379,7 +379,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationTitle')"
-      :message="t('alert_destinations.deleteDestinationMessage')"
+      message-keypath="alert_destinations.deleteDestinationMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
@@ -388,6 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -994,11 +997,7 @@ export default defineComponent({
       return t("alert_destinations.custom");
     };
 
-    // Top-right tab filter — mirrors the alerts list and templates list.
-    // "prebuilt" matches any destination detectable as a prebuilt type
-    // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
-    // `prebuilt_type` metadata or URL/template pattern); "custom" is the
-    // negation, capturing user-defined HTTP/Email destinations.
+    // "prebuilt" is what the server treats as prebuilt (`detectPrebuiltType`); "custom" is everything else.
     const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
     watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {

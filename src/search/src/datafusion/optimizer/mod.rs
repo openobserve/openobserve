@@ -18,6 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
     common::{Result, TableReference},
+    execution::context::SQLOptions,
     optimizer::{
         AnalyzerRule, OptimizerRule,
         common_subexpr_eliminate::CommonSubexprEliminate,
@@ -298,6 +299,12 @@ pub async fn create_physical_plan(
     sql: &str,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let plan = ctx.state().create_logical_plan(sql).await?;
+    // Defense in depth: reject DDL/DML/COPY plans so search SQL cannot write files on the node.
+    SQLOptions::new()
+        .with_allow_ddl(false)
+        .with_allow_dml(false)
+        .with_allow_statements(false)
+        .verify_plan(&plan)?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     optimize_distribute_analyze(physical_plan)
 }
@@ -523,6 +530,22 @@ mod tests {
         ];
         let cases = queries.map(|query| (query, query));
         assert_same_rows_as_datafusion(&sql, &cases).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_physical_plan_rejects_non_select() {
+        let ctx = SessionContext::new();
+        register_tables(&ctx);
+        for sql in [
+            "COPY (SELECT * FROM t) TO 'file:///tmp/oo_verify_plan_test.parquet'",
+            "CREATE TABLE t3 (a INT)",
+            "INSERT INTO t2 VALUES (1)",
+        ] {
+            assert!(
+                create_physical_plan(&ctx, sql).await.is_err(),
+                "should reject: {sql}"
+            );
+        }
     }
 
     #[tokio::test]

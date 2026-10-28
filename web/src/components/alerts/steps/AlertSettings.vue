@@ -698,13 +698,7 @@ export default defineComponent({
       servicenow: "alerts.alertSettings.recoveryResolvesIncident",
     };
 
-    // `destination_type_name` first, because that is the field the server reads
-    // (`derive_channel_format`) when it decides to send a protocol resolve. A
-    // destination pointed at PagerDuty without going through the prebuilt
-    // wizard has no `prebuilt_type`, and saying "new Resolved message" for one
-    // would promise something the server does not do.
-    const platformOf = (destination: any): string =>
-      destination?.destination_type_name || detectPrebuiltType(destination) || "";
+    const platformOf = (destination: any): string => detectPrebuiltType(destination) ?? "";
 
     const platformKeyFor = (name: any): string | undefined => {
       const destination = props.destinationObjects.find((d: any) => d?.name === name);

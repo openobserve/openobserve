@@ -131,7 +131,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -417,6 +417,14 @@ describe("AlertsDestinationList", () => {
 
       expect((wrapper.vm as any).confirmDelete.visible).toBe(true);
       expect((wrapper.vm as any).confirmDelete.data.name).toBe(dest.name);
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
+        );
+      expect(dialog!.props("messageName")).toBe(dest.name);
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("calls destinationService.delete with correct args on deleteDestination()", async () => {
@@ -494,6 +502,13 @@ describe("AlertsDestinationList", () => {
 
       (wrapper.vm as any).openBulkDeleteDialog();
       expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
   });
 

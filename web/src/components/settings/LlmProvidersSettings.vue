@@ -178,7 +178,9 @@
     <ConfirmDialog
       v-model="confirmDeleteOpen"
       :title="t('onlineEvals.deleteTitle', { label: t('onlineEvals.singular.providers') })"
-      :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+      message-keypath="onlineEvals.deleteConfirmMessage"
+      :message-name="pendingDeleteRow?.name ?? ''"
+      ok-variant="destructive"
       @update:ok="performDelete"
       @update:cancel="cancelDelete"
     />

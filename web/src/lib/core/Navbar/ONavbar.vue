@@ -257,12 +257,14 @@ function markRailNavigation(event: MouseEvent) {
 // A navigation the user started by pointing at a tile never moves the rail under the pointer.
 async function onAfterNavigation(
   to: RouteLocationNormalized,
-  _from: RouteLocationNormalized,
+  from: RouteLocationNormalized,
   failure?: NavigationFailure | void,
 ): Promise<void> {
   const mark = pendingMark;
   pendingMark = null;
   if (failure || isMobile.value) return;
+  // A page mirroring its state into the query keeps the same active tile, so it must not scroll the rail.
+  if (to.path === from.path) return;
   const requested = to.redirectedFrom ?? to;
   if (mark !== null && hrefPathname(router.resolve(requested.fullPath).href) === mark) return;
   await nextTick();
