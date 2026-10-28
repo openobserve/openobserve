@@ -608,6 +608,43 @@ describe("Profiles page", () => {
     ]);
   });
 
+  it("leaves in-use memory gaps unfilled, since a missing snapshot is not 0 B", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "inuse_space", unit: "bytes" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "bytes",
+        profile_type: "inuse_space",
+        step_secs: 60,
+        series: [
+          { timestamp: 60_000_000, value: 100 },
+          { timestamp: 120_000_000, value: 200 },
+          { timestamp: 360_000_000, value: 300 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({
+      data: { ...mergeResponse.data, unit: "bytes", profile_type: "inuse_space" },
+    });
+    const wrapper = mountPage();
+    await settle();
+
+    const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options
+      .series[0];
+    expect(series.data).toEqual([
+      [60_000, 100],
+      [120_000, 200],
+      [180_000, null],
+      [360_000, 300],
+    ]);
+    expect(series.showSymbol).toBe(true);
+  });
+
   it("leaves the series unfilled when the response has no step", async () => {
     mocks.series.mockResolvedValue({
       data: {
@@ -755,6 +792,29 @@ describe("Profiles page", () => {
       store.state.theme = startTheme;
       html.style.removeProperty("--color-chart-series-1");
       html.style.removeProperty("--color-border-strong");
+    }
+  });
+
+  it("re-reads the series colours when a theme colour preset is applied", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 2, 3)");
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: 1_000_000, value: 9 }] },
+    });
+    try {
+      const wrapper = mountPage();
+      await settle();
+      const colorOf = () =>
+        wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options.series[0].color;
+      expect(colorOf()).toBe("rgb(1, 2, 3)");
+
+      html.style.setProperty("--color-chart-series-1", "rgb(7, 8, 9)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      expect(colorOf()).toBe("rgb(7, 8, 9)");
+      wrapper.unmount();
+    } finally {
+      html.style.removeProperty("--color-chart-series-1");
     }
   });
 

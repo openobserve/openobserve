@@ -221,7 +221,7 @@ import profilesService, {
   type ProfilesTreeNode,
   type ProfilesQueryBody,
 } from "@/services/profiles";
-import { useStore } from "vuex";
+import { useThemeRevision } from "@/composables/useTheme";
 import { cssToken } from "@/utils/theme";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -255,10 +255,10 @@ const SKELETON_WIDTHS = ["w-full", "w-11/12", "w-4/5", "w-3/5", "w-2/5", "w-1/4"
 const VALUE_CELLS = ["before", "after", "beforePercent", "afterPercent"] as const;
 // Changes under a tenth of a point read as no change, as in the diff flame graph.
 const CHANGE_FLOOR = 0.1;
-const store = useStore();
+const themeRevision = useThemeRevision();
 // Token values change with the theme, so they are re-read whenever it switches.
 const diffColors = computed(() => {
-  void store?.state?.theme;
+  void themeRevision.value;
   return {
     more: cssToken("--color-status-negative", ""),
     less: cssToken("--color-chart-series-1", ""),

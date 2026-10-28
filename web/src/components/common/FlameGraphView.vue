@@ -254,7 +254,7 @@ import { cssToken } from "@/utils/theme";
 import { paletteIndexFor } from "./flameGraphPackage";
 import { parseColor } from "@/lib/styles/tokens/colorMath";
 import { useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
+import { useThemeRevision } from "@/composables/useTheme";
 
 export interface FlameGraphNode {
   name: string;
@@ -382,10 +382,10 @@ const mixColor = (from: string, to: string, amount: number) => {
   return `rgb(${channel(a.r, b.r)}, ${channel(a.g, b.g)}, ${channel(a.b, b.b)})`;
 };
 
-const store = useStore();
+const themeRevision = useThemeRevision();
 // Token values change with the theme, so they are re-read whenever it switches.
 const colors = computed(() => {
-  void store?.state?.theme;
+  void themeRevision.value;
   return {
     // Cool hues of the dashboard series palette only: no red, pink, amber or green (mint included), which read as status.
     palette: [1, 5, 7, 9].map((step) =>
@@ -1008,7 +1008,7 @@ const chartData = computed(() => {
   return {
     options: {
       animation: false,
-      // The chart renders with the ECharts dark theme, whose own background would box the graph in.
+      // In dark mode the ECharts theme draws its own background, which would box the graph in.
       backgroundColor: "transparent",
       tooltip: {
         // On the body, as dashboard charts do: the graph's scroll box would cut off a tooltip above the top row.

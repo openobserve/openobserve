@@ -303,4 +303,27 @@ describe("ProfilesCompare", () => {
       tokens.forEach((token) => html.style.removeProperty(token));
     }
   });
+
+  it("re-reads the legend colours when a theme colour preset is applied", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-status-negative", "rgb(1, 2, 3)");
+    try {
+      const { wrapper } = mountCompare();
+      await flushPromises();
+      const moreSwatch = () =>
+        (
+          wrapper.findAll('[data-test="profiles-compare-legend"] [aria-hidden="true"]').at(-1)
+            ?.element as HTMLElement
+        ).style.backgroundColor;
+      expect(moreSwatch()).toBe("rgb(1, 2, 3)");
+
+      html.style.setProperty("--color-status-negative", "rgb(7, 8, 9)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      expect(moreSwatch()).toBe("rgb(7, 8, 9)");
+      wrapper.unmount();
+    } finally {
+      html.style.removeProperty("--color-status-negative");
+    }
+  });
 });

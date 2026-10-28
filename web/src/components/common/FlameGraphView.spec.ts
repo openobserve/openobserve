@@ -844,6 +844,27 @@ describe("FlameGraphView theme and size", () => {
     wrapper.unmount();
   });
 
+  it("re-reads the theme colours when a theme colour preset is applied", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-flame-grouped-fill", "rgb(1, 2, 3)");
+    html.style.setProperty("--color-border-default", "rgb(4, 5, 6)");
+    const store = createStore({ state: { theme: "light" } });
+    const wrapper = mountWithStore(store);
+    await flushPromises();
+    const before = optionsOf(wrapper).series[0].data[0].itemStyle;
+    expect(before).toMatchObject({ color: "rgb(1, 2, 3)", borderColor: "rgb(4, 5, 6)" });
+
+    html.style.setProperty("--color-flame-grouped-fill", "rgb(7, 8, 9)");
+    html.style.setProperty("--color-border-default", "rgb(10, 11, 12)");
+    window.dispatchEvent(new CustomEvent("themeColorChanged"));
+    await nextTick();
+    const after = optionsOf(wrapper).series[0].data[0].itemStyle;
+    expect(after).toMatchObject({ color: "rgb(7, 8, 9)", borderColor: "rgb(10, 11, 12)" });
+    html.style.removeProperty("--color-flame-grouped-fill");
+    html.style.removeProperty("--color-border-default");
+    wrapper.unmount();
+  });
+
   it("draws on a transparent background, so the dark chart theme does not box it in", async () => {
     const wrapper = mountWithStore();
     await flushPromises();

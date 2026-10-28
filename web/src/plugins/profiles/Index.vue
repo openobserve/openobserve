@@ -655,6 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useThemeRevision } from "@/composables/useTheme";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -752,6 +753,7 @@ const defaultCompareState = (): CompareState => ({
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
 const store = useStore();
+const themeRevision = useThemeRevision();
 const route = useRoute();
 const router = useRouter();
 const pageRouteName = route.name;
@@ -975,7 +977,7 @@ const isCpuMetric = computed(
 
 // Token values change with the theme, so they are re-read whenever it switches.
 const seriesColors = computed(() => {
-  void store?.state?.theme;
+  void themeRevision.value;
   return {
     palette: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) =>
       cssToken(`--color-chart-series-${step}`, ""),
@@ -983,6 +985,7 @@ const seriesColors = computed(() => {
     others: cssToken("--color-border-strong", ""),
   };
 });
+type SeriesDatum = [number, number | null];
 type SeriesLine = {
   key: string;
   label: string;
@@ -1028,17 +1031,23 @@ const seriesLines = computed<SeriesLine[]>(() => {
 
 const seriesChartData = computed(() => {
   const lines = seriesLines.value;
+  // In-use memory is a snapshot, so an empty bucket is missing data, not 0 B.
+  const gapValue = currentType.value.toLowerCase().startsWith("inuse_") ? null : 0;
   const lineData = lines.map((line) =>
-    withZeroGaps(
-      line.points.map((point) => [Math.floor(point.timestamp / 1000), seriesDisplayValue(point)]),
+    withGaps(
+      line.points.map((point): SeriesDatum => [
+        Math.floor(point.timestamp / 1000),
+        seriesDisplayValue(point),
+      ]),
       (seriesResponse.value?.step_secs ?? 0) * 1000,
+      gapValue,
     ),
   );
   const seriesData = lineData.flat();
   const runRange = lastRun.value?.range;
   return {
     options: {
-      // The chart renders with the ECharts dark theme, whose own background would box the chart in.
+      // In dark mode the ECharts theme draws its own background, which would box the chart in.
       backgroundColor: "transparent",
       // Tooltip, grid and y axis follow the Logs histogram (utils/logs/convertLogData.ts).
       tooltip: {
@@ -1086,8 +1095,8 @@ const seriesChartData = computed(() => {
         type: "line",
         name: line.label,
         smooth: false,
-        // With symbols off, a lone point draws nothing, and two read as a bare segment.
-        showSymbol: line.points.length < 3,
+        // With symbols off, a lone point (or one cut off by a gap) draws nothing, and two read as a bare segment.
+        showSymbol: line.points.length < 3 || lineData[index].some(([, value]) => value === null),
         color: line.color || undefined,
         lineStyle: { width: 2 },
         // An area under one line reads as volume; under several it hides the lines below.
@@ -1306,18 +1315,18 @@ const formatCpuCore = (value: number) => {
 
 const isBytesUnit = computed(() => /byte|^b$/i.test(currentUnit.value));
 
-/** Drops a line to zero across empty buckets, so a gap between samples is not drawn as a slope. */
-const withZeroGaps = (points: number[][], stepMs: number) => {
+/** Drops a line to `gapValue` across empty buckets (null breaks it), so a gap is not drawn as a slope. */
+const withGaps = (points: SeriesDatum[], stepMs: number, gapValue: number | null) => {
   // Without the server's bucket size a gap cannot be told from normal spacing.
   if (!(stepMs > 0)) return points;
-  const filled: number[][] = [];
+  const filled: SeriesDatum[] = [];
   for (const point of points) {
     const previous = filled.at(-1);
     if (previous && point[0] - previous[0] > stepMs * 1.5) {
       const gapStart = previous[0] + stepMs;
       const gapEnd = point[0] - stepMs;
-      filled.push([gapStart, 0]);
-      if (gapEnd > gapStart) filled.push([gapEnd, 0]);
+      filled.push([gapStart, gapValue]);
+      if (gapValue !== null && gapEnd > gapStart) filled.push([gapEnd, gapValue]);
     }
     filled.push(point);
   }
@@ -1325,8 +1334,8 @@ const withZeroGaps = (points: number[][], stepMs: number) => {
 };
 
 /** Byte ticks on round binary steps (0, 2.5, 5 GiB), not decimal steps shown as 3.73 GiB. */
-const byteAxisInterval = (points: number[][]) => {
-  const max = Math.max(0, ...points.map(([, value]) => value));
+const byteAxisInterval = (points: SeriesDatum[]) => {
+  const max = Math.max(0, ...points.map(([, value]) => value ?? 0));
   if (!max) return undefined;
   const unitSize = 1024 ** Math.min(4, Math.floor(Math.log(max) / Math.log(1024)));
   return niceStep(max / unitSize / 3) * unitSize;
