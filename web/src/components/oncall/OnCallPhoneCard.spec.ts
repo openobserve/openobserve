@@ -468,7 +468,6 @@ describe("OnCallPhoneCard", () => {
     expect((find(w, "input").element as HTMLInputElement).value).toBe(PHONE);
   });
 
-  // S10: a phone can be taken off, after one line saying what that means.
   // Review finding 4: Remove is offered whenever a number is saved, whatever its verification or the provider.
   describe("which states offer Remove", () => {
     it.each([
@@ -522,6 +521,7 @@ describe("OnCallPhoneCard", () => {
     });
   });
 
+  // S10: a phone can be taken off, after one line saying what that means.
   it("verified: Remove clears the number after a confirm", async () => {
     const w = await render(VERIFIED);
     service.setContact.mockResolvedValue({ data: contact() } as any);

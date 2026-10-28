@@ -47,10 +47,12 @@ const pagesR2 = (generated: boolean | undefined) => ({
   ],
 });
 
-const ROTATIONS = [
-  { id: "r1", name: "Primary", shift_rules: [] },
-  { id: "r2", name: "Secondary", shift_rules: [] },
-];
+const staffed = (id: string, name: string, members = ["ana@o2.ai"]) => ({
+  id,
+  name,
+  shift_rules: [{ name: "Base", members, shift_micros: 604_800_000_000, anchor_micros: 0 }],
+});
+const ROTATIONS = [staffed("r1", "Primary"), staffed("r2", "Secondary")];
 const HOLDERS = [
   { rotation_id: "r1", name: "Carol Nguyen" },
   { rotation_id: "r2", name: "Riya Root" },
@@ -95,17 +97,62 @@ describe("OnCallRemoveRotationDialog", () => {
     );
   });
 
-  it("lists the generated steps that go with the rotation", async () => {
+  // #3117: a generated ladder is rebuilt around the rotations left that have people, so the body says around which.
+  it("says the generated policy is rebuilt around what is left", async () => {
     const wrapper = render(pagesR2(true));
 
-    expect(wrapper.find('[data-test="oncall-remove-rotation-steps"]').text()).toBe(
-      "The escalation step that pages Secondary is removed too: P1 step 2.",
+    expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').text()).toBe(
+      "Riya Root is on call in Secondary now. The escalation policy is rebuilt around Primary.",
     );
+    expect(wrapper.find('[data-test="oncall-remove-rotation-steps"]').exists()).toBe(false);
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
     // Removing a rotation is destructive, so its button is red like every other delete.
     expect(dialog(wrapper).props("primaryButtonVariant")).toBe("destructive");
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("confirm")).toHaveLength(1);
+  });
+
+  function renderWith(rotations: unknown[], rotationId: string, holders = HOLDERS) {
+    return mount(OnCallRemoveRotationDialog, {
+      props: { open: true, rotationId, rotations, holders, policy: pagesR2(true) as any },
+      global: { plugins: [i18n], stubs },
+    });
+  }
+  const bodyOf = (wrapper: ReturnType<typeof render>) =>
+    wrapper.find('[data-test="oncall-remove-rotation-body"]').text();
+
+  it("deleting Primary rebuilds the policy around the next rotation", () => {
+    const wrapper = renderWith([staffed("r1", "Primary"), staffed("r3", "Backup")], "r1");
+
+    expect(bodyOf(wrapper)).toBe(
+      "Carol Nguyen is on call in Primary now. The escalation policy is rebuilt around Backup.",
+    );
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+  });
+
+  it("deleting the middle of three rebuilds around the other two, skipping one with nobody in it", () => {
+    const wrapper = renderWith(
+      [
+        staffed("r1", "Primary"),
+        staffed("r2", "Secondary"),
+        staffed("r4", "Empty", []),
+        staffed("r3", "Tertiary"),
+      ],
+      "r2",
+    );
+
+    expect(bodyOf(wrapper)).toBe(
+      "Riya Root is on call in Secondary now. The escalation policy is rebuilt around Primary and Tertiary.",
+    );
+  });
+
+  it("deleting the last rotation leaves the whole-team ladder", () => {
+    const wrapper = renderWith([staffed("r2", "Secondary")], "r2", []);
+
+    expect(bodyOf(wrapper)).toBe(
+      "Nobody is on call in Secondary now. The escalation policy then pages the whole team.",
+    );
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
   });
 
   it("refuses while a hand-edited policy pages the rotation, and links to it", async () => {

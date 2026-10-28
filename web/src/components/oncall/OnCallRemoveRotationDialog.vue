@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-2 text-sm">
       <p data-test="oncall-remove-rotation-body">{{ body }}</p>
-      <p v-if="generatedSteps" data-test="oncall-remove-rotation-steps">{{ generatedSteps }}</p>
       <span v-if="blocked || mayBeRefused" class="flex flex-col items-start gap-1">
         <p
           v-if="blocked"
@@ -77,13 +76,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { OnCallPolicy, Rotation } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { listInLocale, stepsNamingRotation } from "@/utils/oncall";
+import { listInLocale, rotationMembers, stepsNamingRotation } from "@/utils/oncall";
 
 const props = defineProps<{
   open: boolean;
   rotationId: string;
-  /** The team's rotations, so the body can name the ones that stay. */
-  rotations: Pick<Rotation, "id" | "name">[];
+  /** The team's rotations, so the body can name the ones that stay and those a rebuilt policy pages. */
+  rotations: Pick<Rotation, "id" | "name" | "shift_rules">[];
   /** Who holds each rotation right now, by display name; a rotation absent here has nobody on call. */
   holders: { rotation_id: string; name: string }[];
   policy: Pick<OnCallPolicy, "rungs" | "ladder_is_generated"> | null;
@@ -116,15 +115,30 @@ const body = computed<I18nText>(() => {
       const who = holderOf(rotation.id);
       return who ? `${rotation.name} (${who})` : rotation.name;
     });
-  const after = others.length
+  const after = generated.value ? rebuilt.value : remaining(others);
+  return raw(`${now} ${after}`);
+});
+
+/// What a generated ladder becomes: the server rebuilds the default around the first two remaining rotations with people.
+const rebuilt = computed<I18nText>(() => {
+  const kept = props.rotations
+    .filter((rotation) => rotation.id !== props.rotationId && rotationMembers(rotation).length)
+    .slice(0, 2)
+    .map((rotation) => rotation.name);
+  return kept.length
+    ? t("oncall.removeRotationRebuilt", { rotations: raw(listInLocale(kept, locale.value)) })
+    : t("oncall.removeRotationWholeTeam");
+});
+
+function remaining(others: string[]): I18nText {
+  return others.length
     ? t(
         "oncall.removeRotationOthersKeep",
         { others: raw(listInLocale(others, locale.value)) },
         others.length,
       )
     : t("oncall.removeRotationNobodyTakesOver");
-  return raw(`${now} ${after}`);
-});
+}
 
 const steps = computed(() => stepsNamingRotation(props.policy, props.rotationId));
 
@@ -148,13 +162,6 @@ const mayBeRefused = computed(
   () => steps.value.length > 0 && props.policy?.ladder_is_generated === undefined,
 );
 
-const generatedSteps = computed<I18nText | null>(() =>
-  steps.value.length && props.policy?.ladder_is_generated === true
-    ? t(
-        "oncall.removeRotationStepsGo",
-        { steps: stepList.value, rotation: rotationName.value },
-        steps.value.length,
-      )
-    : null,
-);
+// The server judges this against the stored schedule, the same check its save makes, so true means any delete saves.
+const generated = computed(() => props.policy?.ladder_is_generated === true);
 </script>
