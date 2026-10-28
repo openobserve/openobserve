@@ -56,6 +56,7 @@
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @agent-pick="modeExplicit = true"
       />
     </template>
 

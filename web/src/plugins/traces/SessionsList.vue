@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :streams-loaded="streamsLoaded"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
       <!-- List search — one box, matched against the user id OR the

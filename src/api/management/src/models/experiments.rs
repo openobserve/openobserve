@@ -78,7 +78,7 @@ pub struct ExperimentResultRowBody {
     pub output: Option<Value>,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
     pub p50_latency_ms: Option<u64>,
-    /// First line of the most common error across this row's failed trials.
+    /// Sample message of the row's largest failure cause (grouped by kind, else by first line).
     pub error_message: Option<String>,
     pub dispersion: Option<ExperimentRowDispersionBody>,
 }
@@ -1406,7 +1406,7 @@ pub struct ExperimentAggregateSummaryBody {
     pub incomplete_task_slots: u64,
     pub incomplete_score_dimensions: u64,
     pub error_task_slots: u64,
-    /// Errored slots grouped by error kind and first message line, largest first (top 3).
+    /// Top 3 failure causes, largest first: errored slots grouped by kind, by first line if none.
     pub failure_causes: Vec<ExperimentFailureCauseBody>,
     /// Distinct failure causes across every errored slot.
     pub failure_cause_count: u64,
@@ -1418,7 +1418,7 @@ pub struct ExperimentFailureCauseBody {
     /// Shared failure taxonomy (`provider_auth`, `timeout`, `execution_error`, …); absent on
     /// records written before executions carried a kind.
     pub kind: Option<String>,
-    /// First line of the error message.
+    /// The group's most common first error line.
     pub message: String,
     pub slot_count: u64,
 }

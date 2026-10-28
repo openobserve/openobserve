@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @agent-pick="modeExplicit = true"
       >
         <!-- Version-agnostic hint. Agent Graph hides the cascade's Version
              dropdown (topology is the same across versions), so this info

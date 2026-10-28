@@ -82,6 +82,22 @@ describe("buildKeepPricesPayload", () => {
     payload.tiers[1].prices.input = 1;
     expect(gpt54.tiers[1].prices.input).toBe(2.5e-6);
   });
+
+  it("leaves a side the matched tier does not price unset instead of $0", () => {
+    const oneSided = {
+      ...gpt54,
+      tiers: [
+        {
+          name: "Default",
+          condition: null,
+          prices: { input: 2.5e-6, output: null as unknown as number },
+        },
+      ],
+    };
+    const [tier] = buildKeepPricesPayload("gpt-5.4-mini", oneSided).tiers;
+    expect(tier.prices).toEqual({ input: 2.5e-6 });
+    expect(tier.prices).not.toHaveProperty("output");
+  });
 });
 
 describe("buildMutePayload", () => {

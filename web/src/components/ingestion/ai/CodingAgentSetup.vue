@@ -119,7 +119,13 @@ const downloadEnv = () =>
         <span class="text-text-secondary me-2 text-sm font-normal">{{
           t("ingestion.ai.codingAgent.step", { n: 2 })
         }}</span>
-        {{ t("ingestion.ai.codingAgent.promptTitle") }}
+        {{
+          t("ingestion.ai.codingAgent.promptTitle", {
+            client1: raw("Claude Code"),
+            client2: raw("Cursor"),
+            client3: raw("Codex"),
+          })
+        }}
       </h3>
       <OCodeBlock
         :code="prompt"

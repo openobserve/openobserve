@@ -46,6 +46,8 @@ const CACHE_TTL_MICROS: i64 = 60 * 1_000_000;
 const CACHE_MAX_ENTRIES: usize = 512;
 const WINDOW_QUANTUM_MICROS: i64 = 60 * 1_000_000;
 const MAX_SAMPLES: usize = 3;
+/// Recent matching spans scanned for sample trace ids; deduped in Rust down to `MAX_SAMPLES`.
+const SAMPLE_SCAN_ROWS: usize = 100;
 const MAX_MODELS: usize = 20;
 const MAX_UNPRICED_ROWS: usize = 100;
 
@@ -83,8 +85,7 @@ pub struct DataHealthQuery {
     /// Skip the short server-side cache.
     #[serde(default)]
     pub refresh: bool,
-    /// Also return up to three sample trace ids per failing check. Off by default: only the
-    /// Review checks drawer shows them, and each costs a window-wide query.
+    /// Also return up to three recent trace ids per failing check; off by default, one query each.
     #[serde(default)]
     pub include_samples: bool,
 }
@@ -272,10 +273,27 @@ fn samples_sql(stream: &str, base: &str, pred: &Pred) -> String {
         _ => String::new(),
     };
     format!(
-        "SELECT trace_id, MAX(_timestamp) AS ts FROM {} WHERE {base}{filter} \
-         GROUP BY trace_id ORDER BY ts DESC LIMIT {MAX_SAMPLES}",
+        "SELECT trace_id FROM {} WHERE {base}{filter} \
+         ORDER BY _timestamp DESC LIMIT {SAMPLE_SCAN_ROWS}",
         quote_ident(stream)
     )
+}
+
+/// The first `MAX_SAMPLES` distinct trace ids of rows ordered newest first.
+fn distinct_trace_ids(hits: &[json::Value]) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::with_capacity(MAX_SAMPLES);
+    for id in hits
+        .iter()
+        .filter_map(|h| h.get("trace_id").and_then(|v| v.as_str()))
+    {
+        if ids.len() == MAX_SAMPLES {
+            break;
+        }
+        if !ids.iter().any(|seen| seen == id) {
+            ids.push(id.to_string());
+        }
+    }
+    ids
 }
 
 /// The `model` select item and grouping key. A stream with no model column holds only spans
@@ -507,9 +525,12 @@ async fn compute_checks(
         follow_up_sql(stream, &base, &cols, &preds, &checks, include_samples);
     let sample_jobs = sample_sqls
         .into_iter()
-        .map(
-            |(i, sql)| async move { (i, run_sql(org_id, user_id, sql, window, MAX_SAMPLES).await) },
-        )
+        .map(|(i, sql)| async move {
+            (
+                i,
+                run_sql(org_id, user_id, sql, window, SAMPLE_SCAN_ROWS).await,
+            )
+        })
         .collect::<Vec<_>>();
     let models_job = async {
         match models_sql {
@@ -522,16 +543,7 @@ async fn compute_checks(
     let (samples, models) = tokio::join!(futures::future::join_all(sample_jobs), models_job);
 
     for (i, hits) in samples {
-        checks[i].samples = Some(
-            hits?
-                .iter()
-                .filter_map(|h| {
-                    h.get("trace_id")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string)
-                })
-                .collect(),
-        );
+        checks[i].samples = Some(distinct_trace_ids(&hits?));
     }
     if let Some(hits) = models? {
         checks[0].models = Some(
@@ -1043,11 +1055,12 @@ mod tests {
         assert!(models.is_some());
         let (samples, _) = follow_up_sql("default", "b", &c, &preds, &checks, true);
         assert_eq!(samples.len(), CHECK_IDS.len());
-        assert!(
-            samples
-                .iter()
-                .all(|(_, sql)| sql.contains("GROUP BY trace_id"))
-        );
+        // Bounded to the newest spans, not an aggregate over every span in the window.
+        assert!(samples.iter().all(|(_, sql)| {
+            sql.contains(&format!(
+                "ORDER BY _timestamp DESC LIMIT {SAMPLE_SCAN_ROWS}"
+            )) && !sql.contains("GROUP BY")
+        }));
         // Without samples the field is left out of the response.
         let check = &all_pass(0, false)[0];
         assert!(json::to_value(check).unwrap().get("samples").is_none());
@@ -1056,6 +1069,21 @@ mod tests {
             json::to_value(check).unwrap().get("samples"),
             Some(&json::json!([]))
         );
+    }
+
+    #[test]
+    fn sample_trace_ids_are_distinct_and_capped() {
+        let hits: Vec<json::Value> = ["t1", "t1", "t2", "t1", "t3", "t4"]
+            .iter()
+            .map(|id| json::json!({ "trace_id": id }))
+            .collect();
+        assert_eq!(distinct_trace_ids(&hits), ["t1", "t2", "t3"]);
+        let hits = vec![
+            json::json!({ "trace_id": "t1" }),
+            json::json!({}),
+            json::json!({ "trace_id": "t1" }),
+        ];
+        assert_eq!(distinct_trace_ids(&hits), ["t1"]);
     }
 
     #[test]

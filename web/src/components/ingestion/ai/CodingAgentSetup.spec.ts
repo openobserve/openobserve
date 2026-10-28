@@ -68,4 +68,11 @@ describe("CodingAgentSetup", () => {
     expect(wrapper.find('[data-test="ai-coding-agent-passcode-forbidden"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ai-coding-agent-env-btn"]').exists()).toBe(false);
   });
+
+  it("names the coding agents in the prompt step title from code, not the translation", () => {
+    wrapper = mountSetup();
+    const title = wrapper.find('[data-test="ai-coding-agent-prompt-step"] h3').text();
+    expect(title).toContain("Claude Code, Cursor or Codex");
+    expect(title).not.toContain("{client");
+  });
 });
