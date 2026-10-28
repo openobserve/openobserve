@@ -293,6 +293,82 @@ test.describe('Anomaly Detection', () => {
       await expect(label).toHaveText('Level');
       await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toContainText('σ');
     });
+
+    test('clearing a manual level keeps manual mode and blocks save', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
+      await pm.anomalyDetectionPage.setSensitivityLevel('');
+
+      // Clearing must not silently revert to Auto: the manual input stays and
+      // the Auto readout stays hidden.
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityAutoLevelLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
+        'Enter a band width from 1 to 10.',
+      );
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Trained Auto level readout — a model's learned k read back from the readout
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Trained Auto level readout', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test('a trained config shows Current level with the learned k in the Auto readout', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      test.slow();
+
+      const seededStream = `anomaly_autolevel_${randomValue}`;
+      const seed = await seedAnomalyStream(page, seededStream, {
+        hours: 4,
+        bucketSeconds: 60,
+        baseline: 10,
+        spikeValue: 120,
+        spikeBuckets: 4,
+        spikeOffset: 70,
+      });
+      expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
+      await waitForStream(page, seededStream);
+
+      // No band_width on an API-created config: it stays Auto, so the readout
+      // is the only sensitivity control that can surface the learned level.
+      const name = anomalyName('autolevel');
+      const id = await createAnomalyViaApi(page, name, {
+        streamName: seededStream,
+        histogramInterval: '1m',
+      });
+
+      const trainStarted = await triggerAnomalyTraining(page, id);
+      expect([200, 202]).toContain(trainStarted.status);
+      const trained = await waitForAnomalyTrained(page, id);
+      expect(trained.is_trained).toBe(true);
+
+      // The list is fetched once when the tab mounts, so reload before opening
+      // the editor — the freshly created config is otherwise absent.
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      // The learned value depends on the seed, so assert the shape, not a literal.
+      const autoLevel = pm.anomalyDetectionPage.getSensitivityAutoLevelLocator();
+      await expect(autoLevel).toContainText('Current level');
+      await expect(autoLevel).toContainText(/\d+(\.\d+)?σ/);
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1300,6 +1376,9 @@ test.describe('Anomaly Detection', () => {
       // Template after the destination that references it. Both are named per
       // worker, so this only ever removes what this run created.
       await deleteTemplate(page, prerequisiteTemplateName);
+      // Seeded streams are per-worker-unique and cleanup.spec.js has no anomaly_ sweep, so delete them here or they accumulate every run.
+      await cleanupPm.apiCleanup.deleteStream(`anomaly_autolevel_${randomValue}`, 'logs').catch(() => {});
+      await cleanupPm.apiCleanup.deleteStream(`anomaly_e2e_${randomValue}`, 'logs').catch(() => {});
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
     } finally {

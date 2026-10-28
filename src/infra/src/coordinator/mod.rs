@@ -16,19 +16,30 @@
 pub mod ai_prompts;
 pub mod alerts;
 pub mod dashboards;
-pub mod destinations;
 pub mod downtimes;
 pub mod events;
+pub mod fleet;
 pub mod ingest_rejection;
-pub mod model_pricing;
 pub mod oncall;
 pub mod org_status;
 pub mod pipelines;
 pub mod prompts;
 pub mod service_streams;
 pub mod synthetics;
-pub mod system_settings;
 
 pub async fn get_coordinator() -> &'static Box<dyn crate::db::Db> {
     super::db::get_coordinator().await
+}
+
+/// Announces a change on `key` to every watcher; the value is empty because watchers reload.
+pub async fn emit_put(key: &str) -> Result<(), crate::errors::Error> {
+    get_coordinator()
+        .await
+        .put(key, bytes::Bytes::new(), true, None)
+        .await
+}
+
+/// Announces a removal on `key` to every watcher.
+pub async fn emit_delete(key: &str) -> Result<(), crate::errors::Error> {
+    get_coordinator().await.delete(key, false, true, None).await
 }

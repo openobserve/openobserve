@@ -1616,6 +1616,29 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
     }
 }
 
+/// Org teardown: one delete of the org's remaining alerts, then each one's events and owned rows.
+pub(crate) async fn delete_rest_of_org(org_id: &str) -> Result<(), AlertError> {
+    for alert_id in infra::table::alerts::delete_by_org(org_id).await? {
+        #[cfg(feature = "enterprise")]
+        db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+            org_id: org_id.to_string(),
+            entity_id: alert_id.clone(),
+        })
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        infra::coordinator::alerts::emit_delete_event(org_id, &alert_id).await?;
+        // Its trigger goes with every other trigger of the org, at the scheduler step.
+        remove_ownership(org_id, "alerts", Authz::new(&alert_id)).await;
+        if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id).await {
+            log::warn!("failed to delete alert state for {alert_id}: {e}");
+        }
+        if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id).await {
+            log::warn!("failed to delete alert eval ledger for {alert_id}: {e}");
+        }
+    }
+    Ok(())
+}
+
 /// Delete an alert **on a user's behalf**, refusing while an SLO measures from
 /// it (S-16 PR 4). Disabled SLOs count: a paused SLO measures from that source
 /// again the moment it resumes, and by then the source would be gone.

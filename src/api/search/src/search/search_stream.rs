@@ -56,10 +56,11 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_clear_cache_from_request, get_fallback_order_by_col_from_request,
-            get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-            get_or_create_trace_id, get_search_event_context_from_request,
-            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
+            get_clear_cache_from_request, get_client_search_type,
+            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+            get_is_ui_histogram_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_stream_type_from_request,
+            get_use_cache_from_request,
         },
     },
     search::{
@@ -430,40 +431,38 @@ pub async fn search_http2_stream(
     // Set use_cache from query params
     req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
-    // Set search type if not set
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
-            Ok(v) => v,
-            Err(e) => {
-                #[cfg(feature = "enterprise")]
-                let error_message = e.to_string();
+    // Set search type from the body, else the URL
+    req.search_type = match get_client_search_type(req.search_type, &query) {
+        Ok(v) => v,
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
 
-                let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
 
-                // Add audit before closing
-                #[cfg(feature = "enterprise")]
-                {
-                    report_to_audit(
-                        user_id,
-                        org_id.clone(),
-                        trace_id,
-                        http_response.status().into(),
-                        Some(error_message),
-                        "POST".to_string(),
-                        format!("/api/{}/_search_stream", org_id),
-                        query
-                            .iter()
-                            .map(|(k, v)| format!("{}={}", k, v))
-                            .collect::<Vec<_>>()
-                            .join("&"),
-                        body_bytes,
-                    )
-                    .await;
-                }
-                return http_response;
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id.clone(),
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
+                    body_bytes,
+                )
+                .await;
             }
-        };
-    }
+            return http_response;
+        }
+    };
 
     let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 

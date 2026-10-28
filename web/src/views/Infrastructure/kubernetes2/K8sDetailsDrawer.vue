@@ -17,20 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import useStreams from "@/composables/useStreams";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { copyToClipboard } from "@/utils/clipboard";
 import K8sDrawerMetrics from "./K8sDrawerMetrics.vue";
 import PodDetails from "./PodDetails.vue";
 import NodeDetails from "./NodeDetails.vue";
@@ -38,18 +37,22 @@ import WorkloadDetails from "./WorkloadDetails.vue";
 import { KIND_INFO } from "./kubernetesQueries";
 import { detailKindOf, type EventRow } from "./kubernetesEvents";
 import { labelsOf } from "./kubernetesObjects";
-import { encodeDetails, type DetailsRef } from "./kubernetesUrlState";
+import { encodeDetails, type DetailsRef, type K8sUrlState } from "./kubernetesUrlState";
 import {
-  TONE_TEXT_CLASS,
   chipLabel,
   formatAge,
+  membersOf,
+  severityOf,
   toneOf,
+  warningLabel,
   type AnyRow,
   type Inventory,
   type Owner,
   type Tone,
 } from "./kubernetesModel";
-import { resolvePodLogs } from "./podLogsLink";
+import { TONE_PILL } from "./k8sTone";
+import { worstPod } from "./workloadProblems";
+import type { K8sAction } from "./k8sActions";
 
 const props = defineProps<{
   details: DetailsRef;
@@ -68,15 +71,25 @@ const props = defineProps<{
   anchor: string;
 }>();
 
-const emit = defineEmits<{ close: []; open: [ref: DetailsRef] }>();
+const emit = defineEmits<{
+  close: [];
+  open: [ref: DetailsRef];
+  action: [type: K8sAction, ref: DetailsRef];
+  navigate: [patch: Partial<K8sUrlState>];
+}>();
 
 const store = useStore();
-const router = useRouter();
 const { t } = useI18nTyped();
-// useStreams injects the store, which only works during setup, never inside a click handler.
-const streamsApi = useStreams(gt);
 
 const EVENT_LIMIT = 100;
+
+const MEMBER_KINDS: ReadonlySet<string> = new Set([
+  "deployment",
+  "daemonset",
+  "statefulset",
+  "replicaset",
+  "job",
+]);
 
 const PHASE_TONE: Record<string, Tone> = {
   Active: "success",
@@ -183,28 +196,51 @@ watch(
   },
 );
 
-const logsBusy = ref(false);
+const copyName = () =>
+  copyToClipboard(props.details.name, t, { successMessage: t("infra.k8s2.drawerCopied") });
 
-const viewLogs = async () => {
-  if (logsBusy.value) return;
-  const { cluster, namespace, name } = props.details;
-  logsBusy.value = true;
-  const link = await resolvePodLogs(
-    { cluster, namespace, pod: name },
-    { orgId: props.orgId, start: props.range.start, end: props.range.end, multiCluster: false },
-    streamsApi,
-  ).finally(() => (logsBusy.value = false));
-  if (!link) {
-    toast({ variant: "warning", message: t("infra.k8s2.logsNoStream") });
+const ageText = computed(() =>
+  props.row?.createdAt == null
+    ? null
+    : t("infra.k8s2.drawerAgeOld", { age: formatAge(end.value - props.row.createdAt) }),
+);
+
+const insight = computed(() => {
+  const warnings = props.row?.warnings ?? [];
+  if (!warnings.length) return null;
+  return {
+    variant: severityOf(warnings) === "error" ? ("error" as const) : ("warning" as const),
+    content: raw(warnings.map((w) => String(warningLabel(w, t, end.value))).join("\n")),
+  };
+});
+
+const isWorkload = computed(() => MEMBER_KINDS.has(props.details.kind));
+
+const worstMember = computed(() =>
+  isWorkload.value && props.row ? worstPod(membersOf(props.inventory.pods, props.row)) : null,
+);
+
+const hasLogs = computed(() => props.details.kind === "pod" || isWorkload.value);
+
+const hasTraces = computed(() => hasLogs.value);
+
+const noMember = computed(() => isWorkload.value && !worstMember.value);
+
+const act = (type: K8sAction) => {
+  const pod = worstMember.value;
+  if (pod && (type === "logs" || type === "traces")) {
+    emit("action", type, {
+      kind: "pod",
+      cluster: pod.cluster,
+      namespace: pod.namespace,
+      name: pod.name,
+    });
     return;
   }
-  if (link.warnNoClusterField) {
-    toast({ variant: "warning", message: t("infra.k8s2.logsNoClusterField") });
-  }
-  // Logs restores its previous session from the store while initialized, ignoring these params.
-  store.dispatch("logs/setIsInitialized", false);
-  router.push(link.route);
+  emit("action", type, props.details);
 };
+
+const showPods = () => emit("navigate", { view: "pods", search: props.details.name });
 </script>
 
 <template>
@@ -220,6 +256,37 @@ const viewLogs = async () => {
     data-test="k8s2-details-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
   >
+    <template #header>
+      <div class="flex min-w-0 flex-col gap-1" data-test="k8s2-drawer-header">
+        <OText variant="meta" data-test="k8s2-drawer-kind">{{ t(info.title) }}</OText>
+        <div class="flex min-w-0 items-center gap-1">
+          <OTruncatedText class="text-base font-semibold" data-test="k8s2-drawer-name">{{
+            raw(details.name)
+          }}</OTruncatedText>
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
+            icon-left="content-copy"
+            :aria-label="t('infra.k8s2.drawerCopyName')"
+            data-test="k8s2-drawer-copy"
+            @click="copyName"
+          />
+        </div>
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <OTag
+            v-if="headerStatus"
+            size="xs"
+            :variant="TONE_PILL[headerStatus.tone].variant"
+            :icon="TONE_PILL[headerStatus.tone].icon"
+            data-test="k8s2-drawer-status"
+            >{{ headerStatus.text }}</OTag
+          >
+          <OTruncatedText class="text-text-secondary text-xs" data-test="k8s2-drawer-subtitle">{{
+            raw([subTitle, ageText].filter(Boolean).join(" · "))
+          }}</OTruncatedText>
+        </div>
+      </div>
+    </template>
     <div ref="body" class="flex flex-col gap-5">
       <div v-if="!row" class="flex justify-center py-6">
         <OSpinner v-if="pending" size="md" data-test="k8s2-drawer-pending" />
@@ -228,29 +295,66 @@ const viewLogs = async () => {
         }}</OText>
       </div>
       <template v-else>
-        <div
-          v-if="headerStatus || details.kind === 'pod'"
-          class="flex items-center justify-between gap-2"
-          data-test="k8s2-drawer-actions"
-        >
-          <span
-            v-if="headerStatus"
-            :class="TONE_TEXT_CLASS[headerStatus.tone]"
-            class="text-sm"
-            data-test="k8s2-drawer-status"
-            >{{ headerStatus.text }}</span
+        <div class="flex flex-wrap items-center gap-2" data-test="k8s2-drawer-actions">
+          <OButton
+            v-if="details.kind === 'node'"
+            variant="primary"
+            size="sm-action"
+            icon-left="view-in-ar"
+            data-test="k8s2-drawer-action-pods"
+            @click="showPods"
+            >{{ t("infra.k8s2.drawerActionPods") }}</OButton
           >
           <OButton
-            v-if="details.kind === 'pod'"
-            variant="outline"
+            v-if="hasLogs"
+            variant="primary"
             size="sm-action"
             icon-left="article"
+            :disabled="noMember"
+            focusable-unavailable
             data-test="k8s2-drawer-view-logs"
-            :loading="logsBusy"
-            :disabled="logsBusy"
-            @click="viewLogs"
-            >{{ t("infra.k8s2.viewLogs") }}</OButton
+            @click="act('logs')"
+            >{{ t("infra.k8s2.drawerActionLogs") }}
+            <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
+          /></OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="data-object"
+            data-test="k8s2-drawer-action-yaml"
+            @click="act('yaml')"
+            >{{ t("infra.k8s2.drawerActionYaml") }}</OButton
           >
+          <OButton
+            v-if="hasTraces"
+            variant="outline"
+            size="sm-action"
+            icon-left="account-tree"
+            :disabled="noMember"
+            focusable-unavailable
+            data-test="k8s2-drawer-action-traces"
+            @click="act('traces')"
+            >{{ t("infra.k8s2.drawerActionTraces") }}
+            <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
+          /></OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="show-chart"
+            data-test="k8s2-drawer-action-metrics"
+            @click="act('metrics')"
+            >{{ t("infra.k8s2.drawerActionMetrics") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="auto-awesome"
+            disabled
+            focusable-unavailable
+            data-test="k8s2-drawer-action-explain"
+            >{{ t("infra.k8s2.drawerActionExplain") }}
+            <OTooltip :content="t('infra.k8s2.drawerExplainUnavailable')" />
+          </OButton>
         </div>
         <OBanner
           v-if="eventsScoped && !pending && !observed"
@@ -260,18 +364,18 @@ const viewLogs = async () => {
           data-test="k8s2-drawer-not-observed"
         />
 
-        <K8sDrawerMetrics
-          :details="details"
-          :row="row"
-          :inventory="inventory"
-          :range="range"
-          :refresh-nonce="refreshNonce"
-          :has-stream="hasStream"
+        <OBanner
+          v-if="insight"
+          :variant="insight.variant"
+          dense
+          preserve-whitespace
+          :content="insight.content"
+          data-test="k8s2-drawer-insight"
         />
 
         <section class="flex flex-col gap-2" data-test="k8s2-drawer-section-metadata">
           <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{
-            t("infra.k8s2.drawerMetadata")
+            t("infra.k8s2.drawerProperties")
           }}</OText>
           <ODescriptionList dense>
             <ODescriptionItem :label="t('infra.k8s2.drawerCreated')">
@@ -333,6 +437,15 @@ const viewLogs = async () => {
             </ODescriptionItem>
           </ODescriptionList>
         </section>
+
+        <K8sDrawerMetrics
+          :details="details"
+          :row="row"
+          :inventory="inventory"
+          :range="range"
+          :refresh-nonce="refreshNonce"
+          :has-stream="hasStream"
+        />
 
         <section class="flex flex-col gap-2" data-test="k8s2-drawer-section-kind">
           <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{

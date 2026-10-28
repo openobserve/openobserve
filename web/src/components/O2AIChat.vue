@@ -161,21 +161,45 @@
         :history-unavailable="shareTarget.historyUnavailable"
       />
 
-      <ConfirmDialog
-        v-model="showDeleteChatConfirmDialog"
+      <ODialog
+        v-model:open="showDeleteChatConfirmDialog"
+        size="sm"
         :title="t('aiAssistant.deleteChat')"
-        :message="deleteChatMessage"
-        :ok-label="t('common.delete')"
-        ok-variant="destructive"
-        focus-cancel
-        @update:ok="confirmDeleteChat"
-        @update:cancel="showDeleteChatConfirmDialog = false"
-      />
+        :primary-button-label="t('common.delete')"
+        primary-button-variant="destructive"
+        :secondary-button-label="t('common.cancel')"
+        initial-focus="secondary"
+        data-test="o2-ai-chat-delete-chat-dialog"
+        @click:primary="
+          showDeleteChatConfirmDialog = false;
+          confirmDeleteChat();
+        "
+        @click:secondary="showDeleteChatConfirmDialog = false"
+      >
+        <i18n-t
+          :keypath="
+            deleteLinkCount > 0
+              ? 'aiAssistant.deleteChatWithLinksMessage'
+              : 'aiAssistant.deleteChatConfirmMessage'
+          "
+          :plural="deleteLinkCount || undefined"
+          tag="p"
+        >
+          <template #name>
+            <span
+              data-test="o2-ai-chat-delete-chat-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ deleteChatTitle }}</span
+            >
+          </template>
+        </i18n-t>
+      </ODialog>
 
       <ConfirmDialog
         v-model="showClearAllConfirmDialog"
         :title="t('aiAssistant.clearAllConversationsTitle')"
         :message="t('aiAssistant.clearAllConversationsMessage')"
+        ok-variant="destructive"
         @update:ok="confirmClearAllConversations"
         @update:cancel="showClearAllConfirmDialog = false"
       />
@@ -1427,21 +1451,14 @@ export default defineComponent({
       openShareDialog(currentSessionId.value, displayedTitle.value, historyUnavailable.value);
 
     const deleteLinkCount = ref(0);
-    const deleteChatMessage = computed(() =>
-      deleteLinkCount.value > 0
-        ? t(
-            "aiAssistant.deleteChatWithLinksMessage",
-            { count: deleteLinkCount.value },
-            deleteLinkCount.value,
-          )
-        : t("aiAssistant.deleteChatConfirmMessage"),
-    );
+    const deleteChatTitle = ref("");
 
     // The confirmation opens at once; the link count fills in when the share list answers.
     const requestDeleteChat = async (chatId: number) => {
       deleteLinkCount.value = 0;
-      deleteChat(chatId);
       const chat = chatHistory.value.find((c) => c.id === chatId);
+      deleteChatTitle.value = chat?.title ?? "";
+      deleteChat(chatId);
       if (!chatPersistenceEnabled.value || !chat?.serverBacked) return;
       const count = await activeShareCount(
         queryClient,
@@ -1595,7 +1612,8 @@ export default defineComponent({
       chatPersistenceEnabled,
       shareCurrentChat,
       requestDeleteChat,
-      deleteChatMessage,
+      deleteLinkCount,
+      deleteChatTitle,
       historyUnavailable,
       turnLimitError,
       chatRoot,

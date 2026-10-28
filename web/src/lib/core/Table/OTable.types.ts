@@ -401,10 +401,18 @@ export interface OTableProps<TData = any> {
    * regardless of virtual scroll (which only bounds DOM nodes), so very large
    * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
    * while no client-side row transform needs the full model: requires
-   * virtualScroll, pagination "none", non-client sorting, expansion "none",
-   * no wrap, no tree, and deactivates while a column/global filter is set.
+   * virtualScroll, pagination "none", non-client sorting, expansion "none"
+   * (or single/multiple with `measureExpandedRows`), no wrap, no tree, and
+   * deactivates while a column/global filter is set.
    */
   windowRowModel?: boolean;
+  /**
+   * Under virtual scroll, measure each rendered row together with its expanded
+   * detail row, so a tall detail never shifts the rows below it. Expansion state
+   * is keyed by `rowKey`, so this also lets `windowRowModel` stay on while rows
+   * expand. Opt-in: it measures every rendered row from the DOM.
+   */
+  measureExpandedRows?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**

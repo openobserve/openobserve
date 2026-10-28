@@ -123,6 +123,11 @@ describe("SearchBar — saved views list dialog", () => {
       .findAllComponents(ConfirmDialog)
       .find((c) => c.props("modelValue") === true)!;
     expect(confirm.props("title")).toBe(i18n.global.t("search.deleteSavedView"));
+    expect(confirm.props()).toMatchObject({
+      messageKeypath: "search.deleteSavedViewConfirm",
+      messageName: "error logs",
+      okVariant: "destructive",
+    });
     expect(mockSavedViewsDelete).not.toHaveBeenCalled();
 
     confirm.vm.$emit("update:ok");

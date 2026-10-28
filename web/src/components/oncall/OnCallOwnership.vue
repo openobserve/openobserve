@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="!!ruleToDelete"
       :title="t('oncall.removeRuleTitle')"
       :message="t('oncall.removeRuleMessage')"
+      ok-variant="destructive"
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
     />

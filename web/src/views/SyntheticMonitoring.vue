@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showBulkDeleteConfirm = false"
     >
       <p class="py-2">
-        {{ t("synthetics.dialog.bulkDeleteBody", { count: selectedMonitorIds.length }) }}
+        {{ t("synthetics.dialog.bulkDeleteBody", { count: bulkDeleteCount }) }}
       </p>
     </ODialog>
 
@@ -399,9 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="deleteLocation"
       @click:secondary="showDeleteLocation = false"
     >
-      <p class="py-2">
-        {{ t("synthetics.privateLocations.deleteBody", { name: locationToDelete?.label ?? "" }) }}
-      </p>
+      <i18n-t keypath="synthetics.privateLocations.deleteBody" tag="p" class="py-2">
+        <template #name>
+          <span
+            data-test="synthetic-monitoring-delete-location-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ locationToDelete?.label }}</span
+          >
+        </template>
+      </i18n-t>
     </ODialog>
 
     <!-- Move checks dialog -->
@@ -900,6 +906,8 @@ watch(searchAcrossFolders, async (newVal) => {
 const selectedMonitorIds = ref<string[]>([]);
 const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
+// Set on open and never cleared: the selection empties before the dialog finishes closing.
+const bulkDeleteCount = ref(0);
 const monitorsToMove = ref<string[]>([]);
 
 // Both delete handlers' 409s render here, with distinct titles for a named parent vs outside ones.
@@ -932,6 +940,7 @@ const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
 
 const openBulkDeleteConfirm = () => {
+  bulkDeleteCount.value = selectedMonitorIds.value.length;
   showBulkDeleteConfirm.value = true;
 };
 
@@ -1184,7 +1193,9 @@ const openDomains = (page: StatusPageListItem) => {
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   const ok = await confirm({
     title: t("statusPages.dialog.deleteTitle"),
-    message: t("statusPages.dialog.deleteBody", { name: page.name }),
+    messageKeypath: "statusPages.dialog.deleteBody",
+    messageName: page.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({
@@ -1712,7 +1723,9 @@ async function runMonitor(m: any) {
 async function deleteMonitor(m: any) {
   const ok = await confirm({
     title: t("synthetics.dialog.deleteSingleTitle"),
-    message: t("synthetics.dialog.deleteSingleBody", { name: m.name }),
+    messageKeypath: "synthetics.dialog.deleteSingleBody",
+    messageName: m.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
 

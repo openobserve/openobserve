@@ -187,6 +187,19 @@ describe("DatasetDetailPage experiments", () => {
     });
   });
 });
+
+describe("DatasetDetailPage playground", () => {
+  it("opens the playground preset to this dataset", async () => {
+    const wrapper = await mountPage();
+
+    await wrapper.get('[data-test="ai-dataset-detail-try-playground"]').trigger("click");
+
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      name: "aiPlayground",
+      query: { org_identifier: "test-org", dataset: "dataset-1" },
+    });
+  });
+});
 describe("DatasetDetailPage item writes", () => {
   // The update endpoint replaces the row, so an edit that omits metadata wipes
   // the item's subset-filter dimensions.
@@ -314,5 +327,17 @@ describe("DatasetDetailPage item detail", () => {
 
     expect(mockRemoveItem).not.toHaveBeenCalled();
     expect(wrapper.find(".item-detail").exists()).toBe(true);
+  });
+
+  it("asks to delete an item with a destructive confirm button", async () => {
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+
+    await state.deleteFromDetail(state.items[0]);
+    await flushPromises();
+
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmVariant: "destructive" }),
+    );
   });
 });

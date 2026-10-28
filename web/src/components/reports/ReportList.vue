@@ -406,7 +406,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
-      :message="deleteDialog.message"
+      message-keypath="reports.deleteReportNamedMessage"
+      :message-name="deleteDialog.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteReport"
       @update:cancel="deleteDialog.show = false"
     />
@@ -416,6 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
       :title="t('reports.deleteReportsTitle')"
       :message="t('reports.deleteReportsMsg', { count: selectedReports.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteReports"
       @update:cancel="confirmBulkDelete = false"
     />
@@ -678,7 +681,6 @@ const lastRunTooltip = (row: any) => {
 const deleteDialog = ref({
   show: false,
   title: t("reports.deleteReportTitle"),
-  message: t("reports.deleteReportMessage"),
   data: null as any, // { report_id, name }
 });
 const confirmBulkDelete = ref<boolean>(false);
@@ -1060,9 +1062,6 @@ const toggleReportState = (report: any) => {
 // Delete — uses report_id (v2)
 const confirmDeleteReport = (report: any) => {
   deleteDialog.value.show = true;
-  deleteDialog.value.message = t("reports.deleteReportNamedMessage", {
-    name: report.name,
-  });
   deleteDialog.value.data = { report_id: report.report_id, name: report.name };
 };
 

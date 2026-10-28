@@ -30,8 +30,14 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use super::entity::{oncall_team_members, oncall_teams};
-use crate::{db::get_orm_client_rw, errors};
+use super::{
+    entity::{oncall_team_members, oncall_teams},
+    ttl_cache::TtlCache,
+};
+use crate::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
+};
 
 /// The team row, for the paging path (`06` §3).
 ///
@@ -40,7 +46,7 @@ use crate::{db::get_orm_client_rw, errors};
 ///
 /// Backs [`get_cached`] only, never [`get`]: the screens that edit a team read
 /// through `get`, so an admin never sees what they just replaced.
-static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(Default::default);
+static TEAM_CACHE: TtlCache<Team> = TtlCache::new(TEAM_CACHE_TTL);
 
 /// The roster, for the paging path.
 ///
@@ -48,8 +54,7 @@ static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(
 /// past the third rung. `06` §6 budgets five minutes of staleness because the
 /// consequence is bounded and one-directional: a member removed moments ago may
 /// receive one more page. Nothing here can suppress a page.
-static MEMBERS_CACHE: LazyLock<RwHashMap<String, (Vec<TeamMember>, Instant)>> =
-    LazyLock::new(Default::default);
+static MEMBERS_CACHE: TtlCache<Vec<TeamMember>> = TtlCache::new(TEAM_CACHE_TTL);
 
 /// Whether an org has any team at all, for the firing path.
 ///
@@ -87,6 +92,16 @@ pub fn invalidate_cache(org_id: &str, id: &str) {
 /// Drops one team's roster.
 pub fn invalidate_members_cache(team_id: &str) {
     MEMBERS_CACHE.remove(team_id);
+}
+
+/// Drops every org-keyed on-call cache of a deleted org; rosters are keyed by team alone.
+pub fn invalidate_org(org_id: &str) {
+    let prefix = format!("{org_id}/");
+    TEAM_CACHE.retain(|key| !key.starts_with(&prefix));
+    ORG_HAS_TEAMS_CACHE.remove(org_id);
+    super::oncall_schedules::invalidate_org(org_id);
+    super::oncall_policies::invalidate_org(org_id);
+    super::oncall_ownership::invalidate_cache(org_id);
 }
 
 /// Invalidates locally and tells every other node to do the same.
@@ -363,14 +378,12 @@ pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Erro
 /// keep saying so.
 pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
     let key = team_cache_key(org_id, id);
-    if let Some(entry) = TEAM_CACHE.get(&key)
-        && entry.1.elapsed() < TEAM_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = TEAM_CACHE.get(&key) {
+        return Ok(Some(cached));
     }
     let found = get(org_id, id).await?;
     if let Some(team) = &found {
-        TEAM_CACHE.insert(key, (team.clone(), Instant::now()));
+        TEAM_CACHE.insert(key, team.clone());
     }
     Ok(found)
 }
@@ -410,13 +423,11 @@ pub async fn has_any_cached(org_id: &str) -> Result<bool, errors::Error> {
 /// roster IS cached, unlike a missing team: "this team has nobody on it" is a
 /// real, stable answer, and it is what a coverage gap is made of.
 pub async fn list_members_cached(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
-    if let Some(entry) = MEMBERS_CACHE.get(team_id)
-        && entry.1.elapsed() < TEAM_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = MEMBERS_CACHE.get(team_id) {
+        return Ok(cached);
     }
     let members = list_members(team_id).await?;
-    MEMBERS_CACHE.insert(team_id.to_string(), (members.clone(), Instant::now()));
+    MEMBERS_CACHE.insert(team_id.to_string(), members.clone());
     Ok(members)
 }
 
@@ -509,6 +520,106 @@ pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, erro
     Ok(deleted > 0)
 }
 
+/// Deletes all fourteen on-call tables of an org, children first, and evicts their caches.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    use sea_orm::sea_query::{Expr, Query};
+
+    use super::entity::{
+        oncall_delivery_reads, oncall_overrides, oncall_ownership_rules, oncall_policies,
+        oncall_response_events, oncall_response_reports, oncall_responses, oncall_routing_config,
+        oncall_schedules, oncall_unavailability, oncall_unrouted_signals,
+    };
+
+    let client = get_orm_client_rw().await;
+    let mut team_ids: Vec<String> = oncall_teams::Entity::find()
+        .select_only()
+        .column(oncall_teams::Column::Id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await?;
+    // Sent before the rows go: a retry after the commit can no longer find these team ids.
+    for team_id in &team_ids {
+        crate::coordinator::oncall::emit_members_changed(team_id).await?;
+    }
+    let org_team_ids = Query::select()
+        .column(oncall_teams::Column::Id)
+        .from(oncall_teams::Entity)
+        .and_where(Expr::col(oncall_teams::Column::OrgId).eq(org_id))
+        .to_owned();
+    let org_response_ids = Query::select()
+        .column(oncall_responses::Column::Id)
+        .from(oncall_responses::Entity)
+        .and_where(Expr::col(oncall_responses::Column::OrgId).eq(org_id))
+        .to_owned();
+    let txn = client.begin().await?;
+    oncall_response_events::Entity::delete_many()
+        .filter(oncall_response_events::Column::ResponseId.in_subquery(org_response_ids))
+        .exec(&txn)
+        .await?;
+    oncall_delivery_reads::Entity::delete_many()
+        .filter(oncall_delivery_reads::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_response_reports::Entity::delete_many()
+        .filter(oncall_response_reports::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_responses::Entity::delete_many()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_unrouted_signals::Entity::delete_many()
+        .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_overrides::Entity::delete_many()
+        .filter(oncall_overrides::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_schedules::Entity::delete_many()
+        .filter(oncall_schedules::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_policies::Entity::delete_many()
+        .filter(oncall_policies::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_ownership_rules::Entity::delete_many()
+        .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_routing_config::Entity::delete_many()
+        .filter(oncall_routing_config::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_unavailability::Entity::delete_many()
+        .filter(oncall_unavailability::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_team_members::Entity::delete_many()
+        .filter(oncall_team_members::Column::TeamId.in_subquery(org_team_ids))
+        .exec(&txn)
+        .await?;
+    super::oncall_user_contacts::delete_by_org(&txn, org_id).await?;
+    let teams = oncall_teams::Entity::delete_many().filter(oncall_teams::Column::OrgId.eq(org_id));
+    let removed: Vec<String> =
+        super::delete_returning(&txn, teams, &[oncall_teams::Column::Id]).await?;
+    txn.commit().await?;
+    // The delete names each team the listing missed, which is announced only after it.
+    for team_id in removed {
+        if !team_ids.contains(&team_id) {
+            crate::coordinator::oncall::emit_members_changed(&team_id).await?;
+            team_ids.push(team_id);
+        }
+    }
+    for team_id in &team_ids {
+        invalidate_members_cache(team_id);
+    }
+    invalidate_org(org_id);
+    crate::coordinator::oncall::emit_org_deleted(org_id).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -581,5 +692,39 @@ mod tests {
             ids.iter().all(|i| i.len() == 27),
             "ksuids are fixed width, so lexical and byte order agree"
         );
+    }
+
+    #[test]
+    fn test_invalidate_org_drops_only_that_orgs_teams() {
+        let team = |org: &str| {
+            to_team(oncall_teams::Model {
+                id: "team_1".into(),
+                org_id: org.into(),
+                name: "Platform".into(),
+                timezone: "UTC".into(),
+                description: None,
+                channel_destinations: None,
+                created_at: 0,
+                updated_at: 0,
+            })
+        };
+        for org in ["inv_team_a", "inv_team_ab"] {
+            TEAM_CACHE.insert(team_cache_key(org, "team_1"), team(org));
+            ORG_HAS_TEAMS_CACHE.insert(org.to_string(), (true, Instant::now()));
+        }
+        invalidate_org("inv_team_a");
+        assert!(
+            TEAM_CACHE
+                .get(&team_cache_key("inv_team_a", "team_1"))
+                .is_none()
+        );
+        assert!(!ORG_HAS_TEAMS_CACHE.contains_key("inv_team_a"));
+        assert!(
+            TEAM_CACHE
+                .get(&team_cache_key("inv_team_ab", "team_1"))
+                .is_some()
+        );
+        assert!(ORG_HAS_TEAMS_CACHE.contains_key("inv_team_ab"));
+        invalidate_org("inv_team_ab");
     }
 }

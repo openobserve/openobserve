@@ -221,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'scatter',
                           'stacked',
                           'h-stacked',
+                          'state-timeline',
                         ].includes(dashboardPanelData.data.type) &&
                         panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
                       "
@@ -294,9 +295,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :is_ui_histogram="props.isUiHistogram"
                         :enableColumnFormat="true"
                         @metadata-update="metaDataValue"
-                        @result-metadata-update="handleResultMetadataUpdate"
+                        @result-metadata-update="onResultMetadataUpdate"
                         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                         @series-limit-update="handleSeriesLimitUpdate"
+                        @region-join-update="handleRegionJoinUpdate"
+                        @sankey-notice-update="handleSankeyNoticeUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -351,6 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
                     @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
+                    @open-series-overrides="overrideConfigRef?.openOverrideConfigPopup()"
                   />
                 </PanelSidebar>
               </div>
@@ -373,6 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
+            @openAddVariable="emit('openAddVariable')"
             :initialVariableValues="initialVariableValues"
             class="mb-2 shrink-0"
             :showAddVariableButton="true"
@@ -405,6 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
+            @openAddVariable="emit('openAddVariable')"
             :initialVariableValues="initialVariableValues"
             class="mb-2 shrink-0"
             :showAddVariableButton="true"
@@ -605,9 +611,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :searchResponse="props.searchResponse"
                           :is_ui_histogram="props.isUiHistogram"
                           @metadata-update="metaDataValue"
-                          @result-metadata-update="handleResultMetadataUpdate"
+                          @result-metadata-update="onResultMetadataUpdate"
                           @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                           @series-limit-update="handleSeriesLimitUpdate"
+                          @region-join-update="handleRegionJoinUpdate"
+                          @sankey-notice-update="handleSankeyNoticeUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -690,9 +698,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OverrideConfig
-      v-if="dashboardPanelData.data.type === 'table'"
+      v-if="overrideConfigMode"
+      :key="overrideConfigMode"
       ref="overrideConfigRef"
+      :mode="overrideConfigMode"
       :panelData="seriesData"
+      :preview-source="seriesOverridePreviewSource"
     />
   </div>
 </template>
@@ -704,6 +715,7 @@ import {
   provide,
   defineAsyncComponent,
   getCurrentInstance,
+  shallowRef,
   toRef,
   watch,
   type CSSProperties,
@@ -717,9 +729,11 @@ import type {
   PanelEditorVariablesData,
 } from "./types/panelEditor";
 import { resolveConfig } from "./types/panelEditor";
+import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
 
 // ============================================================================
 // Component Imports
@@ -813,8 +827,13 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value, t);
+const {
+  dashboardPanelData,
+  resetAggregationFunction,
+  makeAutoSQLQuery,
+  regenerateOtherBuilderQueries,
+  validatePanel,
+} = useDashboardPanelData(pageKey.value, t);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -883,6 +902,8 @@ const {
   handleResultMetadataUpdate,
   handlePanelDiagnosticsUpdate,
   handleSeriesLimitUpdate,
+  handleRegionJoinUpdate,
+  handleSankeyNoticeUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,
@@ -906,6 +927,32 @@ const {
   selectedDate: undefined, // Managed by parent
   validatePanel,
   holdQueries: () => props.holdQueries,
+});
+
+// Tables open Column Formatting; charts with named series open Series Formatting in the same dialog.
+const overrideConfigMode = computed<"table" | "chart" | null>(() => {
+  const type = dashboardPanelData.data.type;
+  if (type === "table") return "table";
+  return SERIES_OVERRIDE_CHART_TYPES.includes(type) ? "chart" : null;
+});
+
+// The renderer keeps no copy of its result metadata, so the Series Formatting preview reads it from the event.
+const lastResultMetaData = shallowRef<any>(null);
+const onResultMetadataUpdate = (metadata: any): void => {
+  handleResultMetadataUpdate(metadata);
+  lastResultMetaData.value = metadata;
+};
+
+const seriesOverridePreviewSource = computed(() => {
+  if (overrideConfigMode.value !== "chart" || !chartData.value) return null;
+  const renderer = panelSchemaRendererRef.value;
+  return {
+    panelSchema: chartData.value,
+    data: renderer?.data,
+    metadata: renderer?.metadata,
+    resultMetaData: lastResultMetaData.value,
+    hiddenQueries: dashboardPanelData.layout.hiddenQueries ?? [],
+  };
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
@@ -1212,9 +1259,12 @@ const resolvedVariablesData = computed(() => {
 });
 
 // Live variables data (for HTML/Markdown editors)
-const liveVariablesData = computed(() => {
-  return props.variablesData || { isVariablesLoading: false, values: [] };
-});
+const liveVariablesData = computed(() =>
+  withTimeRangeVariables(
+    props.variablesData || { isVariablesLoading: false, values: [] },
+    dashboardPanelData.meta.dateTime,
+  ),
+);
 
 // ============================================================================
 // Props forwarding
@@ -1261,7 +1311,7 @@ const handleChartTypeSelection = async (selection: any) => {
     const replaceQuery = selection.replaceQuery ?? false;
 
     try {
-      const { loadCustomChartTemplate } =
+      const { loadCustomChartTemplate, customChartTemplateContent } =
         await import("@/components/dashboards/addPanel/customChartExamples/customChartTemplates");
       const template = await loadCustomChartTemplate(chart.value);
 
@@ -1271,8 +1321,12 @@ const handleChartTypeSelection = async (selection: any) => {
 // Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple
 // Define your ECharts 'option' here.
 // 'data' variable is available for use and contains the response data from the search result and it is an array.
+// 'context' is read-only: variables (null when All), timeRange {start, end} in microseconds, timezone and theme ('light' or 'dark').
 `;
-        dashboardPanelData.data.customChartContent = defaultComments + template.code;
+        dashboardPanelData.data.customChartContent = customChartTemplateContent(
+          defaultComments,
+          template,
+        );
 
         const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
         if (dashboardPanelData.data.queries[currentQueryIndex]) {
@@ -1320,6 +1374,10 @@ watch(
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
     dashboardPanelData.data.type,
+    // The builder generates the heatmap y bucketing and range into the SQL itself.
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
   ],
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)
@@ -1336,6 +1394,16 @@ watch(
       }
     }
   },
+  { deep: true },
+);
+
+watch(
+  () => [
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
+  ],
+  () => regenerateOtherBuilderQueries(),
   { deep: true },
 );
 

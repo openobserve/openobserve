@@ -942,6 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
@@ -1661,7 +1662,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('search.deleteSavedView')"
-      :message="t('search.deleteSavedViewConfirm')"
+      message-keypath="search.deleteSavedViewConfirm"
+      :message-name="deleteViewName"
+      ok-variant="destructive"
       @update:ok="confirmDeleteSavedViews"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -1839,6 +1842,7 @@ import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
+import { applySessionTimezone } from "@/utils/storage";
 
 const defaultValue: any = () => {
   return {
@@ -1963,6 +1967,7 @@ export default defineComponent({
       this.savedViewDropdownModel = false;
       this.savedViewsListDialog = false;
       this.deleteViewID = item.view_id;
+      this.deleteViewName = item.view_name;
       this.confirmDelete = true;
     },
     handleUpdateSavedView(item: any) {
@@ -2375,6 +2380,7 @@ export default defineComponent({
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
+    const deleteViewName = ref("");
     const savedViewDropdownModel = ref(false);
     const savedViewsListDialog = ref(false);
     const moreOptionsDropdownModel = ref(false);
@@ -2731,7 +2737,7 @@ export default defineComponent({
       },
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, origin?: { fromUser?: boolean }) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
       // query. Reject these stale re-emissions to prevent the old filter from
@@ -2763,10 +2769,13 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
-        searchObj.meta.sqlMode = false;
+        // An emptied query names no stream, so its stream-not-found error goes however it was emptied.
         searchObj.data.filterErrMsg = "";
+        // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
+        if (origin?.fromUser !== false) {
+          searchObj.meta.sqlMode = false;
+        }
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -3102,14 +3111,10 @@ export default defineComponent({
       }
 
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
+        analytics.track("logs_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
 
@@ -3556,9 +3561,7 @@ export default defineComponent({
               ];
             }
 
-            if (extractedObj.data?.timezone) {
-              store.dispatch("setTimezone", extractedObj.data.timezone);
-            }
+            applySessionTimezone(store, extractedObj.data?.timezone);
 
             if (!Object.prototype.hasOwnProperty.call(extractedObj.data.stream, "streamType")) {
               extractedObj.data.stream.streamType = "logs";
@@ -5017,6 +5020,7 @@ export default defineComponent({
       handleSavedView,
       deleteSavedViews,
       deleteViewID,
+      deleteViewName,
       confirmDelete,
       savedViewDropdownModel,
       savedViewsListDialog,

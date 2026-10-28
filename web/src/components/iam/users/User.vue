@@ -283,7 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <AddUser
-      v-model:open="showAddUserDialog"
+      :open="showAddUserDialog"
+      @update:open="onAddUserOpenChange"
       v-model="selectedUser"
       :isUpdated="isUpdated"
       :userRole="currentUserRole"
@@ -307,10 +308,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('user.confirmDeleteHead')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
+      primary-button-variant="destructive"
       @click:secondary="confirmDelete = false"
       @click:primary="deleteUser"
     >
-      <p>{{ t("user.confirmDeleteMsg") }}</p>
+      <i18n-t keypath="user.confirmDeleteMsg" tag="p" data-test="user-delete-dialog-message">
+        <template #name
+          ><span class="text-text-heading font-semibold break-all">{{
+            deleteUserEmail
+          }}</span></template
+        >
+      </i18n-t>
     </ODialog>
 
     <ODialog
@@ -320,10 +328,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('user.revokeInvitationTitle')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
+      primary-button-variant="destructive"
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
-      <p>{{ t("user.revokeInvitationMsg", { email: revokeInviteEmail }) }}</p>
+      <i18n-t keypath="user.revokeInvitationMsg" tag="p" data-test="user-revoke-dialog-message">
+        <template #email
+          ><span class="text-text-heading font-semibold break-all">{{
+            revokeInviteEmail
+          }}</span></template
+        >
+      </i18n-t>
     </ODialog>
 
     <ODialog
@@ -333,10 +348,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('user.deleteUsersTitle')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
+      primary-button-variant="destructive"
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
+      <p>{{ t("user.deleteUsersMsg", { count: bulkDeleteCount }) }}</p>
     </ODialog>
   </OPageLayout>
 </template>
@@ -426,6 +442,8 @@ export default defineComponent({
     };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
+    // Set on open and never cleared, so the closing fade does not show "0 users".
+    const bulkDeleteCount = ref(0);
     const bulkDeleteLoading = ref(false);
     const rows = ref<any[]>([]);
     const tableKey = ref(0);
@@ -761,7 +779,7 @@ export default defineComponent({
     const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");
-    let deleteUserEmail = "";
+    const deleteUserEmail = ref("");
     let revokeInviteToken = "";
     const revokeInviteEmail = ref("");
 
@@ -1118,6 +1136,8 @@ export default defineComponent({
       showUpdateUserDialog.value = true;
     };
 
+    let openAddUserTimer: ReturnType<typeof setTimeout> | undefined;
+
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       selectedUser.value.organization = store.state.selectedOrganization.identifier;
@@ -1129,14 +1149,13 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          update_user: props.row.email,
           page: "Users",
         });
       } else {
         selectedUser.value = {};
       }
-      setTimeout(() => {
+      clearTimeout(openAddUserTimer);
+      openAddUserTimer = setTimeout(() => {
         showAddUserDialog.value = true;
       }, 100);
     };
@@ -1230,6 +1249,7 @@ export default defineComponent({
     };
 
     const hideForm = () => {
+      clearTimeout(openAddUserTimer);
       showAddUserDialog.value = false;
       router.replace({
         name: "users",
@@ -1237,6 +1257,11 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
+
+    const onAddUserOpenChange = (open: boolean) => {
+      if (open) showAddUserDialog.value = true;
+      else hideForm();
     };
 
     const addMember = async (res: any, data: any, operationType: string) => {
@@ -1304,13 +1329,13 @@ export default defineComponent({
 
     const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;
-      deleteUserEmail = row.email;
+      deleteUserEmail.value = row.email;
     };
 
     const deleteUser = async () => {
       confirmDelete.value = false;
       usersService
-        .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
+        .delete(store.state.selectedOrganization.identifier, deleteUserEmail.value)
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
@@ -1356,12 +1381,7 @@ export default defineComponent({
           await getOrgMembers(true);
           updateUserActions();
 
-          analytics.track("Button Click", {
-            button: "Revoke Invite",
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Users",
-          });
+          analytics.track("invite_revoked");
         })
         .catch((err: any) => {
           dismiss();
@@ -1412,6 +1432,7 @@ export default defineComponent({
     });
 
     const openBulkDeleteDialog = () => {
+      bulkDeleteCount.value = selectedUsers.value.length;
       confirmBulkDelete.value = true;
     };
 
@@ -1505,8 +1526,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        update_user: row.email,
         page: "Users",
       });
     };
@@ -1564,6 +1583,7 @@ export default defineComponent({
       forbidden,
       orgData,
       confirmDelete,
+      deleteUserEmail,
       deleteUser,
       confirmDeleteAction,
       confirmRevoke,
@@ -1586,6 +1606,7 @@ export default defineComponent({
       addRoutePush,
       addMember,
       hideForm,
+      onAddUserOpenChange,
       isUpdated,
       showAddUserDialog,
       selectedUser,
@@ -1616,6 +1637,7 @@ export default defineComponent({
       selectedUserIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteCount,
       bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteUsers,

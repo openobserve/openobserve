@@ -87,7 +87,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -466,6 +466,14 @@ describe("PipelinesDestinationList", () => {
       (wrapper.vm as any).conformDeleteDestination(dest);
       expect((wrapper.vm as any).confirmDelete.visible).toBe(true);
       expect((wrapper.vm as any).confirmDelete.data.name).toBe(dest.name);
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
+        );
+      expect(dialog!.props("messageName")).toBe(dest.name);
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("cancelDeleteDestination resets confirmDelete", async () => {
@@ -525,6 +533,13 @@ describe("PipelinesDestinationList", () => {
       await flushPromises();
       (wrapper.vm as any).openBulkDeleteDialog();
       expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
   });
 
@@ -636,6 +651,27 @@ describe("list view state", () => {
       pageSize: 100,
       sortBy: "name",
       sortOrder: "desc",
+    });
+  });
+  describe("templates load denied", () => {
+    it("falls back to no templates without an unhandled rejection on a 403", async () => {
+      const { queryClient } = await import("@/composables/query/queryClient");
+      queryClient.clear();
+      (templateService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (destinationService.list as any).mockResolvedValue({ data: [] });
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const w: any = mountComponent();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled.mock.calls.map(([reason]) => reason)).not.toContainEqual({
+        response: { status: 403 },
+      });
+      expect(w.vm.templates).toEqual([]);
+      w.unmount();
     });
   });
 });

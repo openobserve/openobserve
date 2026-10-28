@@ -36,7 +36,7 @@ import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
 import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
-import { PrebuiltConfig, PrebuiltType } from "./types";
+import { PrebuiltConfig, PrebuiltType, PrebuiltTypeId } from "./types";
 
 /**
  * All available prebuilt destination types
@@ -81,6 +81,17 @@ export function isPrebuiltType(type: string): boolean {
 }
 
 /**
+ * Prebuilt type the server treats a destination as (`src/core/src/alerts/destinations.rs`), never guessed from its URL.
+ */
+export function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
+  if (destination.type === "email") {
+    return destination.template?.startsWith("prebuilt_") ? "email" : null;
+  }
+  const type = destination.destination_type_name;
+  return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
+}
+
+/**
  * Get all prebuilt destination types grouped by category
  */
 export function getPrebuiltTypesByCategory() {
@@ -98,18 +109,6 @@ export function getPrebuiltTypesByCategory() {
  */
 export function getPopularPrebuiltTypes(): PrebuiltType[] {
   return PREBUILT_DESTINATION_TYPES.filter((t) => t.popular);
-}
-
-/**
- * Detect if a URL matches a prebuilt destination pattern
- */
-export function detectPrebuiltTypeFromUrl(url: string): string | null {
-  for (const [type, config] of Object.entries(PREBUILT_CONFIGS)) {
-    if (config.urlValidator(url)) {
-      return type;
-    }
-  }
-  return null;
 }
 
 /**

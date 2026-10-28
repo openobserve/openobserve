@@ -135,6 +135,13 @@ const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 const isDisabled = useLockedDisabled(() => props.disabled);
 
+// Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
+const tooltipIconLabel = computed(() =>
+  props.label
+    ? t("components.select.moreInfoAbout", { field: props.label })
+    : t("components.select.moreInfo"),
+);
+
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const split = computed(() => splitControlAttrs($attrs));
@@ -411,7 +418,11 @@ watch(popoverOpen, (open) => {
 const nestedFilteredOptions = computed(() => {
   const base = baseFilteredOptions.value;
   if (!hasNestedOptions.value) return base;
-  if (isSearching.value) return base.filter((o) => !o.expandable);
+  if (isSearching.value) {
+    const flat = base.filter((o) => !o.expandable);
+    // A header kept only for a matching expandable row has nothing left under it.
+    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+  }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
 
@@ -494,7 +505,13 @@ const selectedLabels = computed(() => {
 
 const triggerDisplayLabel = computed(() => {
   if (!hasSelection.value) return "";
-  if (props.multiple) return selectedLabels.value.join(", ");
+  if (props.multiple) {
+    // "Select all" is a sentinel elsewhere (e.g. an absent/empty field reads as
+    // "every panel"); showing its own label here keeps the trigger readable
+    // instead of listing every option.
+    if (props.allSelectedLabel && allSelected.value) return String(props.allSelectedLabel);
+    return selectedLabels.value.join(", ");
+  }
   return selectedLabels.value[0] ?? "";
 });
 
@@ -799,6 +816,10 @@ watch(popoverOpen, (open) => {
 });
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
+});
+// The list opens scrolled to the current value; a search keeping that offset hides its best matches above the fold.
+watch(searchTerm, () => {
+  if (listboxScrollEl.value) listboxScrollEl.value.scrollTop = 0;
 });
 
 function scrollHighlightedIntoView() {
@@ -1246,6 +1267,7 @@ const fieldWidthClass = computed(() => {
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
+        :label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
         ><slot name="tooltip"
@@ -1331,7 +1353,12 @@ const fieldWidthClass = computed(() => {
               </span>
 
               <slot name="trigger" :value="modelValue">
-                <template v-if="multiple && selectedLabels.length > 0">
+                <template v-if="multiple && allSelectedLabel && allSelected">
+                  <span class="text-select-text flex-1 truncate text-start text-sm">{{
+                    allSelectedLabel
+                  }}</span>
+                </template>
+                <template v-else-if="multiple && selectedLabels.length > 0">
                   <div class="flex flex-1 flex-nowrap items-center gap-1 overflow-hidden pe-2">
                     <slot
                       v-for="(labelText, idx) in visibleSelectedLabels"

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { RELATIVE_PERIOD_PATTERN } from "@/utils/date";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 export const MICROS_PER_MINUTE = 60 * 1_000_000;
 export const MICROS_PER_HOUR = 60 * MICROS_PER_MINUTE;
@@ -113,6 +114,8 @@ export const NARROW_PRESETS: NarrowPreset[] = Object.entries(PRESET_VALUES)
   .sort((a, b) => a.durationUs - b.durationUs);
 
 export function periodToMicros(period: string): number | null {
+  const calendar = resolveCalendarPeriod(period);
+  if (calendar) return calendar.endTime - calendar.startTime;
   // Same pattern the search resolves the period with, so the guard never sizes a window the search reads differently.
   const match = RELATIVE_PERIOD_PATTERN.exec(period ?? "");
   if (!match) return null;
@@ -120,6 +123,8 @@ export function periodToMicros(period: string): number | null {
 }
 
 export function relativeWindow(period: string, nowUs: number): WindowUs | null {
+  const calendar = resolveCalendarPeriod(period, null, Math.floor(nowUs / 1000));
+  if (calendar) return { startUs: calendar.startTime, endUs: calendar.endTime };
   const duration = periodToMicros(period);
   if (duration === null) return null;
   return { startUs: nowUs - duration, endUs: nowUs };

@@ -443,7 +443,7 @@ const rowModelWindowed = computed(
     !!props.virtualScroll &&
     props.pagination === "none" &&
     props.sorting !== "client" &&
-    props.expansion === "none" &&
+    (props.expansion === "none" || (!!props.measureExpandedRows && props.expansion !== "tree")) &&
     !props.wrap &&
     !tree.enabled.value &&
     !activeClientFilters.value,
@@ -791,7 +791,12 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
 // ── Virtual scroll ──────────────────────────────────────────────
 // Measure row heights only when rows can wrap; otherwise keep the cheaper
 // fixed-stride path.
-const useDynamicRowHeight = computed(() => !!props.virtualScroll && !!props.wrap);
+const measuresExpandedRows = computed(
+  () => !!props.measureExpandedRows && expansion.isEnabled.value,
+);
+const useDynamicRowHeight = computed(
+  () => !!props.virtualScroll && (!!props.wrap || measuresExpandedRows.value),
+);
 
 const {
   virtualRows,
@@ -811,6 +816,7 @@ const {
   rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
+  includeExpansionRow: () => measuresExpandedRows.value,
   // A delegated scroller can contain a histogram or other content before this
   // table. Keep its raw offset stable when wrapped rows are remeasured so a
   // query refresh cannot move the owning page's scrollbar.

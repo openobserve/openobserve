@@ -333,8 +333,6 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 }
 
 /// Delete all search jobs (and their partitions and results) for the given org.
-/// Child rows are deleted explicitly because SQLite does not enforce FK cascades
-/// unless `PRAGMA foreign_keys = ON` is set.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
 

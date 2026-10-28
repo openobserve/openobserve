@@ -65,6 +65,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   alertCalibration: (c) =>
     (c.isEnterprise || c.isCloud) &&
     (c.alertCalibrationEnabled || featureState(c.features, "alerts") === "locked"),
+  // Enterprise plus `/config` `fleet_enabled`; the route stays so management reads keep working.
+  fleet: (c) => c.isEnterprise && c.fleetEnabled,
 };
 
 /**
@@ -340,7 +342,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         ],
       },
       { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
-      { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
     ],
   },
   {
@@ -390,6 +391,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "data-plus-line",
         name: "ingestion",
         requires: "ingestion",
+      },
+      // Lit on the config editor too, which is its own route rather than a tab of /fleet.
+      {
+        titleKey: "menu.fleet",
+        icon: "workspaces",
+        name: "fleet",
+        gate: "fleet",
+        activeOnRoutes: ["fleetConfigEditor"],
       },
     ],
   },

@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="delete"
                   class="self-start"
                   data-test="announcement-editor-delete-style"
-                  @click="deleteStyleOpen = true"
+                  @click="openDeleteStyle"
                   >{{ t("announcements.styles.delete", { name: selectedStyle.name }) }}</OButton
                 >
               </div>
@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="deleteStyleOpen"
     size="sm"
-    :title="t('announcements.styles.deleteTitle', { name: selectedStyle?.name ?? '' })"
+    :title="t('announcements.styles.deleteTitle')"
     :sub-title="t('announcements.styles.deleteHint')"
     :primary-button-label="t('common.delete')"
     primary-button-variant="destructive"
@@ -513,7 +513,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="announcement-editor-delete-style-dialog"
     @click:secondary="deleteStyleOpen = false"
     @click:primary="deleteStyle"
-  />
+  >
+    <i18n-t
+      keypath="announcements.styles.deleteMessage"
+      tag="p"
+      class="text-text-body text-sm"
+      data-test="announcement-editor-delete-style-message"
+    >
+      <template #name
+        ><span class="text-text-heading font-semibold break-all">{{
+          deleteStyleName
+        }}</span></template
+      >
+    </i18n-t>
+  </ODialog>
 
   <ODialog
     v-model:open="leaveOpen"
@@ -987,6 +1000,8 @@ const chooseColor = (choice: string) => {
 
 const saveStyleOpen = ref(false);
 const deleteStyleOpen = ref(false);
+// Set on open and never cleared: the deleted style leaves the list before the dialog finishes closing.
+const deleteStyleName = ref("");
 const styleName = ref("");
 const styleError = ref<I18nText | "">("");
 
@@ -1018,6 +1033,11 @@ const saveStyle = async () => {
     styleError.value =
       raw(error?.response?.data?.message) || t("announcements.settings.saveFailed");
   }
+};
+
+const openDeleteStyle = () => {
+  deleteStyleName.value = selectedStyle.value?.name ?? "";
+  deleteStyleOpen.value = true;
 };
 
 const deleteStyle = async () => {

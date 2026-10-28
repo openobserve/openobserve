@@ -101,7 +101,7 @@ test.describe('nav rail on short screens', () => {
     const rail = new NavRailPage(page);
     await rail.goto('/');
     await rail.tile('/').focus();
-    // ArrowDown until Data (the tile that sits half under the bottom fade at rest).
+    // ArrowDown until Data, which the bottom fade covers at rest.
     for (let i = 0; i < 12; i++) {
       const active = await rail.activeElementDataTest();
       if (active?.dataTest === 'menu-link-/streams-item') break;
@@ -129,13 +129,23 @@ test.describe('nav rail on short screens', () => {
     await rail.goto('/');
     const before = await rail.railState();
     expect(before.scrollTop).toBe(0);
-    // Data sits partly under the bottom fade at rest; click its visible part.
-    const box = await rail.tile('/streams').boundingBox();
-    expect(await rail.isClearOfFade(rail.tile('/streams'))).toBe(false);
+    // Which tile the bottom fade cuts depends on the config-driven tile set, so find it.
+    let target = null;
+    let box = null;
+    for (const tile of await rail.nav.locator("a[data-test^='menu-link-']").all()) {
+      box = await tile.boundingBox();
+      if (box.y + 10 < before.rail.bottom && !(await rail.isClearOfFade(tile))) {
+        target = await tile.getAttribute('data-test');
+        break;
+      }
+    }
+    expect(target, 'a link tile sits partly under the bottom fade at rest').toBeTruthy();
     await page.mouse.click(box.x + box.width / 2, box.y + 10);
-    await page.waitForTimeout(800);
+    // Poll for the activation: a fixed 800ms races the SPA route change on a loaded env.
+    await expect
+      .poll(async () => (await rail.railState()).active, { timeout: 15000 })
+      .toBe(target);
     const after = await rail.railState();
-    expect(after.active).toBe('menu-link-/streams-item');
     expect(after.scrollTop).toBe(0);
   });
 });

@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { rumTestContext } = require('./rum-env.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -125,6 +126,12 @@ class SessionBuilder {
 
   error(message = 'TypeError: e2e') {
     this.rows.push({ ...this.base('error'), error_type: 'TypeError', error_message: message, error_source: 'source' });
+    return this;
+  }
+
+  /** Idle time before the next row, on top of the 5 s every row already adds. */
+  wait(ms) {
+    this.t += ms;
     return this;
   }
 }
@@ -304,7 +311,7 @@ function buildSyntheticMixSeed(appId, nowMs = Date.now()) {
   for (let i = 0; i < 5; i++) {
     const s = new SessionBuilder(appId, `${appId}-s${i}`, nowMs - (i + 2) * HOUR_MS, {
       user: `y${i}@e2e.test`,
-      sessionType: i < 3 ? 'user' : 'synthetic',
+      sessionType: i < 3 ? 'user' : 'synthetics',
     });
     s.view('https://shop.example.com/web/a');
     rows.push(...s.rows);
@@ -373,7 +380,7 @@ async function rumSchemaFields(page, orgId) {
 
 async function ingestJson(page, stream, rows, { orgId = null } = {}) {
   const { orgId: org, baseUrl, headers } = orgApiContext(orgId);
-  const res = await page.request.post(`${baseUrl}/api/${org}/${stream}/_json`, { headers, data: rows });
+  const res = await page.request.post(`${ingestBase(baseUrl)}/api/${org}/${stream}/_json`, { headers, data: rows });
   const body = await res.text();
   if (!res.ok()) throw new Error(`${stream} ingest failed: ${res.status()} ${body}`);
   const parsed = JSON.parse(body);
@@ -495,6 +502,7 @@ module.exports = {
   seedPlaceholderIdentityApp,
   seedLongPageApp,
   buildSeed,
+  SessionBuilder,
   runAppId,
   weekStartUtc,
   PAGE_KEY_VECTORS,

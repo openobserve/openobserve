@@ -46,6 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
+          icon-left="play-arrow"
+          :disabled="!dataset"
+          data-test="ai-dataset-detail-try-playground"
+          @click="openPlayground"
+        >
+          {{ t("aiObservability.datasets.detail.tryInPlayground") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
           @click="openCsvImport"
@@ -434,6 +444,7 @@ import {
 import { useMutation } from "@tanstack/vue-query";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { aiPlaygroundRoute } from "./playgroundRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
@@ -608,6 +619,10 @@ function openCreateExperiment() {
   router.push(aiExperimentCreateRoute(orgId.value, { datasetId: datasetId.value }));
 }
 
+function openPlayground() {
+  router.push(aiPlaygroundRoute(orgId.value, { datasetId: datasetId.value }));
+}
+
 function onPageChange(page: number) {
   currentPage.value = page;
   refresh();
@@ -753,6 +768,7 @@ async function removeItem(row: LlmDatasetItem): Promise<boolean> {
     message: t("aiObservability.datasets.detail.deleteItemMessage"),
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
+    confirmVariant: "destructive",
   });
   if (!ok) return false;
   try {

@@ -765,7 +765,6 @@ mod tests {
             start_time: 0,
             end_time: 0,
             track_total_hits: false,
-            query_type: "UI".to_string(),
             uses_zo_fn: false,
             query_fn: "".to_string(),
             skip_wal: false,

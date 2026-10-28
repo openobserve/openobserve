@@ -36,9 +36,23 @@ import {
   labelledInventory,
   observed,
 } from "./__fixtures__/mapInventory";
-import { buildInventory, severityOf, type QueryResults, type Series } from "./kubernetesModel";
+import {
+  buildInventory,
+  severityOf,
+  type PodRow,
+  type QueryResults,
+  type Series,
+} from "./kubernetesModel";
 import { parseUrlState, type K8sUrlState } from "./kubernetesUrlState";
-import { fillClass, fillValue, groupRows, listTarget, statusClass, type MapRow } from "./mapFill";
+import {
+  fillClass,
+  fillValue,
+  groupRows,
+  isFailing,
+  listTarget,
+  statusClass,
+  type MapRow,
+} from "./mapFill";
 import type { MapObjects } from "./mapFilter";
 
 const chartLog = vi.hoisted(() => ({ errors: [] as string[], applied: null as any }));
@@ -98,6 +112,7 @@ const mountView = async (
     loading: boolean;
     forbidden: boolean;
     objects: MapObjects;
+    failedQueries: string[];
   }> = {},
 ) => {
   wrapper = mount(MapView, {
@@ -197,7 +212,7 @@ describe("MapView fill buckets (AC 43)", () => {
     expect(fillValue(inv, "memLim")).toBeCloseTo(92, 6);
     const classes = pods
       .map((p) => fillClass(p, "memLim"))
-      .filter((c) => c !== "noData")
+      .filter((c) => c !== "noData" && c !== "noReq" && c !== "notRunning")
       .sort();
     expect(fillClass(inv, "memLim")).toBe(classes[classes.length - 1]);
     for (const p of pods)
@@ -219,14 +234,19 @@ describe("MapView fill buckets (AC 43)", () => {
     expect(values.filter((v) => v === lowest)).toHaveLength(2);
   });
 
-  it("draws pods with no request or no usage in the No data swatch", async () => {
-    await mountView();
-    const noData = options().series[0].data[hexIndex("gateway/debug-shell")][2];
-    expect(
-      options().series[0].data[hexIndex("media/transcoding-service-nkgbp5xp5l-vwvn2")][2],
-    ).toBe(noData);
-    expect(fillClass(byName(hexRows(), "gateway/debug-shell"), "cpuReq")).toBe("noData");
+  it("draws a pod with usage but no request as No request set, and one with no usage as No data", async () => {
+    const inv = inventory();
+    const target = inv.pods.find((p) => p.cpuCores != null && p.cpuPctOfRequest != null)!;
+    const bare = { ...target, cpuCores: 0.2, cpuPctOfRequest: null } as PodRow;
+    await mountView(mapState(), { ...inv, pods: inv.pods.map((p) => (p === target ? bare : p)) });
+    const idle = hexRows().find((r): r is PodRow => r.kind === "pod" && r.cpuCores == null)!;
+    const cls = (r: PodRow) => options().series[0].data[hexIndex(`${r.namespace}/${r.name}`)][2];
+    expect(cls(bare)).not.toBe(cls(idle));
+    expect(fillClass(bare, "cpuReq")).toBe("noReq");
+    expect(fillClass(idle, "cpuReq")).toBe("noData");
+    const noData = cls(idle);
     expect(options().series[0].data[hexIndex(INVENTORY)][2]).not.toBe(noData);
+    expect(wrapper.find('[data-test="k8s2-map-legend-noReq"]').text()).toContain("No request set");
     const range = (cls: string) =>
       wrapper.find(`[data-test="k8s2-map-legend-${cls}"] [data-test="k8s2-map-range"]`).text();
     expect(range("noData")).toBe("No data");
@@ -451,7 +471,7 @@ describe("MapView on phones (§4.8)", () => {
     await mountView();
     expect(wrapper.find('[data-test="k8s2-map-area"]').classes()).toContain("max-md:min-h-96");
     expect(wrapper.find('[data-test="k8s2-map-filter"]').classes()).toContain("max-md:w-full");
-    expect(wrapper.find('[data-test="k8s2-map-scale"]').classes()).toContain("shrink-0");
+    expect(wrapper.find('[data-test="k8s2-map-scale"]').classes()).toContain("flex-wrap");
     for (const id of ["k8s2-map-fill", "k8s2-map-group"])
       expect(wrapper.find(`[data-test="${id}"]`).classes()).toEqual(
         expect.arrayContaining(["max-md:min-w-0", "max-md:flex-1"]),
@@ -483,13 +503,16 @@ describe("MapView empty states (AC 49)", () => {
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "", filter: [] }]]);
   });
 
-  it("draws every hex as No data with fill=cpuReq when k8s_pod_cpu_usage is absent", async () => {
+  it("draws running pods as No data and the rest as Not running with fill=cpuReq when k8s_pod_cpu_usage is absent", async () => {
     const results = generatorResults();
     results.delete("K1");
     await mountView(mapState(), inventory(results));
     const classes = new Set(options().series[0].data.map((d: number[]) => d[2]));
-    expect(classes.size).toBe(1);
-    expect(hexRows().every((r) => fillClass(r, "cpuReq") === "noData")).toBe(true);
+    expect(classes.size).toBeLessThanOrEqual(2);
+    expect(hexRows().every((r) => ["noData", "notRunning"].includes(fillClass(r, "cpuReq")))).toBe(
+      true,
+    );
+    expect(hexRows().some((r) => fillClass(r, "cpuReq") === "noData")).toBe(true);
   });
 });
 
@@ -868,10 +891,42 @@ describe("MapView group headers and nav (AC 85)", () => {
   });
 });
 
+describe("MapView failing marker", () => {
+  it("flags exactly the failing pods for the ! marker, whatever the fill", async () => {
+    await mountView();
+    const flags = options().series[0].data.map((d: number[]) => d[5]);
+    expect(flags).toEqual(hexRows().map((r) => Number(isFailing(r))));
+    expect(flags).toContain(1);
+  });
+});
+
+describe("MapView partial failure notice", () => {
+  it("offers Retry and Dismiss for an unavailable limits query, and Retry refreshes but keeps the notice", async () => {
+    await mountView(mapState(), inventory(), { failedQueries: ["P9"] });
+    const notice = wrapper.find('[data-test="k8s2-map-notice-P9"]');
+    expect(notice.text()).toContain("Limits unavailable");
+    await wrapper.find('[data-test="k8s2-map-notice-retry-P9"]').trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    expect(wrapper.find('[data-test="k8s2-map-notice-P9"]').exists()).toBe(true);
+    await wrapper.setProps({ failedQueries: [] });
+    expect(wrapper.find('[data-test="k8s2-map-notice-P9"]').exists()).toBe(false);
+  });
+
+  it("dismisses without refreshing, and shows nothing for the node map", async () => {
+    await mountView(mapState(), inventory(), { failedQueries: ["P9"] });
+    await wrapper.find('[data-test="k8s2-map-notice-dismiss-P9"]').trigger("click");
+    expect(wrapper.find('[data-test="k8s2-map-notice-P9"]').exists()).toBe(false);
+    expect(wrapper.emitted("refresh")).toBeUndefined();
+    wrapper.unmount();
+    await mountView(mapState({ entity: "nodes" }), inventory(), { failedQueries: ["P9"] });
+    expect(wrapper.find('[data-test="k8s2-map-notice-P9"]').exists()).toBe(false);
+  });
+});
+
 describe("MapView legend (AC 86)", () => {
   it("scales cpuReq in 6 steps and status in 4, each with a range and a count summing to the hexes", async () => {
     await mountView();
-    expect(legendItems()).toHaveLength(6);
+    expect(legendItems()).toHaveLength(8);
     expect(legendItems().reduce((sum, item) => sum + legendCount(item), 0)).toBe(41);
     for (const item of legendItems())
       expect(item.find('[data-test="k8s2-map-range"]').text()).not.toBe("");
@@ -883,13 +938,26 @@ describe("MapView legend (AC 86)", () => {
     );
   });
 
-  it("highlights the picked classes and clears them on a fill change", async () => {
+  it("hides a clicked bucket, strikes its swatch label, and Show all restores it", async () => {
     await mountView();
-    byTest(OToggleGroup, "k8s2-map-scale").vm.$emit("update:modelValue", ["b5"]);
-    await flushPromises();
-    expect(hexMap().props("highlight")).toEqual(["b5"]);
+    const b5 = () => wrapper.find('[data-test="k8s2-map-legend-b5"]');
+    expect(b5().attributes("aria-pressed")).toBe("true");
+    await b5().trigger("click");
+    expect(hexMap().props("hidden")).toEqual(["b5"]);
+    expect(b5().attributes("aria-pressed")).toBe("false");
+    expect(b5().find('[data-test="k8s2-map-range"]').classes()).toContain("line-through");
+    await wrapper.find('[data-test="k8s2-map-legend-show-all"]').trigger("click");
+    expect(hexMap().props("hidden")).toEqual([]);
+    expect(wrapper.find('[data-test="k8s2-map-legend-show-all"]').exists()).toBe(false);
+  });
+
+  it("keeps at least one bucket visible and clears hidden buckets on a fill change", async () => {
+    await mountView();
+    const present = legendItems().filter((item) => legendCount(item) > 0);
+    for (const item of present) await item.trigger("click");
+    expect(hexMap().props("hidden")).toHaveLength(present.length - 1);
     await wrapper.setProps({ state: mapState({ fill: "memLim" }) });
-    expect(hexMap().props("highlight")).toEqual([]);
+    expect(hexMap().props("hidden")).toEqual([]);
   });
 });
 

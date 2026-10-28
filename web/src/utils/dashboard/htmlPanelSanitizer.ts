@@ -20,7 +20,13 @@ const DOCUMENT_SELECTOR = /^(html|body|:root)(?![\w-])/i;
 
 const IFRAME_SANDBOX = "allow-scripts allow-same-origin";
 
+const TARGETABLE_TAGS = new Set(["A", "AREA", "FORM"]);
+
 const refusedIframes = new WeakSet<Element>();
+
+const ESCAPED_VALUE_ENTITY = /&(?:(amp|lt|gt|quot)|#(\d+));/g;
+
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"' };
 
 type ScopableRule = CSSRule & { selectorText?: string; cssRules?: CSSRuleList };
 
@@ -48,14 +54,16 @@ export const sanitizeHtmlPanel = (
 ): DocumentFragment => {
   const fragment = htmlPanelPurifier.sanitize(html, {
     ADD_TAGS: ["iframe", "style"],
-    ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp"],
+    ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp", "target"],
     // without it the parser hoists a top-level style into <head>, which DOMPurify drops
     FORCE_BODY: true,
     RETURN_DOM_FRAGMENT: true,
   });
 
   fragment.querySelectorAll("style").forEach((styleEl) => {
-    styleEl.textContent = escapeStyleText(scopeCss(styleEl.textContent || "", prefix));
+    styleEl.textContent = escapeStyleText(
+      scopeCss(decodeEscapedValues(styleEl.textContent || ""), prefix),
+    );
   });
 
   fragment.querySelectorAll("iframe").forEach((frame) => {
@@ -67,6 +75,12 @@ export const sanitizeHtmlPanel = (
 
   return fragment;
 };
+
+// style text is raw, so values escaped by escapeHtmlValue would otherwise stay as literal entities in the CSS
+const decodeEscapedValues = (cssText: string): string =>
+  cssText.replace(ESCAPED_VALUE_ENTITY, (_, name, code) =>
+    name ? NAMED_ENTITIES[name] : String.fromCharCode(Number(code)),
+  );
 
 const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
   for (const rule of Array.from(rules ?? []) as ScopableRule[]) {
@@ -80,13 +94,29 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
             : `${prefix} ${trimmed}`;
         })
         .join(", ");
-    } else if (
-      (rule?.type === CSSRule.MEDIA_RULE || rule?.type === CSSRule.SUPPORTS_RULE) &&
-      rule.cssRules
-    ) {
+    } else if (rule?.cssRules) {
+      // any grouping rule (@media, @supports, @layer, @container, ...) would otherwise apply page-wide
       prefixSelectors(rule.cssRules, prefix);
     }
   }
+};
+
+// prototype getter: a form control named "nodeName" shadows the form's own property
+const readNodeName = (node: Node): string =>
+  String(Object.getOwnPropertyDescriptor(Node.prototype, "nodeName")?.get?.call(node) ?? "");
+
+// a named target could steer a link or form into a panel iframe, past the embed origin check
+const keepOnlyBlankTarget = (node: Element): void => {
+  if (!TARGETABLE_TAGS.has(readNodeName(node).toUpperCase())) return;
+  // prototype calls: a form control named e.g. "getAttribute" shadows the form's own method
+  const target = Element.prototype.getAttribute.call(node, "target");
+  if (target === null) return;
+  if (target.trim().toLowerCase() !== "_blank") {
+    Element.prototype.removeAttribute.call(node, "target");
+    return;
+  }
+  Element.prototype.setAttribute.call(node, "target", "_blank");
+  Element.prototype.setAttribute.call(node, "rel", "noopener noreferrer");
 };
 
 const scopeCss = (cssText: string, prefix: string): string => {
@@ -104,6 +134,7 @@ const scopeCss = (cssText: string, prefix: string): string => {
 };
 
 htmlPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
+  keepOnlyBlankTarget(node);
   if (node.nodeName !== "IFRAME") return;
   node.removeAttribute("srcdoc");
   const src = node.getAttribute("src") || "";

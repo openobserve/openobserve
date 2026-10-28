@@ -12,6 +12,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
 import AiChatSharedByMe from "@/components/ai-assistant/share/AiChatSharedByMe.vue";
 import { isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
@@ -70,6 +71,10 @@ function newChat() {
   emit("new-chat");
 }
 
+const chatToDelete = ref<{ chat: ChatHistoryEntry; links: number } | null>(null);
+// Set on open only, so the message stays put while the dialog fades out.
+const deleteShown = ref({ title: "", links: 0 });
+
 async function deleteChat(e: Event, chat: ChatHistoryEntry) {
   e.stopPropagation();
   const links = canShare(chat)
@@ -79,18 +84,14 @@ async function deleteChat(e: Event, chat: ChatHistoryEntry) {
         chat.sessionId,
       )
     : 0;
-  const ok = await confirm({
-    title: t("aiAssistant.deleteChat"),
-    message:
-      links > 0
-        ? t("aiAssistant.deleteChatWithLinksMessage", { count: links }, links)
-        : t("aiAssistant.deleteChatConfirmMessage"),
-    confirmLabel: t("common.delete"),
-    confirmVariant: "destructive",
-    focusCancel: true,
-    persistent: false,
-  });
-  if (!ok) return;
+  chatToDelete.value = { chat, links };
+  deleteShown.value = { title: chat.title, links };
+}
+
+async function confirmDeleteChat() {
+  const chat = chatToDelete.value?.chat;
+  chatToDelete.value = null;
+  if (!chat) return;
   await deleteChatById(chat.id);
   if (activeChatId.value === chat.id) newChat();
   await refresh();
@@ -106,6 +107,7 @@ async function clearAll() {
   const ok = await confirm({
     title: t("chatHistory.clearAllTitle"),
     message: t("chatHistory.clearAllMessage"),
+    confirmVariant: "destructive",
   });
   if (ok) {
     await clearAllHistory();
@@ -341,5 +343,36 @@ function formatTime(ts: string): string {
       :history-unavailable="shareTarget.historyUnavailable"
     />
     <AiChatSharedByMe v-if="persistenceEnabled" v-model:open="sharedByMeOpen" />
+    <ODialog
+      :open="chatToDelete !== null"
+      size="sm"
+      :title="t('aiAssistant.deleteChat')"
+      :primary-button-label="t('common.delete')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('common.cancel')"
+      initial-focus="secondary"
+      data-test="home-chat-history-delete-dialog"
+      @update:open="(open: boolean) => !open && (chatToDelete = null)"
+      @click:primary="confirmDeleteChat"
+      @click:secondary="chatToDelete = null"
+    >
+      <i18n-t
+        :keypath="
+          deleteShown.links > 0
+            ? 'aiAssistant.deleteChatWithLinksMessage'
+            : 'aiAssistant.deleteChatConfirmMessage'
+        "
+        :plural="deleteShown.links || undefined"
+        tag="p"
+      >
+        <template #name>
+          <span
+            data-test="home-chat-history-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ deleteShown.title }}</span
+          >
+        </template>
+      </i18n-t>
+    </ODialog>
   </div>
 </template>

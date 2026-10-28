@@ -160,6 +160,15 @@ describe("SloList — delete dialog dependent-alert count", () => {
     expect(alertsService.list_by_slo).not.toHaveBeenCalled();
   });
 
+  it("names the SLO in bold in the delete dialog", async () => {
+    wrapper = await mountList([sloRow()]);
+    await openDeleteFor(wrapper, "checkout-availability");
+
+    const name = openDialog(wrapper).find('[data-test="slos-slolist-delete-name"]');
+    expect(name.text()).toBe("checkout-availability");
+    expect(name.classes()).toContain("font-semibold");
+  });
+
   it("looks the alerts up when the dialog opens, exactly once", async () => {
     wrapper = await mountList([sloRow()]);
     await openDeleteFor(wrapper, "checkout-availability");

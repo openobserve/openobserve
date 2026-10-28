@@ -23,6 +23,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // Test configuration
 const TEST_STREAM = 'e2e_automate';
@@ -85,7 +86,7 @@ test.describe("Deduplication Regression Tests", {
             }
         ];
         const ingestResp = await page.request.post(
-            `${process.env.ZO_BASE_URL}/api/${orgId}/${TEST_STREAM}/_json`,
+            `${ingestBase(process.env.ZO_BASE_URL)}/api/${orgId}/${TEST_STREAM}/_json`,
             {
                 data: testData,
                 headers: { "Content-Type": "application/json" }

@@ -24,6 +24,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import IngestionTokens from "@/components/iam/IngestionTokens.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 vi.mock("@/services/organizations", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -234,5 +236,37 @@ describe("IngestionTokens — Create Token form", () => {
       );
       expect(wrapper.vm.showRevealedDialog).toBe(false);
     });
+  });
+});
+
+describe("IngestionTokens — revoke Splunk HEC token confirm", () => {
+  it("names the token in bold in the real provider with a destructive button", async () => {
+    vi.mocked(organizationsService.list_org_ingestion_tokens).mockResolvedValue({
+      data: { data: [] },
+    } as any);
+    const wrapper = mountComp();
+    const ProviderDialogStub = {
+      name: "ODialog",
+      props: ["open", "title", "primaryButtonVariant"],
+      template: `<div data-test-stub="provider-dialog"><slot /></div>`,
+    };
+    const provider = mount(ConfirmDialogProvider, {
+      global: { plugins: [i18n], stubs: { ODialog: ProviderDialogStub } },
+    });
+    await flushPromises();
+
+    const pending = (wrapper.vm as any).setSplunkToken("edge-forwarder", false);
+    await flushPromises();
+    const name = provider.find('[data-test="confirm-dialog-provider-name"]');
+    expect(name.text()).toBe("edge-forwarder");
+    expect(name.classes()).toContain("font-semibold");
+    expect(provider.findComponent(ProviderDialogStub).props("primaryButtonVariant")).toBe(
+      "destructive",
+    );
+
+    useConfirmDialog().handleCancel();
+    await pending;
+    provider.unmount();
+    wrapper.unmount();
   });
 });

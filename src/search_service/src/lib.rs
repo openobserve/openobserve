@@ -237,6 +237,7 @@ pub async fn search(
                             | search::SearchEventType::Other
                             | search::SearchEventType::Alerts
                             | search::SearchEventType::DerivedStream
+                            | search::SearchEventType::PublicDashboard
                     ) {
                         (false, None, None)
                     } else {
@@ -396,7 +397,6 @@ pub async fn search_multi(
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
 
-                multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
                 log::debug!(
@@ -756,7 +756,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         };
         let work_group = result.work_group.clone().unwrap_or_default();
         let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
-            search::SearchEventType::try_from(s_event_type.as_str())
+            s_event_type
+                .parse::<search::SearchEventType>()
                 .unwrap_or(search::SearchEventType::UI)
         });
         status.push(search::QueryStatus {
@@ -776,6 +777,14 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     }
 
     Ok(search::QueryStatusResponse { status })
+}
+
+/// Aborts this node's `trace_id` search and its `{trace_id}-` children in `org_id`; OSS no-op.
+pub async fn abort_trace_family(org_id: &str, trace_id: &str) {
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER.cancel(org_id, trace_id);
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, trace_id);
 }
 
 /// Cancels `trace_id` in `org_id` on every querier.
@@ -1334,5 +1343,59 @@ mod tests {
         ));
         assert!(!is_license_exempt_stream(META_ORG_ID, Some("logs")));
         assert!(!is_license_exempt_stream(META_ORG_ID, None));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_abort_trace_family_reaches_every_child_and_delta() {
+        let org = "abort_family_org";
+        let family = ider::generate_trace_id();
+        let other = ider::generate_trace_id();
+        let leader = |trace_id: &str| {
+            SEARCH_SERVER.register_leader(
+                org,
+                trace_id,
+                LeaderInfo {
+                    user_id: None,
+                    stream_type: "logs",
+                    sql: "select 1",
+                    start_time: 0,
+                    end_time: 0,
+                    search_type: Some("public_dashboard".to_string()),
+                    search_event_context: None,
+                },
+            )
+        };
+        let child = leader(&format!("{family}-0"));
+        let sibling = leader(&format!("{family}-1"));
+        let delta = leader(&format!("{family}-0-1"));
+        let unrelated = leader(&other);
+        let receiver = |r: &QueryRegistration, phase| r.tracker().abort_receiver(phase).unwrap();
+        let aborts = [
+            receiver(&child, QueryPhase::Queued),
+            receiver(&sibling, QueryPhase::Running),
+            receiver(&delta, QueryPhase::Queued),
+        ];
+        let mut unrelated_abort = receiver(&unrelated, QueryPhase::Queued);
+
+        abort_trace_family(org, &family).await;
+
+        for abort in aborts {
+            tokio::time::timeout(std::time::Duration::from_secs(1), abort)
+                .await
+                .expect("every family search is aborted")
+                .unwrap();
+        }
+        assert!(unrelated_abort.try_recv().is_err());
+        assert!(
+            child.tracker().abort_receiver(QueryPhase::Queued).is_err(),
+            "a cancelled child cannot start afterwards"
+        );
+        assert!(
+            unrelated
+                .tracker()
+                .abort_receiver(QueryPhase::Queued)
+                .is_ok()
+        );
     }
 }

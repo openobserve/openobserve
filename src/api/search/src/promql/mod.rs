@@ -35,7 +35,10 @@ use promql_service as core_promql;
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::http::{client_search_type, get_or_create_trace_id},
+    },
     search::error_utils::map_error_to_http_response,
 };
 
@@ -438,6 +441,16 @@ async fn query_range(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(headers, &http_span);
+    if let Some(Err(e)) = req.search_type.map(client_search_type) {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                e.to_string(),
+                Some(trace_id),
+            )),
+        )
+            .into_response();
+    }
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
@@ -1763,6 +1776,22 @@ mod tests {
             !flat.contains(concat!("if user.is_external", " && !")),
             "a metric permission check must not depend on how the user signed in"
         );
+    }
+
+    #[tokio::test]
+    async fn a_client_cannot_run_a_range_query_as_a_public_dashboard() {
+        let req: config::meta::promql::RequestRangeQuery =
+            serde_json::from_value(serde_json::json!({
+                "query": "up", "search_type": "public_dashboard"
+            }))
+            .unwrap();
+        let resp = query_range("org", req, "u@example.com", &HeaderMap::new(), false).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("public_dashboard"), "{body}");
     }
 
     #[test]

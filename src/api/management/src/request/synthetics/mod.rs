@@ -1681,7 +1681,12 @@ async fn probe_token_id(headers: &axum::http::HeaderMap) -> Option<String> {
 /// job's org must all agree; the service layer enforces the last leg).
 async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Result<(), Response> {
     match probe_token_org(headers).await {
-        Some(token_org) if token_org == org_id => Ok(()),
+        Some(token_org) if token_org == org_id => {
+            match crate::request::alerts::external_events::inactive_org_response(&token_org).await {
+                Some(refusal) => Err(refusal),
+                None => Ok(()),
+            }
+        }
         Some(_) => Err(MetaHttpResponse::forbidden(
             "probe token does not belong to this org",
         )),

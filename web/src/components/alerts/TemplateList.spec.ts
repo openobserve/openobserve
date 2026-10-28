@@ -101,6 +101,26 @@ describe("Alert List", async () => {
     expect(tableData[2].text()).toContain("Template2");
   });
 
+  it("names the template and uses a destructive confirm", async () => {
+    await wrapper
+      .find('[data-test="alert-template-list-Template2-delete-template"]')
+      .trigger("click");
+    await flushPromises();
+
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("messageKeypath") === "alert_templates.deleteTemplateMessage");
+    expect(dialog.props("messageName")).toBe("Template2");
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
+  it("uses a destructive confirm for bulk delete", () => {
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("title") === i18n.global.t("alert_templates.deleteTemplatesTitle"));
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
     const deleteAlert = vi.spyOn(templateService, "delete");

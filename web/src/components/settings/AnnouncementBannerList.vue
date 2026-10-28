@@ -155,9 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="deleteOpen"
       :title="t('announcements.list.deleteTitle')"
-      :message="deleteMessage"
+      message-keypath="announcements.list.deleteMessage"
+      :message-name="deleteName"
       :ok-label="t('announcements.list.deleteConfirm')"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="removeBanner"
       @update:cancel="deleteOpen = false"
     />
@@ -354,12 +355,12 @@ const openEditor = (query: Record<string, string> = {}) => {
   });
 };
 
-const deleteMessage = computed(() => {
+const deleteName = computed(() => {
   const row = rows.value.find((r) => r.index === pendingDelete.value);
   const text = row?.text ?? "";
-  const quote =
-    text.length > MESSAGE_QUOTE_LENGTH ? `${text.slice(0, MESSAGE_QUOTE_LENGTH).trimEnd()}…` : text;
-  return t("announcements.list.deleteMessage", { message: quote });
+  return text.length > MESSAGE_QUOTE_LENGTH
+    ? `${text.slice(0, MESSAGE_QUOTE_LENGTH).trimEnd()}…`
+    : text;
 });
 
 const removeBanner = async () => {

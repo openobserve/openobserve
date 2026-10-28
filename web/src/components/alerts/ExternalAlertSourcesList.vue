@@ -312,10 +312,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="deleteDialogVisible"
       :title="t('alert_sources.deleteConfirmTitle')"
-      :message="t('alert_sources.deleteConfirmMessage')"
+      message-keypath="alert_sources.deleteConfirmMessage"
+      :message-name="deleteTarget?.name"
       :warning-message="t('alert_sources.deleteConfirmWarning')"
       :ok-label="t('alert_sources.delete')"
-      ok-color="destructive"
+      ok-variant="destructive"
       data-test="alert-sources-delete-dialog"
       @update:ok="doDelete"
     />

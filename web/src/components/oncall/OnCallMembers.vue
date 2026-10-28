@@ -279,7 +279,9 @@
     <ConfirmDialog
       :model-value="!!memberToRemove"
       :title="t('oncall.removeMemberTitle')"
-      :message="t('oncall.removeMemberMessage')"
+      message-keypath="oncall.removeMemberMessage"
+      :message-name="memberToRemove?.user_email"
+      ok-variant="destructive"
       @update:ok="confirmRemoveMember"
       @update:cancel="memberToRemove = null"
     />

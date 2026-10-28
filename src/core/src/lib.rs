@@ -36,6 +36,8 @@ use ::common;
 use ::db;
 pub mod error_suggest;
 use ::db::folders;
+#[cfg(feature = "enterprise")]
+pub mod fleet;
 pub mod functions;
 pub mod functions_cache;
 pub mod http;
@@ -60,6 +62,7 @@ pub mod profiles;
 pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod rum_pa;

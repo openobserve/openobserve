@@ -1926,6 +1926,51 @@ describe("OTable", () => {
     // branch carrying the measurement wiring never renders.
   });
 
+  describe("windowed row model with row expansion", () => {
+    const mountWindowed = (extra: Record<string, unknown>) =>
+      mount(OTable, {
+        props: {
+          data: makeRows(300),
+          columns: makeColumns(),
+          virtualScroll: true,
+          windowRowModel: true,
+          pagination: "none",
+          sorting: "server",
+          expansion: "multiple",
+          rowKey: (row: TestRow) => String(row.id),
+          ...extra,
+        },
+        slots: { expansion: "<div data-test='detail'>detail</div>" },
+      });
+    const rowModelSize = (w: VueWrapper) => (w.vm as any).table.getRowModel().rows.length as number;
+
+    it("keeps the row model windowed when expanded rows are measured", () => {
+      wrapper = mountWindowed({ measureExpandedRows: true });
+      expect(rowModelSize(wrapper)).toBeLessThan(300);
+    });
+
+    it("still builds every row for an expandable table that does not opt in", () => {
+      wrapper = mountWindowed({});
+      expect(rowModelSize(wrapper)).toBe(300);
+    });
+
+    it("never windows a tree", () => {
+      wrapper = mountWindowed({ measureExpandedRows: true, expansion: "tree" });
+      expect(rowModelSize(wrapper)).toBe(300);
+    });
+
+    it("marks the detail row so the virtualizer can measure it with its data row", async () => {
+      wrapper = mountWindowed({ measureExpandedRows: true });
+      await wrapper.find('[data-test="o2-table-expand-0"]').trigger("click");
+      await nextTick();
+      const detail = wrapper.find("[data-row-expansion]");
+      expect(detail.attributes("data-test")).toBe("o2-table-expanded-row-0");
+      expect(detail.element.previousElementSibling?.getAttribute("data-test")).toBe(
+        "o2-table-row-0",
+      );
+    });
+  });
+
   // ── Column Management ──────────────────────────────────────
 
   describe("bounded elastic (fillRemaining) column width", () => {

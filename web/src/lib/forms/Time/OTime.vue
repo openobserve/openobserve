@@ -257,12 +257,14 @@ function handleText24Change(e: Event) {
 
 // ── Native time input handler ───────────────────────────────
 function handleNativeTimeChange(e: Event) {
-  const val = (e.target as HTMLInputElement).value;
-  if (!val) {
+  const typed = (e.target as HTMLInputElement).value;
+  if (!typed) {
     emit("update:modelValue", "");
     emit("change", "");
     return;
   }
+  // A value set without seconds (autofill, scripted input) must still read as HH:MM:SS downstream.
+  const val = props.withSeconds && /^\d{2}:\d{2}$/.test(typed) ? `${typed}:00` : typed;
   const parts = val.split(":").map(Number);
   internalHour.value = parts[0] ?? 0;
   internalMinute.value = parts[1] ?? 0;

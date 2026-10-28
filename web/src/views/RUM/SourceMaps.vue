@@ -187,13 +187,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="delete-source-maps-dialog"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="t('common.ok')"
+      primary-button-variant="destructive"
       @click:secondary="deleteDialog.show = false"
       @click:primary="
         deleteSourceMap();
         deleteDialog.show = false;
       "
     >
-      <p class="para">{{ deleteDialog.message }}</p>
+      <i18n-t
+        v-if="deleteDialog.data"
+        keypath="rum.deleteSourceMapsConfirm"
+        :plural="deleteDialog.data.fileCount"
+        tag="p"
+        class="para"
+      >
+        <template #service>
+          <span
+            data-test="delete-source-maps-dialog-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ deleteDialog.data.service }}</span
+          >
+        </template>
+        <template #version>
+          <span class="text-text-heading font-semibold break-all">{{
+            deleteDialog.data.version
+          }}</span>
+        </template>
+        <template #env>
+          <span class="text-text-heading font-semibold break-all">{{ deleteDialog.data.env }}</span>
+        </template>
+        <template #count>{{ deleteDialog.data.fileCount }}</template>
+      </i18n-t>
     </ODialog>
   </div>
 </template>
@@ -234,7 +258,6 @@ const router = useRouter();
 const deleteDialog = ref({
   show: false,
   title: "",
-  message: "",
   data: null as any,
 });
 
@@ -461,12 +484,6 @@ const confirmDeleteSourceMap = (sourceMap: any) => {
   deleteDialog.value = {
     show: true,
     title: t("rum.deleteSourceMapsTitle"),
-    message: t("rum.deleteSourceMapsConfirm", {
-      service: sourceMap.service,
-      version: sourceMap.version,
-      env: sourceMap.env,
-      count: sourceMap.fileCount,
-    }),
     data: sourceMap,
   };
 };

@@ -113,9 +113,10 @@ const stubs = {
   OnCallTeamForm: { name: "OnCallTeamForm", props: ["open", "team"], template: "<div />" },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "message"],
+    props: ["modelValue", "message", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel"],
-    template: "<div v-if='modelValue' data-test='confirm'>{{ message }}</div>",
+    template:
+      "<div v-if='modelValue' data-test='confirm'>{{ messageKeypath ? $t(messageKeypath, { name: messageName }) : message }}</div>",
   },
   // Mirrors the real OButton: emits declared (otherwise the listener also
   // falls through and handlers run twice) and the event passed on.
@@ -373,6 +374,10 @@ describe("OnCallTeams", () => {
       expect(confirm.exists()).toBe(true);
       expect(confirm.text()).toContain("Platform");
       expect(confirm.text()).toContain("page nobody");
+      const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+      expect(dialog.props("messageKeypath")).toBe("oncall.deleteTeamMessage");
+      expect(dialog.props("messageName")).toBe("Platform");
+      expect(dialog.props("okVariant")).toBe("destructive");
       expect(service.deleteTeam).not.toHaveBeenCalled();
     });
 

@@ -281,6 +281,12 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Evicts a user from every node's cache and leaves its row in place.
+pub async fn evict_cached(name: &str) -> Result<(), anyhow::Error> {
+    delete_from_db_coordinator(&format!("{USER_RECORD_KEY}{name}"), false, true, None).await?;
+    Ok(())
+}
+
 #[cfg(feature = "cloud")]
 pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, anyhow::Error> {
     org_invites::list_by_invitee(user_id).await

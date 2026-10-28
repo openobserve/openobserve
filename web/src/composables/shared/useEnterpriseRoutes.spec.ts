@@ -267,6 +267,13 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(routes.length).toBe(18);
     });
 
+    // Fleet APIs 403 on OSS, so the routes must be absent, which also drops the nav entry via router.hasRoute.
+    it("should not register the Fleet routes", () => {
+      const names = useEnterpriseRoutes().map((route: any) => route.name);
+      expect(names).not.toContain("fleet");
+      expect(names).not.toContain("fleetConfigEditor");
+    });
+
     // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
     // private-VPC-agent half stays enterprise, so the pages register in an OSS
     // build and the backend `/config` flag decides whether they are reachable.
@@ -408,10 +415,19 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + workflows = 20
+    it.each([
+      ["fleet", "fleet"],
+      ["fleet/configurations/:id", "fleetConfigEditor"],
+    ])("should register the Fleet route %s as %s", (path, name) => {
+      const route = useEnterpriseRoutes().find((r: any) => r.name === name);
+      expect(route?.path).toBe(path);
+      expect(typeof route?.beforeEnter).toBe("function");
+    });
+
+    // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(20);
+      expect(routes.length).toBe(22);
     });
 
     // On-call is configured before any data flows, so the empty-data gate must not block it.
@@ -457,10 +473,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + workflows = 20)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(20);
+      expect(routes.length).toBe(22);
     });
 
     // Test 39: Should have all IAM children when both flags are true

@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #icon-left><OIcon name="folder-outline" size="sm" /></template>
         <OTruncatedText class="max-w-52">{{
-          activeFolderName || t("dashboard.folders")
+          activeFolderName || t(folderKey(type, "dashboard.folders"))
         }}</OTruncatedText>
       </OButton>
       <OButton
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         @click.stop="addFolder"
         data-test="dashboard-new-folder-btn"
-        :title="t('common.addFolder')"
+        :title="t(folderKey(type, 'common.addFolder'))"
       >
         <OIcon name="add" size="sm" />
       </OButton>
@@ -60,14 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!mobileRail"
             class="text-text-heading ps-page-edge flex items-center justify-between gap-2 py-1.5 pe-1.5 text-sm font-semibold"
           >
-            {{ t("dashboard.folders") }}
+            {{ t(folderKey(type, "dashboard.folders")) }}
             <div>
               <OButton
                 variant="ghost"
                 size="icon"
                 @click.stop="addFolder"
                 data-test="dashboard-new-folder-btn"
-                :title="t('common.addFolder')"
+                :title="t(folderKey(type, 'common.addFolder'))"
               >
                 <OIcon name="add" size="sm" />
               </OButton>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="searchQuery"
               data-test="folder-search"
-              :placeholder="t('dashboard.searchFolder')"
+              :placeholder="t(folderKey(type, 'dashboard.searchFolder'))"
               clearable
               class="w-full"
             />
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       variant="destructive"
                       data-test="dashboard-delete-folder-icon"
-                      @select="showDeleteFolderDialogFn(tab.folderId)"
+                      @select="showDeleteFolderDialogFn(tab.folderId, tab.name)"
                     >
                       <template #icon-left>
                         <OIcon name="delete" size="xs" />
@@ -172,9 +172,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :type="type"
   />
   <ConfirmDialog
-    :title="t('dashboard.deleteFolder')"
+    :title="t(folderKey(type, 'dashboard.deleteFolder'))"
     data-test="dashboard-confirm-delete-folder-dialog"
-    :message="t('dashboard.deleteFolderMessage')"
+    :message="type === 'fleets' ? t(folderKey(type, 'dashboard.deleteFolderMessage')) : undefined"
+    :message-keypath="type === 'fleets' ? undefined : 'dashboard.deleteFolderMessage'"
+    :message-name="selectedFolderDeleteName"
+    :confirm-text="deleteConfirmText"
+    :ok-label="type === 'fleets' ? t('common.delete') : undefined"
+    ok-variant="destructive"
+    :focus-cancel="type === 'fleets'"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
     v-model="confirmDeleteFolderDialog"
@@ -195,6 +201,7 @@ import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
+import { folderKey } from "./folderTerms";
 
 import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -257,7 +264,7 @@ export default defineComponent({
             side: "left",
             size: "sm",
             bleed: true,
-            title: t("dashboard.folders"),
+            title: t(folderKey(props.type, "dashboard.folders")),
             anchor: '[data-drawer-anchor="folder-list"]',
             "onUpdate:open": (v: boolean) => (mobileDrawerOpen.value = v),
           }
@@ -270,7 +277,15 @@ export default defineComponent({
     const isFolderEditMode = ref(false);
     const selectedFolderToEdit = ref(null);
     const selectedFolderDelete = ref(null);
+    const selectedFolderDeleteName = ref("");
     const confirmDeleteFolderDialog = ref(false);
+    // A fleet holds collectors and their desired version, so deleting one asks for its name.
+    const deleteConfirmText = computed(() => {
+      if (props.type !== "fleets") return undefined;
+      const folders = store.state.organizationData.foldersByType[props.type] ?? [];
+      const name = folders.find((f: any) => f.folderId === selectedFolderDelete.value)?.name;
+      return name || selectedFolderDelete.value || undefined;
+    });
     const searchQuery = ref("");
     const { track } = useReo();
     const { iconFor } = useFolderIcons();
@@ -311,8 +326,9 @@ export default defineComponent({
       isFolderEditMode.value = false;
       emit("update:folders", folders);
     };
-    const showDeleteFolderDialogFn = (folderId: any) => {
+    const showDeleteFolderDialogFn = (folderId: any, folderName = "") => {
       selectedFolderDelete.value = folderId;
+      selectedFolderDeleteName.value = folderName;
       confirmDeleteFolderDialog.value = true;
     };
 
@@ -325,16 +341,19 @@ export default defineComponent({
           //check activeFolderId to be deleted
           if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
 
-          showPositiveNotification(t("toastMessages.sidebar.folderDeletedSuccessfully"), {
-            timeout: 2000,
-          });
+          showPositiveNotification(
+            t(folderKey(props.type, "toastMessages.sidebar.folderDeletedSuccessfully")),
+            {
+              timeout: 2000,
+            },
+          );
         } catch (err) {
           const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
             raw(
               e?.response?.data?.message ||
                 e?.message ||
-                t("toastMessages.sidebar.folderDeletionFailed"),
+                t(folderKey(props.type, "toastMessages.sidebar.folderDeletionFailed")),
             ),
             {
               timeout: 2000,
@@ -401,13 +420,16 @@ export default defineComponent({
       store,
       deleteFolder,
       selectedFolderDelete,
+      selectedFolderDeleteName,
       confirmDeleteFolderDialog,
+      deleteConfirmText,
       showDeleteFolderDialogFn,
       editFolder,
       filteredTabs,
       searchQuery,
       onTabClick,
       iconFor,
+      folderKey,
       FAVORITES_FOLDER_ID,
     };
   },
