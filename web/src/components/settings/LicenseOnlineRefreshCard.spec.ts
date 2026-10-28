@@ -167,7 +167,7 @@ describe("LicenseOnlineRefreshCard", () => {
       },
       { envKeyActive: true },
     );
-    expect(w.text()).toContain("Copy renewed key");
+    expect(w.text()).toContain("Copy renewed license key");
     await w.get('[data-test="license-online-copy"]').trigger("click");
     expect(copy).toHaveBeenCalledWith("synthetic-key", expect.any(Function));
     await w.setProps({
