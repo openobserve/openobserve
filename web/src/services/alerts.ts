@@ -79,7 +79,7 @@ const alerts = {
       url += `&folder=${folder_id}`;
     }
     if (query) {
-      url += `&alert_name_substring=${query}`;
+      url += `&alert_name_substring=${encodeURIComponent(query)}`;
     }
     if (alert_type) {
       url += `&alert_type=${alert_type}`;

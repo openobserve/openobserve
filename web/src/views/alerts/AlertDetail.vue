@@ -639,11 +639,11 @@ const groupStats = computed<StatItem[]>(() => {
   ];
 });
 
-// The alert GET has no run state, so the header reads this alert's row of its folder's list,
-// or of the list across every folder when the URL names none.
+// The alert GET has no run state, so the header reads this alert's row: the list of its folder,
+// or of every folder when the URL names none, filtered to the alerts named like it.
 const listQuery = useQuery(() =>
-  Object.assign(alertsListQuery(orgId.value, routeFolderId.value), {
-    enabled: !!orgId.value && !!alertId.value,
+  Object.assign(alertsListQuery(orgId.value, routeFolderId.value, alert.value?.name), {
+    enabled: !!orgId.value && !!alertId.value && !!alert.value?.name,
   }),
 );
 

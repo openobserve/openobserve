@@ -646,6 +646,13 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     });
   });
 
+  it("lists only the alerts named like this one, not the whole folder", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView();
+    expect(vi.mocked(alertsService.listByFolderId).mock.calls[0][7]).toBe("cpu-high");
+    expect(header().props("firing")).toBe(true);
+  });
+
   it("reads the alert's own folder from the cross-folder list when the URL names none", async () => {
     for (const key of Object.keys(mockRouteQuery)) delete mockRouteQuery[key];
     withListRow({ folder_id: "prod", last_outcome: "firing" });
