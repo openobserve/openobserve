@@ -134,11 +134,18 @@ mod tests {
 
     use arrow::{
         array::{
-            ArrayRef, BinaryArray, Decimal128Array, DictionaryArray, Float32Array, Float64Array,
-            Int32Array, LargeStringArray, ListArray, NullArray, StringArray, StructArray,
-            TimestampMicrosecondArray, TimestampNanosecondArray, record_batch,
+            ArrayRef, BinaryArray, BinaryViewArray, Date64Array, Decimal128Array, Decimal256Array,
+            DictionaryArray, DurationSecondArray, FixedSizeBinaryArray, FixedSizeListArray,
+            Float16Array, Float32Array, Float64Array, Int32Array, Int64Builder,
+            IntervalMonthDayNanoArray, LargeBinaryArray, LargeListArray, LargeStringArray,
+            ListArray, MapBuilder, NullArray, RunArray, StringArray, StringBuilder, StructArray,
+            Time64MicrosecondArray, TimestampMicrosecondArray, TimestampNanosecondArray,
+            UnionArray, record_batch,
         },
-        datatypes::{Field, Int32Type, Schema},
+        datatypes::{
+            ArrowPrimitiveType, Field, Float16Type, Int32Type, IntervalMonthDayNano, Schema,
+            UnionFields, i256,
+        },
         record_batch::RecordBatch,
     };
 
@@ -466,12 +473,208 @@ mod tests {
         RecordBatch::try_from_iter(columns).unwrap()
     }
 
+    fn more_types_batch() -> RecordBatch {
+        type F16 = <Float16Type as ArrowPrimitiveType>::Native;
+        let mut map = MapBuilder::new(None, StringBuilder::new(), Int64Builder::new());
+        for i in 0..6 {
+            if i % 3 == 2 {
+                map.append(false).unwrap();
+                continue;
+            }
+            map.keys().append_value(format!("k{i}\"q"));
+            if i % 2 == 0 {
+                map.values().append_value(i);
+            } else {
+                map.values().append_null();
+            }
+            map.keys().append_value("second");
+            map.values().append_value(-1);
+            map.append(true).unwrap();
+        }
+        let large_list = LargeListArray::from_iter_primitive::<Int64Type, _, _>(vec![
+            Some(vec![Some(1), None]),
+            None,
+            Some(vec![]),
+            Some(vec![Some(4)]),
+            None,
+            Some(vec![Some(6), Some(7)]),
+        ]);
+        let fixed_list = FixedSizeListArray::from_iter_primitive::<Int64Type, _, _>(
+            vec![
+                Some(vec![Some(1), Some(2)]),
+                None,
+                Some(vec![None, Some(3)]),
+                Some(vec![Some(4), Some(5)]),
+                None,
+                Some(vec![Some(6), Some(7)]),
+            ],
+            2,
+        );
+        let run_end: RunArray<Int32Type> =
+            vec![Some("a"), Some("a"), None, Some("b"), Some("b"), Some("c")]
+                .into_iter()
+                .collect();
+        let columns: Vec<(&str, ArrayRef)> = vec![
+            ("map", Arc::new(map.finish())),
+            ("large_list", Arc::new(large_list)),
+            ("fixed_size_list", Arc::new(fixed_list)),
+            (
+                "large_binary",
+                Arc::new(LargeBinaryArray::from(vec![
+                    Some(&b"ab"[..]),
+                    None,
+                    Some(&b""[..]),
+                    Some(&b"\xff"[..]),
+                    None,
+                    Some(&b"z"[..]),
+                ])),
+            ),
+            (
+                "binary_view",
+                Arc::new(BinaryViewArray::from(vec![
+                    Some(&b"ab"[..]),
+                    None,
+                    Some(&b"a value longer than the inline view"[..]),
+                    Some(&b"\x00"[..]),
+                    None,
+                    Some(&b"z"[..]),
+                ])),
+            ),
+            (
+                "fixed_size_binary",
+                Arc::new(
+                    FixedSizeBinaryArray::try_from_sparse_iter_with_size(
+                        vec![
+                            Some(vec![1u8, 2]),
+                            None,
+                            Some(vec![3, 4]),
+                            Some(vec![5, 6]),
+                            None,
+                            Some(vec![7, 8]),
+                        ]
+                        .into_iter(),
+                        2,
+                    )
+                    .unwrap(),
+                ),
+            ),
+            (
+                "f16",
+                Arc::new(Float16Array::from(vec![
+                    Some(F16::from_f32(0.1)),
+                    Some(F16::INFINITY),
+                    Some(F16::NAN),
+                    None,
+                    Some(F16::from_f32(-2.5)),
+                    Some(F16::MAX),
+                ])),
+            ),
+            (
+                "date64",
+                Arc::new(Date64Array::from(vec![
+                    Some(0),
+                    Some(1_686_568_960_000),
+                    None,
+                    Some(-86_400_000),
+                    None,
+                    Some(5),
+                ])),
+            ),
+            (
+                "time64_us",
+                Arc::new(Time64MicrosecondArray::from(vec![
+                    Some(0),
+                    Some(3_600_000_001),
+                    None,
+                    Some(86_399_999_999),
+                    None,
+                    Some(1),
+                ])),
+            ),
+            (
+                "duration_s",
+                Arc::new(DurationSecondArray::from(vec![
+                    Some(0),
+                    Some(3600),
+                    None,
+                    Some(-5),
+                    None,
+                    Some(86_401),
+                ])),
+            ),
+            (
+                "interval",
+                Arc::new(IntervalMonthDayNanoArray::from(vec![
+                    Some(IntervalMonthDayNano::new(1, 2, 3)),
+                    None,
+                    Some(IntervalMonthDayNano::new(0, 0, 0)),
+                    Some(IntervalMonthDayNano::new(-1, 0, 1_000_000_000)),
+                    None,
+                    Some(IntervalMonthDayNano::new(12, 31, 5)),
+                ])),
+            ),
+            (
+                "decimal256",
+                Arc::new(
+                    Decimal256Array::from(vec![
+                        Some(i256::from_i128(12345)),
+                        None,
+                        Some(i256::from_i128(-1)),
+                        Some(i256::MAX),
+                        None,
+                        Some(i256::from_i128(0)),
+                    ])
+                    .with_precision_and_scale(76, 3)
+                    .unwrap(),
+                ),
+            ),
+            ("run_end", Arc::new(run_end)),
+        ];
+        RecordBatch::try_from_iter(columns).unwrap()
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_rejects_what_array_writer_rejects() {
+        let fields = UnionFields::try_new(
+            vec![0, 1],
+            vec![
+                Field::new("i", DataType::Int64, true),
+                Field::new("s", DataType::Utf8, true),
+            ],
+        )
+        .unwrap();
+        let union = UnionArray::try_new(
+            fields,
+            vec![0i8, 1].into(),
+            None,
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])) as ArrayRef,
+                Arc::new(StringArray::from(vec!["a", "b"])),
+            ],
+        )
+        .unwrap();
+        let batch = RecordBatch::try_from_iter(vec![("u", Arc::new(union) as ArrayRef)]).unwrap();
+        let mut writer = arrow_json::ArrayWriter::new(Vec::new());
+        let expected = writer.write_batches(&[&batch]).unwrap_err().to_string();
+        let got = record_batches_to_json_rows(&[&batch])
+            .unwrap_err()
+            .to_string();
+        assert_eq!(got, expected);
+    }
+
     #[test]
     fn test_record_batches_to_json_rows_matches_array_writer() {
         let batch = all_types_batch();
         let empty = batch.slice(0, 0);
         let tail = batch.slice(2, 4);
-        for batches in [vec![&batch], vec![&batch, &empty, &tail], vec![&empty]] {
+        let more = more_types_batch();
+        let more_tail = more.slice(1, 4);
+        for batches in [
+            vec![&batch],
+            vec![&batch, &empty, &tail],
+            vec![&empty],
+            vec![&more, &more_tail],
+        ] {
             let expected = array_writer_rows(&batches);
             let got = record_batches_to_json_rows(&batches).unwrap();
             assert_eq!(got, expected);
