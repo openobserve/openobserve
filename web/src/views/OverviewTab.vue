@@ -13,7 +13,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
+  <OContent class="text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
     <!-- Header: refresh + time picker -->
     <div v-if="pageState !== 'forbidden'" class="mb-4 flex justify-end">
       <div class="flex items-center gap-2">
@@ -39,6 +39,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Sections rendered top-to-bottom; each collapses when empty -->
+
+    <OverviewHeadlineStrip
+      v-if="pageState !== 'forbidden'"
+      class="mb-5"
+      :overview="overview"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :incidents-state="incidentsTile"
+      :incidents-total="incidentsTotal"
+      @select="onHeadlineSelect"
+    />
+
+    <div
+      v-if="pageState !== 'forbidden'"
+      class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
+      data-test="overview-alerts-health-grid"
+    >
+      <OverviewAlertsCard
+        :section="overview?.alerts"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        @retry="() => loadAll(true)"
+        @open="goToAlertList"
+      />
+      <OverviewDataHealthCard
+        class="self-start"
+        :section="overview?.pipelines"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        @retry="() => loadAll(true)"
+        @open="goToPipelines"
+      />
+    </div>
 
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
@@ -451,6 +484,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="() => loadAll(true)"
     />
 
+    <div
+      v-if="pageState !== 'forbidden'"
+      class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
+      data-test="overview-streams-limit-grid"
+    >
+      <OverviewStreamsCard
+        :section="overview?.streams"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        @retry="() => loadAll(true)"
+        @open="goToStreams"
+        @start-ingesting="goToIngestion"
+      />
+      <OverviewLimitCard
+        class="self-start"
+        :section="overview?.limits"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        @retry="() => loadAll(true)"
+        @unlock="openUpgradeDialog"
+      />
+    </div>
+
     <OEmptyState
       v-if="pageState === 'forbidden'"
       preset="no-access"
@@ -617,7 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       alert-type="anomaly_detection"
       data-test="overview-alert-history-drawer"
     />
-  </div>
+  </OContent>
 </template>
 
 <script setup lang="ts">
@@ -650,6 +706,18 @@ import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue
 import OverviewSectionError from "./OverviewSectionError.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OverviewHeadlineStrip, {
+  type OverviewTarget,
+  type IncidentsTile,
+} from "./overview/OverviewHeadlineStrip.vue";
+import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
+import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
+import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
+import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
+import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
+import { overviewKeys } from "@/services/overview.querykeys";
+import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
@@ -782,6 +850,10 @@ const sectionFailure = reactive<Record<SectionKey, unknown>>({
   anomalies: null,
   recentEvents: null,
 });
+const overview = ref<OrgOverview | null>(null);
+const overviewFailed = ref(false);
+const overviewState = reactive({ loading: false, loaded: false });
+const overviewPending = computed(() => overviewState.loading && !overviewState.loaded);
 const alertCount = ref<number | null>(null);
 const summaryFailed = ref(false);
 const anomalyConfigCount = ref<number | null>(null);
@@ -876,6 +948,8 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier);
 const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
+  // outside allSettled: a slow or failed /overview must never hold the page states
+  void loadOverview(force);
   await Promise.allSettled([
     runSection("recentEvents", () => loadHistoryAndSplit(force)),
     runSection("anomalies", () => loadAnomalies(force)),
@@ -888,6 +962,39 @@ const loadAll = async (force = false) => {
   // the refresh button keeps the last good run, so a fresh dot never sits beside the error
   if (!allFailed.value && pageState.value !== "error") lastFetched.value = new Date();
 };
+
+const loadOverview = async (force = false) => {
+  const org = orgId.value;
+  overviewState.loading = true;
+  try {
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: overviewKeys.data(org, OVERVIEW_TOP),
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res = await queryClient.fetchQuery(orgOverviewQuery(org, { refresh: force }));
+    if (org !== orgId.value) return;
+    overview.value = res;
+    overviewFailed.value = false;
+  } catch {
+    if (org !== orgId.value) return;
+    overview.value = null;
+    overviewFailed.value = true;
+  } finally {
+    overviewState.loading = false;
+    overviewState.loaded = true;
+  }
+};
+
+const incidentsTile = computed<IncidentsTile>(() => {
+  if (!incidentsAccess.value.allowed) return "locked";
+  if (!isIncidentsEnabled.value) return "unavailable";
+  if (isSectionPending("incidents")) return "loading";
+  if (isFailed("incidents")) return "error";
+  return "ok";
+});
 
 // only the flag-on page tells "nothing is watched" apart from "all clear"
 const loadAlertCount = async (force = false) => {
@@ -1362,6 +1469,26 @@ const goToAlertList = () => {
 
 const goToAddAlert = () => {
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
+};
+
+const goToPipelines = () => {
+  router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
+};
+
+const goToStreams = () => {
+  router.push({ name: "logstreams", query: { org_identifier: orgId.value } });
+};
+
+const goToIngestion = () => {
+  router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
+};
+
+const onHeadlineSelect = (target: OverviewTarget) => {
+  if (target === "firing" || target === "failing") goToAlertList();
+  else if (target === "pipelines") goToPipelines();
+  else if (target === "streams") goToStreams();
+  else if (incidentsTile.value === "locked") openUpgradeDialog();
+  else goToIncidentList();
 };
 
 const goToIncidentList = () => {

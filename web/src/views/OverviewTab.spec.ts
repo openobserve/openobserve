@@ -55,6 +55,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
     default: { nameList: vi.fn() },
   });
 });
+vi.mock("@/services/overview", () => ({ default: { getOrgOverview: vi.fn() } }));
 vi.mock("@/services/service_graph", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -103,6 +104,8 @@ import anomalyService from "@/services/anomaly_detection";
 import incidentsService from "@/services/incidents";
 import serviceGraphService from "@/services/service_graph";
 import organizationsService from "@/services/organizations";
+import overviewService from "@/services/overview";
+import { buildOverview } from "./overview/overviewFixtures";
 import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
@@ -251,6 +254,9 @@ describe("OverviewTab", () => {
     // computes the same fresh relative window.
     localStorage.removeItem("o2_overview_time");
 
+    vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+      data: buildOverview(),
+    } as never);
     givenNoData();
     givenStreams({ logs: [{ name: "app", stream_type: "logs" }] });
   });
@@ -1247,6 +1253,117 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(false);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
       expect(streamService.nameList).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the overview endpoint cards", () => {
+    const tile = (key: string) => `[data-test="overview-headline-${key}"]`;
+
+    it("should fetch /overview once on mount and render real values", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(overviewService.getOrgOverview).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(overviewService.getOrgOverview).mock.calls[0][1]).toMatchObject({
+        refresh: false,
+      });
+      expect(wrapper.get(tile("firing")).text()).toContain("3");
+      expect(wrapper.get(tile("failing")).text()).toContain("4");
+      expect(wrapper.get(tile("streams")).text()).toContain("7");
+      expect(wrapper.get('[data-test="overview-limit-percent"]').text()).toBe("85.5%");
+    });
+
+    it("should show a skeleton in the strip while /overview is in flight", async () => {
+      const pending = deferred<{ data: unknown }>();
+      vi.mocked(overviewService.getOrgOverview).mockReturnValue(pending.promise as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(5);
+      expect(wrapper.find('[data-test="overview-streams-loading"]').exists()).toBe(true);
+    });
+
+    it("should force the read with refresh=true on the refresh button", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      await wrapper.get(REFRESH_BTN).trigger("click");
+      await flushPromises();
+
+      expect(overviewService.getOrgOverview).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(overviewService.getOrgOverview).mock.calls[1][1]).toMatchObject({
+        refresh: true,
+      });
+    });
+
+    it("should show the error state on every /overview card, keep the rest, and retry with refresh=true", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValueOnce(new Error("boom"));
+      givenRecentEvents();
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      for (const section of ["alerts", "data-health", "streams", "limit"]) {
+        expect(wrapper.find(`[data-test="overview-${section}-error"]`).exists()).toBe(true);
+      }
+      expect(wrapper.get(tile("firing")).text()).toContain("—");
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+
+      await wrapper.get('[data-test="overview-streams-retry-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(vi.mocked(overviewService.getOrgOverview).mock.calls.at(-1)?.[1]).toMatchObject({
+        refresh: true,
+      });
+      expect(wrapper.find('[data-test="overview-streams-error"]').exists()).toBe(false);
+      expect(wrapper.get(tile("firing")).text()).toContain("3");
+    });
+
+    it("should show the limit card as locked on OSS without rendering the API reason", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview({ limits: { status: "locked", reason: "enterprise only, english" } }),
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-limit-locked"]').exists()).toBe(true);
+      expect(wrapper.text()).not.toContain("enterprise only, english");
+    });
+
+    it("should show forbidden on the alerts card for a forbidden section", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview({ alerts: { status: "forbidden" } }),
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-alerts-forbidden"]').exists()).toBe(true);
+    });
+
+    it("should show the start-ingesting empty state for zero streams", async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview({
+          streams: {
+            status: "ok",
+            data: { total_streams: 0, total_storage_size_mb: 0, by_type: [] },
+          },
+        }),
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-streams-empty"]').exists()).toBe(true);
+    });
+
+    it("should lock the incidents tile on a build without the incidents license", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.get(tile("incidents")).text()).toContain("Locked");
     });
   });
 });
