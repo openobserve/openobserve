@@ -33,6 +33,10 @@ export class RumPage {
         this.prettyUnavailableText = page.getByText('Source Maps Not Available');
         this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
 
+        this.traceCard = page.locator('[data-test="error-viewer-trace-correlation"]');
+        this.traceCardViewDetailsBtn = page.locator('[data-test="trace-correlation-card-view-details-btn"]');
+        this.traceCardNotAvailable = page.locator('[data-test="trace-correlation-card-not-available"]');
+
         // Store first error data from query response
         this.firstErrorId = null;
         this.firstErrorTimestamp = null;
@@ -262,6 +266,29 @@ export class RumPage {
         await expect(this.page).toHaveURL(/\/rum\/errors\/view\//, { timeout: 15000 });
         // Detail view readiness: the viewer container is rendered.
         await this.page.waitForSelector(this.errorViewerContainer, { timeout: 15000 });
+    }
+
+    /** Opens one error's detail view directly; `timestampUs` is the error row's _timestamp. */
+    async gotoErrorViewer(errorId, timestampUs, org = process.env.ORGNAME || 'default') {
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${base}/web/rum/errors/view/${errorId}?timestamp=${timestampUs}&org_identifier=${org}`);
+        await this.page.waitForSelector(this.errorViewerContainer, { timeout: 30000 });
+    }
+
+    /** Records the status of every backend-trace search the Distributed Trace card sends; returns the live list. */
+    watchTraceSearches() {
+        const statuses = [];
+        this.page.on('response', (res) => {
+            if (/\/_search\?/.test(res.url()) && res.url().includes('type=traces')) statuses.push(res.status());
+        });
+        return statuses;
+    }
+
+    /** The card found the trace's backend spans: View Trace Details is enabled and the "not yet available" notice is gone. */
+    async expectBackendTraceFound(timeoutMs = 60000) {
+        await expect(this.traceCard).toBeVisible({ timeout: timeoutMs });
+        await expect(this.traceCardViewDetailsBtn).toBeEnabled({ timeout: timeoutMs });
+        await expect(this.traceCardNotAvailable).toHaveCount(0);
     }
 
     // ===== ERROR DETAIL — RAW / PRETTY STACK TRACE TABS =====

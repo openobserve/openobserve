@@ -3,6 +3,9 @@ import { expect } from '@playwright/test';
 const SUB_TABS = ['overview', 'funnels', 'paths', 'retention', 'events'];
 // Only the Trends panel's renderer streams; every other analytics query uses _search.
 const TRENDS_STREAM = /\/api\/[^/]+\/_search_stream(\?|$)/;
+const SEARCH = /\/api\/[^/]+\/_search(\?|$)/;
+// The env/version filter options: the scope resolves identity only after these answer.
+const FACET_SQL = /AS value, COUNT\(DISTINCT session_id\) AS sessions/;
 // PathsFlow.vue's sankey series box: the canvas holds no DOM per box or band, so they are found by these offsets.
 const PATHS_SANKEY = { left: 8, right: 180, nodeWidth: 10 };
 
@@ -116,6 +119,7 @@ export class RumProductAnalyticsPage {
         this.exclusionsDrawer = page.locator('[data-test="rum-analytics-exclusions-drawer"]');
         this.syntheticExcluded = page.locator('[data-test="rum-analytics-app-filters-synthetic"]');
         this.kpiSessions = page.locator('[data-test="rum-analytics-kpi-sessions"]');
+        this.kpiUsersSkeleton = page.locator('[data-test="rum-analytics-kpi-users"] [data-test="o-stat-card-value-skeleton"]');
 
         this.trendsClearBtn = page.locator('[data-test="rum-analytics-trends-clear-btn"]');
         this.trendsLoading = page.locator('[data-test="rum-analytics-trends-loading"]');
@@ -861,6 +865,31 @@ export class RumProductAnalyticsPage {
         };
     }
 
+    /** Holds the filter-option queries until release(), so the summary lands while identity is still unresolved. */
+    async holdFacetQueries() {
+        let open;
+        const gate = new Promise((resolve) => {
+            open = resolve;
+        });
+        const handler = async (route) => {
+            if (FACET_SQL.test(sqlOf(route.request()))) await gate;
+            await route.continue().catch(() => {});
+        };
+        const summaryAnswered = this.page
+            .waitForResponse((res) => SEARCH.test(res.url()) && /va_rows/.test(sqlOf(res.request())), { timeout: 30000 })
+            .then((res) => res.finished());
+        // A caller that fails before awaiting it must not leave an unhandled rejection behind.
+        summaryAnswered.catch(() => {});
+        await this.page.route(SEARCH, handler);
+        return {
+            summaryAnswered,
+            release: async () => {
+                open();
+                await this.page.unroute(SEARCH, handler);
+            },
+        };
+    }
+
     /** The OTooltip `target` shows on hover; reka's role="tooltip" node is visually hidden, so match the content. */
     async tooltipOf(target) {
         await target.hover();
@@ -885,6 +914,13 @@ export class RumProductAnalyticsPage {
 
     async kpiTextSeen() {
         return this.page.evaluate(() => window.__kpiTextSeen === true);
+    }
+
+    /** Each KPI tile (`{ key: label }`, key as in `rum-analytics-kpi-<key>`) shows its label, not only its number. */
+    async expectKpiLabelsVisible(labels) {
+        for (const [key, label] of Object.entries(labels)) {
+            await expect(this.page.locator(`[data-test="rum-analytics-kpi-${key}"]`).getByText(label)).toBeVisible({ timeout: 30000 });
+        }
     }
 
     /** The value a KPI tile shows (e.g. `3`, `2.0`, `50.0%`), or null while it is a skeleton. */

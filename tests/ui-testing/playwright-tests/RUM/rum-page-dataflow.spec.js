@@ -36,6 +36,7 @@ const {
   driveRumSampleInteractions,
   attachCdnAssetTracker,
   isRumSdkReady,
+  skipOnCdnOutage,
 } = require('../utils/rum-traffic.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
 
@@ -178,10 +179,10 @@ test.describe('RUM Page Data Flow', () => {
   test('Sessions page lists the session recorded in this run', {
     tag: ['@rum', '@rumPageDataflow', '@dataflow', '@ui', '@P0'],
   }, async ({ page }) => {
-    test.skip(!sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
+    skipOnCdnOutage(test.info(), !sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
     // Sessions are listed only when their events carry session_has_replay —
     // impossible when the CDN never served the recorder chunk (external).
-    test.skip(!replayCapable, 'CDN recorder chunk unavailable this run (external dependency)');
+    skipOnCdnOutage(test.info(), !replayCapable, 'CDN recorder chunk unavailable this run (external dependency)');
 
     const pm = new PageManager(page);
 

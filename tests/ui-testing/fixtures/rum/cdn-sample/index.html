@@ -17,12 +17,12 @@
   <script>
     (function (h, o, u, n, g) {
       h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
-      var s = o.createElement(u); s.async = 1; s.src = n;
+      var s = o.createElement(u); s.async = 1; s.src = n; s.crossOrigin = 'anonymous';
       var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
     })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.4.3/openobserve-logs.js', 'O2_LOGS');
     (function (h, o, u, n, g) {
       h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
-      var s = o.createElement(u); s.async = 1; s.src = n;
+      var s = o.createElement(u); s.async = 1; s.src = n; s.crossOrigin = 'anonymous';
       var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
     })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.4.3/openobserve-rum.js', 'O2_RUM');
   </script>
