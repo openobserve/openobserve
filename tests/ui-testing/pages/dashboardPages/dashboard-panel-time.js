@@ -371,6 +371,11 @@ export default class DashboardPanelTime {
     if (!clickApply) {
       // A deferred pick leaves no URL change to detect a swallowed force click; the preset's selected class is the only proof it landed.
       await expect(async () => {
+        // A force click on the popper wrapper dismisses the popover, so reopen it before re-picking.
+        if (!(await this.dateTimeMenu.isVisible())) {
+          await this.clickPanelTimePicker(panelId);
+          await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
+        }
         if (!/bg-button-primary!/.test((await timeOptionLocator.getAttribute("class")) ?? "")) {
           await timeOptionLocator.click({ force: true, timeout: 5000 });
         }
