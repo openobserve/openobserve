@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="appOptions"
         size="sm"
         searchable
-        class="w-48 max-md:hidden"
+        class="w-48"
         data-test="rum-heatmap-app-select"
         @update:model-value="onAppChange"
       />
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('rum.heatmap.deviceLabel')"
         :options="deviceOptions"
         size="sm"
-        class="w-36 max-md:hidden"
+        class="w-36"
         data-test="rum-heatmap-device-select"
         @update:model-value="loadPage(false)"
       />
@@ -66,11 +66,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <OEmptyState
-      v-if="!loading && !pageOptions.length"
+      v-if="!loading && !pageOptions.length && !loadError"
       preset="no-data"
       :title="t('rum.heatmap.noPages')"
       data-test="rum-heatmap-empty"
     />
+    <div v-else-if="!loading && !pageOptions.length" class="p-4">
+      <OBanner
+        variant="warning"
+        dense
+        :content="loadError ?? undefined"
+        data-test="rum-heatmap-load-error"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="rum-heatmap-retry-btn"
+            @click="loadApps"
+            >{{ t("common.retry") }}</OButton
+          >
+        </template>
+      </OBanner>
+    </div>
     <div v-else class="flex h-full min-h-0 flex-col">
       <div v-if="summary.clicks" class="shrink-0 px-4 pt-4" data-test="rum-heatmap-stats">
         <OStatStrip :items="statItems" :loading="loading" />
@@ -111,12 +129,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-heatmap-load-error"
           />
           <OBanner
-            v-if="snapshotError && deviceClass === 'all'"
+            v-if="snapshotError"
             variant="info"
             dense
             :content="snapshotError"
             data-test="rum-heatmap-snapshot-error"
           />
+          <span
+            v-if="pagesLimited"
+            class="text-text-secondary text-xs"
+            data-test="rum-heatmap-pages-limited"
+          >
+            {{ t("rum.heatmap.pagesLimited", { count: PAGE_LIST_LIMIT }) }}
+          </span>
+          <span
+            v-if="rankingLimited"
+            class="text-text-secondary text-xs"
+            data-test="rum-heatmap-ranking-limited"
+          >
+            {{ t("rum.heatmap.rankingLimited", { count: RANKING_LIMIT }) }}
+          </span>
           <span class="text-text-secondary text-xs" data-test="rum-heatmap-placed">
             {{ t("rum.heatmap.placed", { placed: placedCount, total: groups.length }) }}
           </span>
@@ -146,6 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTruncatedText v-if="row.name" class="text-text-secondary text-xs">
                   {{ row.selector }}
                 </OTruncatedText>
+                <span
+                  v-if="snapshotReady && row.clicks && !placedSelectors.has(row.selector)"
+                  class="text-text-secondary text-xs"
+                  :data-test="`rum-heatmap-not-on-snapshot-${row.selector}`"
+                >
+                  {{ t("rum.heatmap.notOnPage") }}
+                </span>
               </div>
             </template>
             <template #cell-clicks="{ row, value }">
@@ -185,18 +224,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import {
-  computed,
-  markRaw,
-  nextTick,
-  onActivated,
-  onBeforeUnmount,
-  onDeactivated,
-  onMounted,
-  ref,
-} from "vue";
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -208,7 +239,6 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { addCommasToNumber } from "@/utils/formatters";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { createMultiViewDecoder } from "@/utils/rum/sessionReplayViews";
@@ -231,7 +261,9 @@ import {
 import {
   deviceClause,
   deviceSplitSql,
+  PAGE_LIST_LIMIT,
   pageListSql,
+  RANKING_LIMIT,
   rankingSql,
   totalsSql,
   type DeviceBucket,
@@ -243,7 +275,6 @@ interface ElementRow {
   selector: string;
   name: string;
   feature: string;
-  detail: string;
   clicks: number;
   share: number;
   sessions: number;
@@ -280,7 +311,7 @@ const appId = ref("");
 const appOptions = ref<{ label: ReturnType<typeof raw>; value: string }[]>([]);
 const pageUrl = ref("");
 const pageOptions = ref<{ label: ReturnType<typeof raw>; value: string }[]>([]);
-const loading = ref(false);
+const loading = ref(true);
 const groups = ref<ElementGroup[]>([]);
 const totals = ref({ clicks: 0, sessions: 0, frustrated: 0 });
 const deviceClicks = ref<Partial<Record<DeviceBucket, number>>>({});
@@ -298,10 +329,19 @@ let stageScale = 1;
 let pageSize = { width: 0, height: 0 };
 let resizeObserver: ResizeObserver | null = null;
 const selectedSelector = ref("");
-let deactivated = false;
+const pagesLimited = ref(false);
+const rankingLimited = ref(false);
 let settingsKey = "";
 
-let player: any = null;
+type Row = Record<string, unknown>;
+
+interface ReplayPlayer {
+  getReplayer?: () => { iframe?: HTMLIFrameElement; wrapper?: HTMLElement; destroy?: () => void };
+  $destroy?: () => void;
+  goto: (ms: number, play?: boolean) => void;
+}
+
+let player: ReplayPlayer | null = null;
 let overlay: HTMLCanvasElement | null = null;
 let elementRects = new Map<string, OutlineRect>();
 let loadToken = 0;
@@ -335,12 +375,6 @@ const tableRows = computed<ElementRow[]>(() => [
     selector: g.selector,
     name: g.name,
     feature: g.name || g.selector,
-    detail: [
-      g.name ? g.selector : "",
-      placedSelectors.value.has(g.selector) ? "" : t("rum.heatmap.notOnPage"),
-    ]
-      .filter(Boolean)
-      .join(" · "),
     clicks: g.clicks,
     share: sharePercent(g.clicks, summary.value.clicks),
     sessions: g.sessions,
@@ -417,7 +451,6 @@ const statItems = computed<StatItem[]>(() => {
 
 const tsField = () => store.state.zoConfig.timestamp_column || "_timestamp";
 const org = () => store.state.selectedOrganization.identifier;
-const sqlText = (v: string) => v.replace(/'/g, "''");
 
 const scope = (): AnalyticsScope => ({
   app: appId.value,
@@ -430,22 +463,6 @@ const scope = (): AnalyticsScope => ({
 function windowMicros(hours: number) {
   const end = Date.now() * 1000;
   return { start_time: end - hours * 3_600_000_000, end_time: end };
-}
-
-async function runSql(
-  sql: string,
-  size: number,
-  hours = RANGE_HOURS[rangeKey.value],
-): Promise<any[]> {
-  const res = await searchService.search(
-    {
-      org_identifier: org(),
-      query: { query: { sql, from: 0, size, ...windowMicros(hours) } },
-      page_type: "logs",
-    },
-    "RUM",
-  );
-  return res.data.hits ?? [];
 }
 
 // A null result means a newer request replaced this one, so the caller must drop it.
@@ -468,6 +485,13 @@ async function searchRows<T>(
     throw new Error(res.error?.message || res.status);
   }
   return null;
+}
+
+// Replay lookups go through the shared search so superseding or leaving the page cancels them.
+async function replayRows(id: string, sql: string, limit: number): Promise<Row[]> {
+  const rows = await searchRows<Row>(id, sql, limit, windowMicros(SNAPSHOT_LOOKBACK_HOURS));
+  if (!rows) throw new Error("replay lookup superseded");
+  return rows;
 }
 
 async function ensureSchema() {
@@ -537,11 +561,12 @@ async function loadPages() {
       ? await searchRows<{ view_url: string }>(
           "pages",
           pageListSql(scope()),
-          50,
+          PAGE_LIST_LIMIT,
           windowMicros(RANGE_HOURS[rangeKey.value]),
         )
       : [];
     if (token !== loadToken || !rows) return;
+    pagesLimited.value = rows.length >= PAGE_LIST_LIMIT;
     pageOptions.value = rows.map((h) => ({ label: raw(h.view_url), value: h.view_url }));
     if (!pageOptions.value.some((o) => o.value === pageUrl.value)) {
       pageUrl.value = pageOptions.value[0]?.value ?? "";
@@ -597,12 +622,13 @@ async function loadClicks(token: number, withSplit: boolean) {
         ? searchRows<Record<string, unknown>>("devices", deviceSplitSql(sc, url), 8, win)
         : [],
       searchRows<Record<string, unknown>>("totals", totalsSql(sc, url, deviceClass.value), 1, win),
-      rankSql ? searchRows<Record<string, unknown>>("ranking", rankSql, 500, win) : [],
+      rankSql ? searchRows<Record<string, unknown>>("ranking", rankSql, RANKING_LIMIT, win) : [],
     ]);
     if (token !== loadToken || !split || !tot || !ranked) return;
     if (withSplit) {
       deviceClicks.value = Object.fromEntries(split.map((r) => [r.cls, Number(r.clicks) || 0]));
     }
+    rankingLimited.value = ranked.length >= RANKING_LIMIT;
     const row = tot[0] ?? {};
     totals.value = {
       clicks: Number(row.clicks) || 0,
@@ -627,17 +653,17 @@ interface SnapshotSource {
 async function pickReplayView(): Promise<string | null> {
   const stream = await getStream("_rumdata", "logs", true);
   const hasActions = (stream?.schema ?? []).some((f: any) => f?.name === "view_action_count");
-  const views = await runSql(
+  const views = await replayRows(
+    "replay-views",
     `SELECT view_id, max(${tsField()}) AS t${hasActions ? ", max(view_action_count) AS ac" : ""} FROM "_rumdata" WHERE type = 'view' AND application_id = ${sqlLiteral(appId.value)} AND view_url = ${sqlLiteral(pageUrl.value)}${deviceClause(scope(), deviceClass.value)} GROUP BY view_id ORDER BY ${hasActions ? "ac DESC, " : ""}t DESC LIMIT 30`,
     30,
-    SNAPSHOT_LOOKBACK_HOURS,
   );
   if (!views.length) return null;
-  const ids = views.map((v) => `'${sqlText(String(v.view_id))}'`).join(",");
-  const rows = await runSql(
+  const ids = views.map((v) => sqlLiteral(String(v.view_id))).join(",");
+  const rows = await replayRows(
+    "replay-flags",
     `SELECT has_full_snapshot, view_id FROM "_sessionreplay" WHERE view_id IN (${ids})`,
     MAX_SNAPSHOT_LOOKUP_ROWS,
-    SNAPSHOT_LOOKBACK_HOURS,
   );
   const withSnapshot = new Set(
     rows.filter((r) => isSnapshotFlag(r.has_full_snapshot)).map((r) => String(r.view_id)),
@@ -661,14 +687,14 @@ function decodeReplayEvents(bodies: any[]): any[] {
 async function loadSnapshotSource(): Promise<SnapshotSource | null> {
   const viewId = await pickReplayView();
   if (!viewId) return null;
-  const segments = await runSql(
-    `SELECT start, segment FROM "_sessionreplay" WHERE view_id = '${sqlText(viewId)}' ORDER BY start ASC`,
+  const segments = await replayRows(
+    "replay-segments",
+    `SELECT start, segment FROM "_sessionreplay" WHERE view_id = ${sqlLiteral(viewId)} ORDER BY start ASC`,
     MAX_REPLAY_SEGMENTS,
-    SNAPSHOT_LOOKBACK_HOURS,
   );
   const bodies = segments.flatMap((r) => {
     try {
-      return [JSON.parse(r.segment)];
+      return [JSON.parse(String(r.segment))];
     } catch {
       return [];
     }
@@ -677,10 +703,10 @@ async function loadSnapshotSource(): Promise<SnapshotSource | null> {
   if (!events.length) return null;
   const first = Number(events[0].timestamp);
   const last = Number(events[events.length - 1].timestamp);
-  const [lastClick] = await runSql(
-    `SELECT max(date) AS d FROM "_rumdata" WHERE type = 'action' AND view_id = '${sqlText(viewId)}'`,
+  const [lastClick] = await replayRows(
+    "replay-click",
+    `SELECT max(date) AS d FROM "_rumdata" WHERE type = 'action' AND view_id = ${sqlLiteral(viewId)}`,
     1,
-    SNAPSHOT_LOOKBACK_HOURS,
   );
   const clickAt = Number(lastClick?.d);
   const target = Number.isFinite(clickAt) && clickAt > first ? clickAt : last;
@@ -734,7 +760,7 @@ async function mountPlayer(source: SnapshotSource, width: number, height: number
   );
   await waitForSnapshotDom(token);
   if (token !== loadToken) return;
-  player.goto(source.seekMs, false);
+  player?.goto(source.seekMs, false);
   await new Promise((r) => setTimeout(r, SETTLE_MS));
 }
 
@@ -886,7 +912,6 @@ function findUnusedControls(
       selector: key,
       name: "",
       feature: label,
-      detail: tag,
       clicks: 0,
       share: 0,
       sessions: 0,
@@ -915,12 +940,15 @@ function onRowClick(row: ElementRow) {
   });
 }
 
-onMounted(() => {
-  loadApps();
-  if (scrollerRef.value) {
-    resizeObserver = new ResizeObserver(fitStage);
-    resizeObserver.observe(scrollerRef.value);
-  }
+onMounted(loadApps);
+
+// The scroller only exists once the page list has loaded, so observe it whenever it appears.
+watch(scrollerRef, (el) => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+  if (!el) return;
+  resizeObserver = new ResizeObserver(fitStage);
+  resizeObserver.observe(el);
 });
 
 function cancelLoads() {
@@ -928,15 +956,6 @@ function cancelLoads() {
   search.abortAll();
 }
 
-onDeactivated(() => {
-  deactivated = true;
-  cancelLoads();
-});
-onActivated(() => {
-  if (!deactivated) return;
-  deactivated = false;
-  loadApps();
-});
 onBeforeUnmount(() => {
   cancelLoads();
   resizeObserver?.disconnect();

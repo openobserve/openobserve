@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { cssToken } from "@/utils/theme";
+
 export interface ElementGroup {
   selector: string;
   name: string;
@@ -84,6 +86,9 @@ export function sharePercent(clicks: number, total: number): number {
 const MIN_HEAT_WEIGHT = 0.3;
 const MIN_SPOT_RADIUS = 28;
 const MAX_SPOT_RADIUS = 90;
+const OUTLINE_LINE_WIDTH = 3;
+const OUTLINE_FILL_ALPHA = 0.08;
+const OUTLINE_FALLBACK_COLOR = "#3f7994";
 
 /** Positions are not fetched, so each element glows at its centre, brighter the more it was clicked. */
 export function placeGroup(
@@ -125,10 +130,14 @@ export function drawOutline(canvas: HTMLCanvasElement, rect: OutlineRect): void 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.save();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgb(37, 99, 235)";
-  ctx.fillStyle = "rgba(37, 99, 235, 0.08)";
+  // Canvas cannot use CSS variables, so resolve the token once per draw to follow light and dark mode.
+  const color = cssToken("--color-focus-ring-accent", OUTLINE_FALLBACK_COLOR);
+  ctx.lineWidth = OUTLINE_LINE_WIDTH;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = OUTLINE_FILL_ALPHA;
   ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.globalAlpha = 1;
   ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
   ctx.restore();
 }
