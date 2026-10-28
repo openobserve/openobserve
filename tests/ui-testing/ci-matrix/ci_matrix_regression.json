@@ -60,7 +60,8 @@
       "dashboard-regression.spec.js",
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
-      "dashboard-14479-variable-name-prefix.spec.js"
+      "dashboard-14479-variable-name-prefix.spec.js",
+      "dashboard-3127-shortcut-behind-drawer.spec.js"
     ],
     "disabled": []
   },
@@ -105,7 +106,9 @@
       "traces-15189-saved-views-more-menu.spec.js",
       "traces-15222-string-replay-flag.spec.js",
       "traces-15248-llm-session-reply.spec.js",
-      "traces-15269-services-catalog-state.spec.js"
+      "traces-15269-services-catalog-state.spec.js",
+      "traces-1578-apply-search-same-field.spec.js",
+      "traces-3126-catalog-health-badge.spec.js"
     ],
     "disabled": []
   },
@@ -225,7 +228,8 @@
     "browser": "chrome",
     "run_files": [
       "synthetics-15269-list-state.spec.js",
-      "synthetics-15060-full-text-on-hover.spec.js"
+      "synthetics-15060-full-text-on-hover.spec.js",
+      "synthetics-ent2691-destination-delete-guard.spec.js"
     ],
     "disabled": [],
     "synthetics_enabled": "true",

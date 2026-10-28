@@ -204,6 +204,28 @@ export class TracesPage {
     this.spanBar = '[data-test="span-marker"]';
     this.spanRow = '[data-test="span-block-container"]';
     this.spanBarTrack = '[data-test="span-block-select-trigger"]';
+
+    // Span sidebar → Attributes → Apply & Search (TraceDetailsSidebar.vue)
+    this.sidebarAttributesTab = '[data-test="trace-details-sidebar-tabs-attributes"]';
+    this.sidebarAttributesViewJson = '[data-test="trace-details-sidebar-attributes-view-json"]';
+    this.sidebarAttributesViewTable = '[data-test="trace-details-sidebar-attributes-view-table"]';
+    this.sidebarAttributesTable = '[data-test="trace-details-sidebar-attributes-tenstack-table"]';
+    this.sidebarAttributesJson = '[data-test="trace-details-sidebar-attributes-table"]';
+    this.sidebarServiceName = '[data-test="trace-details-sidebar-header-toolbar-service-name"]';
+    this.sidebarAttributeFieldCell = '[data-test="o2-table-cell-field"]';
+    this.sidebarAttributeRow = '[data-test^="o2-table-row-"]';
+    this.attributeValueDropdownBtn = '[data-test="attribute-value-cell-dropdown-btn"]';
+    this.attributeFilterActionPrefix = 'trace-details-sidebar-attr-filter-action-';
+    this.jsonFilterActionPrefix = 'trace-details-sidebar-json-filter-action-';
+    this.jsonPreviewKeyPrefix = 'json-preview-key-';
+    this.jsonFieldDropdownBtn = '[data-test="json-preview-field-dropdown-btn"]';
+    this.flameGraphCanvas = '[data-test="flame-graph-view-chart-wrapper"] canvas';
+    this.flameGraphSidebar = '[data-test="trace-details-flame-graph-sidebar"]';
+
+    // Run query / Cancel and the result-area states around a cancelled search
+    this.cancelSearchButton = '[data-test="traces-search-bar-cancel-btn"]';
+    this.searchCancelledState = '[data-test="traces-search-cancelled-state"]';
+    this.traceListStreamUrl = '**/traces/latest_stream**';
   }
 
   // Getter methods for common trace elements
@@ -3247,5 +3269,148 @@ export class TracesPage {
 
   async expectWaterfallSpanRow(spanId) {
     await expect(this.page.locator(`${this.spanRow}[id="${spanId}"]`)).toBeVisible({ timeout: 30000 });
+  }
+
+  /** Open the explorer for `streamName` on `tab`; the `stream` param makes the page search on load. */
+  async navigateToTracesTab(streamName, tab = 'traces', period = '15m') {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(
+      `${baseUrl}/web/traces?org_identifier=${org}&stream=${encodeURIComponent(streamName)}&period=${period}&tab=${tab}`,
+    );
+  }
+
+  async expectTraceResultWithOperationName(operationName, timeout = 30000) {
+    await expect(
+      this.page.locator(`${this.searchResultList} ${this.traceRowOperationName}`)
+        .filter({ hasText: operationName })
+        .first(),
+    ).toBeVisible({ timeout });
+  }
+
+  async openTraceResultByOperationName(operationName, attempts = 3) {
+    const onDetails = (url) => /\/traces\/trace-details\?/.test(url.toString());
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      if (onDetails(this.page.url())) return;
+      await this.expectTraceResultWithOperationName(operationName);
+      await this.page.locator(`${this.searchResultList} ${this.traceRowOperationName}`)
+        .filter({ hasText: operationName })
+        .first()
+        .click();
+      // The explorer's own URL sync after a search can supersede the row's push, so an early click can be lost.
+      if (await this.page.waitForURL(onDetails, { timeout: 10000 }).then(() => true).catch(() => false)) return;
+      testLogger.warn(`Trace row "${operationName}" did not open trace details (attempt ${attempt}/${attempts})`, { url: this.page.url() });
+    }
+    expect(onDetails(this.page.url()), `trace row "${operationName}" never opened trace details`).toBe(true);
+  }
+
+  async selectWaterfallSpan(operationName) {
+    expect(await this.openTraceDetailsTab('waterfall'), 'the waterfall tab must exist').toBe(true);
+    expect(
+      await this.clickTraceTreeSpanByOperationName(operationName),
+      `span "${operationName}" must be on the waterfall`,
+    ).toBe(true);
+  }
+
+  /** The flame graph is a canvas; its depth-0 bar is the root span and spans the full chart width at the top. */
+  async selectFlameGraphRootSpan() {
+    expect(await this.openTraceDetailsTab('flame-graph'), 'the flame graph tab must exist').toBe(true);
+    const canvas = this.page.locator(this.flameGraphCanvas).first();
+    await expect(canvas).toBeVisible({ timeout: 15000 });
+    const box = await canvas.boundingBox();
+    expect(box, 'the flame graph canvas must lay out').not.toBeNull();
+    await this.page.mouse.click(box.x + box.width / 2, box.y + 14);
+    await expect(this.page.locator(this.flameGraphSidebar)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSidebarServiceName(serviceName) {
+    await expect(this.page.locator(this.sidebarServiceName).filter({ visible: true }).first())
+      .toHaveText(serviceName, { timeout: 15000 });
+  }
+
+  /** Attributes → Table or JSON → the field's value menu → Apply & Search with `operator`; waits for the explorer. */
+  async applyAndSearchFromSpanAttributes({ field, operator = '=', view = 'table' }) {
+    await this.page.locator(this.sidebarAttributesTab).filter({ visible: true }).first().click();
+    if (view === 'table') {
+      const toggle = this.page.locator(this.sidebarAttributesViewTable).filter({ visible: true }).first();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('data-state', 'on');
+      const fieldCell = this.page.locator(this.sidebarAttributeFieldCell, {
+        hasText: new RegExp(`^\\s*${field}\\s*$`),
+      });
+      const row = this.page.locator(`${this.sidebarAttributesTable} ${this.sidebarAttributeRow}`)
+        .filter({ has: fieldCell })
+        .first();
+      await row.locator(this.attributeValueDropdownBtn).click();
+      await this.page.locator(`[data-test="${this.attributeFilterActionPrefix}${operator}"]`).click();
+    } else {
+      const toggle = this.page.locator(this.sidebarAttributesViewJson).filter({ visible: true }).first();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('data-state', 'on');
+      await this.page.locator(
+        `${this.sidebarAttributesJson} div:has(> [data-test="${this.jsonPreviewKeyPrefix}${field}"]) ${this.jsonFieldDropdownBtn}`,
+      ).first().click();
+      await this.page.locator(`[data-test="${this.jsonFilterActionPrefix}${operator}"]`).click();
+    }
+    await this.page.waitForURL(/\/web\/traces\?/, { timeout: 30000 });
+  }
+
+  /** The explorer query carried in the URL's base64url `query` param, decoded. */
+  getUrlQueryText() {
+    const encoded = new URL(this.page.url()).searchParams.get('query') || '';
+    const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+    return Buffer.from(base64, 'base64').toString('utf8');
+  }
+
+  getUrlSearchTab() {
+    return new URL(this.page.url()).searchParams.get('tab');
+  }
+
+  /** Hold every trace-list search until the returned release() runs, so a running search can be seen and cancelled. */
+  async holdTraceListSearches() {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    await this.page.route(this.traceListStreamUrl, async (route) => {
+      await gate;
+      await route.continue().catch(() => {});
+    });
+    return async () => {
+      release();
+      await this.page.unroute(this.traceListStreamUrl);
+    };
+  }
+
+  async startTraceSearch() {
+    await this.page.locator(this.refreshButton).click();
+  }
+
+  async cancelRunningSearch() {
+    const cancel = this.page.locator(this.cancelSearchButton);
+    await expect(cancel).toBeVisible({ timeout: 15000 });
+    await cancel.click();
+    await expect(cancel).toBeHidden({ timeout: 15000 });
+  }
+
+  async getResultRowCount() {
+    return await this.page.locator(this.searchResultItem).count();
+  }
+
+  async expectNoEventsStateHidden() {
+    await expect(this.page.locator(this.resultNotFoundText)).toHaveCount(0);
+  }
+
+  async expectSearchCancelledStateVisible() {
+    await expect(this.page.locator(this.searchCancelledState)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSearchCancelledStateHidden() {
+    await expect(this.page.locator(this.searchCancelledState)).toHaveCount(0);
+  }
+
+  /** The cancelled state's only button is its Run query card. */
+  async runQueryFromCancelledState() {
+    await this.page.locator(this.searchCancelledState).getByRole('button').click();
   }
 }

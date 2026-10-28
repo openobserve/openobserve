@@ -220,7 +220,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     }
   });
 
-  test("P1: Verify user-service has degraded status and high error rate", {
+  test("P1: Verify user-service shows the Warning or Critical status its high error rate maps to", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Verifying user-service health status ===');
@@ -243,8 +243,8 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const status = await pm.serviceGraphPage.getHealthStatus();
     testLogger.info(`user-service health status: ${status}`);
-    // Should be degraded (>5% error rate) or critical (>10%)
-    expect(['degraded', 'critical']).toContain(status);
+    // Same scale as the node border and the catalog row: >10% Critical, >5% Warning.
+    expect(status).toBe(apiErrorRate > 10 ? 'critical' : 'warning');
 
     await pm.serviceGraphPage.closeSidePanel();
   });
