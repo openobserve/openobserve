@@ -15,14 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    data-test="rum-heatmap-page"
-    :title="t('rum.heatmap.title')"
-    :subtitle="t('rum.heatmap.subtitle')"
-    title-data-test="rum-heatmap-title"
-    icon="insights"
-    bleed
-  >
+  <div class="h-full min-h-0" data-test="rum-heatmap-page">
     <div class="flex h-full min-h-0 flex-col">
       <div
         class="border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5"
@@ -419,13 +412,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </div>
-  </OPageLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

@@ -2006,8 +2006,6 @@
     "errorEventTooltip": "⛔ ERROR: {name}",
     "frustrationSignalType": "Frustration signal: {type}",
     "heatmap": {
-      "title": "Heatmaps",
-      "subtitle": "See where people click on a page",
       "pagePlaceholder": "Select a page",
       "range1h": "Last hour",
       "range24h": "Last 24 hours",
