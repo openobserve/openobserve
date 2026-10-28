@@ -21,10 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       illustration="lock"
       :title="t('featureLock.title', { feature: label })"
       :description="t('featureLock.description')"
-      :action-label="hasLicensePage ? t('featureLock.viewLicense') : undefined"
-      :secondary-action-label="t('featureLock.contactSales')"
-      @action="openLicense"
-      @secondary-action="openContactSales"
+      :action-label="t('featureLock.contactSales')"
+      @action="openContactSales"
     />
   </OPageLayout>
 </template>
@@ -40,7 +38,7 @@ import { LOCKED_FEATURES } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const route = useRoute();
-const { hasLicensePage, openLicense, openContactSales } = useFeatureLockActions();
+const { openContactSales } = useFeatureLockActions();
 
 const meta = computed(() => LOCKED_FEATURES[String(route.params.feature ?? "")]);
 const label = computed(() => (meta.value ? t(meta.value.labelKey) : t("featureLock.thisFeature")));
