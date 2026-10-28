@@ -7,7 +7,7 @@ const errors = {
   timeout: "Could not reach the license server.",
   blocked: "blocked by OpenObserve",
   superseded: "replaced by another license",
-  key_conflict: "registered with another key",
+  key_conflict: "registered with a different registration key",
   refused_by_env: "O2_LICENSE_KEY",
   rev_ignored: "newer key",
   rev_conflict: "different content",
