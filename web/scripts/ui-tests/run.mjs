@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { linkSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { identity } from "./partition.mjs";
@@ -13,13 +13,14 @@ if (command === "matrix") {
   console.log(`ui_shard_count=${shards}`);
 } else if (command === "count") {
   console.log(shards);
-} else if (command === "validate") {
+} else if (command === "validate" || command === "merge") {
   process.env.NODE_ENV = "test";
   const { createVitest } = await import("vitest/node");
   const ctx = await createVitest("test", {
     root,
-    config: join(root, "vitest.config.ts"),
+    config: join(root, command === "merge" ? "vitest.ci.config.ts" : "vitest.config.ts"),
     watch: false,
+    coverage: { enabled: command === "merge" },
   });
   try {
     const files = (await ctx.globTestSpecifications()).map((spec) => identity(spec, root));
@@ -46,16 +47,19 @@ if (command === "matrix") {
     rmSync(merged, { recursive: true, force: true });
     mkdirSync(merged);
     for (const { metadata } of reports) {
-      copyFileSync(
+      linkSync(
         join(directory, `ui-unit-shard-${metadata.index}-${shards}`, "blob.json"),
         join(merged, `blob-${metadata.index}.json`),
       );
     }
+    // Release validation buffers before Vitest deserializes the same blobs.
+    reports.length = 0;
     console.log(JSON.stringify(summary));
     writeFileSync(join(directory, "completeness.json"), JSON.stringify(summary, null, 2));
+    if (command === "merge") await ctx.mergeReports(merged);
   } finally {
     await ctx.close();
   }
 } else {
-  throw new Error("Expected matrix, count or validate");
+  throw new Error("Expected matrix, count, validate or merge");
 }

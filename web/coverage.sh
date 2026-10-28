@@ -64,8 +64,7 @@ cmd_shard() {
 }
 
 cmd_merge() {
-    node scripts/ui-tests/run.mjs validate
-    npm run test:unit:coverage -- --config vitest.ci.config.ts --merge-reports .vitest-reports/merged
+    node scripts/ui-tests/run.mjs merge
     cmd_verify
 }
 

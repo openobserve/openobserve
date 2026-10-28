@@ -62,6 +62,11 @@ export default mergeConfig(
       exclude: [...configDefaults.exclude, "e2e/**"],
       root: fileURLToPath(new URL(".", import.meta.url)),
       isolate: true,
+      deps: {
+        optimizer: {
+          client: { enabled: true, include: ["date-fns", "date-fns-tz"] },
+        },
+      },
       projects: [
         {
           extends: true,

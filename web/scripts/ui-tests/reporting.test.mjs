@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
   mkdtempSync,
+  copyFileSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
   rmSync,
+  renameSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -53,7 +56,7 @@ test(
       }).trim(),
       GITHUB_RUN_ID: "fixture-run",
       GITHUB_RUN_ATTEMPT: "2",
-      UI_TEST_REPORTS_DIRECTORY: join(root, "reports"),
+      UI_TEST_REPORTS_DIRECTORY: join(root, ".vitest-reports"),
       NODE_ENV: "test",
     };
     try {
@@ -66,9 +69,15 @@ test(
       mkdirSync(join(root, "scripts"));
       symlinkSync(join(webRoot, "node_modules"), join(root, "node_modules"), "dir");
       mkdirSync(join(root, "scripts/ui-tests"));
+      for (const name of ["run.mjs", "runtime.mjs", "partition.mjs", "validate.mjs"])
+        copyFileSync(join(webRoot, "scripts/ui-tests", name), join(root, "scripts/ui-tests", name));
+      copyFileSync(join(webRoot, "coverage.sh"), join(root, "coverage.sh"));
       writeFileSync(join(root, "scripts/ui-tests/config.json"), '{"shards":4}');
       writeFileSync(join(root, "package.json"), '{"type":"module"}');
-      writeFileSync(join(root, "src/value.ts"), "export const value = (n: number) => n + 1;");
+      writeFileSync(
+        join(root, "src/value.ts"),
+        "export const value = (n: number) => n > 2 ? n + 1 : 1 + n;",
+      );
       for (const [name, body] of Object.entries({
         a: 'it("passes", () => expect(value(1)).toBe(2));',
         b: `it.skip("skips", () => expect(value(1)).toBe(0));
@@ -119,9 +128,19 @@ test(
           },
         },
       };
-      const renderConfig = () =>
-        `import Sequencer from ${JSON.stringify(join(webRoot, "scripts/ui-tests/sequencer.ts"))}; export default ${JSON.stringify(config).replace(JSON.stringify(join(webRoot, "scripts/ui-tests/sequencer.ts")), "Sequencer")}`;
+      const renderConfig = (value = config) =>
+        `import Sequencer from ${JSON.stringify(join(webRoot, "scripts/ui-tests/sequencer.ts"))}; export default ${JSON.stringify(value).replace(JSON.stringify(join(webRoot, "scripts/ui-tests/sequencer.ts")), "Sequencer")}`;
       writeFileSync(join(root, "vitest.config.ts"), renderConfig());
+      const mergeConfig = structuredClone(config);
+      mergeConfig.test.reporters = ["default"];
+      mergeConfig.test.coverage.reporter = ["json-summary"];
+      mergeConfig.test.coverage.thresholds = {
+        lines: 100,
+        branches: 100,
+        statements: 100,
+        functions: 100,
+      };
+      writeFileSync(join(root, "vitest.ci.config.ts"), renderConfig(mergeConfig));
       const run = (args) =>
         execFileSync(
           process.execPath,
@@ -129,9 +148,10 @@ test(
           { cwd: root, env, stdio: "pipe", timeout: 12000, encoding: "utf8" },
         );
       for (let index = 1; index <= 4; index++) run(["--coverage", "--shard", `${index}/4`]);
-      const reports = readdirSync(join(root, "reports")).map((name) => ({
-        metadata: JSON.parse(readFileSync(join(root, "reports", name, "metadata.json"), "utf8")),
-        blob: readFileSync(join(root, "reports", name, "blob.json")),
+      const directory = join(root, ".vitest-reports");
+      const reports = readdirSync(directory).map((name) => ({
+        metadata: JSON.parse(readFileSync(join(directory, name, "metadata.json"), "utf8")),
+        blob: readFileSync(join(directory, name, "blob.json")),
       }));
       const expected = {
         configDigest: configurationDigest(root),
@@ -182,21 +202,83 @@ test(
       mkdirSync(join(root, "blobs"));
       for (const report of reports)
         writeFileSync(join(root, "blobs", `${report.metadata.index}.json`), report.blob);
-      config.test.reporters = ["default"];
-      config.test.coverage.reporter = ["json-summary"];
-      config.test.coverage.thresholds = {
-        lines: 100,
-        branches: 100,
-        statements: 100,
-        functions: 100,
-      };
-      writeFileSync(join(root, "merge.config.ts"), renderConfig());
-      run(["--config", "merge.config.ts", "--coverage", "--merge-reports", "blobs"]);
+      run(["--config", "vitest.ci.config.ts", "--coverage", "--merge-reports", "blobs"]);
       const summary = JSON.parse(
         readFileSync(join(root, "coverage/coverage-summary.json"), "utf8"),
       );
       assert.ok(summary.total.lines.total > 0);
       assert.equal(summary.total.lines.pct, 100);
+      const merge = () =>
+        execFileSync(process.execPath, [join(root, "scripts/ui-tests/run.mjs"), "merge"], {
+          cwd: root,
+          env,
+          stdio: "pipe",
+          timeout: 12000,
+          encoding: "utf8",
+        });
+      merge();
+      assert.deepEqual(
+        JSON.parse(readFileSync(join(root, "coverage/coverage-summary.json"), "utf8")),
+        summary,
+      );
+      assert.deepEqual(
+        JSON.parse(readFileSync(join(directory, "completeness.json"), "utf8")),
+        validateReports(reports, expected),
+      );
+      const artifact = join(directory, "ui-unit-shard-1-4");
+      assert.equal(
+        statSync(join(artifact, "blob.json")).ino,
+        statSync(join(directory, "merged/blob-1.json")).ino,
+      );
+      merge();
+      renameSync(artifact, join(root, "missing-report"));
+      assert.throws(merge, /Missing shards/);
+      renameSync(join(root, "missing-report"), artifact);
+      const original = readFileSync(join(artifact, "metadata.json"), "utf8");
+      writeFileSync(
+        join(artifact, "metadata.json"),
+        JSON.stringify({ ...JSON.parse(original), attempt: 1 }),
+      );
+      merge();
+      for (const reason of ["failed", "interrupted"]) {
+        writeFileSync(
+          join(artifact, "metadata.json"),
+          JSON.stringify({ ...JSON.parse(original), reason }),
+        );
+        assert.throws(merge, /did not complete with coverage/);
+      }
+      writeFileSync(join(artifact, "metadata.json"), original);
+      const blob = readFileSync(join(artifact, "blob.json"));
+      writeFileSync(join(artifact, "blob.json"), "corrupt");
+      assert.throws(merge, /Corrupt blob/);
+      writeFileSync(join(artifact, "blob.json"), blob);
+      merge();
+      execFileSync("bash", [join(root, "coverage.sh"), "merge"], {
+        cwd: root,
+        env,
+        stdio: "pipe",
+        timeout: 12000,
+      });
+      assert.throws(
+        () =>
+          execFileSync("bash", [join(root, "coverage.sh"), "merge"], {
+            cwd: root,
+            env: { ...env, FRONTEND_COVERAGE_LINES: "101" },
+            stdio: "pipe",
+            timeout: 12000,
+            encoding: "utf8",
+          }),
+        /lines.*below.*threshold/i,
+      );
+      mergeConfig.test.coverage.thresholds.lines = 101;
+      writeFileSync(join(root, "vitest.ci.config.ts"), renderConfig(mergeConfig));
+      for (const report of reports) {
+        writeFileSync(
+          join(directory, `ui-unit-shard-${report.metadata.index}-4/metadata.json`),
+          JSON.stringify({ ...report.metadata, configDigest: configurationDigest(root) }),
+        );
+      }
+      assert.throws(merge, /Coverage for lines.*does not meet global.*threshold/);
       assert.throws(() => validateReports(reports.slice(1), expected), /Missing shards/);
       reports[0].blob = Buffer.from("invalid");
       assert.throws(() => validateReports(reports, expected), /Corrupt blob/);
