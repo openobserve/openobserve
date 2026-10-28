@@ -17152,143 +17152,122 @@
     },
     "quality": {
       "allAgents": "All Agents",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "All agents",
-      "kpisAriaLabel": "Tier 1 KPIs",
-      "dataTypes": {
-        "numericShort": "Num",
-        "categoricalShort": "Cat",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}d ago"
+        }
       },
+      "healthyIf": "Healthy if {rule}",
+      "noHealthyValue": "none",
+      "setThreshold": "Set a healthy threshold",
+      "noScoresInWindow": "No scores in this window",
+      "outOf": "{count} out of {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Score scope",
-        "filterHint": "Compare this Score Config across evaluation target scopes.",
         "all": "All",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Score Results"
-        },
-        "evaluationCost": {
-          "title": "Evaluation Cost"
-        },
-        "scorerSuccess": {
-          "title": "Scorer Success"
-        },
-        "scorerFailures": {
-          "title": "Scorer Failures"
-        },
-        "latencyP95": {
-          "title": "Scorer Latency p95"
-        },
-        "vsPrev": "vs prev",
-        "noPriorData": "no prior data",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
       },
-      "detail": {
-        "loading": "Loading per-config breakdown…",
-        "noData": "No scores yet for this config in this window.",
-        "empty": {
-          "title": "Waiting for your first scores",
-          "titleScoped": "No {scope} scores in this window",
-          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs.",
-          "descriptionScoped": "No {scope} scores have landed for this config in the selected time range. Choose another scope or widen the time range."
-        },
-        "trendTitle": "Trend",
-        "distributionTitle": "Score distribution",
-        "categoryDistributionTitle": "Category distribution",
-        "healthyRateTitle": "Healthy rate over time",
-        "trueRateTitle": "True rate over time",
-        "trueFalseTitle": "True vs False",
-        "legendAvg": "Avg",
-        "legendThreshold": "threshold {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "healthy {direction} {value}",
-        "healthyThreshold": "Healthy {threshold}",
-        "legendHealthy": "healthy",
-        "legendUnhealthy": "unhealthy",
-        "legendHealthyRate": "Healthy rate",
-        "legendTrueRate": "True rate",
-        "legendTrueCount": "true ({count})",
-        "legendFalseCount": "false ({count})",
-        "kpis": {
-          "average": "Average",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Unhealthy",
-          "healthy": "Healthy",
-          "trueRate": "True rate",
-          "falseRate": "False rate",
-          "coverage": "Coverage",
-          "targetsScored": "Targets scored"
-        },
-        "health": {
-          "title": "Health status",
-          "noThreshold": "No healthy threshold is configured. Scores cannot be classified as healthy or degrading yet.",
-          "thresholdOnly": "Healthy if {threshold}",
-          "summary": "{percent}% below threshold · Healthy if {threshold}"
-        },
-        "ofScoreResults": "of {count} score results",
-        "range": "Range {min}–{max}"
+      "tiles": {
+        "attention": "Configs needing attention",
+        "ofTotal": "of {total}",
+        "attentionNote": "Show them",
+        "attentionTooltip": "Configs with at least one unhealthy score",
+        "withoutResult": "Configs without a result",
+        "withoutResultTooltip": "Configs with no scores in this time range, or without a healthy threshold. Click to show them.",
+        "noScores": "{count} got no scores | {count} got no scores",
+        "noThreshold": "{count} has no threshold | {count} have no threshold",
+        "allGiveResult": "Every config gives a result"
       },
-      "runs": {
-        "title": "Evaluation scores",
-        "hint": "Scores and reasoning come from _llm_scores. Select a run to open its evaluator trace for further investigation.",
-        "filterLabel": "Filter evaluation scores",
-        "noThresholdHint": "Set a healthy threshold on this Score Config to classify and highlight unhealthy scores.",
-        "noReasoning": "No reasoning recorded",
-        "unknownAgent": "Unknown agent",
-        "unknownScope": "Unknown scope",
-        "queryError": "Evaluation scores could not be refreshed. The last successful page is still shown.",
-        "empty": "No evaluation scores in this time range.",
-        "emptyUnhealthy": "No unhealthy scores in this time range.",
-        "filters": {
-          "all": "All scores",
-          "unhealthy": "Unhealthy"
-        },
-        "health": {
-          "healthy": "Healthy",
-          "unhealthy": "Unhealthy"
-        },
-        "columns": {
-          "time": "Evaluated",
-          "result": "Score",
-          "reasoning": "Reasoning",
-          "target": "Target",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filter configs…",
-        "relativeTime": {
-          "daysAgo": "{day}d ago",
-          "monthsAgo": "{month}mo ago"
-        },
-        "status": {
-          "healthy": "Healthy",
-          "unhealthy": "Needs attention",
-          "noThreshold": "Threshold not set",
-          "noData": "No score data"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% below · Healthy if {threshold}",
-          "noThresholdHint": "Set a healthy threshold",
-          "noDataHint": "No scores in this window"
-        },
+        "openUnhealthy": "Open the unhealthy scores",
+        "configLink": "Config",
+        "averageRange": "average, {min} to {max}",
+        "mostCommon": "most common · {count} of {total}",
         "columns": {
-          "health": "Health",
           "scoreConfig": "Score Config",
-          "type": "Type",
-          "quality": "Quality",
-          "totalScores": "Total Scores",
-          "scopeMix": "Scope Mix",
-          "volumeTrend": "Volume Trend",
+          "health": "Health",
+          "typicalScore": "Typical score",
+          "unhealthy": "Unhealthy",
+          "scores": "Scores",
           "updated": "Updated"
         }
       },
-      "averageWithHealthyRate": "Average · {rate}% healthy"
+      "detail": {
+        "back": "All configs",
+        "backToAll": "Back to all configs",
+        "editConfig": "Edit config",
+        "notFound": "Score Config not found",
+        "notFoundDescription": "It may have been deleted, or the link points to an old config.",
+        "emptyTitle": "Waiting for your first scores",
+        "emptyTitleScoped": "No {scope} scores in this window",
+        "emptyDescription": "No scores landed for this config in the selected time range. They appear here once a scorer that uses it runs.",
+        "distributionNumeric": "Score distribution",
+        "distributionValues": "Value distribution",
+        "averageValue": "average {value}",
+        "legendHealthy": "Healthy",
+        "legendUnhealthy": "Unhealthy",
+        "legendScores": "Scores",
+        "chartTooltip": "{count} score, {unhealthy} unhealthy | {count} scores, {unhealthy} unhealthy",
+        "chartTooltipCount": "{count} score | {count} scores",
+        "trendTitle": {
+          "score": "Trend",
+          "healthyRate": "Healthy rate over time",
+          "trueRate": "True rate over time",
+          "count": "Scores over time"
+        },
+        "trendLegend": {
+          "healthyRate": "Healthy rate",
+          "trueRate": "True rate",
+          "count": "Scores"
+        },
+        "legendAvg": "Avg",
+        "legendThreshold": "threshold {direction} {value}",
+        "markLineHealthy": "healthy {direction} {value}",
+        "filterRange": "{from} to {to}",
+        "filterBelow": "Below {to}",
+        "filterAtLeast": "{from} or more",
+        "filterAny": "Any value",
+        "filterByBar": "Filter scores by value",
+        "barButton": "{label}: {count} score | {label}: {count} scores",
+        "clearFilter": "Clear filter"
+      },
+      "review": {
+        "title": "Evaluation scores",
+        "all": "All",
+        "unhealthy": "Unhealthy",
+        "unhealthyDisabled": "Set a healthy threshold to classify scores",
+        "inputNotCaptured": "Input not captured",
+        "outputNotCaptured": "Output not captured",
+        "noMatch": "No scores match this filter"
+      },
+      "pane": {
+        "noneSelected": "No score selected",
+        "healthy": "Healthy",
+        "unhealthy": "Unhealthy",
+        "noThreshold": "No healthy threshold set",
+        "previous": "Previous score",
+        "next": "Next score",
+        "reasoning": "Reasoning",
+        "noReasoning": "No reasoning recorded",
+        "fullTextUnavailable": "Showing a short preview. The full trace could not be loaded.",
+        "open": {
+          "span": "Open span",
+          "trace": "Open trace",
+          "session": "Open session"
+        },
+        "evaluatorTrace": "Evaluator trace",
+        "addToDataset": "Add to dataset",
+        "datasetSession": "Datasets take a single trace or span. Open the session to add one of its traces.",
+        "datasetNoStream": "This score has no source stream to add from."
+      }
     },
     "singular": {
       "jobs": "Eval Job",
@@ -18004,22 +17983,18 @@
       }
     },
     "importCount": "Import ({count})",
-    "count": "Count",
     "failedToDeriveSchema": "Failed to derive schema",
     "failedToImportScoreConfig": "Failed to import score config",
     "failedToImportScorer": "Failed to import scorer",
     "failedToFetchCatalog": "Failed to fetch catalog ({status})",
     "failedToLoadCatalog": "Failed to load catalog",
     "failedToRunScorerTest": "Failed to run scorer test",
-    "healthyRate": "Healthy rate",
     "invalidJsonFormat": "Invalid JSON format",
     "jsonIsEmpty": "JSON is empty",
     "scorerTestFailed": "Scorer test failed",
     "scorerTestSampleContext": "France country profile: Paris is the capital city.",
     "scorerTestSampleInput": "The capital of France is Paris, located on the Seine river.",
     "scorerTestSampleOutput": "Paris is the capital of France.",
-    "topCategory": "Top category",
-    "trueRate": "True rate",
     "unknownError": "Unknown error",
     "import": {
       "createdSuccessfully": "\"{name}\" created successfully",
@@ -20189,6 +20164,7 @@
       "evalTemplates": "Online Evals — Templates",
       "scorers": "Online Evals — Scorers",
       "evalJobs": "Online Evals — Jobs",
+      "quality": "Online Evals — Quality",
       "scoreConfigs": "Online Evals — Score Configs",
       "actions": "Actions",
       "llmProviders": "LLM Providers",
@@ -20304,6 +20280,7 @@
       "evalTemplatesRefresh": "Refresh list",
       "scorersRefresh": "Refresh list",
       "evalJobsRefresh": "Refresh list",
+      "qualityBack": "Back to all configs",
       "scoreConfigsRefresh": "Refresh list",
       "actionsRefresh": "Refresh list",
       "llmProvidersRefresh": "Refresh list",
@@ -20350,7 +20327,9 @@
       "loading": "Loading"
     },
     "stepper": {
-      "steps": "Steps"
+      "steps": "Steps",
+      "stepOf": "Step {current} of {total}",
+      "swipeHint": "swipe to see the rest"
     },
     "attributeValueCell": {
       "addIcon": "Add icon"
@@ -20550,11 +20529,10 @@
         "high": "High"
       },
       "qualityStatus": {
-        "nothreshold": "No Threshold",
-        "nodata": "No Data",
+        "attention": "Needs attention",
         "healthy": "Healthy",
-        "warn": "Warn",
-        "unhealthy": "Unhealthy"
+        "unset": "Threshold not set",
+        "nodata": "No score data"
       },
       "rumEventType": {
         "longtask": "Long Task",
@@ -26470,8 +26448,11 @@
       "columnResult": "Result",
       "failedSummary": "{failed} of {total} failed · fix in the server environment, restart, then Re-check",
       "allPassed": "Every prerequisite passes",
+      "requiredPass": "All required checks pass",
+      "warningCount": "{count} warning | {count} warnings",
+      "canContinue": "you can continue",
       "recheck": "Re-check",
-      "helmHint": "Installed without Helm? Set {variable}, restart, then Re-check.",
+      "helmHint": "Installed without Helm? Set it in the server environment, restart, then Re-check.",
       "loadFailed": "The prerequisite checks could not run.",
       "names": {
         "master_key": "Encryption key",
@@ -26487,8 +26468,21 @@
     },
     "connect": {
       "title": "Connect a Slack workspace",
-      "description": "Your team asks OpenObserve questions without leaving Slack",
-      "featureQuestions": "Ask questions; answers use your own permissions",
+      "description": "Your team asks OpenObserve questions from Slack and gets answers with their own permissions.",
+      "descriptionSelfHosted": "Your team asks OpenObserve questions from Slack and gets answers with their own permissions. OpenObserve creates and installs your own Slack app; nothing is shared with a third party.",
+      "nextTitle": "What happens next · about {minutes} minutes",
+      "stepCheckTitle": "Check this server",
+      "stepCheckDetail": "Encryption key, web URL and AI agent are verified before anything touches Slack",
+      "stepCheckDetailShort": "Encryption key, web URL and AI agent",
+      "stepCreateTitle": "Create the app",
+      "stepCreateDetail": "Paste one configuration token from Slack; OpenObserve builds the app for you",
+      "stepCreateDetailShort": "Paste one configuration token from Slack",
+      "stepInstallTitle": "Install and link people",
+      "stepInstallDetail": "Allow it in Slack, pick the alerts channel, then link Slack members to OpenObserve users",
+      "stepInstallDetailShort": "Allow it in Slack, then link members",
+      "stepAddTitle": "Add to Slack",
+      "stepLinkTitle": "Link people",
+      "stepLinkDetail": "Slack members are linked to OpenObserve users by email domain; everyone else links with one click",
       "addToSlack": "Add to Slack",
       "popupHint": "Opens Slack in a popup: pick a channel for alerts, then Allow",
       "permissionHint": "Needs the Manage Slack permission · org Admins have it by default",
@@ -26496,7 +26490,6 @@
       "consentPrivate": "Two-way Slack also reads your direct messages with OpenObserve. It reads channel messages only when you mention {'@'}OpenObserve.",
       "consentPending": "Slack lists what {product} can access before you allow it.",
       "setupApp": "Set up Slack app",
-      "selfHostedHint": "OpenObserve creates your own Slack app from one configuration token",
       "upgradeTitle": "Already sending alerts to Slack? Upgrade to two-way Slack",
       "upgradeDetail": "{team} · no webhook destination changes · adds questions now | {team} · {count} webhook destination keeps working · adds questions now | {team} · {count} webhook destinations keep working · adds questions now",
       "upgradeButton": "Upgrade to two-way Slack",
@@ -26549,7 +26542,7 @@
         "tokenHelp": "On Slack's Your Apps page, Your App Configuration Tokens › Generate Token shows an access token and a refresh token: paste the refresh token. OpenObserve rotates it and keeps the newest one encrypted to update the app later.",
         "generateToken": "Generate a token",
         "createButton": "Create the app",
-        "manual": "Set up manually",
+        "manualLink": "No configuration token? Set up manually",
         "manualHelp": "Opens Slack's create page with the manifest pre-filled, then asks for the app's credentials from its Basic Information page. Install still goes through Allow, so the bot token is never pasted.",
         "openManifest": "Open Slack with the manifest",
         "clientId": "Client ID",
@@ -26558,6 +26551,9 @@
         "appToken": "App-level token (Socket Mode)",
         "saveManual": "Save credentials",
         "useToken": "Use a configuration token instead",
+        "unreachableTitle": "Couldn't reach OpenObserve. Nothing was created.",
+        "unreachableDetail": "The request to this server got no answer, so nothing was sent to Slack. Check that this tab's address matches the server (http vs https) and that the server is up, then try again.",
+        "noResponse": "{request} · no response",
         "tokenRequired": "Paste the configuration refresh token",
         "clientIdRequired": "Enter the client ID",
         "clientSecretRequired": "Enter the client secret",
@@ -26609,6 +26605,8 @@
       "mappedSummary": "Automatic for {domains} · from your organization's domain mapping",
       "mappedReadonly": "Mapped domains are read-only here; OpenObserve support changes the mapping. Turning linking off is still yours.",
       "manualSummary": "Automatic for {domains}",
+      "noDomains": "On, but no domains: nobody is linked automatically",
+      "skippedDomain": "{count} member skipped: their email domain is not listed | {count} members skipped: their email domain is not listed",
       "offSummary": "Off · people link with one click when they first ask",
       "domains": "Domains",
       "editDomains": "Edit domains",
@@ -26701,18 +26699,18 @@
         "destination": "From an alert destination"
       },
       "empty": "No channel has a default org yet",
-      "emptyDescription": "Questions in a channel without a default go to the earliest connected org.",
+      "emptyDescription": "Questions in a channel without a default go to each person's default org (they can change it with /o2 org).",
       "channel": "Channel",
       "channelPlaceholder": "Search channels",
       "channelRequired": "Pick a channel",
-      "privateHint": "Private channels appear after /invite {'@'}OpenObserve",
+      "privateHint": "Private channels appear after /invite {'@'}OpenObserve; a new channel can take up to 10 minutes to show",
       "loadMore": "Load more channels",
       "saveFailed": "The channel default could not be saved.",
       "answers": "Answers",
       "edit": "Edit",
       "remove": "Remove",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in {name} then go to the earliest connected org.",
+      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with /o2 org).",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",

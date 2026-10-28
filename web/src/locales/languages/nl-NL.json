@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "Alle Agents",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "Alle agenten",
-      "kpisAriaLabel": "Tier 1 KPI's",
-      "dataTypes": {
-        "numericShort": "Getal",
-        "categoricalShort": "Categorie",
-        "booleanShort": "Boolean"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}d geleden"
+        }
       },
+      "healthyIf": "Gezond als {rule}",
+      "noHealthyValue": "geen",
+      "setThreshold": "Stel een gezonde drempelwaarde in",
+      "noScoresInWindow": "Geen scores in dit venster",
+      "outOf": "{count} van {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Scorebereik",
-        "filterHint": "Vergelijk deze Scoreconfiguratie over evaluatiedoelbereiken heen.",
         "all": "Alle",
         "span": "Span",
         "trace": "Trace",
         "session": "Sessie"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Scoreresultaten"
-        },
-        "evaluationCost": {
-          "title": "Evaluatiekosten"
-        },
-        "scorerSuccess": {
-          "title": "Geslaagde scorers"
-        },
-        "scorerFailures": {
-          "title": "Mislukte scorers"
-        },
-        "latencyP95": {
-          "title": "Scorer-latentie p95"
-        },
-        "vsPrev": "versus de vorige",
-        "noPriorData": "geen eerdere gegevens",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "sessie"
       },
-      "detail": {
-        "loading": "Uitsplitsing per configuratie wordt geladen...",
-        "noData": "Nog geen scores voor deze configuratie in dit venster.",
-        "empty": {
-          "title": "Wachten op je eerste scores",
-          "titleScoped": "Geen {scope} scores in dit venster",
-          "description": "Er zijn nog geen scores binnengekomen voor deze configuratie in het geselecteerde tijdsbereik. Ze verschijnen hier automatisch zodra een scorer die deze gebruikt wordt uitgevoerd.",
-          "descriptionScoped": "Er zijn geen {scope} scores voor deze configuratie in het geselecteerde tijdsbereik. Kies een andere scope of vergroot het tijdsbereik."
-        },
-        "trendTitle": "Trend",
-        "distributionTitle": "Scoreverdeling",
-        "categoryDistributionTitle": "Distributie van categorieën",
-        "healthyRateTitle": "Gezondheidspercentage in de tijd",
-        "trueRateTitle": "Waarheidspercentage in de tijd",
-        "trueFalseTitle": "Waar versus onwaar",
-        "legendAvg": "Gem",
-        "legendThreshold": "drempel {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "gezond {direction} {value}",
-        "healthyThreshold": "Gezond {threshold}",
-        "legendHealthy": "gezond",
-        "legendUnhealthy": "ongezond",
-        "legendHealthyRate": "Gezondheidspercentage",
-        "legendTrueRate": "Waarheidspercentage",
-        "legendTrueCount": "waar ({count})",
-        "legendFalseCount": "onwaar ({count})",
-        "kpis": {
-          "average": "Gemiddeld",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Ongezond",
-          "healthy": "Gezond",
-          "trueRate": "Waarheidspercentage",
-          "falseRate": "Onwaarheidspercentage",
-          "coverage": "Dekking",
-          "targetsScored": "Doelen gescoord"
-        },
-        "health": {
-          "title": "Gezondheidsstatus",
-          "noThreshold": "Er is geen gezonde drempel geconfigureerd. Scores kunnen nog niet worden geclassificeerd als gezond of verslechterend.",
-          "thresholdOnly": "Gezond als {threshold}",
-          "summary": "{percent}% onder drempel · Gezond als {threshold}"
-        },
-        "ofScoreResults": "van {count} scoreresultaten",
-        "range": "Bereik {min}–{max}"
+      "tiles": {
+        "attention": "Configuraties die aandacht vereisen",
+        "ofTotal": "van {total}",
+        "attentionNote": "Toon ze",
+        "attentionTooltip": "Configuraties met minstens één ongezonde score",
+        "withoutResult": "Configuraties zonder resultaat",
+        "withoutResultTooltip": "Configuraties zonder scores in dit tijdsbereik, of zonder gezonde drempelwaarde. Klik om ze te tonen.",
+        "noScores": "{count} kreeg geen scores | {count} kregen geen scores",
+        "noThreshold": "{count} heeft geen drempelwaarde | {count} hebben geen drempelwaarde",
+        "allGiveResult": "Elke configuratie geeft een resultaat"
       },
-      "runs": {
-        "title": "Evaluatiescores",
-        "hint": "Scores en redeneringen komen van _llm_scores. Selecteer een run om de evaluatortrace te openen voor verder onderzoek.",
-        "filterLabel": "Filter evaluatiescores",
-        "noThresholdHint": "Stel een gezonde drempel in op deze Scoreconfiguratie om ongezonde scores te classificeren en te markeren.",
-        "noReasoning": "Geen onderbouwing vastgelegd",
-        "unknownAgent": "Onbekende agent",
-        "unknownScope": "Onbekend bereik",
-        "queryError": "Evaluatiescores konden niet worden vernieuwd. De laatste succesvolle pagina wordt nog getoond.",
-        "empty": "Geen evaluatiescores in dit tijdsbereik.",
-        "emptyUnhealthy": "Geen ongezonde scores in dit tijdsbereik.",
-        "filters": {
-          "all": "Alle scores",
-          "unhealthy": "Ongezond"
-        },
-        "health": {
-          "healthy": "Gezond",
-          "unhealthy": "Ongezond"
-        },
-        "columns": {
-          "time": "Geëvalueerd",
-          "result": "Score",
-          "reasoning": "Redenering",
-          "target": "Doelwit",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Configuraties filteren…",
-        "relativeTime": {
-          "daysAgo": "{day}d geleden",
-          "monthsAgo": "{month}ma geleden"
-        },
-        "status": {
-          "healthy": "Gezond",
-          "unhealthy": "Aandacht nodig",
-          "noThreshold": "Drempel niet ingesteld",
-          "noData": "Geen scoregegevens"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% onder · Gezond als {threshold}",
-          "noThresholdHint": "Stel een gezonde drempel in",
-          "noDataHint": "Geen scores in dit venster"
-        },
+        "openUnhealthy": "Open de ongezonde scores",
+        "configLink": "Configuratie",
+        "averageRange": "gemiddelde, {min} tot {max}",
+        "mostCommon": "meest voorkomend · {count} van {total}",
         "columns": {
-          "health": "Gezondheid",
           "scoreConfig": "Scoreconfiguratie",
-          "type": "Typ",
-          "quality": "Kwaliteit",
-          "totalScores": "Totale scores",
-          "scopeMix": "Bereikmix",
-          "volumeTrend": "Volumetrend",
+          "health": "Gezondheid",
+          "typicalScore": "Typische score",
+          "unhealthy": "Ongezond",
+          "scores": "Scores",
           "updated": "Bijgewerkt"
         }
       },
-      "averageWithHealthyRate": "Gemiddelde · {rate}% gezond"
+      "detail": {
+        "back": "Alle configuraties",
+        "backToAll": "Terug naar alle configuraties",
+        "editConfig": "Configuratie bewerken",
+        "notFound": "Scoreconfiguratie niet gevonden",
+        "notFoundDescription": "Deze is mogelijk verwijderd, of de link verwijst naar een oude configuratie.",
+        "emptyTitle": "Wachten op je eerste scores",
+        "emptyTitleScoped": "Geen {scope}-scores in dit venster",
+        "emptyDescription": "Er zijn geen scores binnengekomen voor deze configuratie in het geselecteerde tijdsbereik. Ze verschijnen hier zodra een scorer die deze gebruikt draait.",
+        "distributionNumeric": "Scoreverdeling",
+        "distributionValues": "Waardeverdeling",
+        "averageValue": "gemiddelde {value}",
+        "legendHealthy": "Gezond",
+        "legendUnhealthy": "Ongezond",
+        "legendScores": "Scores",
+        "chartTooltip": "{count} score, {unhealthy} ongezond | {count} scores, {unhealthy} ongezond",
+        "chartTooltipCount": "{count} score | {count} scores",
+        "trendTitle": {
+          "score": "Trend",
+          "healthyRate": "Gezondheidsgraad in de tijd",
+          "trueRate": "Ware graad in de tijd",
+          "count": "Scores in de tijd"
+        },
+        "trendLegend": {
+          "healthyRate": "Gezondheidsgraad",
+          "trueRate": "Waarheidspercentage",
+          "count": "Scores"
+        },
+        "legendAvg": "Gem",
+        "legendThreshold": "drempel {direction} {value}",
+        "markLineHealthy": "gezond {direction} {value}",
+        "filterRange": "{from} tot {to}",
+        "filterBelow": "Onder {to}",
+        "filterAtLeast": "{from} of meer",
+        "filterAny": "Elke waarde",
+        "filterByBar": "Scores filteren op waarde",
+        "barButton": "{label}: {count} score | {label}: {count} scores",
+        "clearFilter": "Filter wissen"
+      },
+      "review": {
+        "title": "Evaluatiescores",
+        "all": "Alle",
+        "unhealthy": "Ongezond",
+        "unhealthyDisabled": "Stel een gezonde drempelwaarde in om scores te classificeren",
+        "inputNotCaptured": "Invoer niet vastgelegd",
+        "outputNotCaptured": "Uitvoer niet vastgelegd",
+        "noMatch": "Geen scores voldoen aan dit filter"
+      },
+      "pane": {
+        "noneSelected": "Geen score geselecteerd",
+        "healthy": "Gezond",
+        "unhealthy": "Ongezond",
+        "noThreshold": "Geen gezonde drempelwaarde ingesteld",
+        "previous": "Vorige score",
+        "next": "Volgende score",
+        "reasoning": "Redenering",
+        "noReasoning": "Geen redenering vastgelegd",
+        "fullTextUnavailable": "Een korte preview wordt getoond. De volledige trace kon niet worden geladen.",
+        "open": {
+          "span": "Span openen",
+          "trace": "Trace openen",
+          "session": "Sessie openen"
+        },
+        "evaluatorTrace": "Trace van de evaluator",
+        "addToDataset": "Toevoegen aan dataset",
+        "datasetSession": "Datasets nemen één trace of span. Open de sessie om een van de traces toe te voegen.",
+        "datasetNoStream": "Deze score heeft geen bron-stream om uit toe te voegen."
+      }
     },
     "singular": {
       "jobs": "Eval Job",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "Import ({count})",
-    "count": "Aantal",
     "failedToDeriveSchema": "Kan schema niet afleiden",
     "failedToImportScoreConfig": "Kan scoreconfiguratie niet importeren",
     "failedToImportScorer": "Kan scorer niet importeren",
     "failedToFetchCatalog": "Kan catalogus niet ophalen ({status})",
     "failedToLoadCatalog": "Kan catalogus niet laden",
     "failedToRunScorerTest": "Kan scorer-test niet uitvoeren",
-    "healthyRate": "Gezondheidspercentage",
     "invalidJsonFormat": "Ongeldig JSON-formaat",
     "jsonIsEmpty": "JSON is leeg",
     "scorerTestFailed": "Scorer-test mislukt",
     "scorerTestSampleContext": "France landprofiel: Paris is de hoofdstad.",
     "scorerTestSampleInput": "De hoofdstad van France is Paris, gelegen aan de rivier de Seine.",
     "scorerTestSampleOutput": "Paris is de hoofdstad van France.",
-    "topCategory": "Topcategorie",
-    "trueRate": "Werkelijk percentage",
     "unknownError": "Onbekende fout",
     "import": {
       "createdSuccessfully": "\"{name}\" is succesvol aangemaakt",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "Online evaluaties — Sjablonen",
       "scorers": "Online evaluaties — Scorers",
       "evalJobs": "Online evaluaties — Jobs",
+      "quality": "Online Evals — Kwaliteit",
       "scoreConfigs": "Online evaluaties — Score-configuraties",
       "actions": "Acties",
       "llmProviders": "LLM-aanbieders",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "Lijst verversen",
       "scorersRefresh": "Lijst verversen",
       "evalJobsRefresh": "Lijst verversen",
+      "qualityBack": "Terug naar alle configuraties",
       "scoreConfigsRefresh": "Lijst verversen",
       "actionsRefresh": "Lijst verversen",
       "llmProvidersRefresh": "Lijst verversen",
@@ -20352,7 +20329,9 @@
       "loading": "Laden"
     },
     "stepper": {
-      "steps": "Stappen"
+      "steps": "Stappen",
+      "stepOf": "Stap {current} van {total}",
+      "swipeHint": "veeg om de rest te zien"
     },
     "attributeValueCell": {
       "addIcon": "Pictogram toevoegen"
@@ -20552,11 +20531,10 @@
         "high": "Hoog"
       },
       "qualityStatus": {
-        "nothreshold": "Geen drempelwaarde",
-        "nodata": "Geen gegevens",
+        "attention": "Vereist aandacht",
         "healthy": "Gezond",
-        "warn": "Waarschuwing",
-        "unhealthy": "Ongezond"
+        "unset": "Drempelwaarde niet ingesteld",
+        "nodata": "Geen scoregegevens"
       },
       "rumEventType": {
         "longtask": "Lange taak",
@@ -26472,8 +26450,11 @@
       "columnResult": "Resultaat",
       "failedSummary": "{failed} van {total} mislukt · los dit op in de serveromgeving, herstart en klik dan op Opnieuw controleren",
       "allPassed": "Alle vereisten zijn voldaan",
+      "requiredPass": "Alle vereiste controles zijn geslaagd",
+      "warningCount": "{count} waarschuwing | {count} waarschuwingen",
+      "canContinue": "je kunt doorgaan",
       "recheck": "Opnieuw controleren",
-      "helmHint": "Zonder Helm geïnstalleerd? Stel {variable} in, herstart en klik dan op Opnieuw controleren.",
+      "helmHint": "Zonder Helm geïnstalleerd? Stel het in de serveromgeving in, herstart en controleer daarna opnieuw.",
       "loadFailed": "De controle van de vereisten kon niet worden uitgevoerd.",
       "names": {
         "master_key": "Versleutelingssleutel",
@@ -26489,8 +26470,21 @@
     },
     "connect": {
       "title": "Een Slack-workspace koppelen",
-      "description": "Je team stelt OpenObserve-vragen zonder Slack te verlaten",
-      "featureQuestions": "Stel vragen; antwoorden gebruiken je eigen machtigingen",
+      "description": "Je team stelt vanuit Slack vragen aan OpenObserve en krijgt antwoorden met hun eigen machtigingen.",
+      "descriptionSelfHosted": "Je team stelt vanuit Slack vragen aan OpenObserve en krijgt antwoorden met hun eigen machtigingen. OpenObserve maakt en installeert je eigen Slack-app; er wordt niets met een derde partij gedeeld.",
+      "nextTitle": "Wat er nu gebeurt · ongeveer {minutes} minuten",
+      "stepCheckTitle": "Controleer deze server",
+      "stepCheckDetail": "Versleutelingssleutel, web-URL en AI-agent worden geverifieerd voordat er iets met Slack gebeurt",
+      "stepCheckDetailShort": "Versleutelingssleutel, web-URL en AI-agent",
+      "stepCreateTitle": "Maak de app aan",
+      "stepCreateDetail": "Plak één configuratietoken uit Slack; OpenObserve bouwt de app voor je",
+      "stepCreateDetailShort": "Plak één configuratietoken uit Slack",
+      "stepInstallTitle": "Installeren en personen koppelen",
+      "stepInstallDetail": "Sta het toe in Slack, kies het alarmkanaal en koppel daarna Slack-leden aan OpenObserve-gebruikers",
+      "stepInstallDetailShort": "Sta het toe in Slack en koppel daarna leden",
+      "stepAddTitle": "Toevoegen aan Slack",
+      "stepLinkTitle": "Personen koppelen",
+      "stepLinkDetail": "Slack-leden worden via e-maildomein aan OpenObserve-gebruikers gekoppeld; alle anderen koppelen met één klik",
       "addToSlack": "Toevoegen aan Slack",
       "popupHint": "Opent Slack in een pop-up: kies een kanaal voor alarmen en klik op Toestaan",
       "permissionHint": "Vereist de machtiging Slack beheren · organisatiebeheerders hebben deze standaard",
@@ -26498,7 +26492,6 @@
       "consentPrivate": "Tweerichtings-Slack leest ook je directe berichten met OpenObserve. Het leest kanaalberichten alleen wanneer je {'@'}OpenObserve vermeldt.",
       "consentPending": "Slack laat zien waar {product} toegang toe heeft voordat je toestemming geeft.",
       "setupApp": "Slack-app instellen",
-      "selfHostedHint": "OpenObserve maakt je eigen Slack-app aan met één configuratietoken",
       "upgradeTitle": "Stuur je al alarmen naar Slack? Upgrade naar tweerichtings-Slack",
       "upgradeDetail": "{team} · geen wijzigingen aan webhook-bestemmingen · voegt nu vragen toe | {team} · {count} webhook-bestemming blijft werken · voegt nu vragen toe | {team} · {count} webhook-bestemmingen blijven werken · voegt nu vragen toe",
       "upgradeButton": "Upgrade naar tweerichtings-Slack",
@@ -26551,7 +26544,7 @@
         "tokenHelp": "Op de pagina 'Your Apps' van Slack, onder 'Your App Configuration Tokens' › 'Generate Token', zie je een access token en een refresh token: plak het refresh token. OpenObserve roteert het en bewaart het nieuwste versleuteld om de app later bij te werken.",
         "generateToken": "Een token genereren",
         "createButton": "De app aanmaken",
-        "manual": "Handmatig instellen",
+        "manualLink": "Geen configuratietoken? Handmatig instellen",
         "manualHelp": "Opent de aanmaakpagina van Slack met het manifest vooraf ingevuld en vraagt daarna om de referenties van de app op de pagina 'Basic Information'. Installeren verloopt nog steeds via 'Toestaan', dus het bot-token wordt nooit geplakt.",
         "openManifest": "Slack openen met het manifest",
         "clientId": "Client-ID",
@@ -26560,6 +26553,9 @@
         "appToken": "Token op appniveau (Socket-modus)",
         "saveManual": "Referenties opslaan",
         "useToken": "In plaats daarvan een configuratietoken gebruiken",
+        "unreachableTitle": "Kon OpenObserve niet bereiken. Er is niets aangemaakt.",
+        "unreachableDetail": "Het verzoek naar deze server kreeg geen antwoord, dus er is niets naar Slack verzonden. Controleer of het adres van dit tabblad overeenkomt met de server (http versus https) en of de server draait, en probeer het daarna opnieuw.",
+        "noResponse": "{request} · geen antwoord",
         "tokenRequired": "Plak het configuratie-refresh token",
         "clientIdRequired": "Voer de client-ID in",
         "clientSecretRequired": "Voer de client secret in",
@@ -26611,6 +26607,8 @@
       "mappedSummary": "Automatisch voor {domains} · via de domeintoewijzing van je organisatie",
       "mappedReadonly": "Toegewezen domeinen zijn hier alleen-lezen; de support van OpenObserve wijzigt de toewijzing. Koppelen uitschakelen kun je nog steeds zelf.",
       "manualSummary": "Automatisch voor {domains}",
+      "noDomains": "Aan, maar geen domeinen: niemand wordt automatisch gekoppeld",
+      "skippedDomain": "{count} lid overgeslagen: het e-maildomein staat niet in de lijst | {count} leden overgeslagen: hun e-maildomein staat niet in de lijst",
       "offSummary": "Uit · personen koppelen met één klik bij hun eerste verzoek",
       "domains": "Domeinen",
       "editDomains": "Domeinen bewerken",
@@ -26703,18 +26701,18 @@
         "destination": "Vanuit een alarmbestemming"
       },
       "empty": "Nog geen kanaal heeft een standaardorganisatie",
-      "emptyDescription": "Vragen in een kanaal zonder standaard gaan naar de eerst gekoppelde organisatie.",
+      "emptyDescription": "Vragen in een kanaal zonder standaardorganisatie gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org).",
       "channel": "Kanaal",
       "channelPlaceholder": "Kanalen zoeken",
       "channelRequired": "Kies een kanaal",
-      "privateHint": "Privékanalen verschijnen na /invite {'@'}OpenObserve",
+      "privateHint": "Privékanalen verschijnen na /invite {'@'}OpenObserve; het kan tot 10 minuten duren voordat een nieuw kanaal verschijnt",
       "loadMore": "Meer kanalen laden",
       "saveFailed": "De kanaalstandaard kon niet worden opgeslagen.",
       "answers": "Antwoorden",
       "edit": "Bewerken",
       "remove": "Verwijderen",
       "removeTitle": "De standaard voor #{channel} verwijderen?",
-      "removeMessage": "Vragen in {name} gaan dan naar de eerst aangesloten organisatie.",
+      "removeMessage": "Vragen in {name} gaan dan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org).",
       "instanceAdminOnly": "Alleen voor instantiebeheerders",
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",

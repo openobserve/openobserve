@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "모든 에이전트",
-      "agentLabel": "에이전트",
-      "agentPlaceholder": "모든 에이전트",
-      "kpisAriaLabel": "티어 1 KPI",
-      "dataTypes": {
-        "numericShort": "숫자",
-        "categoricalShort": "범주",
-        "booleanShort": "불리언"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}일 전"
+        }
       },
+      "healthyIf": "{rule}이면 정상",
+      "noHealthyValue": "없음",
+      "setThreshold": "정상 임계값 설정",
+      "noScoresInWindow": "이 기간에 점수가 없습니다",
+      "outOf": "{count} / {total}",
+      "scopeCount": "{scope} {count}개",
       "scopes": {
-        "filterLabel": "점수 범위",
-        "filterHint": "이 점수 구성을 평가 대상 범위에서 비교합니다.",
         "all": "모두",
         "span": "스팬",
         "trace": "트레이스",
         "session": "세션"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "점수 결과"
-        },
-        "evaluationCost": {
-          "title": "평가 비용"
-        },
-        "scorerSuccess": {
-          "title": "스코어러 성공"
-        },
-        "scorerFailures": {
-          "title": "스코어러 실패"
-        },
-        "latencyP95": {
-          "title": "스코어러 지연 시간 p95"
-        },
-        "vsPrev": "vs 이전",
-        "noPriorData": "이전 데이터 없음",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
       },
-      "detail": {
-        "loading": "구성별 분석을 로드하는 중...",
-        "noData": "이 창에는 이 구성에 대한 점수가 아직 없습니다.",
-        "empty": {
-          "title": "첫 번째 점수를 기다리는 중",
-          "titleScoped": "이 창에 {scope} 점수가 없습니다",
-          "description": "선택한 시간 범위에서 이 구성에 대한 점수가 도착하지 않았습니다. 이를 사용하는 스코어러가 실행되면 여기에 자동으로 표시됩니다.",
-          "descriptionScoped": "선택한 시간 범위에서 이 구성에 대한 {scope} 점수가 없습니다. 다른 범위를 선택하거나 시간 범위를 넓히십시오."
-        },
-        "trendTitle": "트렌드",
-        "distributionTitle": "점수 분포",
-        "categoryDistributionTitle": "카테고리 분포",
-        "healthyRateTitle": "시간별 정상 비율",
-        "trueRateTitle": "시간별 긍정 비율",
-        "trueFalseTitle": "진실 대 거짓",
-        "legendAvg": "평균",
-        "legendThreshold": "임계값 {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "정상 {direction} {value}",
-        "healthyThreshold": "정상 {threshold}",
-        "legendHealthy": "정상",
-        "legendUnhealthy": "비정상",
-        "legendHealthyRate": "정상 비율",
-        "legendTrueRate": "긍정 비율",
-        "legendTrueCount": "참 ({count})",
-        "legendFalseCount": "거짓 ({count})",
-        "kpis": {
-          "average": "평균",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "비정상",
-          "healthy": "정상",
-          "trueRate": "긍정 비율",
-          "falseRate": "거짓 비율",
-          "coverage": "커버리지",
-          "targetsScored": "채점된 대상"
-        },
-        "health": {
-          "title": "상태",
-          "noThreshold": "정상 임계값이 설정되어 있지 않습니다. 아직 점수를 정상 또는 저하로 분류할 수 없습니다.",
-          "thresholdOnly": "{threshold}이면 정상",
-          "summary": "임계값보다 {percent}% 낮음 · {threshold}이면 정상"
-        },
-        "ofScoreResults": "{count}개 점수 결과 중",
-        "range": "범위 {min}–{max}"
+      "tiles": {
+        "attention": "주의가 필요한 구성",
+        "ofTotal": "총 {total}개",
+        "attentionNote": "보기",
+        "attentionTooltip": "비정상 점수가 하나 이상 있는 구성",
+        "withoutResult": "결과가 없는 구성",
+        "withoutResultTooltip": "이 시간 범위에 점수가 없거나 정상 임계값이 없는 구성입니다. 클릭하여 표시하세요.",
+        "noScores": "{count}개는 점수가 없습니다 | {count}개는 점수가 없습니다",
+        "noThreshold": "{count}개는 임계값이 없습니다 | {count}개는 임계값이 없습니다",
+        "allGiveResult": "모든 구성이 결과를 제공합니다"
       },
-      "runs": {
-        "title": "평가 점수",
-        "hint": "점수와 근거는 _llm_scores에서 가져옵니다. 실행을 선택하면 평가자 트레이스가 열려 추가 조사할 수 있습니다.",
-        "filterLabel": "평가 점수 필터링",
-        "noThresholdHint": "이 점수 구성에 정상 임계값을 설정하면 비정상 점수를 분류하고 강조 표시합니다.",
-        "noReasoning": "추론 기록 없음",
-        "unknownAgent": "알 수 없는 에이전트",
-        "unknownScope": "알 수 없는 범위",
-        "queryError": "평가 점수를 새로고침할 수 없습니다. 마지막으로 성공한 페이지가 계속 표시됩니다.",
-        "empty": "이 시간 범위에 평가 점수가 없습니다.",
-        "emptyUnhealthy": "이 시간 범위에 불량 점수가 없습니다.",
-        "filters": {
-          "all": "모든 점수",
-          "unhealthy": "불량"
-        },
-        "health": {
-          "healthy": "정상",
-          "unhealthy": "불량"
-        },
-        "columns": {
-          "time": "평가됨",
-          "result": "점수",
-          "reasoning": "추론",
-          "target": "대상",
-          "agent": "에이전트"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "구성 필터링…",
-        "relativeTime": {
-          "daysAgo": "{day}일 전",
-          "monthsAgo": "{month}개월 전"
-        },
-        "status": {
-          "healthy": "정상",
-          "unhealthy": "주의 필요",
-          "noThreshold": "임계값 미설정",
-          "noData": "점수 데이터 없음"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% 미만 · {threshold}이면 정상",
-          "noThresholdHint": "정상 임계값 설정",
-          "noDataHint": "이 기간에 점수 없음"
-        },
+        "openUnhealthy": "비정상 점수 열기",
+        "configLink": "구성",
+        "averageRange": "평균, {min} ~ {max}",
+        "mostCommon": "가장 많음 · {count} / {total}",
         "columns": {
-          "health": "상태",
           "scoreConfig": "점수 구성",
-          "type": "타입",
-          "quality": "품질",
-          "totalScores": "총점",
-          "scopeMix": "범위 혼합",
-          "volumeTrend": "볼륨 추세",
+          "health": "상태",
+          "typicalScore": "대표 점수",
+          "unhealthy": "비정상",
+          "scores": "점수",
           "updated": "업데이트됨"
         }
       },
-      "averageWithHealthyRate": "평균 · {rate}% 정상"
+      "detail": {
+        "back": "모든 구성",
+        "backToAll": "모든 구성으로 돌아가기",
+        "editConfig": "구성 편집",
+        "notFound": "점수 구성을 찾을 수 없습니다",
+        "notFoundDescription": "삭제되었거나 링크가 이전 구성을 가리키고 있을 수 있습니다.",
+        "emptyTitle": "첫 점수를 기다리는 중입니다",
+        "emptyTitleScoped": "이 기간에 {scope} 점수가 없습니다",
+        "emptyDescription": "선택한 시간 범위에 이 구성에 대한 점수가 없습니다. 이 구성을 사용하는 스코어러가 실행되면 여기에 표시됩니다.",
+        "distributionNumeric": "점수 분포",
+        "distributionValues": "값 분포",
+        "averageValue": "평균 {value}",
+        "legendHealthy": "정상",
+        "legendUnhealthy": "비정상",
+        "legendScores": "점수",
+        "chartTooltip": "{count}개 점수, {unhealthy}개 비정상 | {count}개 점수, {unhealthy}개 비정상",
+        "chartTooltipCount": "{count}개 점수 | {count}개 점수",
+        "trendTitle": {
+          "score": "추세",
+          "healthyRate": "시간별 정상 비율",
+          "trueRate": "시간별 True 비율",
+          "count": "시간별 점수"
+        },
+        "trendLegend": {
+          "healthyRate": "정상 비율",
+          "trueRate": "정답률",
+          "count": "점수"
+        },
+        "legendAvg": "평균",
+        "legendThreshold": "임계값 {direction} {value}",
+        "markLineHealthy": "정상 {direction} {value}",
+        "filterRange": "{from} ~ {to}",
+        "filterBelow": "{to} 미만",
+        "filterAtLeast": "{from} 이상",
+        "filterAny": "모든 값",
+        "filterByBar": "값으로 점수 필터링",
+        "barButton": "{label}: {count}개 점수 | {label}: {count}개 점수",
+        "clearFilter": "필터 지우기"
+      },
+      "review": {
+        "title": "평가 점수",
+        "all": "전체",
+        "unhealthy": "비정상",
+        "unhealthyDisabled": "점수를 분류하려면 정상 임계값을 설정하세요",
+        "inputNotCaptured": "입력이 캡처되지 않음",
+        "outputNotCaptured": "출력이 캡처되지 않음",
+        "noMatch": "이 필터와 일치하는 점수가 없습니다"
+      },
+      "pane": {
+        "noneSelected": "선택된 점수가 없습니다",
+        "healthy": "정상",
+        "unhealthy": "비정상",
+        "noThreshold": "정상 임계값이 설정되지 않음",
+        "previous": "이전 점수",
+        "next": "다음 점수",
+        "reasoning": "추론",
+        "noReasoning": "기록된 추론이 없습니다",
+        "fullTextUnavailable": "짧은 미리보기를 표시합니다. 전체 트레이스를 불러올 수 없습니다.",
+        "open": {
+          "span": "스팬 열기",
+          "trace": "트레이스 열기",
+          "session": "세션 열기"
+        },
+        "evaluatorTrace": "평가자 트레이스",
+        "addToDataset": "데이터셋에 추가",
+        "datasetSession": "데이터셋에는 트레이스 또는 스팬 하나만 추가할 수 있습니다. 세션을 열어 해당 트레이스 중 하나를 추가하세요.",
+        "datasetNoStream": "이 점수에는 추가할 소스 스트림이 없습니다."
+      }
     },
     "singular": {
       "jobs": "평가 작업",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "가져오기 ({count})",
-    "count": "개수",
     "failedToDeriveSchema": "스키마 도출 실패",
     "failedToImportScoreConfig": "점수 설정 가져오기 실패",
     "failedToImportScorer": "스코어러를 가져오지 못했습니다",
     "failedToFetchCatalog": "카탈로그를 가져오지 못했습니다 ({status})",
     "failedToLoadCatalog": "카탈로그를 불러오지 못했습니다",
     "failedToRunScorerTest": "스코어러 테스트를 실행하지 못했습니다",
-    "healthyRate": "정상 비율",
     "invalidJsonFormat": "잘못된 JSON 형식",
     "jsonIsEmpty": "JSON이 비어 있습니다",
     "scorerTestFailed": "스코어러 테스트 실패",
     "scorerTestSampleContext": "프랑스 국가 프로필: 파리는 수도입니다.",
     "scorerTestSampleInput": "프랑스의 수도는 센강에 위치한 파리입니다.",
     "scorerTestSampleOutput": "파리는 프랑스의 수도입니다.",
-    "topCategory": "최상위 카테고리",
-    "trueRate": "참 비율",
     "unknownError": "알 수 없는 오류",
     "import": {
       "createdSuccessfully": "\"{name}\" 생성 성공",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "온라인 평가 — 템플릿",
       "scorers": "온라인 평가 — 스코어러",
       "evalJobs": "온라인 평가 — 작업",
+      "quality": "Online Evals — 품질",
       "scoreConfigs": "온라인 평가 — 점수 구성",
       "actions": "액션",
       "llmProviders": "LLM 공급자",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "목록 새로 고침",
       "scorersRefresh": "목록 새로 고침",
       "evalJobsRefresh": "목록 새로 고침",
+      "qualityBack": "모든 구성으로 돌아가기",
       "scoreConfigsRefresh": "목록 새로 고침",
       "actionsRefresh": "목록 새로 고침",
       "llmProvidersRefresh": "목록 새로 고침",
@@ -20352,7 +20329,9 @@
       "loading": "로딩 중"
     },
     "stepper": {
-      "steps": "단계"
+      "steps": "단계",
+      "stepOf": "{total}단계 중 {current}단계",
+      "swipeHint": "나머지를 보려면 스와이프하세요"
     },
     "attributeValueCell": {
       "addIcon": "아이콘 추가"
@@ -20552,11 +20531,10 @@
         "high": "높음"
       },
       "qualityStatus": {
-        "nothreshold": "임계값 없음",
-        "nodata": "데이터 없음",
+        "attention": "주의 필요",
         "healthy": "정상",
-        "warn": "경고",
-        "unhealthy": "비정상"
+        "unset": "임계값 미설정",
+        "nodata": "점수 데이터 없음"
       },
       "rumEventType": {
         "longtask": "긴 작업",
@@ -26472,8 +26450,11 @@
       "columnResult": "결과",
       "failedSummary": "{failed}/{total} 실패 · 서버 환경에서 수정한 후 재시작하고 다시 확인하세요",
       "allPassed": "모든 사전 요구 사항 통과",
+      "requiredPass": "모든 필수 검사 통과",
+      "warningCount": "{count}개 경고 | {count}개 경고",
+      "canContinue": "계속할 수 있습니다",
       "recheck": "다시 확인",
-      "helmHint": "Helm 없이 설치했나요? {variable}을(를) 설정하고 재시작한 뒤 다시 확인하세요.",
+      "helmHint": "Helm 없이 설치했나요? 서버 환경에서 설정하고 재시작한 다음 다시 확인하세요.",
       "loadFailed": "사전 요구 사항 검사를 실행할 수 없습니다.",
       "names": {
         "master_key": "암호화 키",
@@ -26489,8 +26470,21 @@
     },
     "connect": {
       "title": "Slack 워크스페이스 연결",
-      "description": "팀이 Slack에서 나가지 않고 OpenObserve에 질문할 수 있습니다",
-      "featureQuestions": "질문하면 본인 권한으로 답변합니다",
+      "description": "팀이 Slack에서 OpenObserve에 질문하고 각자의 권한으로 답변을 받습니다.",
+      "descriptionSelfHosted": "팀이 Slack에서 OpenObserve에 질문하고 각자의 권한으로 답변을 받습니다. OpenObserve가 자체 Slack 앱을 생성하고 설치하며, 제3자와 공유되는 것은 없습니다.",
+      "nextTitle": "다음 단계 · 약 {minutes}분",
+      "stepCheckTitle": "이 서버 확인",
+      "stepCheckDetail": "Slack과 연결되기 전에 암호화 키, 웹 URL, AI 에이전트를 검증합니다",
+      "stepCheckDetailShort": "암호화 키, 웹 URL, AI 에이전트",
+      "stepCreateTitle": "앱 만들기",
+      "stepCreateDetail": "Slack에서 구성 토큰 하나를 붙여넣으면 OpenObserve가 앱을 만들어 드립니다",
+      "stepCreateDetailShort": "Slack에서 구성 토큰 하나를 붙여넣으세요",
+      "stepInstallTitle": "설치 및 사용자 연결",
+      "stepInstallDetail": "Slack에서 허용하고 알림 채널을 선택한 다음 Slack 멤버를 OpenObserve 사용자와 연결하세요",
+      "stepInstallDetailShort": "Slack에서 허용한 다음 멤버를 연결하세요",
+      "stepAddTitle": "Slack에 추가",
+      "stepLinkTitle": "사용자 연결",
+      "stepLinkDetail": "Slack 멤버는 이메일 도메인으로 OpenObserve 사용자와 연결되며, 그 외 사용자는 클릭 한 번으로 연결됩니다",
       "addToSlack": "Slack에 추가",
       "popupHint": "팝업에서 Slack이 열립니다: 알림용 채널을 선택한 후 허용하세요",
       "permissionHint": "Slack 관리 권한이 필요합니다 · 조직 관리자는 기본적으로 이 권한을 가집니다",
@@ -26498,7 +26492,6 @@
       "consentPrivate": "양방향 Slack은 OpenObserve와의 다이렉트 메시지도 읽습니다. 채널 메시지는 {'@'}OpenObserve를 멘션할 때만 읽습니다.",
       "consentPending": "허용하기 전에 Slack이 {product}이(가) 액세스할 수 있는 항목을 표시합니다.",
       "setupApp": "Slack 앱 설정",
-      "selfHostedHint": "OpenObserve가 구성 토큰 하나로 자체 Slack 앱을 생성합니다",
       "upgradeTitle": "이미 Slack으로 알림을 보내고 있나요? 양방향 Slack으로 업그레이드하세요",
       "upgradeDetail": "{team} · 웹훅 대상 변경 없음 · 질문 기능 추가 | {team} · 웹훅 대상 {count}개 계속 작동 · 질문 기능 추가 | {team} · 웹훅 대상 {count}개 계속 작동 · 질문 기능 추가",
       "upgradeButton": "양방향 Slack으로 업그레이드",
@@ -26551,7 +26544,7 @@
         "tokenHelp": "Slack의 Your Apps 페이지에서 Your App Configuration Tokens › Generate Token을 선택하면 액세스 토큰과 리프레시 토큰이 표시됩니다. 리프레시 토큰을 붙여넣으세요. OpenObserve는 토큰을 순환시키고 나중에 앱을 업데이트할 수 있도록 최신 토큰을 암호화하여 보관합니다.",
         "generateToken": "토큰 생성",
         "createButton": "앱 생성",
-        "manual": "수동으로 설정",
+        "manualLink": "구성 토큰이 없나요? 수동으로 설정하세요",
         "manualHelp": "매니페스트가 미리 채워진 Slack 생성 페이지를 열고, 앱의 Basic Information 페이지에서 자격 증명을 요청합니다. 설치는 여전히 Allow를 거치므로 봇 토큰을 붙여넣을 필요가 없습니다.",
         "openManifest": "매니페스트로 Slack 열기",
         "clientId": "클라이언트 ID",
@@ -26560,6 +26553,9 @@
         "appToken": "앱 수준 토큰 (Socket 모드)",
         "saveManual": "자격 증명 저장",
         "useToken": "대신 구성 토큰 사용",
+        "unreachableTitle": "OpenObserve에 연결할 수 없습니다. 아무것도 생성되지 않았습니다.",
+        "unreachableDetail": "이 서버로 보낸 요청에 응답이 없어 Slack으로 아무것도 전송되지 않았습니다. 이 탭의 주소가 서버 주소와 일치하는지(http vs https), 서버가 실행 중인지 확인한 후 다시 시도하세요.",
+        "noResponse": "{request} · 응답 없음",
         "tokenRequired": "구성 리프레시 토큰을 붙여넣으세요",
         "clientIdRequired": "클라이언트 ID를 입력하세요",
         "clientSecretRequired": "클라이언트 시크릿을 입력하세요",
@@ -26611,6 +26607,8 @@
       "mappedSummary": "{domains}에 대해 자동 · 조직의 도메인 매핑에서 가져옴",
       "mappedReadonly": "매핑된 도메인은 여기서 읽기 전용입니다. 매핑은 OpenObserve 지원팀이 변경합니다. 연결 끄기는 직접 설정할 수 있습니다.",
       "manualSummary": "{domains}에 대해 자동",
+      "noDomains": "켜져 있지만 도메인이 없습니다: 자동으로 연결되는 사람이 없습니다",
+      "skippedDomain": "이메일 도메인이 목록에 없어 {count}명의 멤버를 건너뛰었습니다 | 이메일 도메인이 목록에 없어 {count}명의 멤버를 건너뛰었습니다",
       "offSummary": "꺼짐 · 사용자가 처음 요청할 때 클릭 한 번으로 연결",
       "domains": "도메인",
       "editDomains": "도메인 편집",
@@ -26703,18 +26701,18 @@
         "destination": "알림 대상에서"
       },
       "empty": "아직 기본 조직이 있는 채널이 없습니다",
-      "emptyDescription": "기본값이 없는 채널의 질문은 가장 먼저 연결된 조직으로 전달됩니다.",
+      "emptyDescription": "기본 조직이 설정되지 않은 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다).",
       "channel": "채널",
       "channelPlaceholder": "채널 검색",
       "channelRequired": "채널을 선택하세요",
-      "privateHint": "비공개 채널은 /invite {'@'}OpenObserve 후에 표시됩니다",
+      "privateHint": "비공개 채널은 /invite {'@'}OpenObserve 후에 표시됩니다; 새 채널은 표시되는 데 최대 10분이 걸릴 수 있습니다",
       "loadMore": "채널 더 불러오기",
       "saveFailed": "채널 기본값을 저장하지 못했습니다.",
       "answers": "답변",
       "edit": "편집",
       "remove": "제거",
       "removeTitle": "#{channel}의 기본값을 제거할까요?",
-      "removeMessage": "이후 {name}의 질문은 가장 먼저 연결된 조직으로 전달됩니다.",
+      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다).",
       "instanceAdminOnly": "인스턴스 관리자 전용",
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",

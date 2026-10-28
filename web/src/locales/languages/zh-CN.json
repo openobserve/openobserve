@@ -17154,143 +17154,122 @@
     },
     "quality": {
       "allAgents": "全部智能体",
-      "agentLabel": "智能体",
-      "agentPlaceholder": "所有智能体",
-      "kpisAriaLabel": "一级KPI",
-      "dataTypes": {
-        "numericShort": "数值",
-        "categoricalShort": "分类",
-        "booleanShort": "布尔"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day} 天前"
+        }
       },
+      "healthyIf": "若 {rule} 则健康",
+      "noHealthyValue": "无",
+      "setThreshold": "设置健康阈值",
+      "noScoresInWindow": "此时间窗口内无评分",
+      "outOf": "{count} / {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "评分范围",
-        "filterHint": "在不同评估目标范围内比较此评分配置。",
         "all": "全部",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "评分结果"
-        },
-        "evaluationCost": {
-          "title": "评估成本"
-        },
-        "scorerSuccess": {
-          "title": "评分器成功率"
-        },
-        "scorerFailures": {
-          "title": "评分器失败"
-        },
-        "latencyP95": {
-          "title": "评分器延迟 p95"
-        },
-        "vsPrev": "vs 上一页",
-        "noPriorData": "无先前数据",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "Span",
+        "trace": "追踪",
+        "session": "会话"
+      },
+      "tiles": {
+        "attention": "需要关注的配置",
+        "ofTotal": "共 {total}",
+        "attentionNote": "查看",
+        "attentionTooltip": "至少有一个不健康评分的配置",
+        "withoutResult": "没有结果的配置",
+        "withoutResultTooltip": "此时间范围内没有评分的配置，或未设置健康阈值的配置。点击查看。",
+        "noScores": "{count} 个未获得评分 | {count} 个未获得评分",
+        "noThreshold": "{count} 个未设置阈值 | {count} 个未设置阈值",
+        "allGiveResult": "所有配置均有结果"
+      },
+      "table": {
+        "searchPlaceholder": "过滤配置…",
+        "openUnhealthy": "查看不健康评分",
+        "configLink": "配置",
+        "averageRange": "平均值，{min} 至 {max}",
+        "mostCommon": "最常见 · {count} / {total}",
+        "columns": {
+          "scoreConfig": "评分配置",
+          "health": "健康度",
+          "typicalScore": "典型评分",
+          "unhealthy": "不健康",
+          "scores": "评分",
+          "updated": "更新时间"
+        }
       },
       "detail": {
-        "loading": "正在加载每个配置的细分...",
-        "noData": "此窗口中此配置尚无分数。",
-        "empty": {
-          "title": "正在等待您的首批评分",
-          "titleScoped": "此窗口中无{scope}评分",
-          "description": "在所选时间范围内，此配置尚无评分。一旦使用它的评分器运行，评分将自动显示在此处。",
-          "descriptionScoped": "在所选时间范围内，此配置尚无{scope}评分。请选择其他范围或扩大时间范围。"
-        },
-        "trendTitle": "趋势",
-        "distributionTitle": "分数分布",
-        "categoryDistributionTitle": "类别分布",
-        "healthyRateTitle": "随时间变化的健康率",
-        "trueRateTitle": "随时间变化的真实率",
-        "trueFalseTitle": "对与错",
-        "legendAvg": "平均值",
-        "legendThreshold": "阈值 {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "健康 {direction} {value}",
-        "healthyThreshold": "健康 {threshold}",
+        "back": "所有配置",
+        "backToAll": "返回所有配置",
+        "editConfig": "编辑配置",
+        "notFound": "未找到评分配置",
+        "notFoundDescription": "它可能已被删除，或链接指向了旧配置。",
+        "emptyTitle": "等待首批评分",
+        "emptyTitleScoped": "此窗口内没有 {scope} 评分",
+        "emptyDescription": "所选时间范围内，此配置没有收到评分。使用该配置的评分器运行后，评分会显示在这里。",
+        "distributionNumeric": "评分分布",
+        "distributionValues": "值分布",
+        "averageValue": "平均值 {value}",
         "legendHealthy": "健康",
         "legendUnhealthy": "不健康",
-        "legendHealthyRate": "健康率",
-        "legendTrueRate": "真实率",
-        "legendTrueCount": "true ({count})",
-        "legendFalseCount": "false ({count})",
-        "kpis": {
-          "average": "平均值",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "不健康",
-          "healthy": "健康",
+        "legendScores": "评分",
+        "chartTooltip": "{count} 个评分，{unhealthy} 个不健康 | {count} 个评分，{unhealthy} 个不健康",
+        "chartTooltipCount": "{count} 个评分 | {count} 个评分",
+        "trendTitle": {
+          "score": "趋势",
+          "healthyRate": "健康率随时间变化",
+          "trueRate": "真实率随时间变化",
+          "count": "评分随时间变化"
+        },
+        "trendLegend": {
+          "healthyRate": "健康率",
           "trueRate": "真实率",
-          "falseRate": "假比率",
-          "coverage": "覆盖范围",
-          "targetsScored": "已评分目标"
+          "count": "评分"
         },
-        "health": {
-          "title": "健康状态",
-          "noThreshold": "尚未配置健康阈值。评分尚无法分类为健康或降级。",
-          "thresholdOnly": "如果{threshold}则健康",
-          "summary": "低于阈值{percent}% · 如果{threshold}则健康"
-        },
-        "ofScoreResults": "在 {count} 个评分结果中",
-        "range": "范围 {min}–{max}"
+        "legendAvg": "平均值",
+        "legendThreshold": "阈值 {direction} {value}",
+        "markLineHealthy": "健康 {direction} {value}",
+        "filterRange": "{from} 至 {to}",
+        "filterBelow": "低于 {to}",
+        "filterAtLeast": "{from} 及以上",
+        "filterAny": "任意值",
+        "filterByBar": "按值筛选评分",
+        "barButton": "{label}：{count} 个评分 | {label}：{count} 个评分",
+        "clearFilter": "清除过滤器"
       },
-      "runs": {
+      "review": {
         "title": "评估评分",
-        "hint": "评分和推理来自 _llm_scores。选择一次运行以打开其评估器追踪进行进一步调查。",
-        "filterLabel": "筛选评估评分",
-        "noThresholdHint": "在此评分配置上设置健康阈值，以分类和突出显示不健康的评分。",
+        "all": "全部",
+        "unhealthy": "不健康",
+        "unhealthyDisabled": "设置健康阈值以对评分进行分类",
+        "inputNotCaptured": "未捕获输入",
+        "outputNotCaptured": "未捕获输出",
+        "noMatch": "没有评分匹配此过滤器"
+      },
+      "pane": {
+        "noneSelected": "未选择评分",
+        "healthy": "健康",
+        "unhealthy": "不健康",
+        "noThreshold": "未设置健康阈值",
+        "previous": "上一个评分",
+        "next": "下一个评分",
+        "reasoning": "推理",
         "noReasoning": "未记录推理",
-        "unknownAgent": "未知智能体",
-        "unknownScope": "未知作用域",
-        "queryError": "评估分数无法刷新。仍显示最后成功的页面。",
-        "empty": "此时间范围内没有评估分数。",
-        "emptyUnhealthy": "此时间范围内没有不健康分数。",
-        "filters": {
-          "all": "所有分数",
-          "unhealthy": "不健康"
+        "fullTextUnavailable": "正在显示简短预览。无法加载完整追踪。",
+        "open": {
+          "span": "打开 Span",
+          "trace": "打开追踪",
+          "session": "打开会话"
         },
-        "health": {
-          "healthy": "健康",
-          "unhealthy": "不健康"
-        },
-        "columns": {
-          "time": "已评估",
-          "result": "分数",
-          "reasoning": "原因",
-          "target": "目标",
-          "agent": "智能体"
-        }
-      },
-      "overview": {
-        "searchPlaceholder": "筛选配置...",
-        "relativeTime": {
-          "daysAgo": "{day} 天前",
-          "monthsAgo": "{month} 个月前"
-        },
-        "status": {
-          "healthy": "健康",
-          "unhealthy": "需要注意",
-          "noThreshold": "阈值未设置",
-          "noData": "无分数数据"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% 低于 · 如果 {threshold} 则为健康",
-          "noThresholdHint": "设置健康阈值",
-          "noDataHint": "此窗口内无分数"
-        },
-        "columns": {
-          "health": "健康",
-          "scoreConfig": "分数配置",
-          "type": "类型",
-          "quality": "质量",
-          "totalScores": "总分数",
-          "scopeMix": "作用域混合",
-          "volumeTrend": "容量趋势",
-          "updated": "已更新"
-        }
-      },
-      "averageWithHealthyRate": "平均 · {rate}% 健康"
+        "evaluatorTrace": "评估器追踪",
+        "addToDataset": "添加到数据集",
+        "datasetSession": "数据集接受单条追踪或 Span。打开会话以添加其中的一条追踪。",
+        "datasetNoStream": "此评分没有可添加的源数据流。"
+      }
     },
     "singular": {
       "jobs": "评估任务",
@@ -18006,22 +17985,18 @@
       }
     },
     "importCount": "导入 ({count})",
-    "count": "计数",
     "failedToDeriveSchema": "无法推导架构",
     "failedToImportScoreConfig": "无法导入评分配置",
     "failedToImportScorer": "无法导入评分器",
     "failedToFetchCatalog": "无法获取目录（{status}）",
     "failedToLoadCatalog": "无法加载目录",
     "failedToRunScorerTest": "无法运行评分器测试",
-    "healthyRate": "健康率",
     "invalidJsonFormat": "无效的 JSON 格式",
     "jsonIsEmpty": "JSON 为空",
     "scorerTestFailed": "评分器测试失败",
     "scorerTestSampleContext": "法国国家概况：巴黎是首都。",
     "scorerTestSampleInput": "法国的首都是巴黎，位于塞纳河畔。",
     "scorerTestSampleOutput": "巴黎是法国的首都。",
-    "topCategory": "顶级类别",
-    "trueRate": "真实率",
     "unknownError": "未知错误",
     "import": {
       "createdSuccessfully": "“{name}”创建成功",
@@ -20191,6 +20166,7 @@
       "evalTemplates": "在线评估—模板",
       "scorers": "在线评估 — 评分器",
       "evalJobs": "在线评估 — 任务",
+      "quality": "在线评估 — 质量",
       "scoreConfigs": "在线评估—分数配置",
       "actions": "操作",
       "llmProviders": "LLM 提供商",
@@ -20306,6 +20282,7 @@
       "evalTemplatesRefresh": "刷新清单",
       "scorersRefresh": "刷新清单",
       "evalJobsRefresh": "刷新清单",
+      "qualityBack": "返回所有配置",
       "scoreConfigsRefresh": "刷新清单",
       "actionsRefresh": "刷新清单",
       "llmProvidersRefresh": "刷新清单",
@@ -20352,7 +20329,9 @@
       "loading": "加载中"
     },
     "stepper": {
-      "steps": "步骤"
+      "steps": "步骤",
+      "stepOf": "第 {current} 步，共 {total} 步",
+      "swipeHint": "滑动以查看其余内容"
     },
     "attributeValueCell": {
       "addIcon": "添加图标"
@@ -20552,11 +20531,10 @@
         "high": "高"
       },
       "qualityStatus": {
-        "nothreshold": "无阈值",
-        "nodata": "无数据",
+        "attention": "需要关注",
         "healthy": "健康",
-        "warn": "警告",
-        "unhealthy": "不健康"
+        "unset": "未设置阈值",
+        "nodata": "无评分数据"
       },
       "rumEventType": {
         "longtask": "长任务",
@@ -26472,8 +26450,11 @@
       "columnResult": "结果",
       "failedSummary": "{failed}/{total} 项失败 · 请在服务器环境中修复，重启后重新检查",
       "allPassed": "所有前提条件均已通过",
+      "requiredPass": "所有必需检查均已通过",
+      "warningCount": "{count} 条警告 | {count} 条警告",
+      "canContinue": "您可以继续",
       "recheck": "重新检查",
-      "helmHint": "未使用 Helm 安装？请设置 {variable}，重启，然后重新检查。",
+      "helmHint": "未使用 Helm 安装？请在服务器环境中设置，重启后重新检查。",
       "loadFailed": "无法运行前提条件检查。",
       "names": {
         "master_key": "加密密钥",
@@ -26489,8 +26470,21 @@
     },
     "connect": {
       "title": "连接 Slack 工作区",
-      "description": "您的团队无需离开 Slack 即可向 OpenObserve 提问",
-      "featureQuestions": "提出问题；回答将使用您自己的权限",
+      "description": "您的团队可在 Slack 中向 OpenObserve 提问，并以各自的权限获得答案。",
+      "descriptionSelfHosted": "您的团队可在 Slack 中向 OpenObserve 提问，并以各自的权限获得答案。OpenObserve 会创建并安装您自己的 Slack 应用；不会与任何第三方共享。",
+      "nextTitle": "接下来会发生什么 · 约 {minutes} 分钟",
+      "stepCheckTitle": "检查此服务器",
+      "stepCheckDetail": "在涉及 Slack 之前，会先验证加密密钥、Web URL 和 AI 代理",
+      "stepCheckDetailShort": "加密密钥、Web URL 和 AI 代理",
+      "stepCreateTitle": "创建应用",
+      "stepCreateDetail": "粘贴来自 Slack 的一个配置令牌；OpenObserve 会为您构建应用",
+      "stepCreateDetailShort": "粘贴来自 Slack 的一个配置令牌",
+      "stepInstallTitle": "安装并关联成员",
+      "stepInstallDetail": "在 Slack 中授权，选择告警频道，然后将 Slack 成员关联到 OpenObserve 用户",
+      "stepInstallDetailShort": "在 Slack 中授权，然后关联成员",
+      "stepAddTitle": "添加到 Slack",
+      "stepLinkTitle": "关联成员",
+      "stepLinkDetail": "Slack 成员按邮箱域名关联到 OpenObserve 用户；其他成员一键即可关联",
       "addToSlack": "添加到 Slack",
       "popupHint": "将在弹窗中打开 Slack：选择一个用于接收告警的频道，然后点击“允许”",
       "permissionHint": "需要“管理 Slack”权限 · 组织管理员默认拥有此权限",
@@ -26498,7 +26492,6 @@
       "consentPrivate": "双向 Slack 还会读取您与 OpenObserve 的私信。仅当您提及 {'@'}OpenObserve 时，它才会读取频道消息。",
       "consentPending": "在您允许之前，Slack 会列出 {product} 可以访问的内容。",
       "setupApp": "设置 Slack 应用",
-      "selfHostedHint": "OpenObserve 通过一个配置令牌创建您自己的 Slack 应用",
       "upgradeTitle": "已经在向 Slack 发送告警？升级到双向 Slack",
       "upgradeDetail": "{team} · 无需更改 Webhook 目标 · 立即获得提问功能 | {team} · {count} 个 Webhook 目标继续正常工作 · 立即获得提问功能 | {team} · {count} 个 Webhook 目标继续正常工作 · 立即获得提问功能",
       "upgradeButton": "升级到双向 Slack",
@@ -26551,7 +26544,7 @@
         "tokenHelp": "在 Slack 的“Your Apps”页面中，“Your App Configuration Tokens › Generate Token”会显示访问令牌和刷新令牌：请粘贴刷新令牌。OpenObserve 会轮换该令牌，并加密保留最新令牌，以便之后更新应用。",
         "generateToken": "生成令牌",
         "createButton": "创建应用",
-        "manual": "手动设置",
+        "manualLink": "没有配置令牌？手动设置",
         "manualHelp": "会打开 Slack 的创建页面并预填应用清单，然后要求填写应用“基本信息”页面中的凭证。安装仍需通过“允许”完成，因此无需粘贴机器人令牌。",
         "openManifest": "使用清单打开 Slack",
         "clientId": "客户端 ID",
@@ -26560,6 +26553,9 @@
         "appToken": "应用级令牌（Socket 模式）",
         "saveManual": "保存凭证",
         "useToken": "改用配置令牌",
+        "unreachableTitle": "无法连接 OpenObserve。未创建任何内容。",
+        "unreachableDetail": "向此服务器发出的请求未得到响应，因此没有向 Slack 发送任何内容。请检查此标签页的地址是否与服务器一致（http 与 https），并确认服务器已启动，然后重试。",
+        "noResponse": "{request} · 无响应",
         "tokenRequired": "请粘贴配置刷新令牌",
         "clientIdRequired": "请输入客户端 ID",
         "clientSecretRequired": "输入客户端密钥",
@@ -26611,6 +26607,8 @@
       "mappedSummary": "对 {domains} 自动关联 · 来自您组织的域名映射",
       "mappedReadonly": "映射的域名在此处为只读；映射由 OpenObserve 支持团队更改。关闭关联仍由您操作。",
       "manualSummary": "对 {domains} 自动关联",
+      "noDomains": "已开启，但未配置域名：不会自动关联任何人",
+      "skippedDomain": "{count} 名成员已跳过：其电子邮件域名未列出 | {count} 名成员已跳过：其电子邮件域名未列出",
       "offSummary": "已关闭 · 人员首次请求时通过一键关联",
       "domains": "域名",
       "editDomains": "编辑域名",
@@ -26703,18 +26701,18 @@
         "destination": "来自告警目标"
       },
       "empty": "尚无频道设置默认组织",
-      "emptyDescription": "未设置默认组织的频道中的问题将发送到最早连接的组织。",
+      "emptyDescription": "在未设置默认组织的频道中，问题会转到每个人的默认组织（可通过 /o2 org 更改）。",
       "channel": "频道",
       "channelPlaceholder": "搜索频道",
       "channelRequired": "选择频道",
-      "privateHint": "执行 /invite {'@'}OpenObserve 后，私密频道才会显示",
+      "privateHint": "私有频道会在 /invite {'@'}OpenObserve 后显示；新频道最多可能需要 10 分钟才会出现",
       "loadMore": "加载更多频道",
       "saveFailed": "无法保存频道默认设置。",
       "answers": "回答",
       "edit": "编辑",
       "remove": "移除",
       "removeTitle": "移除 #{channel} 的默认设置？",
-      "removeMessage": "之后，{name} 中的提问将转至最早连接的组织。",
+      "removeMessage": "此后，{name} 中的问题将转到每个人的默认组织（可通过 /o2 org 更改）。",
       "instanceAdminOnly": "仅实例管理员",
       "ownOrgOnlyHint": "在实例工作区中，您可以将频道映射到自己的组织",
       "claimableHint": "未认领的频道以及 {org} 拥有的频道",

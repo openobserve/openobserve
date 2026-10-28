@@ -403,7 +403,6 @@ pub async fn search_multi(
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
-                multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
 
@@ -1040,7 +1039,6 @@ fn parse_simple_multi_stream_request(
         end_time: simple_req.query.end_time,
         sort_by: None,
         quick_mode: simple_req.query.quick_mode,
-        query_type: "".to_string(),
         track_total_hits: simple_req.query.track_total_hits,
         uses_zo_fn: simple_req.query.query_fn.is_some(),
         query_fn: simple_req.query.query_fn,
@@ -1608,7 +1606,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1662,7 +1659,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros() - 3_600_000_000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1691,7 +1687,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1725,7 +1720,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("base64_encoded_vrl_function".to_string()),
@@ -1760,7 +1754,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1803,7 +1796,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1839,7 +1831,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1906,7 +1897,6 @@ mod tests {
             end_time: 4000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl" base64
@@ -1948,7 +1938,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl"
@@ -2012,7 +2001,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
@@ -2078,7 +2066,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
@@ -2152,7 +2139,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
