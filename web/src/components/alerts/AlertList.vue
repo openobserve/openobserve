@@ -1357,7 +1357,8 @@ export default defineComponent({
         params: { alert_id: row.alert_id },
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+          // The row's own folder: a cross-folder search lists alerts of other folders.
+          folder: row.folder_name?.id,
           tab: activeTab.value,
         },
       });

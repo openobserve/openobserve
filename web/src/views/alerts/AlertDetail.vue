@@ -425,8 +425,8 @@ const store = useStore();
 
 const alertId = computed(() => String(route.params.alert_id || ""));
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
-// The GET carries no folder; the list navigates here with it, and "default" is every org's first folder.
-const folderId = computed(() => String(route.query.folder || "default"));
+// The GET carries no folder; entries navigate here with it, else the alert's list row names it.
+const routeFolderId = computed(() => String(route.query.folder || ""));
 const downtimesEnabled = useDowntimesEnabled();
 
 const alert = ref<any>(null);
@@ -492,7 +492,7 @@ const navigateToReference = (reference: CompositeAlertReference) => {
     params: { alert_id: reference.alert_id },
     query: {
       org_identifier: orgId.value,
-      folder: reference.folder_id || "default",
+      folder: reference.folder_id || undefined,
     },
   });
 };
@@ -517,10 +517,10 @@ const backTarget = computed(() => ({
   to: {
     name: "alertList",
     query: {
-      // Spread first so the tab the list pushed survives — folder still needs its own explicit fallback below since an absent query.folder must resolve to "default", not itself disappear.
+      // Spread first so the tab the list pushed survives; the list opens "default" when the folder is unknown.
       ...route.query,
       org_identifier: orgId.value,
-      folder: route.query.folder || "default",
+      folder: folderId.value || "default",
     },
   },
 }));
@@ -639,14 +639,10 @@ const groupStats = computed<StatItem[]>(() => {
   ];
 });
 
-// The alert GET has no run state, so the header reads this alert's row of its folder's list.
+// The alert GET has no run state, so the header reads this alert's row of its folder's list,
+// or of the list across every folder when the URL names none.
 const listQuery = useQuery(() =>
-  Object.assign(alertsListQuery(orgId.value, folderId.value), {
-    enabled: !!orgId.value && !!alertId.value,
-  }),
-);
-const acksQuery = useQuery(() =>
-  Object.assign(alertAcksQuery(orgId.value, alertId.value, folderId.value), {
+  Object.assign(alertsListQuery(orgId.value, routeFolderId.value), {
     enabled: !!orgId.value && !!alertId.value,
   }),
 );
@@ -654,6 +650,7 @@ const acksQuery = useQuery(() =>
 interface AlertListRow {
   alert_id?: string;
   id?: string;
+  folder_id?: string;
   enabled?: boolean;
   last_outcome?: string | null;
   last_outcome_since?: number | null;
@@ -668,6 +665,13 @@ const listRow = computed<AlertListRow | null>(
     (listQuery.data.value as AlertListRow[] | undefined)?.find(
       (row) => (row.alert_id ?? row.id) === alertId.value,
     ) ?? null,
+);
+
+const folderId = computed(() => routeFolderId.value || listRow.value?.folder_id || "");
+const acksQuery = useQuery(() =>
+  Object.assign(alertAcksQuery(orgId.value, alertId.value, folderId.value), {
+    enabled: !!orgId.value && !!alertId.value && !!folderId.value,
+  }),
 );
 
 const showHeaderActions = computed(() => !!alert.value && !notFound.value && !isAnomalyAlert.value);
@@ -879,7 +883,7 @@ const editAlert = () => {
       params: { anomaly_id: alertId.value },
       query: {
         org_identifier: orgId.value,
-        folder: route.query.folder || "default",
+        folder: folderId.value || "default",
         tab: route.query.tab,
       },
     });
@@ -890,10 +894,9 @@ const editAlert = () => {
     params: { alert_id: alertId.value },
     query: {
       org_identifier: orgId.value,
-      // The GET response carries no folder, so carry through the one the list
-      // navigated with; "default" is the folder every org is created with. The
-      // editor needs it to send the user back to the right folder on save.
-      folder: route.query.folder || "default",
+      // The editor needs the alert's folder to send the user back to it on save;
+      // "default" is the folder every org is created with.
+      folder: folderId.value || "default",
       tab: route.query.tab,
     },
   });

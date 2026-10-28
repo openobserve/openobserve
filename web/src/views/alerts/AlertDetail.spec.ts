@@ -617,7 +617,7 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
 
   const withListRow = (row: Record<string, unknown>, acks: unknown[] = []) => {
     vi.mocked(alertsService.listByFolderId).mockResolvedValue({
-      data: { list: [{ alert_id: "alert-1", enabled: true, ...row }] },
+      data: { list: [{ alert_id: "alert-1", folder_id: "default", enabled: true, ...row }] },
     } as any);
     vi.mocked(alertsService.listAlertAcks).mockResolvedValue({ data: { acks } } as any);
   };
@@ -644,6 +644,15 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
       ack: null,
       downtime: null,
     });
+  });
+
+  it("reads the alert's own folder from the cross-folder list when the URL names none", async () => {
+    for (const key of Object.keys(mockRouteQuery)) delete mockRouteQuery[key];
+    withListRow({ folder_id: "prod", last_outcome: "firing" });
+    wrapper = await mountView();
+    expect(vi.mocked(alertsService.listByFolderId).mock.calls[0][6]).toBe("");
+    expect(header().props()).toMatchObject({ folderId: "prod", firing: true });
+    expect(alertsService.listAlertAcks).toHaveBeenCalledWith(expect.anything(), "alert-1", "prod");
   });
 
   it("shows the ack and the mute after the title", async () => {

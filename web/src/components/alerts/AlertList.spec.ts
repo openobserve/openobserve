@@ -1759,6 +1759,20 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     push.mockRestore();
   });
 
+  it("row click opens the alert in its own folder, not the selected one", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
+    wrapper.vm.triggerExpand({ alert_id: "a1", folder_name: { id: "prod", name: "Prod" } });
+    await flushPromises();
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ folder: "prod" }) }),
+    );
+    push.mockRestore();
+  });
+
   it("row click without an alert id does not navigate", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
