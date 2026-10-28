@@ -20,13 +20,19 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
-import type { TelephonyReason, TelephonyView } from "@/ts/interfaces/oncall";
+import type {
+  TelephonyReason,
+  TelephonyState,
+  TelephonyStatus,
+  TelephonyView,
+} from "@/ts/interfaces/oncall";
 import TelephonyAccountDialog from "./TelephonyAccountDialog.vue";
 import TelephonySettings from "./TelephonySettings.vue";
 
 vi.mock("@/services/oncall", () => ({
   default: {
     getTelephony: vi.fn(),
+    getTelephonyStatus: vi.fn(),
     putTelephony: vi.fn(),
     deleteTelephony: vi.fn(),
   },
@@ -54,9 +60,19 @@ function failure(status: number, data: Record<string, unknown> = {}) {
   return { response: { status, data } };
 }
 
-async function render(read: TelephonyView | ReturnType<typeof failure>, ok = true) {
+function status(state: TelephonyState, over: Partial<TelephonyStatus> = {}): TelephonyStatus {
+  const ok = state === "ok";
+  return { state, trial: false, can_text: ok, can_call: ok, ...over };
+}
+
+async function render(
+  read: TelephonyView | ReturnType<typeof failure>,
+  ok = true,
+  live: TelephonyStatus = status("ok"),
+) {
   if (ok) service.getTelephony.mockResolvedValue({ data: read } as any);
   else service.getTelephony.mockRejectedValue(read);
+  service.getTelephonyStatus.mockResolvedValue({ data: live } as any);
   const wrapper = mount(TelephonySettings, {
     global: { plugins: [i18n, store, withQueryClient()] },
     attachTo: document.body,
@@ -68,11 +84,10 @@ async function render(read: TelephonyView | ReturnType<typeof failure>, ok = tru
 const q = (id: string) =>
   document.querySelector<HTMLElement>(`[data-test="telephony-settings-${id}"]`);
 const text = (id: string) => q(id)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
-// dt and dd sit with no whitespace between them, so their texts are joined explicitly.
-const words = (id: string) =>
-  Array.from(q(id)?.querySelectorAll("dt, dd > *") ?? [])
-    .map((el) => el.textContent?.trim())
-    .join(" ");
+const card = (id: string) =>
+  document.querySelector<HTMLElement>(`[data-test="telephony-card-${id}"]`);
+const cardText = (id: string) => card(id)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+const PRESS4 = "Call keys (4 acknowledge, 6 resolve, 8 escalate)";
 const dialog = (id: string) =>
   document.querySelector<HTMLInputElement>(`[data-test="telephony-account-dialog-${id}-field"]`);
 
@@ -115,13 +130,11 @@ describe("TelephonySettings", () => {
 
     it("5d: the org's account shows provider, short SID, From and press 4", async () => {
       await render(CONNECTED);
-      const card = text("connected");
-      expect(card).toContain("Twilio");
-      expect(card).toContain("Connected");
-      expect(card).toContain("ACte…0001");
-      expect(card).not.toContain(SID);
-      expect(card).toContain("+18335550100");
-      expect(words("press4")).toBe("Call keys: 4 acknowledge, 6 resolve, 8 escalate Available");
+      const body = text("connected");
+      expect(body).toContain("Twilio");
+      expect(cardText("meta")).toBe("From +18335550100 · Account ACte…0001");
+      expect(body).not.toContain(SID);
+      expect(text("press4")).toBe(PRESS4);
       expect(q("update")).not.toBeNull();
       expect(q("disconnect")).not.toBeNull();
       expect(q("hero")).toBeNull();
@@ -129,8 +142,9 @@ describe("TelephonySettings", () => {
 
     it("5d: without a callback URL press 4 reads not available, with the link fallback", async () => {
       await render({ ...CONNECTED, press4_available: false });
-      expect(words("press4")).toBe(
-        "Call keys: 4 acknowledge, 6 resolve, 8 escalate Not available Calls ask people to acknowledge from the link in their text.",
+      expect(text("press4")).toContain(PRESS4);
+      expect(text("press4")).toContain(
+        "Calls ask people to acknowledge from the link in their text.",
       );
     });
 
@@ -138,19 +152,113 @@ describe("TelephonySettings", () => {
       await render(
         view({ deployment_account_present: true, deployment_from_number: "+18335550199" }),
       );
-      const card = text("deployment");
-      expect(card).toContain("This deployment's Twilio account");
-      expect(card).toContain("Active");
-      expect(card).toContain("+18335550199");
-      expect(card).toContain(
+      const body = text("deployment");
+      expect(body).toContain("This deployment's Twilio account");
+      expect(cardText("status")).toBe("Connected");
+      expect(cardText("meta")).toBe("From +18335550199");
+      expect(body).toContain(
         "Texts and calls already work. Set by the operator; nothing to do here.",
       );
-      expect(words("press4")).toBe("Call keys: 4 acknowledge, 6 resolve, 8 escalate Available");
+      expect(text("press4")).toBe(PRESS4);
       expect(q("hero")).toBeNull();
 
       await click("use-own");
       expect(document.body.textContent).toContain("Connect Twilio");
       expect(dialog("token")?.type).toBe("password");
+    });
+  });
+
+  describe("the card's live check", () => {
+    it("says it is checking until Twilio answers", async () => {
+      service.getTelephony.mockResolvedValue({ data: CONNECTED } as any);
+      service.getTelephonyStatus.mockReturnValue(new Promise(() => {}) as any);
+      mount(TelephonySettings, {
+        global: { plugins: [i18n, store, withQueryClient()] },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      expect(cardText("status")).toBe("Checking…");
+      expect(card("problem")).toBeNull();
+    });
+
+    it("ok shows Connected and no warnings", async () => {
+      await render(CONNECTED);
+      expect(cardText("status")).toBe("Connected");
+      for (const id of ["problem", "unchecked", "trial", "cant-text", "cant-call"]) {
+        expect(card(id), id).toBeNull();
+      }
+    });
+
+    it.each<[TelephonyState, string]>([
+      [
+        "account_rejected",
+        "Twilio did not accept this account. Check the Account SID and auth token, and that the account is active.",
+      ],
+      [
+        "from_not_on_account",
+        "This number is not on this Twilio account. Use one from Phone Numbers → Active numbers in Twilio.",
+      ],
+      ["unreadable", "This organisation's phone provider account could not be read."],
+    ])("%s reads Not working, says why, and offers Update", async (state, why) => {
+      await render(CONNECTED, true, status(state));
+      expect(cardText("status")).toBe("Not working");
+      expect(cardText("problem")).toContain(why);
+      card("problem-update")!.click();
+      await flushPromises();
+      expect(dialog("sid")?.value).toBe(SID);
+    });
+
+    it("a broken deployment account offers no Update, which only its operator can do", async () => {
+      await render(
+        view({ deployment_account_present: true, deployment_from_number: "+18335550199" }),
+        true,
+        status("account_rejected"),
+      );
+      expect(cardText("status")).toBe("Not working");
+      expect(card("problem")).not.toBeNull();
+      expect(card("problem-update")).toBeNull();
+    });
+
+    it("an unreachable Twilio reads Couldn't check, not Not working", async () => {
+      await render(CONNECTED, true, status("unavailable"));
+      expect(cardText("status")).toBe("Couldn't check");
+      expect(cardText("unchecked")).toBe("Twilio could not be reached just now.");
+      expect(card("problem")).toBeNull();
+    });
+
+    it("a failed status read reads Couldn't check", async () => {
+      service.getTelephony.mockResolvedValue({ data: CONNECTED } as any);
+      service.getTelephonyStatus.mockRejectedValue(failure(500));
+      mount(TelephonySettings, {
+        global: { plugins: [i18n, store, withQueryClient()] },
+        attachTo: document.body,
+      });
+      await vi.waitFor(() => expect(cardText("status")).toBe("Couldn't check"));
+      expect(card("unchecked")).toBeNull();
+    });
+
+    it("a trial account says who it can reach", async () => {
+      await render(CONNECTED, true, status("ok", { trial: true }));
+      expect(cardText("trial")).toBe(
+        "Trial account: texts and calls only reach numbers verified in Twilio.",
+      );
+    });
+
+    it.each<[string, Partial<TelephonyStatus>, string[]]>([
+      ["cannot text", { can_text: false }, ["cant-text"]],
+      ["cannot call", { can_call: false }, ["cant-call"]],
+      ["can do neither", { can_text: false, can_call: false }, ["cant-text", "cant-call"]],
+    ])("a number that %s is saved and warned about", async (_, over, shown) => {
+      await render(CONNECTED, true, status("ok", over));
+      expect(cardText("status")).toBe("Connected");
+      expect(["cant-text", "cant-call"].filter((id) => card(id))).toEqual(shown);
+      expect(cardText("cant-text") + cardText("cant-call")).toBe(
+        shown
+          .map((id) =>
+            id === "cant-text" ? "This number can't send texts" : "This number can't make calls",
+          )
+          .join(""),
+      );
     });
   });
 
@@ -210,6 +318,50 @@ describe("TelephonySettings", () => {
         "Twilio did not accept this account. Check the Account SID and auth token, and that the account is active.",
       );
       expect(dialog("sid")).not.toBeNull();
+    });
+
+    it("a From number not on the account is pinned on the field, not the banner", async () => {
+      service.putTelephony.mockRejectedValue(
+        failure(400, { message: "English", reason: "from_not_on_account" }),
+      );
+      const wrapper = await render(CONNECTED);
+      await click("update");
+      await submitDialog(wrapper);
+      expect(
+        document.querySelector('[data-test="telephony-account-dialog-from-error"]')?.textContent,
+      ).toContain(
+        "This number is not on this Twilio account. Use one from Phone Numbers → Active numbers in Twilio.",
+      );
+      expect(document.querySelector('[data-test="telephony-account-dialog-refusal"]')).toBeNull();
+
+      await type("sid", "ACanotheraccount0000000002");
+      expect(
+        document.querySelector('[data-test="telephony-account-dialog-from-error"]'),
+      ).toBeNull();
+    });
+
+    it("an unreachable Twilio says so in the banner", async () => {
+      service.putTelephony.mockRejectedValue(
+        failure(400, { message: "English", reason: "unavailable" }),
+      );
+      const wrapper = await render(CONNECTED);
+      await click("update");
+      await submitDialog(wrapper);
+      expect(
+        document.querySelector('[data-test="telephony-account-dialog-refusal"]')?.textContent,
+      ).toContain("Twilio could not be reached. Try again.");
+    });
+
+    it("a changed Account SID makes the token required and says why", async () => {
+      await render(CONNECTED);
+      await click("update");
+      const token = () =>
+        document.querySelector('[data-test="telephony-account-dialog-token"]')?.textContent ?? "";
+      expect(token()).toContain("Leave blank to keep the current token");
+      expect(token()).not.toContain("Auth token*");
+      await type("sid", "ACanotheraccount0000000002");
+      expect(token()).toContain("A different account needs its own auth token");
+      expect(token()).toContain("Auth token*");
     });
 
     it.each<[TelephonyReason, string]>([

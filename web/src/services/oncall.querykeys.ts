@@ -153,6 +153,8 @@ export const oncallKeys = {
   contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
   contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
   telephony: (org: string) => orgKey(org, "oncall", "telephony"),
+  /** Under `telephony`, so a telephony write drops the live check with the settings. */
+  telephonyStatus: (org: string) => orgKey(org, "oncall", "telephony", "status"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

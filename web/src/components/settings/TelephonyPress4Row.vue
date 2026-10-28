@@ -15,22 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="contents" data-test="telephony-settings-press4">
-    <dt class="text-text-secondary">{{ t("telephony.press4") }}</dt>
-    <dd class="flex flex-wrap items-center gap-2">
-      <OTag v-if="available" variant="success-soft" size="sm">
-        {{ t("telephony.press4Available") }}
-      </OTag>
-      <template v-else>
-        <OTag variant="default-soft" size="sm">{{ t("telephony.press4NotAvailable") }}</OTag>
-        <OText variant="meta">{{ t("telephony.press4NotAvailableHint") }}</OText>
-      </template>
-    </dd>
-  </div>
+  <span class="flex flex-wrap items-center gap-2 text-sm" data-test="telephony-settings-press4">
+    <OIcon
+      :name="available ? 'check-circle' : 'info'"
+      size="sm"
+      :class="available ? 'text-status-positive' : 'text-text-secondary'"
+    />
+    <span class="text-text-body">{{ t("telephony.press4") }}</span>
+    <OText v-if="!available" variant="meta">{{ t("telephony.press4NotAvailableHint") }}</OText>
+  </span>
 </template>
 
 <script setup lang="ts">
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
