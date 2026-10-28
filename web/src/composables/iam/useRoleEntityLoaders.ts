@@ -597,6 +597,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       { stream_type: "logs", name: t("common.logs") },
       { stream_type: "traces", name: t("common.traces") },
       { stream_type: "metrics", name: t("common.metrics") },
+      { stream_type: "profiles", name: t("menu.profiles") },
       { stream_type: "index", name: t("iam.indices") },
     ];
 

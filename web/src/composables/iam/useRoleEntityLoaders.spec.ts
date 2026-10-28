@@ -335,7 +335,7 @@ describe("useRoleEntityLoaders - getResourceEntities dispatch", () => {
 });
 
 describe("useRoleEntityLoaders - stream loaders", () => {
-  it("getStreamsTypes builds four type rows without a service call", async () => {
+  it("getStreamsTypes builds five type rows without a service call", async () => {
     const { getStreamsTypes, updateResourceResource } = setup();
     getStreamsMock.mockClear();
 
@@ -346,6 +346,7 @@ describe("useRoleEntityLoaders - stream loaders", () => {
       "logs",
       "traces",
       "metrics",
+      "profiles",
       "index",
     ]);
     expect(updateResourceResource.mock.calls[0]).toEqual([
@@ -357,6 +358,9 @@ describe("useRoleEntityLoaders - stream loaders", () => {
       "name",
     ]);
     expect(updateResourceResource.mock.calls[3][3]).toEqual([
+      { stream_type: "profiles", name: "menu.profiles" },
+    ]);
+    expect(updateResourceResource.mock.calls[4][3]).toEqual([
       { stream_type: "index", name: "iam.indices" },
     ]);
   });
