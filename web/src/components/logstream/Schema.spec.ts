@@ -2332,6 +2332,68 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(false);
     });
 
+    const findConfirmDialog = (title: string) =>
+      wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d: any) => d.props("title") === title)!;
+
+    it("shows the selected field count in a red Delete Fields dialog", async () => {
+      wrapper.vm.selectedFields = [{ name: "message" }, { name: "level" }];
+      await wrapper.vm.$nextTick();
+      await wrapper.find('[data-test="schema-delete-button"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(true);
+      const dialog = findConfirmDialog("Delete Fields");
+      expect(dialog.props("message")).toBe(
+        "Are you sure you want to delete 2 fields? This action cannot be undone.",
+      );
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
+
+    it("uses the singular form and keeps the count after the selection clears", async () => {
+      wrapper.vm.selectedFields = [{ name: "message" }];
+      wrapper.vm.openDeleteConfirm();
+      wrapper.vm.selectedFields = [];
+      await flushPromises();
+
+      expect(findConfirmDialog("Delete Field").props("message")).toBe(
+        "Are you sure you want to delete 1 field? This action cannot be undone.",
+      );
+    });
+
+    it("counts the selected fields in the footer in the singular and the plural", async () => {
+      wrapper.vm.activeMainTab = "schemaSettings";
+      wrapper.vm.selectedFields = [{ name: "message" }];
+      await flushPromises();
+      const footer = () => wrapper.find('[data-test="schema-fields-selected-count"]');
+      expect(footer().text()).toBe("1 field selected");
+      expect(footer().find("strong").text()).toBe("1");
+
+      wrapper.vm.selectedFields = [{ name: "message" }, { name: "level" }];
+      await flushPromises();
+      expect(footer().text()).toBe("2 fields selected");
+    });
+
+    it("shows the selected date range count in a red Delete Dates dialog", async () => {
+      wrapper.vm.activeMainTab = "redButton";
+      wrapper.vm.selectedDateFields = [
+        { index: 0, original_start: 1, original_end: 2 },
+        { index: 1, original_start: 3, original_end: 4 },
+        { index: 2, original_start: 5, original_end: 6 },
+      ];
+      wrapper.vm.openDeleteConfirm();
+      wrapper.vm.selectedDateFields = [];
+      await flushPromises();
+
+      expect(wrapper.vm.confirmDeleteDatesDialog).toBe(true);
+      const dialog = findConfirmDialog("Delete Dates");
+      expect(dialog.props("message")).toBe(
+        "Are you sure you want to delete 3 date ranges? This action cannot be undone.",
+      );
+      expect(dialog.props("okVariant")).toBe("destructive");
+    });
+
     it("should handle deleteFields error gracefully", async () => {
       vi.hoisted(() => ({
         mockStreamServiceDeleteFields: vi.fn(),

@@ -452,12 +452,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="confirmRemoveDomainOpen = false"
     @click:primary="doRemoveDomain"
   >
-    <p v-if="pendingRemoveDomainIndex !== null">
-      {{ t("settings.confirmRemoveDomain", { domain: domains[pendingRemoveDomainIndex]?.name }) }}
-    </p>
+    <i18n-t
+      keypath="settings.confirmRemoveDomain"
+      tag="p"
+      data-test="domain-management-remove-domain-message"
+    >
+      <template #domain
+        ><span class="text-text-heading font-semibold break-all">{{
+          pendingRemoveDomainName
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 
   <!-- Confirm remove email dialog -->
@@ -467,16 +476,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
-    @click:secondary="confirmRemoveEmailOpen = false"
+    :primary-button-variant="shownRemoveEmail.blocked ? 'primary' : 'destructive'"
+    @click:secondary="cancelRemoveEmail"
     @click:primary="doRemoveEmail"
   >
-    <p v-if="pendingRemoveEmail !== null">
-      {{
-        pendingRemoveEmail.blocked
-          ? t("settings.confirmRemoveBlockedEmail", { email: pendingRemoveEmail.email })
-          : t("settings.confirmRemoveEmail", { email: pendingRemoveEmail.email })
-      }}
-    </p>
+    <i18n-t
+      :keypath="
+        shownRemoveEmail.blocked
+          ? 'settings.confirmRemoveBlockedEmail'
+          : 'settings.confirmRemoveEmail'
+      "
+      tag="p"
+      data-test="domain-management-remove-email-message"
+    >
+      <template #email
+        ><span class="text-text-heading font-semibold break-all">{{
+          shownRemoveEmail.email
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 </template>
 
@@ -528,6 +546,8 @@ const { t } = useI18nTyped();
 // Dialog state for domain/email removal confirmations
 const confirmRemoveDomainOpen = ref(false);
 const pendingRemoveDomainIndex = ref<number | null>(null);
+// Set on open and never cleared, so the closing fade keeps the name.
+const pendingRemoveDomainName = ref("");
 const confirmRemoveEmailOpen = ref(false);
 const pendingRemoveEmail = ref<{
   domain: any;
@@ -535,6 +555,8 @@ const pendingRemoveEmail = ref<{
   email: string;
   blocked: boolean;
 } | null>(null);
+// Display copy set on open and never cleared, so the fade keeps the text while pending is cleared.
+const shownRemoveEmail = ref({ email: "", blocked: false });
 const store = useStore();
 const router = useRouter();
 
@@ -739,6 +761,7 @@ const addDomain = (value?: AddDomainForm) => {
 
 const removeDomain = (index: number) => {
   pendingRemoveDomainIndex.value = index;
+  pendingRemoveDomainName.value = domains[index]?.name ?? "";
   confirmRemoveDomainOpen.value = true;
 };
 
@@ -783,6 +806,7 @@ const removeEmail = (domain: Domain, emailIndex: number) => {
     email: domain.allowedEmails[emailIndex],
     blocked: false,
   };
+  shownRemoveEmail.value = { email: domain.allowedEmails[emailIndex], blocked: false };
   confirmRemoveEmailOpen.value = true;
 };
 
@@ -812,6 +836,7 @@ const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
     email: domain.blockedEmails[emailIndex],
     blocked: true,
   };
+  shownRemoveEmail.value = { email: domain.blockedEmails[emailIndex], blocked: true };
   confirmRemoveEmailOpen.value = true;
 };
 
@@ -820,9 +845,20 @@ const doRemoveEmail = () => {
   if (!pending) return;
   const list = pending.blocked ? pending.domain.blockedEmails : pending.domain.allowedEmails;
   list.splice(pending.emailIndex, 1);
+  // Cleared so a second OK click during the fade cannot splice the next email.
   pendingRemoveEmail.value = null;
   confirmRemoveEmailOpen.value = false;
 };
+
+const cancelRemoveEmail = () => {
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
+};
+
+// Escape and the close button bypass cancelRemoveEmail, so they must drop the pending row too.
+watch(confirmRemoveEmailOpen, (open) => {
+  if (!open) pendingRemoveEmail.value = null;
+});
 
 // Load VRL functions from _meta org
 const loadFunctions = async () => {

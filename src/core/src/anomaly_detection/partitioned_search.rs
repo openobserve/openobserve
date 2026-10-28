@@ -1268,7 +1268,6 @@ mod tests {
         }
 
         async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
-            assert!(req.query.query_type.is_empty(), "{}", req.query.query_type);
             let call = (
                 trace_id.to_string(),
                 req.query.start_time,
@@ -1309,7 +1308,6 @@ mod tests {
         }
 
         async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
-            assert!(req.query.query_type.is_empty(), "{}", req.query.query_type);
             self.searched.fetch_add(1, Ordering::SeqCst);
             let batch = self
                 .batches

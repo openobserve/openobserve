@@ -27,8 +27,9 @@ vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: { search: vi.fn() } });
 });
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn(async () => true) }));
 vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(async () => true) }),
+  useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -74,6 +75,7 @@ const compile = (d: FunnelDef) => `SQL ${d.steps.map((s) => s.key).join(",")}`;
 type Exposed = {
   rename: (f: SavedFunnel) => void;
   duplicate: (f: SavedFunnel, asStored: boolean) => void;
+  remove: (f: SavedFunnel) => Promise<boolean>;
 };
 
 describe("pa gap fixes: SavedFunnelDialogs recompiles on rename and duplicate", () => {
@@ -157,6 +159,35 @@ describe("pa gap fixes: SavedFunnelDialogs recompiles on rename and duplicate", 
     wrapper = null;
     delete svc.getAppSettings;
     document.body.innerHTML = "";
+  });
+
+  it("asks to delete a saved funnel by name with a destructive confirm", async () => {
+    confirmMock.mockResolvedValueOnce(false);
+    await mountDialogs();
+    const gone = await dialogs.value!.remove({ id: "f1", name: "Signup flow" } as SavedFunnel);
+
+    expect(gone).toBe(false);
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageKeypath: "rum.analytics.saved.deleteMessage",
+        messageName: "Signup flow",
+        confirmVariant: "destructive",
+      }),
+    );
+  });
+
+  it("asks to delete several saved funnels with a destructive confirm", async () => {
+    confirmMock.mockResolvedValueOnce(false);
+    await mountDialogs();
+    const gone = await dialogs.value!.removeMany([
+      { id: "f1", name: "Signup flow" },
+      { id: "f2", name: "Checkout" },
+    ] as SavedFunnel[]);
+
+    expect(gone).toEqual([]);
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmVariant: "destructive" }),
+    );
   });
 
   it("P7-R1: rename recompiles sql from the stored def and sends the current rules_hash", async () => {

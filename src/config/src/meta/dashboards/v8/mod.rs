@@ -687,6 +687,20 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     tooltip_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_entity_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_group_by: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_reduction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_group_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_cell_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_cell_shape: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostmap_cell_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     no_data_text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
@@ -1226,6 +1240,16 @@ pub enum LabelPosition {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const HOSTMAP_KEYS: [&str; 7] = [
+        "hostmap_entity_label",
+        "hostmap_group_by",
+        "hostmap_reduction",
+        "hostmap_group_sort",
+        "hostmap_cell_sort",
+        "hostmap_cell_shape",
+        "hostmap_cell_label",
+    ];
 
     fn make_dashboard() -> Dashboard {
         serde_json::from_value(serde_json::json!({
@@ -2622,6 +2646,53 @@ mod tests {
             "row_sort",
             "tooltip_mode",
         ] {
+            assert!(json.get(key).is_none(), "{key}");
+        }
+    }
+
+    #[test]
+    fn test_panel_config_hostmap_round_trip() {
+        let input = serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "hostmap_entity_label": "gpu_uuid",
+            "hostmap_group_by": ["rack", "host"],
+            "hostmap_reduction": "max",
+            "hostmap_group_sort": "value",
+            "hostmap_cell_sort": "name",
+            "hostmap_cell_shape": "hexagon",
+            "hostmap_cell_label": "value"
+        });
+        let cfg: PanelConfig = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(cfg.hostmap_entity_label.as_deref(), Some("gpu_uuid"));
+        assert_eq!(
+            cfg.hostmap_group_by,
+            Some(vec!["rack".to_string(), "host".to_string()])
+        );
+        assert_eq!(cfg.hostmap_reduction.as_deref(), Some("max"));
+        assert_eq!(cfg.hostmap_cell_shape.as_deref(), Some("hexagon"));
+
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in HOSTMAP_KEYS {
+            assert_eq!(json[key], input[key], "{key}");
+        }
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_hostmap_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in HOSTMAP_KEYS {
             assert!(json.get(key).is_none(), "{key}");
         }
     }

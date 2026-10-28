@@ -1,0 +1,247 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div
+    class="date-time-rail flex flex-col py-1 outline-none"
+    tabindex="-1"
+    data-test="date-time-rail"
+  >
+    <div
+      role="group"
+      :aria-label="t('common.timeRangeRecent')"
+      class="flex flex-col"
+      data-test="date-time-rail-recent-group"
+    >
+      <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
+      <div
+        v-if="recent.length === 0"
+        class="text-text-muted px-2 pb-1 text-xs"
+        data-test="date-time-rail-recent-empty"
+      >
+        {{ t("common.timeRangeRecentEmpty") }}
+      </div>
+      <div v-if="recent.length > 0" role="list" data-test="date-time-rail-recent-list">
+        <div
+          v-for="(item, index) in visibleRecent"
+          :key="item.id"
+          role="listitem"
+          class="group relative px-1"
+          :class="index < visibleRecent.length - 1 ? 'border-border-default border-b' : ''"
+        >
+          <OTooltip
+            side="right"
+            align="center"
+            :side-offset="8"
+            max-width="18.75rem"
+            :content="item.disabled ? restrictionMsg : item.tooltip"
+          />
+          <OButton
+            variant="ghost"
+            size="xs"
+            data-date-time-rail-item
+            data-date-time-rail-recent
+            :tabindex="tabindexFor(`recent-${item.id}`)"
+            :data-test="`date-time-rail-recent-${item.id}`"
+            class="w-full justify-start! pe-7! font-normal tabular-nums aria-disabled:opacity-35"
+            :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
+            :disabled="item.disabled"
+            focusable-unavailable
+            :aria-pressed="item.selected"
+            :aria-describedby="recentKeysHintId"
+            :description-id="recentKeysHintId"
+            @mouseenter="emit('hover')"
+            @focus="onItemFocus(`recent-${item.id}`)"
+            @click="emit('select-recent', item.id)"
+            @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
+            @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
+          >
+            <OTruncatedText v-if="item.parts" :tooltip="false" class="min-w-0"
+              ><span>{{ item.parts.startDate }}</span
+              ><span :class="item.selected ? '' : 'text-text-secondary'">{{
+                ` ${item.parts.startTime} - `
+              }}</span
+              ><span>{{ item.parts.endDate }}</span
+              ><span :class="item.selected ? '' : 'text-text-secondary'">{{
+                ` ${item.parts.endTime}`
+              }}</span></OTruncatedText
+            >
+            <OTruncatedText v-else :tooltip="false" class="min-w-0">{{
+              item.label
+            }}</OTruncatedText>
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon-chip"
+            icon-left="close"
+            :data-test="`date-time-rail-recent-${item.id}-remove`"
+            tabindex="-1"
+            :aria-label="t('common.timeRangeRemoveRecent', { range: item.label })"
+            @keydown.left.prevent="focusSibling($event, '[data-date-time-rail-recent]')"
+            class="absolute! end-1.5 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+            :class="item.selected ? 'text-button-primary-foreground!' : ''"
+            @click.stop="removeFocusedRecent(item.id, $event)"
+          />
+        </div>
+      </div>
+      <OButton
+        v-if="recent.length > COLLAPSED_COUNT"
+        variant="ghost-primary"
+        size="chip"
+        class="ms-1 self-start"
+        data-date-time-rail-item
+        data-test="date-time-rail-recent-toggle"
+        :tabindex="tabindexFor('toggle')"
+        :aria-expanded="expanded"
+        @focus="onItemFocus('toggle')"
+        @keydown.enter.prevent="expanded = !expanded"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? t("common.timeRangeShowLess") : t("common.timeRangeShowMore") }}
+      </OButton>
+    </div>
+
+    <div
+      v-if="calendar !== null && calendar.length > 0"
+      role="group"
+      :aria-labelledby="calendarHeadingId"
+      class="flex flex-col"
+      data-test="date-time-rail-calendar-group"
+    >
+      <div :id="calendarHeadingId" class="px-2 pt-3 pb-1 text-sm font-semibold">
+        {{ t("common.timeRangeCalendar") }}
+      </div>
+      <div
+        role="list"
+        class="grid grid-cols-2 gap-1.5 px-1"
+        data-test="date-time-rail-calendar-list"
+      >
+        <div v-for="item in calendar" :key="item.id" role="listitem" class="min-w-0">
+          <OTooltip
+            side="right"
+            align="center"
+            :side-offset="8"
+            max-width="18.75rem"
+            :content="item.disabled ? restrictionMsg : item.tooltip"
+          />
+          <OButton
+            variant="ghost"
+            size="xs"
+            data-date-time-rail-item
+            data-date-time-rail-calendar
+            :tabindex="tabindexFor(`calendar-${item.id}`)"
+            :data-test="`date-time-rail-calendar-${item.id}`"
+            class="h-8! w-full font-bold! disabled:opacity-35"
+            :class="
+              item.selected
+                ? 'bg-button-primary! text-button-primary-foreground!'
+                : 'bg-text-heading/7!'
+            "
+            :disabled="item.disabled"
+            :aria-pressed="item.selected"
+            @mouseenter="emit('hover')"
+            @focus="onItemFocus(`calendar-${item.id}`)"
+            @click="emit('select-calendar', item.id)"
+          >
+            <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
+          </OButton>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, ref, useId } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import type { TimeRangeRailItem } from "@/utils/timeRangeRail";
+
+const COLLAPSED_COUNT = 6;
+
+const props = defineProps<{
+  recent: TimeRangeRailItem[];
+  /** Null hides the calendar section, for pages whose backend only takes rolling periods. */
+  calendar: TimeRangeRailItem[] | null;
+  /** Shown instead of the range tooltip on items disabled by the query-range limit. */
+  restrictionMsg?: I18nText;
+}>();
+
+const emit = defineEmits<{
+  "select-recent": [id: string];
+  "remove-recent": [id: string];
+  "select-calendar": [id: string];
+  /** Fires on pointer enter and on focus, so the parent can refresh the clock "so far" tooltips end at. */
+  hover: [];
+}>();
+
+const { t } = useI18nTyped();
+const recentKeysHintId = useId();
+const calendarHeadingId = useId();
+
+// Starts collapsed on every open because the popover unmounts this rail when it closes.
+const expanded = ref(false);
+
+const visibleRecent = computed(() =>
+  expanded.value ? props.recent : props.recent.slice(0, COLLAPSED_COUNT),
+);
+
+// The rail is one Tab stop: only its active item is tabbable and arrow keys move within it.
+const activeKey = ref<string | null>(null);
+
+// A recent row over the query-range limit stays focusable, so it can still be removed by keyboard.
+const focusOrder = computed(() => [
+  ...visibleRecent.value.map((item) => `recent-${item.id}`),
+  ...(props.recent.length > COLLAPSED_COUNT ? ["toggle"] : []),
+  ...(props.calendar ?? []).filter((item) => !item.disabled).map((item) => `calendar-${item.id}`),
+]);
+
+const tabStop = computed(() =>
+  activeKey.value !== null && focusOrder.value.includes(activeKey.value)
+    ? activeKey.value
+    : focusOrder.value[0],
+);
+
+const tabindexFor = (key: string) => (key === tabStop.value ? 0 : -1);
+
+const onItemFocus = (key: string) => {
+  activeKey.value = key;
+  emit("hover");
+};
+
+// The × stays out of the Tab order; ArrowRight from its row reaches it and ArrowLeft returns.
+const focusSibling = (event: KeyboardEvent, selector: string) => {
+  const row = (event.currentTarget as HTMLElement).parentElement;
+  row?.querySelector<HTMLElement>(selector)?.focus();
+};
+
+// The × is out of the Tab order, so Delete on the focused row removes it and focus stays in the list.
+const removeFocusedRecent = async (id: string, event: Event) => {
+  const list = (event.currentTarget as HTMLElement).closest("[data-test='date-time-rail']");
+  const index = visibleRecent.value.findIndex((item) => item.id === id);
+  emit("remove-recent", id);
+  await nextTick();
+  const rows = list?.querySelectorAll<HTMLElement>("[data-date-time-rail-recent]");
+  if (rows && rows.length > 0) rows[Math.min(index, rows.length - 1)].focus();
+  else {
+    // With no rows left, the next enabled rail item or else the rail itself keeps focus inside the picker.
+    const next = list?.querySelector<HTMLElement>("[data-date-time-rail-item]:not([disabled])");
+    (next ?? (list as HTMLElement | null))?.focus();
+  }
+};
+</script>

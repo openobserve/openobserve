@@ -392,7 +392,6 @@ async fn search_index_window(
             // Timer windows use closed endpoints; search ranges are half-open.
             end_time: end_time.saturating_add(1),
             quick_mode: false,
-            query_type: String::new(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
