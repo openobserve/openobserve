@@ -227,6 +227,107 @@ describe("ShortcutManager", () => {
       expect(handler).toHaveBeenCalledOnce();
     });
   });
+
+  // o2-enterprise#3127: `x` inside the Public links drawer exported the dashboard behind it.
+  describe("dialog-focus guard", () => {
+    let dialog: HTMLDivElement;
+    let insideDialog: HTMLButtonElement;
+
+    beforeEach(() => {
+      dialog = document.createElement("div");
+      dialog.setAttribute("role", "dialog");
+      insideDialog = document.createElement("button");
+      dialog.appendChild(insideDialog);
+      document.body.appendChild(dialog);
+    });
+
+    afterEach(() => {
+      dialog.remove();
+    });
+
+    it("should not fire a plain-key page shortcut while focus is inside a dialog", () => {
+      const handler = vi.fn();
+      manager.register({ key: "x", handler, description: "export" });
+
+      manager.handleKeyDown(fakeEvent({ key: "x", target: insideDialog }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should not fire a plain-key shortcut when the dialog element itself has focus", () => {
+      const handler = vi.fn();
+      manager.register({ key: "f", handler, description: "fullscreen" });
+
+      manager.handleKeyDown(fakeEvent({ key: "f", target: dialog }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should not fire a plain-key shortcut inside an alert dialog", () => {
+      const handler = vi.fn();
+      manager.register({ key: "r", handler, description: "refresh" });
+      dialog.setAttribute("role", "alertdialog");
+
+      manager.handleKeyDown(fakeEvent({ key: "r", target: insideDialog }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("control: should still fire the same shortcut outside any dialog", () => {
+      const handler = vi.fn();
+      manager.register({ key: "x", handler, description: "export" });
+
+      manager.handleKeyDown(fakeEvent({ key: "x", target: document.body }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it("control: should still fire Escape inside a dialog so it can close", () => {
+      const handler = vi.fn();
+      manager.register({ key: "escape", handler, description: "close" });
+
+      manager.handleKeyDown(fakeEvent({ key: "Escape", target: insideDialog }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it("control: should still fire command-modifier shortcuts inside a dialog", () => {
+      const handler = vi.fn();
+      manager.register({ key: "ctrl+s", handler, description: "save" });
+
+      manager.handleKeyDown(fakeEvent({ key: "s", ctrlKey: true, target: insideDialog }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it("should fire an allowInDialog shortcut inside a dialog", () => {
+      const handler = vi.fn();
+      manager.register({ key: "j", handler, description: "next row", allowInDialog: true });
+
+      manager.handleKeyDown(fakeEvent({ key: "j", target: insideDialog }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it("should carry allowInDialog from the registry through useShortcuts", async () => {
+      const handler = vi.fn();
+      const wrapper = mount(
+        defineComponent({
+          setup() {
+            useShortcuts([{ id: "logsNextRow", handler }]);
+            return () => h("div");
+          },
+        }),
+      );
+      await nextTick();
+
+      getManager()!.handleKeyDown(fakeEvent({ key: "j", target: insideDialog }));
+
+      expect(handler).toHaveBeenCalledOnce();
+      wrapper.unmount();
+      resetManager();
+    });
+  });
 });
 
 describe("useShortcut composable", () => {
@@ -461,6 +562,13 @@ describe("shortcutRegistry", () => {
 
   it("should return undefined for an unknown id", () => {
     expect(getShortcutDef("nopeNotAnId")).toBeUndefined();
+  });
+
+  it("should let only row and span stepping work inside dialogs", () => {
+    const inDialog = ["logsNextRow", "logsPrevRow", "traceNextSpan", "tracePrevSpan"];
+    inDialog.forEach((id) => expect(getShortcutDef(id)?.allowInDialog).toBe(true));
+    expect(getShortcutDef("dashboardExport")?.allowInDialog).toBeFalsy();
+    expect(getShortcutDef("dashboardFullscreen")?.allowInDialog).toBeFalsy();
   });
 
   it("should return undefined for display-only entries (table-row keys)", () => {
