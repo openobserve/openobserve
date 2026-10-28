@@ -64,7 +64,13 @@ vi.mock("@/components/DateTime.vue", () => ({
   default: {
     name: "DateTime",
     template: '<div data-test="datetime-stub"></div>',
-    props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime", "autoApply"],
+    props: {
+      defaultType: null,
+      defaultAbsoluteTime: null,
+      defaultRelativeTime: null,
+      autoApply: null,
+      calendarPresets: Boolean,
+    },
     emits: ["on:date-change"],
   },
 }));
@@ -240,6 +246,14 @@ describe("SearchBar (logstream/explore)", () => {
 
       expect(wrapper.emitted("update-query")).toBeTruthy();
       expect(wrapper.emitted("update-query")![0]).toEqual(["SELECT * FROM logs"]);
+    });
+  });
+
+  describe("calendar ranges", () => {
+    it("lets the picker keep a calendar range shared from Logs", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "DateTime" }).props("calendarPresets")).toBe(true);
     });
   });
 

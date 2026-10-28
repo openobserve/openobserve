@@ -22,7 +22,7 @@ use config::{
     meta::{
         alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision},
         dashboards::reports::{ReportFrequency, ReportFrequencyType},
-        pipeline::components::NodeData,
+        pipeline::components::{DerivedStream, NodeData, PipelineSource},
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
             usage::{RunOutcome, TriggerData, TriggerDataType},
@@ -68,6 +68,7 @@ use crate::{
 
 /// How soon a blocked org's trigger is looked at again when its org's status cannot be read.
 const UNREADABLE_ORG_RECHECK_MICROS: i64 = 60 * 1_000_000;
+const DISABLED_PIPELINE_RECHECK_DAYS: i64 = 7;
 
 /// One anomaly detection run as the trigger history records it, scheduled or manual.
 pub(crate) struct AnomalyRunRecord {
@@ -87,6 +88,33 @@ enum RetryOutcome {
     Retry,
     Reschedule,
     FinishOnce,
+}
+
+/// Why a stored pipeline's scheduled source cannot run.
+#[derive(Debug)]
+enum Unrunnable {
+    NotScheduled,
+    CrossOrg(String),
+}
+
+impl Unrunnable {
+    /// A cross-org refusal holds until the pipeline is edited, so it waits like a disabled one.
+    /// [pure]
+    fn retry_after(&self) -> Duration {
+        match self {
+            Unrunnable::NotScheduled => Duration::minutes(5),
+            Unrunnable::CrossOrg(_) => Duration::days(DISABLED_PIPELINE_RECHECK_DAYS),
+        }
+    }
+}
+
+impl std::fmt::Display for Unrunnable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unrunnable::NotScheduled => f.write_str("Pipeline is not scheduled"),
+            Unrunnable::CrossOrg(refusal) => f.write_str(refusal),
+        }
+    }
 }
 
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
@@ -1531,6 +1559,12 @@ fn should_dispatch_after_incident(
     has_workflows: bool,
 ) -> bool {
     !incident_destinations_handled || has_workflows
+}
+
+/// Whether a matched evaluation's rows go to the notification path.
+fn should_notify_rows(rows_empty: bool, multi_alert: bool) -> bool {
+    // A zero-row `<`/`=` match still fires; only per-group dispatch has no group to send it to.
+    !rows_empty || !multi_alert
 }
 
 /// A composite has no query and no row, so its `key:value` tags are its identity.
@@ -3721,11 +3755,7 @@ async fn handle_alert_triggers(
         }
     };
 
-    // Whether the condition MATCHED this evaluation. Kept separate from the
-    // notification predicate below: a `<`/`<=` alert can match with an EMPTY
-    // payload, and a matched evaluation can be delivery-suppressed — in both
-    // cases outcome/state/history must still say "fired", only the
-    // notification is skipped.
+    // Suppressed or zero-row multi-alert matches still record "fired"; only the send is skipped.
     let condition_matched = trigger_results.data.is_some();
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
 
@@ -3773,7 +3803,7 @@ async fn handle_alert_triggers(
     };
 
     if let Some(data) = trigger_results.data
-        && !data.is_empty()
+        && should_notify_rows(data.is_empty(), alert.query_condition.multi_alert_enabled())
         // Suppressed deliveries still record state and history; only the
         // notification is skipped.
         && delivery.should_deliver()
@@ -3963,7 +3993,8 @@ async fn handle_alert_triggers(
                         .into_iter()
                         .map(|r| (r.group_key, r.fingerprint))
                         .collect();
-                    if deduplicated_data.is_empty() && deduplicated {
+                    // A zero-row match has nothing to dedup; empty output is no suppression.
+                    if deduplicated_data.is_empty() && deduplicated && !data.is_empty() {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
                             new_trigger.org,
@@ -4457,8 +4488,8 @@ async fn handle_alert_triggers(
         }
     } else {
         if condition_matched {
-            // The condition DID match — this branch was reached because the
-            // payload is empty (`<`/`<=` matching zero rows) or delivery was
+            // The condition DID match — this branch was reached because a
+            // multi-alert matched zero rows or delivery was
             // suppressed (silence window / warning policy). Outcome, state and
             // history must still say "fired"; only the notification is
             // skipped. `trigger_data_stream.status` is initialised to Firing,
@@ -5171,10 +5202,12 @@ async fn handle_derived_stream_triggers(
     if !pipeline.enabled {
         // Pipeline not enabled, check again next week
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 7 days."
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after {DISABLED_PIPELINE_RECHECK_DAYS} days."
         );
         // update trigger, check on next week
-        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+        new_trigger.next_run_at += Duration::days(DISABLED_PIPELINE_RECHECK_DAYS)
+            .num_microseconds()
+            .unwrap();
         let trigger_data_stream = TriggerData {
             _timestamp: now_micros(),
             org: new_trigger.org.clone(),
@@ -5204,46 +5237,48 @@ async fn handle_derived_stream_triggers(
         return Ok(());
     }
 
-    let Some(derived_stream) = pipeline.get_derived_stream() else {
-        let err_msg = format!(
-            "DerivedStream associated with the trigger not found in pipeline: {org_id}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
-        );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: Utc::now().timestamp_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: RunOutcome::Error,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(err_msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-            ..Default::default()
-        };
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream);
-        return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] {}",
-            err_msg
-        ));
+    let derived_stream = match org_bound_derived_stream(&pipeline) {
+        Ok(derived_stream) => derived_stream.clone(),
+        Err(reason) => {
+            let wait = reason.retry_after();
+            let err_msg = format!(
+                "{reason}: {org_id}/{pipeline_name}/{pipeline_id}. Checking after {} mins.",
+                wait.num_minutes()
+            );
+            new_trigger.next_run_at += wait.num_microseconds().unwrap();
+            let trigger_data_stream = TriggerData {
+                _timestamp: Utc::now().timestamp_micros(),
+                org: new_trigger.org.clone(),
+                module: TriggerDataType::DerivedStream,
+                key: new_trigger.module_key.clone(),
+                next_run_at: new_trigger.next_run_at,
+                is_realtime: new_trigger.is_realtime,
+                is_silenced: new_trigger.is_silenced,
+                status: RunOutcome::Error,
+                start_time: 0,
+                end_time: 0,
+                retries: new_trigger.retries,
+                error: Some(err_msg.clone()),
+                success_response: None,
+                is_partial: None,
+                delay_in_secs: None,
+                evaluation_took_in_secs: None,
+                source_node: Some(LOCAL_NODE.name.clone()),
+                query_took: None,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                time_in_queue_ms: Some(time_in_queue),
+                ..Default::default()
+            };
+            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
+            new_trigger_data.reset();
+            new_trigger.data = new_trigger_data.to_json_string();
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            publish_triggers_usage(trigger_data_stream);
+            return Err(anyhow::anyhow!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] {}",
+                err_msg
+            ));
+        }
     };
     // Search excludes a window's end, so the next window starts exactly there.
     let start_time = new_trigger_data.period_end_time;
@@ -5773,10 +5808,7 @@ async fn handle_backfill_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    use config::meta::{
-        pipeline::components::PipelineSource,
-        triggers::{DeletionStatus, ScheduledTriggerData},
-    };
+    use config::meta::triggers::{DeletionStatus, ScheduledTriggerData};
 
     let max_retries = get_scheduler_max_retries();
     let job_id = trigger.module_key.clone();
@@ -6049,11 +6081,11 @@ async fn handle_backfill_triggers(
     };
 
     // 4. Extract DerivedStream configuration
-    let derived_stream = match &pipeline.source {
-        PipelineSource::Scheduled(ds) => ds,
-        _ => {
+    let derived_stream = match org_bound_derived_stream(&pipeline) {
+        Ok(ds) => ds,
+        Err(reason) => {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Pipeline {} is not scheduled",
+                "[SCHEDULER trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] Pipeline {}: {reason}",
                 job_id,
                 config.pipeline_id
             );
@@ -6071,7 +6103,7 @@ async fn handle_backfill_triggers(
                 key: job_id.clone(),
                 status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
-                error: Some("Pipeline is not scheduled. Deleting trigger job.".to_string()),
+                error: Some(format!("{reason}. Deleting trigger job.")),
                 time_in_queue_ms: Some(
                     Duration::microseconds(now - trigger_start_time).num_milliseconds(),
                 ),
@@ -6084,7 +6116,7 @@ async fn handle_backfill_triggers(
                 next_run_at: now,
                 ..Default::default()
             });
-            return Err(anyhow::anyhow!("Pipeline is not scheduled"));
+            return Err(anyhow::anyhow!(reason));
         }
     };
 
@@ -6957,6 +6989,19 @@ async fn handle_backfill_triggers(
     Ok(())
 }
 
+/// The pipeline's scheduled source, refused when a node or the source names another org. [pure]
+fn org_bound_derived_stream(
+    pipeline: &config::meta::pipeline::Pipeline,
+) -> Result<&DerivedStream, Unrunnable> {
+    let PipelineSource::Scheduled(derived_stream) = &pipeline.source else {
+        return Err(Unrunnable::NotScheduled);
+    };
+    if let Some(refusal) = pipeline.cross_org_refusal() {
+        return Err(Unrunnable::CrossOrg(refusal));
+    }
+    Ok(derived_stream)
+}
+
 /// Helper function to get the local destination streams from a pipeline.
 ///
 /// Returns only local `Stream` destinations. Remote (`RemoteStream`) destinations are routed to
@@ -7236,6 +7281,70 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_scheduled_run_refuses_a_pipeline_bound_to_another_org() {
+        let query = |org: &str| {
+            config::meta::pipeline::components::Node::new(
+                "src".to_string(),
+                NodeData::Query(DerivedStream {
+                    org_id: org.to_string(),
+                    ..Default::default()
+                }),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let dest = |org: &str| {
+            config::meta::pipeline::components::Node::new(
+                "dst".to_string(),
+                NodeData::Stream(StreamParams::new(org, "out", StreamType::Logs)),
+                0.0,
+                100.0,
+                "output".to_string(),
+            )
+        };
+        let pipeline = |source: PipelineSource, nodes| config::meta::pipeline::Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "a".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source,
+            kind: Default::default(),
+            nodes,
+            edges: vec![],
+        };
+        let scheduled = |org: &str| {
+            PipelineSource::Scheduled(DerivedStream {
+                org_id: org.to_string(),
+                ..Default::default()
+            })
+        };
+        let realtime = PipelineSource::Realtime(StreamParams::new("a", "in", StreamType::Logs));
+        let retry = Duration::try_minutes(5);
+        let recheck = Duration::try_days(DISABLED_PIPELINE_RECHECK_DAYS);
+        let cases = [
+            (scheduled("a"), vec![query("a"), dest("a")], None),
+            (scheduled(""), vec![query(""), dest("")], None),
+            (scheduled("a"), vec![query("b"), dest("a")], recheck),
+            (scheduled("a"), vec![query("a"), dest("b")], recheck),
+            (scheduled("b"), vec![query("a"), dest("a")], recheck),
+            (realtime, vec![dest("a")], retry),
+        ];
+        for (source, nodes, wait) in cases {
+            let pipeline = pipeline(source, nodes);
+            assert_eq!(
+                org_bound_derived_stream(&pipeline)
+                    .err()
+                    .map(|unbound| unbound.retry_after()),
+                wait,
+                "{pipeline:?}"
+            );
+        }
+    }
+
+    #[test]
     fn a_pending_composite_inside_a_window_stays_pending_and_correlates_nothing() {
         let downtime = config::meta::downtimes::ActiveDowntime {
             id: "dt-1".to_string(),
@@ -7269,6 +7378,14 @@ mod tests {
         assert!(should_dispatch_after_incident(true, true));
         assert!(!should_dispatch_after_incident(true, false));
         assert!(should_dispatch_after_incident(false, false));
+    }
+
+    #[test]
+    fn zero_row_match_notifies_unless_multi_alert() {
+        assert!(should_notify_rows(true, false));
+        assert!(!should_notify_rows(true, true));
+        assert!(should_notify_rows(false, true));
+        assert!(should_notify_rows(false, false));
     }
 
     fn dispatch_counts(

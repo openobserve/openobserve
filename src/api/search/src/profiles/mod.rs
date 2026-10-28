@@ -50,7 +50,7 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
-const DEFAULT_RESULT_SIZE: i64 = 50_000;
+const DEFAULT_RESULT_SIZE: i64 = 99_999;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ProfileFilter {
@@ -428,7 +428,6 @@ pub(crate) async fn run_profiles_sql(
             start_time: params.start_time,
             end_time: params.end_time,
             quick_mode: false,
-            query_type: String::new(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,

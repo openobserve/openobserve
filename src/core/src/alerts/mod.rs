@@ -541,7 +541,6 @@ impl QueryConditionExt for QueryCondition {
                 sort_by: None,
                 quick_mode: false,
                 track_total_hits: false,
-                query_type: "".to_string(),
                 uses_zo_fn: false,
                 query_fn: self.vrl_function.clone(),
                 skip_wal: false,
@@ -584,7 +583,6 @@ impl QueryConditionExt for QueryCondition {
                     start_time: start_time.unwrap(),
                     end_time,
                     quick_mode: false,
-                    query_type: "".to_string(),
                     track_total_hits: false,
                     uses_zo_fn: false,
                     query_fn: encode_query_fn,
@@ -925,7 +923,6 @@ async fn run_alert_count_query(
             start_time,
             end_time,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts

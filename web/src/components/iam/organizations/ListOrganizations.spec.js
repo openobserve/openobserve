@@ -6,6 +6,7 @@ import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 // Mock the organizations service
 vi.mock("@/services/organizations", async (importOriginal) => {
@@ -594,6 +595,21 @@ describe("ListOrganizations", () => {
       await flushPromises();
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-api-key-123");
+    });
+
+    it("names the organization and uses a destructive button in the delete confirm", async () => {
+      const { currentDialog, handleCancel } = useConfirmDialog();
+      const pending = wrapper.vm.deleteOrganization({ name: "Acme", identifier: "acme" });
+      await flushPromises();
+
+      expect(currentDialog.value).toMatchObject({
+        messageKeypath: "iam.listOrganizations.deleteConfirm",
+        messageName: "Acme",
+        confirmVariant: "destructive",
+      });
+      handleCancel();
+      await pending;
+      expect(organizationsService.delete_org).not.toHaveBeenCalled();
     });
   });
 

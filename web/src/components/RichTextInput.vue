@@ -118,6 +118,12 @@ export default defineComponent({
     const showDetailCard = ref(false);
     const detailCardContent = ref("");
     const cardPosition = ref({ top: 0, left: 0, below: false });
+    // The card belongs to its chip: a send (clear), a delete or new references close it.
+    watch(localReferences, (refs) => {
+      if (showDetailCard.value && !refs.some((r) => r.fullContent === detailCardContent.value)) {
+        showDetailCard.value = false;
+      }
+    });
 
     // Escape before embedding in HTML — mirrors anomalySummaryGenerator.ts's esc().
     // JSON.stringify doesn't escape </>/&, so an unescaped token (e.g. a string value

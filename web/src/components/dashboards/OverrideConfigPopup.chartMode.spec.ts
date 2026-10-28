@@ -342,7 +342,7 @@ describe("OverrideConfigPopup in chart mode", () => {
     await mountChart({ chartType, entries: [series("cart")] });
     expect($('[data-test="dashboard-series-format-thresholds"]')).toBeNull();
     expect($('[data-test="dashboard-series-format-rule"]')!.textContent).toContain(
-      "Later overrides win. An override beats the panel setting and Color by series.",
+      "Name rules beat regex rules; otherwise the later rule wins.",
     );
   });
 

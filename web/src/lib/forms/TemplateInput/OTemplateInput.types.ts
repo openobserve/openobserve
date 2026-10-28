@@ -21,10 +21,12 @@ import type { InputProps, InputSlots } from "../Input/OInput.types";
 /** One row offered when the user types `{{`; callers may add their own fields. */
 export interface TemplateSuggestion {
   name: string;
+  /** Secondary line under the token in the default row, e.g. what the token prints. */
+  description?: I18nText;
 }
 
-/** `double` reads `{{name}}` tokens; `single` reads `{name}` and leaves `{{…}}` and `${…}` alone. */
-export type TemplateDelimiter = "double" | "single";
+/** `double` reads `{{name}}` tokens; `single` reads `{name}` and leaves `{{…}}` and `${…}` alone; `dollar` reads `$name` and `${name}`, where a `name:format` suggestion always inserts braced. */
+export type TemplateDelimiter = "double" | "single" | "dollar";
 
 /** The `{{` list props both wrappers share, on top of the wrapped field's own props. */
 export interface TemplateSuggestProps<T extends TemplateSuggestion> {
@@ -77,6 +79,8 @@ export interface UseTemplateSuggestOptions<T extends TemplateSuggestion> {
 export interface OpenToken {
   query: string;
   start: number;
+  /** A `dollar` token opened with `${` rather than a bare `$`. */
+  braced?: boolean;
 }
 
 export interface UseTemplateSuggestReturn<T extends TemplateSuggestion> {

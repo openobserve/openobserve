@@ -2211,6 +2211,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: None,
+            alert_groups: None,
         };
 
         let response = ListIncidentsResponse {
@@ -2472,6 +2473,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: Some("l0_off".to_string()),
+            alert_groups: None,
         };
         let json = serde_json::to_value(&incident).unwrap();
         assert!(json.as_object().unwrap().contains_key("rca"));
