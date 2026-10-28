@@ -207,7 +207,7 @@ export default class DashboardFilter {
         .catch(() => {});
       // The virtualizer renders items asynchronously; search then select
       // Type into the search filter to narrow results, then click
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const searchInput = operatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
@@ -392,7 +392,7 @@ export default class DashboardFilter {
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const searchInput = operatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
@@ -506,7 +506,7 @@ export default class DashboardFilter {
       const nestedOperatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await nestedOperatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const nestedHasSearch = await nestedSearchInput.count() > 0;
       if (nestedHasSearch) {
         await nestedSearchInput.fill(operator);
