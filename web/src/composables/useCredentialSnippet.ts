@@ -69,12 +69,11 @@ export function useCredentialSnippet(content: Ref<string>) {
     PASSCODE_PLACEHOLDERS.some((token) => (content.value ?? "").includes(token)),
   );
   const { ready } = useOrgCredential(needsPasscode);
-  // No key, while it loads or after a failed read: copying now would send an empty key.
-  const keyPending = computed(() => needsPasscode.value && !passcode.value);
+  const hasCredential = computed(() => !!passcode.value);
   const forbidden = computed(() => !!store.state.organizationData?.organizationPasscodeForbidden);
   const tokenName = computed(() => snippetTokenName(store.state.organizationData));
 
-  return { code, codeMasked, needsPasscode, forbidden, tokenName, ready, keyPending };
+  return { code, codeMasked, needsPasscode, forbidden, tokenName, ready, hasCredential };
 }
 
 export default useCredentialSnippet;

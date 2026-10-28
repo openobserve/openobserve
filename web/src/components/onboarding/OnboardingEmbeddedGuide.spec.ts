@@ -176,6 +176,7 @@ const mountGuide = async (name: string) => {
 describe("OnboardingEmbeddedGuide", () => {
   afterEach(() => {
     store.state.organizationData.rumToken = { rum_token: "" };
+    store.state.organizationData.organizationPasscode = "";
     statusShown.value = true;
     statusKey.value = "browser";
     queryClient.clear();
@@ -259,6 +260,8 @@ describe("OnboardingEmbeddedGuide", () => {
   });
 
   it("gives a real Data sources page the signal and test stream its route implies", async () => {
+    // with no key the snippet shows a banner in place of its container
+    store.state.organizationData.organizationPasscode = "pass";
     const { wrapper } = await mountGuide("curl");
     await vi.dynamicImportSettled();
     await flushPromises();

@@ -451,6 +451,7 @@ describe("OnboardingStepGuide", () => {
     ])("restarts %s stopped check", (_, at, pageOwnCheck) => {
       afterEach(() => {
         pageChecks.value = false;
+        store.state.organizationData.organizationPasscode = "";
       });
 
       const mountStopped = async () => {
@@ -477,6 +478,8 @@ describe("OnboardingStepGuide", () => {
       });
 
       it("on copying the agent key", async () => {
+        // with no key the block shows a banner, which has nothing to copy
+        store.state.organizationData.organizationPasscode = "tok";
         const w = await mountStopped();
         w.find("aside")
           .findComponent(CredentialCodeBlock)

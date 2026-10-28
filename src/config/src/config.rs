@@ -1224,7 +1224,7 @@ pub struct PublicDashboards {
     pub max_links_per_org: u32,
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_MAX_PANELS",
-        default = 10,
+        default = 50,
         help = "Panels a public link can show, counted across every tab (at least 1)."
     )]
     pub max_panels: u32,
@@ -2535,7 +2535,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
-        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, no cost is computed for spans that do not report one."
     )]
     pub model_pricing_enabled: bool,
     #[env_config(
@@ -4091,13 +4091,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num;
     }
-    // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_merge_thread_num = cpu_num;
-        }
+        cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
     }
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
@@ -6802,7 +6797,7 @@ mod tests {
         assert!(pd.enabled && pd.time_shifts);
         assert_eq!(
             (pd.rpm, pd.slug_rpm, pd.max_links_per_org, pd.max_panels),
-            (240, 1200, 50, 10)
+            (240, 1200, 50, 50)
         );
         assert_eq!(
             (

@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 raw(powerShell.codeMasked.value)
               }}</OCode>
               <OButton
-                v-if="!powerShell.keyPending.value"
+                v-if="!powerShell.needsPasscode.value || powerShell.hasCredential.value"
                 variant="ghost-muted"
                 size="icon-xs"
                 icon-left="content-copy"
@@ -393,7 +393,7 @@ const activeStep = computed(() => (!tokenCopied.value ? 1 : !promptCopied.value 
 
 // The PowerShell line, and the status's "Copy command", which copies the export line again.
 const copySnippet = async (snippet: typeof exportLine) => {
-  if (snippet.keyPending.value) return;
+  if (snippet.needsPasscode.value && !snippet.hasCredential.value) return;
   if (await copyToClipboard(snippet.code.value, t)) {
     tokenCopied.value = true;
     restartWatch();

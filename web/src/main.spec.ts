@@ -5,6 +5,8 @@ const routerOnError = vi.hoisted(() => vi.fn());
 const isStaleChunkError = vi.hoisted(() => vi.fn());
 const toast = vi.hoisted(() => vi.fn());
 const logsInit = vi.hoisted(() => vi.fn());
+const dispatch = vi.hoisted(() => vi.fn());
+const route = vi.hoisted(() => ({ name: "logs" }));
 
 vi.mock("@/services/config.queries", () => ({ configQuery: () => ({}) }));
 vi.mock("vue", async (importOriginal) => {
@@ -14,10 +16,16 @@ vi.mock("vue", async (importOriginal) => {
 });
 vi.mock("@tanstack/vue-query", () => ({ VueQueryPlugin: {} }));
 vi.mock("./stores", () => ({
-  default: { state: { zoConfig: {}, API_ENDPOINT: "http://localhost:5080" }, dispatch: vi.fn() },
+  default: { state: { zoConfig: {}, API_ENDPOINT: "http://localhost:5080" }, dispatch },
 }));
 vi.mock("./App.vue", () => ({ default: {} }));
-vi.mock("./router", () => ({ default: () => ({ onError: routerOnError }) }));
+vi.mock("./router", () => ({
+  default: () => ({
+    onError: routerOnError,
+    resolve: () => ({ name: route.name }),
+    options: { history: { location: "/" } },
+  }),
+}));
 vi.mock("./locales", () => ({
   default: { global: { t: (key: string) => key } },
   applyDocumentLocale: vi.fn(),
@@ -217,4 +225,19 @@ describe("main.ts chunk load errors", () => {
     },
     60000,
   );
+});
+
+describe("main.ts RUM on public dashboards", () => {
+  it("starts neither the RUM nor the logs SDK for an anonymous public-link viewer", async () => {
+    route.name = "publicDashboard";
+    rumInit.mockClear();
+    logsInit.mockClear();
+    dispatch.mockClear();
+    vi.resetModules();
+    await import("./main");
+    await vi.waitFor(() => expect(dispatch).toHaveBeenCalledWith("setConfig", expect.anything()));
+    expect(rumInit).not.toHaveBeenCalled();
+    expect(logsInit).not.toHaveBeenCalled();
+    route.name = "logs";
+  }, 60000);
 });

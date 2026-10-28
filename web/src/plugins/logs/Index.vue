@@ -1240,7 +1240,7 @@ export default defineComponent({
           // loadLogsData();
           //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
           //of functions of loadLogsData to stop run query whenever this gets redirecited
-          await getStreamList();
+          await getStreamList(true, { fromUrl: true });
           await getFunctions();
           await extractFields();
           refreshData();
@@ -1730,7 +1730,7 @@ export default defineComponent({
     async function applyReAppliedQuery() {
       resetRunStateForReapply();
       searchObj.meta.searchApplied = false;
-      await getStreamList();
+      await getStreamList(true, { fromUrl: true });
       await getFunctions();
       await extractFields();
       refreshData();
