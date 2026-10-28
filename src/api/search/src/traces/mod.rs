@@ -305,7 +305,7 @@ pub async fn get_latest_traces(
     tag = "Traces",
     operation_id = "GetLatestTracesStream",
     summary = "Stream recent trace data",
-    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges. With sort_by=duration and sort_order=desc, each partition ranks a trace by the larger of its longest span and its span range inside that partition, and the stream keeps the largest value per trace across partitions. Three limits apply. A trace whose spans spread across partitions with no single span that covers them is ranked by its range inside one partition. Page boundaries follow that ranking while each page is sorted by the full duration. sort_order=asc ranks each partition by its local range only.",
+    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges. With sort_by=duration, ranking across partitions is approximate; each page is sorted by full trace duration.",
     security(
         ("Authorization"= [])
     ),
