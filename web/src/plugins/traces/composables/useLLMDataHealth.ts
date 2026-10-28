@@ -26,7 +26,7 @@ export type DataHealthSamples = Partial<Record<DataHealthCheckId, string[]>>;
 /**
  * AI data health for LLM Insights: one request per scope + window, shared by
  * the health strip and the Total Cost tile (which reads the unpriced check).
- * Sample trace ids cost a window-wide query per failing check, so they are
+ * Sample trace ids cost an extra query per failing check, so they are
  * fetched only on demand (the Review checks drawer) for the last scope + window.
  * A response that lands after a newer request started is dropped.
  */

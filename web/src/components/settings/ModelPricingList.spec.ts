@@ -46,10 +46,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 // Router mock — capture push calls
 const routerPushMock = vi.fn();
+const routerReplaceMock = vi.fn();
 const currentRouteRef = { value: { query: {} as Record<string, any> } };
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: routerPushMock,
+    replace: routerReplaceMock,
     currentRoute: currentRouteRef,
   }),
 }));
@@ -1713,6 +1715,41 @@ describe("Unpriced / approximate tab", () => {
     expect(vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)![1].stream_name).toBe(
       "default",
     );
+  });
+
+  it("switching tab writes it to the route query, keeping the other params", async () => {
+    w = mountComponent({ query: { tab: "unpriced", stream: "llm" } });
+    await flushPromises();
+
+    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "org");
+    await flushPromises();
+
+    expect(w.vm.selectedTab).toBe("org");
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({ query: { tab: "org", stream: "llm" } });
+  });
+
+  it("reopens the tab named in the route query after a reload", async () => {
+    w = mountComponent({ query: { tab: "inherited" } });
+    await flushPromises();
+    expect(w.vm.selectedTab).toBe("inherited");
+  });
+
+  it("shows the load error when the unpriced read fails, and Retry reads again", async () => {
+    vi.mocked(modelPricingService.listUnpriced).mockRejectedValue({ response: { status: 400 } });
+    w = mountComponent({ query: { tab: "unpriced" } });
+    await vi.waitFor(() =>
+      expect(w.find('[data-test="model-pricing-unpriced-error"]').exists()).toBe(true),
+    );
+    expect(w.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
+    const calls = vi.mocked(modelPricingService.listUnpriced).mock.calls.length;
+
+    // A later timestamp gives the retried read a new window, so it never reuses the failed one.
+    const now = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 1000);
+    await w.find('[data-test="o2-empty-state-action-retry"]').trigger("click");
+    await flushPromises();
+    now.mockRestore();
+
+    expect(vi.mocked(modelPricingService.listUnpriced).mock.calls.length).toBeGreaterThan(calls);
   });
 
   it("says online sync has not run when the built-in list was never synced", async () => {

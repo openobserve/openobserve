@@ -897,6 +897,11 @@ mod tests {
         assert!(is_querier_route("/api/default/config"));
         assert!(!is_querier_route("/api/default/config/_json"));
         assert!(is_querier_route("/api/default/ai/chat_stream"));
+        assert!(is_querier_route(
+            "/api/default/gen_ai/data_health?stream_name=default&start_time=1&end_time=2"
+        ));
+        assert!(is_querier_route("/api/default/llm/models/unpriced"));
+        assert!(!is_querier_route("/api/default/llm/models"));
     }
 
     #[test]

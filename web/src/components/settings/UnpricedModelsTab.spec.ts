@@ -74,17 +74,23 @@ const unpricedResponse: { models: UnpricedModel[] } = {
   ],
 };
 
-function mountTab(models: UnpricedModel[] = unpricedResponse.models) {
+function mountTab(
+  models: UnpricedModel[] = unpricedResponse.models,
+  overrides: Record<string, unknown> = {},
+) {
   const store = createStore({ state: { selectedOrganization: { identifier: "test-org" } } });
   return mount(UnpricedModelsTab, {
     props: {
       models,
       loading: false,
       fetching: false,
+      error: false,
+      loaded: true,
       lastRunAt: 0,
       streams: ["default"],
       streamsLoaded: true,
       stream: "default",
+      ...overrides,
     },
     global: {
       provide: { store },
@@ -139,6 +145,53 @@ describe("UnpricedModelsTab", () => {
       expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(true),
     );
     expect(wrapper.find('[data-test="model-pricing-unpriced-banner"]').exists()).toBe(false);
+  });
+
+  it("shows the load error, not the all-priced state, and Retry asks for a new read", async () => {
+    wrapper = mountTab([], { error: true, loaded: false });
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="model-pricing-unpriced-error"]').exists()).toBe(true),
+    );
+    expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="o2-empty-state-action-retry"]').trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+
+  it("holds the skeleton, not the all-priced state, while the stream list loads", async () => {
+    wrapper = mountTab([], { streams: [], streamsLoaded: false, stream: "", loaded: false });
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="model-pricing-unpriced-no-streams"]').exists()).toBe(false);
+  });
+
+  it("holds the skeleton, not the all-priced state, until the first read succeeds", async () => {
+    wrapper = mountTab([], { loading: true, loaded: false });
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
+  });
+
+  it("shows a missing price side as not priced and Keep saves only the priced side", async () => {
+    const oneSided: UnpricedModel = {
+      ...unpricedResponse.models[1],
+      matched: {
+        ...unpricedResponse.models[1].matched!,
+        tiers: [{ name: "Default", condition: null, prices: { input: 2.5e-6 } }],
+      },
+    };
+    wrapper = mountTab([oneSided]);
+    const row = await waitForRow(wrapper, "gpt-5.4-mini");
+    expect(row.text()).toContain("$2.50");
+    expect(row.text()).toContain("not priced");
+    expect(row.text()).not.toContain("$0.00");
+
+    await row.find('[data-test="model-pricing-unpriced-keep-btn"]').trigger("click");
+    await flushPromises();
+    const saved = vi.mocked(modelPricingService.create).mock.calls[0][1];
+    expect(saved.tiers[0].prices).toEqual({ input: 2.5e-6 });
+    expect(saved.tiers[0].prices).not.toHaveProperty("output");
   });
 
   it("Create price opens the New model editor with the exact pattern filled in", async () => {

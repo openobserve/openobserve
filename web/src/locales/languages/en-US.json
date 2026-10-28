@@ -5376,7 +5376,7 @@
         "envTitle": "Download your .env",
         "envHelp": "Save it in the project root. The skill reads the token from this file, so it never goes into the chat.",
         "envButton": "Download .env",
-        "promptTitle": "Paste this into Claude Code, Cursor or Codex",
+        "promptTitle": "Paste this into {client1}, {client2} or {client3}",
         "promptCopied": "Prompt copied"
       }
     },
@@ -15627,6 +15627,7 @@
       "noMatch": "No match",
       "approximate": "Approximate",
       "defaultTierPrices": "in {input} / out {output} per 1M",
+      "notPriced": "not priced",
       "createPrice": "Create price",
       "keepPrices": "Keep {name} prices",
       "mute": "Mute",
@@ -27298,7 +27299,7 @@
       "checks": {
         "unpriced_models": {
           "label": "Unpriced models",
-          "detail": "{count} model(s) · {spans} spans · {tokens} tokens counted as $0",
+          "detail": "{count} model · {spans} spans · {tokens} tokens counted as $0 | {count} models · {spans} spans · {tokens} tokens counted as $0",
           "pass": "Every LLM span matched a price.",
           "fix": "Fix in LLM Model Pricing"
         },

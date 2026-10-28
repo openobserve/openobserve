@@ -42,6 +42,7 @@ const mockListAgents = vi.fn();
 const mockRouteQuery: Record<string, string> = {};
 
 import { reactive, ref } from "vue";
+import type { DataHealthResponse } from "@/services/gen-ai-data-health.service";
 
 const mockStoreState = reactive({ selectedOrganization: { identifier: "test-org" } });
 
@@ -68,6 +69,7 @@ const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
 const mockAvailableStreams = ref<string[]>([]);
 const mockStreamsLoaded = ref(false);
+const mockHealth = ref<DataHealthResponse | null>(null);
 
 vi.mock("./composables/useLLMInsights", () => ({
   useLLMInsights: () => ({
@@ -81,6 +83,19 @@ vi.mock("./composables/useLLMInsights", () => ({
     streamsLoaded: mockStreamsLoaded,
     fetchAll: mockFetchAll,
     cancelAll: mockCancelAll,
+  }),
+}));
+
+vi.mock("./composables/useLLMDataHealth", () => ({
+  useLLMDataHealth: () => ({
+    health: mockHealth,
+    loading: ref(false),
+    error: ref(false),
+    samples: ref(null),
+    samplesLoading: ref(false),
+    fetchHealth: vi.fn(),
+    fetchSamples: vi.fn(),
+    reset: vi.fn(),
   }),
 }));
 
@@ -166,6 +181,7 @@ function mountDashboard(
           },
         },
         KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
+        LLMDataHealthStrip: { template: '<div data-test="llm-data-health-strip" />' },
         LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
         OButton: {
           template: "<button @click=\"$emit('click')\"><slot /></button>",
@@ -207,6 +223,7 @@ beforeEach(() => {
   mockHasLoadedOnce.value = false;
   mockAvailableStreams.value = [];
   mockStreamsLoaded.value = false;
+  mockHealth.value = null;
   // Reset localStorage between tests so the dashboard's stream
   // initialisation doesn't bleed across cases.
   localStorage.clear();
@@ -639,6 +656,14 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     const wrapper = await mountAndEnter();
 
     expect((wrapper.vm as any).filterMode).toBe("agent");
+    // The auto-picked agent stays out of the URL too, so a reload with no agents ends in Stream.
+    const lastQuery = (mockRouterReplace.mock.calls.at(-1) as any[])[0].query;
+    expect([lastQuery.type, lastQuery.agent, lastQuery.env, lastQuery.version]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
     expect(wrapper.find("[data-test='llm-insights-no-agent-identity']").exists()).toBe(false);
   });
 
@@ -711,5 +736,57 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     await flushPromises();
 
     expect(mockListAgents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("LLMInsightsDashboard — Total Cost tile", () => {
+  async function costTileText(cost: number, tokens: number, unpricedTokens: number) {
+    // A window with requests, so the tiles render rather than the empty state.
+    mockKpi.value = {
+      ...mockKpi.value,
+      requestCount: 10,
+      traceCount: 5,
+      totalCost: cost,
+      totalTokens: tokens,
+    };
+    mockHealth.value =
+      unpricedTokens > 0
+        ? {
+            checked_at: 1,
+            checks: [
+              {
+                id: "unpriced_models",
+                status: "warning",
+                affected: 3,
+                total: 10,
+                models: [{ model: "mystery-model", spans: 3, tokens: unpricedTokens }],
+              },
+            ],
+          }
+        : null;
+    mockHasLoadedOnce.value = true;
+    const wrapper = mountDashboard();
+    await (wrapper.vm as any).refresh(undefined, undefined, false);
+    await flushPromises();
+    return wrapper.find("[data-test='llm-insights-kpi-value']").text();
+  }
+
+  it("reads 'cost unknown' when none of the tokens were priced", async () => {
+    const text = await costTileText(0, 1000, 1000);
+    expect(text).toContain("llmDataTrust.cost.unknown");
+    expect(text).not.toContain("≥");
+    expect(text).not.toContain("0.00");
+  });
+
+  it("reads as a lower bound when some tokens were priced", async () => {
+    const text = await costTileText(1.5, 1000, 400);
+    expect(text).toContain("≥");
+    expect(text).toContain("1.50");
+  });
+
+  it("reads plain when every token was priced", async () => {
+    const text = await costTileText(1.5, 1000, 0);
+    expect(text).not.toContain("≥");
+    expect(text).toContain("1.50");
   });
 });

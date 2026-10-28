@@ -108,6 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :models="unpricedModels"
           :loading="unpricedQuery.isLoading.value"
           :fetching="unpricedQuery.isFetching.value"
+          :error="unpricedQuery.isError.value"
+          :loaded="unpricedQuery.isSuccess.value"
           :last-run-at="unpricedQuery.dataUpdatedAt.value"
           :streams="unpricedStreams"
           :streams-loaded="unpricedStreamsLoaded"
@@ -865,11 +867,12 @@ watch(unpricedQuery.error, (e) => {
   if (e) notifyError(t("modelPricing.unpriced.errLoad"), e);
 });
 
-/** `?tab=unpriced[&stream=<name>]` opens the tab, as Insights and data-health links do. */
+/** `?tab=<tab>` reopens a tab after a reload; `?tab=unpriced[&stream=<name>]` is also how Insights and data-health links open it. */
 function applyRouteTab() {
   const { tab, stream } = router.currentRoute.value.query;
+  if (typeof tab !== "string" || !tabOptions.value.some((o) => o.value === tab)) return;
+  selectedTab.value = tab;
   if (tab !== "unpriced") return;
-  selectedTab.value = "unpriced";
   if (typeof stream === "string" && stream) {
     // Before the list loads, the loader keeps a valid name and clamps an unknown one.
     if (!unpricedStreamsLoaded.value || unpricedStreams.value.includes(stream)) {
@@ -988,6 +991,8 @@ const tabOptions = computed(() => [
 
 function onTabChange() {
   selectedIds.value = [];
+  // The other params (an Unpriced deep link's stream) stay, so a reload reopens this exact view.
+  router.replace({ query: { ...router.currentRoute.value.query, tab: selectedTab.value } });
 }
 
 /** Flat list of all models (parents + children) for ID-based lookups. */
@@ -1094,6 +1099,7 @@ const isFiltered = computed(() => !!filterQuery.value.trim() || selectedTab.valu
 function clearFilters() {
   filterQuery.value = "";
   selectedTab.value = "all";
+  onTabChange();
 }
 
 const filteredModels = computed(() => {

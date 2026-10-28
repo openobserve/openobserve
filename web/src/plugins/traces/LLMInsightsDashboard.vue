@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :streams-loaded="true"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
       <template #trailing>
@@ -306,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="card.icon" size="sm" />
                   </span>
                 </div>
-                <div class="flex items-baseline gap-[0.2rem]">
+                <div class="flex items-baseline gap-[0.2rem]" data-test="llm-insights-kpi-value">
                   <span
                     v-if="card.prefix"
                     class="text-text-secondary text-lg leading-none font-bold max-lg:text-base"
@@ -322,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   v-if="card.note"
                   type="button"
-                  class="text-2xs text-text-warning self-start text-left underline-offset-2 hover:underline"
+                  class="text-2xs text-status-warning-text self-start text-left underline-offset-2 hover:underline"
                   :title="card.noteTooltip"
                   data-test="llm-insights-cost-unpriced"
                   @click="openUnpricedTab"
@@ -426,7 +427,7 @@ import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMDataHealthStrip from "./LLMDataHealthStrip.vue";
 import { useLLMDataHealth } from "./composables/useLLMDataHealth";
-import { unpricedSummary, unpricedTabRoute } from "./llmDataTrust.utils";
+import { costKind, unpricedSummary, unpricedTabRoute } from "./llmDataTrust.utils";
 import { formatTokens } from "@/utils/llmUtils";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -1041,15 +1042,19 @@ const kpiCards = computed<KpiCard[]>(() => {
 
   // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary. Spans
   // whose model has no price carry no cost, so when the data health check finds
-  // unpriced tokens the tile reads as a lower bound with the token count under it.
+  // unpriced tokens the tile reads as a lower bound ("≥ $X"), or "cost unknown"
+  // when none of the window's tokens were priced, with the token count under it.
   const u = unpriced.value;
+  const kind = costKind(kpi.value.totalCost, kpi.value.totalTokens, u?.tokens ?? 0);
   const costCard: KpiCard = {
     label: t("traces.lLMInsightsDashboard.totalCost"),
     icon: "payments",
-    ...splitCost(kpi.value.totalCost),
+    ...(kind === "unknown"
+      ? { value: t("llmDataTrust.cost.unknown") }
+      : splitCost(kpi.value.totalCost)),
+    ...(kind === "partial" ? { prefix: "≥" } : {}),
     ...(u
       ? {
-          prefix: "≥",
           note: t("llmDataTrust.tile.unpricedTokens", { tokens: formatTokens(u.tokens) }),
           noteTooltip: t("llmDataTrust.tile.unpricedTooltip", {
             tokens: formatTokens(u.tokens),

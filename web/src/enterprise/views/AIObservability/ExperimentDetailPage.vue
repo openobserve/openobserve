@@ -80,7 +80,7 @@
         data-test="ai-experiment-detail-meta"
       >
         <div class="flex min-w-0 items-center gap-1.5">
-          <span class="text-2xs text-text-tertiary font-semibold">
+          <span class="text-2xs text-text-secondary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.dataset") }}
           </span>
           <OTruncatedText
@@ -94,7 +94,7 @@
         <OSeparator vertical class="h-4" />
 
         <div class="flex min-w-0 items-center gap-1.5">
-          <span class="text-2xs text-text-tertiary font-semibold">
+          <span class="text-2xs text-text-secondary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.task") }}
           </span>
           <span class="text-text-secondary truncate text-xs">
@@ -105,7 +105,7 @@
         <template v-if="taskModel">
           <OSeparator vertical class="h-4" />
           <div class="flex min-w-0 items-center gap-1.5">
-            <span class="text-2xs text-text-tertiary font-semibold">
+            <span class="text-2xs text-text-secondary font-semibold">
               {{ t("aiObservability.experiments.detail.metaLabels.model") }}
             </span>
             <OTruncatedText class="text-text-secondary text-xs">{{
@@ -117,7 +117,7 @@
         <OSeparator vertical class="h-4" />
 
         <div class="flex min-w-0 items-center gap-1.5">
-          <span class="text-2xs text-text-tertiary font-semibold">
+          <span class="text-2xs text-text-secondary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.run") }}
           </span>
           <span class="text-text-secondary truncate text-xs">{{ runSummary }}</span>
@@ -198,7 +198,7 @@
             </span>
           </template>
           <template v-if="card.footer" #footer>
-            <span class="text-3xs text-text-tertiary font-medium">{{ raw(card.footer) }}</span>
+            <span class="text-3xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
           </template>
         </KpiCard>
       </KpiCardRow>
@@ -319,7 +319,7 @@
             >
               {{ raw(row.errorMessage) }}
             </OTruncatedText>
-            <span v-else class="text-text-tertiary">{{ raw("—") }}</span>
+            <span v-else class="text-text-secondary">{{ raw("—") }}</span>
           </template>
 
           <template #cell-latency="{ row }: { row: any }">
