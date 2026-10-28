@@ -23,6 +23,7 @@
         {{ t("aiObservability.experiments.newButton") }}
         <EditorDraftDot
           v-if="experimentDrafts.hasNew"
+          :saved-at="experimentDrafts.savedAt(null)"
           corner
           data-test="ai-experiments-new-draft-dot"
         />

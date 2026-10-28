@@ -12,7 +12,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.scorer.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'scorer-form-back-btn',
       }"
       bleed
@@ -618,7 +618,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -674,12 +674,13 @@
         </template>
       </ODialog>
     </OPageLayout>
+    <EditorDraftDialogs :draft="scorerDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -709,6 +710,9 @@ import { extractTemplateVariables, formatTemplateVariable, showError } from "../
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
 import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { leavesEvalForm } from "../utils/routeSync";
 
 const props = defineProps<{
   orgId: string;
@@ -724,6 +728,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
   (e: "request-versions", scoreConfigId: string): void;
   (e: "refresh-providers"): void;
 }>();
@@ -1112,10 +1118,11 @@ watch(decisionProvider, (isDecision) => {
 
 const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
-onMounted(() => {
+onMounted(async () => {
   if (props.mode === "edit" && formValues.value.producesScoreConfigId) {
     void prepareSelectedScoreConfigVersion(true);
   }
+  await scorerDraft.start();
 });
 
 type AuthType = "" | "bearer" | "basic" | "api_key";
@@ -1278,6 +1285,10 @@ async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
 // Save spinner spans the save.
 async function save(value: ScorerForm) {
   if (!props.orgId) return;
+  if (scorerDraft.pendingReentries().some((path) => secretInUse(path, value))) {
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return;
+  }
   try {
     const isLlmJudge = value.scorerType === "llm_judge";
     // producesScoreConfigVersion / pinScoreConfigVersion are set programmatically
@@ -1330,10 +1341,90 @@ async function save(value: ScorerForm) {
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scorers") }),
     });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    scorerDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.scorer.saveError"));
   }
+}
+interface ScorerDraft {
+  values: ScorerForm;
+}
+
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+const AUTH_TYPE_BY_SECRET: Record<string, AuthType> = {
+  "/values/authBearerToken": "bearer",
+  "/values/authBasicPassword": "basic",
+  "/values/authApiKeyToken": "api_key",
+};
+
+/** Whether a blanked secret is still sent: only a remote scorer sends auth and headers, and only its chosen auth. */
+function secretInUse(path: string, value: ScorerForm): boolean {
+  const auth = AUTH_TYPE_BY_SECRET[path];
+  if (auth) return value.scorerType === "remote" && value.authType === auth;
+  if (path.startsWith("/values/customHeaders/")) return value.scorerType === "remote";
+  return true;
+}
+
+function secretFieldLabel(path: string, data: ScorerDraft): I18nText | null {
+  const header = /^\/values\/customHeaders\/(\d+)\/value$/.exec(path);
+  if (header) {
+    return t("common.editorDraft.headerField", {
+      name: data.values.customHeaders[Number(header[1])]?.key ?? "",
+    });
+  }
+  if (path === "/values/authBasicPassword") {
+    return t("onlineEvals.scorer.remoteAuth.passwordLabel");
+  }
+  if (path === "/values/authBearerToken" || path === "/values/authApiKeyToken") {
+    return t("onlineEvals.scorer.remoteAuth.tokenLabel");
+  }
+  return null;
+}
+
+const scorerDraft = useEditorDraft<ScorerDraft>({
+  kind: "eval_scorer",
+  entityLabel: () => t("common.editorDraft.entities.eval_scorer"),
+  entityId: () => (props.mode === "edit" && props.row ? entityId(props.row) : null),
+  newVariant: () => props.scorerType,
+  snapshot: () => ({
+    values: {
+      ...formValues.value,
+      extraMetadataFields: formValues.value.extraMetadataFields.map((field) => ({ ...field })),
+      customHeaders: formValues.value.customHeaders.map((header) => ({ ...header })),
+    },
+  }),
+  // A header name, not a secret, though its key matches the secret pattern.
+  secretExemptKeys: ["authApiKeyHeaderName"],
+  apply: (data) => {
+    form.reset({ ...initForm(null, props.scorerType), ...data.values });
+    if (data.values.producesScoreConfigId) void prepareSelectedScoreConfigVersion(true);
+  },
+  base: () =>
+    props.mode === "edit" && props.row ? initForm(props.row, props.scorerType) : undefined,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  describeRedacted: (paths, data) => paths.flatMap((path) => secretFieldLabel(path, data) ?? []),
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await scorerDraft.confirmLeave()) emit("cancel");
 }
 </script>
 
