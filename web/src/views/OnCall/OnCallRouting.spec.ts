@@ -140,7 +140,7 @@ const stubs = {
     props: ["open", "primaryButtonDisabled", "title"],
     template: "<div><slot /></div>",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
+  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
   OButton: {
     name: "OButton",
     props: ["disabled", "active"],
@@ -242,6 +242,16 @@ describe("OnCallRouting", () => {
     const wrapper = render();
     await flushPromises();
     expect(rulesPanel(wrapper).props("showTeam")).toBe(true);
+  });
+
+  it("asks to remove a rule with a destructive confirm button", async () => {
+    const wrapper = render();
+    await flushPromises();
+    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("okVariant")).toBe("destructive");
   });
 
   /// G4: claiming an unrouted signal opens the rule dialog with the failing

@@ -541,7 +541,6 @@ export default defineComponent({
       return Boolean(store.state.zoConfig?.synthetics_enabled);
     });
 
-    // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
     const isProfilingEnabled = computed(() => {
       return Boolean(store.state.zoConfig?.profiling_enabled);
     });

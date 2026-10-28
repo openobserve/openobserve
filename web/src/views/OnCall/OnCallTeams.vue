@@ -278,7 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :model-value="!!teamToDelete"
       :title="t('oncall.deleteTeamTitle')"
-      :message="t('oncall.deleteTeamMessage', { name: teamToDelete?.name ?? '' })"
+      message-keypath="oncall.deleteTeamMessage"
+      :message-name="teamToDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteTeam"
       @update:cancel="teamToDelete = null"
     />

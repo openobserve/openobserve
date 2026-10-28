@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="dateTimePickerRef"
         :disable="disable"
         :hide-range-shift="isMobile"
+        calendar-presets
         class="h-8"
         data-test="metrics-date-picker"
       />

@@ -59,7 +59,8 @@ async function mountAppRoles() {
         },
         AddRole: { template: '<div data-test="add-role-stub" />' },
         ConfirmDialog: {
-          props: ["modelValue", "title", "message"],
+          name: "ConfirmDialog",
+          props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div data-test="confirm-dialog-stub"></div>',
         },
@@ -298,6 +299,16 @@ describe("AppRoles - showConfirmDialog", () => {
     expect((wrapper.vm as any).deleteConformDialog.data).toEqual(row);
   });
 
+  it("names the role and uses a destructive OK button", async () => {
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).showConfirmDialog({ role_name: "Viewer" });
+    await flushPromises();
+    const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+    expect(dialog.props("messageKeypath")).toBe("iam.appRoles.deleteConfirm");
+    expect(dialog.props("messageName")).toBe("Viewer");
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
   it("builds a blast-radius warning with the live user count", async () => {
     const wrapper = await mountAppRoles();
     await (wrapper.vm as any).showConfirmDialog({ role_name: "Admin" });
@@ -373,6 +384,10 @@ describe("AppRoles - openBulkDeleteDialog", () => {
     const wrapper = await mountAppRoles();
     (wrapper.vm as any).openBulkDeleteDialog();
     expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("title") === i18n.global.t("iam.appRoles.bulkDeleteRoles"));
+    expect(dialog!.props("okVariant")).toBe("destructive");
   });
 });
 

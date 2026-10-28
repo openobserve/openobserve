@@ -63,8 +63,8 @@ use {
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
-        workflows,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers,
+        service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1763,6 +1763,9 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
+                .route("/{org_id}/score_configs/quality", get(quality::list_quality_summaries))
+                .route("/{org_id}/score_configs/{entity_id}/quality", get(quality::list_quality_scores))
+                .route("/{org_id}/score_configs/{entity_id}/quality/timeline", get(quality::get_quality_timeline))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
                 // Scorers (Online Eval Phase 2)
@@ -2727,14 +2730,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             .merge(crate::router::http::create_splunk_collector_proxy_routes())
             .merge(router_routes)
     } else {
-        // Non-router node: use direct service routes
-        Router::new()
-            .merge(basic_routes())
-            .merge(splunk_collector_routes())
-            .nest("/config", config_routes())
-            .nest("/api", service_routes())
-            .merge(other_service_routes())
-            .merge(proxy_routes(true))
+        local_routes()
     };
 
     // Ensure redirect takes into account base_uri
@@ -2786,6 +2782,17 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         ));
     }
     outer
+}
+
+/// Every route a non-router node serves itself, without the UI.
+fn local_routes() -> Router {
+    Router::new()
+        .merge(basic_routes())
+        .merge(splunk_collector_routes())
+        .nest("/config", config_routes())
+        .nest("/api", service_routes())
+        .merge(other_service_routes())
+        .merge(proxy_routes(true))
 }
 
 /// Root-only node management routes, before the authentication layers `basic_routes` adds.
@@ -5146,6 +5153,87 @@ mod tests {
         assert_eq!(
             status(request("POST", "take_overs")).await,
             StatusCode::NOT_FOUND
+        );
+    }
+
+    // OSS documents enterprise-only operations without routing them, so this holds only there.
+    #[cfg(feature = "enterprise")]
+    /// `METHOD /path` OpenAPI operations a non-router node does not route.
+    const UNROUTED_OPENAPI_OPERATIONS: &[&str] = &[
+        // The deprecated v1 folder API is still documented; only `/v2/{org_id}/folders` is routed.
+        "DELETE /api/{org_id}/folders/{folder_id}",
+        "GET /api/{org_id}/folders",
+        "GET /api/{org_id}/folders/name/{folder_name}",
+        "GET /api/{org_id}/folders/{folder_id}",
+        "POST /api/{org_id}/folders",
+        "PUT /api/{org_id}/folders/{folder_id}",
+        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
+        "POST /{org_id}/service_streams/_correlate",
+    ];
+
+    #[cfg(feature = "enterprise")]
+    fn any_param(template: &str) -> String {
+        template
+            .split('/')
+            .map(|s| if is_param(s) { "{}" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
+    #[tokio::test]
+    async fn every_openapi_operation_reaches_the_route_it_documents() {
+        let app = local_routes().route_layer(middleware::from_fn(
+            |req: Request<Body>, _next: Next| async move {
+                let matched = req
+                    .extensions()
+                    .get::<axum::extract::MatchedPath>()
+                    .map(|p| p.as_str().to_string())
+                    .unwrap_or_default();
+                (StatusCode::IM_A_TEAPOT, matched).into_response()
+            },
+        ));
+        let spec = super::openapi::ApiDoc::openapi();
+        let mut unrouted = Vec::new();
+        for (template, item) in &spec.paths.paths {
+            let operations = [
+                (Method::GET, item.get.is_some()),
+                (Method::PUT, item.put.is_some()),
+                (Method::POST, item.post.is_some()),
+                (Method::DELETE, item.delete.is_some()),
+                (Method::PATCH, item.patch.is_some()),
+                (Method::HEAD, item.head.is_some()),
+            ];
+            let uri = template
+                .split('/')
+                .map(|s| if is_param(s) { "zz" } else { s })
+                .collect::<Vec<_>>()
+                .join("/");
+            for (method, _) in operations.into_iter().filter(|(_, documented)| *documented) {
+                let req = Request::builder()
+                    .method(method.clone())
+                    .uri(&uri)
+                    .body(Body::empty())
+                    .unwrap();
+                let resp = app.clone().oneshot(req).await.unwrap();
+                let status = resp.status();
+                let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                let matched = String::from_utf8_lossy(&bytes);
+                if status != StatusCode::IM_A_TEAPOT || any_param(&matched) != any_param(template) {
+                    unrouted.push(format!("{method} {template}"));
+                }
+            }
+        }
+        unrouted.sort();
+        let mut allowed = UNROUTED_OPENAPI_OPERATIONS.to_vec();
+        allowed.sort_unstable();
+        assert_eq!(
+            unrouted, allowed,
+            "each documented operation must resolve to the route of the same template; fix the \
+             utoipa `path`, or list a path no local route serves in UNROUTED_OPENAPI_OPERATIONS"
         );
     }
 }

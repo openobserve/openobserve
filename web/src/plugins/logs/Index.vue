@@ -679,6 +679,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   isSimpleSelectAllQuery,
@@ -775,6 +776,7 @@ import {
   noFtsRecoveryStreams,
   noFtsRecoveryTerm as recoveryTerm,
   planStreamsFilter,
+  loadPendingFreeTextSchemas,
   recoveryCardsFor,
   searchTextReplacement,
 } from "@/composables/useLogs/freeTextSearch";
@@ -1786,6 +1788,14 @@ export default defineComponent({
       });
     };
 
+    const loadSchemasBeforeSqlToggle = async () => {
+      const query = searchObj.data.query ?? "";
+      if (!query.trim() || isAuthoredStatement(query)) return;
+      await loadPendingFreeTextSchemas(searchObj, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true),
+      );
+    };
+
     const setQuery = (sqlMode: boolean) => {
       if (!searchBarRef.value) {
         console.error("searchBarRef is null");
@@ -2130,7 +2140,7 @@ export default defineComponent({
       emit(
         "sendToAiChat",
         raw(
-          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod ? describePeriod(searchObj.data.datetime.relativeTimePeriod) : "custom"}. Can you help me adjust the filter to get results?`,
         ),
         false,
       );
@@ -4083,6 +4093,7 @@ export default defineComponent({
       showIntro,
       refreshData,
       setQuery,
+      loadSchemasBeforeSqlToggle,
       verifyOrganizationStatus,
       collapseFieldList,
       areStreamsPresent,
@@ -4333,7 +4344,8 @@ export default defineComponent({
         if (this.searchObj.meta.sqlModeManualTrigger) {
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
-          this.setQuery(newVal);
+          await this.loadSchemasBeforeSqlToggle();
+          if (this.searchObj.meta.sqlMode) this.setQuery(newVal);
         }
       } else {
         this.searchObj.meta.sqlMode = false;

@@ -1561,6 +1561,12 @@ fn should_dispatch_after_incident(
     !incident_destinations_handled || has_workflows
 }
 
+/// Whether a matched evaluation's rows go to the notification path.
+fn should_notify_rows(rows_empty: bool, multi_alert: bool) -> bool {
+    // A zero-row `<`/`=` match still fires; only per-group dispatch has no group to send it to.
+    !rows_empty || !multi_alert
+}
+
 /// A composite has no query and no row, so its `key:value` tags are its identity.
 #[cfg(feature = "enterprise")]
 fn composite_downtime(
@@ -3749,11 +3755,7 @@ async fn handle_alert_triggers(
         }
     };
 
-    // Whether the condition MATCHED this evaluation. Kept separate from the
-    // notification predicate below: a `<`/`<=` alert can match with an EMPTY
-    // payload, and a matched evaluation can be delivery-suppressed — in both
-    // cases outcome/state/history must still say "fired", only the
-    // notification is skipped.
+    // Suppressed or zero-row multi-alert matches still record "fired"; only the send is skipped.
     let condition_matched = trigger_results.data.is_some();
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
 
@@ -3801,7 +3803,7 @@ async fn handle_alert_triggers(
     };
 
     if let Some(data) = trigger_results.data
-        && !data.is_empty()
+        && should_notify_rows(data.is_empty(), alert.query_condition.multi_alert_enabled())
         // Suppressed deliveries still record state and history; only the
         // notification is skipped.
         && delivery.should_deliver()
@@ -3991,7 +3993,8 @@ async fn handle_alert_triggers(
                         .into_iter()
                         .map(|r| (r.group_key, r.fingerprint))
                         .collect();
-                    if deduplicated_data.is_empty() && deduplicated {
+                    // A zero-row match has nothing to dedup; empty output is no suppression.
+                    if deduplicated_data.is_empty() && deduplicated && !data.is_empty() {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
                             new_trigger.org,
@@ -4485,8 +4488,8 @@ async fn handle_alert_triggers(
         }
     } else {
         if condition_matched {
-            // The condition DID match — this branch was reached because the
-            // payload is empty (`<`/`<=` matching zero rows) or delivery was
+            // The condition DID match — this branch was reached because a
+            // multi-alert matched zero rows or delivery was
             // suppressed (silence window / warning policy). Outcome, state and
             // history must still say "fired"; only the notification is
             // skipped. `trigger_data_stream.status` is initialised to Firing,
@@ -7375,6 +7378,14 @@ mod tests {
         assert!(should_dispatch_after_incident(true, true));
         assert!(!should_dispatch_after_incident(true, false));
         assert!(should_dispatch_after_incident(false, false));
+    }
+
+    #[test]
+    fn zero_row_match_notifies_unless_multi_alert() {
+        assert!(should_notify_rows(true, false));
+        assert!(!should_notify_rows(true, true));
+        assert!(should_notify_rows(false, true));
+        assert!(should_notify_rows(false, false));
     }
 
     fn dispatch_counts(

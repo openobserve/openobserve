@@ -49,6 +49,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 import BackfillJobsList from "./BackfillJobsList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import backfillService from "@/services/backfill";
 import type { BackfillJob } from "@/services/backfill";
 
@@ -117,7 +118,7 @@ const ODialogStub = {
   `,
 };
 
-function createWrapper() {
+function createWrapper(extraStubs: Record<string, any> = {}) {
   return mount(BackfillJobsList, {
     global: {
       plugins: [i18n, store],
@@ -135,6 +136,7 @@ function createWrapper() {
         OIcon: { template: "<span />" },
         Teleport: { template: "<div><slot /></div>" },
         ODialog: ODialogStub,
+        ...extraStubs,
       },
     },
   });
@@ -589,5 +591,51 @@ describe("BackfillJobsList – Error ODialog migration", () => {
     await nextTick();
     expect((wrapper.vm as any).errorDialogVisible).toBe(false);
     expect((wrapper.vm as any).errorDialogData).toBeNull();
+  });
+});
+
+describe("BackfillJobsList – delete confirmation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const openDelete = async (job: BackfillJob) => {
+    const wrapper = createWrapper({ ConfirmDialog: ConfirmDialog });
+    await flushPromises();
+    (wrapper.vm as any).confirmDeleteJob(job);
+    await nextTick();
+    return wrapper.findComponent(ConfirmDialog);
+  };
+
+  it("names the pipeline in bold in the real ConfirmDialog", async () => {
+    const confirm = await openDelete(makeJob({ pipeline_name: "orders-rollup" }));
+    const name = confirm.find('[data-test="confirm-dialog-name"]');
+    expect(name.text()).toBe("orders-rollup");
+    expect(name.classes()).toContain("font-semibold");
+    expect(confirm.find('[data-test="dialog-box"]').text()).toContain(
+      "delete the backfill job for the orders-rollup pipeline?",
+    );
+  });
+
+  it("falls back to the pipeline id when the job has no pipeline name", async () => {
+    const confirm = await openDelete(makeJob({ pipeline_name: null, pipeline_id: "pipe-42" }));
+    expect(confirm.find('[data-test="confirm-dialog-name"]').text()).toBe("pipe-42");
+  });
+
+  it("makes the delete button destructive and keeps its OK label", async () => {
+    const confirm = await openDelete(makeJob());
+    const dialog = confirm.findComponent(ODialogStub);
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primaryButtonLabel")).toBe(i18n.global.t("confirmDialog.ok"));
+  });
+
+  it("keeps the pause confirmation plain and non-destructive", async () => {
+    const wrapper = createWrapper({ ConfirmDialog: ConfirmDialog });
+    await flushPromises();
+    (wrapper.vm as any).confirmPauseJob(makeJob());
+    await nextTick();
+    const confirm = wrapper.findComponent(ConfirmDialog);
+    expect(confirm.find('[data-test="confirm-dialog-name"]').exists()).toBe(false);
+    expect(confirm.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("primary");
   });
 });
