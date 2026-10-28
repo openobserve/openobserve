@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="logs-view-mode-dropdown-btn"
                 size="xs"
+                class="h-[2.125rem]!"
                 variant="outline"
                 icon-right="arrow-drop-down"
               >
@@ -151,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!toolbarMoveResetToMenu"
             data-test="logs-search-bar-reset-filters-btn"
             size="xs"
+            class="h-[2.125rem]!"
             variant="outline"
             @click="resetFilters"
           >
@@ -171,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-histogram-btn"
             size="xs"
             variant="outline"
-            class="gap-1.5"
+            class="h-[2.125rem]! gap-1.5"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
@@ -198,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-sql-mode-pinned-btn"
             size="xs"
             variant="outline"
-            class="gap-1.5"
+            class="h-[2.125rem]! gap-1.5"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
@@ -219,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-quick-mode-pinned-btn"
             size="xs"
             variant="outline"
-            class="gap-1.5"
+            class="h-[2.125rem]! gap-1.5"
             @click="handleQuickMode"
           >
             <OSwitch
@@ -361,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
+              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 h-[2.125rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
