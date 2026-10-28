@@ -9245,6 +9245,7 @@
     },
     "limit": {
       "used": "Ingestion used",
+      "scope": "Across the whole deployment, not just this organization.",
       "daysOver": "Days over the limit",
       "license": "License",
       "expired": "Expired",

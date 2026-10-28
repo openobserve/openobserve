@@ -166,6 +166,9 @@ describe("OverviewLimitCard", () => {
     expect(w.get('[data-test="overview-limit-percent"]').text()).toBe("85.5%");
     expect(w.get('[data-test="overview-limit-days-over"]').text()).toBe("1");
     expect(w.get('[data-test="overview-limit-license"]').text()).toBe("Valid");
+    expect(w.get('[data-test="overview-limit-scope"]').text()).toBe(
+      "Across the whole deployment, not just this organization.",
+    );
   });
 
   it("flags an expired license", () => {
