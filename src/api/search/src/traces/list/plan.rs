@@ -30,7 +30,6 @@ use super::{
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
 
 const DEFAULT_PAGE_SIZE: i64 = 10;
-const UNLIMITED_PAGE_SIZE: i64 = -1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraceListMode {
@@ -166,8 +165,8 @@ impl TraceListOptions {
         let mut size = query.get("size").map_or(DEFAULT_PAGE_SIZE, |v| {
             v.parse::<i64>().unwrap_or(DEFAULT_PAGE_SIZE)
         });
-        // The complete endpoint passes 0 on, where the engine reads it as ZO_QUERY_DEFAULT_LIMIT.
-        if mode == TraceListMode::Streaming && size == 0 {
+        // Complete mode passes size <= 0 on, where the engine reads it as its default limit.
+        if mode == TraceListMode::Streaming && size <= 0 {
             size = DEFAULT_PAGE_SIZE;
         }
         let mut options = Self {
@@ -202,18 +201,6 @@ impl TraceListOptions {
         Ok(options)
     }
 
-    pub fn page_size(&self) -> PageSize {
-        match self.size {
-            UNLIMITED_PAGE_SIZE => PageSize::Unlimited,
-            // Other negative sizes have no streamed contract and keep returning an empty page.
-            size => PageSize::Bounded(usize::try_from(size).unwrap_or(0)),
-        }
-    }
-
-    pub fn skip(&self) -> usize {
-        usize::try_from(self.from).unwrap_or(0)
-    }
-
     pub fn restrict_range(&mut self, max_hours: i64) {
         if max_hours > 0 && (self.range.1 - self.range.0) > max_hours * 3600 * 1_000_000 {
             self.range.0 = self.range.1 - max_hours * 3600 * 1_000_000;
@@ -239,30 +226,6 @@ impl TraceListOptions {
                 self.range = (timestamp - 60 * 1_000_000, timestamp + 3600 * 1_000_000);
             }
             TraceListMode::Complete => {}
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PageSize {
-    Unlimited,
-    Bounded(usize),
-}
-
-impl PageSize {
-    /// Rows a ranking must keep to serve the page after `skip`; `None` keeps every row.
-    pub fn retain(self, skip: usize) -> Option<usize> {
-        match self {
-            Self::Unlimited => None,
-            Self::Bounded(size) => Some(skip.saturating_add(size)),
-        }
-    }
-
-    /// Rows still owed after `delivered`; `None` when every matching trace is owed.
-    pub fn remaining(self, delivered: usize) -> Option<usize> {
-        match self {
-            Self::Unlimited => None,
-            Self::Bounded(size) => Some(size.saturating_sub(delivered)),
         }
     }
 }
@@ -410,38 +373,38 @@ mod tests {
             query.insert("from".to_string(), "-2".to_string());
             query.insert("size".to_string(), "-1".to_string());
             let options = TraceListOptions::parse(&query, mode).unwrap();
-            assert_eq!((options.from, options.size), (-2, -1));
+            let size = if mode == TraceListMode::Streaming {
+                10
+            } else {
+                -1
+            };
+            assert_eq!((options.from, options.size), (-2, size));
             query.insert("size".to_string(), "invalid".to_string());
             assert_eq!(TraceListOptions::parse(&query, mode).unwrap().size, 10);
         }
     }
 
     #[test]
-    fn streamed_sizes_resolve_to_unlimited_the_default_or_the_request() {
+    fn streamed_sizes_below_one_resolve_to_the_default_page() {
         for (size, streamed, complete) in [
-            (None, PageSize::Bounded(10), 10),
-            (Some("0"), PageSize::Bounded(10), 0),
-            (Some("-1"), PageSize::Unlimited, -1),
-            (Some("2"), PageSize::Bounded(2), 2),
-            (Some("2000"), PageSize::Bounded(2000), 2000),
-            (Some("invalid"), PageSize::Bounded(10), 10),
-            (Some("-5"), PageSize::Bounded(0), -5),
+            (None, 10, 10),
+            (Some("0"), 10, 0),
+            (Some("-1"), 10, -1),
+            (Some("-5"), 10, -5),
+            (Some("invalid"), 10, 10),
+            (Some("1"), 1, 1),
+            (Some("2"), 2, 2),
+            (Some("2000"), 2000, 2000),
         ] {
             let mut query = query();
             if let Some(size) = size {
                 query.insert("size".to_string(), size.to_string());
             }
             let options = TraceListOptions::parse(&query, TraceListMode::Streaming).unwrap();
-            assert_eq!(options.page_size(), streamed, "{size:?}");
+            assert_eq!(options.size, streamed, "{size:?}");
             let options = TraceListOptions::parse(&query, TraceListMode::Complete).unwrap();
             assert_eq!(options.size, complete, "{size:?}");
         }
-        assert_eq!(PageSize::Unlimited.retain(2), None);
-        assert_eq!(PageSize::Unlimited.remaining(1_000_000), None);
-        assert_eq!(PageSize::Bounded(10).retain(2), Some(12));
-        assert_eq!(PageSize::Bounded(10).remaining(4), Some(6));
-        assert_eq!(PageSize::Bounded(10).remaining(11), Some(0));
-        assert_eq!(PageSize::Bounded(usize::MAX).retain(2), Some(usize::MAX));
     }
 
     #[test]
