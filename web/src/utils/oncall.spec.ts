@@ -94,6 +94,7 @@ import {
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
 import i18n from "@/locales";
+import rosterParity from "../../../src/config/src/meta/oncall/roster_parity.json";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -1795,6 +1796,19 @@ describe("rotation drawer, part B", () => {
     expect(turnLine(after.members, memberAt(after, now))).toEqual(expectedOrder);
     expect(nextHandover(after, now)).toBe(nextHandover(rule, now));
   });
+
+  // The Rust suite runs these same cases (`roster_parity.json`), so preview and save cannot drift.
+  it.each(rosterParity.map((c) => [c.case, c] as const))(
+    "withRoster matches the server: %s",
+    (_name, c) => {
+      const rule = {
+        ...layer("Base", c.members, 0, []),
+        shift_micros: c.shift_micros,
+        anchor_micros: c.anchor_micros,
+      };
+      expect(withRoster(rule, c.new_members, c.now_micros, c.timezone)).toEqual(c.expected);
+    },
+  );
 
   // F8: shifts are counted in the team's wall time, so a DST change between anchor and now moves no turn.
   it("withRoster counts shifts in the team's zone across a DST change", () => {

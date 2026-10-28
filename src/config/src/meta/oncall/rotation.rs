@@ -3680,4 +3680,34 @@ mod tests {
             );
         }
     }
+
+    /// The cases `web/src/utils/oncall.spec.ts` also runs, so preview and save cannot drift.
+    #[test]
+    fn test_with_roster_matches_the_shared_parity_cases() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            case: String,
+            timezone: String,
+            members: Vec<String>,
+            shift_micros: i64,
+            anchor_micros: i64,
+            now_micros: i64,
+            new_members: Vec<String>,
+            expected: Vec<String>,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("roster_parity.json")).unwrap();
+        for c in cases {
+            let rule = ShiftRule {
+                shift_micros: c.shift_micros,
+                ..ShiftRule::weekly("Base", c.members, c.anchor_micros)
+            };
+            let tz: chrono_tz::Tz = c.timezone.parse().unwrap();
+            assert_eq!(
+                rule.with_roster(c.new_members, c.now_micros, tz).members,
+                c.expected,
+                "{}",
+                c.case
+            );
+        }
+    }
 }

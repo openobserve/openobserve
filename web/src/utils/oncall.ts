@@ -42,7 +42,12 @@ import type {
   VerificationRefusalBody,
 } from "@/ts/interfaces/oncall";
 import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import {
+  MICROS_PER_DAY,
+  MICROS_PER_HOUR,
+  MICROS_PER_MINUTE,
+  MICROS_PER_WEEK,
+} from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
@@ -983,10 +988,56 @@ export function turnLine(members: string[], holder: string | null): string[] {
   return at < 0 ? [...members] : [...members.slice(at), ...members.slice(0, at)];
 }
 
-/** The shift `atMicros` falls in, counted in `timezone`'s wall time like `ShiftRule::shift_index`. [pure] */
+/** How far the local estimate may be walked to the real boundary; `MAX_BOUNDARY_CORRECTIONS` in Rust. */
+const MAX_BOUNDARY_CORRECTIONS = 4;
+
+/** How far past a DST gap a handover is looked for; `MAX_GAP_MINUTES` in Rust. */
+const MAX_GAP_MINUTES = 180;
+
+/** Every instant at which `timezone`'s wall clock reads `local`: none in a gap, two in a fold. [pure] */
+function instantsAtLocal(local: number, timezone: string): number[] {
+  // One transition at most within a day either side, so the offsets on both sides are all there are.
+  const offsets = new Set([
+    offsetMicrosAt(local - 26 * MICROS_PER_HOUR, timezone),
+    offsetMicrosAt(local + 26 * MICROS_PER_HOUR, timezone),
+  ]);
+  return [...offsets]
+    .map((offset) => local - offset)
+    .filter((at) => at + offsetMicrosAt(at, timezone) === local)
+    .sort((a, b) => a - b);
+}
+
+/** The instant the wall clock reads `local`: the first of a fold, the end of a gap; mirrors `from_local_micros`. [pure] */
+function fromLocalMicros(local: number, timezone: string): number | null {
+  for (let minutes = 0; minutes <= MAX_GAP_MINUTES; minutes++) {
+    const first = instantsAtLocal(local + minutes * MICROS_PER_MINUTE, timezone)[0];
+    if (first !== undefined) return first;
+  }
+  return null;
+}
+
+/** The shift `atMicros` falls in, counted in `timezone`'s wall time; mirrors `ShiftRule::shift_index`. [pure] */
 function localShiftIndex(rule: ShiftRule, atMicros: number, timezone: string): number {
   const local = (micros: number) => micros + offsetMicrosAt(micros, timezone);
-  return Math.floor((local(atMicros) - local(rule.anchor_micros)) / rule.shift_micros);
+  const localAnchor = local(rule.anchor_micros);
+  const boundary = (index: number) =>
+    fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
+  let index = Math.floor((local(atMicros) - localAnchor) / rule.shift_micros);
+  // Local counts are one out across a transition, so settle against boundary instants.
+  for (let step = 0; step < MAX_BOUNDARY_CORRECTIONS; step++) {
+    const start = boundary(index);
+    if (start !== null && start > atMicros) {
+      index -= 1;
+      continue;
+    }
+    const next = boundary(index + 1);
+    if (next !== null && next <= atMicros) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return index;
 }
 
 /** `rule`'s roster as `members`, keeping its holder at `nowMicros` and its handovers; mirrors `ShiftRule::with_roster`. [pure] */
