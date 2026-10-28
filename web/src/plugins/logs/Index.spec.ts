@@ -294,6 +294,7 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
 
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
+import streamService from "@/services/stream";
 
 describe("Logs Index", async () => {
   let wrapper: any;
@@ -1930,6 +1931,10 @@ describe("Logs Index", async () => {
     // the watcher refreshes the stream lists before it reports, so the intro must outlast that refresh
     it("with the flag on, keeps the intro until the first-data watcher reports, then opens the query UI", async () => {
       store.state.zoConfig.restricted_routes_on_empty_data = true;
+      // the intro reads the live logs list once, and this org has none
+      const nameList = vi
+        .spyOn(streamService, "nameList")
+        .mockResolvedValue({ data: { list: [] } } as never);
       await remount(false);
       orgData.flip(true);
       await flushPromises();
@@ -1949,6 +1954,7 @@ describe("Logs Index", async () => {
       expect(has("no-data-intro")).toBe(false);
       expect(has("logs-search-bar")).toBe(true);
       expect(wrapper.vm.firstDataArrival?.streamName).toBe("default");
+      nameList.mockRestore();
     });
 
     // nothing watches with the flag off, so the intro follows the org's data itself

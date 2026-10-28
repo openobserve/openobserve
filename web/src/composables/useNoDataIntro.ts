@@ -19,6 +19,7 @@ import config from "@/aws-exports";
 import { cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { queryClient } from "@/composables/query/queryClient";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
+import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { isUserDataStream } from "@/utils/internalStreams";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
@@ -27,7 +28,7 @@ import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoic
  * Whether the Logs page shows its intro: only while the org has no logs stream of any kind, so an
  * org with only O2's own or synthetics streams can still search. Only ever turned off for the mount.
  * With the restricted-routes flag on, the page ends it when FirstDataPanel reports, or this does when
- * the only logs streams are ones the panel never reports (O2's own); with it off this
+ * a stream was there before the panel started or is one it never reports (O2's own); with it off this
  * re-reads the logs list on the first-event budget, paused while the tab is hidden.
  */
 export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
@@ -42,12 +43,21 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
       [];
     return list.length > 0 && !list.some((s) => isUserDataStream(s?.name ?? "", "logs"));
   };
+  // a cached empty list can predate the first stream, which FirstDataPanel's watch then never reports
+  const recheck = () =>
+    void queryClient
+      .fetchQuery({ ...streamNameListQuery(toValue(org), "logs"), staleTime: 0 })
+      .then((list) => {
+        if (list.length) showIntro.value = false;
+      })
+      .catch(() => undefined);
   watch(
     [hasLogsStream, isFetching],
     ([has, fetching]) => {
       if (fetching) return;
       if (showIntro.value === undefined) {
         if (has !== undefined) showIntro.value = !has;
+        if (showIntro.value && pageWatches()) recheck();
         // only a list that shows a stream ends it: a failed read (a 401 at session expiry) is not data
       } else if (showIntro.value && has === true && (!pageWatches() || onlyInternalLogs())) {
         showIntro.value = false;

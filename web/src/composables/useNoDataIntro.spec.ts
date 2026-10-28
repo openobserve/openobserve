@@ -200,6 +200,45 @@ describe("useNoDataIntro", () => {
     wrapper.unmount();
   });
 
+  // the list was cached empty moments before the first stream landed; FirstDataPanel's watch takes
+  // that stream as its starting point and never reports it
+  it("with the flag on, ends the intro when the live list already holds a logs stream", async () => {
+    store.state.zoConfig.restricted_routes_on_empty_data = true;
+    queryClient.clear();
+    for (const type of USER_DATA_STREAM_TYPES) {
+      queryClient.setQueryData(streamNameListQuery(ORG, type).queryKey, []);
+    }
+    lists(["default"], { docNum: 0 });
+    const { showIntro, wrapper } = setup();
+    expect(showIntro.value).toBe(true);
+
+    // the watch's own first read of the list
+    await queryClient.fetchQuery({ ...streamNameListQuery(ORG, "logs"), staleTime: 0 });
+    await flushPromises();
+
+    expect(showIntro.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("with the flag on, from a cached empty list, still waits for FirstDataPanel when data lands later", async () => {
+    store.state.zoConfig.restricted_routes_on_empty_data = true;
+    queryClient.clear();
+    for (const type of USER_DATA_STREAM_TYPES) {
+      queryClient.setQueryData(streamNameListQuery(ORG, type).queryKey, []);
+    }
+    lists([]);
+    const { showIntro, wrapper } = setup();
+    await flushPromises();
+    expect(showIntro.value).toBe(true);
+
+    lists(["default"], { docNum: 0 });
+    await queryClient.refetchQueries();
+    await flushPromises();
+
+    expect(showIntro.value).toBe(true);
+    wrapper.unmount();
+  });
+
   it("never shows the intro from a stale cached 'no data' that refetches to data", async () => {
     queryClient.clear();
     for (const type of USER_DATA_STREAM_TYPES) {

@@ -150,6 +150,25 @@ describe("useOrgHasUserData", () => {
     wrapper.unmount();
   });
 
+  // the mark only bridges the stats flush: a stream deleted and made again, empty, later is not data
+  it("stops counting a detection once the stats have had time to flush", async () => {
+    listsFor({ aged: { logs: ["default"] } }, 0);
+    markDetectionSeen("aged", { type: "logs", name: "default" });
+    queryClient.clear();
+    expect(await orgHasUserData("aged")).toBe(true);
+    vi.restoreAllMocks();
+
+    vi.setSystemTime(Date.now() + 16 * 60_000);
+    listsFor({ aged: {} });
+    queryClient.clear();
+    expect(await orgHasUserData("aged")).toBe(false);
+    vi.restoreAllMocks();
+
+    listsFor({ aged: { logs: ["default"] } }, 0);
+    queryClient.clear();
+    expect(await orgHasUserData("aged")).toBeUndefined();
+  });
+
   it("counts a traces stream", async () => {
     expect((await run({ traces: ["checkout"] })).after).toBe(true);
   });

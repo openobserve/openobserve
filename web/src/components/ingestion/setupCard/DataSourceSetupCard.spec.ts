@@ -21,6 +21,7 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
 import DataSourceSetupCard from "./DataSourceSetupCard.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { SETUP_CARD_ONBOARDING, type SetupCardPresets } from "./types";
 import i18n from "@/locales";
 
@@ -490,5 +491,38 @@ describe("DataSourceSetupCard — onboarding's tracing answer", () => {
     const step = instrument(mountK8s());
     expect(step.collapsed).toBe(true);
     expect(step.inputs).toBeUndefined();
+  });
+});
+
+describe("DataSourceSetupCard — commands that carry the org key", () => {
+  // the key is loading, or its read failed: the command would carry the email and an empty password
+  it("offers no copy of a key-bearing command until the key has loaded", async () => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: { organizationPasscode: "" },
+        theme: "light",
+      },
+    });
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { template: "<div />" } }],
+    });
+    const wrapper = mount(DataSourceSetupCard, {
+      props: { slug: "linux" },
+      global: { plugins: [store, router, i18n], stubs: { FirstEventStatus: true } },
+    });
+    const keyed = () =>
+      wrapper.findAllComponents(OCodeBlock).filter((block) => !!block.props("codeMasked"));
+    expect(keyed()[0].props("code")).toContain(btoa("t@e.com:"));
+    expect(keyed().map((block) => block.props("copyable"))).not.toContain(true);
+
+    store.state.organizationData.organizationPasscode = "pc";
+    await flushPromises();
+
+    expect(keyed()[0].props("code")).toContain(btoa("t@e.com:pc"));
+    expect(keyed().map((block) => block.props("copyable"))).not.toContain(false);
+    wrapper.unmount();
   });
 });

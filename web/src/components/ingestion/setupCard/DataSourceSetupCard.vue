@@ -31,6 +31,7 @@ import { useRouter } from "vue-router";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
+import { useOrgCredential } from "@/composables/useOrgCredential";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import analytics from "@/services/product_analytics";
 import {
@@ -85,6 +86,8 @@ const subs = computed<CardSubstitutions>(() => {
 const onboarding = inject(SETUP_CARD_ONBOARDING, null);
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t, onboarding?.value));
 
+// pages that host the card without a key of their own (Infra empty states) load it here
+useOrgCredential();
 const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
 );
@@ -230,6 +233,7 @@ const onStepAction = async (actionId: string) => {
       v-else-if="content"
       :content="content"
       :subs="subs"
+      :key-pending="!store.state.organizationData?.organizationPasscode"
       data-test="data-source-setup-card"
       @detected="onDetected"
       @state="emit('state', $event)"

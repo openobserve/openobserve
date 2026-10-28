@@ -82,6 +82,8 @@ const props = defineProps<{
   logoUrlDark?: string;
   /** Drop the hero — for a host page whose own header already names the card. */
   hideHero?: boolean;
+  /** The org key in `subs.token` is loading or failed: commands that carry it are not offered yet. */
+  keyPending?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -800,10 +802,11 @@ function fireConfetti() {
                 :reveal-tooltip="t('ingestion.setupCard.revealToken')"
                 :hide-tooltip="t('ingestion.setupCard.hideToken')"
                 :token-name="displayCode(step)?.masked ? tokenName : undefined"
+                :copyable="!(keyPending && displayCode(step)?.masked)"
                 @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
                 @token-click="openTokenPicker?.()"
               >
-                <template v-if="displayCode(step)?.downloadEnv" #actions>
+                <template v-if="displayCode(step)?.downloadEnv && !keyPending" #actions>
                   <OButton
                     data-test="ai-code-env-btn"
                     variant="ghost"
@@ -953,6 +956,7 @@ function fireConfetti() {
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"
               :token-name="extras.advanced.code.masked ? tokenName : undefined"
+              :copyable="!(keyPending && extras.advanced.code.masked)"
               @token-click="openTokenPicker?.()"
             />
           </div>

@@ -45,7 +45,12 @@ export interface FirstDataRecord {
 export interface DetectedStream {
   type: string;
   name: string;
+  /** When the record arrived, in ms. */
+  at?: number;
 }
+
+// stats count flushed files only (ZO_MAX_FILE_RETENTION_TIME, 600 s by default); after that they speak for the stream
+const DETECTION_MARK_MS = 15 * 60_000;
 
 export interface FirstDataStream {
   name: string;
@@ -98,15 +103,16 @@ export function markDetectionSeen(org: string, stream?: DetectedStream): void {
   writeFirstDataRecord(org, {
     ...record,
     seenDetection: true,
-    ...(stream ? { detectedStream: stream } : {}),
+    ...(stream ? { detectedStream: { ...stream, at: Date.now() } } : {}),
   });
   detections.value++;
 }
 
-/** The stream whose first record a setup page in this browser saw arrive. */
+/** The stream whose first record a setup page in this browser saw arrive, until its stats have had time to flush. */
 export function detectedStream(org: string): DetectedStream | undefined {
   void detections.value;
-  return readFirstDataRecord(org)?.detectedStream;
+  const seen = readFirstDataRecord(org)?.detectedStream;
+  return seen && Date.now() - (seen.at ?? 0) < DETECTION_MARK_MS ? seen : undefined;
 }
 
 /** Whether the org holds a user stream, read with the notice's own bounded probes; null when a read fails. */
