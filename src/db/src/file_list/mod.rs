@@ -53,19 +53,26 @@ pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool
         deleted,
     );
 
+    let mut last_err = None;
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
         match progress(account, key, meta.as_ref(), deleted).await {
             Ok(id) => {
                 file_data.id = id;
+                last_err = None;
                 break;
             }
             Err(e) => {
                 log::error!("[FILE_LIST] Error saving file to storage, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                last_err = Some(e);
             }
         }
+    }
+
+    if let Some(err) = last_err {
+        return Err(err);
     }
 
     let cfg = config::get_config();
@@ -84,6 +91,7 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
             log::error!("service:db:file_list: delete {key}, remove error: {e}");
+            return Err(e);
         }
     } else if let Some(data) = data {
         match infra::file_list::add(account, key, data).await {
@@ -92,6 +100,7 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
             }
             Err(e) => {
                 log::error!("service:db:file_list: add {key}, add error: {e}");
+                return Err(e);
             }
         }
         // update stream stats realtime
@@ -179,6 +188,19 @@ mod tests {
         let result = progress("test_org", "test_file.parquet", None, false).await;
         assert!(result.is_ok()); // Should return 0 when no operation is performed
         assert_eq!(result.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_progress_add_error() {
+        let meta = create_test_file_meta();
+        let result = progress("test_org", "invalid_key", Some(&meta), false).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_progress_delete_error() {
+        let result = progress("test_org", "invalid_key", None, true).await;
+        assert!(result.is_err());
     }
 
     #[test]
