@@ -302,6 +302,8 @@ jobs:
       contents: read
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      # Kept from the earlier attempt on "Re-run failed jobs"; equal to run_attempt on "Re-run all jobs".
+      attempt: ${{ github.run_attempt }}
       smoke_active: ${{ steps.gen.outputs.smoke_active }}
       shards_selected: ${{ steps.gen.outputs.shards_selected }}
     steps:
@@ -649,7 +651,9 @@ jobs:
 
             # Re-run whole files that had a failure (a serial group needs its earlier tests).
             PREV=last-run-prev/.last-run.json
-            if [ "$GITHUB_RUN_ATTEMPT" -gt 1 ] && [ -f "$PREV" ] \
+            if [ "$GITHUB_RUN_ATTEMPT" -gt 1 ] && [ "${{ needs.generate_matrix.outputs.attempt }}" = "$GITHUB_RUN_ATTEMPT" ]; then
+              echo "Re-run all jobs: running the full shard"
+            elif [ "$GITHUB_RUN_ATTEMPT" -gt 1 ] && [ -f "$PREV" ] \
               && node -e "const r=require('./$PREV'); process.exit(r.status === 'failed' && (r.failedTests||[]).length ? 0 : 1)"; then
               mkdir -p test-results && cp "$PREV" test-results/.last-run.json
               LIST_JSON=$(mktemp)
