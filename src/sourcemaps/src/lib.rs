@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_list_files() {
+    async fn test_list_files() {
         let service = "svc_list_files";
         let environment = "env_list_files";
         let version = "v_list_files";
@@ -701,7 +701,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_delete_files() {
+    async fn test_delete_files() {
         let service = "svc_delete_files";
         let environment = "env_delete_files";
         let version = "v_delete_files";
@@ -758,7 +758,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_translate() {
+    async fn test_translate() {
         let service = "svc_translate";
         let environment = "env_translate";
         let version = "v_translate";
@@ -986,7 +986,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_zip_too_many_entries_is_rejected() {
+    async fn test_zip_too_many_entries_is_rejected() {
         let org = "org_zip_entries";
         let names: Vec<String> = (0..=SOURCEMAP_ZIP_MAX_ENTRIES)
             .map(|i| format!("f{i}.js.map"))
@@ -1000,7 +1000,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_zip_total_size_over_limit_rolls_back_storage() {
+    async fn test_zip_total_size_over_limit_rolls_back_storage() {
         let org = "org_zip_total";
         let data = vec![0u8; SOURCEMAP_FILE_MAX_SIZE as usize];
         let count = (SOURCEMAP_ZIP_MAX_SIZE / SOURCEMAP_FILE_MAX_SIZE) as usize + 1;
@@ -1017,7 +1017,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_zip_entry_with_understated_size_is_rejected() {
+    async fn test_zip_entry_with_understated_size_is_rejected() {
         let org = "org_zip_declared";
         let data = vec![0u8; SOURCEMAP_FILE_MAX_SIZE as usize + 1];
         let mut zip = build_zip(&[("big.js.map", data.as_slice())]);
@@ -1034,7 +1034,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_delete_group_removes_stored_files() {
+    async fn test_delete_group_removes_stored_files() {
         let service = "svc_delete_storage";
         let environment = "env_delete_storage";
         let version = "v_delete_storage";
@@ -1089,7 +1089,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_delete_group_returns_only_removed_rows() {
+    async fn test_delete_group_returns_only_removed_rows() {
         let (svc_a, svc_b) = ("svc_delete_rows_a", "svc_delete_rows_b");
         let environment = "env_delete_rows";
         let version = "v_delete_rows";
@@ -1138,7 +1138,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sourcemaps_delete_stored_files_ignores_missing_objects() {
+    async fn test_delete_stored_files_ignores_missing_objects() {
         let org = "org_delete_missing";
         let entry = |name: &str| SourceMap {
             id: 0,

@@ -3,7 +3,7 @@ name: Unit tests
 on:
   # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
-     branches:
+    branches:
       - "main"
   pull_request:
     branches:
