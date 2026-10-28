@@ -383,7 +383,6 @@ describe("OnCallResponses", () => {
     expect(table.props("sortOrder")).toBe("desc");
     expect(table.props("columnVisibility")).toEqual({
       firings: false,
-      state: false,
       channels: false,
     });
     const ids = (table.props("columns") as any[]).map((c) => c.id);
@@ -1014,29 +1013,36 @@ describe("OnCallResponses", () => {
     );
   });
 
-  /// The stored state stays triggered; the screen says what it means.
-  it("tags a triggered page whose ladder ran out as nobody answered", async () => {
-    const wrapper = await withPages([page({ exhausted_at: 1_700_000_100_000_000 })]);
+  /// The section headers already say ringing/handled/resolved, so a Status column only repeated them.
+  it("has no Status column, and the always-shown Escalation column says what is happening", async () => {
+    const wrapper = await withPages([page()]);
+    const table = wrapper.findComponent({ name: "OTable" });
+    const columns = table.props("columns") as any[];
 
-    expect(wrapper.find('[type="oncallResponseState"]').attributes("value")).toBe("exhausted");
-  });
-
-  /// Status is hidden by default, so the always-visible Escalation cell carries the state.
-  it("says nobody answered in the escalation cell, which is always shown", async () => {
-    const wrapper = await withPages([page({ exhausted_at: 1_700_000_100_000_000 })]);
-
-    const tag = wrapper.find('[data-test="oncall-row-escalation-exhausted"]');
-    expect(tag.attributes("value")).toBe("exhausted");
-    expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).exists()).toBe(false);
-    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+    expect(columns.some((c) => c.id === "state")).toBe(false);
+    expect(Object.keys(table.props("columnVisibility"))).not.toContain("state");
     expect(columns.find((c) => c.id === "escalation").hideable).not.toBe(true);
   });
 
-  it("sizes the status column to fit its longest state", async () => {
-    const wrapper = await withPages([page()]);
-    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+  /// One signal: the ladder's own progress, which the "nobody answered" tag and the ladder text both read.
+  it("tags nobody answered from the ladder's progress, before the record's flag lands", async () => {
+    service.escalationProgress.mockImplementation(async ({ response_id }: any) => ({
+      data: {
+        fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: response_id === "resp_done",
+      },
+    }));
+    const wrapper = await withPages([
+      page({ id: "resp_done", exhausted_at: null }, "al_done"),
+      page({ id: "resp_live" }, "al_live"),
+    ]);
 
-    expect(columns.find((c) => c.id === "state").size).toBeGreaterThanOrEqual(160);
+    expect(wrapper.find('[data-test="oncall-escalation-cell-exhausted"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="oncall-escalation-cell-exhausted"]')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain("Ladder finished");
+    expect(wrapper.text()).not.toContain("Triggered");
   });
 
   it("names a team missing from the loaded list as deleted, without a link", async () => {
@@ -1087,6 +1093,14 @@ describe("OnCallResponses", () => {
       w
         .findAllComponents({ name: "OToggleGroup" })
         .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!;
+
+    /// The Status column is gone, and a view saved while sorted by it must still load.
+    it("falls back to the default sort when the saved view sorted by Status", async () => {
+      Object.assign(seed(), { sortBy: "state" });
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("sortBy")).toBe("last_alert_at");
+    });
 
     it("restores the filter tab, page, page size and sort", async () => {
       Object.assign(seed(), {

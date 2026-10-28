@@ -19,38 +19,41 @@ import { describe, expect, it } from "vitest";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
-import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
+import store from "@/test/unit/helpers/store";
+import type { EscalationProgress, OnCallResponse } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
   OProgressBar: { name: "OProgressBar", props: ["value", "variant"], template: "<div />" },
 };
 
-/// The detail sentence lives in the tooltip's `content` prop now, not a
-/// second visible line — reading the prop avoids needing a real hover to
-/// mount the (lazy, portalled) tooltip content.
+const NOW = () => Date.now() * 1000;
+const MINUTE = 60_000_000;
+
+/// The detail sentence lives in the tooltip's `content` prop, not a second visible line.
 function tooltipText(wrapper: VueWrapper) {
   return String(wrapper.findComponent(OTooltip).props("content"));
 }
 
-function firedRungs(count: number) {
+function firedRungs(count: number, reached: string[] = []) {
   return Array.from({ length: count }, (_, i) => ({
     after_micros: i * 300_000_000,
-    at: Date.now() * 1000,
+    at: NOW(),
     targets: ["the on-call"],
+    reached,
   }));
 }
 
 function render(
-  state: ResponseState,
+  record: Partial<OnCallResponse>,
   progress: Partial<EscalationProgress> | null,
-  totalRungs: number | null = 3,
+  extra: Record<string, unknown> = {},
 ) {
   return mount(OnCallEscalationCell, {
     props: {
       responseId: "resp-1",
-      state,
-      totalRungs,
+      record: { state: "triggered", opened_at: NOW() - 10 * MINUTE, ...record } as OnCallResponse,
+      totalRungs: 3,
       progressLoaded: true,
       progress: progress && {
         fired: [],
@@ -60,120 +63,68 @@ function render(
         stopped_because: null,
         ...progress,
       },
+      ...extra,
     },
-    global: { plugins: [i18n], stubs },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
+const text = (wrapper: VueWrapper) =>
+  wrapper.find('[data-test="oncall-escalation-cell-level"]').text();
+
 describe("OnCallEscalationCell", () => {
-  it("names the rung it is on out of the rungs the policy defines", () => {
-    const wrapper = render("triggered", { fired: firedRungs(2) });
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe("Level 2 of 3");
-  });
-
-  /// A guessed denominator is worse than none: "Level 2 of 3" against a policy
-  /// nobody could read would state a deadline that does not exist.
-  it("omits the denominator when the policy could not be read", () => {
-    const wrapper = render("triggered", { fired: firedRungs(2) }, null);
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe("Level 2");
-  });
-
-  it("counts down to the next rung and names who it wakes", () => {
-    const wrapper = render("triggered", {
-      fired: firedRungs(1),
-      next_targets: ["the next on-call"],
-      next_at: (Date.now() + 4 * 60_000) * 1000,
-    });
-
-    const tooltip = tooltipText(wrapper);
-    expect(tooltip).toContain("the next on-call");
-    // Not exact: the countdown runs against the real clock, so seconds have
-    // already elapsed by the time it renders.
-    expect(tooltip).toMatch(/[34]m/);
-  });
-
-  /// One or two words, not a sentence. The full copy ("Escalation stopped —
-  /// somebody owns this.") truncated to nothing in a table cell, which is what
-  /// this column was doing.
+  /// One phrase per row, and never the bare state word the group header already says.
   it.each([
-    ["acknowledged" as ResponseState, null, "Acknowledged"],
-    ["resolved" as ResponseState, null, "Resolved"],
-    ["triggered" as ResponseState, "snoozed", "Snoozed"],
-  ])("reports %s as a stopped ladder in one word", (state, stoppedBecause, expected) => {
-    const wrapper = render(state, {
-      fired: firedRungs(1),
-      stopped_because: stoppedBecause,
-    });
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe(expected);
+    [{}, { fired: firedRungs(2, ["bo@o2.ai"]) }, {}, "Paging step 2 of 3 · bo@o2.ai"],
+    [{}, { fired: firedRungs(2, ["bo@o2.ai"]) }, { totalRungs: null }, "Paging step 2 · bo@o2.ai"],
+    [{}, { fired: firedRungs(2) }, {}, "Paging step 2 of 3"],
+    [{}, null, { reachedStep: 1 }, "Paging step 1 of 3"],
+    [{}, { fired: [] }, {}, "Not paged yet"],
+    [{}, { fired: [], exhausted: true }, { totalRungs: 0 }, "Pages nobody"],
+    [
+      {},
+      { fired: [...firedRungs(1, ["ana@o2.ai"]), { ...firedRungs(1)[0], reached_nobody: true }] },
+      {},
+      "Step 2 of 3 reached nobody",
+    ],
+    [
+      {},
+      { fired: [{ ...firedRungs(1)[0], reached_nobody: true }] },
+      { totalRungs: null },
+      "Step 1 reached nobody",
+    ],
+    [
+      { state: "acknowledged", acked_by: "ana@o2.ai" },
+      { fired: firedRungs(1) },
+      {},
+      "Acknowledged by ana@o2.ai",
+    ],
+    [
+      { state: "resolved", opened_at: 1_000_000, closed_at: 1_000_000 + 5 * MINUTE },
+      { fired: firedRungs(1) },
+      {},
+      "Resolved after 5m",
+    ],
+  ] as const)("says %o / %o as one phrase", (record, progress, extra, expected) => {
+    const wrapper = render(record as any, progress as any, extra as any);
+    expect(text(wrapper)).toBe(expected);
+    expect(text(wrapper)).not.toContain("Triggered");
   });
 
-  /// Once a page IS answered, how fast is the useful fact — the ladder itself
-  /// has nothing left to say.
-  it("says how quickly an answered page was claimed", () => {
-    const wrapper = mount(OnCallEscalationCell, {
-      props: {
-        responseId: "resp-1",
-        state: "acknowledged" as ResponseState,
-        totalRungs: 3,
-        ackedInMicros: 42_000_000,
-        progress: {
-          fired: firedRungs(1),
-          next_targets: [],
-          next_at: null,
-          exhausted: false,
-          stopped_because: "acknowledged",
-        },
-      },
-      global: { plugins: [i18n], stubs },
-    });
-    expect(tooltipText(wrapper)).toContain("acked in 42s");
+  it("says when a snooze ends", () => {
+    const wrapper = render({ snoozed_until: NOW() + 30 * MINUTE }, { fired: firedRungs(1) });
+    expect(text(wrapper)).toMatch(/^Snoozed until ([A-Z][a-z]{2} \d{1,2}, \d{4}, )?\d{2}:\d{2}$/);
   });
 
-  it("says nothing has been paged when the ladder position is unknown", () => {
-    const wrapper = render("triggered", null);
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe("Not paged yet");
+  it("says AI triage is first, as an upper bound", () => {
+    const wrapper = render({}, { held_until_micros: NOW() + 54_500_000 });
+    expect(text(wrapper)).toMatch(/^AI triage first · paging within 5[45]s$/);
   });
 
-  /// The bar and the state icon both restated the headline, and the row already
-  /// carries a priority rail — so the cell is words and tone only.
-  it("draws no bar and no icon at all", () => {
-    const wrapper = render("triggered", { fired: firedRungs(2), exhausted: true }, 4);
-
-    expect(wrapper.find('[data-test="oncall-escalation-cell-bar"]').exists()).toBe(false);
-    expect(wrapper.findComponent({ name: "OProgressBar" }).exists()).toBe(false);
-    expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(false);
-  });
-
-  /// Tone is the cell's only signal now, so every state has to carry one.
-  it.each([
-    ["triggered" as const, { fired: firedRungs(3), exhausted: true }, "text-status-error-text"],
-    ["triggered" as const, { fired: firedRungs(1) }, "text-status-error-text"],
-    ["acknowledged" as const, { fired: firedRungs(1) }, "text-text-body"],
-    ["triggered" as const, { stopped_because: "snoozed" }, "text-status-warning-text"],
-    ["resolved" as const, { fired: firedRungs(1) }, "text-text-secondary"],
-  ])("tones %s/%o as %s", (state, progress, expected) => {
-    const wrapper = render(state, progress);
-
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').classes()).toContain(
-      expected,
-    );
-  });
-
-  /// "Level 6 of 6" and "nobody is coming" are the same number and opposite
-  /// situations, so the finished ladder has to say so in words.
-  it("says the ladder finished rather than naming its last level", () => {
-    const wrapper = render("escalating", { fired: firedRungs(3), exhausted: true });
-
-    expect(wrapper.find("[data-test='oncall-escalation-cell-level']").text()).toBe(
-      "Ladder finished — nobody left",
-    );
-  });
-
-  /// "Exhausted" alone does not say whether the ladder reached three people or
-  /// nobody at all, and that is the difference between waiting and re-paging.
-  it("says how many people a finished ladder actually reached", () => {
+  /// The tag and the ladder come from the same progress, so a row cannot say both "finished" and "ringing".
+  it("tags a finished ladder as nobody answered, from the progress alone", () => {
     const wrapper = render(
-      "escalating",
+      { exhausted_at: null },
       {
         fired: [
           { after_micros: 0, at: 1, targets: ["ana@o2.ai"] },
@@ -181,24 +132,70 @@ describe("OnCallEscalationCell", () => {
         ],
         exhausted: true,
       },
-      6,
+      { totalRungs: 6 },
     );
 
-    // Two distinct people over two rungs — the repeat is not a second pair of hands.
+    expect(wrapper.find('[data-test="oncall-escalation-cell-exhausted"]').text()).toBe(
+      "Nobody answered",
+    );
+    expect(wrapper.text()).not.toContain("Ladder finished");
     expect(tooltipText(wrapper)).toContain("rung 2 people over 6 levels, no ack");
   });
 
-  /// The name being woken right now is what a responder checks against their
-  /// own — a bare level number does not answer "is this me".
-  it("names who is being paged while the ladder climbs", () => {
-    const wrapper = render("escalating", {
-      fired: firedRungs(2),
-      next_targets: ["liam@o2.ai"],
-      next_at: Date.now() * 1000 + 60_000_000,
-    });
+  it("counts down to the next rung and names who it wakes", () => {
+    const wrapper = render(
+      {},
+      {
+        fired: firedRungs(1),
+        next_targets: ["the next on-call"],
+        next_at: NOW() + 4 * MINUTE,
+      },
+    );
 
-    expect(wrapper.find("[data-test='oncall-escalation-cell-level']").text()).toBe(
-      "Escalating — level 2, paging liam@o2.ai",
+    const tooltip = tooltipText(wrapper);
+    expect(tooltip).toContain("the next on-call");
+    expect(tooltip).toMatch(/[34]m/);
+  });
+
+  it("says how quickly an answered page was claimed", () => {
+    const opened = NOW() - 10 * MINUTE;
+    const wrapper = render(
+      {
+        state: "acknowledged",
+        acked_by: "ana@o2.ai",
+        opened_at: opened,
+        acked_at: opened + 42_000_000,
+      },
+      { fired: firedRungs(1), stopped_because: "acknowledged" },
+    );
+    expect(tooltipText(wrapper)).toContain("acked in 42s");
+  });
+
+  it("says nothing while the ladder position is still loading", () => {
+    const wrapper = render({}, null, { progressLoaded: false });
+    expect(text(wrapper)).toBe("");
+  });
+
+  it("draws no bar and no icon at all", () => {
+    const wrapper = render({}, { fired: firedRungs(2) }, { totalRungs: 4 });
+
+    expect(wrapper.find('[data-test="oncall-escalation-cell-bar"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OProgressBar" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(false);
+  });
+
+  /// Tone is the cell's only signal, so every phrase carries one.
+  it.each([
+    [{}, { fired: firedRungs(1) }, "text-status-error-text"],
+    [{ state: "acknowledged", acked_by: "a@o2.ai" }, { fired: firedRungs(1) }, "text-text-body"],
+    [{ snoozed_until: NOW() + MINUTE }, { fired: firedRungs(1) }, "text-status-warning-text"],
+    [{ state: "resolved", closed_at: NOW() }, { fired: firedRungs(1) }, "text-text-secondary"],
+    [{}, { fired: [] }, "text-status-error-text"],
+    [{}, { fired: [{ ...firedRungs(1)[0], reached_nobody: true }] }, "text-status-warning-text"],
+  ] as const)("tones %o as %s", (record, progress, expected) => {
+    const wrapper = render(record as any, progress as any);
+    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').classes()).toContain(
+      expected,
     );
   });
 });

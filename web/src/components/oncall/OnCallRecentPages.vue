@@ -83,21 +83,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
       </template>
 
-      <!-- A closed page says how long it took in its own tag, so "Resolved" is said once. -->
+      <!-- The same one phrase the Pages list's Escalation column says; there is no progress here, so the step comes from the record. -->
       <template #cell-state="{ row }">
-        <OTag
-          type="oncallResponseState"
-          :value="pageState(row)"
-          :label="
-            row.closed_at
-              ? t('oncall.recentPagesResolvedAfter', {
-                  duration: raw(formatMicrosDuration(row.closed_at - row.opened_at)),
-                })
-              : undefined
-          "
-          size="sm"
-          :data-test="`oncall-recent-pages-state-${row.id}`"
-        />
+        <span :data-test="`oncall-recent-pages-state-${row.id}`">
+          <OnCallEscalationCell
+            :response-id="row.id"
+            :record="row"
+            :total-rungs="stepsFor(row)?.length ?? null"
+            :reached-step="reachedStep(row)"
+          />
+        </span>
       </template>
 
       <template #cell-opened_at="{ value }">
@@ -115,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
+import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -126,7 +122,6 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { pageState } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -150,6 +145,20 @@ const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
+
+/// The ladder's steps for this record's priority, earliest first.
+function stepsFor(page: OnCallResponse) {
+  const steps = props.policy?.rungs.find((rung) => rung.priority === page.priority)?.steps;
+  return steps ? [...steps].sort((a, b) => a.after_micros - b.after_micros) : null;
+}
+
+/// Which step the record reached, as a 1-based position on its ladder; `null` when unknown.
+function reachedStep(page: OnCallResponse): number | null {
+  const micros = page.reached_rung_micros;
+  if (micros === undefined || micros === null) return null;
+  const index = stepsFor(page)?.findIndex((step) => step.after_micros === micros) ?? -1;
+  return index < 0 ? null : index + 1;
+}
 
 /// The delay before this record's ladder would have woken a SECOND person.
 function secondRungDelay(page: OnCallResponse): number | null {
@@ -180,7 +189,7 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
   {
     id: "state",
     header: t("oncall.state"),
-    accessorFn: (page: OnCallResponse) => pageState(page),
+    accessorFn: (page: OnCallResponse) => page.state,
     size: 180,
   },
   {

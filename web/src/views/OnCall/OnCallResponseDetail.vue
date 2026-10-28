@@ -61,16 +61,20 @@
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <OTag type="oncallResponseState" :value="pageState(response)" size="sm" />
+        <span data-test="oncall-response-phrase">
+          <OnCallEscalationCell
+            :response-id="response.id"
+            :record="response"
+            :progress="escalation"
+            :total-rungs="totalRungs"
+          />
+        </span>
         <!-- How long it has been ringing, beside the word "ringing". The two
              were a stat tile apart, and the one people read first is the
              one that says how bad this already is. -->
         <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
           {{ elapsedLabel }}
         </span>
-        <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
-          {{ t("oncall.snoozed") }}
-        </OTag>
         <!-- Why this team is looking at somebody else's outage, said where the
              state is said rather than halfway down the page. -->
         <OTag
@@ -268,13 +272,17 @@
           data-test="oncall-response-meta"
         >
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <OTag type="oncallResponseState" :value="pageState(response)" size="sm" />
+          <span data-test="oncall-response-phrase">
+            <OnCallEscalationCell
+              :response-id="response.id"
+              :record="response"
+              :progress="escalation"
+              :total-rungs="totalRungs"
+            />
+          </span>
           <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
             {{ elapsedLabel }}
           </span>
-          <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
-            {{ t("oncall.snoozed") }}
-          </OTag>
           <OTag
             v-if="isImpacted"
             variant="info-outline"
@@ -736,6 +744,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
+import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
@@ -825,6 +834,7 @@ import {
   isEscalating,
   isSnoozed,
   isUnresolved,
+  formatOnCallInstant,
   pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
@@ -1074,15 +1084,20 @@ const openedAtClock = computed(() => {
   return formatTimestampInTimezone(r.opened_at, "HH:mm", store.state.timezone);
 });
 
-// A bare clock time from yesterday reads as minutes ago, so the date shows unless it is today.
+/// Rungs the team's policy defines for this priority, `null` when the policy could not be read.
+const totalRungs = computed(
+  () =>
+    policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps.length ??
+    null,
+);
+
+// The same progress decides the header tag; the time is the last step's, which the record's flag lags.
 const exhaustedAtClock = computed(() => {
   const r = response.value;
-  if (!r || pageState(r) !== "exhausted") return "";
-  const at = r.exhausted_at as number;
-  const zone = store.state.timezone;
-  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
-  const format = day(at) === day(nowMicros.value) ? "HH:mm" : "MMM d, yyyy, HH:mm";
-  return formatTimestampInTimezone(at, format, zone);
+  if (!r || pageState(r, escalation.value) !== "exhausted") return "";
+  const lastStepAt = escalation.value?.fired.at(-1)?.at ?? r.exhausted_at;
+  if (!lastStepAt) return "";
+  return formatOnCallInstant(lastStepAt, nowMicros.value, store.state.timezone);
 });
 
 /// Whole seconds until the triage hold releases the first page; 0 once it has, or when there is none.

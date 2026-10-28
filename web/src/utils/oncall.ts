@@ -22,6 +22,7 @@ import type {
   Channel,
   DeliveryRecord,
   DeliveryStatus,
+  EscalationProgress,
   EscalationTarget,
   L0Policy,
   ResponseState,
@@ -47,6 +48,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
+import { formatTimestampInTimezone } from "@/utils/date";
 
 /**
  * Who holds `rule` at `atMicros`.
@@ -345,12 +347,72 @@ export function isSnoozed(
   return !!record.snoozed_until && record.snoozed_until > nowMicros;
 }
 
-/** The state a page's tag shows: a triggered page whose ladder ran out reads as nobody answered. [pure] */
-export function pageState(record: {
-  state: ResponseState;
-  exhausted_at?: number | null;
-}): ResponseState | "exhausted" {
-  return record.state === "triggered" && record.exhausted_at ? "exhausted" : record.state;
+/** An unanswered page whose ladder ran out reads as nobody answered; the ladder's progress decides when known, the record's lagging flag only without it. [pure] */
+export function pageState(
+  record: { state: ResponseState; exhausted_at?: number | null },
+  progress?: EscalationProgress | null,
+): ResponseState | "exhausted" {
+  if (!isEscalating(record.state)) return record.state;
+  // The server also marks an empty ladder exhausted, and nobody can fail to answer a page that paged nobody.
+  const ranOut = progress ? progress.exhausted && progress.fired.length > 0 : !!record.exhausted_at;
+  return ranOut ? "exhausted" : record.state;
+}
+
+/** What is happening to a page, as one phrase: the Pages list, Recent pages and the page header all say this. */
+export type PagePhrase =
+  | { kind: "resolved"; afterMicros: number | null }
+  | { kind: "acknowledged"; by: string }
+  | { kind: "snoozed"; until: number }
+  | { kind: "nobodyAnswered" }
+  | { kind: "held"; secondsLeft: number }
+  | { kind: "pagesNobody" }
+  | { kind: "unknown" }
+  | { kind: "notPaged" }
+  | { kind: "paging"; step: number; total: number | null; who: string[] }
+  | { kind: "reachedNobody"; step: number; total: number | null };
+
+/** Picks the one phrase for a page; `reachedStep` stands in for the progress on a list that does not fetch it. [pure] */
+export function pagePhrase(input: {
+  record: Pick<
+    OnCallResponse,
+    "state" | "opened_at" | "acked_by" | "closed_at" | "snoozed_until" | "exhausted_at"
+  >;
+  progress?: EscalationProgress | null;
+  progressLoaded: boolean;
+  totalRungs?: number | null;
+  reachedStep?: number | null;
+  nowMicros: number;
+}): PagePhrase {
+  const { record, progress, nowMicros } = input;
+  if (record.state === "resolved") {
+    return {
+      kind: "resolved",
+      afterMicros: record.closed_at ? record.closed_at - record.opened_at : null,
+    };
+  }
+  if (record.state === "acknowledged") return { kind: "acknowledged", by: record.acked_by ?? "" };
+  if (isSnoozed(record, nowMicros))
+    return { kind: "snoozed", until: record.snoozed_until as number };
+  if (pageState(record, progress) === "exhausted") return { kind: "nobodyAnswered" };
+  const heldUntil = progress?.held_until_micros;
+  if (heldUntil && heldUntil > nowMicros) {
+    return { kind: "held", secondsLeft: Math.ceil((heldUntil - nowMicros) / 1_000_000) };
+  }
+  if (input.totalRungs === 0) return { kind: "pagesNobody" };
+  if (!progress && !input.progressLoaded) return { kind: "unknown" };
+  const step = progress ? progress.fired.length : (input.reachedStep ?? 0);
+  if (!step) return { kind: "notPaged" };
+  const total = input.totalRungs ?? null;
+  const last = progress?.fired[progress.fired.length - 1];
+  if (last?.reached_nobody) return { kind: "reachedNobody", step, total };
+  return { kind: "paging", step, total, who: last?.reached ?? [] };
+}
+
+/** Clock time for today, date and time otherwise, in the given zone: a bare time from yesterday reads as minutes ago. [pure] */
+export function formatOnCallInstant(atMicros: number, nowMicros: number, zone: string): string {
+  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
+  const format = day(atMicros) === day(nowMicros) ? "HH:mm" : "MMM d, yyyy, HH:mm";
+  return formatTimestampInTimezone(atMicros, format, zone);
 }
 
 /**

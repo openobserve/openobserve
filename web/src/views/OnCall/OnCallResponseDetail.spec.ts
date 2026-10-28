@@ -1515,18 +1515,45 @@ describe("OnCallResponseDetail — responding", () => {
   });
 
   describe("a page nobody answered", () => {
-    it("tags it and says when the last step ran", async () => {
-      const wrapper = await renderWith({ exhausted_at: 1_700_000_000_000_000 + HOUR_MICROS });
+    /// The ladder's own progress decides it, the same signal the Pages list reads.
+    const ranOut = (lastAt: number) =>
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [
+            { after_micros: 0, at: lastAt - 300_000_000, targets: [], reached: ["a@o2.ai"] },
+            { after_micros: 300_000_000, at: lastAt, targets: [], reached: ["b@o2.ai"] },
+          ],
+          next_targets: [],
+          next_at: null,
+          exhausted: true,
+        },
+      } as any);
+    const phrase = (wrapper: any) =>
+      wrapper.find(
+        '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+      );
 
-      expect(wrapper.find('[type="oncallResponseState"]').attributes("value")).toBe("exhausted");
+    it("tags it and says when the last step ran, before the record's flag lands", async () => {
+      ranOut(1_700_000_000_000_000 + HOUR_MICROS);
+      const wrapper = await renderWith({ exhausted_at: null });
+
+      expect(
+        wrapper
+          .find(
+            '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-exhausted"]',
+          )
+          .exists(),
+      ).toBe(true);
       const banner = wrapper.find('[data-test="oncall-response-exhausted-banner"]');
       expect(banner.text()).toMatch(
         /^Nobody answered\. Every step ran by [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}\. Acknowledge to take it, or hand it off\.$/,
       );
+      expect(wrapper.text()).not.toContain("Triggered");
     });
 
     it("drops the date when the ladder ran out today", async () => {
-      const wrapper = await renderWith({ exhausted_at: NOW() - 60_000_000 });
+      ranOut(NOW() - 60_000_000);
+      const wrapper = await renderWith();
 
       expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').text()).toMatch(
         /^Nobody answered\. Every step ran by \d{2}:\d{2}\. Acknowledge/,
@@ -1534,6 +1561,7 @@ describe("OnCallResponseDetail — responding", () => {
     });
 
     it("says nothing of the sort once somebody owns it", async () => {
+      ranOut(NOW());
       const wrapper = await renderWith({
         state: "acknowledged",
         acked_by: "engineer@example.com",
@@ -1541,7 +1569,7 @@ describe("OnCallResponseDetail — responding", () => {
         exhausted_at: 1_700_000_000_000_000,
       });
 
-      expect(wrapper.find('[type="oncallResponseState"]').attributes("value")).toBe("acknowledged");
+      expect(phrase(wrapper).text()).toMatch(/^Acknowledged by engineer@example\.com/);
       expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').exists()).toBe(false);
     });
   });

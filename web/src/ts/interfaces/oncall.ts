@@ -959,6 +959,10 @@ export interface FiredRung {
   /** Absolute instant it fired. */
   at: number;
   targets: string[];
+  /** The people it actually reached, from the delivery ledger. */
+  reached?: string[];
+  /** The step fired and the ledger has nobody for it: an unstaffed rotation, say. */
+  reached_nobody?: boolean;
 }
 
 /// Where the ladder has got to. The question mid-incident is "when does this

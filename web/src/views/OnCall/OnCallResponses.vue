@@ -116,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sort-order="sortOrder"
       :column-visibility="{
         firings: false,
-        state: false,
         channels: false,
       }"
       table-id="oncall-responses-list-v3"
@@ -396,17 +395,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </template>
 
-      <!-- A snoozed page is still open, so it would otherwise look exactly
-           like one escalating right now. -->
-      <template #cell-state="{ row }">
-        <span class="flex flex-wrap items-center gap-1">
-          <OTag type="oncallResponseState" :value="pageState(row.latest)" size="sm" />
-          <OTag v-if="isSnoozed(row.latest)" variant="warning-soft" size="sm">
-            {{ t("oncall.snoozed") }}
-          </OTag>
-        </span>
-      </template>
-
       <!-- No team means nothing claimed it, which is a routing bug rather than
            a blank cell. -->
       <template #cell-team="{ row }">
@@ -495,23 +483,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- How far up the ladder this page has climbed, and what fires next.
            Loaded for the oldest open pages only — see ESCALATION_DETAIL_LIMIT. -->
-      <!-- Status is hidden by default, so a page nobody answered says so in this always-shown cell. -->
+      <!-- The one "what is happening" phrase per row; the section headers already say the state. -->
       <template #cell-escalation="{ row }">
-        <OTag
-          v-if="pageState(row.latest) === 'exhausted'"
-          type="oncallResponseState"
-          value="exhausted"
-          size="sm"
-          data-test="oncall-row-escalation-exhausted"
-        />
         <OnCallEscalationCell
-          v-else
           :response-id="row.latest.id"
-          :state="row.latest.state"
+          :record="row.latest"
           :progress="progressById[row.latest.id] ?? null"
           :progress-loaded="progressLoaded"
           :total-rungs="totalRungsFor(row.latest)"
-          :acked-in-micros="ackedInMicros(row.latest)"
         />
       </template>
 
@@ -989,7 +968,6 @@ import {
   isOnCallUnavailable,
   isSnoozed,
   nextHandover,
-  pageState,
   winningRule,
 } from "@/utils/oncall";
 
@@ -1113,7 +1091,8 @@ const activeFilter = ref<"all" | SectionKey>(savedView.activeFilter);
 const causeFilter = ref<ResolutionCause | "">(includeResolved.value ? savedView.causeFilter : "");
 const currentPage = ref(savedView.currentPage);
 const pageSize = ref(savedView.pageSize);
-const sortBy = ref(savedView.sortBy);
+// A view saved before the Status column was removed can still sort by it.
+const sortBy = ref(savedView.sortBy === "state" ? "last_alert_at" : savedView.sortBy);
 const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
 const oTableRef = ref<any>(null);
 const busyId = ref("");
@@ -1319,17 +1298,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     hideable: true,
   },
   {
-    // State now reads off the escalation cell, so this is the redundant copy —
-    // kept for sorting and filtering, off by default.
-    id: "state",
-    header: t("oncall.state"),
-    // Wide enough for "Nobody answered", the longest state tag.
-    size: 160,
-    accessorFn: (row: PageRow) => row.latest.state,
-    sortable: true,
-    hideable: true,
-  },
-  {
     // "95 firings" is the number that matters; the individual firing number
     // only means something on a single record. Secondary, so off by default.
     id: "firings",
@@ -1478,11 +1446,6 @@ const youLabel = computed(() => String(t("oncall.onCallYou")));
 /// it is rather than as an ordinary page.
 function isImpactedRow(record: OnCallResponse): boolean {
   return record.responder_role === "impacted" || !!record.origin_response_id;
-}
-
-/// How fast the page was answered, for a row that already has been.
-function ackedInMicros(record: OnCallResponse): number | null {
-  return record.acked_at ? record.acked_at - record.opened_at : null;
 }
 
 /// The channels this record's priority pages on, per its team's policy.

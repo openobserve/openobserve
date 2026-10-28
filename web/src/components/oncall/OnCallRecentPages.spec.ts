@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import OnCallRecentPages from "@/components/oncall/OnCallRecentPages.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 
 const MINUTE = 60_000_000;
@@ -95,7 +96,7 @@ const stubs = {
 function render(pages: OnCallResponse[], props: Record<string, unknown> = {}) {
   return mount(OnCallRecentPages, {
     props: { pages, policy, windowDays: 7, ...props },
-    global: { plugins: [i18n], stubs },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
@@ -190,16 +191,29 @@ describe("OnCallRecentPages", () => {
     expect(wrapper.emitted("view-all")).toHaveLength(1);
   });
 
-  /// The same state the Pages list shows, so a resolved page reads as resolved here too.
-  it("shows each page's state, and how long a closed one took", () => {
-    const wrapper = render([
-      page({ id: "open", state: "triggered", exhausted_at: OPENED + 20 * MINUTE }),
-      page({ id: "closed", state: "resolved", closed_at: OPENED + 42 * MINUTE }),
-    ]);
+  /// The same one phrase the Pages list's Escalation column says, and never the bare word "Triggered".
+  it("says what happened to each page in one phrase", () => {
+    const wrapper = render(
+      [
+        page({ id: "out", state: "triggered", exhausted_at: OPENED + 20 * MINUTE }),
+        page({ id: "ringing", state: "triggered", reached_rung_micros: 5 * MINUTE }),
+        page({
+          id: "owned",
+          state: "acknowledged",
+          acked_by: "ana@o2.ai",
+          acked_at: OPENED + MINUTE,
+        }),
+        page({ id: "closed", state: "resolved", closed_at: OPENED + 42 * MINUTE }),
+      ],
+      { limit: 4 },
+    );
 
     const state = (id: string) => wrapper.find(`[data-test="oncall-recent-pages-state-${id}"]`);
-    expect(state("open").text()).toBe("Nobody answered");
+    expect(state("out").text()).toBe("Nobody answered");
+    expect(state("ringing").text()).toBe("Paging step 2 of 2");
+    expect(state("owned").text()).toBe("Acknowledged by ana@o2.ai");
     expect(state("closed").text()).toBe("Resolved after 42m");
+    expect(wrapper.text()).not.toContain("Triggered");
   });
 
   it("shows the empty state rather than a bare card when nothing fired", () => {
