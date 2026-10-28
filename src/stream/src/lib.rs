@@ -395,9 +395,11 @@ fn is_stream_permitted(
         StreamType::EnrichmentTables => "enrichment_table",
         _ => stream_type.as_str(),
     };
+    if permitted.contains(&format!("{s_type}:_all_{org_id}")) {
+        return true;
+    }
     let grant_name = config::utils::str::into_ofga_supported_format(stream_name);
-    permitted.contains(&format!("{s_type}:_all_{org_id}"))
-        || permitted.contains(&format!("{s_type}:{grant_name}"))
+    permitted.contains(&format!("{s_type}:{grant_name}"))
 }
 
 async fn sync_associated_metadata_stream_retention(
