@@ -13,54 +13,132 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::array::RecordBatch;
+use arrow::{
+    array::{
+        Array, AsArray, BooleanArray, GenericStringArray, Int64Array, RecordBatch, StringViewArray,
+        UInt64Array,
+    },
+    datatypes::{DataType, FieldRef, Int64Type, UInt64Type},
+    error::ArrowError,
+};
+use arrow_json::writer::{EncoderOptions, NullableEncoder, make_encoder};
 
-use super::json::{Map as JsonMap, Value};
+use super::json::{self, Map as JsonMap, Value};
 
-/// Converts an arrow [`RecordBatch`] into a `Vec` of Serde JSON
-/// [`JsonMap`]s (objects)
+/// A result column, read directly when its JSON value needs no encoding.
+struct JsonColumn<'a> {
+    name: &'a str,
+    encoder: NullableEncoder<'a>,
+    direct: DirectValue<'a>,
+}
+
+impl<'a> JsonColumn<'a> {
+    fn try_new(
+        field: &'a FieldRef,
+        array: &'a dyn Array,
+        options: &'a EncoderOptions,
+    ) -> Result<Self, ArrowError> {
+        let direct = match array.data_type() {
+            DataType::Utf8 => DirectValue::Utf8(array.as_string::<i32>()),
+            DataType::LargeUtf8 => DirectValue::LargeUtf8(array.as_string::<i64>()),
+            DataType::Utf8View => DirectValue::Utf8View(array.as_string_view()),
+            DataType::Boolean => DirectValue::Boolean(array.as_boolean()),
+            DataType::Int64 => DirectValue::Int64(array.as_primitive::<Int64Type>()),
+            DataType::UInt64 => DirectValue::UInt64(array.as_primitive::<UInt64Type>()),
+            DataType::Float16 | DataType::Float32 | DataType::Float64 => DirectValue::Float,
+            _ => DirectValue::Encoded,
+        };
+        Ok(Self {
+            name: field.name(),
+            encoder: make_encoder(field, array, options)?,
+            direct,
+        })
+    }
+
+    fn value(&mut self, idx: usize, buf: &mut Vec<u8>) -> Result<Value, anyhow::Error> {
+        Ok(match self.direct {
+            DirectValue::Utf8(array) => Value::String(array.value(idx).to_string()),
+            DirectValue::LargeUtf8(array) => Value::String(array.value(idx).to_string()),
+            DirectValue::Utf8View(array) => Value::String(array.value(idx).to_string()),
+            DirectValue::Boolean(array) => Value::Bool(array.value(idx)),
+            DirectValue::Int64(array) => Value::from(array.value(idx)),
+            DirectValue::UInt64(array) => Value::from(array.value(idx)),
+            DirectValue::Float | DirectValue::Encoded => {
+                buf.clear();
+                self.encoder.encode(idx, buf);
+                // skips from_slice's second number parse; NaN and infinity arrive as null
+                if matches!(self.direct, DirectValue::Float) && buf != b"null" {
+                    Value::Number(std::str::from_utf8(buf)?.parse()?)
+                } else {
+                    json::from_slice(buf)?
+                }
+            }
+        })
+    }
+}
+
+enum DirectValue<'a> {
+    Utf8(&'a GenericStringArray<i32>),
+    LargeUtf8(&'a GenericStringArray<i64>),
+    Utf8View(&'a StringViewArray),
+    Boolean(&'a BooleanArray),
+    Int64(&'a Int64Array),
+    UInt64(&'a UInt64Array),
+    Float,
+    Encoded,
+}
+
+/// Converts arrow [`RecordBatch`]es into the JSON objects `arrow_json::ArrayWriter` writes.
 pub fn record_batches_to_json_rows(
     batches: &[&RecordBatch],
 ) -> Result<Vec<JsonMap<String, Value>>, anyhow::Error> {
-    if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
-        return Ok(Vec::new());
+    let mut rows = Vec::with_capacity(batches.iter().map(|b| b.num_rows()).sum());
+    for batch in batches {
+        append_json_rows(batch, &mut rows)?;
     }
+    Ok(rows)
+}
 
-    let json_buf = Vec::with_capacity(
-        batches
-            .iter()
-            .map(|b| b.get_array_memory_size())
-            .sum::<usize>(),
-    );
-    let mut writer = arrow_json::ArrayWriter::new(json_buf);
-    writer.write_batches(batches)?;
-    writer.finish()?;
-    let json_data = writer.into_inner();
-    let ret: Vec<JsonMap<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
-
-    // This effects other function, comment it for now
-    //
-    // Hack for uint64, because Chrome V8 does not support uint64
-    // for field in schema.fields() {
-    //     if field.data_type() == &DataType::UInt64 {
-    //         for row in ret.iter_mut() {
-    //             if let Some(val) = row.get_mut(field.name()) {
-    //                 if val.is_u64() {
-    //                     *val = Value::String(val.to_string());
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    Ok(ret)
+fn append_json_rows(
+    batch: &RecordBatch,
+    rows: &mut Vec<JsonMap<String, Value>>,
+) -> Result<(), anyhow::Error> {
+    let options = EncoderOptions::default();
+    let schema = batch.schema();
+    let mut columns = schema
+        .fields()
+        .iter()
+        .zip(batch.columns())
+        .map(|(field, array)| JsonColumn::try_new(field, array.as_ref(), &options))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut buf = Vec::new();
+    for idx in 0..batch.num_rows() {
+        // sized by the non-null cells: wide sparse rows would otherwise hold slots for every column
+        let len = columns.iter().filter(|c| !c.encoder.is_null(idx)).count();
+        let mut row = JsonMap::with_capacity(len);
+        for column in &mut columns {
+            // the writer leaves SQL NULL out of the object, it never writes an explicit null
+            if column.encoder.is_null(idx) {
+                continue;
+            }
+            row.insert(column.name.to_string(), column.value(idx, &mut buf)?);
+        }
+        rows.push(row);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use arrow::{
-        array::{Int32Array, StringArray, record_batch},
-        datatypes::{DataType, Field, Schema},
+        array::{
+            ArrayRef, BinaryArray, Decimal128Array, DictionaryArray, Float32Array, Float64Array,
+            Int32Array, LargeStringArray, ListArray, NullArray, StringArray, StructArray,
+            TimestampMicrosecondArray, TimestampNanosecondArray, record_batch,
+        },
+        datatypes::{Field, Int32Type, Schema},
         record_batch::RecordBatch,
     };
 
@@ -164,5 +242,248 @@ mod tests {
         assert!(result[1].is_empty());
         assert_eq!(result[2]["id"], 3);
         assert_eq!(result[2]["name"], "Charlie");
+    }
+
+    /// The rows `arrow_json::ArrayWriter` produces, parsed back with serde_json.
+    fn array_writer_rows(batches: &[&RecordBatch]) -> Vec<JsonMap<String, Value>> {
+        let mut writer = arrow_json::ArrayWriter::new(Vec::new());
+        writer.write_batches(batches).unwrap();
+        writer.finish().unwrap();
+        let buf = writer.into_inner();
+        if buf.is_empty() {
+            return Vec::new();
+        }
+        json::from_slice(&buf).unwrap()
+    }
+
+    fn all_types_batch() -> RecordBatch {
+        let strs = vec![
+            Some(""),
+            Some("quote\" back\\slash /"),
+            Some("new\nline\ttab\r\u{0001}"),
+            Some("中文 😀"),
+            None,
+            Some("plain"),
+        ];
+        let list = ListArray::from_iter_primitive::<Int64Type, _, _>(vec![
+            Some(vec![Some(1), None, Some(3)]),
+            Some(vec![]),
+            None,
+            Some(vec![Some(i64::MAX)]),
+            None,
+            Some(vec![None]),
+        ]);
+        let nested = StructArray::try_new(
+            vec![
+                Field::new("a", DataType::Int64, true),
+                Field::new("b", DataType::Utf8, true),
+            ]
+            .into(),
+            vec![
+                Arc::new(Int64Array::from(vec![
+                    Some(1),
+                    None,
+                    Some(3),
+                    None,
+                    None,
+                    Some(6),
+                ])),
+                Arc::new(StringArray::from(vec![
+                    Some("x"),
+                    Some("y"),
+                    None,
+                    None,
+                    None,
+                    Some("\"z\""),
+                ])),
+            ],
+            Some(vec![true, true, true, false, false, true].into()),
+        )
+        .unwrap();
+        let dict: DictionaryArray<Int32Type> =
+            vec![Some("d1"), Some("d2"), Some("d1"), None, None, Some("d3")]
+                .into_iter()
+                .collect();
+        let columns: Vec<(&str, ArrayRef)> = vec![
+            ("utf8", Arc::new(StringArray::from(strs.clone()))),
+            ("large_utf8", Arc::new(LargeStringArray::from(strs.clone()))),
+            ("utf8_view", Arc::new(StringViewArray::from(strs))),
+            (
+                "bool",
+                Arc::new(BooleanArray::from(vec![
+                    Some(true),
+                    Some(false),
+                    None,
+                    Some(true),
+                    None,
+                    None,
+                ])),
+            ),
+            (
+                "i32",
+                Arc::new(Int32Array::from(vec![
+                    Some(i32::MIN),
+                    Some(0),
+                    Some(i32::MAX),
+                    None,
+                    None,
+                    Some(-1),
+                ])),
+            ),
+            (
+                "i64",
+                Arc::new(Int64Array::from(vec![
+                    Some(i64::MIN),
+                    Some(0),
+                    Some(i64::MAX),
+                    None,
+                    None,
+                    Some(-1),
+                ])),
+            ),
+            (
+                "u64",
+                Arc::new(UInt64Array::from(vec![
+                    Some(0),
+                    Some(1),
+                    Some(u64::MAX),
+                    None,
+                    None,
+                    Some(7),
+                ])),
+            ),
+            (
+                "f32",
+                Arc::new(Float32Array::from(vec![
+                    Some(0.1),
+                    Some(1e20),
+                    Some(f32::NAN),
+                    Some(f32::INFINITY),
+                    None,
+                    Some(-0.0),
+                ])),
+            ),
+            (
+                "f64",
+                Arc::new(Float64Array::from(vec![
+                    Some(0.1),
+                    Some(1e20),
+                    Some(1e-7),
+                    Some(f64::NEG_INFINITY),
+                    None,
+                    Some(f64::NAN),
+                ])),
+            ),
+            (
+                "f64_edges",
+                Arc::new(Float64Array::from(vec![
+                    Some(-0.0),
+                    Some(f64::MAX),
+                    Some(f64::MIN_POSITIVE),
+                    Some(1.0),
+                    None,
+                    Some(123_456_789.123),
+                ])),
+            ),
+            (
+                "ts_us",
+                Arc::new(TimestampMicrosecondArray::from(vec![
+                    Some(1_686_568_960_000_000),
+                    Some(0),
+                    Some(-1),
+                    None,
+                    None,
+                    Some(1_700_000_000_123_456),
+                ])),
+            ),
+            (
+                "ts_ns_tz",
+                Arc::new(
+                    TimestampNanosecondArray::from(vec![
+                        Some(1_686_568_960_000_000_001),
+                        Some(0),
+                        None,
+                        None,
+                        None,
+                        Some(5),
+                    ])
+                    .with_timezone("+08:00"),
+                ),
+            ),
+            (
+                "decimal",
+                Arc::new(
+                    Decimal128Array::from(vec![
+                        Some(12345),
+                        Some(-1),
+                        Some(0),
+                        None,
+                        None,
+                        Some(7),
+                    ])
+                    .with_precision_and_scale(20, 2)
+                    .unwrap(),
+                ),
+            ),
+            ("list", Arc::new(list)),
+            ("struct", Arc::new(nested)),
+            ("dict", Arc::new(dict)),
+            (
+                "binary",
+                Arc::new(BinaryArray::from(vec![
+                    Some(&b"ab"[..]),
+                    Some(&b""[..]),
+                    None,
+                    None,
+                    None,
+                    Some(&b"\x00\xff"[..]),
+                ])),
+            ),
+            ("null", Arc::new(NullArray::new(6))),
+            (
+                "dup",
+                Arc::new(Int64Array::from(vec![
+                    Some(1),
+                    None,
+                    Some(3),
+                    None,
+                    None,
+                    Some(6),
+                ])),
+            ),
+            (
+                "dup",
+                Arc::new(StringArray::from(vec![
+                    Some("second"),
+                    Some("only-second"),
+                    None,
+                    None,
+                    None,
+                    None,
+                ])),
+            ),
+        ];
+        RecordBatch::try_from_iter(columns).unwrap()
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_matches_array_writer() {
+        let batch = all_types_batch();
+        let empty = batch.slice(0, 0);
+        let tail = batch.slice(2, 4);
+        for batches in [vec![&batch], vec![&batch, &empty, &tail], vec![&empty]] {
+            let expected = array_writer_rows(&batches);
+            let got = record_batches_to_json_rows(&batches).unwrap();
+            assert_eq!(got, expected);
+            assert_eq!(
+                json::to_string(&got).unwrap(),
+                json::to_string(&expected).unwrap()
+            );
+        }
+        let rows = record_batches_to_json_rows(&[&batch]).unwrap();
+        assert!(rows[4].is_empty(), "{:?}", rows[4]);
+        assert_eq!(rows[2].get("f32"), Some(&Value::Null));
+        assert!(!rows[3].contains_key("i64"));
+        assert_eq!(rows[0]["dup"], "second");
     }
 }
