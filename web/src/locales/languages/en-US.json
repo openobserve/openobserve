@@ -16563,6 +16563,7 @@
       "tab": "Unpriced / approximate",
       "tabWithCount": "Unpriced / approximate · {count}",
       "banner": "{count} model in your traces has no price or an approximate one. Its cost may be wrong. | {count} models in your traces have no price or an approximate one. Their cost may be wrong.",
+      "bannerTruncated": "{total} models in your traces had no price or an approximate one at ingest. Their cost may be wrong. Showing the top {shown} by tokens.",
       "streamLabel": "Stream",
       "window": "Last 24 hours",
       "colModel": "Model seen in traces (24 h)",
@@ -28343,6 +28344,7 @@
   },
   "llmDataTrust": {
     "noModelName": "(no model name)",
+    "topModels": "{models} (top {shown} of {total})",
     "cost": {
       "partial": "partial",
       "unknown": "cost unknown",
@@ -28388,7 +28390,8 @@
           "label": "Unpriced models",
           "detail": "{count} model · {spans} spans · {tokens} tokens counted as $0 | {count} models · {spans} spans · {tokens} tokens counted as $0",
           "pass": "Every LLM span matched a price.",
-          "fix": "Fix in LLM Model Pricing"
+          "fix": "Fix in LLM Model Pricing",
+          "truncated": "Top {shown} of {total} by tokens"
         },
         "missing_agent_identity": {
           "label": "Missing agent identity",

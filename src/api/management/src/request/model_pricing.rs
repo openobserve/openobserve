@@ -618,7 +618,15 @@ pub struct UnpricedModel {
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UnpricedModelsResponse {
+    /// The models with the most tokens, minus those an exact price covers today.
     pub models: Vec<UnpricedModel>,
+    /// Distinct models ingest marked in the window, uncapped and before today's prices are
+    /// applied; spans without a model name count as one.
+    pub model_count: i64,
+    /// Tokens on every span ingest marked in the window.
+    pub tokens: i64,
+    /// The server listed only the models with the most tokens; `model_count` has them all.
+    pub models_truncated: bool,
 }
 
 /// Joins the spans' ingest-time status with today's definitions: a model that now has an exact
@@ -726,10 +734,16 @@ pub async fn list_unpriced(
         return resp;
     }
     match crate::request::gen_ai_health::unpriced_models(&org_id, user_id, &query).await {
-        Ok(rows) => {
+        Ok(listing) => {
             let entries = model_pricing::get_org_pricing_entries(&org_id);
-            let models = resolve_unpriced(rows, &entries, config::utils::time::now_micros());
-            MetaHttpResponse::json(UnpricedModelsResponse { models })
+            let models =
+                resolve_unpriced(listing.rows, &entries, config::utils::time::now_micros());
+            MetaHttpResponse::json(UnpricedModelsResponse {
+                models,
+                model_count: listing.model_count,
+                tokens: listing.tokens,
+                models_truncated: listing.truncated,
+            })
         }
         Err(e) => {
             log::error!("[model_pricing] unpriced models for {org_id}: {e}");

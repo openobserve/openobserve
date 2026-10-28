@@ -73,6 +73,30 @@ describe("unpricedSummary", () => {
     };
     expect(unpricedSummary(failing)).toMatchObject({ tokens: 1000, spans: 3 });
   });
+
+  it("takes the uncapped totals, not the length or sum of the capped list", () => {
+    const models = Array.from({ length: 20 }, (_, i) => ({ model: `m${i}`, spans: 1, tokens: 10 }));
+    const health = {
+      checked_at: 1,
+      checks: [
+        check({
+          id: "unpriced_models",
+          status: "error",
+          affected: 30,
+          models,
+          model_count: 25,
+          unpriced_tokens: 5000,
+          models_truncated: true,
+        }),
+      ],
+    };
+    expect(unpricedSummary(health)).toMatchObject({
+      tokens: 5000,
+      modelCount: 25,
+      truncated: true,
+      spans: 30,
+    });
+  });
 });
 
 describe("health checks", () => {

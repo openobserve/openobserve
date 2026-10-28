@@ -214,6 +214,12 @@ def describe(check):
             f"{m.get('model') or '(no model name)'} · {int(m.get('tokens', 0)):,} tokens counted as $0"
             for m in check["models"]
         ]
+        if check.get("models_truncated"):
+            # The server lists the models with the most tokens; the totals cover all of them.
+            parts.append(
+                f"top {len(check['models'])} of {int(check.get('model_count', 0)):,} models, "
+                f"{int(check.get('unpriced_tokens', 0)):,} tokens in all"
+            )
         return ", ".join(parts)
     return f"{affected:,} of {plural(total, 'span')}"
 

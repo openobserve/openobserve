@@ -34,7 +34,14 @@ export interface DataHealthCheck {
   status: DataHealthStatus;
   affected: number;
   total: number;
+  /** Unpriced check only: the 20 models with the most unpriced tokens. */
   models?: DataHealthModelUsage[];
+  /** Unpriced check only: every distinct model behind the unpriced spans, uncapped. */
+  model_count?: number;
+  /** Unpriced check only: tokens on every unpriced span, uncapped. */
+  unpriced_tokens?: number;
+  /** Unpriced check only: `models` leaves some of the `model_count` models out. */
+  models_truncated?: boolean;
   /** Sample trace ids; present only when requested with `include_samples`. */
   samples?: string[];
 }

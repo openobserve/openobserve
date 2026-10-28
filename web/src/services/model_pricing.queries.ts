@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import modelPricing, { type BuiltInPricingResponse, type UnpricedModel } from "./model_pricing";
+import modelPricing, {
+  type BuiltInPricingResponse,
+  type UnpricedModelsResponse,
+} from "./model_pricing";
 import { modelPricingKeys } from "./model_pricing.querykeys";
 import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -38,14 +41,14 @@ export const builtInPricingQuery = (org: string) =>
 export const unpricedModelsQuery = (org: string, stream: string, start: number, end: number) =>
   queryOptions({
     queryKey: modelPricingKeys.unpriced(org, stream, start, end),
-    queryFn: async (): Promise<UnpricedModel[]> =>
+    queryFn: async (): Promise<UnpricedModelsResponse> =>
       (
         await modelPricing.listUnpriced(org, {
           stream_name: stream,
           start_time: start,
           end_time: end,
         })
-      )?.data?.models ?? [],
+      )?.data ?? { models: [], model_count: 0, tokens: 0, models_truncated: false },
     staleTime: MEDIUM_STALE_TIME,
   });
 
