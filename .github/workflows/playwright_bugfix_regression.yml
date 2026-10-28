@@ -350,6 +350,8 @@ jobs:
               if PLAYWRIGHT_JSON_OUTPUT_NAME="$LIST_JSON" npx playwright test "${SHARD_FILES[@]}" --last-failed --list --reporter=json > /dev/null; then
                 FAILED_FILES=$(node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')); console.log([...new Set((r.suites||[]).map(s => s.file).filter(Boolean))].sort().map(f => './playwright-tests/' + f).join(' '))" "$LIST_JSON" || true)
               fi
+              # An attempt that dies before writing its own list must not upload the previous attempt's as its own.
+              rm -f test-results/.last-run.json
               if [ -n "$FAILED_FILES" ]; then
                 echo "Re-run: files with failed tests from attempt ${{ steps.prev.outputs.attempt }}: $FAILED_FILES"
                 FILE_PATHS="$FAILED_FILES"
@@ -710,9 +712,9 @@ jobs:
           if printf '%s' "$FLAKY" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
             FLAKY_FILE=$(mktemp "${TMPDIR:-/tmp}/flaky.XXXXXX")
             trap 'rm -f "$FLAKY_FILE"' EXIT
-            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg repo "$GITHUB_REPOSITORY" \
               --arg branch "${REPORT_BRANCH:-}" --arg pr "${REPORT_PR:-}" \
-              '[.[] | {run_id:$run_id, repo:$repo, suite:"regression", workflow:"regression", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file, branch:(if $branch=="" then null else $branch end), pr_number:(if $pr=="" then null else ($pr|tonumber) end)}]' \
+              '[.[] | {run_id:$run_id, run_attempt:($run_attempt|tonumber), repo:$repo, suite:"regression", workflow:"regression", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file, branch:(if $branch=="" then null else $branch end), pr_number:(if $pr=="" then null else ($pr|tonumber) end)}]' \
               > "$FLAKY_FILE" 2>/dev/null || echo '[]' > "$FLAKY_FILE"
             if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
               bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
