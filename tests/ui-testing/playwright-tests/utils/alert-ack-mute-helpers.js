@@ -79,19 +79,25 @@ async function waitGroupsFiring(page, alert, cities, { timeoutMs = 240_000 } = {
 
 const v2 = (p) => `${urls().v2}${p}`;
 
+// A failed read throws, so an empty list or a missing row always means the read succeeded.
+async function okJson(r, what) {
+  if (!r.ok()) throw new Error(`${what}: ${r.status()} ${await r.text()}`);
+  return r.json();
+}
+
 async function acks(page, alertId) {
   const r = await api(page, 'get', v2(`/alerts/${alertId}/acks?folder=default`));
-  return r.ok() ? (await r.json()).acks || [] : [];
+  return (await okJson(r, `acks of ${alertId}`)).acks || [];
 }
 
 async function downtime(page, id) {
   const r = await api(page, 'get', v2(`/downtimes/${id}`));
-  return r.ok() ? r.json() : null;
+  return okJson(r, `downtime ${id}`);
 }
 
 async function history(page, alertId) {
   const r = await api(page, 'get', v2(`/alerts/history?alert_id=${alertId}&size=100&sort_by=timestamp&sort_order=desc`));
-  return r.ok() ? (await r.json()).hits || [] : [];
+  return (await okJson(r, `history of ${alertId}`)).hits || [];
 }
 
 async function pollUntil(page, read, test, { timeoutMs = 120_000, everyMs = 4000, onTick } = {}) {
