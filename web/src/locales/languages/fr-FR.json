@@ -5199,6 +5199,7 @@
     },
     "copyContentError": "Erreur lors de la copie du contenu.",
     "passcodeForbiddenMessage": "Le rôle Admin ou Root est nécessaire pour voir le jeton d'ingestion. Demandez à un administrateur la commande de configuration, ou le rôle requis pour le voir ici.",
+    "passcodeUnavailableMessage": "Le token d'ingestion de l'organisation n'a pas pu être chargé, cette commande ne pourrait donc pas s'authentifier. Actualisez la page pour réessayer.",
     "updateRUMTokenMessage": "Êtes-vous sûr de vouloir mettre à jour le jeton RUM pour cette organisation ?",
     "completeAwsIntegration": "Terminer l'intégration AWS",
     "deployAwsServicesOneClick": "Déployez tous les services AWS sélectionnés en un clic à l'aide d'une seule pile CloudFormation.",
