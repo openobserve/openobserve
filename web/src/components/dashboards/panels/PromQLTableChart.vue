@@ -45,6 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("infra.curated.tileAllClear") }}</span>
           </div>
         </template>
+        <template v-else-if="emptyText" #empty>
+          <OEmptyState
+            size="inline"
+            icon="bar-chart"
+            :title="emptyText"
+            :backdrop="false"
+            data-test="no-data"
+          />
+        </template>
 
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
@@ -91,13 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { I18nText } from "@/types/i18n";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -114,8 +125,13 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Replaces the "No Data" title when the table has no rows. */
+    emptyText: {
+      type: String as unknown as PropType<I18nText | null>,
+      default: null,
+    },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect, OIcon },
+  components: { TableRenderer, TablePaginationControls, OSelect, OIcon, OEmptyState },
   setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();

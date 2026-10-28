@@ -164,8 +164,6 @@ pub struct Query {
     #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
-    pub query_type: String,
-    #[serde(default)]
     pub track_total_hits: bool,
     #[serde(default)]
     pub uses_zo_fn: bool,
@@ -206,7 +204,6 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -264,8 +261,6 @@ pub struct Response {
     pub scan_size: usize,
     pub idx_scan_size: usize,
     pub scan_records: usize,
-    #[serde(skip_serializing_if = "String::is_empty", default)]
-    pub response_type: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
@@ -484,7 +479,6 @@ impl Response {
             scan_records: 0,
             columns: Vec::new(),
             hits: Vec::new(),
-            response_type: "".to_string(),
             trace_id: "".to_string(),
             function_error: Vec::new(),
             is_partial: false,
@@ -756,7 +750,6 @@ impl SearchHistoryRequest {
                 start_time: self.start_time,
                 end_time: self.end_time,
                 quick_mode: false,
-                query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
                 query_fn: None,
@@ -974,7 +967,6 @@ impl From<Query> for cluster_rpc::SearchQuery {
         cluster_rpc::SearchQuery {
             sql: query.sql,
             quick_mode: query.quick_mode,
-            query_type: query.query_type,
             from: query.from as i32,
             size: query.size as i32,
             start_time: query.start_time,
@@ -1324,8 +1316,6 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
-    pub query_type: String,
-    #[serde(default)]
     pub track_total_hits: bool,
     #[serde(default)]
     pub uses_zo_fn: bool,
@@ -1409,7 +1399,6 @@ impl MultiStreamRequest {
                     start_time: query.start_time.unwrap_or(self.start_time),
                     end_time: query.end_time.unwrap_or(self.end_time),
                     quick_mode: self.quick_mode,
-                    query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
@@ -2162,7 +2151,6 @@ mod tests {
         assert_eq!(query.start_time, 0);
         assert_eq!(query.end_time, 0);
         assert!(!query.quick_mode);
-        assert_eq!(query.query_type, "");
         assert!(!query.track_total_hits);
         assert!(!query.uses_zo_fn);
         assert!(query.query_fn.is_none());
@@ -2613,7 +2601,6 @@ mod tests {
         let query = Query {
             sql: "SELECT * FROM test".to_string(),
             quick_mode: true,
-            query_type: "test".to_string(),
             from: 10,
             size: 20,
             start_time: 100,
@@ -2629,7 +2616,6 @@ mod tests {
         let cluster_query: cluster_rpc::SearchQuery = query.into();
         assert_eq!(cluster_query.sql, "SELECT * FROM test");
         assert!(cluster_query.quick_mode);
-        assert_eq!(cluster_query.query_type, "test");
         assert_eq!(cluster_query.from, 10);
         assert_eq!(cluster_query.size, 20);
         assert_eq!(cluster_query.start_time, 100);
@@ -2875,7 +2861,6 @@ mod tests {
             end_time: 250,
             sort_by: Some("timestamp".to_string()),
             quick_mode: true,
-            query_type: "test".to_string(),
             track_total_hits: true,
             uses_zo_fn: true,
             query_fn: Some("global_fn".to_string()),
@@ -2899,7 +2884,6 @@ mod tests {
         assert_eq!(first_req.query.from, 5);
         assert_eq!(first_req.query.size, 25);
         assert!(first_req.query.quick_mode);
-        assert_eq!(first_req.query.query_type, "test");
         assert!(first_req.query.track_total_hits);
         assert!(first_req.query.uses_zo_fn);
         assert!(first_req.query.skip_wal);
@@ -3653,7 +3637,6 @@ mod tests {
         assert!(!obj.contains_key("function_error"));
         assert!(!obj.contains_key("order_by_metadata"));
         // String::is_empty fields
-        assert!(!obj.contains_key("response_type"));
         assert!(!obj.contains_key("trace_id"));
         // Option::is_none fields
         assert!(!obj.contains_key("histogram_interval"));
@@ -3673,7 +3656,6 @@ mod tests {
         let r = Response {
             columns: vec!["col1".to_string()],
             function_error: vec!["err".to_string()],
-            response_type: "json".to_string(),
             trace_id: "t1".to_string(),
             histogram_interval: Some(3600),
             new_start_time: Some(1000),
@@ -3691,7 +3673,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("columns"));
         assert!(obj.contains_key("function_error"));
-        assert!(obj.contains_key("response_type"));
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("histogram_interval"));
         assert!(obj.contains_key("new_start_time"));

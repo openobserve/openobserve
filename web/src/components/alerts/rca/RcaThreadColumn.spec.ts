@@ -286,6 +286,14 @@ describe("RcaThreadColumn", () => {
       expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(0);
     });
 
+    it("a live run whose session is not stored yet shows the working line, not 'no longer stored'", () => {
+      const wrapper = mountColumn({ thread: null, status: "expired", runLive: true });
+
+      expect(byTest(wrapper, "rca-thread-working").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-thread-empty").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("no longer stored");
+    });
+
     it("a run with no transcript to read (v1) shows the no-transcript message, not 'No run'", () => {
       const wrapper = mountColumn({
         thread: null,

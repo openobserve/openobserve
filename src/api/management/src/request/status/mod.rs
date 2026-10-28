@@ -190,6 +190,7 @@ struct ConfigResponse<'a> {
     query_default_limit: i64,
     max_dashboard_series: usize,
     max_dashboard_state_timeline_series: usize,
+    max_dashboard_hostmap_cells: usize,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
@@ -318,7 +319,6 @@ struct ConfigBootstrapResponse {
     custom_hide_self_logo: bool,
     /// The editors need it before the authenticated config lands, or `off` arrives too late.
     editor_suggest_mode: String,
-    rum: Rum,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -461,7 +461,6 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         custom_logo_dark_img,
         custom_hide_self_logo,
         editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
-        rum: Rum::from_cfg(cfg.clone()),
     })
 }
 
@@ -625,6 +624,7 @@ pub async fn zo_config(
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         max_dashboard_state_timeline_series: cfg.limit.max_dashboard_state_timeline_series,
+        max_dashboard_hostmap_cells: cfg.limit.max_dashboard_hostmap_cells,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,

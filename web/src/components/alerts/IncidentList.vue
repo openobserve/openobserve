@@ -207,7 +207,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #cell-alert_count="{ row }">
-          <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
+          <div
+            v-if="row.alert_groups?.length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
+            <OTag
+              v-for="group in row.alert_groups.slice(0, 2)"
+              :key="group.alert_id"
+              type="countChip"
+              value="neutral"
+              class="min-w-0"
+              data-test="incident-alert-group-chip"
+            >
+              <!-- One element, so the tooltip anchors on the whole label, truncated name included. -->
+              <span class="flex min-w-0">
+                <span class="truncate">{{ group.alert_name }}</span>
+                <span class="shrink-0">&nbsp;×{{ group.count }}</span>
+              </span>
+              <OTooltip
+                :delay="300"
+                :content="
+                  t(
+                    'alerts.incidents.alertGroupTooltip',
+                    { name: group.alert_name, count: group.count },
+                    group.count,
+                  )
+                "
+              />
+            </OTag>
+            <OTag
+              v-if="row.alert_groups.length > 2"
+              type="countChip"
+              value="neutral"
+              class="shrink-0"
+              data-test="incident-alert-group-more"
+            >
+              {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
+              <OTooltip :delay="300" :max-width="'28rem'">
+                <template #content>
+                  <div
+                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
+                    data-test="incident-alert-group-list"
+                  >
+                    <template v-for="group in row.alert_groups.slice(2)" :key="group.alert_id">
+                      <span class="truncate">{{ group.alert_name }}</span>
+                      <span class="text-right tabular-nums">×{{ group.count }}</span>
+                    </template>
+                  </div>
+                </template>
+              </OTooltip>
+            </OTag>
+          </div>
+          <OTag v-else type="countChip" value="neutral">{{ row.alert_count }}</OTag>
         </template>
         <template #cell-last_alert_at="{ row }">
           <OTimeCell
@@ -536,7 +587,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 500,
+        size: 320,
         meta: { align: "left" },
       },
       {
@@ -545,8 +596,8 @@ export default defineComponent({
         accessorKey: "alert_count",
         resizable: true,
         hideable: true,
-        size: 80,
-        meta: { align: "right" },
+        size: 260,
+        meta: { align: "left" },
       },
       {
         id: "last_alert_at",

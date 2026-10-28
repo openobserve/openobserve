@@ -460,6 +460,20 @@ describe("fitAxisBoundsToStacks", () => {
     expect(fit({ min: -10, max: 100 }, series)).toEqual({ min: -120, max: 500 });
   });
 
+  it("fits each axis of an axis list to the stacks bound to it", () => {
+    const options = {
+      yAxis: [{ max: 10 }, { max: 10 }],
+      series: [
+        { name: "a", stack: "s", data: [200] },
+        { name: "b", stack: "s", data: [300] },
+        { name: "c", stack: "r", yAxisIndex: 1, data: [40] },
+        { name: "d", stack: "r", yAxisIndex: 1, data: [5] },
+      ],
+    };
+    fitAxisBoundsToStacks(options);
+    expect(options.yAxis).toEqual([{ max: 500 }, { max: 45 }]);
+  });
+
   it("stacks positives and negatives apart in one bucket", () => {
     const series = [
       { name: "a", stack: "s", data: [100] },

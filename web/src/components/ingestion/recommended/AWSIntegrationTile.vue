@@ -471,10 +471,10 @@ export default defineComponent({
           // Ask user if they want to replace the existing dashboard
           const ok = await confirm({
             title: t("ingestion.awsSetup.dashboardExistsTitle"),
-            message: t("ingestion.awsSetup.dashboardExistsMessage", {
-              name: props.integration.displayName,
-            }),
+            messageKeypath: "ingestion.awsSetup.dashboardExistsMessage",
+            messageName: props.integration.displayName,
             confirmLabel: t("common.replace"),
+            confirmVariant: "destructive",
           });
           if (!ok) return;
 

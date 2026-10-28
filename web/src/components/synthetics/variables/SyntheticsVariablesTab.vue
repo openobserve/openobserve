@@ -59,6 +59,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :source="duplicateSource"
       @done="landOn"
     />
+
+    <ODialog
+      :open="environmentToDelete !== null"
+      size="sm"
+      persistent
+      :title="t('synthetics.environments.deleteTitle')"
+      :primary-button-label="t('common.ok')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('common.cancel')"
+      data-test="synthetics-environment-delete-dialog"
+      @update:open="(open: boolean) => !open && (environmentToDelete = null)"
+      @click:primary="confirmRemoveEnvironment"
+      @click:secondary="environmentToDelete = null"
+    >
+      <i18n-t
+        :keypath="
+          deleteShown.variables
+            ? 'synthetics.environments.deleteWithVariables'
+            : 'synthetics.environments.deleteConfirm'
+        "
+        :plural="deleteShown.variables || undefined"
+        tag="p"
+      >
+        <template #name>
+          <span
+            data-test="synthetics-environment-delete-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ deleteShown.name }}</span
+          >
+        </template>
+      </i18n-t>
+    </ODialog>
   </div>
 </template>
 
@@ -67,7 +99,7 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import SyntheticsScopeRail from "./SyntheticsScopeRail.vue";
@@ -80,7 +112,9 @@ import { serverMessage } from "./serverMessage";
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { confirm } = useConfirmDialog();
+const environmentToDelete = ref<SyntheticsEnvironment | null>(null);
+// Set on open only, so the message stays put while the dialog fades out.
+const deleteShown = ref({ name: "", variables: 0 });
 
 const environments = ref<SyntheticsEnvironment[]>([]);
 const globals = ref<SyntheticsVariable[]>([]);
@@ -147,19 +181,18 @@ function addVariable() {
   listRef.value?.openCreate();
 }
 
-async function removeEnvironment(environment: SyntheticsEnvironment) {
+function removeEnvironment(environment: SyntheticsEnvironment) {
   if (environmentDeleteBlock(environment.variables, environment.checks_count)) return;
+  environmentToDelete.value = environment;
+  deleteShown.value = { name: environment.name, variables: environment.variables.length };
+}
+
+async function confirmRemoveEnvironment() {
+  const environment = environmentToDelete.value;
+  environmentToDelete.value = null;
+  if (!environment) return;
 
   const count = environment.variables.length;
-  const ok = await confirm({
-    title: t("synthetics.environments.deleteTitle"),
-    // Name what goes with it before asking, not after.
-    message: count
-      ? t("synthetics.environments.deleteWithVariables", { name: environment.name, n: count })
-      : t("synthetics.environments.deleteConfirm", { name: environment.name }),
-  });
-  if (!ok) return;
-
   try {
     const org = store.state.selectedOrganization.identifier;
     await syntheticsService.deleteEnvironment(org, environment.name, count > 0);

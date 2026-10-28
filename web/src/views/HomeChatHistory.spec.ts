@@ -17,8 +17,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { notifyChatListChanged } from "@/utils/chatListRevision";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const history = vi.hoisted(() => ({
   loadHistory: vi.fn(),
@@ -60,7 +60,10 @@ function mountList() {
     },
   });
   store.dispatch = vi.fn() as any;
-  const wrapper = mount(HomeChatHistory, { global: { plugins: [store] } });
+  const wrapper = mount(HomeChatHistory, {
+    global: { plugins: [store] },
+    attachTo: document.body,
+  });
   mounted.push(wrapper);
   return { wrapper, store };
 }
@@ -68,6 +71,7 @@ function mountList() {
 describe("HomeChatHistory", () => {
   afterEach(() => {
     mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+    document.body.innerHTML = "";
   });
 
   beforeEach(() => {
@@ -88,29 +92,58 @@ describe("HomeChatHistory", () => {
     expect(wrapper.emitted("load-chat")).toEqual([[1]]);
   });
 
-  it("confirms a delete, naming the links that stop working", async () => {
-    const { currentDialog, handleCancel, handleConfirm } = useConfirmDialog();
+  it("confirms a delete, naming the chat in bold and the links that stop working", async () => {
+    const { wrapper } = mountList();
+    await flushPromises();
+    const q = (dt: string) => document.querySelector<HTMLElement>(`[data-test="${dt}"]`);
+
+    await wrapper.find('[data-test="home-chat-history-delete-1"]').trigger("click");
+    await flushPromises();
+    const name = q("home-chat-history-delete-name");
+    expect(name?.textContent).toBe("Error spike");
+    expect(name?.classList.contains("font-semibold")).toBe(true);
+    expect(name?.closest("p")?.textContent).toBe(
+      "Delete the Error spike chat? Its 2 active share links stop working. This action cannot be undone.",
+    );
+    const ok = q("o-dialog-primary-btn");
+    expect(ok?.textContent?.trim()).toBe("Delete");
+    expect(ok?.getAttribute("data-o2-variant")).toBe("destructive");
+    q("o-dialog-secondary-btn")!.click();
+    await flushPromises();
+    expect(q("home-chat-history-delete-name")).toBeNull();
+    expect(history.deleteChatById).not.toHaveBeenCalled();
+
+    await wrapper.find('[data-test="home-chat-history-delete-1"]').trigger("click");
+    await flushPromises();
+    q("o-dialog-primary-btn")!.click();
+    await flushPromises();
+    expect(history.deleteChatById).toHaveBeenCalledWith(1);
+  });
+
+  it("asks for a destructive confirm before clearing all chats", async () => {
+    const { wrapper } = mountList();
+    await flushPromises();
+    const dialog = useConfirmDialog();
+
+    const clearAll = wrapper.findAll("button").find((b) => b.text().includes("Clear"));
+    await clearAll!.trigger("click");
+    expect(dialog.currentDialog.value?.confirmVariant).toBe("destructive");
+    dialog.handleCancel();
+    await flushPromises();
+    expect(history.clearAllHistory).not.toHaveBeenCalled();
+  });
+
+  it("names the chat when it has no share links", async () => {
+    service.listForChat.mockResolvedValue({ data: { shares: [] } });
     const { wrapper } = mountList();
     await flushPromises();
 
     await wrapper.find('[data-test="home-chat-history-delete-1"]').trigger("click");
     await flushPromises();
-    expect(currentDialog.value?.message).toContain("2");
-    expect(currentDialog.value).toMatchObject({
-      confirmLabel: "Delete",
-      confirmVariant: "destructive",
-      focusCancel: true,
-      persistent: false,
-    });
-    handleCancel();
-    await flushPromises();
-    expect(history.deleteChatById).not.toHaveBeenCalled();
-
-    await wrapper.find('[data-test="home-chat-history-delete-1"]').trigger("click");
-    await flushPromises();
-    handleConfirm();
-    await flushPromises();
-    expect(history.deleteChatById).toHaveBeenCalledWith(1);
+    const name = document.querySelector('[data-test="home-chat-history-delete-name"]');
+    expect(name?.closest("p")?.textContent).toBe(
+      "Are you sure you want to delete the Error spike chat? This action cannot be undone.",
+    );
   });
 
   it("warns on Share when the chat's history cannot be read", async () => {

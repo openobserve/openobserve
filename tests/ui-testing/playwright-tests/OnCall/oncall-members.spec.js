@@ -383,8 +383,8 @@ test.describe('On-call team staffing', {
     //
     // NOTE, and it is a gap worth recording rather than failing on: the copy is
     // the SAME whether or not this person is holding the pager at this instant
-    // ("They will no longer be paged for this team. Any rotation position they
-    // hold goes with them."). Removing the person currently on call reads
+    // ("They will no longer be paged for it. Any rotation position they hold
+    // goes with them."). Removing the person currently on call reads
     // exactly like removing somebody on the bench. Asserted here as the
     // consequence being stated at all; the missing distinction is in the
     // generation report.
