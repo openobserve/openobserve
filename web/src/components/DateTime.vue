@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col max-sm:overflow-y-auto"
         :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
         @keydown.capture="onPickerKeydown"
+        @paste="onPickerPaste"
       >
         <div
           class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
@@ -445,6 +446,7 @@ import {
   type ParsedSingleDateTime,
 } from "@/utils/dateTimeRangeParse";
 import { copyToClipboard } from "@/utils/clipboard";
+import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -1504,19 +1506,37 @@ export default defineComponent({
       return true;
     };
 
-    const pasteRange = async () => {
-      let text = "";
-      try {
-        text = await navigator.clipboard.readText();
-      } catch {
-        toast({ variant: "error", message: t("common.dateRangePasteError") });
-        return;
-      }
+    const applyPastedTextWithToast = (text: string) => {
       if (applyPastedText(text)) {
         toast({ variant: "success", message: t("common.dateRangePasted") });
       } else {
         toast({ variant: "error", message: t("common.dateRangePasteError") });
       }
+    };
+
+    const pasteRange = async () => {
+      let text = "";
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        toast({
+          variant: "error",
+          message: t("common.dateRangePasteBlocked", {
+            shortcut: isMacOS() ? raw("⌘V") : raw("Ctrl+V"),
+          }),
+        });
+        return;
+      }
+      applyPastedTextWithToast(text);
+    };
+
+    // A native paste event carries the clipboard text without the read permission pasteRange needs.
+    const onPickerPaste = (event: ClipboardEvent) => {
+      if (isInputFocused(event.target)) return;
+      const text = event.clipboardData?.getData("text") ?? "";
+      if (!text.trim()) return;
+      event.preventDefault();
+      applyPastedTextWithToast(text);
     };
 
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
@@ -2080,6 +2100,7 @@ export default defineComponent({
       triggerLabel,
       copyRange,
       pasteRange,
+      onPickerPaste,
       refresh,
       dateLocale,
       resetTime,

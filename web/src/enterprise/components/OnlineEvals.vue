@@ -156,6 +156,7 @@ the Free Software Foundation, either version 3 of the License, or
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
+            calendar-presets
             class="max-lg:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />

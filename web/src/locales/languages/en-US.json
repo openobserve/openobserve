@@ -669,6 +669,7 @@
     "dateRangeCopied": "Date range copied",
     "dateRangePasted": "Date range pasted",
     "dateRangePasteError": "Could not parse date range",
+    "dateRangePasteBlocked": "This browser blocked reading the clipboard. Press {shortcut} with the picker open to paste.",
     "pastSecond": "Past {count} Second | Past {count} Seconds",
     "pastMinute": "Past {count} Minute | Past {count} Minutes",
     "pastHour": "Past {count} Hour | Past {count} Hours",
