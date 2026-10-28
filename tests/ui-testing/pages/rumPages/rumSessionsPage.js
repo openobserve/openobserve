@@ -13,6 +13,12 @@ export class RumSessionsPage {
         this.sessionViewerSubtitle = '[data-test="session-viewer-subtitle"]';
         this.sessionViewerShareLinkBtn = '[data-test="session-viewer-share-link-btn"]';
         this.sessionViewerBackBtn = '[data-test="session-viewer-back-btn"]';
+        this.sessionIdCells = page.locator('[data-test="rum-app-sessions-session-id-text"]');
+        this.sessionIdCellsWithoutId = page.locator(
+            '[data-test="rum-app-sessions-session-id-text"]:not([title]), [data-test="rum-app-sessions-session-id-text"][title=""]',
+        );
+        this.activitySparkline = '[data-test="rum-session-activity-sparkline"]';
+        this.activityLoading = '[data-test="rum-session-activity-loading"]';
     }
 
     /**
@@ -21,15 +27,54 @@ export class RumSessionsPage {
      * mount) instead of typing into the Monaco editor, which is racy while the
      * editor boots.
      */
-    async gotoSessionsList({ service = null, period = '1h' } = {}) {
+    async gotoSessionsList({ service = null, period = '1h', filter = null, org = null } = {}) {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
-        const org = process.env.ORGNAME || 'default';
-        let url = `${base}/web/rum/sessions?period=${period}&org_identifier=${org}`;
-        if (service) {
-            const filter = Buffer.from(`service='${service}'`).toString('base64');
-            url = `${base}/web/rum/sessions?period=${period}&query=${encodeURIComponent(filter)}&org_identifier=${org}`;
+        const orgId = org || process.env.ORGNAME || 'default';
+        let url = `${base}/web/rum/sessions?period=${period}&org_identifier=${orgId}`;
+        const where = filter || (service ? `service='${service}'` : null);
+        if (where) {
+            const encoded = Buffer.from(where).toString('base64');
+            url = `${base}/web/rum/sessions?period=${period}&query=${encodeURIComponent(encoded)}&org_identifier=${orgId}`;
         }
         await this.page.goto(url);
+    }
+
+    /** Session aggregation can lag ingestion, so the list is polled until it settles on exactly `count` rows. */
+    async expectSessionRowCount(count, timeoutMs = 60000) {
+        await expect
+            .poll(async () => this.tableRow.count(), { timeout: timeoutMs, intervals: [2000, 3000, 5000] })
+            .toBe(count);
+    }
+
+    /** No listed row lacks a session id; such a row is SDK telemetry grouped into a phantom session. */
+    async expectEverySessionRowHasAnId() {
+        await expect(this.sessionIdCells.first()).toBeVisible({ timeout: 30000 });
+        await expect(this.sessionIdCellsWithoutId).toHaveCount(0);
+    }
+
+    sessionRow(sessionId) {
+        return this.tableRow.filter({
+            has: this.page.locator(`[data-test="rum-app-sessions-session-id-text"][title="${sessionId}"]`),
+        });
+    }
+
+    /** The session's Activity cell finishes loading into a sparkline instead of keeping its skeleton. */
+    async expectActivityLoadedFor(sessionId, timeoutMs = 30000) {
+        const row = this.sessionRow(sessionId);
+        await expect(row).toHaveCount(1, { timeout: timeoutMs });
+        await row.scrollIntoViewIfNeeded();
+        await expect(row.locator(this.activitySparkline)).toBeVisible({ timeout: timeoutMs });
+        await expect(row.locator(this.activityLoading)).toHaveCount(0);
+    }
+
+    async expectSessionViewerUrlKeepsOrg(sessionId, org, timeoutMs = 15000) {
+        await expect(this.page).toHaveURL(new RegExp(`/rum/sessions/view/${sessionId}\\?.*org_identifier=${org}(&|$)`), {
+            timeout: timeoutMs,
+        });
+    }
+
+    async reloadSessionViewer() {
+        await this.page.reload();
     }
 
     async expectSessionsTableVisible(timeoutMs = 15000) {
