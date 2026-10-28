@@ -3415,6 +3415,16 @@ pub(crate) async fn send_templated_to_destination(
     let effective =
         crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
             .await;
+    if let DestinationType::SlackApp(target) = &destination_type {
+        return crate::alerts::slack_publish::send_templated_post(
+            &crate::alerts::slack_publish::QueueSink,
+            org_id,
+            target,
+            effective.template(),
+            ctx,
+        )
+        .await;
+    }
     send_to_destination_type(
         org_id,
         sns_subject,

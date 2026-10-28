@@ -270,6 +270,42 @@ pub async fn send_post(
     publish_unchecked(sink, &event).await
 }
 
+/// An incident notification to a Slack app destination: its template rendered as a one-off Post.
+pub async fn send_templated_post(
+    sink: &dyn OutboundSink,
+    org_id: &str,
+    target: &SlackAppTarget,
+    template: &Template,
+    ctx: &NotificationContext,
+) -> anyhow::Result<String> {
+    if let Some(reason) = unavailable_reason(org_id) {
+        return Err(anyhow::anyhow!(reason));
+    }
+    let destination_id = destination_id_for(org_id, target).await?;
+    let now = config::utils::time::now_micros();
+    let event = templated_post_event(org_id, &destination_id, template, ctx, now)?;
+    publish_unchecked(sink, &event).await
+}
+
+/// The Post event of [`send_templated_post`]. [pure]
+fn templated_post_event(
+    org_id: &str,
+    destination_id: &str,
+    template: &Template,
+    ctx: &NotificationContext,
+    now: i64,
+) -> anyhow::Result<AlertSlackEvent> {
+    let rendered = render_wire(template, ctx)?;
+    let target = post_target(org_id, destination_id, "", now.max(0) as u64);
+    Ok(build_event(
+        &target,
+        level_of(ctx),
+        rendered,
+        chart(ctx),
+        now,
+    ))
+}
+
 /// The short thread reply of a recovery a downtime did not mute; the green edit is the clear's.
 pub async fn send_recovered(
     sink: &dyn OutboundSink,
@@ -1339,6 +1375,21 @@ mod tests {
         assert_eq!(
             take_pending_start(id, stale + PENDING_START_TTL_MICROS + 1),
             None
+        );
+    }
+
+    #[test]
+    fn an_incident_notification_posts_its_rendered_template() {
+        let template = Template {
+            body: "{alert_name} opened an incident".to_string(),
+            ..Default::default()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &ctx(), 5).unwrap();
+        assert_eq!(event.kind, AlertSlackEventKind::Post);
+        assert_eq!(event.destination_id, "dest-1");
+        assert_eq!(
+            event.rendered.map(|r| r.body).as_deref(),
+            Some("checkout-errors opened an incident")
         );
     }
 
