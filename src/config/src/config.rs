@@ -1224,7 +1224,7 @@ pub struct PublicDashboards {
     pub max_links_per_org: u32,
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_MAX_PANELS",
-        default = 10,
+        default = 50,
         help = "Panels a public link can show, counted across every tab (at least 1)."
     )]
     pub max_panels: u32,
@@ -6802,7 +6802,7 @@ mod tests {
         assert!(pd.enabled && pd.time_shifts);
         assert_eq!(
             (pd.rpm, pd.slug_rpm, pd.max_links_per_org, pd.max_panels),
-            (240, 1200, 50, 10)
+            (240, 1200, 50, 50)
         );
         assert_eq!(
             (
