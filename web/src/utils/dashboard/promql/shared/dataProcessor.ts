@@ -18,7 +18,7 @@ import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./type
 import { buildPromqlSeriesNames } from "./legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
-import { PROMETHEUS_HISTOGRAM_MODE, limitWholeHistograms } from "./histogramBuckets";
+import { PROMETHEUS_HISTOGRAM_MODE, limitWholeHistograms, parseLe } from "./histogramBuckets";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -257,23 +257,34 @@ export function fillMissingTimestamps(
   return timestamps.map(([ts, formattedTs]) => [formattedTs, dataObj[ts] ?? null]);
 }
 
+/** Parses a Prometheus sample value; `parseFloat` alone reads "+Inf" and "-Inf" as NaN. */
+export function parsePromValue(raw: string | number | null | undefined): number {
+  if (typeof raw === "number") return raw;
+  return typeof raw === "string" ? parseLe(raw) : NaN;
+}
+
 /**
  * Apply aggregation function to time series data
  *
  * @param values - Array of [timestamp, value] tuples
  * @param aggregation - Aggregation function to apply
- * @returns Aggregated value of the finite samples, NaN when none is finite
+ * @param options.keepInfinite - reduce an all-infinite series over its infinities instead of returning NaN
+ * @returns Aggregated value of the finite samples, NaN when none is finite (unless `keepInfinite`)
  */
 // Unknown aggregation strings from panel config fall through to the `last` default case
 export function applyAggregation(
   values: Array<[number, string]>,
   aggregation: AggregationFunction | (string & {}) = "last",
+  options: { keepInfinite?: boolean } = {},
 ): number {
   if (!values || values.length === 0) return 0;
   if (aggregation === "count") return values.length;
 
+  const parsed = values.map(([, val]) => parsePromValue(val));
   // Prometheus sends "NaN"/"+Inf" for empty or unbounded steps; one of them would poison every reducer.
-  const numericValues = values.map(([, val]) => parseFloat(val)).filter(Number.isFinite);
+  const finite = parsed.filter(Number.isFinite);
+  const numericValues =
+    finite.length > 0 || !options.keepInfinite ? finite : parsed.filter((v) => !Number.isNaN(v));
   if (numericValues.length === 0) return NaN;
 
   switch (aggregation) {

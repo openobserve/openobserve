@@ -42,6 +42,7 @@ vi.mock("./shared/dataProcessor", async (importOriginal) => ({
     return 0;
   }),
   fillMissingTimestamps: vi.fn((data) => data),
+  parsePromValue: (await importOriginal<typeof import("./shared/dataProcessor")>()).parsePromValue,
 }));
 
 vi.mock("../legendConfiguration", () => ({

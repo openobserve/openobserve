@@ -16,7 +16,7 @@
 import { gt } from "@/types/i18n";
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
-import { applyAggregation } from "./shared/dataProcessor";
+import { applyAggregation, parsePromValue } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { formatDate } from "../dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
@@ -107,6 +107,7 @@ export class TableConverter implements PromQLChartConverter {
     const valueFormat = (colNameLower: string) => (val: any) => {
       const mapped = lookupValueMapping(val, valueMappingCache);
       if (mapped != null) return mapped;
+      if (val === Infinity || val === -Infinity) return val > 0 ? "+Inf" : "-Inf";
       const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
       const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
       return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
@@ -231,7 +232,7 @@ export class TableConverter implements PromQLChartConverter {
           seriesData.values.forEach(([timestamp, value]) => {
             rows.push({
               timestamp: formatDate(toZonedTime(timestamp * 1000, timezone)),
-              value: parseFloat(value),
+              value: parsePromValue(value),
               __legend__: seriesData.name, // Store legend for filtering
             });
           });
@@ -257,7 +258,7 @@ export class TableConverter implements PromQLChartConverter {
             const row: any = {
               timestamp: formatDate(toZonedTime(timestamp * 1000, timezone)),
               ...seriesData.metric, // Spread all metric labels (job, instance, etc.)
-              value: parseFloat(value),
+              value: parsePromValue(value),
               __legend__: seriesData.name, // Store legend for filtering
             };
             rows.push(row);
@@ -286,7 +287,7 @@ export class TableConverter implements PromQLChartConverter {
         // Calculate each aggregation for the series
         aggregations.forEach((agg: string) => {
           const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
-          row[columnName] = applyAggregation(seriesData.values, agg);
+          row[columnName] = applyAggregation(seriesData.values, agg, { keepInfinite: true });
         });
 
         rows.push(row);

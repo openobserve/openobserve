@@ -19,6 +19,7 @@ import {
   getInstantValue,
   fillMissingTimestamps,
   applyAggregation,
+  parsePromValue,
 } from "./dataProcessor";
 import type { PromQLResponse } from "./types";
 
@@ -702,6 +703,48 @@ describe("dataProcessor", () => {
       ];
       expect(applyAggregation(none, "avg")).toBeNaN();
       expect(applyAggregation(none, "max")).toBeNaN();
+    });
+
+    it("reduces an all-infinite series over its infinities when keepInfinite is set", () => {
+      const infinite: Array<[number, string]> = [
+        [1, "+Inf"],
+        [2, "NaN"],
+        [3, "+Inf"],
+      ];
+      const keep = { keepInfinite: true };
+      expect(applyAggregation(infinite, "last", keep)).toBe(Infinity);
+      expect(applyAggregation(infinite, "sum", keep)).toBe(Infinity);
+      expect(applyAggregation([[1, "-Inf"]], "max", keep)).toBe(-Infinity);
+      expect(applyAggregation(infinite, "range", keep)).toBeNaN();
+      expect(applyAggregation([[1, "NaN"]], "last", keep)).toBeNaN();
+      expect(
+        applyAggregation(
+          [
+            [1, "+Inf"],
+            [2, "3"],
+          ],
+          "last",
+          keep,
+        ),
+      ).toBe(3);
+    });
+  });
+
+  describe("parsePromValue", () => {
+    it("reads the Prometheus infinity spellings that parseFloat turns into NaN", () => {
+      expect(parsePromValue("+Inf")).toBe(Infinity);
+      expect(parsePromValue("Inf")).toBe(Infinity);
+      expect(parsePromValue("-Inf")).toBe(-Infinity);
+    });
+
+    it("keeps NaN for NaN and non-numbers, and passes numbers through", () => {
+      expect(parsePromValue("NaN")).toBeNaN();
+      expect(parsePromValue("")).toBeNaN();
+      expect(parsePromValue(null)).toBeNaN();
+      expect(parsePromValue(undefined)).toBeNaN();
+      expect(parsePromValue("1e+21")).toBe(1e21);
+      expect(parsePromValue("-0.5")).toBe(-0.5);
+      expect(parsePromValue(7)).toBe(7);
     });
   });
 });

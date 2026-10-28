@@ -17,7 +17,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TableConverter } from "./convertPromQLTableChart";
 import { ProcessedPromQLData } from "./shared/types";
 
-vi.mock("./shared/dataProcessor", () => ({
+vi.mock("./shared/dataProcessor", async (importOriginal) => ({
+  parsePromValue: (await importOriginal<typeof import("./shared/dataProcessor")>()).parsePromValue,
   applyAggregation: vi.fn((values: any[], aggregation: string) => {
     if (aggregation === "last" && values.length > 0) {
       return parseFloat(values[values.length - 1][1]);
@@ -1142,6 +1143,97 @@ describe("TableConverter", () => {
       const valueColumn = result.columns.find((c: any) => c.name === "value");
       const formatted = valueColumn.format(100);
       expect(formatted).toBe("100.00%");
+    });
+  });
+
+  describe("infinite values", () => {
+    const infSeries = (): ProcessedPromQLData[] => [
+      {
+        series: [
+          {
+            metric: { job: "api" },
+            name: "ratio",
+            data: [],
+            values: [
+              [1234567890, "+Inf"],
+              [1234567900, "-Inf"],
+              [1234567910, "NaN"],
+              [1234567920, "1.5"],
+            ],
+          },
+        ],
+        timestamps: [],
+      },
+    ];
+
+    it.each(["single", "expanded_timeseries"])(
+      "keeps +Inf and -Inf as infinities in %s mode and only NaN as NaN",
+      (mode) => {
+        const result = converter.convert(
+          infSeries(),
+          { type: "table", config: { promql_table_mode: mode } },
+          mockStore,
+          mockExtras,
+        );
+
+        const values = result.rows.map((row: any) => row.value);
+        expect(values.slice(0, 2)).toEqual([Infinity, -Infinity]);
+        expect(Number.isNaN(values[2])).toBe(true);
+        expect(values[3]).toBe(1.5);
+      },
+    );
+
+    it("renders infinities as +Inf and -Inf in the value column, whatever the unit", () => {
+      for (const unit of [undefined, "bytes", "percent"]) {
+        const result = converter.convert(
+          infSeries(),
+          { type: "table", config: { promql_table_mode: "single", unit } },
+          mockStore,
+          mockExtras,
+        );
+        const valueColumn = result.columns.find((col: any) => col.name === "value");
+
+        const [posInf, negInf, , finite] = result.rows.map((row: any) =>
+          valueColumn.format(row.value),
+        );
+        expect([posInf, negInf]).toEqual(["+Inf", "-Inf"]);
+        expect(finite).toBe(unit === "bytes" ? "1.50B" : unit === "percent" ? "1.50%" : "1.50");
+      }
+    });
+
+    it("still applies a threshold value mapping to +Inf before the +Inf text", () => {
+      const result = converter.convert(
+        infSeries(),
+        {
+          type: "table",
+          config: {
+            promql_table_mode: "single",
+            mappings: [{ type: "gt", value: 1000, text: "unbounded" }],
+          },
+        },
+        mockStore,
+        mockExtras,
+      );
+      const valueColumn = result.columns.find((col: any) => col.name === "value");
+
+      expect(valueColumn.format(Infinity)).toBe("unbounded");
+      expect(valueColumn.format(-Infinity)).toBe("-Inf");
+    });
+
+    it("asks the aggregate mode to keep an all-infinite series infinite", async () => {
+      const { applyAggregation } = await import("./shared/dataProcessor");
+      vi.mocked(applyAggregation).mockClear();
+
+      converter.convert(
+        infSeries(),
+        { type: "table", config: { promql_table_mode: "all", aggregation: "last" } },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(applyAggregation).toHaveBeenCalledWith(expect.any(Array), "last", {
+        keepInfinite: true,
+      });
     });
   });
 
