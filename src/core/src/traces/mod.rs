@@ -859,15 +859,12 @@ pub async fn handle_otlp_request(
     let otel_processor = OtelIngestionProcessor::new();
 
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
-    // When ZO_MODEL_PRICING_ENABLED=false, no pricing applies and spans keep only reported costs.
-    static EMPTY_PRICING: std::sync::OnceLock<
-        std::sync::Arc<Vec<crate::db::model_pricing::CachedModelPricing>>,
-    > = std::sync::OnceLock::new();
-    let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
-        crate::db::model_pricing::get_org_pricing_entries(org_id)
-    } else {
-        std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
-    };
+    // When ZO_MODEL_PRICING_ENABLED=false, nothing is priced or marked and spans keep only
+    // reported costs.
+    let org_pricing_entries = config::get_config()
+        .common
+        .model_pricing_enabled
+        .then(|| crate::db::model_pricing::get_org_pricing_entries(org_id));
 
     let gen_ai_agent_mapping_config =
         crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
@@ -953,7 +950,7 @@ pub async fn handle_otlp_request(
                         &service_att_map,
                         scope_name,
                         &events,
-                        &org_pricing_entries,
+                        org_pricing_entries.as_deref().map(Vec::as_slice),
                         start_time,
                         &gen_ai_agent_mapping_config,
                     );

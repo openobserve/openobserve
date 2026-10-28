@@ -125,7 +125,7 @@ pub async fn list_dataset_items(
     tag = "Datasets",
     operation_id = "GetDatasetSnapshotRows",
     summary = "Read the row set of a pinned Dataset Snapshot",
-    description = "Resolves the Dataset's MVCC history at `version` and returns one page of the live rows that Snapshot contains. Omitting `version` reads the current Snapshot and answers with the version it resolved. This is the read an Experiment pins at creation, so it is also how a client inspects the exact rows a historical Experiment ran against.",
+    description = "Resolves the Dataset's MVCC history at row-level `version` and returns one page of live rows. Alternatively, `write_version` resolves a displayed write version to its highest row version. Omitting both reads the current Snapshot. The response's `snapshotVersion` is always a row-level pin key: use it as the Experiment's `datasetVersion`. Existing pins and `version` reads retain their original semantics.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),

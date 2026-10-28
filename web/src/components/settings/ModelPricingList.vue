@@ -828,6 +828,17 @@ const builtInStatus = computed(() => {
   return raw(`${seed} ${sync}`);
 });
 
+const viewState = useListViewState("model-pricing", {
+  filterQuery: "",
+  selectedTab: "all",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+// Declared before the Unpriced query, which runs only while its tab is open.
+const selectedTab = ref(viewState.selectedTab);
+
 // ── Unpriced / approximate tab ──────────────────────────────────────────────
 // Read here, not in the tab, because the tab label carries the row count.
 const UNPRICED_WINDOW_US = 24 * 60 * 60 * 1_000_000;
@@ -855,7 +866,11 @@ const unpricedQuery = useQuery(() =>
       unpricedWindow.value.start,
       unpricedWindow.value.end,
     ),
-    { enabled: !!orgIdentifier.value && !!unpricedStream.value },
+    // The 24 h trace aggregation runs only while the Unpriced tab is open
+    // (selected, or opened by `?tab=unpriced`), not on every page visit.
+    {
+      enabled: !!orgIdentifier.value && !!unpricedStream.value && selectedTab.value === "unpriced",
+    },
   ),
 );
 const unpricedModels = computed(() => unpricedQuery.data.value?.models ?? []);
@@ -950,14 +965,6 @@ const confirmDialogMeta = ref({
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
 };
-const viewState = useListViewState("model-pricing", {
-  filterQuery: "",
-  selectedTab: "all",
-  pageSize: 20,
-  currentPage: 1,
-  sortBy: "",
-  sortOrder: "asc" as "asc" | "desc",
-});
 const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const currentPage = ref(viewState.currentPage);
@@ -967,7 +974,6 @@ const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
 const bulkDeleteLoading = ref(false);
-const selectedTab = ref(viewState.selectedTab);
 
 watch([filterQuery, selectedTab, pageSize, currentPage, sortBy, sortOrder], () => {
   Object.assign(viewState, {

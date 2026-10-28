@@ -1734,6 +1734,21 @@ describe("Unpriced / approximate tab", () => {
     expect(w.vm.selectedTab).toBe("inherited");
   });
 
+  it("reads unpriced models only while the Unpriced tab is open", async () => {
+    w = mountComponent({ query: { tab: "all" } });
+    await flushPromises();
+    expect(w.vm.selectedTab).toBe("all");
+    expect(modelPricingService.listUnpriced).not.toHaveBeenCalled();
+
+    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "inherited");
+    await flushPromises();
+    expect(modelPricingService.listUnpriced).not.toHaveBeenCalled();
+
+    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "unpriced");
+    await flushPromises();
+    await vi.waitFor(() => expect(modelPricingService.listUnpriced).toHaveBeenCalledTimes(1));
+  });
+
   it("shows the load error when the unpriced read fails, and Retry reads again", async () => {
     vi.mocked(modelPricingService.listUnpriced).mockRejectedValue({ response: { status: 400 } });
     w = mountComponent({ query: { tab: "unpriced" } });

@@ -25,14 +25,24 @@ vi.mock("vue-router", () => ({
 
 const ODrawerStub = { name: "ODrawer", template: "<div><slot /></div>" };
 
-function mountStrip(models: DataHealthModelUsage[], totals: Partial<DataHealthCheck> = {}) {
-  const store = createStore({ state: { selectedOrganization: { identifier: "test-org" } } });
+function mountStrip(
+  models: DataHealthModelUsage[],
+  totals: Partial<DataHealthCheck> = {},
+  { pricingEnabled = true, extraChecks = [] as DataHealthCheck[] } = {},
+) {
+  const store = createStore({
+    state: {
+      selectedOrganization: { identifier: "test-org" },
+      zoConfig: { model_pricing_enabled: pricingEnabled },
+    },
+  });
   return mount(LLMDataHealthStrip, {
     props: {
       health: {
         checked_at: 0,
         checks: [
           { id: "unpriced_models", status: "warning", affected: 12, total: 40, models, ...totals },
+          ...extraChecks,
         ],
       },
       stream: "default",
@@ -91,5 +101,28 @@ describe("LLMDataHealthStrip unpriced models detail", () => {
       models_truncated: false,
     });
     expect(wrapper.find('[data-test="llm-data-health-unpriced-truncated"]').exists()).toBe(false);
+  });
+
+  it("hides the unpriced check when model pricing is disabled", () => {
+    const models = [{ model: "acme", spans: 12, tokens: 1000 }];
+    wrapper = mountStrip(models, {}, { pricingEnabled: false });
+    // Nothing else is failing: no strip at all.
+    expect(wrapper.find('[data-test="llm-data-health-strip"]').exists()).toBe(false);
+    wrapper.unmount();
+
+    wrapper = mountStrip(
+      models,
+      {},
+      {
+        pricingEnabled: false,
+        extraChecks: [{ id: "zero_duration_spans", status: "warning", affected: 3, total: 40 }],
+      },
+    );
+    expect(wrapper.find('[data-test="llm-data-health-strip"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="llm-data-health-chip-unpriced_models"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="llm-data-health-card-unpriced_models"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="llm-data-health-chip-zero_duration_spans"]').exists()).toBe(
+      true,
+    );
   });
 });

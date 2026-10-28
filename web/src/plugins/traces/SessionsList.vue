@@ -435,9 +435,12 @@ const filterMode = ref<ScopeMode>(
   explicitMode ?? (agentsDecided ? resolveScopeMode(null, agents.value.length) : "stream"),
 );
 const modeExplicit = ref(explicitMode !== null);
-// The org whose agents list decided the mode. A load for another org, or after
-// a failed agents load, decides again (unless the user chose a mode).
-let modeSettledOrg: string | null = agentsDecided ? currentOrg() : null;
+// The org whose agents list decided the mode. A load for another org, after a
+// failed agents load, or for a window the user picked decides again (unless the
+// user chose a mode). The module-scoped list above may belong to another window,
+// so it only seeds the mode a back-navigation's cached rows show; the next load
+// that runs decides from its own window's list.
+let modeSettledOrg: string | null = null;
 // Env/name/version to seed the cascade with once the list is available: the
 // URL deep-link first (any of agent/env/version), else the persisted last
 // selection, never a mix of the two. Resolved via `selectAgentByScope`, then
@@ -712,6 +715,7 @@ async function loadSessions(
   endTime?: number,
   force = false,
   forceAgents = false,
+  windowPicked = false,
 ) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
@@ -762,7 +766,7 @@ async function loadSessions(
   } finally {
     resolvingScope--;
   }
-  if (modeSettledOrg !== orgId && !modeExplicit.value) {
+  if ((modeSettledOrg !== orgId || windowPicked) && !modeExplicit.value) {
     filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
   }
   // A failed load decided nothing about agent identity: the next load decides.
@@ -901,11 +905,13 @@ function handleRowClick(row: SessionRow) {
 // Explicit refresh (header button) / real date change — always re-fetches,
 // bypassing the cache guard. `lastRunAt` is stamped inside `fetchPage`, so it
 // only advances on an actual load, never on a cache hit.
-async function refresh(startTime?: number, endTime?: number, force = true) {
+// `windowPicked` is true only for a user's own date pick: an auto-decided mode
+// is decided again for that window (Agent with no agents → Stream).
+async function refresh(startTime?: number, endTime?: number, force = true, windowPicked = false) {
   // Only snap back to page 1 when we're actually going to fetch. On the
   // non-forced mount replay we skip the fetch and keep the restored page.
   if (force) currentPage.value = 1;
-  await loadSessions(startTime, endTime, force, force);
+  await loadSessions(startTime, endTime, force, force, windowPicked);
 }
 
 defineExpose({ refresh, lastRunAt, loading });

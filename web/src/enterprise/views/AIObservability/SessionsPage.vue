@@ -104,12 +104,15 @@ async function onDateChange(value: any) {
   await nextTick();
   // `userChangedValue` distinguishes a genuine user date pick from the
   // programmatic window replay DateTime fires on every mount. Only the former
-  // forces a re-fetch; the mount replay lets SessionsList restore its cached
-  // list (so returning from a session detail doesn't re-hit the API).
+  // forces a re-fetch and re-decides an auto mode for the new window; the mount
+  // replay lets SessionsList restore its cached list (so returning from a
+  // session detail doesn't re-hit the API).
+  const userPicked = value?.userChangedValue === true;
   sessionsRef.value?.refresh?.(
     timeRange.value.startTime,
     timeRange.value.endTime,
-    value?.userChangedValue === true,
+    userPicked,
+    userPicked,
   );
 }
 

@@ -129,7 +129,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 129: add source, query_key, streams, run_count, updated_at and status to query_history.
 // 130: add suppress_repeats to alerts.
 // 131: org domain mapping migrations
-// 132: let the rows of one Dataset write request share one version.
+// 132: add write_version to llm_dataset_items, so one write request is one Dataset version.
 pub const DB_SCHEMA_VERSION: u64 = 132;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

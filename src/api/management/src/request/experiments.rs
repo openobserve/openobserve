@@ -61,6 +61,29 @@ use crate::{
     },
 };
 
+/// What an Experiment's pinned `global_version` shows as. When the Dataset's
+/// rows cannot be read the pin shows as itself, as it does for a deleted
+/// Dataset; the response describes an action that already happened.
+async fn pinned_write_version(org_id: &str, dataset_id: &str, pin: i64) -> i64 {
+    datasets::pinned_write_version(org_id, dataset_id, pin)
+        .await
+        .unwrap_or_else(|error| {
+            log::error!(
+                "[Experiment] failed to resolve the write version of Dataset {dataset_id} at {pin}: {error}"
+            );
+            pin
+        })
+}
+
+async fn experiment_body(
+    org_id: &str,
+    experiment: experiments::Experiment,
+) -> ExperimentResponseBody {
+    let shown =
+        pinned_write_version(org_id, &experiment.dataset_id, experiment.dataset_version).await;
+    ExperimentResponseBody::new(experiment, shown)
+}
+
 fn experiment_error_response(error: ExperimentError) -> Response {
     match error {
         ExperimentError::Database(error) => {
@@ -531,7 +554,13 @@ pub async fn create_experiment(
     match experiments::create(&org_id, &user.user_id, body.into(), &canonical_request).await {
         Ok(result) => {
             set_ownership(&org_id, "experiments", Authz::new(&result.experiment.id)).await;
-            MetaHttpResponse::json(CreateExperimentResponseBody::from(result))
+            let shown = pinned_write_version(
+                &org_id,
+                &result.experiment.dataset_id,
+                result.experiment.dataset_version,
+            )
+            .await;
+            MetaHttpResponse::json(CreateExperimentResponseBody::new(result, shown))
         }
         Err(error) => experiment_error_response(error),
     }
@@ -629,14 +658,27 @@ pub async fn list_experiments(
     } else {
         Vec::new()
     };
+    // One query for every pin in the list, not one per experiment.
+    let pins: Vec<(String, i64)> = experiments
+        .iter()
+        .map(|experiment| (experiment.dataset_id.clone(), experiment.dataset_version))
+        .collect();
+    let shown_versions = datasets::pinned_write_versions(&org_id, &pins)
+        .await
+        .unwrap_or_else(|error| {
+            log::error!("[Experiment] failed to resolve pinned Dataset write versions: {error}");
+            HashMap::new()
+        });
     MetaHttpResponse::json(ListExperimentsResponseBody {
         list: experiments
             .into_iter()
             .map(|experiment| {
                 let id = experiment.id.clone();
                 let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
+                let pin = (experiment.dataset_id.clone(), experiment.dataset_version);
+                let shown = shown_versions.get(&pin).copied().unwrap_or(pin.1);
                 ExperimentViewResponseBody {
-                    experiment: ExperimentResponseBody::from(experiment)
+                    experiment: ExperimentResponseBody::new(experiment, shown)
                         .with_dataset_name(dataset_name),
                     summary: include_summary.then(|| {
                         experiment_summary_body(
@@ -806,9 +848,12 @@ pub async fn get_experiment(
         summaries.remove(&experiment.id).unwrap_or_default(),
         &score_configs,
     );
+    let shown =
+        pinned_write_version(&org_id, &experiment.dataset_id, experiment.dataset_version).await;
     MetaHttpResponse::json(ExperimentDetailResponseBody {
         experiment: ExperimentViewResponseBody {
-            experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+            experiment: ExperimentResponseBody::new(experiment, shown)
+                .with_dataset_name(dataset_name),
             summary: Some(summary),
         },
         preview: preview.into(),
@@ -1160,11 +1205,14 @@ pub async fn get_experiment_row(
         .slots
         .first()
         .expect("a resolved Experiment row always contains at least one trial");
+    let dataset_write_version =
+        pinned_write_version(&org_id, &experiment.dataset_id, experiment.dataset_version).await;
     let response = ExperimentRowDetailResponseBody {
         experiment_id: experiment.id,
         snapshot: ExperimentRowSnapshotBody {
             dataset_id: experiment.dataset_id,
             dataset_version: experiment.dataset_version,
+            dataset_write_version,
         },
         navigation: ExperimentRowNavigationBody {
             row_index: row.row_index,
@@ -1208,7 +1256,7 @@ pub async fn get_experiment_row(
 )]
 pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
     match experiments::cancel(&org_id, &experiment_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1243,7 +1291,7 @@ pub async fn set_experiment_baseline(
     }
     match baseline::set_baseline(&org_id, &experiment_id, &user.user_id).await {
         Ok(change) => MetaHttpResponse::json(ExperimentBaselineResponseBody {
-            experiment: ExperimentResponseBody::from(change.experiment),
+            experiment: experiment_body(&org_id, change.experiment).await,
             previous_baseline_id: change.previous_baseline_id,
         }),
         Err(error) => experiment_error_response(error),
@@ -1278,7 +1326,7 @@ pub async fn clear_experiment_baseline(
         return response;
     }
     match baseline::clear_baseline(&org_id, &experiment_id, &user.user_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1353,7 +1401,7 @@ pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, Strin
     )
     .await
     {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => experiment_error_response(error),
     }
 }
@@ -1470,7 +1518,7 @@ pub async fn clone_experiment(
     match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.into()).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
-            MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
+            MetaHttpResponse::json(experiment_body(&org_id, experiment).await)
         }
         Err(error) => experiment_error_response(error),
     }
@@ -1600,7 +1648,7 @@ pub async fn finalize_experiment(
         return response;
     }
     match ingest::finalize(&org_id, &experiment_id).await {
-        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Ok(experiment) => MetaHttpResponse::json(experiment_body(&org_id, experiment).await),
         Err(error) => ingest_error_response(error),
     }
 }
