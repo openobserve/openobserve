@@ -2824,7 +2824,7 @@
     "online_plaintext_hint": "Set O2_MASTER_ENCRYPTION_KEY to encrypt it, then rotate the registration key.",
     "online_key_root_only": "Visible to the root user only",
     "online_copy_renewed": "Copy renewed key",
-    "online_copy_fetched": "Copy fetched key",
+    "online_copy_fetched": "Copy fetched license key",
     "online_refreshing": "Refreshing",
     "online_refreshing_detail": "Refreshing limits, then checking with the license server…",
     "online_rotate": "Rotate registration key",
