@@ -650,7 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
+              class="download-logs-btn hover:bg-interactive-hover-bg! order-4 size-[2.125rem]!"
               variant="outline"
               size="icon-toolbar"
             >
@@ -912,7 +912,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           :disabled="!!shareReason"
           :tooltip="shareReason || undefined"
-          class="order-3"
+          class="order-3 size-[2.125rem]!"
         />
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
@@ -921,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
-          class="element-box-shadow order-1 me-1 gap-1.5"
+          class="element-box-shadow order-1 me-1 h-[2.125rem]! gap-1.5"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
@@ -952,7 +952,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
-            class="element-box-shadow"
+            class="element-box-shadow h-[2.125rem]!"
           />
         </div>
 
@@ -1010,7 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1021,17 +1021,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-px" vertical />
+                <OSeparator class="h-[2.125rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      class="h-[2.125rem]!"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1066,7 +1067,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1078,17 +1079,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-px" vertical />
+                <OSeparator class="h-[2.125rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      class="h-[2.125rem]!"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1124,7 +1126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default h-[1.875rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default h-[2.125rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1135,7 +1137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1148,7 +1150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
-                class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="element-box-shadow rounded-s-default! relative h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -1182,7 +1184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending || isRunQueryCancelShown"
-                class="h-[1.875rem]! w-px"
+                class="h-[2.125rem]! w-px"
                 vertical
               />
               <ODropdown align="end" side="bottom">
@@ -1190,6 +1192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
+                    class="h-[2.125rem]!"
                     :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
@@ -1247,7 +1250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-1"
+                class="ms-1 *:size-[2.125rem]!"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -5393,7 +5396,6 @@ export default defineComponent({
 }
 
 .logs-search-bar-component .download-logs-btn {
-  height: 1.875rem;
   border-radius: var(--radius-default);
   transition: all 0.2s ease;
 }
@@ -5415,7 +5417,7 @@ export default defineComponent({
   font-weight: 600;
   font-size: var(--text-xs);
   padding-left: 0.5rem;
-  height: 1.875rem;
+  height: 2rem;
   padding-top: 0.1875rem;
   border-radius: var(--radius-default);
 }
