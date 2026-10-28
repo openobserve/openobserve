@@ -1518,6 +1518,7 @@
     "searchNoMatches": "Aucune correspondance",
     "runQuery": "Exécuter la requête",
     "runOptions": "Options d'exécution",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "Valeurs de profil dans le temps",
     "breakdown": "Répartition",
     "breakdownNone": "Aucun",
