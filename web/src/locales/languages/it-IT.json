@@ -10488,6 +10488,7 @@
         "leadsNotEvidence": "Indizi, non prove",
         "working": "Elaborazione in corso. I messaggi inviati ora saranno letti dopo questo turno.",
         "finalNote": "Questo report è definitivo e non cambierà. Per reindirizzare l'agente, rianalizza. Crea una nuova versione nella cronologia dei report.",
+        "resumableNote": "Questa esecuzione si è fermata prima di terminare. Riprendi l'esecuzione continua dall'ultimo passaggio completato.",
         "copy": "Copia thread",
         "copied": "Thread copiato negli appunti",
         "copyFailed": "Impossibile copiare il thread",
