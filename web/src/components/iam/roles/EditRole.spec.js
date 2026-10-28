@@ -74,6 +74,7 @@ vi.mock("@/composables/useStreams", () => ({
           ],
         },
         traces: { list: [{ name: "svc-a" }] },
+        profiles: { list: [{ name: "cpu-prof" }, { name: "mem-prof" }] },
         index: { list: [{ name: "users" }] },
         enrichment_tables: { list: [{ name: "geo" }] },
         metadata: { list: [{ name: "meta" }] },
@@ -465,6 +466,14 @@ const SAVED_GRANTS_RESOURCE_CATALOG = [
     parent: "stream",
     top_level: false,
     order: 3,
+  },
+  {
+    key: "profiles",
+    display_name: "Profiles",
+    has_entities: true,
+    parent: "stream",
+    top_level: false,
+    order: 80,
   },
   { key: "dfolder", display_name: "Dash Folders", has_entities: true, top_level: true, order: 4 },
   {
@@ -3084,6 +3093,15 @@ describe("EditRole savedGrants - updateRolePermissions expansion", () => {
     expect(app.type).toBe("Resource");
     expect(app.permission.AllowGet.value).toBe(true);
     expect(rows.find((r) => r.name === "sys").permission.AllowGet.value).toBe(false);
+  });
+
+  it("expands the stream tree and ticks a per-stream profiles row", async () => {
+    const wrapper = await mountWithSaved([{ object: "profiles:cpu-prof", permission: "AllowGet" }]);
+    const rows = wrapper.vm.heavyResourceEntities["profiles"] ?? [];
+    const cpu = rows.find((r) => r.name === "cpu-prof");
+    expect(cpu.resourceName).toBe("profiles");
+    expect(cpu.permission.AllowGet.value).toBe(true);
+    expect(rows.find((r) => r.name === "mem-prof").permission.AllowGet.value).toBe(false);
   });
 
   it("expands dfolder and its folder to tick a folder-scoped dashboard grant", async () => {
