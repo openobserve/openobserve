@@ -45,6 +45,8 @@ pub struct Stream {
     pub pattern_associations: Vec<PatternAssociation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_internal: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -172,6 +174,7 @@ mod tests {
             total_fields: 1,
             pattern_associations: vec![],
             is_derived: None,
+            is_internal: false,
         };
 
         let list_stream = ListStream {
@@ -253,6 +256,7 @@ mod tests {
             total_fields: 1,
             pattern_associations: vec![],
             is_derived: None,
+            is_internal: false,
         };
 
         assert!(stream.uds_schema.len() == 1);

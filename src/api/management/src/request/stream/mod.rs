@@ -445,7 +445,7 @@ pub async fn delete(
     tag = "Streams",
     operation_id = "StreamList",
     summary = "List organization streams",
-    description = "Retrieves a paginated list of streams within the organization, with optional filtering by type and keyword. Supports sorting by various metrics",
+    description = "Retrieves a paginated list of streams within the organization, with optional filtering by type and keyword. Supports sorting by various metrics. Streams written by OpenObserve itself carry `is_internal: true`; the field is omitted for user streams.",
     security(
         ("Authorization"= [])
     ),
@@ -466,7 +466,7 @@ pub async fn delete(
         ("x-o2-mcp" = json!({
             "description": "List all streams in the organization, you can filter by type and keyword.",
             "category": "streams",
-            "summary_fields": ["name", "stream_type", "stats.storage_size"],
+            "summary_fields": ["name", "stream_type", "stats.storage_size", "is_internal"],
             "pinned": true
         }))
     )
@@ -1153,6 +1153,7 @@ mod tests {
             total_fields: 0,
             pattern_associations: vec![],
             is_derived: None,
+            is_internal: false,
         }
     }
 

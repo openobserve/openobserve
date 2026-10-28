@@ -494,7 +494,12 @@ mod job_cluster_gate_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::{ClaimRead::*, StopToken, SupervisorAction::*, supervisor_action};
+    use config::meta::self_reporting::usage::is_system_stream;
+
+    use super::{
+        ClaimRead::*, RESULTS_STREAM, STEP_RESULTS_STREAM, StopToken, SupervisorAction::*,
+        supervisor_action,
+    };
 
     #[test]
     fn starts_only_on_a_held_claim() {
@@ -550,5 +555,11 @@ mod tests {
 
         let never = StopToken::never();
         assert!(!never.sleep(std::time::Duration::from_millis(1)).await);
+    }
+
+    #[test]
+    fn test_result_streams_are_system_streams() {
+        assert!(is_system_stream("acme", RESULTS_STREAM));
+        assert!(is_system_stream("acme", STEP_RESULTS_STREAM));
     }
 }

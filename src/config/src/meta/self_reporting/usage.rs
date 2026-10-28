@@ -16,11 +16,12 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    SIZE_IN_MB, get_config,
+    META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
         alerts::ack::{AckAction, AckSource},
         dashboards::usage_report::DashboardInfo,
         search::{SearchEventContext, SearchEventType},
+        slo::stream::SLO_SLICES_STREAM,
         stream::{FileMeta, StreamType},
     },
 };
@@ -66,6 +67,29 @@ pub fn is_internal_stream(stream_name: &str) -> bool {
                 | super::llm_experiments::LLM_EXPERIMENT_STREAM
                 | "_anomalies"
         )
+}
+
+/// Streams O2 writes itself, matched by name for picker ordering; never use it for access control.
+pub fn is_system_stream(org_id: &str, stream_name: &str) -> bool {
+    if stream_name.starts_with("_o2_") {
+        return true;
+    }
+    // Non-underscore names other than `triggers` are written only to `_meta`; users may reuse them.
+    if INTERNAL_STREAM_NAMES.contains(&stream_name) {
+        return stream_name.starts_with('_')
+            || stream_name == TRIGGERS_STREAM
+            || org_id == META_ORG_ID;
+    }
+    match stream_name {
+        "_rumdata"
+        | "_rumlog"
+        | "_sessionreplay"
+        | "synthetics_results"
+        | "synthetics_step_results"
+        | SLO_SLICES_STREAM => true,
+        "self_profiles" => org_id == META_ORG_ID,
+        _ => false,
+    }
 }
 
 /// Outcome of a single scheduled evaluation — "did it fire?".
@@ -1717,6 +1741,79 @@ mod tests {
         assert!(!is_internal_rollup_stream("_o2"));
         assert!(!is_internal_rollup_stream("_agent_signals_backup"));
         assert!(!is_internal_rollup_stream(""));
+    }
+
+    #[test]
+    fn test_is_system_stream_matches_every_internal_name_in_meta() {
+        for name in INTERNAL_STREAM_NAMES {
+            assert!(is_system_stream(META_ORG_ID, name), "{name}");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_scopes_meta_only_names_to_meta() {
+        for name in [
+            USAGE_STREAM,
+            AUDIT_STREAM,
+            STATS_STREAM,
+            ERROR_STREAM,
+            DATA_RETENTION_USAGE_STREAM,
+            "cloud_events",
+            "self_profiles",
+        ] {
+            assert!(is_system_stream(META_ORG_ID, name), "{name} in _meta");
+            assert!(!is_system_stream("acme", name), "{name} in acme");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_matches_in_any_org() {
+        for name in [
+            "_o2_dbm_server",
+            "_o2_service_graph",
+            "_agent_signals",
+            "_redaction_evidence",
+            "_evaluator",
+            "_llm_scores",
+            "_llm_experiment",
+            "_anomalies",
+            TRIGGERS_STREAM,
+            "_rumdata",
+            "_rumlog",
+            "_sessionreplay",
+            "synthetics_results",
+            "synthetics_step_results",
+            SLO_SLICES_STREAM,
+        ] {
+            assert!(is_system_stream("acme", name), "{name} in acme");
+            assert!(is_system_stream(META_ORG_ID, name), "{name} in _meta");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_rejects_user_streams() {
+        for name in [
+            "default",
+            "usage_report",
+            "_foo",
+            "_o2",
+            "o2_stuff",
+            "_rumdata_v2",
+            "traces_service_graph_request_total",
+            "traces_service_graph_request_failed_total",
+            "",
+        ] {
+            assert!(!is_system_stream("acme", name), "{name} in acme");
+            assert!(!is_system_stream(META_ORG_ID, name), "{name} in _meta");
+        }
+    }
+
+    #[test]
+    fn test_is_system_stream_covers_is_internal_stream() {
+        for name in ["_o2_db_stats", "_agent_signals", "_anomalies", "_evaluator"] {
+            assert!(is_internal_stream(name));
+            assert!(is_system_stream("acme", name), "{name}");
+        }
     }
 
     #[test]
