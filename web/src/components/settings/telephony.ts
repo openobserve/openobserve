@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { TelephonyReason, TelephonyRefusalBody, TelephonyView } from "@/ts/interfaces/oncall";
+import type {
+  TelephonyReason,
+  TelephonyRefusalBody,
+  TelephonyStatus,
+  TelephonyView,
+} from "@/ts/interfaces/oncall";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 
@@ -26,6 +31,9 @@ const MASTER_KEY_VARIABLE = raw("O2_MASTER_ENCRYPTION_KEY");
 export type TelephonyPageState =
   "loading" | "forbidden" | "failed" | "empty" | "deployment" | "connected";
 
+/** The status tag an account card shows. */
+export type TelephonyHealth = "checking" | "ok" | "broken" | "unchecked";
+
 const TELEPHONY_REASONS: ReadonlySet<string> = new Set<TelephonyReason>([
   "bad_provider",
   "bad_sid",
@@ -33,6 +41,8 @@ const TELEPHONY_REASONS: ReadonlySet<string> = new Set<TelephonyReason>([
   "token_required",
   "no_master_key",
   "account_rejected",
+  "from_not_on_account",
+  "unavailable",
   "unreadable",
 ]);
 
@@ -69,6 +79,10 @@ export function telephonyRefusalText(t: TranslateFn, reason: TelephonyReason): I
       return t("telephony.refusal.noMasterKey", { variable: MASTER_KEY_VARIABLE });
     case "account_rejected":
       return t("telephony.refusal.accountRejected", { provider: PROVIDER });
+    case "from_not_on_account":
+      return t("telephony.refusal.fromNotOnAccount", { provider: PROVIDER });
+    case "unavailable":
+      return t("telephony.refusal.unavailable", { provider: PROVIDER });
     case "unreadable":
       return t("telephony.refusal.unreadable");
   }
@@ -85,6 +99,25 @@ export function telephonyPageState(
   }
   if (view.org) return "connected";
   return view.deployment_account_present ? "deployment" : "empty";
+}
+
+/** The card's status tag; `none` beside a shown account means the page and the check disagree, so nothing is claimed. [pure] */
+export function telephonyHealth(
+  status: TelephonyStatus | null | undefined,
+  err: unknown,
+): TelephonyHealth {
+  if (!status) return err ? "unchecked" : "checking";
+  switch (status.state) {
+    case "ok":
+      return "ok";
+    case "account_rejected":
+    case "from_not_on_account":
+    case "unreadable":
+      return "broken";
+    case "unavailable":
+    case "none":
+      return "unchecked";
+  }
 }
 
 /** An Account SID cut to its first and last four characters, as the connected card shows it. [pure] */
