@@ -546,7 +546,8 @@ pub async fn list_ended_unposted_with<C: ConnectionTrait>(
         .filter(Column::InstallationId.eq(installation_id))
         .filter(Column::MessageTs.is_null())
         .filter(Column::DigestTs.is_null())
-        .filter(Column::State.is_in(state_texts(&MessageState::TERMINAL)?))
+        // A failed row's channel refused it for good; no digest line reaches it either.
+        .filter(Column::State.is_in(state_texts(&[MessageState::Cleared, MessageState::Gone])?))
         .filter(Column::CreatedAt.lte(to))
         .filter(Column::UpdatedAt.gte(from))
         .order_by_asc(Column::ChannelId)
@@ -572,7 +573,9 @@ pub async fn list_waiting_with<C: ConnectionTrait>(
     let unrendered = Expr::col(Column::RenderedSeq)
         .lt(Expr::col(Column::WantedSeq))
         .and(Column::PendingSince.lt(before));
-    let mut query = live().filter(unposted.or(unrendered));
+    let mut query = live()
+        .filter(unposted.or(unrendered))
+        .filter(Column::State.ne(enum_text(&MessageState::Failed)?));
     if let Some(installation_id) = installation_id {
         query = query.filter(Column::InstallationId.eq(installation_id));
     }
@@ -1091,6 +1094,50 @@ mod tests {
                 .unwrap()
                 .len(),
             1
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_row_never_waits_and_is_terminal() {
+        let db = db().await;
+        let unposted = row("d1", "k", 1);
+        let unrendered = row("d2", "k", 2);
+        for r in [&unposted, &unrendered] {
+            insert_firing_with(&db, r).await.unwrap();
+        }
+        set_posting_with(&db, &unposted.key(), 10).await.unwrap();
+        set_posted_with(&db, &unrendered.key(), "1.1", 10)
+            .await
+            .unwrap();
+        bump_wanted_with(&db, "a1", "k", 2).await.unwrap();
+        assert_eq!(
+            list_waiting_with(&db, None, now_micros(), 10)
+                .await
+                .unwrap()
+                .len(),
+            2
+        );
+        for r in [&unposted, &unrendered] {
+            set_state_with(&db, &r.key(), MessageState::Failed, 20)
+                .await
+                .unwrap();
+        }
+        assert!(
+            list_waiting_with(&db, None, now_micros(), 10)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            list_terminal_before_with(&db, 21, 10).await.unwrap().len(),
+            2
+        );
+        assert!(
+            list_ended_unposted_with(&db, "i1", 0, 100, 10)
+                .await
+                .unwrap()
+                .is_empty(),
+            "no outage digest line for a channel that refused it"
         );
     }
 

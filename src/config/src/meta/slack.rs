@@ -465,6 +465,9 @@ pub struct SlackMessageContent {
     pub level: Option<AlertLevel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub escalated_from: Option<(AlertLevel, i64)>,
+    /// The Slack error that ended the row as `failed`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failed: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -476,11 +479,14 @@ pub enum MessageState {
     Muted,
     Cleared,
     Gone,
+    /// Slack refused the post or edit for good (the channel or message is gone); nothing retries
+    /// it.
+    Failed,
 }
 
 impl MessageState {
     pub const OPEN: [MessageState; 3] = [Self::Firing, Self::Acked, Self::Muted];
-    pub const TERMINAL: [MessageState; 2] = [Self::Cleared, Self::Gone];
+    pub const TERMINAL: [MessageState; 3] = [Self::Cleared, Self::Gone, Self::Failed];
 }
 
 /// The unique key of a `slack_alert_messages` row.
@@ -719,6 +725,7 @@ mod tests {
             (MessageState::Muted, "muted"),
             (MessageState::Cleared, "cleared"),
             (MessageState::Gone, "gone"),
+            (MessageState::Failed, "failed"),
         ] {
             assert_eq!(serde_json::to_value(state).unwrap(), text);
         }
