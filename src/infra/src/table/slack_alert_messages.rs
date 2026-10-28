@@ -425,6 +425,30 @@ pub async fn list_open_with<C: ConnectionTrait>(
     Ok(decode_rows(models))
 }
 
+/// Open rows folded into a channel digest (no message of their own), one page in key order.
+pub async fn list_folded_with<C: ConnectionTrait>(
+    conn: &C,
+    offset: u64,
+    limit: u64,
+) -> Result<Vec<SlackAlertMessage>, Error> {
+    let folded = Column::DigestTs
+        .is_not_null()
+        .or(Column::PostingSince.is_null());
+    let models = live()
+        .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?))
+        .filter(Column::MessageTs.is_null())
+        .filter(folded)
+        .order_by_asc(Column::DestinationId)
+        .order_by_asc(Column::AlertId)
+        .order_by_asc(Column::GroupKey)
+        .order_by_asc(Column::FiringStartedAt)
+        .offset(offset)
+        .limit(limit)
+        .all(conn)
+        .await?;
+    Ok(decode_rows(models))
+}
+
 pub async fn delete_terminal_before_with<C: ConnectionTrait>(
     conn: &C,
     at: i64,
@@ -1095,6 +1119,40 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn folded_rows_list_page_by_page_without_posted_or_posting_rows() {
+        let db = db().await;
+        for d in ["d1", "d2", "d3", "d4", "d5"] {
+            insert_firing_with(&db, &row(d, "k", 1)).await.unwrap();
+        }
+        set_digest_ts_with(&db, &row("d2", "k", 1).key(), "9.1", 10)
+            .await
+            .unwrap();
+        set_posting_with(&db, &row("d3", "k", 1).key(), 10)
+            .await
+            .unwrap();
+        set_posted_with(&db, &row("d4", "k", 1).key(), "1.1", 10)
+            .await
+            .unwrap();
+        set_state_with(&db, &row("d5", "k", 1).key(), MessageState::Cleared, 10)
+            .await
+            .unwrap();
+        let page = |offset| {
+            let db = &db;
+            async move {
+                list_folded_with(db, offset, 1)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|m| m.destination_id)
+                    .collect::<Vec<_>>()
+            }
+        };
+        assert_eq!(page(0).await, ["d1"]);
+        assert_eq!(page(1).await, ["d2"]);
+        assert!(page(2).await.is_empty());
     }
 
     #[tokio::test]
