@@ -58,6 +58,7 @@
       "dashboard-series-color-multiwindow.spec.js",
       "dashboard-config-advanced.spec.js",
       "dashboard-config-axis.spec.js",
+      "dashboard-stacked-axis-bounds.spec.js",
       "dashboard-config-gauge-maps.spec.js",
       "dashboard-config-general.spec.js",
       "dashboard-config-heatmap.spec.js",
