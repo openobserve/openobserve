@@ -79,13 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-heatmap-load-error"
       >
         <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="rum-heatmap-retry-btn"
-            @click="loadApps"
-            >{{ t("common.retry") }}</OButton
-          >
+          <OButton variant="outline" size="sm" data-test="rum-heatmap-retry-btn" @click="onRetry">{{
+            t("common.retry")
+          }}</OButton>
         </template>
       </OBanner>
     </div>
@@ -98,6 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="scrollerRef"
           class="rounded-surface border-border-default min-w-0 flex-1 overflow-auto border"
         >
+          <OEmptyState
+            v-if="snapshotError"
+            size="block"
+            :title="snapshotError"
+            data-test="rum-heatmap-snapshot-error"
+          />
           <OBanner
             v-if="pageUrl && !loading && !groups.length"
             variant="warning"
@@ -124,11 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex w-136 shrink-0 flex-col gap-2 max-lg:w-full">
           <OBanner
-            v-if="snapshotError"
-            variant="info"
+            v-if="settingsFailed"
+            variant="warning"
             dense
-            :content="snapshotError"
-            data-test="rum-heatmap-snapshot-error"
+            :content="t('rum.heatmap.settingsFailed')"
+            data-test="rum-heatmap-settings-failed"
           />
           <span
             v-if="pagesLimited"
@@ -322,6 +324,7 @@ const loading = ref(true);
 const groups = ref<ElementGroup[]>([]);
 const totals = ref({ clicks: 0, sessions: 0, frustrated: 0 });
 const deviceClicks = ref<Partial<Record<DeviceBucket, number>>>({});
+const deviceSplitLoaded = ref(false);
 const schemaFlags = ref<Record<string, boolean>>({});
 const exclusions = ref<AnalyticsScope["exclusions"]>(undefined);
 const placedSelectors = ref<Set<string>>(new Set());
@@ -329,6 +332,7 @@ const snapshotLoading = ref(false);
 const snapshotReady = ref(false);
 const snapshotError = ref<I18nText | null>(null);
 const loadError = ref<I18nText | null>(null);
+const settingsFailed = ref(false);
 const stageRef = ref<HTMLElement | null>(null);
 const scrollerRef = ref<HTMLElement | null>(null);
 const fitRef = ref<HTMLElement | null>(null);
@@ -352,6 +356,8 @@ let player: ReplayPlayer | null = null;
 let overlay: HTMLCanvasElement | null = null;
 let elementRects = new Map<string, OutlineRect>();
 let loadToken = 0;
+let retryTarget: "apps" | "page" = "apps";
+let cycleEnd = Date.now() * 1000;
 
 const rangeOptions = computed(() => [
   { label: t("rum.heatmap.range1h"), value: "1h" },
@@ -362,7 +368,8 @@ const rangeOptions = computed(() => [
 
 const deviceLabel = (key: string, device: DeviceBucket) => {
   const n = deviceClicks.value[device];
-  return n ? raw(`${t(key)} (${addCommasToNumber(n)})`) : t(key);
+  if (!deviceSplitLoaded.value) return t(key);
+  return raw(`${t(key)} (${addCommasToNumber(n ?? 0)})`);
 };
 
 const deviceOptions = computed(() => [
@@ -468,8 +475,11 @@ const scope = (): AnalyticsScope => ({
 });
 
 function windowMicros(hours: number) {
-  const end = Date.now() * 1000;
-  return { start_time: end - hours * 3_600_000_000, end_time: end };
+  return { start_time: cycleEnd - hours * 3_600_000_000, end_time: cycleEnd };
+}
+
+function startCycle() {
+  cycleEnd = Date.now() * 1000;
 }
 
 class ForbiddenError extends Error {}
@@ -507,14 +517,20 @@ async function ensureSchema() {
   schemaFlags.value = Object.fromEntries((stream?.schema ?? []).map((f: any) => [f?.name, true]));
 }
 
-function failLoad(label: string, error: unknown) {
+function failLoad(label: string, error: unknown, retry: "apps" | "page" = "apps") {
+  retryTarget = retry;
   console.error(`Click heatmap: ${label} failed`, error);
   loadError.value = t(
     error instanceof ForbiddenError ? "rum.heatmap.forbidden" : "rum.heatmap.loadFailed",
   );
 }
 
+function onRetry() {
+  return retryTarget === "page" ? loadPage() : loadApps();
+}
+
 async function loadApps() {
+  startCycle();
   const token = ++loadToken;
   loading.value = true;
   loadError.value = null;
@@ -550,14 +566,17 @@ async function loadSettings() {
     const res = await rumProductAnalytics.getAppSettings(org(), appId.value);
     exclusions.value = res.data;
     settingsKey = key;
+    settingsFailed.value = false;
   } catch (error) {
     console.error("Click heatmap: app settings failed", error);
     exclusions.value = undefined;
     settingsKey = "";
+    settingsFailed.value = true;
   }
 }
 
 async function onAppChange() {
+  startCycle();
   const token = ++loadToken;
   await loadSettings();
   if (token === loadToken) await loadPages();
@@ -590,7 +609,7 @@ async function loadPages() {
     return;
   }
   loading.value = false;
-  await loadPage();
+  await loadPage(true, false);
 }
 
 function resetPage() {
@@ -600,14 +619,22 @@ function resetPage() {
   placedSelectors.value = new Set();
   snapshotError.value = null;
   loadError.value = null;
+  rankingLimited.value = false;
+  pagesLimited.value = false;
   selectedSelector.value = "";
   unusedRows.value = [];
 }
 
-async function loadPage(refreshSplit = true) {
+async function loadPage(refreshSplit = true, newCycle = true) {
+  if (newCycle) startCycle();
   const token = ++loadToken;
-  if (refreshSplit) deviceClicks.value = {};
+  if (refreshSplit) {
+    deviceClicks.value = {};
+    deviceSplitLoaded.value = false;
+  }
+  const pageListFull = pagesLimited.value;
   resetPage();
+  pagesLimited.value = pageListFull;
   if (!pageUrl.value) {
     for (const id of RANK_PANELS) search.hold(id, "idle");
     return;
@@ -617,7 +644,7 @@ async function loadPage(refreshSplit = true) {
     loadSnapshot(token),
   ]);
   if (token !== loadToken) return;
-  if (clicks.status === "rejected") failLoad("clicks", clicks.reason);
+  if (clicks.status === "rejected") failLoad("clicks", clicks.reason, "page");
   if (snapshot.status === "fulfilled" && snapshotReady.value) drawHeat();
 }
 
@@ -638,6 +665,7 @@ async function loadClicks(token: number, withSplit: boolean) {
     if (token !== loadToken || !split || !tot || !ranked) return;
     if (withSplit) {
       deviceClicks.value = Object.fromEntries(split.map((r) => [r.cls, Number(r.clicks) || 0]));
+      deviceSplitLoaded.value = true;
     }
     rankingLimited.value = ranked.length >= RANKING_LIMIT;
     const row = tot[0] ?? {};
@@ -840,6 +868,7 @@ function fitStage() {
   fit.style.setProperty("height", `${pageSize.height * stageScale}px`);
 }
 
+// A hand-rolled canvas because it paints over a rebuilt replay DOM, which no chart component can host.
 function ensureOverlay(frame: { wrapper: HTMLElement }, width: number, height: number) {
   if (!overlay) {
     overlay = document.createElement("canvas");

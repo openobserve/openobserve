@@ -2025,6 +2025,7 @@
       "noReplay": "No session replay was recorded for this page, so there is no screenshot to draw on.",
       "loadFailed": "Couldn't load the click data.",
       "snapshotFailed": "Couldn't load the page snapshot.",
+      "settingsFailed": "Couldn't load the app's bot and identity settings, so counts may include bot sessions.",
       "noPosition": "No clicks in this period for this page.",
       "pagesLimited": "Showing the top page by clicks. | Showing the top {count} pages by clicks.",
       "rankingLimited": "Showing the top element by clicks. | Showing the top {count} elements by clicks.",

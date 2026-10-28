@@ -31,6 +31,8 @@ vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => ({
 
 import ClickHeatmap from "./ClickHeatmap.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import rumProductAnalytics from "@/services/rumProductAnalytics";
+import { PAGE_LIST_LIMIT, RANKING_LIMIT } from "@/utils/rum/clickHeatmapQueries";
 
 const store = createStore({
   state: {
@@ -56,8 +58,8 @@ const answer = (overrides: Record<string, () => unknown> = {}) =>
 
 const ids = () => h.run.mock.calls.map((c) => c[0] as string);
 
-const mountPage = async () => {
-  const wrapper = mount(ClickHeatmap, { global: { plugins: [store] } });
+const mountPage = async (stubs: Record<string, boolean> = {}) => {
+  const wrapper = mount(ClickHeatmap, { global: { plugins: [store], stubs } });
   await flushPromises();
   return wrapper;
 };
@@ -161,5 +163,89 @@ describe("ClickHeatmap", () => {
     expect(ids().filter((id) => id === "totals")).toHaveLength(2);
     expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("4");
     expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).not.toContain("99");
+  });
+
+  it("shows the settings notice and still loads when the app settings fail", async () => {
+    answer();
+    vi.mocked(rumProductAnalytics.getAppSettings).mockRejectedValueOnce(new Error("nope"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="rum-heatmap-settings-failed"]').text()).toContain(
+      "counts may include bot sessions",
+    );
+    expect(wrapper.find('[data-test="rum-heatmap-stat-clicks"]').text()).toContain("4");
+  });
+
+  it("clears the ranking note when the next page load fails", async () => {
+    const full = Array.from({ length: RANKING_LIMIT }, (_, i) => ({
+      selector: `#b${i}`,
+      clicks: 1,
+      sessions: 1,
+    }));
+    answer({ ranking: () => ok(full) });
+    const wrapper = await mountPage({ OTable: true });
+    expect(wrapper.find('[data-test="rum-heatmap-ranking-limited"]').exists()).toBe(true);
+
+    answer({ totals: () => ({ status: "error", error: { message: "boom" } }) });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const device = wrapper
+      .findAllComponents(OSelect)
+      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    device?.vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="rum-heatmap-ranking-limited"]').exists()).toBe(false);
+  });
+
+  it("keeps the page-list note across a page reload", async () => {
+    const pages = Array.from({ length: PAGE_LIST_LIMIT }, (_, i) => ({
+      view_url: `https://x.test/p${i}`,
+    }));
+    answer({ pages: () => ok(pages) });
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="rum-heatmap-pages-limited"]').exists()).toBe(true);
+  });
+
+  it("explains a missing replay inside the left pane", async () => {
+    answer();
+    const wrapper = await mountPage();
+
+    const notice = wrapper.find('[data-test="rum-heatmap-snapshot-error"]');
+    expect(notice.text()).toContain("No session replay was recorded");
+    expect(wrapper.findAll('[data-test="rum-heatmap-snapshot-error"]')).toHaveLength(1);
+  });
+
+  it("retries only the clicks and keeps the page after a clicks failure", async () => {
+    answer({ totals: () => ({ status: "error", error: { message: "boom" } }) });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const wrapper = await mountPage();
+    answer();
+    h.run.mockClear();
+
+    await wrapper.find('[data-test="rum-heatmap-retry-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(ids()).not.toContain("apps");
+    expect(ids()).not.toContain("pages");
+    expect(ids()).toContain("totals");
+    expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
+    const page = wrapper
+      .findAllComponents(OSelect)
+      .find((s) => s.attributes("data-test") === "rum-heatmap-page-select");
+    expect(page?.props("modelValue")).toBe("https://x.test/home");
+  });
+
+  it("shows device counts including zero once the split returns", async () => {
+    answer();
+    const wrapper = await mountPage();
+    const device = wrapper
+      .findAllComponents(OSelect)
+      .find((s) => s.attributes("data-test") === "rum-heatmap-device-select");
+    const labels = (device?.props("options") as { label: unknown }[]).map((o) => String(o.label));
+
+    expect(labels).toContain("Tablet (0)");
+    expect(labels).toContain("Desktop (4)");
   });
 });

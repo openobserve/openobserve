@@ -142,7 +142,7 @@ export function drawOutline(canvas: HTMLCanvasElement, rect: OutlineRect): void 
   ctx.restore();
 }
 
-/** Draws additive alpha blobs, then recolours by accumulated density (green = few clicks, red = many). */
+/** Recolours by accumulated density because a single blob alpha cannot show overlapping clicks. */
 export function renderHeat(canvas: HTMLCanvasElement, spots: HeatSpot[], radius = 28): void {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return;
