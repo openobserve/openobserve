@@ -248,6 +248,7 @@
               <EditorDraftDot
                 v-if="experimentDrafts.ids.has(row.id)"
                 corner
+                :tooltip="false"
                 :data-test="`ai-experiment-draft-dot-${row.id}`"
               />
             </OButton>

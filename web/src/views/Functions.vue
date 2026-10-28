@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline.addPipeline") }}
               <EditorDraftDot
                 v-if="pipelineDrafts.hasNew"
+                :saved-at="pipelineDrafts.savedAt(null)"
                 corner
                 data-test="pipeline-list-add-pipeline-draft-dot"
               />

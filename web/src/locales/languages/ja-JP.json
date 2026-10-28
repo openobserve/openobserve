@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "名前付きイベントを {count} 件削除しますか？これを使用するファネルには削除済みステップのタグが表示されます。 | 名前付きイベントを {count} 件削除しますか？これらを使用するファネルには削除済みステップのタグが表示されます。",
         "bulkDeleteInUseMessage": "名前付きイベントを {count} 件削除しますか？保存済みファネルには次の削除済みイベントステップが表示されます: {names}。 | 名前付きイベントを {count} 件削除しますか？保存済みファネルには次の削除済みイベントステップが表示されます: {names}。",
         "notFound": "この名前付きイベントはすでに存在しません",
-        "discardTitle": "変更を破棄しますか？",
-        "discardMessage": "この名前付きイベントには未保存の変更があります。保存せずに離れますか？",
         "editorApp": "アプリ: {app}",
         "details": "詳細",
         "opParam": "URL パラメーター",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "このタブには保存されていない変更があります。"
       },
-      "leaveConfirm": {
-        "title": "保存していない変更を破棄しますか?",
-        "message": "保存されていない権限またはメンバーの変更があります。このページを離れると、変更内容は破棄されます。"
-      },
       "show": "表示",
       "searchPermissions": "権限を検索",
       "filterModules": "モジュールをフィルター",
@@ -3808,9 +3825,6 @@
         "emoji": "絵文字を挿入",
         "placeholder": "テキスト"
       },
-      "leaveTitle": "変更を破棄しますか？",
-      "leaveMessage": "このバナーへの編集は保存されていません。",
-      "leaveConfirm": "破棄",
       "publishNow": "今すぐ公開",
       "schedule": "スケジュール",
       "statusLive": "現在公開中",
@@ -3822,7 +3836,6 @@
       "savedEnded": "バナーを保存しましたが、スケジュールはすでに終了しています",
       "conflict": "このバナーは他のユーザーによって変更されました。最新バージョンを表示するには再読み込みしてください。",
       "reload": "再読み込み",
-      "keepEditing": "編集を続ける",
       "orgsSome": "これらの組織のみ",
       "orgsPick": "組織",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "シークレットタイプ",
     "staticSecret": "静的シークレット",
     "staticSecretName": "名前",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC名",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC暗号化データ",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "最大試行回数は1回から3回の間である必要があります",
           "concurrencyRange": "最大同時実行数は1〜32の間でなければなりません。",
           "signingKeyRequired": "署名キーを生成できませんでした。再試行してください。"
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "署名キーをコピー",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "AI SRE は実行されません。呼び出しは AI トリアージなしの場合とまったく同じように動作します",
     "l0BudgetLabel": "保留バジェット",
     "l0BudgetRange": "30〜600秒の範囲です。この範囲外の値は、クランプせずサーバーが拒否します。",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "フェイルオープン — エージェントが遅い、または応答しない場合、アラートは即座に送信されます。",
     "l0AllowPromotion": "重大度を上げる",
     "l0AllowPromotionNote": "エージェントの判定が必要と判断された場合に適用されます。",

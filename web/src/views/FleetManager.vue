@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ createLabel }}
         <EditorDraftDot
           v-if="showNewConfigDot"
+          :saved-at="configDrafts.savedAt(null)"
           corner
           data-test="fleet-manager-create-configurations-draft-dot"
         />

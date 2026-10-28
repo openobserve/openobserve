@@ -21,10 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :persistent="saving"
     :title="t('common.editorDraft.leaveTitle')"
-    :primary-button-label="canSave ? t('common.save') : undefined"
+    :primary-button-label="canSave ? (saveLabel ?? t('common.save')) : undefined"
     primary-button-data-test="editor-draft-leave-save"
     :primary-button-loading="saving"
-    :secondary-button-label="canKeepDraft ? t('common.editorDraft.keepDraft') : undefined"
+    :secondary-button-label="
+      canKeepDraft
+        ? serverDraftItem
+          ? t('common.editorDraft.keepInBrowser')
+          : t('common.editorDraft.keepDraft')
+        : undefined
+    "
     :neutral-button-label="t('panel.discard')"
     neutral-button-variant="ghost-destructive"
     data-test="editor-draft-leave-dialog"
@@ -38,9 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{
           !canSave
             ? t("common.editorDraft.leaveMessageDiscardOnly", { entity: entityLabel })
-            : canKeepDraft
-              ? t("common.editorDraft.leaveMessage", { entity: entityLabel })
-              : t("common.editorDraft.leaveMessageNoDraft", { entity: entityLabel })
+            : !canKeepDraft
+              ? t("common.editorDraft.leaveMessageNoDraft", { entity: entityLabel })
+              : serverDraftItem
+                ? t("common.editorDraft.leaveMessageInBrowser", { entity: entityLabel })
+                : t("common.editorDraft.leaveMessage", { entity: entityLabel })
         }}
       </p>
       <p
@@ -67,6 +75,9 @@ withDefaults(
     canKeepDraft?: boolean;
     signingOut?: boolean;
     canSave?: boolean;
+    /** The item has a server-side draft of its own, so the copy avoids the word "draft". */
+    serverDraftItem?: boolean;
+    saveLabel?: I18nText | null;
   }>(),
   { canSave: true },
 );

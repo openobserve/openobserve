@@ -213,9 +213,17 @@ const updateUserTable = async (value: string) => {
   if (usersDisplay.value === "all") {
     rows.value = users.value;
   } else {
-    rows.value = users.value.filter((user: any) => user.isInGroup);
+    rows.value = users.value.filter(isListedAsSelected);
   }
 };
+
+// Staged picks count too, so a member list mounted over restored changes shows them ticked.
+const isSelected = (email: string) =>
+  props.addedUsers.has(email) || (groupUsersMap.value.has(email) && !props.removedUsers.has(email));
+
+// A member staged for removal stays listed under Selected, so a restored removal can be undone.
+const isListedAsSelected = (user: { email: string; isInGroup: boolean }) =>
+  user.isInGroup || props.removedUsers.has(user.email);
 
 const fetchOrgServiceAccounts = async () => {
   // fetch group users
@@ -230,7 +238,7 @@ const fetchOrgServiceAccounts = async () => {
       .map((user: any) => {
         return {
           email: user.email,
-          isInGroup: groupUsersMap.value.has(user.email),
+          isInGroup: isSelected(user.email),
         };
       }),
   );
@@ -240,7 +248,7 @@ const fetchOrgServiceAccounts = async () => {
       return {
         "#": index + 1,
         email: user.email,
-        isInGroup: groupUsersMap.value.has(user.email),
+        isInGroup: isSelected(user.email),
       };
     },
   );

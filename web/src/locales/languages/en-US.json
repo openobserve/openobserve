@@ -977,6 +977,8 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "continueDraft": "Continue draft",
       "startFresh": "Start fresh",
       "itemDeleted": "This {entity} no longer exists, so its unsaved draft was discarded.",
@@ -989,6 +991,7 @@
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "rowDot": "Unsaved draft · {date}",
       "newDot": "{label} · unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}",
       "entities": {
         "alert": "alert",
         "alert_template": "alert template",
@@ -1002,11 +1005,29 @@
         "synthetic_browser": "browser test",
         "fleet_config": "collector configuration",
         "prompt": "prompt",
-        "experiment": "experiment"
+        "experiment": "experiment",
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft"
     }
   },
   "flow": {
@@ -2491,8 +2512,6 @@
         "bulkDeleteMessage": "Delete {count} named event? Funnels that use it will show a deleted-step tag. | Delete {count} named events? Funnels that use them will show a deleted-step tag.",
         "bulkDeleteInUseMessage": "Delete {count} named event? Saved funnels will show a Deleted event step for: {names}. | Delete {count} named events? Saved funnels will show a Deleted event step for: {names}.",
         "notFound": "This named event no longer exists",
-        "discardTitle": "Discard changes?",
-        "discardMessage": "This named event has unsaved changes. Leave without saving them?",
         "editorApp": "App: {app}",
         "details": "Details",
         "opParam": "URL parameter",
@@ -3360,10 +3379,6 @@
       "unsavedDot": {
         "title": "This tab has unsaved changes."
       },
-      "leaveConfirm": {
-        "title": "Discard unsaved changes?",
-        "message": "You have unsaved permission or member changes. Leaving this page will discard them."
-      },
       "show": "Show",
       "searchPermissions": "Search Permissions",
       "filterModules": "Filter Modules",
@@ -3837,9 +3852,6 @@
         "emoji": "Insert emoji",
         "placeholder": "text"
       },
-      "leaveTitle": "Discard changes?",
-      "leaveMessage": "Your edits to this banner have not been saved.",
-      "leaveConfirm": "Discard",
       "publishNow": "Publish now",
       "schedule": "Schedule",
       "statusLive": "Currently live",
@@ -3851,7 +3863,6 @@
       "savedEnded": "Banner saved; its schedule has already ended",
       "conflict": "This banner was changed by someone else. Reload to see the latest version.",
       "reload": "Reload",
-      "keepEditing": "Keep editing",
       "orgsSome": "Only these organizations",
       "orgsPick": "Organizations",
       "orgOption": "{name} ({id})",
@@ -14858,6 +14869,7 @@
     "secretType": "Secret Type",
     "staticSecret": "Static Secret",
     "staticSecretName": "Name",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC Name",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC Encrypted Data",
@@ -16725,7 +16737,9 @@
           "attemptsRange": "Max attempts must be between 1 and 3",
           "concurrencyRange": "Max concurrency must be between 1 and 32",
           "signingKeyRequired": "Could not generate a signing key. Try again."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "Copy Your Signing Key",
@@ -24377,6 +24391,7 @@
     "l0OffSentence": "no AI SRE runs; the page behaves exactly as it did without AI triage",
     "l0BudgetLabel": "Hold budget",
     "l0BudgetRange": "Between 30 and 600 seconds — the server refuses values outside this range rather than clamping",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "Fail-open — if the agent is slow or unresponsive, the alert is sent immediately.",
     "l0AllowPromotion": "Raise severity",
     "l0AllowPromotionNote": "Applied when the agent's verdict warrants it.",

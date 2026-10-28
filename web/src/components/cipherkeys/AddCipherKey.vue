@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="min-h-[inherit]"
     :back="{
       label: t('cipherKey.header'),
-      onClick: () => emit('cancel:hideform'),
+      onClick: closeEditor,
     }"
     bleed
   >
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               :disabled="isSubmitting"
-              @click="openCancelDialog"
+              @click="closeEditor"
             >
               {{ t("common.cancel") }}
             </OButton>
@@ -157,28 +157,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OForm>
     </div>
-    <ConfirmDialog
-      v-model="dialog.show"
-      :title="dialog.title"
-      :message="dialog.message"
-      @update:ok="dialog.okCallback"
-      @update:cancel="dialog.show = false"
-    />
+    <EditorDraftDialogs :draft="cipherKeyDraft" />
   </OPageLayout>
 </template>
 <script lang="ts" setup>
-import { ref, computed, onMounted, onActivated } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { ref, computed, nextTick, onMounted, onActivated } from "vue";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
 import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
 import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechanism.vue";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import CipherKeysService from "@/services/cipher_keys";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
@@ -209,14 +204,6 @@ const cipherKeyTypes = [
   { label: raw("OpenObserve"), value: "local" },
   { label: raw("Akeyless"), value: "akeyless" },
 ];
-
-const dialog = ref({
-  show: false,
-  // raw("") is only the empty placeholder — the real values are assigned from t().
-  title: raw(""),
-  message: raw(""),
-  okCallback: () => {},
-});
 
 const getTypeLabel = (type: string) => cipherKeyTypes.find((item) => item.value === type)?.label;
 
@@ -258,40 +245,162 @@ function mergeObjects(base: any, updates: any) {
   return base;
 }
 
-const setupTemplateData = () => {
-  if (router.currentRoute.value.query.action === "edit") {
-    isUpdatingCipherKey.value = true;
-    const name = String(router.currentRoute.value.query.name || "");
-    if (name === "") {
-      toast({ variant: "error", message: t("toastMessages.cipherkeys.invalidCipherKeyName") });
-      emit("cancel:hideform");
-      return;
-    }
-    CipherKeysService.get_by_name(store.state.selectedOrganization.identifier, name)
-      .then((response) => {
-        // :default-values is read once at mount; re-seed via reset now the
-        // record has arrived.
-        const record = mergeObjects(addCipherKeyDefaults(), response.data) as AddCipherKeyForm;
-        form.reset(record);
-        originalData.value = JSON.stringify(form.state.values ?? record);
-      })
-      .catch((error) => {
-        if (error.status != 403) {
-          toast({
-            variant: "error",
-            message: error.response?.data?.message || t("cipherKeys.fetchCipherKeyError"),
-          });
-        }
+interface LoadFailure {
+  status?: number;
+  response?: { status?: number; data?: { message?: string } };
+}
+
+// The loaded key in edit mode, or null once a load found it gone.
+const serverRecord = ref<AddCipherKeyForm | null>(null);
+
+const loadCipherKey = async (): Promise<boolean> => {
+  if (router.currentRoute.value.query.action !== "edit") return true;
+  isUpdatingCipherKey.value = true;
+  const name = String(router.currentRoute.value.query.name || "");
+  if (name === "") {
+    toast({ variant: "error", message: t("toastMessages.cipherkeys.invalidCipherKeyName") });
+    emit("cancel:hideform");
+    return false;
+  }
+  try {
+    const response = await CipherKeysService.get_by_name(
+      store.state.selectedOrganization.identifier,
+      name,
+    );
+    // :default-values is read once at mount; re-seed via reset now the record has arrived.
+    const record = mergeObjects(addCipherKeyDefaults(), response.data) as AddCipherKeyForm;
+    form.reset(record);
+    originalData.value = JSON.stringify(form.state.values ?? record);
+    serverRecord.value = JSON.parse(originalData.value) as AddCipherKeyForm;
+    return true;
+  } catch (error: unknown) {
+    const failure = (error ?? {}) as LoadFailure;
+    const status = failure.response?.status ?? failure.status;
+    if (status !== 403) {
+      toast({
+        variant: "error",
+        message: raw(failure.response?.data?.message) || t("cipherKeys.fetchCipherKeyError"),
       });
+    }
+    // A key that is gone still opens, so its stale draft is dropped; any other failure keeps it.
+    return status === 404;
   }
 };
 
+const setupTemplateData = () => {
+  void loadCipherKey();
+};
+
 onActivated(() => setupTemplateData());
-onMounted(() => {
+
+const formValues = form.useStore((s: { values: AddCipherKeyForm }) => s.values);
+// Set while the leave dialog's Save runs, so a successful save does not close the editor itself.
+let leaveSave: { saved: boolean } | null = null;
+
+const AKEYLESS = "/key/store/akeyless";
+// Key material and the credentials that unlock it never reach browser storage.
+const SECRET_FIELDS: Record<string, I18nKey> = {
+  "/key/store/local": "cipherKey.secret",
+  [`${AKEYLESS}/access_id`]: "cipherKey.accessId",
+  [`${AKEYLESS}/auth/access_key`]: "cipherKey.accessKey",
+  [`${AKEYLESS}/auth/ldap/username`]: "cipherKey.ldapUsername",
+  [`${AKEYLESS}/auth/ldap/password`]: "cipherKey.ldapPassword",
+  [`${AKEYLESS}/store/static_secret`]: "cipherKey.staticSecretNameNotKept",
+  [`${AKEYLESS}/store/dfc/iv`]: "cipherKey.dfcIV",
+  [`${AKEYLESS}/store/dfc/encrypted_data`]: "cipherKey.dfcEncryptedData",
+};
+
+const redactCipherKeyDraft = (data: AddCipherKeyForm) => {
+  const copy = JSON.parse(JSON.stringify(data)) as AddCipherKeyForm;
+  const paths: string[] = [];
+  for (const path of Object.keys(SECRET_FIELDS)) {
+    const segments = path.slice(1).split("/");
+    const field = segments.pop() as string;
+    const holder = segments.reduce<Record<string, unknown> | undefined>(
+      (node, segment) => node?.[segment] as Record<string, unknown> | undefined,
+      copy as unknown as Record<string, unknown>,
+    );
+    if (!holder || typeof holder[field] !== "string" || holder[field] === "") continue;
+    holder[field] = "";
+    paths.push(path);
+  }
+  return { data: copy, paths };
+};
+
+const describeRedactedCipherKey = (paths: string[]): I18nText[] => [
+  ...new Set(paths.flatMap((path) => (SECRET_FIELDS[path] ? [t(SECRET_FIELDS[path])] : []))),
+];
+
+const flagReentries = (paths: string[]) => {
+  for (const path of paths) {
+    const name = path.slice(1).split("/").join(".") as FormFieldPath<AddCipherKeyForm>;
+    const meta = form.getFieldMeta(name);
+    if (!meta) continue;
+    form.setFieldMeta(name, {
+      ...meta,
+      errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
+    });
+  }
+};
+
+/** A changed secret the draft could not keep must be typed again before saving. */
+const blockOnPendingReentries = (): boolean => {
+  const pending = cipherKeyDraft.pendingReentries();
+  if (!pending.length) return false;
+  flagReentries(pending);
+  toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+  return true;
+};
+
+const cipherKeyDraft = useEditorDraft<AddCipherKeyForm>({
+  kind: "cipher_key",
+  entityLabel: () => t("common.editorDraft.entities.cipher_key"),
+  entityId: () =>
+    isUpdatingCipherKey.value ? String(router.currentRoute.value.query.name ?? "") : null,
+  snapshot: () => JSON.parse(JSON.stringify(formValues.value)) as AddCipherKeyForm,
+  apply: async (data, { notKeptPaths }) => {
+    // A saved key's name is locked, so the draft can never rename it.
+    form.reset({ ...data, name: isUpdatingCipherKey.value ? form.state.values.name : data.name });
+    // After the form's own error sweep, which runs on the reset values.
+    await nextTick();
+    flagReentries(notKeptPaths);
+  },
+  base: () => (isUpdatingCipherKey.value ? serverRecord.value : null),
+  redactBase: (base) => redactCipherKeyDraft(base as AddCipherKeyForm).data,
+  hasChanges: () => JSON.stringify(form.state.values ?? {}) !== originalData.value,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  redact: redactCipherKeyDraft,
+  describeRedacted: describeRedactedCipherKey,
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path ||
+    to.query.action !== from.query.action ||
+    to.query.name !== from.query.name,
+});
+
+onMounted(async () => {
   // Baseline for the cancel diff; edit mode re-snapshots after the record loads.
   originalData.value = JSON.stringify(form.state.values ?? addCipherKeyDefaults());
-  setupTemplateData();
+  if (await loadCipherKey()) await cipherKeyDraft.start();
 });
+
+/** Ends a successful save: the leave dialog's Save stays on the page, any other save closes it. */
+const finishSave = () => {
+  if (leaveSave) {
+    leaveSave.saved = true;
+    return;
+  }
+  cipherKeyDraft.markSaved();
+  emit("cancel:hideform");
+};
 
 // Continue: validate the whole form by submitting through it (reveals any step-1
 // errors on the mounted fields); advance only when valid. pendingContinue makes
@@ -312,6 +421,7 @@ const onFormSubmit = async (value: AddCipherKeyForm) => {
     step.value = 2;
     return;
   }
+  if (blockOnPendingReentries()) return;
   if (isUpdatingCipherKey.value) {
     await updateCipherKey(value);
   } else {
@@ -341,7 +451,7 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
       variant: "success",
       message: t("toastMessages.cipherkeys.cipherKeyCreatedSuccessfully"),
     });
-    emit("cancel:hideform");
+    finishSave();
   } catch (error: any) {
     dismiss();
     if (error.status != 403) {
@@ -354,7 +464,7 @@ const updateCipherKey = async (value: AddCipherKeyForm) => {
   const current = JSON.stringify(form.state.values ?? value);
   if (current === originalData.value) {
     toast({ variant: "success", message: t("toastMessages.cipherkeys.noChangesDetected") });
-    emit("cancel:hideform");
+    finishSave();
     return;
   }
   const dismiss = toast({
@@ -375,7 +485,7 @@ const updateCipherKey = async (value: AddCipherKeyForm) => {
       variant: "success",
       message: t("toastMessages.cipherkeys.cipherKeyUpdatedSuccessfully"),
     });
-    emit("cancel:hideform");
+    finishSave();
   } catch (error: any) {
     dismiss();
     if (error.status != 403) {
@@ -384,20 +494,8 @@ const updateCipherKey = async (value: AddCipherKeyForm) => {
   }
 };
 
-const goToCipherList = () => {
-  emit("cancel:hideform");
-};
-
-const openCancelDialog = () => {
-  const current = JSON.stringify(form.state.values ?? {});
-  if (current === originalData.value) {
-    goToCipherList();
-    return;
-  }
-  dialog.value.show = true;
-  dialog.value.title = t("common.discardChanges");
-  dialog.value.message = t("common.cancelChangesConfirm");
-  dialog.value.okCallback = goToCipherList;
+const closeEditor = async () => {
+  if (await cipherKeyDraft.confirmLeave()) emit("cancel:hideform");
 };
 
 defineExpose({
@@ -407,8 +505,7 @@ defineExpose({
   storeType,
   cipherKeyTypes,
   getTypeLabel,
-  dialog,
   continueToStep2,
-  openCancelDialog,
+  closeEditor,
 });
 </script>

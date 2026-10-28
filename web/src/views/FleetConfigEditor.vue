@@ -1149,6 +1149,7 @@ const configDraft = useEditorDraft<FleetConfigDraft>({
     return { ...data, yamlText: restoreYamlSecrets(data.yamlText, lines, savedYaml.value) };
   },
   restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
+  serverDraftItem: true,
   // Another config's page reuses this view, so only an id change leaves the draft.
   leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
 });

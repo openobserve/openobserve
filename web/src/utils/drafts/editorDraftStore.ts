@@ -34,7 +34,21 @@ export type EditorDraftKind =
   | "synthetic_browser"
   | "fleet_config"
   | "prompt"
-  | "experiment";
+  | "experiment"
+  | "dashboard_settings"
+  | "cipher_key"
+  | "ai_toolset"
+  | "announcement_banner"
+  | "status_page"
+  | "rum_named_event"
+  | "iam_role"
+  | "oncall_policy"
+  | "oncall_schedule"
+  | "regex_pattern"
+  | "model_pricing"
+  | "remote_task"
+  | "eval_job"
+  | "eval_scorer";
 
 export interface EditorDraftScope {
   kind: EditorDraftKind;
@@ -64,6 +78,12 @@ export interface EditorDraftInput<T = unknown> {
   redactedPaths?: string[];
   redactedLabels?: Record<string, string>;
   changedRedactedPaths?: string[];
+}
+
+/** What identifies a draft within its kind and org. */
+export interface EditorDraftKeyParts {
+  entityId: string | null;
+  variant: string | null;
 }
 
 export interface EditorDraftEntry {
@@ -414,11 +434,29 @@ export const countEditorDraftsFor = (userEmail: string, now: number = Date.now()
 export const countAllDraftsFor = (userEmail: string): number =>
   countEditorDraftsFor(userEmail) + countPanelDraftsFor(userEmail);
 
+const matchesDeleteTarget = (
+  parsed: ParsedKey,
+  target: {
+    entityId?: string;
+    variant?: string;
+    match?: (draft: EditorDraftKeyParts) => boolean;
+  },
+): boolean => {
+  if (target.match?.({ entityId: parsed.entityId, variant: parsed.variant })) return true;
+  if (target.entityId !== undefined && parsed.entityId === target.entityId) return true;
+  if (parsed.entityId !== null || parsed.variant === null) return false;
+  return target.variant !== undefined && parsed.variant === target.variant;
+};
+
 /** Drops one item's drafts for every user in this browser; run when the item is deleted. */
 export const deleteEditorDraftsFor = (target: {
   kind: EditorDraftKind;
   org: string;
-  entityId: string;
+  entityId?: string;
+  /** Also drops every user's new-item drafts in this variant, e.g. the `clone:<id>` copies of a deleted source. */
+  variant?: string;
+  /** Any other rule over a draft's entity id and variant, e.g. every draft of a deleted team's rotations. */
+  match?: (draft: EditorDraftKeyParts) => boolean;
 }): number => {
   const storage = getStorage();
   if (!storage) return 0;
@@ -427,7 +465,7 @@ export const deleteEditorDraftsFor = (target: {
     for (const key of draftKeys(storage)) {
       const parsed = parseKey(key);
       if (!parsed || parsed.kind !== target.kind || parsed.org !== target.org) continue;
-      if (parsed.entityId !== target.entityId) continue;
+      if (!matchesDeleteTarget(parsed, target)) continue;
       storage.removeItem(key);
       removed++;
     }

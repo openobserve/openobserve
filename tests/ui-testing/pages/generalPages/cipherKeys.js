@@ -1,6 +1,7 @@
 // cipher keys.js
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from './draftSignOut.js';
+import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
 
 
 export class CipherKeys {
@@ -181,6 +182,7 @@ export class CipherKeys {
     async updateCipherKeysCancel() {
         await this.page.waitForSelector('[data-test="add-cipher-key-cancel-btn"]');
         await this.page.locator('[data-test="add-cipher-key-cancel-btn"]').click();
+        await discardEditorDraftIfAsked(this.page);
 
     }
 

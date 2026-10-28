@@ -7,7 +7,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'job-form-back-btn',
       }"
       bleed
@@ -274,7 +274,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -318,11 +318,12 @@
         </OButton>
       </footer>
     </OPageLayout>
+    <EditorDraftDialogs :draft="jobDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -348,6 +349,7 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
+import { leavesEvalForm } from "../utils/routeSync";
 import { parseSamplingRate, samplingRateForForm, samplingRatePercent } from "../utils/jobSampling";
 import {
   buildJobFilterConditionPayload,
@@ -380,6 +382,9 @@ import JobFilterBuilder from "./job/JobFilterBuilder.vue";
 import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
 import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 
 const props = defineProps<{
   orgId: string;
@@ -391,6 +396,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -607,9 +614,10 @@ async function loadStreamFields() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   void loadTraceStreams();
   void loadStreamFields();
+  await jobDraft.start();
 });
 
 const samplingModeOptions = computed(() => [
@@ -626,7 +634,7 @@ const targetScopeOptions = computed(() => [
 watch(
   () => formValues.value.targetScope,
   (targetScope, previousScope) => {
-    if (targetScope === previousScope) return;
+    if (targetScope === previousScope || applyingDraft) return;
     if (targetScope !== "trace") {
       spanSelectors.value = [];
       spanSelectorBindings.value = {};
@@ -733,6 +741,86 @@ function initScorerVersions(row: EvalJob | null) {
   return Object.fromEntries(
     (row.scorers || []).map((scorer) => [scorerRefId(scorer), scorerRefVersion(scorer)]),
   );
+}
+
+interface JobDraft {
+  values: JobForm;
+  endSignalGroup: V2Group;
+  inputMappings: Record<string, Record<string, string>>;
+  spanSelectors: SpanSelector[];
+  spanSelectorBindings: Record<string, string>;
+  scorerVersions: Record<string, number | null>;
+}
+
+// Set while a continued draft lands, so the scope watcher does not reset its completion window and selectors.
+let applyingDraft = false;
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+// Run state, health and timestamps change on their own; only what the form edits is hashed.
+const RUN_STATE_KEYS = new Set([
+  "status",
+  "version",
+  "health",
+  "pipelineId",
+  "pipeline_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function jobDefinition(row: EvalJob | null) {
+  if (!row) return null;
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)));
+}
+
+const jobDraft = useEditorDraft<JobDraft>({
+  kind: "eval_job",
+  entityLabel: () => t("common.editorDraft.entities.eval_job"),
+  // "Draft" already names a job that has never been activated.
+  restoreTitle: () => t("common.editorDraft.fleetRestoreTitle"),
+  serverDraftItem: true,
+  entityId: () => (props.mode === "edit" ? (props.row?.id ?? null) : null),
+  snapshot: () => ({
+    values: { ...formValues.value, scorerIds: [...formValues.value.scorerIds] },
+    endSignalGroup: endSignalGroup.value,
+    inputMappings: inputMappings.value,
+    spanSelectors: spanSelectors.value,
+    spanSelectorBindings: spanSelectorBindings.value,
+    scorerVersions: scorerVersions.value,
+  }),
+  apply: async (data) => {
+    applyingDraft = true;
+    try {
+      form.reset({ ...initForm(null), ...data.values });
+      endSignalGroup.value = data.endSignalGroup;
+      inputMappings.value = data.inputMappings;
+      spanSelectors.value = data.spanSelectors;
+      spanSelectorBindings.value = data.spanSelectorBindings;
+      scorerVersions.value = data.scorerVersions;
+      await nextTick();
+    } finally {
+      applyingDraft = false;
+    }
+  },
+  base: () => (props.mode === "edit" ? jobDefinition(props.row) : undefined),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    activateOnSave.value = false;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await jobDraft.confirmLeave()) emit("cancel");
 }
 
 function syncMappings() {
@@ -861,6 +949,12 @@ async function onSubmit(value: JobForm) {
         });
       }
     }
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    jobDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.job.saveError"));

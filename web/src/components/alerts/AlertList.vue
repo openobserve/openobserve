@@ -60,7 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : showAddUpdateFn({})
           "
           >{{ t(`alerts.add`) }}
-          <EditorDraftDot v-if="hasNewDraft" corner data-test="alert-list-add-alert-draft-dot" />
+          <EditorDraftDot
+            v-if="hasNewDraft"
+            :saved-at="newDraftSavedAt"
+            corner
+            data-test="alert-list-add-alert-draft-dot"
+          />
         </OButton>
       </template>
 
@@ -1365,6 +1370,12 @@ export default defineComponent({
       activeTab.value === "anomalyDetection"
         ? alertDrafts.hasNewVariant(ANOMALY_DRAFT_VARIANT)
         : alertDrafts.hasNew,
+    );
+    // The date belongs to the draft this tab's Add button opens.
+    const newDraftSavedAt = computed(() =>
+      activeTab.value === "anomalyDetection"
+        ? alertDrafts.savedAtVariant(ANOMALY_DRAFT_VARIANT)
+        : alertDrafts.savedAt(null),
     );
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
@@ -3993,6 +4004,7 @@ export default defineComponent({
       showAddAlertDialog,
       alertDrafts,
       hasNewDraft,
+      newDraftSavedAt,
       showForm,
       toBeCloneAlertName,
       toBeClonedAlert,

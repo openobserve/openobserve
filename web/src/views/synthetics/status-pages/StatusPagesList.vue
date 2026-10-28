@@ -63,15 +63,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Name -->
-      <template #cell-name="{ row }">
-        <OTooltip
-          v-if="(row as any).name"
-          :content="raw((row as any).name)"
-          content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-        >
-          <span class="cursor-pointer truncate">{{ (row as any).name }}</span>
-        </OTooltip>
-        <span v-else class="truncate">—</span>
+      <template #cell-name="{ row }: { row: StatusPageListItem }">
+        <div class="flex min-w-0 items-center gap-2">
+          <OTooltip
+            v-if="row.name"
+            :content="raw(row.name)"
+            content-class="max-w-[25rem] whitespace-normal break-words text-xs"
+          >
+            <span class="cursor-pointer truncate">{{ row.name }}</span>
+          </OTooltip>
+          <span v-else class="truncate">—</span>
+          <EditorDraftDot
+            v-if="pageDrafts.ids.has(row.id)"
+            :saved-at="pageDrafts.savedAt(row.id)"
+            :data-test="`status-pages-draft-dot-${row.id}`"
+          />
+        </div>
       </template>
 
       <!-- Health -->
@@ -295,6 +302,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { StatusPageListItem } from "@/services/status_pages";
 import { healthBadge, visibilityBadge, publicStatusPageUrl } from "./statusPageBadges";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -317,6 +326,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const search = ref("");
+const pageDrafts = useEditorDraftIds("status_page");
 
 /**
  * Notices ("Post update" / "View updates") and Custom domains are locked in

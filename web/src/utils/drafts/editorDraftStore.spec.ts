@@ -262,6 +262,43 @@ describe("editorDraftStore", () => {
       expect(listEditorDraftIds("function", "org1", "me@x.io")).toEqual(["fn1", "new", "new~tcp"]);
     });
 
+    it("deletes every user's variant drafts of a deleted source, exact variant only", () => {
+      const clone = { ...newScope, variant: "clone:fn1" };
+      writeEditorDraft(clone, { data: {} });
+      writeEditorDraft({ ...clone, userEmail: "other@x.io" }, { data: {} });
+      writeEditorDraft({ ...newScope, variant: "clone:fn10" }, { data: {} });
+      writeEditorDraft(newScope, { data: {} });
+
+      expect(
+        deleteEditorDraftsFor({
+          kind: "function",
+          org: "org1",
+          entityId: "fn1",
+          variant: "clone:fn1",
+        }),
+      ).toBe(2);
+      expect(readEditorDraft({ ...newScope, variant: "clone:fn10" })).not.toBeNull();
+      expect(readEditorDraft(newScope)).not.toBeNull();
+    });
+
+    it("deletes every user's drafts a match rule picks, saved and new alike", () => {
+      writeEditorDraft({ ...scope, entityId: "team_1/rot_a" }, { data: {} });
+      writeEditorDraft({ ...newScope, variant: "team_1/new" }, { data: {} });
+      writeEditorDraft(
+        { ...newScope, variant: "team_1/new", userEmail: "other@x.io" },
+        { data: {} },
+      );
+      writeEditorDraft({ ...scope, entityId: "team_10/rot_a" }, { data: {} });
+
+      const removed = deleteEditorDraftsFor({
+        kind: "function",
+        org: "org1",
+        match: ({ entityId, variant }) => (entityId ?? variant ?? "").startsWith("team_1/"),
+      });
+      expect(removed).toBe(3);
+      expect(readEditorDraft({ ...scope, entityId: "team_10/rot_a" })).not.toBeNull();
+    });
+
     it("deletes one item's drafts for every user in the org", () => {
       writeEditorDraft(scope, { data: {} });
       writeEditorDraft({ ...scope, userEmail: "other@x.io" }, { data: {} });

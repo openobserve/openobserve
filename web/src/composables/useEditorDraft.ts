@@ -21,6 +21,7 @@ import {
   onBeforeUnmount,
   reactive,
   shallowRef,
+  Teleport,
   watch,
   type ComponentInternalInstance,
   type VNode,
@@ -83,11 +84,23 @@ export interface UseEditorDraftOptions<T> {
   save: () => boolean | Promise<boolean>;
   /** Extra redaction after the built-in one; a path into a string (e.g. "/yaml/3") is noted but never restored. */
   redact?: (data: T) => { data: T; paths: string[]; changedPaths?: string[] };
+  /** Keys the built-in redaction never blanks, for a non-secret field whose name matches the secret pattern (e.g. `authApiKeyHeaderName`). */
+  secretExemptKeys?: string[];
+  /** Extra elements whose fields count as this editor's, for fields rendered outside its own component tree. */
+  inputRoots?: () => (Element | null | undefined)[];
   /** Refills the blanked secrets of a continued draft from the current state, in place of the built-in path restore. */
   restoreSecrets?: (draftData: T, currentData: T, redactedPaths: string[]) => T;
+  /** An extra line in the restore dialog about what continuing this draft will do (e.g. a key that is regenerated). */
+  restoreNote?: (draftData: T) => I18nText | null;
   /** Names the fields behind redacted paths, so the restore dialog can say which changes were not kept. */
   describeRedacted?: (redactedPaths: string[], draftData: T) => I18nText[];
   restoreTitle?: () => I18nText;
+  /** The item has a server-side draft state of its own, so the dialogs say "in this browser" instead of "draft". */
+  serverDraftItem?: boolean;
+  /** The leave dialog's Save label, when the editor's save is not a plain save (e.g. it publishes). */
+  saveLabel?: () => I18nText;
+  /** Blanks secrets the built-in redaction cannot see in `base` before it is hashed (the hash is stored with the draft). */
+  redactBase?: (base: unknown) => unknown;
   /** Whether a same-component route update leaves this item; defaults to a path change. */
   leaveOnRouteUpdate?: (to: RouteLocationNormalized, from: RouteLocationNormalized) => boolean;
 }
@@ -101,6 +114,8 @@ export interface EditorDraftDialogState {
   credentialsNotSaved: boolean;
   /** The changed secret fields that were not kept, when the editor names them. */
   notKeptFields: I18nText[];
+  /** The editor's own note about the offered draft. */
+  restoreNote: I18nText | null;
   leaveOpen: boolean;
   leaveSaving: boolean;
   readonly canKeepDraft: boolean;
@@ -108,6 +123,10 @@ export interface EditorDraftDialogState {
   readonly canSave: boolean;
   /** Set while signing out, when no draft can be kept. */
   readonly signingOut: boolean;
+  /** Set for an item with a server-side draft state: the dialogs avoid the word "draft". */
+  readonly serverDraftItem: boolean;
+  /** The leave dialog's Save label override. */
+  readonly saveLabel: I18nText | null;
 }
 
 export interface EditorDraftController {
@@ -133,6 +152,8 @@ export interface EditorDraftIds {
   readonly hasNew: boolean;
   hasNewVariant: (variant: string) => boolean;
   savedAt: (entityId: string | null) => number | null;
+  /** When the new-item draft in this variant was written, or null when there is none. */
+  savedAtVariant: (variant: string) => number | null;
 }
 
 const isNil = (value: unknown): value is null | undefined => value === null || value === undefined;
@@ -167,14 +188,25 @@ const fieldValue = (field: HTMLElement): string => {
   return field.textContent ?? "";
 };
 
+const isTeleport = (vnode: VNode) => (vnode.type as unknown) === Teleport;
+
+const vnodeChildren = (vnode: VNode): VNode[] =>
+  Array.isArray(vnode.children) ? vnode.children.filter(isVNode) : [];
+
 // A component root (e.g. OPageLayout) or a fragment, with dev-build comments, has its elements further down.
 const vnodeElements = (vnode: VNode): Element[] => {
   if (vnode.component) return vnodeElements(vnode.component.subTree);
-  if (vnode.type === Fragment) {
-    const children = Array.isArray(vnode.children) ? vnode.children : [];
-    return children.flatMap((child) => (isVNode(child) ? vnodeElements(child) : []));
-  }
-  return vnode.el instanceof Element ? [vnode.el] : [];
+  if (vnode.type === Fragment || isTeleport(vnode))
+    return vnodeChildren(vnode).flatMap(vnodeElements);
+  if (!(vnode.el instanceof Element)) return [];
+  return [vnode.el, ...vnodeChildren(vnode).flatMap(teleportedElements)];
+};
+
+// A drawer or dialog the editor renders is teleported out of its root element, so its content is a root of its own.
+const teleportedElements = (vnode: VNode): Element[] => {
+  if (isTeleport(vnode)) return vnodeElements(vnode);
+  if (vnode.component) return teleportedElements(vnode.component.subTree);
+  return vnodeChildren(vnode).flatMap(teleportedElements);
 };
 
 /** The editor component's own root elements. */
@@ -202,7 +234,10 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
 
   /** An editable control inside this editor, outside any aria-hidden mirror. */
   const isEditorField = (target: EventTarget | null): target is HTMLElement =>
-    isEditable(target) && rootElements(instance).some((root) => root.contains(target));
+    isEditable(target) &&
+    [...rootElements(instance), ...(options.inputRoots?.() ?? [])].some(
+      (root) => !!root && root.contains(target),
+    );
 
   // Fields edited while the item was still loading, with the value the user left in each.
   const preStartEdits = new Map<HTMLElement, string>();
@@ -226,11 +261,14 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     changedOnServer: false,
     credentialsNotSaved: false,
     notKeptFields: [] as I18nText[],
+    restoreNote: null as I18nText | null,
     leaveOpen: false,
     leaveSaving: false,
     canKeepDraft: computed(() => storageAvailable && !signingOutNow()),
     canSave: computed(() => !editorDraftSignOutDiscardOnly.value),
     signingOut: computed(() => signingOutNow()),
+    serverDraftItem: !!options.serverDraftItem,
+    saveLabel: computed(() => options.saveLabel?.() ?? null),
   });
 
   const scope = (): EditorDraftScope => ({
@@ -262,6 +300,15 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       ? null
       : (JSON.parse(baselineJson) as unknown);
 
+  // The hash is stored next to the draft, so it covers the base only after the draft's own redaction.
+  const baseHashOf = (base: unknown): string => {
+    const redacted = redactDraftSecrets(options.redactBase ? options.redactBase(base) : base, {
+      containers: !options.redact,
+      exemptKeys: options.secretExemptKeys,
+    });
+    return hashDraftValue(redacted.data);
+  };
+
   /** Writes this session's draft; false when a kept draft is protected or storage refused it. */
   const writeSessionDraft = (replaceKept: boolean): boolean => {
     if (!storageAvailable) return false;
@@ -269,14 +316,17 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     keptSavedAt = null;
     const snapshot = options.snapshot();
     // An editor with its own redaction knows which fields of its secret containers are safe to keep.
-    const redacted = redactDraftSecrets(snapshot, { containers: !options.redact });
+    const redacted = redactDraftSecrets(snapshot, {
+      containers: !options.redact,
+      exemptKeys: options.secretExemptKeys,
+    });
     const extra = options.redact ? options.redact(redacted.data) : null;
     const base = options.base?.();
     const redactedPaths = [...redacted.paths, ...(extra?.paths ?? [])];
     const changed = changedRedactedPaths(snapshot, baselineSnapshot(), redactedPaths);
     return writeEditorDraft(scope(), {
       data: extra ? extra.data : redacted.data,
-      baseHash: isNil(base) ? undefined : hashDraftValue(base),
+      baseHash: isNil(base) ? undefined : baseHashOf(base),
       redactedPaths,
       redactedLabels: redactedEntryLabels(snapshot, redactedPaths),
       changedRedactedPaths: [...new Set([...changed, ...(extra?.changedPaths ?? [])])],
@@ -360,6 +410,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       state.changedOnServer = changedOnServer;
       const changed = notKeptPathsOf(draft);
       state.credentialsNotSaved = changed.length > 0;
+      state.restoreNote = options.restoreNote?.(draft.data) ?? null;
       state.notKeptFields = changed.length
         ? (options.describeRedacted?.(changed, draft.data) ?? [])
         : [];
@@ -398,8 +449,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       });
       return;
     }
-    const changedOnServer =
-      !!draft.baseHash && !isNil(base) && hashDraftValue(base) !== draft.baseHash;
+    const changedOnServer = !!draft.baseHash && !isNil(base) && baseHashOf(base) !== draft.baseHash;
     const choice = await askRestore(draft, changedOnServer);
     if (disposed) return;
     if (choice === "fresh") deleteEditorDraft(scope());
@@ -624,9 +674,11 @@ export const useEditorDraftIds = (kind: EditorDraftKind): EditorDraftIds => {
   );
   const newVariants = computed(
     () =>
-      new Set(
+      new Map(
         entries.value.flatMap((entry) =>
-          entry.entityId === null && entry.variant !== null ? [entry.variant] : [],
+          entry.entityId === null && entry.variant !== null
+            ? [[entry.variant, entry.savedAt] as const]
+            : [],
         ),
       ),
   );
@@ -640,5 +692,6 @@ export const useEditorDraftIds = (kind: EditorDraftKind): EditorDraftIds => {
     hasNew: computed(() => savedAtById.value.has(null)),
     hasNewVariant: (variant: string) => newVariants.value.has(variant),
     savedAt: (entityId: string | null) => savedAtById.value.get(normaliseId(entityId)) ?? null,
+    savedAtVariant: (variant: string) => newVariants.value.get(variant) ?? null,
   });
 };

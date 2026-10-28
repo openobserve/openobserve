@@ -46,7 +46,12 @@
         @click="goToNew"
       >
         {{ t("slos.new") }}
-        <EditorDraftDot v-if="sloDrafts.hasNew" corner data-test="slos-slolist-new-draft-dot" />
+        <EditorDraftDot
+          v-if="sloDrafts.hasNew"
+          :saved-at="sloDrafts.savedAt(null)"
+          corner
+          data-test="slos-slolist-new-draft-dot"
+        />
       </OButton>
     </template>
 

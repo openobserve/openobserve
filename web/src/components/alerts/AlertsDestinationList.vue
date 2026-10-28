@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}
           <EditorDraftDot
             v-if="destinationDrafts.hasNew"
+            :saved-at="destinationDrafts.savedAt(null)"
             corner
             data-test="alert-destination-list-add-draft-dot"
         /></OButton>

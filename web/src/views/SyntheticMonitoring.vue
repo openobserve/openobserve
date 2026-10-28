@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("synthetics.newCheck.button") }}
         <EditorDraftDot
           v-if="hasNewCheckDraft"
+          :saved-at="newCheckDraftSavedAt"
           corner
           data-test="synthetic-monitoring-new-check-draft-dot"
         />
@@ -448,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
         </div>
         <CheckTypePicker
+          :draft-saved-at="newCheckDraftSavedAtByType"
           variant="modal"
           layout="row"
           data-test="synthetic-monitoring-check-type-picker-modal"
@@ -684,6 +686,22 @@ const hasNewCheckDraft = computed(
     browserDrafts.hasNew ||
     SYNTHETIC_CHECK_TYPES.some((type) => type !== "browser" && protocolDrafts.hasNewVariant(type)),
 );
+/** Each type's new-check draft time: the browser test has its own kind, a protocol check one slot per type. */
+const newCheckDraftSavedAtByType = computed(() =>
+  Object.fromEntries(
+    SYNTHETIC_CHECK_TYPES.map((type) => [
+      type,
+      type === "browser" ? browserDrafts.savedAt(null) : protocolDrafts.savedAtVariant(type),
+    ]),
+  ),
+);
+/** The newest of the new-check drafts, browser or any protocol type. */
+const newCheckDraftSavedAt = computed(() => {
+  const times = Object.values(newCheckDraftSavedAtByType.value).filter(
+    (at): at is number => at !== null,
+  );
+  return times.length ? Math.max(...times) : null;
+});
 /** Check id to its newest draft's time; one scan per kind, not per row. */
 const checkDraftSavedAt = computed(() => {
   const map: Record<string, number> = {};
@@ -1246,6 +1264,7 @@ const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   });
   try {
     await statusPagesService.delete(orgIdentifier.value, page.id);
+    deleteEditorDraftsFor({ kind: "status_page", org: orgIdentifier.value, entityId: page.id });
     statusPages.value = statusPages.value.filter((p) => p.id !== page.id);
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.deleted") });

@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="title ?? t('common.editorDraft.restoreTitle')"
-    :primary-button-label="t('common.editorDraft.continueDraft')"
+    :primary-button-label="
+      serverDraftItem
+        ? t('common.editorDraft.continueEditing')
+        : t('common.editorDraft.continueDraft')
+    "
     primary-button-data-test="editor-draft-continue"
     :secondary-button-label="t('common.editorDraft.startFresh')"
     data-test="editor-draft-restore-dialog"
@@ -46,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="credentialsNote"
         data-test="editor-draft-credentials-not-saved"
       />
+      <OBanner
+        v-if="note"
+        variant="info"
+        icon="info"
+        :content="note"
+        data-test="editor-draft-restore-note"
+      />
     </div>
   </ODialog>
 </template>
@@ -66,6 +77,9 @@ const props = defineProps<{
   changedOnServer?: boolean;
   credentialsNotSaved?: boolean;
   notKeptFields?: I18nText[];
+  /** The item has a server-side draft of its own, so the copy avoids the word "draft". */
+  serverDraftItem?: boolean;
+  note?: I18nText | null;
 }>();
 
 const emit = defineEmits<{

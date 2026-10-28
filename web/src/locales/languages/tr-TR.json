@@ -972,12 +972,35 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
+      "envVarField": "environment variable {name}",
+      "credentialFileField": "credential file {name}",
       "signOutDiscards": "Signing out discards the unsaved drafts kept in this browser.",
       "leaveMessageNoDraft": "Save the {entity} or discard your changes.",
       "leaveMessageDiscardOnly": "This {entity} cannot be saved until you sign in again. Discard your changes to sign out, or stay on this page.",
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
-      "signOutConfirm": "Sign out"
+      "signOutConfirm": "Sign out",
+      "entities": {
+        "dashboard_settings": "dashboard settings",
+        "cipher_key": "cipher key",
+        "ai_toolset": "AI toolset",
+        "announcement_banner": "announcement banner",
+        "status_page": "status page",
+        "rum_named_event": "named event",
+        "iam_role": "role",
+        "oncall_policy": "escalation policy",
+        "oncall_schedule": "on-call schedule",
+        "regex_pattern": "regex pattern",
+        "model_pricing": "model pricing",
+        "remote_task": "remote task",
+        "eval_job": "evaluation job",
+        "eval_scorer": "scorer"
+      },
+      "continueEditing": "Continue editing",
+      "keepInBrowser": "Keep in this browser",
+      "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser until you sign out, or discard them.",
+      "dotUndated": "Unsaved draft",
+      "newDotDated": "{label} · unsaved draft from {date}"
     }
   },
   "flow": {
@@ -2462,8 +2485,6 @@
         "bulkDeleteMessage": "{count} adlandırılmış olay silinsin mi? Bunu kullanan huniler silinmiş adım etiketi gösterir. | {count} adlandırılmış olay silinsin mi? Bunları kullanan huniler silinmiş adım etiketi gösterir.",
         "bulkDeleteInUseMessage": "{count} adlandırılmış olay silinsin mi? Kayıtlı huniler şunlar için Silinmiş olay adımı gösterecek: {names}. | {count} adlandırılmış olay silinsin mi? Kayıtlı huniler şunlar için Silinmiş olay adımı gösterecek: {names}.",
         "notFound": "Bu adlandırılmış olay artık mevcut değil",
-        "discardTitle": "Değişiklikler atılsın mı?",
-        "discardMessage": "Bu adlandırılmış olayda kaydedilmemiş değişiklikler var. Kaydetmeden çıkılsın mı?",
         "editorApp": "Uygulama: {app}",
         "details": "Ayrıntılar",
         "opParam": "URL parametresi",
@@ -3331,10 +3352,6 @@
       "unsavedDot": {
         "title": "Bu sekmede kaydedilmemiş değişiklikler var."
       },
-      "leaveConfirm": {
-        "title": "Kaydedilmemiş değişiklikler atılsın mı?",
-        "message": "Kaydedilmemiş izniniz veya üye değişiklikleriniz var. Bu sayfadan ayrılmak onları atacaktır."
-      },
       "show": "Göster",
       "searchPermissions": "İzinleri Ara",
       "filterModules": "Modülleri Filtrele",
@@ -3808,9 +3825,6 @@
         "emoji": "Emoji ekle",
         "placeholder": "metin"
       },
-      "leaveTitle": "Değişiklikler atılsın mı?",
-      "leaveMessage": "Bu bannerdaki düzenlemeleriniz kaydedilmedi.",
-      "leaveConfirm": "Vazgeç",
       "publishNow": "Şimdi yayımla",
       "schedule": "Zamanla",
       "statusLive": "Şu anda canlı",
@@ -3822,7 +3836,6 @@
       "savedEnded": "Banner kaydedildi; zamanlaması çoktan sona erdi",
       "conflict": "Bu banner başka biri tarafından değiştirildi. En son sürümü görmek için yeniden yükleyin.",
       "reload": "Yeniden yükle",
-      "keepEditing": "Düzenlemeye devam et",
       "orgsSome": "Yalnızca bu kuruluşlar",
       "orgsPick": "Kuruluşlar",
       "orgOption": "{name} ({id})",
@@ -14831,6 +14844,7 @@
     "secretType": "Gizli Türü",
     "staticSecret": "Statik Gizli",
     "staticSecretName": "İsim",
+    "staticSecretNameNotKept": "Akeyless static secret name",
     "dfcName": "DFC Adı",
     "dfcIV": "DFC İV",
     "dfcEncryptedData": "DFC Şifreli Veriler",
@@ -16698,7 +16712,9 @@
           "attemptsRange": "Maksimum deneme 1 ile 3 arasında olmalıdır",
           "concurrencyRange": "Maksimum eşzamanlılık 1 ile 32 arasında olmalıdır.",
           "signingKeyRequired": "İmza anahtarı oluşturulamadı. Tekrar deneyin."
-        }
+        },
+        "signingKeyNotKept": "Signing keys are not kept in drafts. Continuing generates a new key, which you must copy into your service.",
+        "signingKeyRegenerated": "This is a new signing key. The one in your draft was not kept, so copy this key into your service before you test the connection."
       },
       "generatedSigning": {
         "title": "İmza Anahtarını Kopyala",
@@ -24350,6 +24366,7 @@
     "l0OffSentence": "Yapay Zeka SRE çalışmaz; çağrı, Yapay Zeka triyajı olmadan olduğu gibi tam olarak davranır",
     "l0BudgetLabel": "Bekletme süresi",
     "l0BudgetRange": "30 ile 600 saniye arasında — sunucu, bu aralığın dışındaki değerleri sınır değerlerine sabitlemek yerine reddeder",
+    "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0FailOpen": "Fail-open — ajan yavaşsa veya yanıt vermezse, uyarı hemen gönderilir.",
     "l0AllowPromotion": "Önem derecesini artır",
     "l0AllowPromotionNote": "Ajanın kararı bunu gerektirdiğinde uygulanır.",

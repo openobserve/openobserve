@@ -55,6 +55,8 @@ vi.mock("vuex", () => ({
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
+    // The draft dot formats its saved time in the active locale.
+    locale: { value: "en-US" },
     t: (key: string, params?: Record<string, unknown>) => {
       const template =
         key === "aiObservability.experiments.scoreEvidence"

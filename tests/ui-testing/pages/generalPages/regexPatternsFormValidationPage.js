@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
+
 export class RegexPatternsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -84,6 +86,7 @@ export class RegexPatternsFormValidationPage {
 
     async clickCancel() {
         await this.page.locator(this.cancelButton).click();
+        await discardEditorDraftIfAsked(this.page);
     }
 
     async touchNameField() {

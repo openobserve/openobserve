@@ -109,6 +109,23 @@ describe("redactDraftSecrets", () => {
     expect(data).toEqual({ credentials: { username: "bot", password: "" } });
   });
 
+  it("never blanks an exempt key, even under a secret container", () => {
+    const { data, paths } = redactDraftSecrets(
+      {
+        authApiKeyHeaderName: "X-Key",
+        authApiKeyToken: "t",
+        credentials: { authApiKeyHeaderName: "Y" },
+      },
+      { exemptKeys: ["authApiKeyHeaderName"] },
+    );
+    expect(data).toEqual({
+      authApiKeyHeaderName: "X-Key",
+      authApiKeyToken: "",
+      credentials: { authApiKeyHeaderName: "Y" },
+    });
+    expect(paths).toEqual(["/authApiKeyToken"]);
+  });
+
   it("escapes slashes and tildes in path segments", () => {
     const { paths } = redactDraftSecrets({ "a/b": { "~token": "x" } });
     expect(paths).toEqual(["/a~1b/~0token"]);

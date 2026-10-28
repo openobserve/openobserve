@@ -160,9 +160,9 @@ test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () =
 
         await pm.rolesPage.cancelButton.click();
         // A leave guard may stand in the way; discarding is the point of the test.
-        const confirm = page.locator('[data-test="confirm-dialog"]');
+        const confirm = page.locator('[data-test="editor-draft-leave-dialog"]');
         if (await confirm.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await confirm.locator('[data-test="o-dialog-primary-btn"]').click();
+            await confirm.locator('[data-test="o-dialog-neutral-btn"]').click();
         }
         await page.waitForTimeout(2000);
         expect(await getPerms(page, name)).toEqual([]);

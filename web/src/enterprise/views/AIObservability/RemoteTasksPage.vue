@@ -33,8 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
-      <OButton variant="primary" size="sm" data-test="ai-remote-tasks-new-btn" @click="openCreate">
+      <OButton
+        variant="primary"
+        size="sm"
+        data-test="ai-remote-tasks-new-btn"
+        :aria-label="
+          taskDrafts.hasNew
+            ? t('common.editorDraft.newDot', { label: t('aiObservability.remoteTasks.newButton') })
+            : undefined
+        "
+        @click="openCreate"
+      >
         {{ t("aiObservability.remoteTasks.newButton") }}
+        <EditorDraftDot
+          v-if="taskDrafts.hasNew"
+          :saved-at="taskDrafts.savedAt(null)"
+          corner
+          data-test="ai-remote-tasks-new-draft-dot"
+        />
       </OButton>
     </template>
 
@@ -93,7 +109,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-name="{ row }">
-          <span class="text-text-heading font-medium">{{ row.name }}</span>
+          <div class="flex min-w-0 items-center gap-2">
+            <OTruncatedText class="text-text-heading font-medium">{{ row.name }}</OTruncatedText>
+            <EditorDraftDot
+              v-if="taskDrafts.ids.has(row.entityId)"
+              :saved-at="taskDrafts.savedAt(row.entityId)"
+              class="shrink-0"
+              :data-test="`ai-remote-tasks-draft-dot-${row.entityId}`"
+            />
+          </div>
         </template>
 
         <!-- A draft has no version to pin, so it never shows `v0` — that number
@@ -229,6 +253,10 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -268,6 +296,7 @@ const lastUpdatedAt = ref<number | null>(null);
 const loading = ref(false);
 const forbidden = ref(false);
 const search = ref("");
+const taskDrafts = useEditorDraftIds("remote_task");
 
 /**
  * How many Experiments pin each task, keyed by task name.
@@ -484,6 +513,7 @@ async function removeTask(row: RemoteTask) {
   if (!ok) return;
   try {
     await remoteTasksService.delete(orgId.value, row.entityId);
+    deleteEditorDraftsFor({ kind: "remote_task", org: orgId.value, entityId: row.entityId });
     toast({ variant: "success", message: t("aiObservability.remoteTasks.delete.success") });
     await refresh(true);
   } catch (error: any) {

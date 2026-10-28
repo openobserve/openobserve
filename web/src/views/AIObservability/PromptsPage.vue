@@ -33,7 +33,12 @@
         @click="openCreate"
       >
         {{ t("aiObservability.promptManagement.newPrompt") }}
-        <EditorDraftDot v-if="promptDrafts.hasNew" corner data-test="prompt-new-draft-dot" />
+        <EditorDraftDot
+          v-if="promptDrafts.hasNew"
+          :saved-at="promptDrafts.savedAt(null)"
+          corner
+          data-test="prompt-new-draft-dot"
+        />
       </OButton>
     </template>
     <template #sidebar>
