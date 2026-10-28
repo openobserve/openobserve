@@ -40,9 +40,6 @@ use openobserve_api_common::extractors::ValidatedJson;
 #[cfg(feature = "enterprise")]
 use crate::service::auth::{UserEmail, check_permissions};
 
-/// The org-level module of fleet-wide reads and writes that name no single fleet.
-#[cfg(feature = "enterprise")]
-const FLEET: &str = "fleet";
 #[cfg(feature = "enterprise")]
 const FLEET_CONFIGS: &str = "fleet_configs";
 /// Settings, audit, summary and pipelines.
@@ -75,9 +72,6 @@ pub async fn list_collectors(
         use config::meta::fleet::CollectorList;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "LIST").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(failed) = ensure_default_fleet(&org_id).await {
             return failed;
         }
@@ -135,9 +129,6 @@ pub async fn get_collector(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         match o2_enterprise::enterprise::fleet::service::get_collector(&org_id, &id).await {
             Ok(collector) => {
                 match fleet_read(&org_id, user_id, &collector.collector.fleet.id).await {
@@ -351,9 +342,6 @@ pub async fn list_fleets(
         use config::meta::fleet::FleetList;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "LIST").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(failed) = ensure_default_fleet(&org_id).await {
             return failed;
         }
@@ -469,9 +457,6 @@ pub async fn get_fleet(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(refused) = fleet_read(&org_id, user_id, &fleet_id).await {
             return refused;
         }
@@ -523,9 +508,6 @@ pub async fn rename_fleet(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(refused) = fleet_write(&org_id, user_id, &fleet_id, "PUT").await {
             return refused;
         }
@@ -587,9 +569,6 @@ pub async fn delete_fleet(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(refused) = fleet_write(&org_id, user_id, &fleet_id, "DELETE").await {
             return refused;
         }
@@ -635,9 +614,6 @@ pub async fn get_fleet_settings(
         use o2_enterprise::enterprise::fleet::settings;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(refused) = fleet_read(&org_id, user_id, &fleet_id).await {
             return refused;
         }
@@ -683,9 +659,6 @@ pub async fn put_fleet_settings(
         use o2_enterprise::enterprise::fleet::settings;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         if let Some(refused) = fleet_write(&org_id, user_id, &fleet_id, "PUT").await {
             return refused;
         }
@@ -832,9 +805,6 @@ pub async fn move_collectors(
         use o2_enterprise::enterprise::fleet::fleets;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         let req = match serde_json::from_value::<MoveCollectorsRequest>(body) {
             Ok(req) => req,
             Err(e) => return MetaHttpResponse::bad_request(e),
@@ -898,9 +868,6 @@ pub async fn list_tokens(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "LIST").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
             Ok(permitted) => permitted,
             Err(refused) => return refused,
@@ -947,9 +914,6 @@ pub async fn create_token(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         let req = match serde_json::from_value::<CreateTokenRequest>(body) {
             Ok(req) => req,
             Err(e) => return MetaHttpResponse::bad_request(e),
@@ -999,9 +963,6 @@ pub async fn revoke_token(
         use o2_enterprise::enterprise::fleet::service;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         let fleet = match service::token_fleet(&org_id, &id).await {
             Ok(fleet) => fleet,
             Err(e) => return to_response(e),
@@ -1396,9 +1357,6 @@ pub async fn list_rollouts(
         use config::meta::fleet::RolloutList;
 
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "LIST").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         let permitted = match permitted_fleets(&org_id, user_id).await {
             Ok(permitted) => permitted,
             Err(refused) => return refused,
@@ -1458,9 +1416,6 @@ pub async fn get_rollout(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
         match o2_enterprise::enterprise::fleet::rollouts::get_rollout(&org_id, &id).await {
             Ok(rollout) => match fleet_read(&org_id, user_id, &rollout.fleet.id).await {
                 Some(refused) => refused,
@@ -1821,12 +1776,6 @@ pub async fn update_settings(
     }
 }
 
-/// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
-#[cfg(feature = "enterprise")]
-async fn allowed(org_id: &str, user_id: &str, permission: &str) -> bool {
-    allowed_on(FLEET, org_id, user_id, permission).await
-}
-
 /// §13: configurations and management are org-level modules of their own.
 #[cfg(feature = "enterprise")]
 async fn allowed_on(module: &str, org_id: &str, user_id: &str, permission: &str) -> bool {
@@ -1843,11 +1792,10 @@ async fn allowed_on(module: &str, org_id: &str, user_id: &str, permission: &str)
 /// §13: creating a fleet is org-level, as creating a dashboard folder is.
 #[cfg(feature = "enterprise")]
 async fn fleet_create_allowed(org_id: &str, user_id: &str) -> bool {
-    allowed(org_id, user_id, "GET").await
-        && check_permissions(
-            org_id, org_id, user_id, FLEETS, "POST", None, true, false, false,
-        )
-        .await
+    check_permissions(
+        org_id, org_id, user_id, FLEETS, "POST", None, true, false, false,
+    )
+    .await
 }
 
 /// D17-D18: the fleet's own check, as dashboards check theirs; no role is ever looked up.
@@ -1880,9 +1828,6 @@ async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> 
 async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<String, Response> {
     use o2_enterprise::enterprise::fleet::{fleets, service::FleetError};
 
-    if !allowed(org_id, user_id, "GET").await {
-        return Err(MetaHttpResponse::forbidden("Forbidden"));
-    }
     let ids = [id.to_string()];
     let fleet = match fleets::collector_fleets(org_id, &ids).await {
         Ok(found) => found.get(id).cloned(),
@@ -1902,9 +1847,6 @@ async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<String
 /// §13: a rollout exit is `PUT` on the rollout's fleet.
 #[cfg(feature = "enterprise")]
 async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<(), Response> {
-    if !allowed(org_id, user_id, "GET").await {
-        return Err(MetaHttpResponse::forbidden("Forbidden"));
-    }
     let rollout = match o2_enterprise::enterprise::fleet::rollouts::get_rollout(org_id, id).await {
         Ok(rollout) => rollout,
         Err(e) => return Err(to_response(e)),
@@ -1923,9 +1865,6 @@ async fn desired_request(
     fleet_id: &str,
     body: serde_json::Value,
 ) -> Result<SetDesiredRequest, Response> {
-    if !allowed(org_id, user_id, "GET").await {
-        return Err(MetaHttpResponse::forbidden("Forbidden"));
-    }
     if let Some(refused) = fleet_write(org_id, user_id, fleet_id, "PUT").await {
         return Err(refused);
     }
@@ -2145,9 +2084,6 @@ mod tests {
 
     /// Org-level modules other than `fleet`, which the tests leave to the real check.
     pub(super) fn org_answer(module: &str, verb: &str) -> Option<bool> {
-        if module == FLEET {
-            return None;
-        }
         FGA.with(|fga| {
             fga.borrow_mut().as_mut().map(|fga| {
                 let key = (module.to_string(), verb.to_string());

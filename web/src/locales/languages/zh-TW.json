@@ -27019,6 +27019,7 @@
       "lastReported": "最後回報時間",
       "noEffectiveConfig": "收集器尚未回報其生效組態",
       "eventAssigned": "已指派組態",
+      "eventRunning": "最近確認執行",
       "assignment": "指派",
       "assignmentValue": "{config} v{version}，修訂版 {revision}",
       "consistency": "一致性",
