@@ -93,9 +93,14 @@ describe("placeGroup", () => {
     expect(spot).toMatchObject({ x: 400, y: 360, weight: 1 });
   });
 
+  it("skips an element with a zero-size rect because it is not rendered", () => {
+    const hidden = { left: 0, top: 0, width: 0, height: 0 } as DOMRect;
+    expect(placeGroup(group("#a"), 10, hidden, 0, 0)).toBeNull();
+  });
+
   it("dims quieter elements but never below the floor", () => {
-    expect(placeGroup(group("#a", { clicks: 1 }), 100, rect, 0, 0).weight).toBeCloseTo(0.307);
-    expect(placeGroup(group("#a", { clicks: 0 }), 0, rect, 0, 0).weight).toBe(0.3);
+    expect(placeGroup(group("#a", { clicks: 1 }), 100, rect, 0, 0)?.weight).toBeCloseTo(0.307);
+    expect(placeGroup(group("#a", { clicks: 0 }), 0, rect, 0, 0)?.weight).toBe(0.3);
   });
 
   it("clamps the glow radius to the element size within bounds", () => {

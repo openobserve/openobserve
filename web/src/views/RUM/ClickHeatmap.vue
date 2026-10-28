@@ -404,17 +404,17 @@ const columns = computed<OTableColumnDef<ElementRow>[]>(() => [
   {
     id: "feature",
     header: t("rum.heatmap.colFeature"),
-    size: 160,
+    size: 120,
     meta: { fillRemaining: true },
   },
-  { id: "clicks", header: t("rum.heatmap.colClicks"), accessorKey: "clicks", size: 110 },
-  { id: "share", header: t("rum.heatmap.colShare"), size: 70, meta: { align: "right" } },
-  { id: "sessions", header: t("rum.heatmap.colSessions"), size: 100, meta: { align: "right" } },
+  { id: "clicks", header: t("rum.heatmap.colClicks"), accessorKey: "clicks", size: 100 },
+  { id: "share", header: t("rum.heatmap.colShare"), size: 64, meta: { align: "right" } },
+  { id: "sessions", header: t("rum.heatmap.colSessions"), size: 96, meta: { align: "right" } },
   {
     id: "frustrated",
     header: t("rum.heatmap.colFrustrated"),
     accessorKey: "frustrated",
-    size: 120,
+    size: 100,
     meta: { align: "right" },
   },
 ]);
@@ -893,6 +893,12 @@ function ensureOverlay(frame: { wrapper: HTMLElement }, width: number, height: n
   return overlay;
 }
 
+// Hidden controls (collapsed menus) still match a selector but have no place on the page.
+function isVisible(el: Element): boolean {
+  const style = el.ownerDocument.defaultView?.getComputedStyle(el);
+  return !!style && style.display !== "none" && style.visibility !== "hidden";
+}
+
 function drawHeat() {
   const frame = frameDoc();
   if (!frame) return;
@@ -914,10 +920,12 @@ function drawHeat() {
     } catch {
       el = null;
     }
-    if (!el) continue;
-    clickedEls.push(el);
+    if (!el || !isVisible(el)) continue;
     const box = el.getBoundingClientRect();
-    spots.push(placeGroup(g, clicksMax.value, box, win?.scrollX ?? 0, win?.scrollY ?? 0));
+    const spot = placeGroup(g, clicksMax.value, box, win?.scrollX ?? 0, win?.scrollY ?? 0);
+    if (!spot) continue;
+    clickedEls.push(el);
+    spots.push(spot);
     rects.set(g.selector, {
       x: box.left + (win?.scrollX ?? 0),
       y: box.top + (win?.scrollY ?? 0),

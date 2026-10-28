@@ -90,14 +90,15 @@ const OUTLINE_LINE_WIDTH = 3;
 const OUTLINE_FILL_ALPHA = 0.08;
 const OUTLINE_FALLBACK_COLOR = "currentColor";
 
-/** Positions are not fetched, so each element glows at its centre, brighter the more it was clicked. */
+/** Positions are not fetched, so each element glows at its centre, brighter the more it was clicked; unrendered (zero-size) elements have no centre and return null. */
 export function placeGroup(
   group: ElementGroup,
   maxClicks: number,
   rect: DOMRect,
   scrollX: number,
   scrollY: number,
-): HeatSpot {
+): HeatSpot | null {
+  if (rect.width < 1 || rect.height < 1) return null;
   const share = maxClicks > 0 ? Math.min(group.clicks / maxClicks, 1) : 0;
   return {
     x: rect.left + scrollX + rect.width / 2,
