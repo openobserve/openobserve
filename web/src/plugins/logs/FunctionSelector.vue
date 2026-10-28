@@ -14,9 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OButtonGroup
-    class="function-selector element-box-shadow border-button-outline-border float-left me-1 border p-0"
-  >
+  <OButtonGroup class="function-selector border-button-outline-border float-left me-1 border p-0">
     <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
@@ -30,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
-          class="ms-1!"
+          class="ms-1! size-8!"
           size="icon-toolbar"
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
@@ -74,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="logs-search-bar-save-function-btn"
       variant="ghost"
       size="icon-toolbar"
+      class="size-8!"
       @click="fnSavedFunctionDialog"
     >
       <OIcon name="save" size="sm" />

@@ -186,7 +186,7 @@ pub async fn traces_write(
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("from" = i64, Query, description = "from"),
-        ("size" = i64, Query, description = "size"),
+        ("size" = i64, Query, description = "page size; 0, negative, invalid or omitted uses ZO_QUERY_DEFAULT_LIMIT"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
@@ -305,7 +305,7 @@ pub async fn get_latest_traces(
     tag = "Traces",
     operation_id = "GetLatestTracesStream",
     summary = "Stream recent trace data",
-    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges.",
+    description = "Streams the most recent trace data from a specific stream within a time range using HTTP/2 server-sent events. Results are returned progressively as each time partition is processed, reducing time-to-first-result for large time ranges. With sort_by=duration, ranking across partitions is approximate; each page is sorted by full trace duration.",
     security(
         ("Authorization"= [])
     ),
@@ -314,11 +314,11 @@ pub async fn get_latest_traces(
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("from" = i64, Query, description = "from"),
-        ("size" = i64, Query, description = "size"),
+        ("size" = i64, Query, description = "page size; 0, negative, invalid or omitted uses ZO_QUERY_DEFAULT_LIMIT"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
-        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time)"),
+        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time); see the endpoint description for the limits of the streamed duration sort"),
         ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(

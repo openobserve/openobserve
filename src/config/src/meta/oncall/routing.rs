@@ -363,15 +363,20 @@ impl RoutingDecision {
     /// One line for the timeline. Every case names the team and the mechanism
     /// in the same shape, so "why did this page me" reads as a sentence rather
     /// than a rule id somebody then has to look up.
-    pub fn reason(&self) -> String {
+    pub fn reason(&self, team_name: Option<&str>) -> String {
+        // The id stands in only when the caller could not read the team's name.
+        let team = |team_id: &str| team_name.unwrap_or(team_id).to_string();
         match self {
-            Self::Explicit { team_id } => format!("routed to {team_id} by the alert's own setting"),
+            Self::Explicit { team_id } => {
+                format!("routed to {} by the alert's own setting", team(team_id))
+            }
             Self::Ownership { team_id, path, .. } => {
-                format!("routed to {team_id} by ownership rule {path}")
+                format!("routed to {} by ownership rule {path}", team(team_id))
             }
-            Self::Default { team_id } => {
-                format!("no ownership rule matched, so it went to the default team {team_id}")
-            }
+            Self::Default { team_id } => format!(
+                "no ownership rule matched, so it went to the default team {}",
+                team(team_id)
+            ),
             Self::Unrouted => "no ownership rule matches this signal and no default team is set, \
                                so no team was paged"
                 .to_string(),
@@ -429,11 +434,15 @@ impl Routed {
     }
 
     /// The whole story in one timeline line: what was ignored, then what won.
-    pub fn reason(&self) -> String {
+    pub fn reason(&self, team_name: Option<&str>) -> String {
         if self.notes.is_empty() {
-            return self.decision.reason();
+            return self.decision.reason(team_name);
         }
-        format!("{}; {}", self.notes.join("; "), self.decision.reason())
+        format!(
+            "{}; {}",
+            self.notes.join("; "),
+            self.decision.reason(team_name)
+        )
     }
 }
 
@@ -1206,9 +1215,9 @@ mod tests {
             let label = format!("explicit={explicit} owned={owned} default={defaulted}");
             assert_eq!(routed.decision, want, "{label}");
             assert!(
-                routed.reason().contains(sentence),
+                routed.reason(None).contains(sentence),
                 "{label}: reason `{}` does not say `{sentence}`",
-                routed.reason()
+                routed.reason(None)
             );
         }
     }
@@ -1319,8 +1328,8 @@ mod tests {
         let routed = route(&RoutingInputs::default());
         assert!(!routed.is_routed());
         assert_eq!(routed.team_id(), None);
-        assert!(routed.reason().contains("no team was paged"));
-        assert!(routed.reason().contains("no default team is set"));
+        assert!(routed.reason(None).contains("no team was paged"));
+        assert!(routed.reason(None).contains("no default team is set"));
     }
 
     /// "Nothing owns this" is actionable only if the note says what nothing
@@ -1346,7 +1355,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(defaulted.notes, queued.notes);
-        assert!(defaulted.reason().contains("service=zxporter"));
+        assert!(defaulted.reason(None).contains("service=zxporter"));
 
         assert_eq!(
             route(&RoutingInputs::default()).notes,
@@ -1375,20 +1384,20 @@ mod tests {
             dimensions: Some(&dims(&[("k8s-cluster", "prod")])),
             ..Default::default()
         });
-        assert!(ownership.reason().contains("k8s-cluster=prod"));
-        assert!(ownership.reason().contains("platform"));
+        assert!(ownership.reason(None).contains("k8s-cluster=prod"));
+        assert!(ownership.reason(None).contains("platform"));
 
         assert!(
             route(&RoutingInputs {
                 explicit_team_id: Some("t"),
                 ..Default::default()
             })
-            .reason()
+            .reason(None)
             .contains("alert's own setting")
         );
         assert!(
             route(&RoutingInputs::default())
-                .reason()
+                .reason(None)
                 .contains("no ownership rule matches")
         );
 
@@ -1398,10 +1407,41 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            defaulted.decision.reason(),
+            defaulted.decision.reason(None),
             "no ownership rule matched, so it went to the default team Platform"
         );
-        assert!(!defaulted.reason().contains("rule_id"));
+        assert!(!defaulted.reason(None).contains("rule_id"));
+    }
+
+    /// B15: a person reads the team's name; `insight` still finds the path after the marker.
+    #[test]
+    fn test_the_sentence_names_the_team_and_keeps_the_ownership_marker() {
+        let named = Some("Platform SRE");
+        let cases = [
+            (
+                RoutingDecision::Ownership {
+                    team_id: "team_1".into(),
+                    rule_id: "r_1".into(),
+                    path: "k8s-cluster=prod".into(),
+                },
+                "routed to Platform SRE by ownership rule k8s-cluster=prod",
+            ),
+            (
+                RoutingDecision::Explicit {
+                    team_id: "team_1".into(),
+                },
+                "routed to Platform SRE by the alert's own setting",
+            ),
+            (
+                RoutingDecision::Default {
+                    team_id: "team_1".into(),
+                },
+                "no ownership rule matched, so it went to the default team Platform SRE",
+            ),
+        ];
+        for (decision, sentence) in cases {
+            assert_eq!(decision.reason(named), sentence);
+        }
     }
 
     // ── Trailing wildcards (§7) ─────────────────────────────────────────────

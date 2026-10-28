@@ -132,7 +132,12 @@ pub enum MemberPlacement {
 /// default shape, so appending to the end of the handover order is unambiguous
 /// and is what somebody adding a person means. The moment there are layers or
 /// restrictions, placement stops being obvious and stops being automatic.
-pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement {
+pub fn place_member(
+    rotations: &[Rotation],
+    user_email: &str,
+    now: i64,
+    tz: chrono_tz::Tz,
+) -> MemberPlacement {
     let email = user_email.trim().to_ascii_lowercase();
     let names = |r: &Rotation| {
         r.shift_rules.iter().any(|s| {
@@ -149,23 +154,32 @@ pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement
     match rotations {
         [] => MemberPlacement::NoRotationYet,
         _ if rotations.iter().all(simple) => {
+            let rules: Vec<&ShiftRule> = rotations
+                .iter()
+                .filter_map(|r| r.shift_rules.first())
+                .collect();
+            let joined = |r: &ShiftRule| {
+                let mut members = r.members.clone();
+                members.push(email.clone());
+                members
+            };
             let appended: Vec<Rotation> = rotations
                 .iter()
                 .map(|r| {
                     let mut next = r.clone();
                     if let Some(rule) = next.shift_rules.first_mut() {
-                        rule.members.push(email.clone());
+                        *rule = with_roster_paired(rule, &rules, &joined, now, tz);
                     }
                     next
                 })
                 .collect();
             MemberPlacement::Appended {
+                rotations: appended,
                 rotation: rotations
                     .iter()
                     .map(|r| r.name.clone())
                     .collect::<Vec<_>>()
                     .join(", "),
-                rotations: appended,
             }
         }
         _ => MemberPlacement::NeedsManualPlacement,
@@ -446,21 +460,28 @@ impl Schedule {
             || self.unavailability.iter().any(|u| is(&u.user_email))
     }
 
-    pub fn without_member(&self, user_email: &str) -> MemberRemoval {
+    pub fn without_member(&self, user_email: &str, now: i64) -> MemberRemoval {
         let email = user_email.trim().to_ascii_lowercase();
         let mut rotations = Vec::with_capacity(self.rotations.len());
         let mut emptied_rotations = Vec::new();
         let mut changed = false;
+        let rules: Vec<&ShiftRule> = self
+            .rotations
+            .iter()
+            .flat_map(|r| r.shift_rules.iter())
+            .collect();
+        let without = |r: &ShiftRule| -> Vec<String> {
+            r.members
+                .iter()
+                .filter(|m| m.trim().to_ascii_lowercase() != email)
+                .cloned()
+                .collect()
+        };
 
         for rotation in &self.rotations {
             let mut kept_rules = Vec::with_capacity(rotation.shift_rules.len());
             for rule in &rotation.shift_rules {
-                let kept: Vec<String> = rule
-                    .members
-                    .iter()
-                    .filter(|m| m.trim().to_ascii_lowercase() != email)
-                    .cloned()
-                    .collect();
+                let kept = without(rule);
                 if kept.len() != rule.members.len() {
                     changed = true;
                 }
@@ -468,10 +489,12 @@ impl Schedule {
                 if kept.is_empty() {
                     continue;
                 }
-                kept_rules.push(ShiftRule {
-                    members: kept,
-                    ..rule.clone()
-                });
+                // A rule this person is not on is not theirs to reorder.
+                if kept.len() == rule.members.len() {
+                    kept_rules.push(rule.clone());
+                    continue;
+                }
+                kept_rules.push(with_roster_paired(rule, &rules, &without, now, self.tz()));
             }
             if kept_rules.is_empty() {
                 emptied_rotations.push(rotation.name.clone());
@@ -538,6 +561,46 @@ impl std::fmt::Display for TeamError {
 }
 
 impl std::error::Error for TeamError {}
+
+/// The rule `rule` runs exactly one shift behind: same people in the same order, same turn length.
+fn pair_leader<'a>(rule: &ShiftRule, rules: &[&'a ShiftRule]) -> Option<&'a ShiftRule> {
+    let people = |r: &ShiftRule| -> Vec<String> {
+        r.members
+            .iter()
+            .map(|m| m.trim().to_ascii_lowercase())
+            .collect()
+    };
+    rules.iter().copied().find(|leader| {
+        leader.shift_micros == rule.shift_micros
+            && leader.anchor_micros.checked_sub(rule.shift_micros) == Some(rule.anchor_micros)
+            && people(leader) == people(rule)
+    })
+}
+
+/// `rule` with new people: a pair's follower copies its leader's order, others keep their holder.
+fn with_roster_paired(
+    rule: &ShiftRule,
+    rules: &[&ShiftRule],
+    members_of: &dyn Fn(&ShiftRule) -> Vec<String>,
+    now: i64,
+    tz: chrono_tz::Tz,
+) -> ShiftRule {
+    let mut leader = None;
+    // Bounded by the rule count, so a chain of rotations one shift apart leads from its first.
+    for _ in 0..rules.len() {
+        match pair_leader(leader.unwrap_or(rule), rules) {
+            Some(next) => leader = Some(next),
+            None => break,
+        }
+    }
+    match leader {
+        Some(leader) => ShiftRule {
+            members: leader.with_roster(members_of(leader), now, tz).members,
+            ..rule.clone()
+        },
+        None => rule.with_roster(members_of(rule), now, tz),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -702,7 +765,7 @@ mod tests {
     #[test]
     fn test_a_member_added_later_joins_the_existing_rotation() {
         let rotations = vec![weekly("On-call rotation", &["ana@o2.ai"])];
-        let placement = place_member(&rotations, "  BOB@o2.ai ");
+        let placement = place_member(&rotations, "  BOB@o2.ai ", ANCHOR, chrono_tz::UTC);
 
         let MemberPlacement::Appended {
             rotation,
@@ -743,7 +806,7 @@ mod tests {
     fn test_adding_a_member_who_is_already_on_the_rotation_changes_nothing() {
         let rotations = vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])];
         assert_eq!(
-            place_member(&rotations, "BOB@o2.ai"),
+            place_member(&rotations, "BOB@o2.ai", ANCHOR, chrono_tz::UTC),
             MemberPlacement::AlreadyOnRotation
         );
     }
@@ -757,7 +820,7 @@ mod tests {
         weekend.shift_rules[0].priority = 10;
         let layered = vec![weekly("Weekdays", &["ana@o2.ai"]), weekend];
         assert_eq!(
-            place_member(&layered, "cara@o2.ai"),
+            place_member(&layered, "cara@o2.ai", ANCHOR, chrono_tz::UTC),
             MemberPlacement::NeedsManualPlacement
         );
 
@@ -769,7 +832,7 @@ mod tests {
             end_minute: 17 * 60,
         }];
         assert_eq!(
-            place_member(&[restricted], "cara@o2.ai"),
+            place_member(&[restricted], "cara@o2.ai", ANCHOR, chrono_tz::UTC),
             MemberPlacement::NeedsManualPlacement
         );
     }
@@ -779,7 +842,7 @@ mod tests {
     #[test]
     fn test_a_team_with_no_rotation_yet_asks_the_caller_to_seed_one() {
         assert_eq!(
-            place_member(&[], "ana@o2.ai"),
+            place_member(&[], "ana@o2.ai", ANCHOR, chrono_tz::UTC),
             MemberPlacement::NoRotationYet
         );
     }
@@ -793,7 +856,7 @@ mod tests {
             "On-call rotation",
             &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"],
         )]);
-        let removal = s.without_member("bob@o2.ai");
+        let removal = s.without_member("bob@o2.ai", ANCHOR);
 
         assert!(removal.changed);
         assert_eq!(
@@ -829,7 +892,7 @@ mod tests {
             weekly("Catch-all", &["bob@o2.ai", "cara@o2.ai"]),
             weekday,
         ]);
-        let removal = s.without_member("bob@o2.ai");
+        let removal = s.without_member("bob@o2.ai", ANCHOR);
 
         assert_eq!(removal.rotations.len(), 2);
         for rotation in &removal.rotations {
@@ -855,7 +918,7 @@ mod tests {
             r.shift_rules[0].priority = 10;
             r
         }]);
-        let removal = s.without_member("bob@o2.ai");
+        let removal = s.without_member("bob@o2.ai", ANCHOR);
 
         assert_eq!(removal.rotations.len(), 1, "the empty rotation is dropped");
         assert_eq!(removal.emptied_rotations, vec!["Weekends".to_string()]);
@@ -877,7 +940,7 @@ mod tests {
     #[test]
     fn test_removing_the_last_person_leaves_a_named_coverage_gap() {
         let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
-        let removal = s.without_member("ANA@o2.ai");
+        let removal = s.without_member("ANA@o2.ai", ANCHOR);
 
         assert!(removal.changed, "matching is case-insensitive");
         assert!(removal.rotations.is_empty());
@@ -901,12 +964,231 @@ mod tests {
     #[test]
     fn test_removing_somebody_who_was_never_on_a_rotation_changes_nothing() {
         let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
-        let removal = s.without_member("newcomer@o2.ai");
+        let removal = s.without_member("newcomer@o2.ai", ANCHOR);
 
         assert!(!removal.changed);
         assert!(!removal.leaves_no_rotation);
         assert_eq!(removal.rotations, s.rotations);
         assert_eq!(removal.coverage_warning(), None);
+    }
+
+    /// B1: before the first handover the last person is on, so an appended newcomer went on call.
+    #[test]
+    fn test_a_member_added_before_the_first_handover_is_not_put_on_call() {
+        let now = ANCHOR - 24 * 60 * 60 * 1_000_000;
+        let rotations = vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"])];
+        let MemberPlacement::Appended { rotations, .. } =
+            place_member(&rotations, "cara@o2.ai", now, chrono_tz::Asia::Kolkata)
+        else {
+            panic!("a single plain rotation takes the newcomer");
+        };
+        let s = schedule(rotations);
+        assert_eq!(
+            s.rotation("Primary").unwrap().shift_rules[0].order_at(now, s.tz()),
+            vec!["bob@o2.ai", "ana@o2.ai", "cara@o2.ai"]
+        );
+    }
+
+    /// B1: dropping the holder hands the shift to whoever was next, not where the modulo lands.
+    #[test]
+    fn test_removing_the_holder_hands_the_shift_to_the_next_person() {
+        // Shift 4 of three people: bob holds, cara is next.
+        let now = ANCHOR + 4 * MICROS_PER_WEEK;
+        let s = schedule(vec![weekly(
+            "Primary",
+            &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"],
+        )]);
+        assert_eq!(s.on_call_in("Primary", now).as_deref(), Some("bob@o2.ai"));
+        let after = Schedule {
+            rotations: s.without_member("bob@o2.ai", now).rotations,
+            ..s
+        };
+        assert_eq!(
+            after.on_call_in("Primary", now).as_deref(),
+            Some("cara@o2.ai")
+        );
+    }
+
+    /// F1: a pair one shift apart, marked or not, must never share a person after an edit.
+    #[test]
+    fn test_a_pair_one_shift_apart_never_shares_a_person_after_an_edit() {
+        // Shift 4 of three people: Primary holds bob, the Secondary holds cara.
+        let now = ANCHOR + 4 * MICROS_PER_WEEK;
+        let people = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
+        // Exactly as the team form saves it: same roster, anchor one shift back, no marker.
+        let mut secondary = weekly("Secondary", &people);
+        secondary.shift_rules[0].anchor_micros = ANCHOR - MICROS_PER_WEEK;
+        for stored in [
+            vec![weekly("Primary", &people), secondary.clone()],
+            vec![secondary.clone(), weekly("Primary", &people)],
+        ] {
+            assert_pair_stays_apart(&schedule(stored), now);
+        }
+    }
+
+    /// F12: three rotations each one shift apart all follow the first, so nobody holds two at once.
+    #[test]
+    fn test_a_chain_of_three_rotations_follows_the_first() {
+        // Shift 4 of four people: Primary holds ana, Secondary bob, Third cara.
+        let now = ANCHOR + 4 * MICROS_PER_WEEK;
+        let people = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai", "dan@o2.ai"];
+        // As the team form saves a third staffed rotation: anchor two shifts back.
+        let behind = |name: &str, shifts: i64| {
+            let mut r = weekly(name, &people);
+            r.shift_rules[0].anchor_micros = ANCHOR - shifts * MICROS_PER_WEEK;
+            r
+        };
+        let s = schedule(vec![
+            behind("Primary", 0),
+            behind("Secondary", 1),
+            behind("Third", 2),
+        ]);
+        let added = match place_member(&s.rotations, "eve@o2.ai", now, s.tz()) {
+            MemberPlacement::Appended { rotations, .. } => rotations,
+            other => panic!("three plain rotations take the newcomer, got {other:?}"),
+        };
+        // (case, rotations after, roster size, who the Primary must hold now)
+        let cases = [
+            (
+                "remove the holder",
+                s.without_member("ana@o2.ai", now).rotations,
+                3,
+                "bob@o2.ai",
+            ),
+            (
+                "remove the next person",
+                s.without_member("bob@o2.ai", now).rotations,
+                3,
+                "ana@o2.ai",
+            ),
+            ("add a member", added, 5, "ana@o2.ai"),
+        ];
+        for (case, rotations, len, holder) in cases {
+            for r in &rotations {
+                assert_eq!(
+                    r.shift_rules[0].members, rotations[0].shift_rules[0].members,
+                    "{case}"
+                );
+            }
+            let after = Schedule {
+                rotations,
+                ..s.clone()
+            };
+            assert_eq!(
+                after.on_call_in("Primary", now).as_deref(),
+                Some(holder),
+                "{case}"
+            );
+            for week in 0..2 * len {
+                let at = now + week * MICROS_PER_WEEK;
+                let on: Vec<_> = ["Primary", "Secondary", "Third"]
+                    .iter()
+                    .map(|id| after.on_call_in(id, at))
+                    .collect();
+                assert!(on.iter().all(Option::is_some), "{case}: week {week}");
+                assert!(
+                    on[0] != on[1] && on[1] != on[2] && on[0] != on[2],
+                    "{case}: week {week}"
+                );
+            }
+        }
+    }
+
+    /// F10: same people in a different order is not a pair, so each rule keeps its own holder.
+    #[test]
+    fn test_a_hand_built_reordered_rotation_stays_independent() {
+        let now = ANCHOR + 4 * MICROS_PER_WEEK;
+        let s = schedule(vec![
+            weekly("Primary", &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]),
+            weekly("Other", &["bob@o2.ai", "cara@o2.ai", "ana@o2.ai"]),
+        ]);
+        let added = match place_member(&s.rotations, "dan@o2.ai", now, s.tz()) {
+            MemberPlacement::Appended { rotations, .. } => rotations,
+            other => panic!("two plain rotations take the newcomer, got {other:?}"),
+        };
+        let removed = s.without_member("cara@o2.ai", now).rotations;
+        let edit = |members: &[String], change: &dyn Fn(&mut Vec<String>)| {
+            let mut next = members.to_vec();
+            change(&mut next);
+            next
+        };
+        for (i, before) in s.rotations.iter().enumerate() {
+            let rule = &before.shift_rules[0];
+            let alone_added = rule.with_roster(
+                edit(&rule.members, &|m| m.push("dan@o2.ai".into())),
+                now,
+                s.tz(),
+            );
+            let alone_removed = rule.with_roster(
+                edit(&rule.members, &|m| m.retain(|x| x != "cara@o2.ai")),
+                now,
+                s.tz(),
+            );
+            assert_eq!(added[i].shift_rules[0], alone_added, "add: {}", before.name);
+            assert_eq!(
+                removed[i].shift_rules[0], alone_removed,
+                "remove: {}",
+                before.name
+            );
+        }
+    }
+
+    /// F10: a rule the removed person is not on is left exactly as it was.
+    #[test]
+    fn test_a_rule_without_the_removed_person_is_untouched() {
+        let now = ANCHOR + 4 * MICROS_PER_WEEK;
+        let s = schedule(vec![
+            weekly("Primary", &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]),
+            weekly("Other", &["bob@o2.ai", "cara@o2.ai", "ana@o2.ai"]),
+            weekly("Night", &["dan@o2.ai", "eve@o2.ai"]),
+        ]);
+        let after = s.without_member("dan@o2.ai", now).rotations;
+        assert_eq!(after[0], s.rotations[0]);
+        assert_eq!(after[1], s.rotations[1]);
+    }
+
+    fn assert_pair_stays_apart(s: &Schedule, now: i64) {
+        let tz = s.tz();
+        let added = match place_member(&s.rotations, "dan@o2.ai", now, tz) {
+            MemberPlacement::Appended { rotations, .. } => rotations,
+            other => panic!("a default pair takes the newcomer, got {other:?}"),
+        };
+        // (case, rotations after, roster size, who the Primary must hold now)
+        let cases = [
+            (
+                "remove the holder",
+                s.without_member("bob@o2.ai", now).rotations,
+                2,
+                "cara@o2.ai",
+            ),
+            (
+                "remove the next person",
+                s.without_member("cara@o2.ai", now).rotations,
+                2,
+                "bob@o2.ai",
+            ),
+            ("add a member", added, 4, "bob@o2.ai"),
+        ];
+        for (case, rotations, len, holder) in cases {
+            let after = Schedule {
+                rotations,
+                ..s.clone()
+            };
+            assert_eq!(
+                after.on_call_in("Primary", now).as_deref(),
+                Some(holder),
+                "{case}"
+            );
+            for week in 0..2 * len {
+                let at = now + week * MICROS_PER_WEEK;
+                let (first, second) = (
+                    after.on_call_in("Primary", at),
+                    after.on_call_in("Secondary", at),
+                );
+                assert!(first.is_some(), "{case}: week {week}");
+                assert_ne!(first, second, "{case}: week {week}");
+            }
+        }
     }
 
     // Every `Schedule` accessor faces the same cover: one caller missing it pages the excused.
@@ -1194,7 +1476,7 @@ mod tests {
     fn schedule_after_offboarding() -> Schedule {
         let before = schedule_with_a_leaver();
         Schedule {
-            rotations: before.without_member("leaver@o2.ai").rotations,
+            rotations: before.without_member("leaver@o2.ai", ANCHOR).rotations,
             overrides: Vec::new(),
             unavailability: Vec::new(),
             ..before
@@ -1256,7 +1538,7 @@ mod tests {
     fn test_dropping_the_rotations_alone_would_leave_the_leaver_on_call() {
         let before = schedule_with_a_leaver();
         let rotations_only = Schedule {
-            rotations: before.without_member("leaver@o2.ai").rotations,
+            rotations: before.without_member("leaver@o2.ai", ANCHOR).rotations,
             ..before
         };
         assert_eq!(
@@ -1275,7 +1557,7 @@ mod tests {
             rotations: vec![weekly("On-call rotation", &["leaver@o2.ai"])],
             ..schedule(vec![])
         };
-        let removal = s.without_member("leaver@o2.ai");
+        let removal = s.without_member("leaver@o2.ai", ANCHOR);
 
         assert!(removal.changed);
         assert_eq!(
@@ -1316,7 +1598,7 @@ mod tests {
         );
 
         let after = Schedule {
-            rotations: s.without_member("leaver@o2.ai").rotations,
+            rotations: s.without_member("leaver@o2.ai", ANCHOR).rotations,
             ..s
         };
         assert_eq!(

@@ -6798,9 +6798,19 @@ mod tests {
     async fn e2e_config() {
         let auth = setup();
         let app = init_test_router();
-        let headers = auth_headers(auth);
-        let (status, _body) = make_request(&app, Method::GET, "/config", Some(headers), None).await;
+        let (status, body) = make_request(&app, Method::GET, "/config", None, None).await;
         assert!(status.is_success());
+        let bootstrap: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(bootstrap.get("rum").is_none(), "{bootstrap}");
+        assert!(bootstrap.get("commit_hash").is_some(), "{bootstrap}");
+
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/config", Some(headers), None).await;
+        assert!(status.is_success());
+        let full: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(full["rum"]["version"], config::VERSION, "{full}");
+        assert!(full["rum"].get("client_token").is_some(), "{full}");
     }
 
     // Helper function to create pipeline via API
