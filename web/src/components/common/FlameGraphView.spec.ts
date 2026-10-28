@@ -825,7 +825,7 @@ describe("FlameGraphView theme and size", () => {
 
   it("re-reads the theme colours and rebuilds the chart when the theme switches", async () => {
     const html = document.documentElement;
-    html.style.setProperty("--color-border-strong", "rgb(1, 2, 3)");
+    html.style.setProperty("--color-flame-grouped-fill", "rgb(1, 2, 3)");
     html.style.setProperty("--color-border-default", "rgb(4, 5, 6)");
     const store = createStore({ state: { theme: "light" } });
     const wrapper = mountWithStore(store);
@@ -833,13 +833,13 @@ describe("FlameGraphView theme and size", () => {
     const before = optionsOf(wrapper).series[0].data[0].itemStyle;
     expect(before).toMatchObject({ color: "rgb(1, 2, 3)", borderColor: "rgb(4, 5, 6)" });
 
-    html.style.setProperty("--color-border-strong", "rgb(7, 8, 9)");
+    html.style.setProperty("--color-flame-grouped-fill", "rgb(7, 8, 9)");
     html.style.setProperty("--color-border-default", "rgb(10, 11, 12)");
     store.state.theme = "dark";
     await nextTick();
     const after = optionsOf(wrapper).series[0].data[0].itemStyle;
     expect(after).toMatchObject({ color: "rgb(7, 8, 9)", borderColor: "rgb(10, 11, 12)" });
-    html.style.removeProperty("--color-border-strong");
+    html.style.removeProperty("--color-flame-grouped-fill");
     html.style.removeProperty("--color-border-default");
     wrapper.unmount();
   });

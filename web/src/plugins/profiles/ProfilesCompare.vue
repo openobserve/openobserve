@@ -221,6 +221,7 @@ import profilesService, {
   type ProfilesTreeNode,
   type ProfilesQueryBody,
 } from "@/services/profiles";
+import { useStore } from "vuex";
 import { cssToken } from "@/utils/theme";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -254,9 +255,16 @@ const SKELETON_WIDTHS = ["w-full", "w-11/12", "w-4/5", "w-3/5", "w-2/5", "w-1/4"
 const VALUE_CELLS = ["before", "after", "beforePercent", "afterPercent"] as const;
 // Changes under a tenth of a point read as no change, as in the diff flame graph.
 const CHANGE_FLOOR = 0.1;
-const moreColor = cssToken("--color-status-negative", "");
-const lessColor = cssToken("--color-chart-series-1", "");
-const sameColor = cssToken("--color-border-strong", "");
+const store = useStore();
+// Token values change with the theme, so they are re-read whenever it switches.
+const diffColors = computed(() => {
+  void store?.state?.theme;
+  return {
+    more: cssToken("--color-status-negative", ""),
+    less: cssToken("--color-chart-series-1", ""),
+    same: cssToken("--color-flame-grouped-fill", ""),
+  };
+});
 
 const values = ref<string[]>([]);
 const valuesLoading = ref(false);
@@ -268,9 +276,9 @@ let diffSeq = 0;
 let diffAbort: AbortController | null = null;
 
 const legend = computed(() => [
-  { label: t("profiles.diffLess"), color: lessColor },
-  { label: t("profiles.diffSame"), color: sameColor },
-  { label: t("profiles.diffMore"), color: moreColor },
+  { label: t("profiles.diffLess"), color: diffColors.value.less },
+  { label: t("profiles.diffSame"), color: diffColors.value.same },
+  { label: t("profiles.diffMore"), color: diffColors.value.more },
 ]);
 
 const valueOption = (value: string): SelectOption => ({ label: raw(value), value });
@@ -501,8 +509,10 @@ const columns = computed<OTableColumnDef[]>(() => {
   ];
 });
 
-const changeColor = (change: number) =>
-  Math.abs(change) < CHANGE_FLOOR ? sameColor : change > 0 ? moreColor : lessColor;
+const changeColor = (change: number) => {
+  const { more, less, same } = diffColors.value;
+  return Math.abs(change) < CHANGE_FLOOR ? same : change > 0 ? more : less;
+};
 const formatPoints = (change: number) =>
   t("profiles.diffPoints", {
     value: `${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(2)}`,

@@ -719,6 +719,45 @@ describe("Profiles page", () => {
     );
   });
 
+  it("re-reads the series and Others colours when the theme switches", async () => {
+    const html = document.documentElement;
+    const startTheme = store.state.theme;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 2, 3)");
+    html.style.setProperty("--color-border-strong", "rgb(4, 5, 6)");
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        groups: [
+          { value: "pod-a", total: 9, others: false, series: [{ timestamp: 1_000_000, value: 9 }] },
+          { value: "", total: 1, others: true, series: [{ timestamp: 1_000_000, value: 1 }] },
+        ],
+      },
+    });
+    try {
+      const wrapper = mountPage();
+      await settle();
+      await wrapper.find('[data-test="profiles-breakdown-select"] select').setValue("k8s_pod_name");
+      await flushPromises();
+      await nextTick();
+      const colorsOf = () =>
+        wrapper
+          .findComponent({ name: "ChartRendererStub" })
+          .props("data")
+          .options.series.map((line: { color?: string }) => line.color);
+      expect(colorsOf()).toEqual(["rgb(1, 2, 3)", "rgb(4, 5, 6)"]);
+
+      html.style.setProperty("--color-chart-series-1", "rgb(7, 8, 9)");
+      html.style.setProperty("--color-border-strong", "rgb(10, 11, 12)");
+      store.state.theme = startTheme === "dark" ? "light" : "dark";
+      await nextTick();
+      expect(colorsOf()).toEqual(["rgb(7, 8, 9)", "rgb(10, 11, 12)"]);
+    } finally {
+      store.state.theme = startTheme;
+      html.style.removeProperty("--color-chart-series-1");
+      html.style.removeProperty("--color-border-strong");
+    }
+  });
+
   it("says how much of the samples the views show when the result is cut", async () => {
     mocks.merge.mockResolvedValue({
       data: { ...mergeResponse.data, truncated: true, total: 50, merged_total: 45 },
@@ -726,7 +765,7 @@ describe("Profiles page", () => {
     const wrapper = mountPage();
     await settle();
 
-    expect(wrapper.find('[data-test="profiles-partial-result"]').text()).toContain("90.0%");
+    expect(wrapper.find('[data-test="profiles-partial-result"]').text()).toContain("90.00%");
   });
 
   it("marks the page as beta in the title line, as Workflows does", async () => {
@@ -912,7 +951,7 @@ describe("Profiles page", () => {
       children: [{ name: "fn-c", total: 10 }],
     });
     // fn-b has 30 samples in the Top list, but only 15 sit in the drawn tree.
-    expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.0%");
+    expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.00%");
   });
 
   it("shows Function Details for a row and closes them", async () => {
@@ -1025,7 +1064,7 @@ describe("Profiles page", () => {
     await nextTick();
     // The recursive main.hash counts once: 40 of 100.
     expect(wrapper.find('[data-test="profiles-search-summary"]').text()).toBe(
-      "1 function · 40.0% of samples",
+      "1 function · 40.00% of samples",
     );
 
     await wrapper.find('[data-test="profiles-search-functions"]').setValue("nothing");

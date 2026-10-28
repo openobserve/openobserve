@@ -393,7 +393,7 @@ const colors = computed(() => {
     ),
     // Dark in both themes, because the frame fills are light in both.
     textColor: tokenColor("--color-flame-frame-text", "--color-text-heading"),
-    groupedFill: tokenColor("--color-border-strong", "--color-border-default"),
+    groupedFill: tokenColor("--color-flame-grouped-fill", "--color-border-default"),
     borderColor: tokenColor("--color-border-default", "--color-border-strong"),
     matchTextBg: tokenColor("--color-status-warning-bg", "--color-warning-500"),
     // Diff colours: a bigger share reads as more cost, a smaller share as less, grey for no change.
@@ -918,7 +918,7 @@ let resizeObserver: ResizeObserver | null = null;
 let resizeFrame = 0;
 const resizeChart = () => {
   resizeFrame = 0;
-  chartRendererRef.value?.chart?.resize();
+  chartRendererRef.value?.chart?.resize?.();
 };
 
 onMounted(() => {

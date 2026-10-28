@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, nextTick, ref } from "vue";
+import { createStore, type Store } from "vuex";
 import i18n from "@/locales";
 import ProfilesCompare, { type CompareState } from "./ProfilesCompare.vue";
 
@@ -78,7 +79,7 @@ const stubs = {
 };
 
 /** Mounts the view under a host that holds its v-model state, as the page does. */
-const mountCompare = (initial: Partial<CompareState> = {}) => {
+const mountCompare = (initial: Partial<CompareState> = {}, store?: Store<{ theme: string }>) => {
   const state = ref<CompareState>({
     label: null,
     baseline: null,
@@ -100,7 +101,7 @@ const mountCompare = (initial: Partial<CompareState> = {}) => {
     template: `<ProfilesCompare v-model:state="state" org-identifier="org" stream="default"
       :payload="payload" :labels="labels" search-query="" unit-label="CPU" :value-formatter="valueFormatter" />`,
   });
-  const wrapper = mount(Host, { global: { plugins: [i18n], stubs } });
+  const wrapper = mount(Host, { global: { plugins: store ? [i18n, store] : [i18n], stubs } });
   return { wrapper, state };
 };
 
@@ -127,11 +128,11 @@ describe("ProfilesCompare", () => {
       position: "inside",
     });
     expect(labelOf("profiles-compare-baseline")).toEqual({
-      label: "Compare From",
+      label: "Compare from",
       position: "inside",
     });
     expect(labelOf("profiles-compare-comparison")).toEqual({
-      label: "Compare To",
+      label: "Compare to",
       position: "inside",
     });
   });
@@ -274,5 +275,32 @@ describe("ProfilesCompare", () => {
     expect(wrapper.find('[data-test="profiles-compare-message"]').text()).toContain(
       "fewer than two values",
     );
+  });
+
+  it("re-reads the legend colours when the theme switches", async () => {
+    const html = document.documentElement;
+    const tokens = [
+      "--color-chart-series-1",
+      "--color-flame-grouped-fill",
+      "--color-status-negative",
+    ];
+    tokens.forEach((token, index) => html.style.setProperty(token, `rgb(${index}, 0, 0)`));
+    const store = createStore({ state: { theme: "light" } });
+    try {
+      const { wrapper } = mountCompare({}, store);
+      await flushPromises();
+      const swatches = () =>
+        wrapper
+          .findAll('[data-test="profiles-compare-legend"] [aria-hidden="true"]')
+          .map((swatch) => (swatch.element as HTMLElement).style.backgroundColor);
+      expect(swatches()).toEqual(["rgb(0, 0, 0)", "rgb(1, 0, 0)", "rgb(2, 0, 0)"]);
+
+      tokens.forEach((token, index) => html.style.setProperty(token, `rgb(0, ${index}, 9)`));
+      store.state.theme = "dark";
+      await nextTick();
+      expect(swatches()).toEqual(["rgb(0, 0, 9)", "rgb(0, 1, 9)", "rgb(0, 2, 9)"]);
+    } finally {
+      tokens.forEach((token) => html.style.removeProperty(token));
+    }
   });
 });

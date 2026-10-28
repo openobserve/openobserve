@@ -809,7 +809,7 @@ const searchSummary = computed(() => {
     for (const child of node.children ?? []) walk(child, inMatch || hit);
   };
   for (const child of result.root.children ?? []) walk(child, false);
-  const percent = `${((matched / result.root.total) * 100).toFixed(1)}%`;
+  const percent = formatPercent(matched, result.root.total);
   return t("profiles.searchSummary", { count, percent }, count);
 });
 
@@ -959,7 +959,7 @@ const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
 const sampledPercent = computed(() => {
   const result = mergeResult.value;
   if (!result?.truncated || !result.total) return "";
-  return `${((result.merged_total / result.total) * 100).toFixed(1)}%`;
+  return formatPercent(result.merged_total, result.total);
 });
 const seriesPoints = computed(() => seriesResponse.value?.series ?? []);
 const seriesStepSecs = computed(() => Math.max(1, seriesResponse.value?.step_secs ?? 1));
@@ -973,9 +973,16 @@ const isCpuMetric = computed(
   () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
 );
 
-const seriesColors = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) =>
-  cssToken(`--color-chart-series-${step}`, ""),
-);
+// Token values change with the theme, so they are re-read whenever it switches.
+const seriesColors = computed(() => {
+  void store?.state?.theme;
+  return {
+    palette: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) =>
+      cssToken(`--color-chart-series-${step}`, ""),
+    ),
+    others: cssToken("--color-border-strong", ""),
+  };
+});
 type SeriesLine = {
   key: string;
   label: string;
@@ -994,11 +1001,12 @@ const seriesLines = computed<SeriesLine[]>(() => {
         label: currentType.value,
         value: "",
         others: false,
-        color: seriesColors[0],
+        color: seriesColors.value.palette[0],
         points: seriesPoints.value,
       },
     ];
   }
+  const { palette, others } = seriesColors.value;
   let colorIndex = 0;
   // Values in their own order (v1.4.0, v1.5.0, v1.10.0), so a value keeps its colour; Others last.
   const ordered = [...groups].sort(
@@ -1013,9 +1021,7 @@ const seriesLines = computed<SeriesLine[]>(() => {
       : group.value || t("profiles.breakdownNoValue"),
     value: group.value,
     others: group.others,
-    color: group.others
-      ? cssToken("--color-border-strong", "")
-      : seriesColors[colorIndex++ % seriesColors.length],
+    color: group.others ? others : palette[colorIndex++ % palette.length],
     points: group.series,
   }));
 });
@@ -1124,7 +1130,7 @@ const sandwichCallees = computed(() =>
 const treeCoverage = (name: string | null, drawn: number) => {
   const exact = mergeResult.value?.top.find((row) => row.name === name)?.total ?? 0;
   if (exact <= 0 || drawn / exact >= 0.995) return "";
-  return `${((drawn / exact) * 100).toFixed(1)}%`;
+  return formatPercent(drawn, exact);
 };
 const sandwichCoverage = computed(() =>
   treeCoverage(sandwichName.value, sandwichCallees.value?.total ?? 0),
@@ -1318,7 +1324,7 @@ const withZeroGaps = (points: number[][], stepMs: number) => {
   return filled;
 };
 
-/** Byte ticks on round binary steps (0, 2.5, 5 GB), not decimal steps shown as 3.73 GB. */
+/** Byte ticks on round binary steps (0, 2.5, 5 GiB), not decimal steps shown as 3.73 GiB. */
 const byteAxisInterval = (points: number[][]) => {
   const max = Math.max(0, ...points.map(([, value]) => value));
   if (!max) return undefined;
