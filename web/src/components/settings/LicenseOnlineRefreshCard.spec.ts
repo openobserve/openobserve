@@ -277,7 +277,7 @@ it("env-key root can rotate when OpenObserve requests rotation", () => {
 
 it("env-key root without a rotation request keeps copy in place of rotate", () => {
   const w = card({ stored_key: "fetched-key" }, { envKeyActive: true });
-  expect(w.find('[data-test="license-online-copy"]').exists()).toBe(true);
+  expect(w.find('[data-test="license-online-copy"]').text()).toBe("Copy fetched license key");
   expect(w.find('[data-test="license-online-rotate"]').exists()).toBe(false);
 });
 
