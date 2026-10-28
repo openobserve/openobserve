@@ -236,26 +236,36 @@ test.describe('Logs toolbar pins', () => {
     testLogger.info('Syntax guide pin state was tracked through the menu pin button title');
   });
 
-  test('the function editor stays pinned and visible at every viewport width', {
-    tag: ['@toolbarPins', '@logs', '@P1', '@all'],
+  test('the function editor outlives the width budget that collapses the left section', {
+    tag: ['@toolbarPins', '@logs', '@P2', '@all'],
   }, async () => {
     const pins = pm.logsToolbarPinsPage;
-    // A fresh profile with the histogram default suppressed leaves nothing pinned,
-    // so the sweep below proves the function editor stays put on its own.
-    await pins.seedPinStorage({ pins: [], decided: true });
+    // Left section pinned too, so the budget contends and the exemption is a contrast.
+    await pins.seedPinStorage({
+      pins: [...pins.leftSectionOrder, 'functionEditor'],
+      decided: true,
+    });
     await pins.navigateToLogs(getOrgIdentifier());
-    await pins.expectPinnedHidden('functionEditor');
+    await pins.expectPinnedUnclipped('functionEditor');
 
-    await pins.togglePin('functionEditor');
-    await pins.expectPinnedVisible('functionEditor');
-
-    // showPinnedFunctionEditor has no width budget (SearchBar.vue:2501), so unlike
-    // left-section controls it must stay visible at every width while they collapse.
+    const kept = [];
     for (const width of [1700, 1300, 1100, 900, 700]) {
-      await pins.setViewportWidthAndSettle(width);
-      await pins.expectPinnedVisible('functionEditor');
+      // The settled left-pin set is the barrier: it only changes once the ResizeObserver fired.
+      const visible = await pins.setViewportWidthAndSettle(width);
+      kept.push({ width, count: visible.length });
+      await pins.expectPinnedUnclipped('functionEditor');
     }
 
-    testLogger.info('Function editor stayed pinned and visible at every viewport width');
+    // Without a width that actually dropped a left pin, the sweep proves nothing.
+    expect(kept[0].count, 'the whole left section must fit at the widest viewport').toBe(
+      pins.assertablePinOrder.length,
+    );
+    const collapsed = kept.find((entry) => entry.count < pins.assertablePinOrder.length);
+    expect(collapsed, 'no width in the sweep collapsed a left-section pin').toBeDefined();
+
+    testLogger.info(
+      `Left pins kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}` +
+        ` | first collapse at ${collapsed.width}px, function editor unclipped throughout`,
+    );
   });
 });

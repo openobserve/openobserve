@@ -18,6 +18,8 @@ export class LogsToolbarPinsPage {
 
     // ===== LOCATORS =====
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+    // The bar clips its overflow, so its box is what decides "clipped" below.
+    this.searchBar = '#searchBarComponent';
 
     // Traces uses the same composable under its own scope. Cross-scope tests move
     // by nav-rail click, never page.goto, so both scopes share one document.
@@ -256,6 +258,22 @@ export class LogsToolbarPinsPage {
 
   async expectPinnedHidden(key) {
     await expect(this.page.locator(this.pinnedControl[key])).toBeHidden();
+  }
+
+  /** Visible AND inside the bar's clip box: the bar is `overflow-hidden`, so a
+   * control pushed past its right edge still satisfies toBeVisible(). */
+  async expectPinnedUnclipped(key) {
+    const control = this.page.locator(this.pinnedControl[key]);
+    await expect(control).toBeVisible();
+    const box = await control.boundingBox();
+    const bar = await this.page.locator(this.searchBar).boundingBox();
+    expect(box, `${key} is pinned but has no layout box`).not.toBeNull();
+    const within = box.x >= bar.x - 1 && box.x + box.width <= bar.x + bar.width + 1;
+    expect(
+      within,
+      `${key} is clipped by the toolbar: control spans ${Math.round(box.x)}-${Math.round(box.x + box.width)}px,` +
+        ` bar spans ${Math.round(bar.x)}-${Math.round(bar.x + bar.width)}px`,
+    ).toBe(true);
   }
 
   /** A collapsed control must still be pinned — only its rendering moved. */
