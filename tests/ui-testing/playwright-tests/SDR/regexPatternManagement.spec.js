@@ -40,7 +40,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     testLogger.info('Verifying drawer stays open after save with empty name');
     await expect(pm.sdrPatternsPage.addPatternTitle).toBeVisible({ timeout: 5000 });
 
-    await pm.sdrPatternsPage.cancelButton.click();
+    await pm.sdrPatternsPage.clickCancel();
     await page.waitForTimeout(500);
 
     // Test 2: Empty regex pattern — form should not close
@@ -126,7 +126,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
       'This will be cancelled',
       '^test$'
     );
-    await pm.sdrPatternsPage.cancelButton.click();
+    await pm.sdrPatternsPage.clickCancel();
 
     await page.waitForTimeout(500);
     const patternVisible = await pm.sdrPatternsPage.checkPatternExists('cancelled_pattern');

@@ -5,6 +5,7 @@
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
+import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
 const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
 
 // en-US trigger labels for each rule operator. The rule-op select renders a
@@ -403,11 +404,13 @@ export class ModelPricingPage {
 
     async clickCancel() {
         await this.cancelBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEditorBack() {
         await this.editorBackBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 

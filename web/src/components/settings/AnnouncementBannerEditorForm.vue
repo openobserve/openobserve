@@ -528,27 +528,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </i18n-t>
   </ODialog>
 
-  <ODialog
-    v-model:open="leaveOpen"
-    size="sm"
-    :title="t('announcements.editor.leaveTitle')"
-    :sub-title="t('announcements.editor.leaveMessage')"
-    :primary-button-label="t('announcements.editor.leaveConfirm')"
-    primary-button-variant="destructive"
-    :secondary-button-label="t('announcements.editor.keepEditing')"
-    data-test="announcement-editor-leave-dialog"
-    @update:open="(open: boolean) => !open && resolveLeave(false)"
-    @click:secondary="resolveLeave(false)"
-    @click:primary="resolveLeave(true)"
+  <EditorDraftDialogs :draft="bannerDraft" />
+  <EditorDraftLeaveDialog
+    v-if="!draftsKept"
+    :open="unkeptLeave.open"
+    :entity-label="bannerDraft.state.entityLabel"
+    :saving="unkeptLeave.saving"
+    :can-keep-draft="false"
+    :signing-out="bannerDraft.state.signingOut"
+    :can-save="bannerDraft.state.canSave"
+    @choose="chooseUnkeptLeave"
   />
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { onBeforeRouteLeave, useRouter } from "vue-router";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRouter,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { useStore } from "vuex";
 
 import { BANNER_COLOR_PRESETS } from "@/constants/themes";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
+import { useEditorDraft, type EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -606,6 +612,7 @@ import {
   bannerStatus,
   hasCustomLook,
   isHiddenByCritical,
+  bannerDraftKey,
   newBannerId,
   parseDurationMs,
   withoutStyle,
@@ -752,6 +759,8 @@ const draftFromValues = (values: BannerForm): BannerDraft => ({
 });
 
 let leavingAfterSave = false;
+// Set while the leave dialog's Save runs, so a successful save does not leave the editor itself.
+let leaveSave: { saved: boolean } | null = null;
 
 const form = useOForm<BannerForm>({
   defaultValues: { ...props.draft, links: props.draft.links.map((l) => ({ ...l })) } as BannerForm,
@@ -777,7 +786,12 @@ const form = useOForm<BannerForm>({
         return { ...latest, banners };
       });
       toast({ variant: "success", message: savedMessage(draft) });
+      if (leaveSave) {
+        leaveSave.saved = true;
+        return;
+      }
       leavingAfterSave = true;
+      bannerDraft.markSaved();
       goBack();
     } catch (error: any) {
       conflict.value = error instanceof AnnouncementConflictError;
@@ -1109,39 +1123,120 @@ const insertEmoji = (emoji: string) => {
 
 // ── Leaving ───────────────────────────────────────────────────────────────
 
-const leaveOpen = ref(false);
-let leaveResolve: ((proceed: boolean) => void) | null = null;
-
-const resolveLeave = (proceed: boolean) => {
-  leaveOpen.value = false;
-  leaveResolve?.(proceed);
-  leaveResolve = null;
-};
+// A continued draft is restored by a form reset, which clears the form's own dirty flag.
+const continuedDraft = ref(false);
 
 const hasUnsavedChanges = () =>
   !leavingAfterSave &&
   (isDirty.value ||
+    continuedDraft.value ||
     resetDismissals.value ||
     (audience.value === "some") !== !!props.draft.orgs.length);
+
+interface BannerDraftData {
+  values: BannerForm;
+  resetDismissals: boolean;
+  audience: "all" | "some";
+  styleChoice: string;
+  colorChoice: string;
+}
+
+const openedDraftKey = bannerDraftKey(props.original);
+const sourceDraftKey = bannerDraftKey(props.base);
+// A legacy banner without an id, or a copy of one, has no key that survives an edit, so its work is never kept as a draft.
+const draftsKept = index === null ? !props.base || !!sourceDraftKey : !!openedDraftKey;
+
+/** Runs the editor's save without leaving; resolves true on success. */
+const saveInPlace = async (): Promise<boolean> => {
+  const run = { saved: false };
+  leaveSave = run;
+  try {
+    await form.handleSubmit();
+  } finally {
+    leaveSave = null;
+  }
+  return run.saved;
+};
+
+const leavesEditor = (to: RouteLocationNormalized, from: RouteLocationNormalized) =>
+  to.path !== from.path ||
+  to.query.index !== from.query.index ||
+  to.query.duplicate !== from.query.duplicate;
+
+const bannerDraft = useEditorDraft<BannerDraftData>({
+  kind: "announcement_banner",
+  entityLabel: () => t("common.editorDraft.entities.announcement_banner"),
+  entityId: () => (index === null ? null : openedDraftKey),
+  newVariant: () => (sourceDraftKey ? `duplicate:${sourceDraftKey}` : null),
+  snapshot: () => ({
+    values: JSON.parse(JSON.stringify(values.value)) as BannerForm,
+    resetDismissals: resetDismissals.value,
+    audience: audience.value,
+    styleChoice: styleChoice.value,
+    colorChoice: colorChoice.value,
+  }),
+  apply: (data) => {
+    // A saved banner keeps its id, so the draft can never re-key it.
+    form.reset({ ...data.values, id: index === null ? data.values.id : values.value.id });
+    resetDismissals.value = data.resetDismissals;
+    audience.value = data.audience;
+    styleChoice.value = data.styleChoice;
+    colorChoice.value = data.colorChoice;
+    continuedDraft.value = true;
+  },
+  base: () => (index === null ? null : original),
+  hasChanges: hasUnsavedChanges,
+  save: saveInPlace,
+  leaveOnRouteUpdate: leavesEditor,
+});
+
+// Without a draft the shared leave dialog still asks, offering only Save or Discard.
+const unkeptLeave = reactive({ open: false, saving: false });
+let resolveUnkeptLeave: ((allowed: boolean) => void) | null = null;
+
+const askUnkeptLeave = (): boolean | Promise<boolean> => {
+  if (draftsKept || !hasUnsavedChanges()) return true;
+  if (resolveUnkeptLeave) return false;
+  unkeptLeave.open = true;
+  return new Promise<boolean>((resolve) => {
+    resolveUnkeptLeave = resolve;
+  });
+};
+
+const chooseUnkeptLeave = async (choice: EditorDraftLeaveChoice) => {
+  const resolve = resolveUnkeptLeave;
+  if (!resolve || unkeptLeave.saving) return;
+  if (choice === "save" && !bannerDraft.state.canSave) return;
+  let allowed = choice === "discard";
+  if (choice === "save") {
+    unkeptLeave.saving = true;
+    allowed = await saveInPlace().catch(() => false);
+    unkeptLeave.saving = false;
+  }
+  if (allowed) leavingAfterSave = true;
+  unkeptLeave.open = false;
+  resolveUnkeptLeave = null;
+  resolve(allowed);
+};
+
+onBeforeRouteLeave(askUnkeptLeave);
+onBeforeRouteUpdate((to, from) => (leavesEditor(to, from) ? askUnkeptLeave() : true));
 
 // A reload or tab close skips the router, so the browser's own prompt has to cover it.
 const warnOnUnload = (event: BeforeUnloadEvent) => {
   if (hasUnsavedChanges()) event.preventDefault();
 };
 
-onMounted(() => window.addEventListener("beforeunload", warnOnUnload));
+onMounted(async () => {
+  window.addEventListener("beforeunload", warnOnUnload);
+  if (draftsKept) await bannerDraft.start();
+});
 onBeforeUnmount(() => window.removeEventListener("beforeunload", warnOnUnload));
 
-onBeforeRouteLeave(() => {
-  if (!hasUnsavedChanges()) return true;
-  return new Promise<boolean>((resolve) => {
-    leaveResolve = resolve;
-    leaveOpen.value = true;
-  });
-});
-
+// Reload means taking the stored banner over the edits, so they are not kept as a draft either.
 const reload = () => {
   leavingAfterSave = true;
+  bannerDraft.discard();
   emit("reload");
 };
 

@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import { discardEditorDraftIfAsked } from '../alertsPages/editorDraftHelpers.js';
 
 export class AiToolsetsFormValidationPage {
     /**
@@ -130,6 +131,7 @@ export class AiToolsetsFormValidationPage {
     async clickCancel() {
         testLogger.debug('Clicking Cancel button');
         await this.page.locator(this.cancelBtn).click();
+        await discardEditorDraftIfAsked(this.page);
     }
 
     // ── Locator getters (for expect() assertions in spec) ─────────────────────

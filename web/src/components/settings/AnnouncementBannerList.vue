@@ -26,9 +26,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         data-test="announcement-list-add-btn"
+        :aria-label="
+          bannerDrafts.hasNew
+            ? t('common.editorDraft.newDot', { label: t('announcements.settings.addBanner') })
+            : undefined
+        "
         @click="openEditor()"
-        >{{ t("announcements.settings.addBanner") }}</OButton
-      >
+        >{{ t("announcements.settings.addBanner") }}
+        <EditorDraftDot
+          v-if="bannerDrafts.hasNew"
+          :saved-at="bannerDrafts.savedAt(null)"
+          corner
+          data-test="announcement-list-add-draft-dot"
+      /></OButton>
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
@@ -98,9 +108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-message="{ row }">
-            <span class="text-text-heading block truncate text-sm" :title="row.text">
-              {{ row.text }}
-            </span>
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="text-text-heading block truncate text-sm" :title="row.text">
+                {{ row.text }}
+              </span>
+              <EditorDraftDot
+                v-if="row.draftKey && bannerDrafts.ids.has(row.draftKey)"
+                :saved-at="bannerDrafts.savedAt(row.draftKey)"
+                :data-test="`announcement-list-draft-dot-${row.index}`"
+              />
+            </div>
           </template>
           <template #cell-severity="{ row }">
             <OBadge :variant="SEVERITY_BADGE[row.draft.variant]" size="sm">
@@ -133,10 +150,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
                 icon-left="content-copy"
                 :title="t('announcements.list.duplicate')"
-                :aria-label="t('announcements.list.duplicate')"
+                :aria-label="
+                  hasDuplicateDraft(row)
+                    ? t('common.editorDraft.newDot', { label: t('announcements.list.duplicate') })
+                    : t('announcements.list.duplicate')
+                "
                 :data-test="`announcement-list-duplicate-${row.index}`"
                 @click.stop="openEditor({ duplicate: String(row.index) })"
-              />
+              >
+                <EditorDraftDot
+                  v-if="hasDuplicateDraft(row)"
+                  corner
+                  :tooltip="false"
+                  :data-test="`announcement-list-duplicate-draft-dot-${row.index}`"
+                />
+              </OButton>
               <OButton
                 variant="ghost-destructive"
                 size="icon-sm"
@@ -184,12 +212,16 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { announcementConfigQuery } from "@/services/announcements.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { bannerRank } from "@/utils/announcementOrder";
 import { bannerMessageText } from "@/utils/announcementMarkdown";
 import {
+  bannerDraftKey,
   bannerStatus,
   draftFromAuthored,
   hasCustomLook,
@@ -213,6 +245,7 @@ interface BannerRow {
   index: number;
   draft: BannerDraft;
   authored: Record<string, unknown>;
+  draftKey: string | null;
   text: string;
   severityLabel: string;
   status: RowStatus;
@@ -255,6 +288,20 @@ const configQuery = useQuery(() =>
   Object.assign(announcementConfigQuery(metaOrg.value), { enabled: !!metaOrg.value }),
 );
 const { update } = useAnnouncementConfigUpdate();
+const bannerDrafts = useEditorDraftIds("announcement_banner");
+const hasDuplicateDraft = (row: BannerRow) =>
+  !!row.draftKey && bannerDrafts.hasNewVariant(`duplicate:${row.draftKey}`);
+
+// A copy of a deleted banner has nothing left to come from, so its draft goes too.
+const dropBannerDrafts = (key: string) => {
+  const org = String(store.state.selectedOrganization?.identifier ?? "");
+  deleteEditorDraftsFor({
+    kind: "announcement_banner",
+    org,
+    entityId: key,
+    variant: `duplicate:${key}`,
+  });
+};
 
 const now = ref(serverNowMs());
 let statusTimer: ReturnType<typeof setInterval> | undefined;
@@ -291,6 +338,7 @@ const rows = computed<BannerRow[]>(() => {
       index,
       draft,
       authored: configQuery.data.value!.banners[index],
+      draftKey: bannerDraftKey(configQuery.data.value!.banners[index]),
       text: bannerMessageText(draft.message),
       severityLabel:
         styleNames.get(draft.styleId) ??
@@ -367,13 +415,15 @@ const removeBanner = async () => {
   const index = pendingDelete.value;
   pendingDelete.value = null;
   if (index === null) return;
-  const expected = rows.value.find((row) => row.index === index)?.authored;
+  const removed = rows.value.find((row) => row.index === index);
+  const expected = removed?.authored;
 
   try {
     await update((latest) => {
       if (!sameAuthored(latest.banners[index], expected)) throw new AnnouncementConflictError();
       return { ...latest, banners: latest.banners.filter((_, i) => i !== index) };
     });
+    if (removed?.draftKey) dropBannerDrafts(removed.draftKey);
     toast({ variant: "success", message: t("announcements.list.deleted") });
   } catch (error: any) {
     toast({
