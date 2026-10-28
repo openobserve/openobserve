@@ -60,7 +60,9 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForPanelRenderSettled(page, pm);
 
-    await expect(pm.dashboardNotices.noticeChip("series-cap")).toBeVisible({ timeout: 20000 });
+    const seriesCapChip = pm.dashboardNotices.noticeChip("series-cap");
+    await expect(seriesCapChip).toBeVisible({ timeout: 20000 });
+    await expect(seriesCapChip).toContainText(/(?:^|\D)1\/\d[\d,]*\+? series/);
 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
@@ -85,7 +87,11 @@ test.describe("Dashboard chart options — PromQL series limit, query type, redu
     const request = pm.dashboardPanelActions.nextPromQLQueryRangeRequest();
     await pm.dashboardPanelActions.applyDashboardBtn();
     const url = await request;
-    expect(url.searchParams.get("start")).toBe(url.searchParams.get("end"));
+    const start = url.searchParams.get("start");
+    const end = url.searchParams.get("end");
+    expect(start).not.toBeNull();
+    expect(end).not.toBeNull();
+    expect(start).toBe(end);
     await waitForPanelRenderSettled(page, pm);
 
     await pm.dashboardPanelActions.savePanel();
