@@ -1093,7 +1093,12 @@ import {
 } from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
-import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
+import {
+  buildFilterTerm,
+  applyFilterTerm,
+  mergeFilterTerm,
+  mergePendingFilters,
+} from "@/utils/traces/filterUtils";
 import { buildPathPatterns, buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
 import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
@@ -1658,10 +1663,8 @@ export default defineComponent({
       showFilterPopover.value = true;
     };
 
-    const applyAndViewTraces = () => {
-      searchObj.data.editorValue = searchObj.data.editorValue
-        ? searchObj.data.editorValue + " and " + localEditorValue.value
-        : localEditorValue.value;
+    const viewTracesWithQuery = (editorValue: string) => {
+      searchObj.data.editorValue = editorValue;
       showFilterPopover.value = false;
       localEditorValue.value = "";
       areFiltersAdded.value = false;
@@ -1673,9 +1676,19 @@ export default defineComponent({
         query.from = searchObj.data.datetime.startTime.toString();
         query.to = searchObj.data.datetime.endTime.toString();
       }
-      query.query = b64EncodeUnicode(searchObj.data.editorValue);
+      query.query = b64EncodeUnicode(editorValue);
       query["run-query"] = "true";
+      // Only the traces and spans tabs run a search, so any other tab falls back to spans.
+      query.tab = searchObj.meta.searchMode === "traces" ? "traces" : "spans";
       router.push({ name: "traces", query });
+    };
+
+    const applyAndViewTraces = () => {
+      viewTracesWithQuery(
+        searchObj.data.editorValue
+          ? searchObj.data.editorValue + " and " + localEditorValue.value
+          : localEditorValue.value,
+      );
     };
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -3439,9 +3452,9 @@ export default defineComponent({
       operator: "=" | "!=";
     }) => {
       const term = buildFilterTerm(field, value, operator);
-      localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
-      areFiltersAdded.value = true;
-      applyAndViewTraces();
+      // viewTracesWithQuery clears the pending sidebar filters, so they go into the query first.
+      const query = mergePendingFilters(localEditorValue.value, searchObj.data.editorValue ?? "");
+      viewTracesWithQuery(mergeFilterTerm(term, query));
     };
 
     const handleExpandToFullView = () => {
