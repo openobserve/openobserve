@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             block
-            class="h-auto justify-between"
+            class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
             :data-test="`overview-streams-type-${type.stream_type}`"
             @click="emit('open')"
           >
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               block
-              class="h-auto justify-between"
+              class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
               :data-test="`overview-streams-top-${row.stream_type}-${row.name}`"
               @click="emit('open')"
             >

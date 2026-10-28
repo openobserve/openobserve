@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           block
-          class="justify-between"
+          class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start"
           :data-test="`overview-alerts-row-${row.key}`"
           @click="emit('open')"
         >
