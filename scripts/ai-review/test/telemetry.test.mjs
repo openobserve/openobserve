@@ -61,8 +61,8 @@ test("response content and provider-reported usage use standard attributes", () 
   assert.equal(attributes["gen_ai.usage.input_tokens"], 1234 + 78 + 9);
   assert.equal(attributes["gen_ai.usage.output_tokens"], 56 + 12);
   assert.equal(attributes["gen_ai.usage.total_tokens"], 1234 + 78 + 9 + 56 + 12);
-  assert.equal(attributes["gen_ai.usage.cache_read_input_tokens"], 78);
-  assert.equal(attributes["gen_ai.usage.cache_creation_input_tokens"], 9);
+  assert.equal(attributes["gen_ai.usage.cache_read.input_tokens"], 78);
+  assert.equal(attributes["gen_ai.usage.cache_creation.input_tokens"], 9);
   assert.equal(attributes["gen_ai.usage.cache_read_tokens"], undefined);
   assert.equal(attributes["gen_ai.usage.cost"], 0.42);
   assert.equal(attributes["ai.usage.reasoning_tokens"], 12);
@@ -81,7 +81,7 @@ test("usage without cache or reasoning breakdown passes through unchanged", () =
 
   assert.equal(attributes["gen_ai.usage.input_tokens"], 100);
   assert.equal(attributes["gen_ai.usage.output_tokens"], 20);
-  assert.equal(attributes["gen_ai.usage.cache_read_input_tokens"], undefined);
+  assert.equal(attributes["gen_ai.usage.cache_read.input_tokens"], undefined);
 });
 
 test("missing provider usage is omitted instead of replaced with synthetic counts", () => {

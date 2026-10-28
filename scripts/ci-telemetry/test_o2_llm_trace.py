@@ -126,7 +126,7 @@ class UsageTest(unittest.TestCase):
         )
         attrs = t.usage_attributes(usage)
         self.assertEqual(attrs["gen_ai.usage.input_tokens"], 1000)
-        self.assertEqual(attrs["gen_ai.usage.cache_read_input_tokens"], 800)
+        self.assertEqual(attrs["gen_ai.usage.cache_read.input_tokens"], 800)
         self.assertEqual(attrs["gen_ai.usage.output_tokens"], 300)
         self.assertEqual(attrs["ai.usage.reasoning_tokens"], 120)
 

@@ -89,8 +89,8 @@ export function genAiResponseAttributes(data, text, requestedModel) {
     "gen_ai.usage.total_tokens": inputTokens !== undefined && outputTokens !== undefined
       ? inputTokens + outputTokens
       : undefined,
-    "gen_ai.usage.cache_read_input_tokens": cacheReadTokens,
-    "gen_ai.usage.cache_creation_input_tokens": cacheWriteTokens,
+    "gen_ai.usage.cache_read.input_tokens": cacheReadTokens,
+    "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
     "gen_ai.usage.cost": Number.isFinite(info.cost) && info.cost >= 0 ? info.cost : undefined,
     "ai.usage.reasoning_tokens": reasoningTokens,
     "ai.review.output.chars": text.length,

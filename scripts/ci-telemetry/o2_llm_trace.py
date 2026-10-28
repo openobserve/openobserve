@@ -304,10 +304,10 @@ def usage_from_response(data):
 
 
 def usage_attributes(usage):
-    """OpenObserve's extractor treats input_tokens as including cache_read_input_tokens."""
+    """OpenObserve's extractor treats input_tokens as including gen_ai.usage.cache_read.input_tokens."""
     return {
         "gen_ai.usage.input_tokens": usage.get("input"),
-        "gen_ai.usage.cache_read_input_tokens": usage.get("cache_read"),
+        "gen_ai.usage.cache_read.input_tokens": usage.get("cache_read"),
         "gen_ai.usage.output_tokens": usage.get("output"),
         "gen_ai.usage.total_tokens": usage.get("total"),
         "ai.usage.reasoning_tokens": usage.get("reasoning"),
