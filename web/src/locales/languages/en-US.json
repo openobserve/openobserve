@@ -2047,7 +2047,7 @@
       "statClicks": "Clicks",
       "statSessions": "Sessions",
       "statTop": "Most used",
-      "statTopSub": "{pct}% of clicks",
+      "statTopNamed": "Most used: {name}",
       "statFrustrated": "Frustrated clicks",
       "statFrustratedSub": "{pct}% of clicks",
       "colClicks": "Clicks"

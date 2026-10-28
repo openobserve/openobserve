@@ -7,31 +7,47 @@ const h = vi.hoisted(() => ({
   hold: vi.fn(),
   abortAll: vi.fn(),
   getStream: vi.fn(),
+  real: false,
 }));
 
-vi.mock("@/composables/rum/useAnalyticsSearch", () => ({
-  default: () => ({ run: h.run, hold: h.hold, abortAll: h.abortAll }),
-}));
+vi.mock("@/composables/rum/useAnalyticsSearch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/rum/useAnalyticsSearch")>();
+  return {
+    default: () => (h.real ? actual.default() : { run: h.run, hold: h.hold, abortAll: h.abortAll }),
+  };
+});
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStream: h.getStream }) }));
 vi.mock("@/services/rumProductAnalytics", () => ({
   default: { getAppSettings: vi.fn().mockResolvedValue({ data: undefined }) },
 }));
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
-vi.mock("@/utils/rum/clickHeatmapQueries", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  rankingSql: () => "SELECT ranking",
-  totalsSql: () => "SELECT totals",
-  deviceSplitSql: () => "SELECT devices",
-  pageListSql: () => "SELECT pages",
-}));
-vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  appProbeSql: () => "SELECT apps",
-}));
+vi.mock("@/utils/rum/clickHeatmapQueries", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/rum/clickHeatmapQueries")>();
+  const stub =
+    <A extends unknown[]>(real: (...a: A) => string, text: string) =>
+    (...a: A) =>
+      h.real ? real(...a) : text;
+  return {
+    ...actual,
+    rankingSql: stub(actual.rankingSql, "SELECT ranking"),
+    totalsSql: stub(actual.totalsSql, "SELECT totals"),
+    deviceSplitSql: stub(actual.deviceSplitSql, "SELECT devices"),
+    pageListSql: stub(actual.pageListSql, "SELECT pages"),
+  };
+});
+vi.mock("@/utils/rum/productAnalyticsQueries", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/rum/productAnalyticsQueries")>();
+  return {
+    ...actual,
+    appProbeSql: (...a: Parameters<typeof actual.appProbeSql>) =>
+      h.real ? actual.appProbeSql(...a) : "SELECT apps",
+  };
+});
 
 import ClickHeatmap from "./ClickHeatmap.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import rumProductAnalytics from "@/services/rumProductAnalytics";
+import searchService from "@/services/search";
 import { PAGE_LIST_LIMIT, RANKING_LIMIT } from "@/utils/rum/clickHeatmapQueries";
 
 const store = createStore({
@@ -67,6 +83,7 @@ const mountPage = async (stubs: Record<string, boolean> = {}) => {
 describe("ClickHeatmap", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.real = false;
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -247,5 +264,35 @@ describe("ClickHeatmap", () => {
 
     expect(labels).toContain("Tablet (0)");
     expect(labels).toContain("Desktop (4)");
+  });
+
+  it("runs the snapshot lookups through the real search helper without a stream rejection", async () => {
+    h.real = true;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const hits = (sql: string) => {
+      if (sql.includes('FROM "_sessionreplay" WHERE view_id IN'))
+        return [{ view_id: "v1", has_full_snapshot: true }];
+      if (sql.includes('FROM "_sessionreplay"')) return [];
+      if (sql.includes("view_id, max(")) return [{ view_id: "v1" }];
+      if (sql.includes("AS sessions FROM") && sql.includes("GROUP BY application_id"))
+        return [{ app: "web" }];
+      if (sql.includes("view_url")) return [{ view_url: "https://x.test/home" }];
+      return [];
+    };
+    vi.mocked(searchService.search).mockImplementation((async (req: any) => ({
+      data: { hits: hits(String(req.query.query.sql)) },
+    })) as never);
+    const wrapper = await mountPage();
+
+    const sqls = vi
+      .mocked(searchService.search)
+      .mock.calls.map((c) => String((c[0].query as any).query.sql));
+    expect(sqls.some((q) => q.includes('FROM "_sessionreplay" WHERE view_id IN'))).toBe(true);
+    expect(sqls.some((q) => q.includes('FROM "_sessionreplay" WHERE view_id = '))).toBe(true);
+    expect(console.error).not.toHaveBeenCalledWith(
+      expect.stringContaining("replay"),
+      expect.anything(),
+    );
+    expect(wrapper.find('[data-test="rum-heatmap-load-error"]').exists()).toBe(false);
   });
 });

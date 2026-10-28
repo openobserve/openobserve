@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="none"
             :show-global-filter="false"
             :frame="false"
+            horizontal-scroll
             :loading="loading"
             data-test="rum-heatmap-elements-table"
             @row-click="onRowClick"
@@ -403,7 +404,7 @@ const columns = computed<OTableColumnDef<ElementRow>[]>(() => [
   {
     id: "feature",
     header: t("rum.heatmap.colFeature"),
-    size: 200,
+    size: 160,
     meta: { fillRemaining: true },
   },
   { id: "clicks", header: t("rum.heatmap.colClicks"), accessorKey: "clicks", size: 110 },
@@ -413,7 +414,7 @@ const columns = computed<OTableColumnDef<ElementRow>[]>(() => [
     id: "frustrated",
     header: t("rum.heatmap.colFrustrated"),
     accessorKey: "frustrated",
-    size: 90,
+    size: 120,
     meta: { align: "right" },
   },
 ]);
@@ -434,9 +435,10 @@ const statItems = computed<StatItem[]>(() => {
     },
     {
       key: "top",
-      label: t("rum.heatmap.statTop"),
-      value: top ? top.name || top.selector : "—",
-      sub: top ? t("rum.heatmap.statTopSub", { pct: sharePercent(top.clicks, clicks) }) : undefined,
+      label: top
+        ? t("rum.heatmap.statTopNamed", { name: top.name || top.selector })
+        : t("rum.heatmap.statTop"),
+      value: top ? t("rum.heatmap.sharePct", { pct: sharePercent(top.clicks, clicks) }) : "—",
       tone: "primary",
       dataTest: "rum-heatmap-stat-top",
     },
@@ -490,6 +492,7 @@ async function searchRows<T>(
   sql: string,
   limit: number,
   win: { start_time: number; end_time: number },
+  stream?: string,
 ): Promise<T[] | null> {
   const spec: SearchSpec = {
     sql,
@@ -497,6 +500,7 @@ async function searchRows<T>(
     endUs: win.end_time,
     limit,
     sampled: 1,
+    stream,
   };
   const res = await search.run<T>(id, spec, `${id}:${sql}`);
   if (res.status === "ok") return res.rows;
@@ -506,8 +510,13 @@ async function searchRows<T>(
 }
 
 // Replay lookups go through the shared search so superseding or leaving the page cancels them.
-async function replayRows(id: string, sql: string, limit: number): Promise<Row[]> {
-  const rows = await searchRows<Row>(id, sql, limit, windowMicros(SNAPSHOT_LOOKBACK_HOURS));
+async function replayRows(
+  id: string,
+  sql: string,
+  limit: number,
+  stream = "_rumdata",
+): Promise<Row[]> {
+  const rows = await searchRows<Row>(id, sql, limit, windowMicros(SNAPSHOT_LOOKBACK_HOURS), stream);
   if (!rows) throw new Error("replay lookup superseded");
   return rows;
 }
@@ -703,6 +712,7 @@ async function pickReplayView(): Promise<string | null> {
     "replay-flags",
     `SELECT has_full_snapshot, view_id FROM "_sessionreplay" WHERE view_id IN (${ids})`,
     MAX_SNAPSHOT_LOOKUP_ROWS,
+    "_sessionreplay",
   );
   const withSnapshot = new Set(
     rows.filter((r) => isSnapshotFlag(r.has_full_snapshot)).map((r) => String(r.view_id)),
@@ -730,6 +740,7 @@ async function loadSnapshotSource(): Promise<SnapshotSource | null> {
     "replay-segments",
     `SELECT start, segment FROM "_sessionreplay" WHERE view_id = ${sqlLiteral(viewId)} ORDER BY start ASC`,
     MAX_REPLAY_SEGMENTS,
+    "_sessionreplay",
   );
   const bodies = segments.flatMap((r) => {
     try {

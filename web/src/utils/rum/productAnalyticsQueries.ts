@@ -636,10 +636,11 @@ export function stepPredicateGrouped(
 }
 
 // Removes string literals first, so a click key such as 'Join us' cannot trip the structural checks.
-export function assertJoinFree(sql: string): void {
+export function assertJoinFree(sql: string, stream = "_rumdata"): void {
   const bare = sql.replace(/'(?:[^']|'')*'/g, "''");
-  const scans = bare.split('FROM "_rumdata"').length - 1;
-  if (scans !== 1) throw new Error(`Analytics SQL must read _rumdata exactly once, found ${scans}`);
+  const scans = bare.split(`FROM "${stream}"`).length - 1;
+  if (scans !== 1)
+    throw new Error(`Analytics SQL must read ${stream} exactly once, found ${scans}`);
   for (const re of [/\bJOIN\b/i, /\bIN\s*\(\s*SELECT/i, /\bEXISTS\b/i, /\bUNION\b/i]) {
     if (re.test(bare)) throw new Error(`Analytics SQL must be join-free: ${re}`);
   }
