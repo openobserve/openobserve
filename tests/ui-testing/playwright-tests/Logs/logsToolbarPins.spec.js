@@ -235,4 +235,37 @@ test.describe('Logs toolbar pins', () => {
 
     testLogger.info('Syntax guide pin state was tracked through the menu pin button title');
   });
+
+  test('the function editor outlives the width budget that collapses the left section', {
+    tag: ['@toolbarPins', '@logs', '@P2', '@all'],
+  }, async () => {
+    const pins = pm.logsToolbarPinsPage;
+    // Left section pinned too, so the budget contends and the exemption is a contrast.
+    await pins.seedPinStorage({
+      pins: [...pins.leftSectionOrder, 'functionEditor'],
+      decided: true,
+    });
+    await pins.navigateToLogs(getOrgIdentifier());
+    await pins.expectPinnedUnclipped('functionEditor');
+
+    const kept = [];
+    for (const width of [1700, 1300, 1100, 900, 700]) {
+      // The settled left-pin set is the barrier: it only changes once the ResizeObserver fired.
+      const visible = await pins.setViewportWidthAndSettle(width);
+      kept.push({ width, count: visible.length });
+      await pins.expectPinnedUnclipped('functionEditor');
+    }
+
+    // Without a width that actually dropped a left pin, the sweep proves nothing.
+    expect(kept[0].count, 'the whole left section must fit at the widest viewport').toBe(
+      pins.assertablePinOrder.length,
+    );
+    const collapsed = kept.find((entry) => entry.count < pins.assertablePinOrder.length);
+    expect(collapsed, 'no width in the sweep collapsed a left-section pin').toBeDefined();
+
+    testLogger.info(
+      `Left pins kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}` +
+        ` | first collapse at ${collapsed.width}px, function editor unclipped throughout`,
+    );
+  });
 });
