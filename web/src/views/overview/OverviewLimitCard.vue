@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           raw(`${percent.toFixed(1)}%`)
         }}</span>
       </div>
+      <p class="text-text-secondary text-xs" data-test="overview-limit-scope">
+        {{ t("overview.limit.scope") }}
+      </p>
       <OProgressBar
         :value="percentToFraction(percent)"
         :variant="percentVariant(percent)"
