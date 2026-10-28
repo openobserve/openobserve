@@ -213,6 +213,7 @@ pub struct PipelinesData {
 pub struct LimitsData {
     pub scope: &'static str,
     pub ingestion_used_percent: f64,
+    pub expired: bool,
     pub days_over_limit: u8,
 }
 
@@ -244,6 +245,19 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
         stream_grants,
         pipeline_grants,
     })
+}
+
+/// Overview returned when the caller's grants cannot be resolved; every scoped section reports an
+/// error.
+pub async fn scope_unavailable() -> Overview {
+    Overview {
+        streams: Section::error("failed to resolve permissions"),
+        alerts: Section::error("failed to resolve permissions"),
+        pipelines: Section::error("failed to resolve permissions"),
+        limits: limits_section().await,
+        generated_at: now_micros(),
+        cached: false,
+    }
 }
 
 /// Returns a fresh cached overview for the caller, so a hit can skip the permission lookups.
@@ -474,7 +488,7 @@ fn build_pipelines_data(pipelines: &[Pipeline], errored: &HashSet<String>) -> Pi
 #[cfg(feature = "enterprise")]
 async fn limits_section() -> Section<LimitsData> {
     use o2_enterprise::enterprise::license::{
-        get_license, ingestion_limit_exceeded_count, ingestion_used,
+        get_license, ingestion_limit_exceeded_count, ingestion_used, license_expired,
     };
 
     if get_license().await.is_none() {
@@ -483,6 +497,7 @@ async fn limits_section() -> Section<LimitsData> {
     Section::ok(LimitsData {
         scope: "deployment",
         ingestion_used_percent: ingestion_used() * 100.0,
+        expired: license_expired().await,
         days_over_limit: ingestion_limit_exceeded_count(),
     })
 }

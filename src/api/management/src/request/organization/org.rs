@@ -390,7 +390,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     tag = "Organizations",
     operation_id = "GetOrganizationOverview",
     summary = "Get organization overview",
-    description = "Returns the streams, alerts, pipelines and license limits sections the Overview page needs in one call. Each section carries its own status (ok, error or locked), so one failing section never fails the response, and results only include objects the caller may see. Responses are cached briefly per caller.",
+    description = "Returns the streams, alerts, pipelines and license limits sections the Overview page needs in one call. Each section carries its own status (ok, error, locked or forbidden), so one failing section never fails the response, and results only include objects the caller may see. Responses are cached briefly per caller.",
     security(
         ("Authorization"= [])
     ),
@@ -422,13 +422,18 @@ pub async fn org_overview(
         None => None,
     };
     let top_n = overview::normalize_top_n(top);
-    let refresh = query.get("refresh").is_some_and(|v| v == "true");
+    let refresh = query
+        .get("refresh")
+        .is_some_and(|v| v == "true" || v == "1");
     if !refresh && let Some(hit) = overview::cached_overview(&org_id, &user_email.user_id, top_n) {
         return Json(hit).into_response();
     }
     let scope = match overview::resolve_scope(&org_id, &user_email.user_id).await {
         Ok(scope) => scope,
-        Err(e) => return MetaHttpResponse::internal_error(e),
+        Err(e) => {
+            log::error!("[overview] failed to resolve permissions for {org_id}: {e}");
+            return Json(overview::scope_unavailable().await).into_response();
+        }
     };
     let result = overview::get_overview(&org_id, &scope, top_n).await;
     Json(result).into_response()
