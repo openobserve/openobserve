@@ -71,6 +71,7 @@ pub async fn mute(
     ack::authorize(target, actor, Act::Mute)
         .await
         .map_err(MuteError::Refused)?;
+    authorize_folder(&target.org_id, actor, req).await?;
     let now = now_micros();
     let ends_at = requested_end(req.until_clear, req.minutes, req.ends_at, now)?;
     let groups = requested_groups(target, req).await?;
@@ -408,6 +409,33 @@ async fn quick_mute_of(target: &AckTarget, downtime_id: &str) -> Result<Downtime
     Ok(row)
 }
 
+/// The downtime folder the caller names; none files the mute in the default folder. [pure]
+fn named_folder(req: &AlertMuteRequest) -> Option<&str> {
+    req.folder_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|f| !f.is_empty())
+}
+
+/// A named folder needs the write access creating a downtime there needs; the default folder
+/// stays open so a responder with no downtime folder can still mute.
+async fn authorize_folder(
+    org_id: &str,
+    actor: &str,
+    req: &AlertMuteRequest,
+) -> Result<(), MuteError> {
+    let Some(folder) = named_folder(req) else {
+        return Ok(());
+    };
+    if crate::auth::check_folder_write_permissions(org_id, actor, "downtime_folders", folder).await
+    {
+        return Ok(());
+    }
+    Err(MuteError::Downtime(DowntimeError::Forbidden(
+        "You cannot create downtimes in this folder.".to_string(),
+    )))
+}
+
 /// Filed in the request's folder, else the default downtimes folder, created on first use.
 fn quick_mute_request(
     target: &AckTarget,
@@ -417,13 +445,7 @@ fn quick_mute_request(
     alert_groups: Option<Vec<AlertGroupRef>>,
     end_on_clear: Option<EndOnClear>,
 ) -> DowntimeRequest {
-    let folder_id = req
-        .folder_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|f| !f.is_empty())
-        .unwrap_or(DEFAULT_FOLDER)
-        .to_string();
+    let folder_id = named_folder(req).unwrap_or(DEFAULT_FOLDER).to_string();
     DowntimeRequest {
         folder_id,
         name: Some(
@@ -524,6 +546,36 @@ mod tests {
             updated_by: "u".to_string(),
             updated_at: NOW,
         }
+    }
+
+    #[tokio::test]
+    async fn a_named_folder_needs_write_access_and_no_folder_needs_none() {
+        let named = AlertMuteRequest {
+            folder_id: Some("prod-oncall".to_string()),
+            ..Default::default()
+        };
+        assert!(matches!(
+            authorize_folder("default", "nobody@example.com", &named).await,
+            Err(MuteError::Downtime(DowntimeError::Forbidden(_)))
+        ));
+        let blank = AlertMuteRequest {
+            folder_id: Some(" ".to_string()),
+            ..Default::default()
+        };
+        assert!(
+            authorize_folder("default", "nobody@example.com", &blank)
+                .await
+                .is_ok()
+        );
+        assert!(
+            authorize_folder(
+                "default",
+                "nobody@example.com",
+                &AlertMuteRequest::default()
+            )
+            .await
+            .is_ok()
+        );
     }
 
     #[test]
