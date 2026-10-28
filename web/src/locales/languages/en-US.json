@@ -321,8 +321,13 @@
     "noLLMInsights": {
       "title": "No LLM activity yet",
       "description": "Instrument your services with the OpenTelemetry Gen-AI semantic conventions and ingest at least one trace to populate this dashboard.",
-      "action": "Instrument with OpenTelemetry",
-      "actionDesc": "Capture gen_ai_* attributes on your traces"
+      "action": "All AI integrations",
+      "actionDesc": "Browse every framework and provider guide",
+      "suggested": "Set up {name} tracing",
+      "suggestedDesc": "Suggested because you came from the {name} docs",
+      "codingAgent": "Instrument with a coding agent",
+      "codingAgentDesc": "Your coding agent adds tracing and checks the first trace",
+      "startFrom": "Or start from"
     },
     "noLLMSessions": {
       "title": "No LLM sessions yet",
@@ -5956,7 +5961,19 @@
       "viewDocsPrefix": "Click",
       "viewDocsLinkLabel": "here",
       "viewDocsSuffix": "to check further documentation.",
-      "selectIntegrationPrompt": "Select an integration to view details."
+      "selectIntegrationPrompt": "Select an integration to view details.",
+      "codingAgent": {
+        "tabAgent": "With a coding agent",
+        "tabSteps": "Step by step",
+        "step": "Step {n}",
+        "streamLabel": "Traces Stream Name",
+        "streamHelp": "The agent writes traces to this stream and checks it.",
+        "envTitle": "Download your .env",
+        "envHelp": "Save it in the project root. The skill reads the token from this file, so it never goes into the chat.",
+        "envButton": "Download .env",
+        "promptTitle": "Paste this into Claude Code, Cursor or Codex",
+        "promptCopied": "Prompt copied"
+      }
     },
     "header": "Data sources",
     "resetRUMTokenLabel": "Reset RUM Token",
@@ -15388,7 +15405,7 @@
         "filterErrors": "Filter Errors",
         "resetFilters": "Reset Filters",
         "errorsNone": "No Errors · {total} Turns",
-        "latencyLead": "Slowest {slowest} ·",
+        "latencyLead": "Avg Turn {avg} · Slowest {slowest} ·",
         "costLead": "Peak {peak} ·",
         "tokens": "{ratio}% Cached",
         "cacheImpact": "{ratio}% Reused · {tokens} Tok Read",
@@ -15564,6 +15581,7 @@
     "lLMErrorTable": {
       "noData": "No data",
       "noErrorsInRange": "No errors in this time range",
+      "loadFailed": "Could not load recent errors",
       "time": "Time",
       "service": "Service",
       "operation": "Operation",
@@ -16535,7 +16553,41 @@
     "tierAlwaysActive": "Always active (default)",
     "testAtTimeLabel": "Test at UTC time",
     "testAtTimeHint": "Leave empty to use the current time. Peak / off-peak tiers resolve against this time.",
-    "localTimeHint": "In your timezone: {range}"
+    "localTimeHint": "In your timezone: {range}",
+    "builtInStatus": {
+      "seed": "Built-in prices: seed list shipped with this release, dated {date}.",
+      "neverSynced": "Online sync has not run since the server started.",
+      "lastSynced": "Last synced online {time}."
+    },
+    "unpriced": {
+      "tab": "Unpriced / approximate",
+      "tabWithCount": "Unpriced / approximate · {count}",
+      "banner": "{count} model in your traces has no price or an approximate one. Its cost may be wrong. | {count} models in your traces have no price or an approximate one. Their cost may be wrong.",
+      "streamLabel": "Stream",
+      "window": "Last 24 hours",
+      "colModel": "Model seen in traces (24 h)",
+      "colPricedAs": "Priced as",
+      "colTokens": "Tokens",
+      "colCost": "Cost recorded",
+      "colActions": "Actions",
+      "spans": "{count} span | {count} spans",
+      "noMatch": "No match",
+      "approximate": "Approximate",
+      "defaultTierPrices": "in {input} / out {output} per 1M",
+      "createPrice": "Create price",
+      "keepPrices": "Keep {name} prices",
+      "mute": "Mute",
+      "muteConfirmTitle": "Mute this model?",
+      "muteConfirmMessage": "Spans of {model} will be priced as free and the model leaves this list. Delete the \"{name}\" price to unmute it.",
+      "mutedNotif": "{model} muted",
+      "keptNotif": "{model} now uses {name} prices",
+      "errSave": "Failed to save the price",
+      "errLoad": "Failed to load unpriced models",
+      "emptyTitle": "Every model in this stream's last 24 h has an exact price.",
+      "noStreamsTitle": "No LLM trace streams",
+      "noStreamsDesc": "Models appear here once gen_ai spans reach a traces stream.",
+      "recordedCostNote": "New prices apply to spans ingested after you save. Older spans keep their recorded cost."
+    }
   },
   "aiObservability": {
     "title": "AI Observability",
@@ -17128,6 +17180,8 @@
       "skipTiers": "Rows skipped: {full} fully · {partial} partially",
       "scoreEvidence": "{scorer} · v{version}: {samples} samples, {noReference} no reference, {noTrace} no trace",
       "scorerApplicability": "{scorer} · v{version}: {eligible} eligible slots, {noReference} without reference",
+      "costUnknown": "cost unknown",
+      "costAtLeast": "≥ {cost}",
       "loadError": "Failed to load experiments",
       "previewError": "Failed to preview experiment slots",
       "createSuccess": "Experiment created",
@@ -17210,6 +17264,8 @@
         "costConfirmMessage": "This experiment is estimated to cost about {cost}, above the {threshold} warning threshold. Create and run it anyway?",
         "costConfirmMessageUnpriced": "This experiment is estimated to cost more than the warning threshold. Create and run it anyway?",
         "costConfirmOk": "Create Anyway",
+        "taskProviderFailed": "Nothing was created. The task provider {provider} did not answer the test call.",
+        "judgeProviderFailed": "Nothing was created. The judge provider {provider} did not answer the test call.",
         "skippedFully": "{count} rows fully skipped — every selected scorer needs an expected output. Skipped rows cost nothing to run.",
         "skippedPartially": "{count} rows partially skipped — the task still runs, but reference-based scorers cannot score rows without an expected output.",
         "skippedNone": "Every matched row can be scored on at least one dimension.",
@@ -17298,7 +17354,26 @@
           "trials": "Trials",
           "dispersion": "Dispersion",
           "latency": "Latency",
-          "p50Latency": "P50 Latency"
+          "p50Latency": "P50 Latency",
+          "error": "Error"
+        },
+        "failureBanner": {
+          "title": "{failed} of {total} slots failed: {cause}.",
+          "cause": "Top cause, {count} slots: {message}",
+          "moreCauses": "+ {count} more causes",
+          "noMessage": "no error message was recorded",
+          "openProviders": "Open Providers"
+        },
+        "failureKinds": {
+          "provider_auth": "the provider rejected the credentials",
+          "rate_limited": "the provider rate-limited the run",
+          "timeout": "the provider did not answer in time",
+          "provider_5xx": "the provider returned a server error",
+          "parse_error": "the output could not be parsed",
+          "mapping_error": "the task input could not be built",
+          "scorer_missing": "a scorer no longer exists",
+          "execution_error": "the task call failed",
+          "unknown": "the task call failed"
         },
         "saveAsPrompt": "Save as Prompt",
         "openPrompt": "Open Prompt",
@@ -17579,7 +17654,11 @@
     "scope": {
       "env": "Env",
       "agent": "Agent",
-      "version": "Version"
+      "version": "Version",
+      "agentIdHint": "Agent ID: {ids}",
+      "noAgentIdentity": "No agent identity found",
+      "noAgentIdentityDescription": "These LLM spans carry no agent name, so they are shown by stream. Map the attribute that names your agent to view them by agent.",
+      "noAgentIdentityAction": "Open GenAI Agent Mapping"
     },
     "agentGraph": {
       "stream": "Stream",
@@ -18439,7 +18518,7 @@
       "remoteCta": "Configure Endpoint"
     },
     "provider": {
-      "backTo": "Back to Providers",
+      "backTo": "Providers",
       "createTitle": "Create LLM Provider",
       "editTitle": "Edit LLM Provider",
       "subtitle": "Configure the model endpoint used by LLM judge scorers.",
@@ -18684,7 +18763,7 @@
           "duplicateName": "Scorer {index}: name \"{name}\" is used more than once in this import"
         }
       },
-      "backTo": "Back to Scorers",
+      "backTo": "Scorers",
       "badgeRemote": "Remote",
       "badgeLlm": "LLM Judge",
       "createTitleRemote": "New Remote Scorer",
@@ -18715,6 +18794,9 @@
       "providerPlaceholder": "Select provider",
       "modelLabel": "Model",
       "modelPlaceholder": "gpt-4o",
+      "temperatureLabel": "Temperature",
+      "temperaturePlaceholder": "0",
+      "temperatureHelp": "0 to 2. Leave blank to judge at 0.",
       "promptLabel": "Judge prompt",
       "includeReasoningLabel": "Include Reasoning",
       "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
@@ -18788,6 +18870,7 @@
         "apiKeyHeaderRequired": "Header name is required",
         "apiKeyTokenRequired": "Token is required",
         "timeoutInvalid": "Timeout must be 0 or greater",
+        "temperatureInvalid": "Temperature must be between 0 and 2",
         "retriesInvalid": "Retries must be 0 or greater",
         "duplicateFieldName": "Field names must be unique"
       },
@@ -18894,6 +18977,7 @@
         "degraded": "Degraded",
         "waitingForCredentials": "Waiting for credentials",
         "noRecentRuns": "No recent runs",
+        "lastScored": "Last scored {time}",
         "summary": "{errors} of {runs} runs failed in the last 15 minutes",
         "since": "Entered this state {time}",
         "checked": "Last checked {time}"
@@ -18916,7 +19000,7 @@
       "samplingValuePreview": "Evaluates {percent}% of matched targets.",
       "samplingValueAllHelp": "Every matched target is evaluated.",
       "samplingHelp": "Runs after filtering, to control cost.",
-      "backTo": "Back to Eval Jobs",
+      "backTo": "Eval Jobs",
       "createTitle": "New Eval Job",
       "editTitle": "Update Eval Job",
       "stepper": {
@@ -28251,6 +28335,75 @@
       "notSent": "Not sent",
       "reminded": "Reminder sent to {count} person | Reminder sent to {count} people",
       "remindFailed": "The reminders could not be sent."
+    }
+  },
+  "llmDataTrust": {
+    "cost": {
+      "partial": "partial",
+      "unknown": "cost unknown",
+      "atLeast": "≥ {cost}",
+      "partialTooltip": "Partial cost. No price for {models}: {tokens} tokens in this {scope} are not counted.",
+      "unknownTooltip": "Cost unknown. No price for {models}: none of the {tokens} tokens in this {scope} has a cost.",
+      "scopeSession": "session",
+      "scopeTrace": "trace",
+      "unknownModel": "an unnamed model",
+      "addPrice": "Add a price"
+    },
+    "tile": {
+      "unpricedTokens": "{tokens} tokens unpriced",
+      "unpricedTooltip": "Cost is a lower bound: {tokens} tokens on {models} have no price. Open the Unpriced tab in LLM Model Pricing."
+    },
+    "chart": {
+      "costMissing": "Not in this chart: {models}. {tokens} tokens have no price.",
+      "unpricedModels": "Unpriced: {models}",
+      "addPrice": "Add a price"
+    },
+    "health": {
+      "title": "Data health",
+      "errors": "{n} error | {n} errors",
+      "warnings": "{n} warning | {n} warnings",
+      "passing": "{n} passing",
+      "checkedAgo": "checked {ago}",
+      "review": "Review checks",
+      "drawerTitle": "AI data health",
+      "drawerSubtitle": "{stream} · current window",
+      "rerun": "Re-run checks",
+      "close": "Close",
+      "loadError": "Data health checks could not run.",
+      "samples": "Samples:",
+      "copyLink": "Copy link for an admin",
+      "linkCopied": "Link copied",
+      "status": {
+        "pass": "Passing",
+        "warning": "Warning",
+        "error": "Error"
+      },
+      "checks": {
+        "unpriced_models": {
+          "label": "Unpriced models",
+          "detail": "{count} model(s) · {spans} spans · {tokens} tokens counted as $0",
+          "pass": "Every LLM span matched a price.",
+          "fix": "Fix in LLM Model Pricing"
+        },
+        "missing_agent_identity": {
+          "label": "Missing agent identity",
+          "detail": "{affected} of {total} LLM spans ({pct}) have no gen_ai.agent.name, so agent views miss them.",
+          "pass": "Every LLM span carries an agent name or id.",
+          "fix": "Open GenAI Agent Mapping"
+        },
+        "zero_duration_spans": {
+          "label": "Zero-duration spans",
+          "detail": "{affected} LLM spans report 0 ms, so latency and session duration read too low.",
+          "pass": "No LLM span reports 0 ms.",
+          "fix": "How to fix"
+        },
+        "missing_session_id": {
+          "label": "Spans without session id",
+          "detail": "{affected} of {total} LLM spans ({pct}) have no gen_ai.conversation.id, so Sessions misses them.",
+          "pass": "Every LLM span has gen_ai.conversation.id.",
+          "fix": "Integration guide"
+        }
+      }
     }
   },
   "fleet": {

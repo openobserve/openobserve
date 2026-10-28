@@ -103,6 +103,11 @@ pub struct ExperimentExecutionRecord {
     pub output: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    /// Failure class from the shared evaluation taxonomy (`provider_auth`,
+    /// `timeout`, `execution_error`, …). Absent on records written before it
+    /// existed, which group by message alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_kind: Option<String>,
     /// Permanent reason an intentionally ineligible slot was not executed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_reason: Option<ExperimentSkipReason>,
@@ -148,6 +153,7 @@ impl ExperimentExecutionRecord {
         Self {
             output: Some(serde_json::Value::String(String::new())),
             error_message: Some(String::new()),
+            error_kind: Some(String::new()),
             skip_reason: Some(ExperimentSkipReason::NoReference),
             error_attempt_count: Some(0),
             latency_ms: Some(0),
@@ -334,6 +340,7 @@ mod tests {
             status: ExperimentExecutionStatus::Ok,
             output: Some(json!("It ships tomorrow")),
             error_message: None,
+            error_kind: None,
             skip_reason: None,
             error_attempt_count: None,
             latency_ms: Some(42),
@@ -367,6 +374,7 @@ mod tests {
             "status",
             "output",
             "error_message",
+            "error_kind",
             "skip_reason",
             "error_attempt_count",
             "latency_ms",

@@ -19,8 +19,10 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService, { type SessionSortField, type SessionSortOrder } from "@/services/sessions";
 import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import type { AgentsLoadError } from "@/enterprise/composables/useAgentScope";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
+import { unpricedFields } from "../llmDataTrust.utils";
 
 export interface SessionDetail {
   sessionId: string;
@@ -33,6 +35,9 @@ export interface SessionDetail {
   outputTokens: number;
   tokens: number;
   cost: number;
+  /** Tokens with no price (their cost is missing from `cost`) and their models. */
+  unpricedTokens: number;
+  unpricedModels: string[];
   cacheReadInputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputCost: number;
@@ -53,6 +58,8 @@ export interface SessionTraceRow {
   outputTokens: number;
   tokens: number;
   cost: number;
+  unpricedTokens: number;
+  unpricedModels: string[];
   cacheReadInputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputCost: number;
@@ -122,6 +129,8 @@ export interface SessionRow {
   outputTokens: number;
   tokens: number;
   cost: number;
+  unpricedTokens: number;
+  unpricedModels: string[];
   cacheReadInputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputCost: number;
@@ -192,6 +201,10 @@ let fetchSeq = 0;
 // reset `agentsLoaded` to false and strand the agent picker on its skeleton.
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);
+const agentsError = ref<AgentsLoadError | null>(null);
+// The org `agents` belongs to: another org's list must not decide this org's
+// mode or fill its picker, so SessionsList resets the three above on a mismatch.
+const agentsOrg = ref<string | null>(null);
 
 /**
  * Composable owning the Sessions tab's list state and fetch flow.
@@ -276,6 +289,7 @@ export function useSessions() {
           outputTokens: Number(h.gen_ai_usage_output_tokens) || 0,
           tokens: Number(h.gen_ai_usage_total_tokens) || 0,
           cost: Number(h.gen_ai_usage_cost) || 0,
+          ...unpricedFields(h),
           cacheReadInputTokens: Number(h.gen_ai_usage_cache_read_input_tokens) || 0,
           cacheCreationInputTokens: Number(h.gen_ai_usage_cache_creation_input_tokens) || 0,
           cacheReadInputCost: Number(h.gen_ai_usage_cost_cache_read_input) || 0,
@@ -400,6 +414,7 @@ export function useSessions() {
         outputTokens: Number(r.gen_ai_usage_output_tokens) || 0,
         tokens: Number(r.gen_ai_usage_total_tokens) || 0,
         cost: Number(r.gen_ai_usage_cost) || 0,
+        ...unpricedFields(r),
         cacheReadInputTokens: Number(r.gen_ai_usage_cache_read_input_tokens) || 0,
         cacheCreationInputTokens: Number(r.gen_ai_usage_cache_creation_input_tokens) || 0,
         cacheReadInputCost: Number(r.gen_ai_usage_cost_cache_read_input) || 0,
@@ -430,6 +445,8 @@ export function useSessions() {
     let totalEstimatedCostWithoutCache = 0;
     let totalCacheReadSavings = 0;
     let totalNetCacheImpact = 0;
+    let totalUnpricedTokens = 0;
+    const unpricedModels = new Set<string>();
     let totalErrors = 0;
     let userId: string | null = null;
     let serviceName: string | null = null;
@@ -444,6 +461,8 @@ export function useSessions() {
       totalOutputTokens += t.outputTokens;
       totalTokens += t.tokens;
       totalCost += t.cost;
+      totalUnpricedTokens += t.unpricedTokens;
+      for (const m of t.unpricedModels) unpricedModels.add(m);
       totalCacheReadInputTokens += t.cacheReadInputTokens;
       totalCacheCreationInputTokens += t.cacheCreationInputTokens;
       totalCacheReadInputCost += t.cacheReadInputCost;
@@ -473,6 +492,8 @@ export function useSessions() {
       outputTokens: totalOutputTokens,
       tokens: totalTokens,
       cost: totalCost,
+      unpricedTokens: totalUnpricedTokens,
+      unpricedModels: [...unpricedModels],
       cacheReadInputTokens: totalCacheReadInputTokens,
       cacheCreationInputTokens: totalCacheCreationInputTokens,
       cacheReadInputCost: totalCacheReadInputCost,
@@ -603,6 +624,8 @@ export function useSessions() {
     sortOrder,
     agents,
     agentsLoaded,
+    agentsError,
+    agentsOrg,
     fetchPage,
     fetchSession,
     fetchTurnDetail,

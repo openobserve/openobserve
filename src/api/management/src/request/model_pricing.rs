@@ -448,7 +448,10 @@ pub struct BuiltInModelPricingEntry {
 pub struct BuiltInModelPricingResponse {
     pub models: Vec<BuiltInModelPricingEntry>,
     pub source_url: String,
+    /// Unix seconds of this server's last successful online sync; 0 = none since startup.
     pub last_updated: i64,
+    /// Date of the seed price list compiled into this binary.
+    pub seed_date: &'static str,
 }
 
 /// GetBuiltInModelPricing
@@ -529,6 +532,7 @@ pub async fn get_built_in(
         models,
         source_url,
         last_updated,
+        seed_date: openobserve_builtins::model_pricing::SEED_DATE,
     })
 }
 
@@ -592,6 +596,139 @@ pub async fn refresh_built_in(
     match openobserve_builtins::model_pricing::sync_built_in_from_github(true).await {
         Ok(result) => MetaHttpResponse::json(result),
         Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+/// The pricing definition a listed model resolves to today.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UnpricedModelMatch {
+    pub name: String,
+    pub match_pattern: String,
+    pub source: PricingSource,
+    pub tiers: Vec<PricingTierDefinition>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UnpricedModel {
+    #[serde(flatten)]
+    pub row: crate::request::gen_ai_health::UnpricedModelRow,
+    /// Null when no definition matches the model today.
+    pub matched: Option<UnpricedModelMatch>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UnpricedModelsResponse {
+    pub models: Vec<UnpricedModel>,
+}
+
+/// Joins the spans' ingest-time status with today's definitions: a model that now has an exact
+/// price (created, kept or muted since) is dropped; the rest carry what they resolve to now.
+fn resolve_unpriced(
+    rows: Vec<crate::request::gen_ai_health::UnpricedModelRow>,
+    entries: &[CachedModelPricing],
+    now_micros: i64,
+) -> Vec<UnpricedModel> {
+    let mut by_model: HashMap<String, UnpricedModel> = HashMap::new();
+    let mut order = Vec::new();
+    for row in rows {
+        let resolved = model_pricing::find_pricing_sync_at(entries, &row.model, Some(now_micros));
+        if matches!(&resolved, Some(r) if r.match_kind == MatchKind::Exact) {
+            continue;
+        }
+        // A model seen both unpriced and approximate (a price was added mid-window) is one row.
+        if let Some(existing) = by_model.get_mut(&row.model) {
+            existing.row.spans += row.spans;
+            existing.row.tokens += row.tokens;
+            existing.row.cost += row.cost;
+            for agent in row.agents {
+                if !existing.row.agents.contains(&agent) {
+                    existing.row.agents.push(agent);
+                }
+            }
+            continue;
+        }
+        let matched = resolved.map(|r| UnpricedModelMatch {
+            name: r.definition.name,
+            match_pattern: r.definition.match_pattern,
+            source: r.definition.source,
+            tiers: r.definition.tiers,
+        });
+        let mut row = row;
+        row.status = if matched.is_some() {
+            config::meta::model_pricing::CostStatus::Approximate
+        } else {
+            config::meta::model_pricing::CostStatus::Unpriced
+        };
+        order.push(row.model.clone());
+        by_model.insert(row.model.clone(), UnpricedModel { row, matched });
+    }
+    order
+        .into_iter()
+        .filter_map(|m| by_model.remove(&m))
+        .collect()
+}
+
+/// ListUnpricedModels
+///
+/// #{"ratelimit_module":"ModelPricing", "ratelimit_module_operation":"list"}#
+#[utoipa::path(
+    get,
+    path = "/{org_id}/llm/models/unpriced",
+    context_path = "/api",
+    tag = "LLM",
+    operation_id = "ListUnpricedModels",
+    summary = "List models seen in traces with no price or an approximate one",
+    description = "Models in the stream's spans that ingest marked unpriced or approximately priced during the window, with spans, tokens and recorded cost. Models that resolve to an exact price today are omitted.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        crate::request::gen_ai_health::UnpricedModelsQuery,
+    ),
+    responses(
+        (status = 200, description = "Success", body = UnpricedModelsResponse),
+        (status = 400, description = "Invalid query"),
+        (status = 500, description = "Internal server error"),
+    ),
+)]
+pub async fn list_unpriced(
+    Path(org_id): Path<String>,
+    openobserve_api_common::extractors::Headers(user_email): openobserve_api_common::extractors::Headers<
+        openobserve_core::auth::UserEmail,
+    >,
+    Query(query): Query<crate::request::gen_ai_health::UnpricedModelsQuery>,
+) -> Response {
+    let user_id = &user_email.user_id;
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &org_id,
+        &org_id,
+        user_id,
+        "model_pricing",
+        "LIST",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    if let Err(resp) =
+        crate::request::gen_ai_health::authorize_unpriced(&org_id, user_id, &query).await
+    {
+        return resp;
+    }
+    match crate::request::gen_ai_health::unpriced_models(&org_id, user_id, &query).await {
+        Ok(rows) => {
+            let entries = model_pricing::get_org_pricing_entries(&org_id);
+            let models = resolve_unpriced(rows, &entries, config::utils::time::now_micros());
+            MetaHttpResponse::json(UnpricedModelsResponse { models })
+        }
+        Err(e) => {
+            log::error!("[model_pricing] unpriced models for {org_id}: {e}");
+            MetaHttpResponse::internal_error("Failed to list unpriced models")
+        }
     }
 }
 
@@ -1455,6 +1592,45 @@ mod tests {
             entry("GPT-4o", r"(?i)^gpt-4o$", PricingSource::BuiltIn),
             entry("GPT-4o Mini", r"(?i)^gpt-4o-mini$", PricingSource::BuiltIn),
         ]
+    }
+
+    fn unpriced_row(
+        model: &str,
+        status: config::meta::model_pricing::CostStatus,
+        tokens: i64,
+    ) -> crate::request::gen_ai_health::UnpricedModelRow {
+        crate::request::gen_ai_health::UnpricedModelRow {
+            model: model.to_string(),
+            status,
+            spans: 1,
+            tokens,
+            cost: 0.0,
+            agents: vec!["a".to_string()],
+        }
+    }
+
+    #[test]
+    fn test_resolve_unpriced_drops_exact_and_merges_statuses() {
+        use config::meta::model_pricing::CostStatus;
+        let mut entries = built_in_gpt_4o();
+        // Approximate today: `gpt-5.4` covers only part of `gpt-5.4-mini`.
+        entries.push(entry("GPT-5.4", r"(?i)gpt-5\.4", PricingSource::BuiltIn));
+        let rows = vec![
+            unpriced_row("acme-internal-llm", CostStatus::Unpriced, 100),
+            // Was unpriced at ingest, has an exact price now: fixed, so dropped.
+            unpriced_row("gpt-4o", CostStatus::Unpriced, 50),
+            unpriced_row("gpt-5.4-mini", CostStatus::Approximate, 30),
+            // Seen unpriced earlier in the window, approximate since: one row.
+            unpriced_row("gpt-5.4-mini", CostStatus::Unpriced, 20),
+        ];
+        let out = resolve_unpriced(rows, &entries, 0);
+        let models: Vec<_> = out.iter().map(|m| m.row.model.as_str()).collect();
+        assert_eq!(models, ["acme-internal-llm", "gpt-5.4-mini"]);
+        assert!(out[0].matched.is_none());
+        assert_eq!(out[0].row.status, CostStatus::Unpriced);
+        assert_eq!(out[1].row.status, CostStatus::Approximate);
+        assert_eq!(out[1].row.tokens, 50);
+        assert_eq!(out[1].matched.as_ref().unwrap().name, "GPT-5.4");
     }
 
     #[test]

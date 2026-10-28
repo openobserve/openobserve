@@ -1025,6 +1025,7 @@ fn build_session_trace_details_sql(
             "gen_ai_usage_cost_net_cache_impact",
             "gen_ai_usage_cost_net_cache_impact",
         );
+        let unpriced_selects = validated.unpriced_selects();
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -1033,6 +1034,7 @@ fn build_session_trace_details_sql(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            {unpriced_selects}, \
             {cache_read_tokens_expr}, \
             {cache_creation_tokens_expr}, \
             {cost_cache_read_expr}, \
@@ -1147,7 +1149,8 @@ fn build_session_trace_response_item(
     } else {
         max_duration
     };
-
+    let (gen_ai_unpriced_tokens, gen_ai_unpriced_models) =
+        super::schema_compat::parse_unpriced(item);
     let hit = SessionTraceResponseItem {
         trace_id: tid.clone(),
         user_ids,
@@ -1213,6 +1216,8 @@ fn build_session_trace_response_item(
                     .collect()
             })
             .unwrap_or_default(),
+        gen_ai_unpriced_tokens,
+        gen_ai_unpriced_models,
     };
 
     Some((tid, service_count, hit))
@@ -1624,6 +1629,7 @@ fn build_latest_sessions_sql(
         "gen_ai_usage_cost_net_cache_impact",
         "gen_ai_usage_cost_net_cache_impact",
     );
+    let unpriced_selects = validated.unpriced_selects();
     let stream_ident = traces::session::quote_identifier(stream_name);
 
     format!(
@@ -1637,6 +1643,7 @@ fn build_latest_sessions_sql(
          sum({output_tokens_col}) as gen_ai_usage_output_tokens, \
          {total_tokens_expr}, \
          sum({cost_col}) as gen_ai_usage_cost, \
+         {unpriced_selects}, \
          {cache_read_tokens_expr}, \
          {cache_creation_tokens_expr}, \
          {cost_cache_read_expr}, \
@@ -1720,6 +1727,9 @@ struct SessionTraceResponseItem {
     gen_ai_usage_cost_net_cache_impact: f64,
     gen_ai_input_messages: Option<json::Value>,
     models: Vec<String>,
+    /// Tokens of this trace's spans that no price matched; their cost is missing.
+    gen_ai_unpriced_tokens: i64,
+    gen_ai_unpriced_models: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize)]

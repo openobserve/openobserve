@@ -257,6 +257,34 @@ describe("ModelPricingEditor.vue", () => {
       expect((wrapper.vm as any).model.id).toBeNull();
       expect((wrapper.vm as any).model.name).toContain("(Copy)");
     });
+
+    it("prefills a new model's name and pattern from the route, as Create price links do", async () => {
+      const wrapper = createWrapper({
+        query: { name: "gpt-5.4-mini", match_pattern: "^gpt-5\\.4-mini$" },
+      });
+      await flushPromises();
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("gpt-5.4-mini");
+      expect(form.state.values.match_pattern).toBe("^gpt-5\\.4-mini$");
+      expect((wrapper.vm as any).model.id).toBeNull();
+    });
+
+    it("ignores prefill parameters when editing an existing model", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "abc",
+          name: "Existing",
+          match_pattern: "gpt-.*",
+          enabled: true,
+          tiers: [{ name: "Default", condition: null, prices: { input: 0.001 } }],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "abc", name: "other", match_pattern: "^x$" } });
+      await flushPromises();
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("Existing");
+      expect(form.state.values.match_pattern).toBe("gpt-.*");
+    });
   });
 
   describe("Layout and explanatory copy", () => {

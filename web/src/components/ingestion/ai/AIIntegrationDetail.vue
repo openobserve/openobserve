@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
@@ -29,6 +30,10 @@ import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
 import AIRichSetupCard from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import CodingAgentSetup from "./CodingAgentSetup.vue";
+import { CODING_AGENT_TAB, STEP_BY_STEP_TAB } from "./codingAgentPrompt";
 
 const props = defineProps<{
   categorySlug: string;
@@ -38,6 +43,7 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 const store = useStore();
 const { aiContent, endpoint } = useIngestion();
+const route = useRoute();
 
 const category = computed<AICategory | undefined>(() =>
   aiCategories.find((c) => c.slug === props.categorySlug),
@@ -84,12 +90,56 @@ const richContentNeedsPasscode = computed(() =>
 const richContent = computed(() =>
   getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value, t),
 );
+
+// "With a coding agent" / "Step by step". `?tab=agent` (e.g. from the LLM
+// Insights empty state) opens the coding-agent tab; anything else opens the
+// stepped card, which stays the default.
+const tabFromQuery = (tab: unknown) =>
+  tab === CODING_AGENT_TAB ? CODING_AGENT_TAB : STEP_BY_STEP_TAB;
+const activeTab = ref<string | number>(tabFromQuery(route?.query?.tab));
+watch(
+  () => route?.query?.tab,
+  (tab) => {
+    activeTab.value = tabFromQuery(tab);
+  },
+);
+
+// The stream the prompt names: the card's own stream default, else "default".
+const agentDefaultStream = computed(
+  () =>
+    richContent.value?.streamInput?.default || richContent.value?.detect?.streamName || "default",
+);
+const agentGuideName = computed(
+  () => richContent.value?.provider.name ?? String(integration.value?.name ?? ""),
+);
 </script>
 
 <template>
   <div v-if="integration" class="p-2">
+    <OTabs v-model="activeTab" dense bordered data-test="ai-integration-setup-tabs">
+      <OTab
+        :name="CODING_AGENT_TAB"
+        :label="t('ingestion.ai.codingAgent.tabAgent')"
+        data-test="ai-integration-tab-coding-agent"
+      />
+      <OTab
+        :name="STEP_BY_STEP_TAB"
+        :label="t('ingestion.ai.codingAgent.tabSteps')"
+        data-test="ai-integration-tab-step-by-step"
+      />
+    </OTabs>
+    <CodingAgentSetup
+      v-if="activeTab === CODING_AGENT_TAB"
+      :key="`agent-${integrationSlug}`"
+      :subs="subs"
+      :default-stream="agentDefaultStream"
+      :detect="richContent?.detect"
+      :guide-name="agentGuideName"
+      :doc-url="richContent?.docUrl ?? docURL"
+      :passcode-forbidden="passcodeForbidden"
+    />
     <OBanner
-      v-if="passcodeForbidden && richContent && richContentNeedsPasscode"
+      v-else-if="passcodeForbidden && richContent && richContentNeedsPasscode"
       variant="warning"
       data-test="ai-integration-detail-passcode-forbidden"
       :content="t('ingestion.passcodeForbiddenMessage')"

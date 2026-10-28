@@ -30,11 +30,11 @@ use openobserve_core::llm_evaluations::{
             RecordBatch, RecordBatchResult,
         },
         results::{
-            ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
-            ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
-            ExperimentResultTaskStatus, ExperimentScoreOutcomes, ExperimentScoreSummary,
-            ExperimentSkipSummary, ExperimentSlotStatus, ExperimentSummaryStatus,
-            ExperimentTaskOutcomes, ScoringStatus,
+            ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentFailureCause,
+            ExperimentProgress, ExperimentResultScore, ExperimentResultScoreStatus,
+            ExperimentResultSlot, ExperimentResultTaskStatus, ExperimentScoreOutcomes,
+            ExperimentScoreSummary, ExperimentSkipSummary, ExperimentSlotStatus,
+            ExperimentSummaryStatus, ExperimentTaskOutcomes, ScoringStatus,
         },
     },
 };
@@ -78,6 +78,8 @@ pub struct ExperimentResultRowBody {
     pub output: Option<Value>,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
     pub p50_latency_ms: Option<u64>,
+    /// First line of the most common error across this row's failed trials.
+    pub error_message: Option<String>,
     pub dispersion: Option<ExperimentRowDispersionBody>,
 }
 
@@ -1404,6 +1406,31 @@ pub struct ExperimentAggregateSummaryBody {
     pub incomplete_task_slots: u64,
     pub incomplete_score_dimensions: u64,
     pub error_task_slots: u64,
+    /// Errored slots grouped by error kind and first message line, largest first (top 3).
+    pub failure_causes: Vec<ExperimentFailureCauseBody>,
+    /// Distinct failure causes across every errored slot.
+    pub failure_cause_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentFailureCauseBody {
+    /// Shared failure taxonomy (`provider_auth`, `timeout`, `execution_error`, …); absent on
+    /// records written before executions carried a kind.
+    pub kind: Option<String>,
+    /// First line of the error message.
+    pub message: String,
+    pub slot_count: u64,
+}
+
+impl From<ExperimentFailureCause> for ExperimentFailureCauseBody {
+    fn from(value: ExperimentFailureCause) -> Self {
+        Self {
+            kind: value.kind,
+            message: value.message,
+            slot_count: value.slot_count,
+        }
+    }
 }
 
 impl From<ExperimentSlotStatus> for ExperimentSlotStatusBody {
@@ -1573,6 +1600,8 @@ impl From<ExperimentAggregateSummary> for ExperimentAggregateSummaryBody {
             incomplete_task_slots: value.incomplete_task_slots,
             incomplete_score_dimensions: value.incomplete_score_dimensions,
             error_task_slots: value.error_task_slots,
+            failure_causes: value.failure_causes.into_iter().map(Into::into).collect(),
+            failure_cause_count: value.failure_cause_count,
         }
     }
 }

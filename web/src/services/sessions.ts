@@ -48,6 +48,10 @@ export interface SessionApiHit {
   gen_ai_usage_cost_estimated_without_cache?: number;
   gen_ai_usage_cost_cache_read_savings?: number;
   gen_ai_usage_cost_net_cache_impact?: number;
+  /** Tokens on spans whose model has no price (absent on servers without the unpriced marker). */
+  gen_ai_unpriced_tokens?: number;
+  /** Models of those unpriced spans. */
+  gen_ai_unpriced_models?: string[];
   /** Number of error spans across all traces in this session. */
   error_count: number;
   user_ids?: string[];

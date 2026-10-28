@@ -59,6 +59,12 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   getImageURL: (path: string) => `mock://${path}`,
 }));
 
+// The Unpriced tab's stream picker lists LLM trace streams.
+const mockGetStreams = vi.fn();
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStreams: mockGetStreams }),
+}));
+
 import modelPricingService from "@/services/model_pricing";
 
 // ── Stubs for child components ───────────────────────────────────────────────
@@ -309,6 +315,12 @@ const mockI18n = createI18n({
         localTimeHint: "In your timezone: {range}",
         tierAlwaysActive: "Always active (default)",
         tierDefaultName: "Default",
+        builtInStatus: {
+          seed: "seed {date}.",
+          neverSynced: "never synced",
+          lastSynced: "synced at {time}",
+        },
+        unpriced: { tab: "Unpriced", tabWithCount: "Unpriced · {count}" },
       },
     },
   },
@@ -366,6 +378,7 @@ describe("ModelPricingList.vue", () => {
     vi.mocked(modelPricingService.update).mockResolvedValue({} as any);
     vi.mocked(modelPricingService.delete).mockResolvedValue({} as any);
     vi.mocked(modelPricingService.refreshBuiltIn).mockResolvedValue({} as any);
+    mockGetStreams.mockResolvedValue({ list: [] });
     routerPushMock.mockReset();
     mockToastFn.mockReset();
   });
@@ -1623,5 +1636,104 @@ describe("list view state", () => {
       sortBy: "name",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("Unpriced / approximate tab", () => {
+  const unpricedResponse = {
+    models: [
+      {
+        model: "acme-internal-llm",
+        status: "unpriced",
+        spans: 1870,
+        tokens: 2_330_000,
+        cost: 0,
+        agents: ["research-agent"],
+        matched: null,
+      },
+      {
+        model: "gpt-5.4-mini",
+        status: "approximate",
+        spans: 1204,
+        tokens: 9_100_000,
+        cost: 41.22,
+        agents: ["support-bot"],
+        matched: {
+          name: "GPT-5.4",
+          match_pattern: "^gpt-5\\.4",
+          source: "built_in",
+          tiers: [{ name: "Default", condition: null, prices: { input: 2.5e-6, output: 1.5e-5 } }],
+        },
+      },
+    ],
+  };
+  let w: any;
+
+  beforeEach(() => {
+    vi.mocked(modelPricingService.list).mockResolvedValue({ data: mockModels } as any);
+    vi.mocked(modelPricingService.listUnpriced).mockResolvedValue({
+      data: unpricedResponse,
+    } as any);
+    mockGetStreams.mockResolvedValue({
+      list: [
+        { name: "default", settings: { is_llm_stream: true } },
+        { name: "llm", settings: {} },
+        { name: "plain", settings: { is_llm_stream: false } },
+      ],
+    });
+  });
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("opens from ?tab=unpriced&stream= and renders the rows of the unpriced response", async () => {
+    w = mountComponent({ query: { tab: "unpriced", stream: "llm" } });
+    await flushPromises();
+
+    expect(w.vm.selectedTab).toBe("unpriced");
+    const [org, params] = vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)!;
+    expect(org).toBe("test-org");
+    expect(params.stream_name).toBe("llm");
+    expect(params.end_time - params.start_time).toBe(24 * 60 * 60 * 1_000_000);
+
+    const tab = w.findComponent({ name: "UnpricedModelsTab" });
+    expect(tab.props("streams")).toEqual(["default", "llm"]);
+    await vi.waitFor(() =>
+      expect(w.findAll('[data-test="model-pricing-unpriced-row"]')).toHaveLength(2),
+    );
+    expect(w.find('[data-test="model-pricing-list-table"]').exists()).toBe(false);
+    expect(w.vm.tabOptions.find((o: any) => o.value === "unpriced").label).toBe("Unpriced · 2");
+  });
+
+  it("reads the first LLM stream when the link names none", async () => {
+    w = mountComponent({ query: { tab: "unpriced" } });
+    await flushPromises();
+    expect(vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)![1].stream_name).toBe(
+      "default",
+    );
+  });
+
+  it("says online sync has not run when the built-in list was never synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 0, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("2026-10-14");
+    expect(status.text()).toContain("never synced");
+  });
+
+  it("gives the last online sync time once the built-in list has synced", async () => {
+    vi.mocked(modelPricingService.getBuiltIn).mockResolvedValue({
+      data: { models: [], source_url: "", last_updated: 1_798_000_000, seed_date: "2026-10-14" },
+    } as any);
+    w = mountComponent();
+    await flushPromises();
+    const status = w.find('[data-test="model-pricing-built-in-status"]');
+    expect(status.text()).toContain("synced at 2026-12-");
+    expect(status.text()).not.toContain("never synced");
   });
 });

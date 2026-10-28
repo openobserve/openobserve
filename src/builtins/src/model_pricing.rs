@@ -17,6 +17,8 @@
 //!
 //! Syncs model pricing definitions from the configured GitHub source into the database
 //! under the `_openobserve` org. Runs on startup and periodically (every 6h by default).
+//! Until a sync succeeds, or forever on an offline install, the seed list compiled into the
+//! binary ([`SEED_PRICING_JSON`]) supplies the built-in prices.
 
 use std::sync::{
     LazyLock,
@@ -37,10 +39,42 @@ pub static GITHUB_SERVICE: LazyLock<GitHubDataService> = LazyLock::new(GitHubDat
 /// Timestamp (Unix seconds) of the last successful sync from GitHub. 0 means never synced.
 static LAST_SYNC_TIMESTAMP: AtomicI64 = AtomicI64::new(0);
 
+/// The built-in price list as of [`SEED_DATE`], shipped in the binary so prices work offline.
+/// Same format as the GitHub source (`llm_pricing.json` in openobserve/sdr_patterns).
+pub const SEED_PRICING_JSON: &str = include_str!("model_pricing_seed.json");
+
+/// Date (UTC) of the upstream `llm_pricing.json` commit that [`SEED_PRICING_JSON`] copies.
+pub const SEED_DATE: &str = "2026-10-28";
+
 /// Returns the Unix timestamp (seconds) of the last successful built-in pricing sync.
 /// Returns 0 if no sync has completed yet.
 pub fn last_sync_timestamp() -> i64 {
     LAST_SYNC_TIMESTAMP.load(Ordering::Relaxed)
+}
+
+/// Parses the compiled-in seed list.
+pub fn seed_entries() -> Result<Vec<BuiltInModelPricingEntry>, anyhow::Error> {
+    let raw: Vec<serde_json::Value> = serde_json::from_str(SEED_PRICING_JSON)
+        .map_err(|e| anyhow::anyhow!("Failed to parse seed pricing JSON: {e}"))?;
+    Ok(parse_entries(raw))
+}
+
+/// Stores the seed list as the built-in prices when none are stored yet, so a fresh or
+/// offline install prices spans before (or without) a GitHub sync. A later sync overwrites
+/// these rows and disables the ones upstream dropped. Returns how many rows were written.
+pub async fn load_seed_if_empty() -> Result<usize, anyhow::Error> {
+    if !table::model_pricing::list_built_in_names()
+        .await?
+        .is_empty()
+    {
+        return Ok(0);
+    }
+    let (created, _) = upsert_entries(seed_entries()?, &Default::default()).await;
+    if created > 0 {
+        emit_sync_event().await;
+    }
+    log::info!("[model_pricing_sync] loaded {created} seed prices dated {SEED_DATE}");
+    Ok(created)
 }
 
 /// A model pricing entry from the community/built-in GitHub JSON source.
@@ -95,51 +129,7 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
             .into_iter()
             .collect();
 
-    let mut created = 0usize;
-    let mut updated = 0usize;
-
-    // Upsert each entry
-    for entry in entries {
-        let is_new = !existing_names.contains(&entry.name);
-        let definition = ModelPricingDefinition {
-            id: None, // will be looked up by (org, name) on upsert
-            org_id: BUILT_IN_ORG.to_string(),
-            name: entry.name,
-            match_pattern: entry.match_pattern,
-            enabled: true,
-            tiers: entry.tiers,
-            valid_from: None,
-            sort_order: 0,
-            source: PricingSource::BuiltIn,
-            provider: entry.provider,
-            description: entry.description,
-            created_at: 0, // set by DB layer
-            updated_at: 0,
-            children: Vec::new(),
-            prepared_rule_keys: Default::default(),
-        };
-        // An invalid entry could overprice every span; keep the previously stored row.
-        if let Err(e) = definition.validate_tiers(true) {
-            log::warn!(
-                "[model_pricing_sync] skipping invalid entry '{}': {e}",
-                definition.name
-            );
-            continue;
-        }
-
-        match table::model_pricing::put(definition).await {
-            Ok(_) => {
-                if is_new {
-                    created += 1;
-                } else {
-                    updated += 1;
-                }
-            }
-            Err(e) => {
-                log::warn!("[model_pricing_sync] failed to upsert built-in model: {e}");
-            }
-        }
-    }
+    let (created, updated) = upsert_entries(entries, &existing_names).await;
 
     // Disable models that were removed from the upstream source
     let mut disabled = 0usize;
@@ -162,11 +152,7 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         }
     }
 
-    // Emit coordinator event so all nodes refresh the _openobserve cache
-    let event_key = format!("/model_pricing/{BUILT_IN_ORG}/_sync");
-    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
-        log::error!("[model_pricing_sync] failed to emit sync event: {e}");
-    }
+    emit_sync_event().await;
 
     LAST_SYNC_TIMESTAMP.store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
 
@@ -179,6 +165,72 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         updated,
         disabled,
     })
+}
+
+/// Upserts catalogue entries as built-in definitions; returns (created, updated).
+/// An entry whose name is in `existing_names` counts as updated.
+async fn upsert_entries(
+    entries: Vec<BuiltInModelPricingEntry>,
+    existing_names: &std::collections::HashSet<String>,
+) -> (usize, usize) {
+    let mut created = 0usize;
+    let mut updated = 0usize;
+    for entry in entries {
+        let is_new = !existing_names.contains(&entry.name);
+        let definition = entry.into_definition();
+        // An invalid entry could overprice every span; keep the previously stored row.
+        if let Err(e) = definition.validate_tiers(true) {
+            log::warn!(
+                "[model_pricing_sync] skipping invalid entry '{}': {e}",
+                definition.name
+            );
+            continue;
+        }
+
+        match table::model_pricing::put(definition).await {
+            Ok(_) => {
+                if is_new {
+                    created += 1;
+                } else {
+                    updated += 1;
+                }
+            }
+            Err(e) => {
+                log::warn!("[model_pricing_sync] failed to upsert built-in model: {e}");
+            }
+        }
+    }
+    (created, updated)
+}
+
+/// Tells every node to refresh its `_openobserve` pricing cache.
+async fn emit_sync_event() {
+    let event_key = format!("/model_pricing/{BUILT_IN_ORG}/_sync");
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
+        log::error!("[model_pricing_sync] failed to emit sync event: {e}");
+    }
+}
+
+impl BuiltInModelPricingEntry {
+    fn into_definition(self) -> ModelPricingDefinition {
+        ModelPricingDefinition {
+            id: None, // will be looked up by (org, name) on upsert
+            org_id: BUILT_IN_ORG.to_string(),
+            name: self.name,
+            match_pattern: self.match_pattern,
+            enabled: true,
+            tiers: self.tiers,
+            valid_from: None,
+            sort_order: 0,
+            source: PricingSource::BuiltIn,
+            provider: self.provider,
+            description: self.description,
+            created_at: 0, // set by DB layer
+            updated_at: 0,
+            children: Vec::new(),
+            prepared_rule_keys: Default::default(),
+        }
+    }
 }
 
 /// Parses each catalogue entry on its own so one malformed entry does not stop the whole sync.
@@ -200,6 +252,27 @@ fn parse_entries(raw: Vec<serde_json::Value>) -> Vec<BuiltInModelPricingEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The seed list is all an offline install has, so every entry must parse and validate
+    /// without any network access.
+    #[test]
+    fn test_seed_list_loads_offline() {
+        let raw: Vec<serde_json::Value> = serde_json::from_str(SEED_PRICING_JSON).unwrap();
+        let entries = seed_entries().unwrap();
+        assert!(
+            entries.len() > 50,
+            "seed list has {} entries",
+            entries.len()
+        );
+        assert_eq!(entries.len(), raw.len(), "an entry failed to parse");
+        for entry in entries {
+            let definition = entry.into_definition();
+            definition
+                .validate_tiers(true)
+                .unwrap_or_else(|e| panic!("{}: {e}", definition.name));
+        }
+        assert!(chrono::NaiveDate::parse_from_str(SEED_DATE, "%Y-%m-%d").is_ok());
+    }
 
     #[test]
     fn test_last_sync_timestamp_initial_value() {

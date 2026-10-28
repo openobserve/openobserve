@@ -34,6 +34,10 @@ pub struct TraceResponseItem {
     gen_ai_usage_cost: f64,
     gen_ai_input_messages: Option<serde_json::Value>,
     models: Vec<String>,
+    /// Tokens of this trace's spans that no price matched; their cost is missing.
+    gen_ai_unpriced_tokens: i64,
+    /// Models of those unpriced spans.
+    gen_ai_unpriced_models: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -189,6 +193,8 @@ fn insert_summary(
         max_duration
     };
 
+    let (gen_ai_unpriced_tokens, gen_ai_unpriced_models) =
+        crate::traces::schema_compat::parse_unpriced(item);
     batch.traces.insert(
         trace_id.clone(),
         TraceResponseItem {
@@ -227,6 +233,8 @@ fn insert_summary(
                         .collect()
                 })
                 .unwrap_or_default(),
+            gen_ai_unpriced_tokens,
+            gen_ai_unpriced_models,
         },
     );
 }
@@ -290,7 +298,8 @@ mod tests {
             "first_service_name": "api", "first_operation_name": "request",
             "gen_ai_usage_details_input": 10, "gen_ai_usage_details_output": 20,
             "gen_ai_usage_details_total": 30, "gen_ai_usage_cost_details": 0.5,
-            "gen_ai_input_messages": "hello", "gen_ai_response_models": ["model", null]
+            "gen_ai_input_messages": "hello", "gen_ai_response_models": ["model", null],
+            "gen_ai_unpriced_tokens": 12, "gen_ai_unpriced_models": ["acme-internal-llm"]
         })
     }
 
@@ -307,7 +316,8 @@ mod tests {
                 "first_event": {"service_name": "gateway", "operation_name": "request"},
                 "gen_ai_usage_input_tokens": 10, "gen_ai_usage_output_tokens": 20,
                 "gen_ai_usage_total_tokens": 30, "gen_ai_usage_cost": 0.5,
-                "gen_ai_input_messages": "hello", "models": ["model"]
+                "gen_ai_input_messages": "hello", "models": ["model"],
+                "gen_ai_unpriced_tokens": 12, "gen_ai_unpriced_models": ["acme-internal-llm"]
             })
         );
     }

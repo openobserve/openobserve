@@ -15,6 +15,7 @@
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import onlineEvalsService, {
+  type EvalJobPayload,
   type QualityConfigSummary,
   type QualityListParams,
   type QualityScorePage,
@@ -131,6 +132,34 @@ export const deleteEvalEntityMutation = (org: string) =>
       if (vars.tab === "scorers") return onlineEvalsService.scorers.delete(org, vars.id);
       return onlineEvalsService.jobs.delete(org, vars.id);
     },
+    meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
+  });
+
+/** Create when `id` is absent, else update; each form and import goes through one of these so no write skips the invalidation. */
+export const saveScorerMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id?: string; payload: Record<string, any> }) =>
+      vars.id
+        ? onlineEvalsService.scorers.update(org, vars.id, vars.payload)
+        : onlineEvalsService.scorers.create(org, vars.payload),
+    meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
+  });
+
+export const saveScoreConfigMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id?: string; payload: Record<string, any> }) =>
+      vars.id
+        ? onlineEvalsService.scoreConfigs.update(org, vars.id, vars.payload)
+        : onlineEvalsService.scoreConfigs.create(org, vars.payload),
+    meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
+  });
+
+export const saveEvalJobMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id?: string; payload: EvalJobPayload }) =>
+      vars.id
+        ? onlineEvalsService.jobs.update(org, vars.id, vars.payload)
+        : onlineEvalsService.jobs.create(org, vars.payload),
     meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
   });
 

@@ -53,6 +53,21 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // ── LLM judge ───────────────────────────────────────────────────────
       providerId: z.string().optional().default(""),
       model: z.string().optional().default(""),
+      // Blank = not sent (the judge runs at temperature 0). A number <input>
+      // emits strings, so validate the text and convert at save.
+      temperature: z
+        .union([z.string(), z.number()])
+        .optional()
+        .default("")
+        .refine(
+          (val) => {
+            const text = String(val ?? "").trim();
+            if (!text) return true;
+            const num = Number(text);
+            return Number.isFinite(num) && num >= 0 && num <= 2;
+          },
+          { message: t("onlineEvals.scorer.validation.temperatureInvalid") },
+        ),
       // Intentionally NOT required: legacy scorers may exist with an empty
       // template, and requiring it here would block re-saving those on edit
       // (create seeds a default template; edit preserves whatever was stored).
