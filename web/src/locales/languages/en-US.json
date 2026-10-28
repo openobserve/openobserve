@@ -377,7 +377,7 @@
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
     },
     "noProfiles": {
-      "title": "No Profiles found",
+      "title": "No profiles found",
       "description": "Your time window doesn't contain any profile data from this stream. Try a wider time range or a different service."
     },
     "noServiceGraph": {
@@ -1517,7 +1517,7 @@
     "searchSummary": "{count} function · {percent} of samples | {count} functions · {percent} of samples",
     "searchNoMatches": "No matches",
     "runQuery": "Run query",
-    "runOptions": "Run Options",
+    "runOptions": "Run options",
     "timeSeriesTitle": "Profile values over time",
     "breakdown": "Breakdown",
     "breakdownNone": "None",
@@ -1575,7 +1575,7 @@
     "noStreams": "No profile streams available",
     "setupIngestion": "Set up profiles ingestion",
     "setupIngestionDesc": "Connect a profiling data source",
-    "noSeries": "No Data",
+    "noSeries": "No data",
     "noResults": "No Profiles found",
     "noProfilesFound": "No Profiles found",
     "noProfilesFoundDesc": "Your time window doesn't contain any profile data from this stream. Try a wider time range or a different service.",
@@ -1586,7 +1586,7 @@
     "labelAlign": "Label alignment",
     "alignLeft": "Align Left",
     "alignRight": "Align Right",
-    "rootAtBottom": "Root at Bottom",
+    "rootAtBottom": "Root at bottom",
     "zoomHint": "Use {key} + scroll to zoom",
     "dontShowAgain": "Don't Show Again",
     "clickToZoomOut": "Click to zoom out",
@@ -8405,7 +8405,7 @@
     "otherColumn": "Other Columns",
     "metric": "Metric",
     "filters": "Filters",
-    "labelFilters": "Label Filters",
+    "labelFilters": "Label filters",
     "operations": "Operations",
     "joins": "Joins",
     "xAxisShort": "X-Axis",

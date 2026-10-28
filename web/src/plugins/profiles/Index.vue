@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedProfileType"
             :label="t('profiles.profileType')"
             label-position="inside"
-            :options="profileTypeOptions"
+            :options="profileTypeSelectOptions"
             class="w-full"
             data-test="profiles-type-select"
           />
@@ -685,6 +685,7 @@ import ProfilesFunctionMenu from "./ProfilesFunctionMenu.vue";
 import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";
 import ProfilesCompare, { type CompareState } from "./ProfilesCompare.vue";
 import { calleesOf, callersOf } from "./sandwich";
+import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
 import profilesService, {
@@ -915,6 +916,14 @@ const profileTypeOptions = computed<SelectOption[]>(() =>
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
+// A type seeded from the URL is shown by its label, not its raw id, until meta lists it.
+const profileTypeSelectOptions = computed<SelectOption[]>(() => {
+  const selected = selectedProfileType.value;
+  const options = profileTypeOptions.value;
+  if (!selected || options.some((option) => option.value === selected)) return options;
+  const [type, unit = ""] = selected.split("\u0000");
+  return [...options, { label: raw(`${type} (${seriesUnitLabel(type, unit)})`), value: selected }];
+});
 const tagKeyOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
 );
@@ -1008,11 +1017,16 @@ const seriesLines = computed<SeriesLine[]>(() => {
 const seriesChartData = computed(() => {
   const lines = seriesLines.value;
   const lineData = lines.map((line) =>
-    line.points.map((point) => [Math.floor(point.timestamp / 1000), seriesDisplayValue(point)]),
+    withZeroGaps(
+      line.points.map((point) => [Math.floor(point.timestamp / 1000), seriesDisplayValue(point)]),
+      (seriesResponse.value?.step_secs ?? 0) * 1000,
+    ),
   );
   const seriesData = lineData.flat();
   return {
     options: {
+      // The chart renders with the ECharts dark theme, whose own background would box the chart in.
+      backgroundColor: "transparent",
       // Tooltip, grid and y axis follow the Logs histogram (utils/logs/convertLogData.ts).
       tooltip: {
         show: true,
@@ -1052,7 +1066,7 @@ const seriesChartData = computed(() => {
       series: lines.map((line, index) => ({
         type: "line",
         name: line.label,
-        smooth: true,
+        smooth: false,
         showSymbol: false,
         color: line.color || undefined,
         lineStyle: { width: 2 },
@@ -1272,6 +1286,24 @@ const formatCpuCore = (value: number) => {
 
 const isBytesUnit = computed(() => /byte|^b$/i.test(currentUnit.value));
 
+/** Drops a line to zero across empty buckets, so a gap between samples is not drawn as a slope. */
+const withZeroGaps = (points: number[][], stepMs: number) => {
+  // Without the server's bucket size a gap cannot be told from normal spacing.
+  if (!(stepMs > 0)) return points;
+  const filled: number[][] = [];
+  for (const point of points) {
+    const previous = filled.at(-1);
+    if (previous && point[0] - previous[0] > stepMs * 1.5) {
+      const gapStart = previous[0] + stepMs;
+      const gapEnd = point[0] - stepMs;
+      filled.push([gapStart, 0]);
+      if (gapEnd > gapStart) filled.push([gapEnd, 0]);
+    }
+    filled.push(point);
+  }
+  return filled;
+};
+
 /** Byte ticks on round binary steps (0, 2.5, 5 GB), not decimal steps shown as 3.73 GB. */
 const byteAxisInterval = (points: number[][]) => {
   const max = Math.max(0, ...points.map(([, value]) => value));
@@ -1280,11 +1312,11 @@ const byteAxisInterval = (points: number[][]) => {
   return niceStep(max / unitSize / 3) * unitSize;
 };
 
-/** Short axis labels from the shared chart formatter, as on the Logs histogram (1.50K, 2.50GB, 2.00s). */
+/** Short axis labels as on the Logs histogram (1.50K, 2.00s); bytes use the table's binary units (2.5 GiB). */
 const formatSeriesAxisLabel = (value: number) => {
+  if (isBytesUnit.value) return formatBytes(value);
   let unit = "numbers";
-  if (isBytesUnit.value) unit = "bytes";
-  else if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
+  if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
   return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
@@ -1300,8 +1332,6 @@ const shareOf = (value: number) => {
   const total = mergeResult.value?.total ?? 0;
   return total > 0 ? (value / total) * 100 : 0;
 };
-const formatPercent = (value: number, total: number) =>
-  total > 0 ? `${((value / total) * 100).toFixed(2)}%` : "0.00%";
 
 const highlightName = (name: string) => {
   const query = searchQuery.value.trim();

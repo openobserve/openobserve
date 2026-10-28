@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
+import { createStore } from "vuex";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
 import i18n from "@/locales";
 
@@ -356,7 +357,7 @@ describe("FlameGraphView grouped frames", () => {
       }
     ).options.series[0].data.map((datum) => datum.block);
 
-  it("labels the flip switch Root at Bottom and draws the root last when it is on", async () => {
+  it("labels the flip switch Root at bottom and draws the root last when it is on", async () => {
     const wrapper = mountGraph({
       name: "total",
       total: 10,
@@ -364,7 +365,7 @@ describe("FlameGraphView grouped frames", () => {
     });
     await flushPromises();
     await nextTick();
-    expect(wrapper.text()).toContain("Root at Bottom");
+    expect(wrapper.text()).toContain("Root at bottom");
 
     (wrapper.vm as unknown as { rootAtBottom: boolean }).rootAtBottom = true;
     await nextTick();
@@ -790,6 +791,110 @@ describe("FlameGraphView grouped frames", () => {
       };
       expect(options.options.dataZoom[0]).toMatchObject({ start: 0, end: 100 });
     });
+  });
+});
+
+describe("FlameGraphView theme and size", () => {
+  const mountWithStore = (store = createStore({ state: { theme: "light" } })) =>
+    mount(FlameGraphView, {
+      props: {
+        root: { name: "main", self: 1, total: 4, children: [] },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "4",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+  const optionsOf = (wrapper: ReturnType<typeof mountWithStore>) =>
+    (
+      wrapper.findComponent({ name: "ChartRenderer" }).props("data") as {
+        options: {
+          backgroundColor?: string;
+          series: { data: { itemStyle: { color: string; borderColor: string } }[] }[];
+        };
+      }
+    ).options;
+
+  it("re-reads the theme colours and rebuilds the chart when the theme switches", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-border-strong", "rgb(1, 2, 3)");
+    html.style.setProperty("--color-border-default", "rgb(4, 5, 6)");
+    const store = createStore({ state: { theme: "light" } });
+    const wrapper = mountWithStore(store);
+    await flushPromises();
+    const before = optionsOf(wrapper).series[0].data[0].itemStyle;
+    expect(before).toMatchObject({ color: "rgb(1, 2, 3)", borderColor: "rgb(4, 5, 6)" });
+
+    html.style.setProperty("--color-border-strong", "rgb(7, 8, 9)");
+    html.style.setProperty("--color-border-default", "rgb(10, 11, 12)");
+    store.state.theme = "dark";
+    await nextTick();
+    const after = optionsOf(wrapper).series[0].data[0].itemStyle;
+    expect(after).toMatchObject({ color: "rgb(7, 8, 9)", borderColor: "rgb(10, 11, 12)" });
+    html.style.removeProperty("--color-border-strong");
+    html.style.removeProperty("--color-border-default");
+    wrapper.unmount();
+  });
+
+  it("draws on a transparent background, so the dark chart theme does not box it in", async () => {
+    const wrapper = mountWithStore();
+    await flushPromises();
+    expect(optionsOf(wrapper).backgroundColor).toBe("transparent");
+    wrapper.unmount();
+  });
+
+  it("resizes the chart when its container changes size and stops watching on unmount", async () => {
+    const observers: { callback: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        callback: () => void;
+        disconnect = vi.fn();
+        observe = vi.fn();
+        constructor(callback: () => void) {
+          this.callback = callback;
+          observers.push(this);
+        }
+      },
+    );
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+      callback();
+      return 1;
+    });
+    const chartInstance = { setOption: vi.fn(), dispatchAction: vi.fn(), resize: vi.fn() };
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        root: { name: "main", self: 1, total: 4, children: [] },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "4",
+      },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: { ...ChartRendererStub, setup: () => ({ chart: chartInstance }) },
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+    await flushPromises();
+    expect(observers).toHaveLength(1);
+    observers[0].callback();
+    expect(chartInstance.resize).toHaveBeenCalledTimes(1);
+
+    wrapper.unmount();
+    expect(observers[0].disconnect).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 

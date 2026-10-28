@@ -57,9 +57,10 @@ const diffResponse = {
 
 const stubs = {
   OSelect: {
+    name: "OSelectStub",
     template:
       '<div :data-test="$attrs[\'data-test\']"><select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</option></select></div>',
-    props: ["modelValue", "options", "loading"],
+    props: ["modelValue", "options", "loading", "label", "labelPosition"],
     emits: ["update:modelValue"],
   },
   OButton: { template: "<button><slot /></button>" },
@@ -109,6 +110,30 @@ describe("ProfilesCompare", () => {
       data: { tag: "service_version", values: ["v1.5.1", "v1.10.0", "v1.4.0", "v1.5.0"], took: 1 },
     });
     mocks.diff.mockReset().mockResolvedValue(diffResponse);
+  });
+
+  it("labels each select visibly, as the main toolbar does", async () => {
+    const { wrapper } = mountCompare();
+    await flushPromises();
+
+    const labelOf = (dataTest: string) => {
+      const select = wrapper
+        .findAllComponents({ name: "OSelectStub" })
+        .find((item) => item.attributes("data-test") === dataTest)!;
+      return { label: select.props("label"), position: select.props("labelPosition") };
+    };
+    expect(labelOf("profiles-compare-label")).toEqual({
+      label: "Compare by label",
+      position: "inside",
+    });
+    expect(labelOf("profiles-compare-baseline")).toEqual({
+      label: "Compare From",
+      position: "inside",
+    });
+    expect(labelOf("profiles-compare-comparison")).toEqual({
+      label: "Compare To",
+      position: "inside",
+    });
   });
 
   it("compares the filtered version with the one before it, by version order", async () => {
