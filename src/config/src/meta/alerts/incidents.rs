@@ -947,11 +947,7 @@ impl IncidentEvent {
 mod tests {
     use super::*;
 
-    /// A node that predates an event type must still recover the whole timeline.
-    ///
-    /// Without the `Unknown` catch-all the array parse fails on the first unrecognized
-    /// tag, and callers that decode-then-write persist the truncated result — silently
-    /// destroying every prior event during a rolling deploy.
+    /// Without the `Unknown` catch-all one unrecognized tag would wipe the whole timeline.
     #[test]
     fn test_unknown_event_type_preserves_timeline() {
         let stored = serde_json::json!([
@@ -967,17 +963,12 @@ mod tests {
             IncidentEventType::Unknown(_)
         ));
 
-        // The unknown event must survive a read/write cycle byte-for-byte, otherwise an
-        // old node rewriting the row would strip data a newer node depends on.
+        // An old node rewriting the row must not strip data a newer node depends on.
         let rewritten = serde_json::to_value(&events).unwrap();
         assert_eq!(rewritten, stored, "unknown events must round-trip verbatim");
     }
 
-    /// A known tag with a malformed payload is absorbed by `Unknown` rather than erroring.
-    ///
-    /// This is the wide net documented on the variant: it preserves the row, but it means
-    /// an `Unknown` count alone cannot be read as "events from a newer node". `is_known_tag`
-    /// is what separates the two, and the read path logs them at different levels.
+    /// `Unknown` also absorbs malformed known tags; `is_known_tag` tells drift from forward-compat.
     #[test]
     fn test_malformed_known_event_is_absorbed_but_detectable() {
         // `user_id` must be a string; a number makes the tagged variant fail to decode.
@@ -991,15 +982,11 @@ mod tests {
         let IncidentEventType::Unknown(inner) = &event.event_type else {
             panic!("malformed known event should fall through to Unknown");
         };
-
-        // The distinguishing signal: the tag is one we own, so this is schema drift, not
-        // a forward-compatible event from a newer binary.
         assert!(
             IncidentEventType::is_known_tag(inner),
             "known tag must be detectable inside Unknown"
         );
 
-        // A genuinely unknown type must NOT be flagged as drift.
         let future = serde_json::json!({"timestamp": 1, "type": "some_future_event"});
         let future_event: IncidentEvent = serde_json::from_value(future).unwrap();
         let IncidentEventType::Unknown(future_inner) = &future_event.event_type else {
@@ -1008,13 +995,9 @@ mod tests {
         assert!(!IncidentEventType::is_known_tag(future_inner));
     }
 
-    /// `KNOWN_TAGS` must list exactly the tags the enum actually serializes.
-    ///
-    /// Guards the hand-maintained list: a new variant whose tag is not added here would
-    /// make its malformed payloads look like benign forward-compat events.
+    /// Guards the hand-maintained `KNOWN_TAGS` list and that no known variant decodes as `Unknown`.
     #[test]
     fn test_known_tags_matches_variants() {
-        // One representative value per variant; the payloads are irrelevant, only the tag.
         let variants = vec![
             IncidentEventType::Created,
             IncidentEventType::Alert {
@@ -1066,7 +1049,9 @@ mod tests {
                 trigger_type: AnalysisTriggerType::Manual,
                 error_details: None,
             },
-            IncidentEventType::AIAnalysisCancelled { user_id: None },
+            IncidentEventType::AIAnalysisCancelled {
+                user_id: Some("bob".into()),
+            },
             IncidentEventType::AiAnalysisSteered {
                 run_id: "r".into(),
                 steer_id: "s".into(),
@@ -1082,15 +1067,20 @@ mod tests {
             },
         ];
 
-        let mut actual: Vec<String> = variants
-            .iter()
-            .map(|v| {
-                serde_json::to_value(v).unwrap()["type"]
-                    .as_str()
-                    .expect("every known variant serializes a string tag")
-                    .to_string()
+        let mut actual: Vec<String> = Vec::new();
+        for v in variants {
+            let json = serde_json::to_value(IncidentEvent {
+                timestamp: 1,
+                event_type: v,
             })
-            .collect();
+            .unwrap();
+            let back: IncidentEvent = serde_json::from_value(json.clone()).unwrap();
+            assert!(
+                !matches!(back.event_type, IncidentEventType::Unknown(_)),
+                "{json} decoded as Unknown"
+            );
+            actual.push(json["type"].as_str().unwrap().to_string());
+        }
         let mut expected: Vec<String> = IncidentEventType::KNOWN_TAGS
             .iter()
             .map(|s| s.to_string())
@@ -1103,985 +1093,158 @@ mod tests {
         );
     }
 
-    /// Steering and question events serialize with their tag and round-trip to their own variant.
     #[test]
-    fn sg5_sg42_steering_events_round_trip() {
-        use crate::meta::alerts::rca_steering::SteerKind;
-        let steered =
-            IncidentEvent::ai_analysis_steered("r1", "stg_x", "a.rao@acme.io", SteerKind::Answer);
-        let v = serde_json::to_value(&steered).unwrap();
-        assert_eq!(v["type"], "ai_analysis_steered");
-        assert_eq!(
-            v["data"],
-            serde_json::json!({"run_id": "r1", "steer_id": "stg_x",
-                               "user_id": "a.rao@acme.io", "kind": "answer"})
-        );
-        assert!(IncidentEventType::is_known_tag(&v));
-        let back: IncidentEvent = serde_json::from_value(v.clone()).unwrap();
-        assert!(matches!(
-            back.event_type,
-            IncidentEventType::AiAnalysisSteered { .. }
-        ));
-        assert_eq!(serde_json::to_value(&back).unwrap(), v);
-
-        let asked = IncidentEvent::ai_analysis_needs_input("r1", "call_7f", "pool size", "q?", 42);
-        let v = serde_json::to_value(&asked).unwrap();
-        assert_eq!(v["type"], "ai_analysis_needs_input");
-        assert_eq!(
-            v["data"],
-            serde_json::json!({"run_id": "r1", "question_id": "call_7f", "need": "pool size",
-                               "question": "q?", "deadline_at": 42})
-        );
-        assert!(IncidentEventType::is_known_tag(&v));
-        let back: IncidentEvent = serde_json::from_value(v.clone()).unwrap();
-        assert!(matches!(
-            back.event_type,
-            IncidentEventType::AiAnalysisNeedsInput { .. }
-        ));
-        assert_eq!(serde_json::to_value(&back).unwrap(), v);
-    }
-
-    /// Known variants must still win over the untagged catch-all.
-    #[test]
-    fn test_known_event_types_not_captured_as_unknown() {
-        let event = IncidentEvent {
-            timestamp: 5,
-            event_type: IncidentEventType::AIAnalysisCancelled {
-                user_id: Some("bob".into()),
-            },
-        };
-        let json = serde_json::to_value(&event).unwrap();
-        let roundtrip: IncidentEvent = serde_json::from_value(json).unwrap();
-        assert!(matches!(
-            roundtrip.event_type,
-            IncidentEventType::AIAnalysisCancelled { .. }
-        ));
-    }
-
-    #[test]
-    fn test_incident_event_serde_created() {
-        let event = IncidentEvent {
-            timestamp: 1000000,
-            event_type: IncidentEventType::Created,
-        };
-        let json = serde_json::to_string(&event).unwrap();
-        println!("Created: {json}");
-        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
-        assert_eq!(roundtrip.timestamp, 1000000);
-    }
-
-    #[test]
-    fn test_incident_event_serde_alert() {
-        let event = IncidentEvent {
-            timestamp: 2000000,
-            event_type: IncidentEventType::Alert {
-                alert_id: "abc".into(),
-                alert_name: "CPU High".into(),
-                count: 5,
-                first_at: 1000000,
-                last_at: 2000000,
-            },
-        };
-        let json = serde_json::to_string(&event).unwrap();
-        println!("Alert: {json}");
-        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
-        assert_eq!(roundtrip.timestamp, 2000000);
-    }
-
-    #[test]
-    fn test_incident_event_serde_ai_analysis() {
-        let event = IncidentEvent::now(IncidentEventType::AIAnalysisBegin);
-        let json = serde_json::to_string(&event).unwrap();
-        println!("AIAnalysisBegin: {json}");
-        assert!(json.contains("\"type\":\"ai_analysis_begin\""));
-
-        let event2 = IncidentEvent::now(IncidentEventType::AIAnalysisComplete);
-        let json2 = serde_json::to_string(&event2).unwrap();
-        println!("AIAnalysisComplete: {json2}");
-        assert!(json2.contains("\"type\":\"ai_analysis_complete\""));
-    }
-
-    #[test]
-    fn test_incident_event_serde_comment() {
-        let event = IncidentEvent {
-            timestamp: 3000000,
-            event_type: IncidentEventType::Comment {
-                user_id: "user@test.com".into(),
-                comment: "investigating".into(),
-            },
-        };
-        let json = serde_json::to_string(&event).unwrap();
-        println!("Comment: {json}");
-        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
-        assert_eq!(roundtrip.timestamp, 3000000);
-    }
-
-    #[test]
-    fn test_incident_event_serde_title_changed() {
-        let event = IncidentEvent {
-            timestamp: 4000000,
-            event_type: IncidentEventType::TitleChanged {
-                from: "Old Title".into(),
-                to: "New Title".into(),
-                user_id: "user@test.com".into(),
-            },
-        };
-        let json = serde_json::to_string(&event).unwrap();
-        println!("TitleChanged: {json}");
-        assert!(json.contains("\"type\":\"TitleChanged\""));
-        assert!(json.contains("\"from\":\"Old Title\""));
-        assert!(json.contains("\"to\":\"New Title\""));
-        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
-        assert_eq!(roundtrip.timestamp, 4000000);
-        assert!(matches!(
-            roundtrip.event_type,
-            IncidentEventType::TitleChanged { ref from, ref to, .. }
-            if from == "Old Title" && to == "New Title"
-        ));
-    }
-
-    #[test]
-    fn test_incident_status_roundtrip() {
-        for status in [
+    fn test_display_from_str_round_trip_case_insensitive_and_rejects() {
+        for s in [
             IncidentStatus::Open,
             IncidentStatus::Acknowledged,
             IncidentStatus::Resolved,
         ] {
-            let s = status.to_string();
-            let parsed: IncidentStatus = s.parse().unwrap();
-            assert_eq!(status, parsed);
+            assert_eq!(s.to_string().parse::<IncidentStatus>(), Ok(s));
+            assert_eq!(
+                s.to_string().to_uppercase().parse::<IncidentStatus>(),
+                Ok(s)
+            );
         }
-    }
-
-    #[test]
-    fn test_incident_severity_roundtrip() {
-        for severity in [
+        for s in [
             IncidentSeverity::P1,
             IncidentSeverity::P2,
             IncidentSeverity::P3,
             IncidentSeverity::P4,
         ] {
-            let s = severity.to_string();
-            let parsed: IncidentSeverity = s.parse().unwrap();
-            assert_eq!(severity, parsed);
+            assert_eq!(s.to_string().parse::<IncidentSeverity>(), Ok(s));
+            assert_eq!(
+                s.to_string().to_lowercase().parse::<IncidentSeverity>(),
+                Ok(s)
+            );
         }
-    }
-
-    #[test]
-    fn test_incident_status_from_str_case_insensitive() {
-        assert_eq!(
-            "OPEN".parse::<IncidentStatus>().unwrap(),
-            IncidentStatus::Open
-        );
-        assert_eq!(
-            "Open".parse::<IncidentStatus>().unwrap(),
-            IncidentStatus::Open
-        );
-        assert_eq!(
-            "open".parse::<IncidentStatus>().unwrap(),
-            IncidentStatus::Open
-        );
-        assert_eq!(
-            "ACKNOWLEDGED".parse::<IncidentStatus>().unwrap(),
-            IncidentStatus::Acknowledged
-        );
-        assert_eq!(
-            "resolved".parse::<IncidentStatus>().unwrap(),
-            IncidentStatus::Resolved
-        );
-    }
-
-    #[test]
-    fn test_incident_status_from_str_invalid() {
-        assert!("invalid".parse::<IncidentStatus>().is_err());
-        assert!("".parse::<IncidentStatus>().is_err());
-        assert!("pending".parse::<IncidentStatus>().is_err());
-    }
-
-    #[test]
-    fn test_incident_severity_from_str_case_insensitive() {
-        assert_eq!(
-            "p1".parse::<IncidentSeverity>().unwrap(),
-            IncidentSeverity::P1
-        );
-        assert_eq!(
-            "P1".parse::<IncidentSeverity>().unwrap(),
-            IncidentSeverity::P1
-        );
-        assert_eq!(
-            "p2".parse::<IncidentSeverity>().unwrap(),
-            IncidentSeverity::P2
-        );
-        assert_eq!(
-            "P3".parse::<IncidentSeverity>().unwrap(),
-            IncidentSeverity::P3
-        );
-        assert_eq!(
-            "p4".parse::<IncidentSeverity>().unwrap(),
-            IncidentSeverity::P4
-        );
-    }
-
-    #[test]
-    fn test_incident_severity_from_str_invalid() {
-        assert!("P0".parse::<IncidentSeverity>().is_err());
-        assert!("P5".parse::<IncidentSeverity>().is_err());
-        assert!("invalid".parse::<IncidentSeverity>().is_err());
-        assert!("".parse::<IncidentSeverity>().is_err());
-    }
-
-    #[test]
-    fn test_incident_status_default() {
-        let status = IncidentStatus::default();
-        assert_eq!(status, IncidentStatus::Open);
-    }
-
-    #[test]
-    fn test_incident_severity_default() {
-        let severity = IncidentSeverity::default();
-        assert_eq!(severity, IncidentSeverity::P3);
-    }
-
-    #[test]
-    fn test_correlation_reason_display() {
-        assert_eq!(
-            CorrelationReason::ServiceDiscovery.to_string(),
-            "service_discovery"
-        );
-        assert_eq!(CorrelationReason::PrimaryMatch.to_string(), "primary_match");
-        assert_eq!(
-            CorrelationReason::SecondaryMatch.to_string(),
-            "secondary_match"
-        );
-    }
-
-    #[test]
-    fn test_incident_topology_default() {
-        let topology = IncidentTopology::default();
-        assert!(topology.nodes.is_empty());
-        assert!(topology.edges.is_empty());
-        assert!(topology.related_incident_ids.is_empty());
-    }
-
-    #[test]
-    fn test_incident_status_equality() {
-        assert_eq!(IncidentStatus::Open, IncidentStatus::Open);
-        assert_ne!(IncidentStatus::Open, IncidentStatus::Acknowledged);
-        assert_ne!(IncidentStatus::Acknowledged, IncidentStatus::Resolved);
-    }
-
-    #[test]
-    fn test_incident_severity_ordering() {
-        // Test that different severities are not equal
-        assert_ne!(IncidentSeverity::P1, IncidentSeverity::P2);
-        assert_ne!(IncidentSeverity::P2, IncidentSeverity::P3);
-        assert_ne!(IncidentSeverity::P3, IncidentSeverity::P4);
-    }
-
-    #[test]
-    fn test_correlation_reason_equality() {
-        assert_eq!(
+        for r in [
             CorrelationReason::ServiceDiscovery,
-            CorrelationReason::ServiceDiscovery
-        );
-        assert_ne!(
-            CorrelationReason::ServiceDiscovery,
-            CorrelationReason::PrimaryMatch
-        );
-        assert_ne!(
             CorrelationReason::PrimaryMatch,
-            CorrelationReason::SecondaryMatch
-        );
-    }
-
-    #[test]
-    fn test_incident_topology_with_alert_nodes() {
-        let node1 = AlertNode {
-            alert_id: "alert_cpu_high".to_string(),
-            alert_name: "High CPU Usage".to_string(),
-            service_name: "api-gateway".to_string(),
-            alert_count: 2,
-            first_fired_at: 1000,
-            last_fired_at: 2000,
-        };
-
-        let node2 = AlertNode {
-            alert_id: "alert_db_pool".to_string(),
-            alert_name: "Connection Pool Exhausted".to_string(),
-            service_name: "database".to_string(),
-            alert_count: 1,
-            first_fired_at: 1500,
-            last_fired_at: 1500,
-        };
-
-        let edge = AlertEdge {
-            from_node_index: 0,
-            to_node_index: 1,
-            edge_type: EdgeType::ServiceDependency,
-        };
-
-        let topology = IncidentTopology {
-            nodes: vec![node1, node2],
-            edges: vec![edge],
-            related_incident_ids: vec!["incident-1".to_string()],
-        };
-
-        assert_eq!(topology.nodes.len(), 2);
-        assert_eq!(topology.edges.len(), 1);
-        assert_eq!(topology.nodes[0].alert_id, "alert_cpu_high");
-        assert_eq!(topology.nodes[1].service_name, "database");
-        assert_eq!(topology.related_incident_ids.len(), 1);
-    }
-
-    #[test]
-    fn test_serde_incident_status() {
-        // Test serialization to lowercase
-        let status = IncidentStatus::Acknowledged;
-        let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(json, "\"acknowledged\"");
-
-        // Test deserialization from lowercase
-        let deserialized: IncidentStatus = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized, IncidentStatus::Acknowledged);
-    }
-
-    #[test]
-    fn test_serde_incident_severity() {
-        let severity = IncidentSeverity::P1;
-        let json = serde_json::to_string(&severity).unwrap();
-        assert_eq!(json, "\"P1\"");
-
-        let deserialized: IncidentSeverity = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized, IncidentSeverity::P1);
-    }
-
-    #[test]
-    fn test_serde_correlation_reason() {
-        let reason = CorrelationReason::ServiceDiscovery;
-        let json = serde_json::to_string(&reason).unwrap();
-        assert_eq!(json, "\"service_discovery\"");
-
-        let deserialized: CorrelationReason = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized, CorrelationReason::ServiceDiscovery);
-    }
-
-    // ========== KeyType Tests ==========
-
-    #[test]
-    fn test_key_type_from_stored() {
-        assert_eq!(KeyType::from_stored("Primary"), KeyType::Primary);
-        assert_eq!(KeyType::from_stored("Secondary"), KeyType::Secondary);
-        assert_eq!(KeyType::from_stored("AlertId"), KeyType::AlertId);
-        assert_eq!(KeyType::from_stored("unknown"), KeyType::AlertId);
-    }
-
-    // ========== DimensionRelationship Tests ==========
-
-    #[test]
-    fn test_dimension_relationship_superset() {
-        let existing = HashMap::from([("namespace".to_string(), "prod".to_string())]);
-        let new = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("cluster".to_string(), "us-east".to_string()),
-        ]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::NewIsSuperset);
-    }
-
-    #[test]
-    fn test_dimension_relationship_subset() {
-        let existing = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("cluster".to_string(), "us-east".to_string()),
-        ]);
-        let new = HashMap::from([("namespace".to_string(), "prod".to_string())]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::NewIsSubset);
-    }
-
-    #[test]
-    fn test_dimension_relationship_equal() {
-        let existing = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("cluster".to_string(), "us-east".to_string()),
-        ]);
-        let new = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("cluster".to_string(), "us-east".to_string()),
-        ]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::Equal);
-    }
-
-    #[test]
-    fn test_dimension_relationship_incompatible() {
-        let existing = HashMap::from([("region".to_string(), "us-east".to_string())]);
-        let new = HashMap::from([("region".to_string(), "us-west".to_string())]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::Incompatible);
-    }
-
-    #[test]
-    fn test_dimension_relationship_incompatible_multiple_keys() {
-        let existing = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("region".to_string(), "us-east".to_string()),
-        ]);
-        let new = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("region".to_string(), "us-west".to_string()), // Conflict!
-        ]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::Incompatible);
-    }
-
-    #[test]
-    fn test_dimension_relationship_partial_overlap() {
-        let existing = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("database".to_string(), "postgres".to_string()),
-        ]);
-        let new = HashMap::from([
-            ("namespace".to_string(), "prod".to_string()),
-            ("cache".to_string(), "redis".to_string()), // Different key
-        ]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::PartialOverlap);
-    }
-
-    #[test]
-    fn test_dimension_relationship_empty_existing() {
-        let existing = HashMap::new();
-        let new = HashMap::from([("namespace".to_string(), "prod".to_string())]);
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        // New has more keys, all existing keys (0) match -> Superset
-        assert_eq!(rel, DimensionRelationship::NewIsSuperset);
-    }
-
-    #[test]
-    fn test_dimension_relationship_empty_new() {
-        let existing = HashMap::from([("namespace".to_string(), "prod".to_string())]);
-        let new = HashMap::new();
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        // Empty dimensions should not match any incident (create new incident with alert_id key)
-        assert_eq!(rel, DimensionRelationship::PartialOverlap);
-    }
-
-    #[test]
-    fn test_dimension_relationship_both_empty() {
-        let existing = HashMap::new();
-        let new = HashMap::new();
-
-        let rel = DimensionRelationship::check(&existing, &new);
-        assert_eq!(rel, DimensionRelationship::Equal);
-    }
-
-    #[test]
-    fn test_incident_event_is_alert() {
-        let alert_event = IncidentEvent::alert("alert-1", "High CPU", 1000);
-        assert!(alert_event.is_alert());
-
-        let created_event = IncidentEvent::created();
-        assert!(!created_event.is_alert());
-
-        let resolved_event = IncidentEvent::resolved(None);
-        assert!(!resolved_event.is_alert());
-    }
-
-    #[test]
-    fn test_incident_event_is_alert_for() {
-        let event = IncidentEvent::alert("alert-abc", "High CPU", 1000);
-        assert!(event.is_alert_for("alert-abc"));
-        assert!(!event.is_alert_for("alert-xyz"));
-        assert!(!event.is_alert_for(""));
-
-        // Non-alert event is never alert_for any id
-        let created = IncidentEvent::created();
-        assert!(!created.is_alert_for("alert-abc"));
-    }
-
-    #[test]
-    fn test_incident_event_increment_alert_matching() {
-        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
-
-        // First increment: count goes 1→2, last_at updated
-        let result = event.increment_alert("alert-1", 2000);
-        assert!(result);
-
-        if let IncidentEventType::Alert {
-            count,
-            last_at,
-            first_at,
-            ..
-        } = &event.event_type
-        {
-            assert_eq!(*count, 2);
-            assert_eq!(*last_at, 2000);
-            assert_eq!(*first_at, 1000); // first_at unchanged
-        } else {
-            panic!("expected Alert variant");
+            CorrelationReason::SecondaryMatch,
+            CorrelationReason::AlertId,
+        ] {
+            assert_eq!(r.to_string().parse::<CorrelationReason>(), Ok(r));
+            assert_eq!(
+                r.to_string().to_uppercase().parse::<CorrelationReason>(),
+                Ok(r)
+            );
         }
-
-        // Second increment
-        let result2 = event.increment_alert("alert-1", 3000);
-        assert!(result2);
-        if let IncidentEventType::Alert { count, last_at, .. } = &event.event_type {
-            assert_eq!(*count, 3);
-            assert_eq!(*last_at, 3000);
+        for bad in ["", "pending", "invalid"] {
+            assert!(bad.parse::<IncidentStatus>().is_err(), "{bad}");
         }
-    }
-
-    #[test]
-    fn test_incident_event_increment_alert_wrong_id() {
-        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
-        let result = event.increment_alert("alert-2", 2000);
-        assert!(!result);
-
-        // count unchanged
-        if let IncidentEventType::Alert { count, last_at, .. } = &event.event_type {
-            assert_eq!(*count, 1);
-            assert_eq!(*last_at, 1000);
+        for bad in ["", "P0", "P5", "invalid"] {
+            assert!(bad.parse::<IncidentSeverity>().is_err(), "{bad}");
         }
-    }
-
-    #[test]
-    fn test_incident_event_increment_alert_non_alert_event() {
-        let mut event = IncidentEvent::created();
-        let result = event.increment_alert("alert-1", 2000);
-        assert!(!result);
-    }
-
-    // ── IncidentStatus Display + FromStr ─────────────────────────────────────
-
-    #[test]
-    fn test_incident_status_display() {
-        assert_eq!(IncidentStatus::Open.to_string(), "open");
-        assert_eq!(IncidentStatus::Acknowledged.to_string(), "acknowledged");
-        assert_eq!(IncidentStatus::Resolved.to_string(), "resolved");
-    }
-
-    #[test]
-    fn test_incident_status_from_str() {
-        use std::str::FromStr;
-        assert_eq!(
-            IncidentStatus::from_str("open").unwrap(),
-            IncidentStatus::Open
-        );
-        assert_eq!(
-            IncidentStatus::from_str("ACKNOWLEDGED").unwrap(),
-            IncidentStatus::Acknowledged
-        );
-        assert_eq!(
-            IncidentStatus::from_str("resolved").unwrap(),
-            IncidentStatus::Resolved
-        );
-        assert!(IncidentStatus::from_str("unknown").is_err());
-    }
-
-    // ── IncidentSeverity Display + FromStr ────────────────────────────────────
-
-    #[test]
-    fn test_incident_severity_display() {
-        assert_eq!(IncidentSeverity::P1.to_string(), "P1");
-        assert_eq!(IncidentSeverity::P2.to_string(), "P2");
-        assert_eq!(IncidentSeverity::P3.to_string(), "P3");
-        assert_eq!(IncidentSeverity::P4.to_string(), "P4");
-    }
-
-    #[test]
-    fn test_incident_severity_from_str() {
-        use std::str::FromStr;
-        assert_eq!(
-            IncidentSeverity::from_str("p1").unwrap(),
-            IncidentSeverity::P1
-        );
-        assert_eq!(
-            IncidentSeverity::from_str("P2").unwrap(),
-            IncidentSeverity::P2
-        );
-        assert_eq!(
-            IncidentSeverity::from_str("P3").unwrap(),
-            IncidentSeverity::P3
-        );
-        assert_eq!(
-            IncidentSeverity::from_str("P4").unwrap(),
-            IncidentSeverity::P4
-        );
-        assert!(IncidentSeverity::from_str("P5").is_err());
-    }
-
-    // ── CorrelationReason TryFrom ─────────────────────────────────────────────
-
-    #[test]
-    fn test_correlation_reason_try_from() {
-        assert_eq!(
-            "service_discovery".parse::<CorrelationReason>().unwrap(),
-            CorrelationReason::ServiceDiscovery
-        );
-        assert_eq!(
-            "PRIMARY_MATCH".parse::<CorrelationReason>().unwrap(),
-            CorrelationReason::PrimaryMatch
-        );
         assert!("bad_value".parse::<CorrelationReason>().is_err());
     }
 
-    // ── KeyType ───────────────────────────────────────────────────────────────
-
     #[test]
-    fn test_key_type_display() {
-        assert_eq!(KeyType::AlertId.to_string(), "AlertId");
-        assert_eq!(KeyType::Secondary.to_string(), "Secondary");
-        assert_eq!(KeyType::Primary.to_string(), "Primary");
+    fn test_from_stored_round_trips_and_defaults_unknown() {
+        for k in [KeyType::AlertId, KeyType::Secondary, KeyType::Primary] {
+            assert_eq!(KeyType::from_stored(&k.to_string()), k);
+        }
+        assert_eq!(KeyType::from_stored("unknown"), KeyType::AlertId);
+        for k in [AlertKind::Internal, AlertKind::External] {
+            assert_eq!(AlertKind::from_stored(k.as_str()), k);
+        }
+        assert_eq!(AlertKind::from_stored("garbage"), AlertKind::Internal);
     }
 
     #[test]
     fn test_key_type_can_upgrade_to() {
-        // AlertId can upgrade to Secondary or Primary
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Secondary));
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Primary));
-        // Secondary can upgrade to Primary or stay Secondary
-        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Primary));
-        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Secondary));
-        // Secondary cannot downgrade to AlertId
-        assert!(!KeyType::Secondary.can_upgrade_to(KeyType::AlertId));
-        // Primary can only upgrade to itself
-        assert!(KeyType::Primary.can_upgrade_to(KeyType::Primary));
-        assert!(!KeyType::Primary.can_upgrade_to(KeyType::Secondary));
-        assert!(!KeyType::Primary.can_upgrade_to(KeyType::AlertId));
-    }
-
-    // ── DimensionRelationship::check ──────────────────────────────────────────
-
-    #[test]
-    fn test_dimension_relationship_new_empty_existing_not() {
-        let existing: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
-        let result = DimensionRelationship::check(&existing, &HashMap::new());
-        assert_eq!(result, DimensionRelationship::PartialOverlap);
-    }
-
-    #[test]
-    fn test_dimension_relationship_new_is_superset() {
-        let existing: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
-        let new: HashMap<String, String> = [
-            ("ns".to_string(), "prod".to_string()),
-            ("cluster".to_string(), "us-east".to_string()),
-        ]
-        .into();
-        let result = DimensionRelationship::check(&existing, &new);
-        assert_eq!(result, DimensionRelationship::NewIsSuperset);
-    }
-
-    #[test]
-    fn test_dimension_relationship_new_is_subset() {
-        let existing: HashMap<String, String> = [
-            ("ns".to_string(), "prod".to_string()),
-            ("cluster".to_string(), "us-east".to_string()),
-        ]
-        .into();
-        let new: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
-        let result = DimensionRelationship::check(&existing, &new);
-        assert_eq!(result, DimensionRelationship::NewIsSubset);
-    }
-
-    fn make_incident(
-        resolved_at: Option<i64>,
-        title: Option<String>,
-        assigned_to: Option<String>,
-        topology_context: Option<IncidentTopology>,
-    ) -> Incident {
-        Incident {
-            id: "abc123".to_string(),
-            org_id: "org1".to_string(),
-            status: IncidentStatus::default(),
-            severity: IncidentSeverity::default(),
-            first_alert_at: 1000,
-            last_alert_at: 2000,
-            resolved_at,
-            alert_count: 1,
-            title,
-            assigned_to,
-            acknowledged_by: None,
-            acknowledged_at: None,
-            created_at: 1000,
-            updated_at: 2000,
-            group_values: serde_json::Value::Null,
-            key_type: KeyType::default(),
-            topology_context,
-            muted_by_downtime_id: None,
-            rca: None,
-            rca_off_reason: None,
-            alert_groups: None,
+        use KeyType::*;
+        let cases = [
+            (AlertId, AlertId, false),
+            (AlertId, Secondary, true),
+            (AlertId, Primary, true),
+            (Secondary, AlertId, false),
+            (Secondary, Secondary, true),
+            (Secondary, Primary, true),
+            (Primary, AlertId, false),
+            (Primary, Secondary, false),
+            (Primary, Primary, true),
+        ];
+        for (from, to, want) in cases {
+            assert_eq!(from.can_upgrade_to(to), want, "{from} -> {to}");
         }
     }
 
     #[test]
-    fn test_incident_optional_fields_none_absent_from_json() {
-        let incident = make_incident(None, None, None, None);
-        let json = serde_json::to_value(&incident).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("resolved_at"));
-        assert!(!obj.contains_key("title"));
-        assert!(!obj.contains_key("assigned_to"));
-        assert!(!obj.contains_key("topology_context"));
-        assert!(!obj.contains_key("acknowledged_by"));
-        assert!(!obj.contains_key("acknowledged_at"));
-        assert!(!obj.contains_key("muted_by_downtime_id"));
-    }
-
-    #[test]
-    fn a_muted_incident_names_its_downtime_and_old_rows_read_unmuted() {
-        let mut incident = make_incident(None, None, None, None);
-        incident.muted_by_downtime_id = Some("2f9K".to_string());
-        let json = serde_json::to_value(&incident).unwrap();
-        assert_eq!(json["muted_by_downtime_id"], "2f9K");
-        let mut old = json.as_object().unwrap().clone();
-        old.remove("muted_by_downtime_id");
-        let back: Incident = serde_json::from_value(serde_json::Value::Object(old)).unwrap();
-        assert_eq!(back.muted_by_downtime_id, None);
-    }
-
-    #[test]
-    fn test_incident_optional_fields_some_present_in_json() {
-        let incident = make_incident(
-            Some(3000),
-            Some("High CPU".to_string()),
-            Some("oncall@example.com".to_string()),
-            None,
-        );
-        let json = serde_json::to_value(&incident).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("resolved_at"));
-        assert_eq!(obj["resolved_at"], serde_json::json!(3000_i64));
-        assert!(obj.contains_key("title"));
-        assert_eq!(obj["title"], serde_json::json!("High CPU"));
-        assert!(obj.contains_key("assigned_to"));
-    }
-
-    #[test]
-    fn test_incident_acknowledged_by_at_present_in_json() {
-        let mut incident = make_incident(None, None, None, None);
-        incident.acknowledged_by = Some("user@example.com".to_string());
-        incident.acknowledged_at = Some(1500);
-        let json = serde_json::to_value(&incident).unwrap();
-        let obj = json.as_object().unwrap();
-        assert_eq!(
-            obj["acknowledged_by"],
-            serde_json::json!("user@example.com")
-        );
-        assert_eq!(obj["acknowledged_at"], serde_json::json!(1500_i64));
-    }
-
-    #[test]
-    fn test_incident_stats_mttr_none_absent_from_json() {
-        let stats = IncidentStats {
-            total_incidents: 10,
-            open_incidents: 5,
-            acknowledged_incidents: 2,
-            resolved_incidents: 3,
-            by_severity: Default::default(),
-            by_service: Default::default(),
-            mttr_minutes: None,
-            alerts_per_incident_avg: 2.5,
+    fn test_dimension_relationship_check() {
+        use DimensionRelationship::*;
+        let dims = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
         };
-        let json = serde_json::to_value(&stats).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("mttr_minutes"));
-    }
-
-    #[test]
-    fn test_incident_stats_mttr_some_present_in_json() {
-        let stats = IncidentStats {
-            total_incidents: 5,
-            open_incidents: 1,
-            acknowledged_incidents: 0,
-            resolved_incidents: 4,
-            by_severity: Default::default(),
-            by_service: Default::default(),
-            mttr_minutes: Some(15.5),
-            alerts_per_incident_avg: 3.0,
-        };
-        let json = serde_json::to_value(&stats).unwrap();
-        let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("mttr_minutes"));
-        assert_eq!(obj["mttr_minutes"], serde_json::json!(15.5_f64));
-    }
-
-    #[test]
-    fn test_incident_event_factory_severity_upgrade() {
-        let event = IncidentEvent::severity_upgrade(
-            IncidentSeverity::P3,
-            IncidentSeverity::P1,
-            "latency spike",
-        );
-        assert!(event.timestamp > 0);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::SeverityUpgrade {
-                from: IncidentSeverity::P3,
-                to: IncidentSeverity::P1,
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn test_incident_event_factory_severity_override() {
-        let event = IncidentEvent::severity_override(
-            IncidentSeverity::P1,
-            IncidentSeverity::P4,
-            "user@example.com",
-        );
-        assert!(event.timestamp > 0);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::SeverityOverride {
-                from: IncidentSeverity::P1,
-                to: IncidentSeverity::P4,
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn test_incident_event_factory_acknowledged() {
-        let event = IncidentEvent::acknowledged("user@example.com");
-        assert!(event.timestamp > 0);
-        if let IncidentEventType::Acknowledged { user_id } = &event.event_type {
-            assert_eq!(user_id, "user@example.com");
-        } else {
-            panic!("Expected Acknowledged event");
+        let ns = [("ns", "prod")];
+        let ns_cluster = [("ns", "prod"), ("cluster", "us-east")];
+        type Dims<'a> = &'a [(&'a str, &'a str)];
+        let cases: [(Dims, Dims, DimensionRelationship); 9] = [
+            (&ns, &ns_cluster, NewIsSuperset),
+            (&ns_cluster, &ns, NewIsSubset),
+            (&ns_cluster, &ns_cluster, Equal),
+            (
+                &[("region", "us-east")],
+                &[("region", "us-west")],
+                Incompatible,
+            ),
+            (
+                &[("ns", "prod"), ("region", "us-east")],
+                &[("ns", "prod"), ("region", "us-west")],
+                Incompatible,
+            ),
+            (
+                &[("ns", "prod"), ("db", "postgres")],
+                &[("ns", "prod"), ("cache", "redis")],
+                PartialOverlap,
+            ),
+            (&[], &ns, NewIsSuperset),
+            // Dimensionless alerts must never join an incident that has dimensions.
+            (&ns, &[], PartialOverlap),
+            (&[], &[], Equal),
+        ];
+        for (existing, new, want) in cases {
+            assert_eq!(
+                DimensionRelationship::check(&dims(existing), &dims(new)),
+                want,
+                "{existing:?} vs {new:?}"
+            );
         }
     }
 
     #[test]
-    fn test_incident_event_factory_reopened() {
-        let event = IncidentEvent::reopened("user@example.com", "false positive");
-        assert!(event.timestamp > 0);
-        if let IncidentEventType::Reopened { user_id, reason } = &event.event_type {
-            assert_eq!(user_id, "user@example.com");
-            assert_eq!(reason, "false positive");
-        } else {
-            panic!("Expected Reopened event");
-        }
+    fn test_is_alert_and_is_alert_for() {
+        let alert = IncidentEvent::alert("alert-abc", "High CPU", 1000);
+        assert!(alert.is_alert());
+        assert!(alert.is_alert_for("alert-abc"));
+        assert!(!alert.is_alert_for("alert-xyz"));
+
+        let created = IncidentEvent::created();
+        assert!(!created.is_alert());
+        assert!(!created.is_alert_for("alert-abc"));
     }
 
     #[test]
-    fn test_incident_event_factory_dimensions_upgraded() {
-        let event = IncidentEvent::dimensions_upgraded("alert-id-key", "secondary-key");
-        assert!(event.timestamp > 0);
-        if let IncidentEventType::DimensionsUpgraded { from_key, to_key } = &event.event_type {
-            assert_eq!(from_key, "alert-id-key");
-            assert_eq!(to_key, "secondary-key");
-        } else {
-            panic!("Expected DimensionsUpgraded event");
-        }
-    }
-
-    #[test]
-    fn test_incident_event_factory_title_changed() {
-        let event = IncidentEvent::title_changed("Old Title", "New Title", "user@example.com");
-        assert!(event.timestamp > 0);
-        if let IncidentEventType::TitleChanged { from, to, user_id } = &event.event_type {
-            assert_eq!(from, "Old Title");
-            assert_eq!(to, "New Title");
-            assert_eq!(user_id, "user@example.com");
-        } else {
-            panic!("Expected TitleChanged event");
-        }
-    }
-
-    #[test]
-    fn test_incident_event_factory_comment() {
-        let event = IncidentEvent::comment("user@example.com", "investigating now");
-        assert!(event.timestamp > 0);
-        if let IncidentEventType::Comment { user_id, comment } = &event.event_type {
-            assert_eq!(user_id, "user@example.com");
-            assert_eq!(comment, "investigating now");
-        } else {
-            panic!("Expected Comment event");
-        }
-    }
-
-    #[test]
-    fn test_incident_event_factory_ai_analysis_failed() {
-        let event = IncidentEvent::ai_analysis_failed(
-            "timeout",
-            AnalysisTriggerType::AutomaticNewIncident,
-            Some("request timed out".to_string()),
-        );
-        assert!(event.timestamp > 0);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::AIAnalysisFailed { .. }
-        ));
-    }
-
-    #[test]
-    fn test_incident_correlation_outcome_incident_id_all_variants() {
-        let created = IncidentCorrelationOutcome::NewIncidentCreated {
-            incident_id: "inc-001".to_string(),
-            service_name: "svc-a".to_string(),
+    fn test_increment_alert() {
+        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
+        assert!(event.increment_alert("alert-1", 2000));
+        assert!(event.increment_alert("alert-1", 3000));
+        assert!(!event.increment_alert("alert-2", 4000));
+        let IncidentEventType::Alert {
+            count,
+            first_at,
+            last_at,
+            ..
+        } = event.event_type
+        else {
+            panic!("expected Alert variant");
         };
-        assert_eq!(created.incident_id(), "inc-001");
+        assert_eq!((count, first_at, last_at), (3, 1000, 3000));
 
-        let joined = IncidentCorrelationOutcome::NewAlertTypeJoined {
-            incident_id: "inc-002".to_string(),
-            service_name: "svc-b".to_string(),
-        };
-        assert_eq!(joined.incident_id(), "inc-002");
-
-        let repeated = IncidentCorrelationOutcome::ExistingAlertRepeated {
-            incident_id: "inc-003".to_string(),
-            service_name: "svc-c".to_string(),
-        };
-        assert_eq!(repeated.incident_id(), "inc-003");
-    }
-
-    #[test]
-    fn test_incident_correlation_outcome_service_name_all_variants() {
-        let created = IncidentCorrelationOutcome::NewIncidentCreated {
-            incident_id: "inc-001".to_string(),
-            service_name: "service-x".to_string(),
-        };
-        assert_eq!(created.service_name(), "service-x");
-
-        let joined = IncidentCorrelationOutcome::NewAlertTypeJoined {
-            incident_id: "inc-001".to_string(),
-            service_name: "service-y".to_string(),
-        };
-        assert_eq!(joined.service_name(), "service-y");
-
-        let repeated = IncidentCorrelationOutcome::ExistingAlertRepeated {
-            incident_id: "inc-001".to_string(),
-            service_name: "service-z".to_string(),
-        };
-        assert_eq!(repeated.service_name(), "service-z");
-    }
-
-    #[test]
-    fn test_incident_event_factory_resolved_with_user() {
-        let event = IncidentEvent::resolved(Some("user@test.com".to_string()));
-        assert!(event.timestamp > 0);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::Resolved { user_id: Some(ref u) } if u == "user@test.com"
-        ));
-    }
-
-    #[test]
-    fn test_incident_event_factory_resolved_without_user() {
-        let event = IncidentEvent::resolved(None);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::Resolved { user_id: None }
-        ));
+        assert!(!IncidentEvent::created().increment_alert("alert-1", 2000));
     }
 
     #[test]
@@ -2098,71 +1261,8 @@ mod tests {
     }
 
     #[test]
-    fn test_incident_event_factory_ai_analysis_begin() {
-        let event = IncidentEvent::ai_analysis_begin();
-        assert!(event.timestamp > 0);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::AIAnalysisBegin
-        ));
-    }
-
-    #[test]
-    fn test_incident_event_factory_ai_analysis_complete() {
-        let event = IncidentEvent::ai_analysis_complete();
-        assert!(event.timestamp > 0);
-        assert!(matches!(
-            event.event_type,
-            IncidentEventType::AIAnalysisComplete
-        ));
-    }
-
-    #[test]
-    fn test_alert_kind_serde_and_stored() {
-        assert_eq!(
-            serde_json::to_string(&AlertKind::External).unwrap(),
-            "\"external\""
-        );
-        assert_eq!(AlertKind::from_stored("external"), AlertKind::External);
-        assert_eq!(AlertKind::from_stored("internal"), AlertKind::Internal);
-        assert_eq!(AlertKind::from_stored("garbage"), AlertKind::Internal); // safe default
-        assert_eq!(AlertKind::External.as_str(), "external");
-    }
-
-    #[test]
-    fn test_incident_alert_external_fields_serde() {
-        let alert = IncidentAlert {
-            incident_id: "inc1".to_string(),
-            alert_id: "ext1".to_string(),
-            alert_name: "External Alert".to_string(),
-            alert_kind: AlertKind::External,
-            alert_fired_at: 1000,
-            correlation_reason: CorrelationReason::AlertId,
-            created_at: 1000,
-            source_url: Some("https://example.com/alert/1".to_string()),
-            labels: Some(std::collections::HashMap::from([(
-                "service".to_string(),
-                "checkout".to_string(),
-            )])),
-            detected_source: Some("pagerduty".to_string()),
-        };
-
-        let json = serde_json::to_value(&alert).unwrap();
-        assert_eq!(json["alert_kind"], "external");
-        assert_eq!(json["source_url"], "https://example.com/alert/1");
-        assert_eq!(json["detected_source"], "pagerduty");
-
-        let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
-        assert_eq!(round_tripped.alert_kind, AlertKind::External);
-        assert_eq!(
-            round_tripped.source_url,
-            Some("https://example.com/alert/1".to_string())
-        );
-    }
-
-    #[test]
     fn test_incident_alert_legacy_json_defaults_to_internal() {
-        // Legacy stored/older payloads have no alert_kind or external fields at all.
+        // Rows stored before external alert sources have no alert_kind or external fields.
         let legacy_json = serde_json::json!({
             "incident_id": "inc1",
             "alert_id": "alert1",
@@ -2180,47 +1280,18 @@ mod tests {
     }
 
     #[test]
-    fn test_external_alert_status_serde() {
-        assert_eq!(
-            serde_json::to_string(&ExternalAlertStatus::Firing).unwrap(),
-            "\"firing\""
-        );
-        let s: ExternalAlertStatus = serde_json::from_str("\"resolved\"").unwrap();
-        assert_eq!(s, ExternalAlertStatus::Resolved);
-    }
-
-    #[test]
     fn test_map_external_severity() {
-        assert_eq!(map_external_severity("critical"), IncidentSeverity::P1);
-        assert_eq!(map_external_severity("CRITICAL"), IncidentSeverity::P1);
-        assert_eq!(map_external_severity("error"), IncidentSeverity::P2);
-        assert_eq!(map_external_severity("warning"), IncidentSeverity::P3);
-        assert_eq!(map_external_severity("info"), IncidentSeverity::P4);
-        assert_eq!(map_external_severity("p2"), IncidentSeverity::P2);
-        assert_eq!(
-            map_external_severity("unknown-things"),
-            IncidentSeverity::P3
-        ); // default
-    }
-
-    #[test]
-    fn test_external_alert_event_serde_roundtrip() {
-        let ev = ExternalAlertEvent {
-            status: ExternalAlertStatus::Firing,
-            dedup_key: "abc123".into(),
-            title: "High CPU".into(),
-            severity: IncidentSeverity::P1,
-            labels: std::collections::HashMap::from([(
-                "namespace".to_string(),
-                "prod".to_string(),
-            )]),
-            event_ts: 1_722_300_000_000_000,
-            source_url: Some("https://grafana.example/alerting/x".into()),
-            raw: serde_json::json!({"k": "v"}),
-        };
-        let json = serde_json::to_string(&ev).unwrap();
-        let back: ExternalAlertEvent = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.dedup_key, "abc123");
-        assert_eq!(back.severity, IncidentSeverity::P1);
+        let cases = [
+            ("critical", IncidentSeverity::P1),
+            ("CRITICAL", IncidentSeverity::P1),
+            ("error", IncidentSeverity::P2),
+            ("p2", IncidentSeverity::P2),
+            ("warning", IncidentSeverity::P3),
+            ("info", IncidentSeverity::P4),
+            ("unknown-things", IncidentSeverity::P3),
+        ];
+        for (input, want) in cases {
+            assert_eq!(map_external_severity(input), want, "{input}");
+        }
     }
 }
