@@ -8,6 +8,9 @@ const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 const { ingestBase } = require('./ingest-url.js');
 
+// RED-chart brushes drag 25–80% of a 15m range (~11–3 min ago); several ages keep data inside as tests run later.
+const BRUSH_WINDOW_AGES_MS = [5, 6.5, 8].map((min) => min * 60 * 1000);
+
 /**
  * Generate a random hex string of specified byte length
  * @param {number} bytes - Number of bytes
@@ -319,6 +322,21 @@ async function ingestTraces(page, traceCount = 10, options = {}) {
 }
 
 /**
+ * Seed error and success traces 5–8 min in the past, inside a RED-chart brush on a 15m range.
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @returns {Promise<number>} Number of traces that failed to ingest
+ */
+async function ingestBrushWindowTraces(page) {
+  let failed = 0;
+  for (const ageMs of BRUSH_WINDOW_AGES_MS) {
+    for (const [count, forceScenario] of [[2, 'error'], [3, 'success']]) {
+      failed += (await ingestTraces(page, count, { forceScenario, ageMs })).failed;
+    }
+  }
+  return failed;
+}
+
+/**
  * Ingest `count` single-span ERROR traces named err-op-000.. (newest first) into `streamName`,
  * each followed by an OK span, so a span_status filter and page boundaries are both checkable.
  * @returns {Promise<{status: number}>}
@@ -360,6 +378,7 @@ async function ingestSequencedErrorSpans(page, streamName, count) {
 module.exports = {
   generateTrace,
   ingestTraces,
+  ingestBrushWindowTraces,
   ingestSequencedErrorSpans,
   generateHexId,
   getTimestampNs

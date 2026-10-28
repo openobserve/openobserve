@@ -3,7 +3,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { ingestTraces, ingestBrushWindowTraces } = require('../utils/trace-ingestion.js');
 
 // A heatmap box writes its half-open band with exact 1-2-5 bounds.
 const DURATION_FILTER_PATTERN = /duration\s*(>=|<)\s*'\d+(us|ms|s)'/;
@@ -15,7 +15,7 @@ test.describe("Traces Charts testcases", () => {
   let pm;
 
   // The Errors panel plots an empty series unless the window holds at least one error span.
-  // Seeded spans are stamped "now" in the shared `default` stream, so they age out and need no teardown.
+  // Seeded spans land in the shared `default` stream and age out, so they need no teardown.
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
     const context = await browser.newContext({
@@ -25,9 +25,11 @@ test.describe("Traces Charts testcases", () => {
     try {
       const errors = await ingestTraces(page, 6, { forceScenario: 'error' });
       const success = await ingestTraces(page, 10, { forceScenario: 'success' });
+      const backdatedFailed = await ingestBrushWindowTraces(page);
       testLogger.info('Seeded traces for chart tests', {
         errors: errors.successful,
         success: success.successful,
+        backdatedFailed,
       });
     } catch (e) {
       testLogger.warn('Chart trace seeding failed (continuing)', { error: e.message });
