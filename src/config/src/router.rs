@@ -69,7 +69,7 @@ const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query_exemplars",
 ];
-const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
+const FIXED_QUERIER_ROUTES: [&str; 4] = ["/summary", "/schema", "/streams", "/overview"];
 pub const INGESTER_ROUTES: [&str; 13] = [
     "/services/collector",
     "/_json",
@@ -265,6 +265,7 @@ mod tests {
     #[test]
     fn test_is_fixed_querier_route() {
         assert!(is_fixed_querier_route("/summary"));
+        assert!(is_fixed_querier_route("/api/org1/overview"));
         assert!(is_fixed_querier_route("/schema"));
         assert!(is_fixed_querier_route("/streams"));
 
