@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body">
           <span class="text-text-secondary font-semibold">{{
             t("alerts.incidents.rcaSummary.agentsReading")
-          }}</span>
-          <RcaInlineText :text="citation.observation" />
+          }}</span
+          >{{ " " }}<RcaInlineText :text="citation.observation" />
         </span>
       </li>
     </ul>

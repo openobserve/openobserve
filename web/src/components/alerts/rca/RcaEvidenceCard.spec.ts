@@ -84,7 +84,9 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     const rootStatement = statementOf(rcaEvidenceEntry().citations[0].hypothesis_id);
     expect(links[0].text()).not.toBe(rootStatement);
     expect(links[0].attributes("title")).toBe(rootStatement);
-    expect(citations[0].text()).toContain(rcaEvidenceEntry().citations[0].observation);
+    expect(citations[0].text()).toContain(
+      `Agent's reading: ${rcaEvidenceEntry().citations[0].observation}`,
+    );
     // A ruled-out hypothesis has no role name: the link is its statement.
     expect(links[1].text()).toBe(statementOf("h4"));
     // The result summary carries the query time; the card does not add the call's duration again.
