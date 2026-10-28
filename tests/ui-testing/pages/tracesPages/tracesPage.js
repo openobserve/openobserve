@@ -186,6 +186,24 @@ export class TracesPage {
 
     // Trace details span attribute table (rendered inside trace-details-sidebar)
     this.traceDetailsSidebarRow = '[data-test="trace-details-sidebar"] [data-test^="o2-table-row-"]';
+
+    this.moreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
+    this.openDropdownMenu = page.getByRole('menu');
+    this.menuSavedViewsGroup = '[data-test="traces-search-bar-menu-saved-views-group"]';
+    this.menuPinSavedViewsButton = '[data-test="traces-search-bar-menu-pin-saved-views-btn"]';
+    this.menuListSavedViewsButton = '[data-test="traces-search-bar-menu-list-saved-views-btn"]';
+    this.menuCreateSavedViewButton = '[data-test="traces-search-bar-menu-create-saved-view-btn"]';
+    this.pinnedSavedViewsGroup = '[data-test="traces-search-bar-saved-views"]';
+    this.pinnedSavedViewsTrigger = '[data-test="traces-search-bar-saved-views-btn"]';
+    this.pinnedSavedViewItemPrefix = '[data-test^="traces-saved-view-apply-"]';
+    this.savedViewNameInput = '[data-test="traces-saved-view-name-input"]';
+    this.savedViewsListDialog = '[data-test="traces-saved-views-dialog"]';
+    this.savedViewsDialogApplyPrefix = '[data-test^="traces-saved-views-dialog-apply-"]';
+
+    this.waterfallAxisLastLabels = '[data-test="trace-header-tic-label-3"]';
+    this.spanBar = '[data-test="span-marker"]';
+    this.spanRow = '[data-test="span-block-container"]';
+    this.spanBarTrack = '[data-test="span-block-select-trigger"]';
   }
 
   // Getter methods for common trace elements
@@ -584,8 +602,17 @@ export class TracesPage {
 
     const selector = rangeMap[range] || '[data-test="date-time-relative-15-m-btn"]';
     await this.page.locator(selector).click();
-    // Wait for datetime dropdown to close
-    await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await this.closeDateTimePickerIfOpen();
+  }
+
+  /** The auto-apply picker stays open after a pick, and its panel covers part of the query editor. */
+  async closeDateTimePickerIfOpen() {
+    const panel = this.page.locator('#date-time-menu');
+    if (!(await panel.isVisible().catch(() => false))) return;
+    await this.page.keyboard.press('Escape');
+    const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+    if (!closed) await this.page.locator(this.dateTimeButton).click();
+    await expect(panel).toBeHidden({ timeout: 5000 });
   }
 
   async runSearch() {
@@ -3117,5 +3144,108 @@ export class TracesPage {
 
   async expectServiceSidePanelVisible() {
     await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
+  }
+
+  async openMoreMenu() {
+    await this.page.locator(this.moreMenuButton).click();
+    await expect(this.openDropdownMenu).toBeVisible({ timeout: 10000 });
+  }
+
+  async closeMoreMenu() {
+    await this.page.keyboard.press('Escape');
+    await expect(this.openDropdownMenu).toBeHidden({ timeout: 10000 });
+  }
+
+  async expectMoreMenuSavedViewsEntriesVisible() {
+    const group = this.page.locator(this.menuSavedViewsGroup);
+    await expect(group).toBeVisible({ timeout: 10000 });
+    await expect(group.locator(this.menuPinSavedViewsButton)).toBeVisible();
+    await expect(group.locator(this.menuListSavedViewsButton)).toContainText(/list saved views/i);
+    await expect(group.locator(this.menuCreateSavedViewButton)).toContainText(/create saved view/i);
+  }
+
+  /** Asserts on an open menu, so an unopened menu cannot pass for a missing group. */
+  async expectMoreMenuSavedViewsEntriesHidden() {
+    await expect(this.openDropdownMenu).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.menuSavedViewsGroup)).toHaveCount(0);
+    await expect(this.page.locator(this.menuListSavedViewsButton)).toHaveCount(0);
+    await expect(this.page.locator(this.menuCreateSavedViewButton)).toHaveCount(0);
+  }
+
+  async toggleSavedViewsPinFromMoreMenu() {
+    await this.openMoreMenu();
+    await this.page.locator(this.menuPinSavedViewsButton).click();
+  }
+
+  async expectSavedViewsPinTitle(title) {
+    await expect(this.page.locator(this.menuPinSavedViewsButton)).toHaveAttribute('title', title);
+  }
+
+  async expectPinnedSavedViewsInToolbar() {
+    await expect(this.page.locator(this.pinnedSavedViewsGroup)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator(this.pinnedSavedViewsGroup).locator(this.pinnedSavedViewsTrigger)).toBeVisible();
+  }
+
+  /** Waits for the toolbar's More button first, so a toolbar that never rendered cannot pass. */
+  async expectPinnedSavedViewsNotInToolbar() {
+    await expect(this.page.locator(this.moreMenuButton)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator(this.pinnedSavedViewsGroup)).toHaveCount(0);
+  }
+
+  async openCreateSavedViewFromMoreMenu() {
+    await this.openMoreMenu();
+    await this.page.locator(this.menuCreateSavedViewButton).click();
+    await expect(this.page.locator(this.savedViewNameInput)).toBeVisible({ timeout: 10000 });
+  }
+
+  async applySavedViewFromPinnedGroup(viewName) {
+    await this.page.locator(this.pinnedSavedViewsGroup).locator(this.pinnedSavedViewsTrigger).click();
+    const view = this.page.locator(this.pinnedSavedViewItemPrefix).filter({ hasText: viewName });
+    await expect(view).toHaveCount(1, { timeout: 15000 });
+    await view.click();
+  }
+
+  async openSavedViewsListFromMoreMenu() {
+    await this.openMoreMenu();
+    await this.page.locator(this.menuListSavedViewsButton).click();
+    await expect(this.page.locator(this.savedViewsListDialog)).toBeVisible({ timeout: 10000 });
+  }
+
+  savedViewsDialogApplyCell(viewName) {
+    return this.page.locator(`${this.savedViewsListDialog} ${this.savedViewsDialogApplyPrefix}[data-test-view-name="${viewName}"]`);
+  }
+
+  async applySavedViewFromListDialog(viewName) {
+    const cell = this.savedViewsDialogApplyCell(viewName);
+    await expect(cell).toBeVisible({ timeout: 15000 });
+    await cell.click();
+    await expect(this.page.locator(this.savedViewsListDialog)).toBeHidden({ timeout: 10000 });
+  }
+
+  async expectQueryEditorEventuallyContains(text) {
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 15000 }).toContain(text);
+  }
+
+  /** Reads the axis end label (the last of the two labels in the final quarter) as milliseconds; NaN until it renders. */
+  async getWaterfallAxisEndMs() {
+    const text = await this.page.locator(this.waterfallAxisLastLabels).textContent({ timeout: 5000 }).catch(() => '');
+    const matches = [...(text || '').matchAll(/(\d+(?:\.\d+)?)(us|ms|s|m)/g)];
+    if (!matches.length) return NaN;
+    const [, value, unit] = matches[matches.length - 1];
+    const toMs = { us: 0.001, ms: 1, s: 1000, m: 60000 };
+    return Number(value) * toMs[unit];
+  }
+
+  /** Width of a span's bar as a share of its row's timeline track, plus the bar's pixel width; zero until both lay out. */
+  async getSpanBarShare(spanId) {
+    const row = this.page.locator(`${this.spanRow}[id="${spanId}"]`);
+    const bar = await row.locator(this.spanBar).boundingBox({ timeout: 5000 }).catch(() => null);
+    const track = await row.locator(this.spanBarTrack).boundingBox({ timeout: 5000 }).catch(() => null);
+    if (!bar || !track?.width) return { barPx: 0, share: 0 };
+    return { barPx: bar.width, share: bar.width / track.width };
+  }
+
+  async expectWaterfallSpanRow(spanId) {
+    await expect(this.page.locator(`${this.spanRow}[id="${spanId}"]`)).toBeVisible({ timeout: 30000 });
   }
 }

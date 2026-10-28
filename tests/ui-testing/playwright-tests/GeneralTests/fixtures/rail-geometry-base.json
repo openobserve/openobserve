@@ -46,51 +46,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 4,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 4,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 4,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 4,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 4,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 4,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 4,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 4,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -151,51 +157,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 4,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 4,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 4,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 4,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 4,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 4,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 4,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 4,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -256,51 +268,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 1356,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 1356,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 1356,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 1356,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 1356,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 1356,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 1356,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 1356,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 1356,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -361,51 +379,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 916,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 916,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 916,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 916,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 916,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 916,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 916,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 916,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 916,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -466,51 +490,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 4,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 4,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 4,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 4,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 4,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 4,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 4,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 4,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -571,51 +601,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 4,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 4,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 4,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 4,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 4,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 4,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 4,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 4,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -676,51 +712,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 1356,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 1356,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 1356,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 1356,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 1356,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 1356,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 1356,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 1356,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 1356,
+          "y": 700,
           "w": 80,
           "h": 51
         }
@@ -781,51 +823,57 @@
           "w": 80,
           "h": 51
         },
-        "menu-link-/ai-item": {
+        "menu-link-/profiles-item": {
           "x": 916,
           "y": 260,
           "w": 80,
           "h": 51
         },
-        "menu-link-/rum-item": {
+        "menu-link-/ai-item": {
           "x": 916,
           "y": 315,
           "w": 80,
           "h": 51
         },
-        "menu-link-/dashboards-item": {
+        "menu-link-/rum-item": {
           "x": 916,
           "y": 370,
           "w": 80,
           "h": 51
         },
-        "menu-link-/alerts-item": {
+        "menu-link-/dashboards-item": {
           "x": 916,
           "y": 425,
           "w": 80,
           "h": 51
         },
-        "menu-link-/infra/databases-item": {
+        "menu-link-/alerts-item": {
           "x": 916,
           "y": 480,
           "w": 80,
           "h": 51
         },
-        "menu-link-/streams-item": {
+        "menu-link-/infra/databases-item": {
           "x": 916,
           "y": 535,
           "w": 80,
           "h": 51
         },
-        "menu-link-/iam-item": {
+        "menu-link-/streams-item": {
           "x": 916,
           "y": 590,
           "w": 80,
           "h": 51
         },
-        "menu-link-/settings-item": {
+        "menu-link-/iam-item": {
           "x": 916,
           "y": 645,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 916,
+          "y": 700,
           "w": 80,
           "h": 51
         }

@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- truncate has to sit on an inline child: on the flex parent the text
                      is an anonymous flex item and never picks up the ellipsis. -->
-                <OTruncatedText>{{ item.title }}</OTruncatedText>
+                <OTruncatedText>{{ getPanelTitle(item) }}</OTruncatedText>
               </h2>
               <!-- Off-screen panels render this lightweight placeholder; the
                    real panel mounts only when it comes near the viewport.
@@ -201,9 +201,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="drag-cancel flex h-full flex-col p-2"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
-                <span class="text-text-secondary truncate text-sm" :title="item.title">
-                  {{ item.title }}
-                </span>
+                <OTruncatedText
+                  class="text-text-secondary text-sm"
+                  :data-test="`dashboard-placeholder-title-${item.id}`"
+                >
+                  {{ getPanelTitle(item) }}
+                </OTruncatedText>
                 <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
               </div>
               <!-- Panel with Panel-Level Variables -->
@@ -243,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :allowAlertCreation="allowAlertCreation"
                   :showLegendsButton="showLegendsButton"
                   :simplifiedPanelView="simplifiedPanelView"
+                  :injectedPanelData="injectedPanelData?.[item.id]"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
@@ -268,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <DateTimePickerDashboard
                           :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
                           :auto-apply-dashboard="true"
+                          calendar-presets
                           size="sm"
                           class="panel-time-picker-widget"
                           @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
@@ -362,6 +367,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { getPanelDisplayTitle } from "@/utils/dashboard/panelTitle";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
@@ -378,6 +384,11 @@ import {
   useDashboardTimeGate,
   type DashboardTimeGate,
 } from "@/composables/dashboard/useDashboardTimeGate";
+import useStreams from "@/composables/useStreams";
+import {
+  DASHBOARD_ANNOTATION_SOURCES_KEY,
+  useDashboardAnnotationSources,
+} from "@/composables/dashboard/useDashboardAnnotationSources";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import { computeFitCellHeight } from "@/utils/dashboard/kiosk";
@@ -476,6 +487,12 @@ export default defineComponent({
     frame: {
       type: Boolean,
       default: true,
+    },
+    /** Pre-built results keyed by panel id; a panel with an entry renders it
+     *  instead of querying (public dashboards read materialized snapshots). */
+    injectedPanelData: {
+      type: Object,
+      default: undefined,
     },
     /** "live" drags and saves at once; "view" locks the layout; "edit" unlocks it and emits layoutChange instead of saving. */
     layoutMode: {
@@ -614,6 +631,20 @@ export default defineComponent({
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
 
+    const { getStream } = useStreams(t);
+    const annotationSources = useDashboardAnnotationSources({
+      dashboardData: () => props.dashboardData,
+      timeRange: () => props.currentTimeObj?.__global,
+      variables: () => variablesManager.committedVariablesData.global,
+      store,
+      folderId: () => props.folderId,
+      schemaFields: async (stream: string, streamType: string) =>
+        ((await getStream(stream, streamType, true))?.schema ?? []).map(
+          (field: { name: string }) => field.name,
+        ),
+    });
+    provide(DASHBOARD_ANNOTATION_SOURCES_KEY, annotationSources);
+
     const dashboardAutoRun = inject<Ref<boolean>>("dashboardAutoRun", ref(false));
     watch(dashboardAutoRun, (on) => variablesManager.setLiveMode(on === true), {
       immediate: true,
@@ -685,6 +716,14 @@ export default defineComponent({
         values: mergedVars,
       };
     };
+
+    const getPanelTitle = (panel: any) =>
+      getPanelDisplayTitle(
+        panel?.title,
+        getMergedVariablesForPanel(panel?.id),
+        { tabId: selectedTabId.value, panelId: panel?.id },
+        t("dashboard.variableQueryValueSelector.all"),
+      );
 
     // Helper to get LIVE (uncommitted) variables for a panel
     // Used for detecting changes and showing yellow refresh icon
@@ -776,9 +815,11 @@ export default defineComponent({
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
 
       // Check if every value in both variablesData and panels is false
+      // Annotation sources count too, so a captured report already has its markers drawn.
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
-        panelsValues.every((value) => value === false);
+        panelsValues.every((value) => value === false) &&
+        !annotationSources.loading.value;
 
       return isAllVariablesAndPanelsDataLoaded;
     });
@@ -1971,6 +2012,7 @@ export default defineComponent({
       currentTabVariables,
       getPanelVariables,
       getMergedVariablesForPanel,
+      getPanelTitle,
       getLiveVariablesForPanel,
       // Exposed methods for parent components
       commitAllVariables,

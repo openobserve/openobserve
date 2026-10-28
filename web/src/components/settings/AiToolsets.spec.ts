@@ -70,3 +70,17 @@ describe("AiToolsets list view state", () => {
     });
   });
 });
+
+describe("AiToolsets delete confirm", () => {
+  it("names the toolset and uses a destructive OK button", async () => {
+    const w: any = mountPage();
+    await flushPromises();
+    w.vm.confirmDeleteToolset({ id: "t1", name: "github-tools" });
+    await flushPromises();
+    const dialog = w.findComponent({ name: "ConfirmDialog" });
+    expect(dialog.props("messageKeypath")).toBe("aiToolset.deleteMessage");
+    expect(dialog.props("messageName")).toBe("github-tools");
+    expect(dialog.props("okVariant")).toBe("destructive");
+    w.unmount();
+  });
+});

@@ -124,6 +124,20 @@ describe("AnnouncementBannerList", () => {
     ).toBe("Ended");
   });
 
+  it("names the banner in bold in the real confirm dialog with a red Delete button", async () => {
+    await mountList();
+
+    document.querySelector<HTMLElement>('[data-test="announcement-list-delete-1"]')!.click();
+    await flushPromises();
+    const name = document.querySelector('[data-test="confirm-dialog-name"]');
+    expect(name?.textContent).toBe("Later");
+    expect(name?.classList.contains("font-semibold")).toBe(true);
+    const ok = document.querySelector(
+      '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+    );
+    expect(ok?.className).toContain("bg-button-destructive");
+  });
+
   it("removes a banner after confirmation and saves the rest", async () => {
     await mountList();
 

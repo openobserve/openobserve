@@ -55,9 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              unaffected — the spacer just absorbs 1.25rem less. -->
         <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
         <!-- One line; next to notice chips it holds ~40% of the bar so the chip squeezes nothing but the spacer. -->
+        <!-- shrink-[1000]: at factor 1 a long title still hands a fraction of a pixel of its cut to the freshness label, which ellipsises it to "no…". -->
         <OTruncatedText
           as="div"
-          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
+          class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
             hasNoticeChips
@@ -66,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           data-test="dashboard-panel-header"
         >
-          {{ props.data.title }}
+          {{ panelTitle }}
         </OTruncatedText>
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
@@ -83,6 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="schedule" size="xs" class="@min-[32rem]/panelbar:hidden" />
           </span>
           <OTooltip :content="curatedBadgeTooltip" side="bottom" />
+        </OTag>
+        <!-- A note the injected result carries about itself, such as the public view's retained or truncated data. -->
+        <OTag
+          v-if="injectedNotice"
+          variant="default-soft"
+          size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
+          data-test="dashboard-panel-injected-notice"
+        >
+          {{ injectedNotice }}
         </OTag>
         <OTag
           v-if="
@@ -155,11 +166,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
@@ -242,6 +251,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
+          name="error-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-error"
+          :label="failedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="failedAnnotationSourcesLabel"
+          />
+        </OIcon>
+        <OIcon
+          v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-annotation-source-truncated"
+          :label="truncatedAnnotationSourcesLabel"
+        >
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="15rem"
+            :content="truncatedAnnotationSourcesLabel"
+          />
+        </OIcon>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
         <!-- On a wall screen only a failure may draw the eye; the failed panel says so in its body. -->
@@ -251,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          v-bind="noticeProps"
+          v-bind="panelNoticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -373,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-csv-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(panelFileName)"
             >
               <template #icon-left><OIcon name="file-download" size="sm" /></template>
               {{ t("panel.downloadAsCSV") }}
@@ -381,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-json-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(panelFileName)"
             >
               <template #icon-left><OIcon name="data-object" size="sm" /></template>
               {{ t("panel.downloadAsJSON") }}
@@ -434,7 +473,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="drag-cancel relative min-h-0 flex-1"
-      :class="curatedBadge || kioskStale ? 'opacity-60' : undefined"
+      :class="
+        curatedBadge || kioskStale || props.injectedPanelData?.dimmed ? 'opacity-60' : undefined
+      "
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
     >
@@ -458,6 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="viewOnly"
         :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
         :exemplars-override="exemplarOverride"
+        :injectedPromqlData="props.injectedPanelData"
         @loading-state-change="handleLoadingStateChange"
         @metadata-update="metaDataValue"
         @limit-number-of-series-warning-message-update="
@@ -465,6 +507,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
+        @sankey-notice-update="handleSankeyNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -479,7 +523,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @is-partial-data-update="handleIsPartialDataUpdate"
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
-        :allowAnnotationsAdd="true"
+        :allowAnnotationsAdd="!props.injectedPanelData"
+        :allowDrilldown="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
@@ -554,7 +599,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
-      :message="t('panel.deletePanelMessage')"
+      message-keypath="panel.deletePanelMessage"
+      :message-name="data.title"
+      ok-variant="destructive"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
@@ -608,7 +655,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
+import { toPanelFileName } from "@/utils/dashboard/panelTitle";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -635,6 +685,7 @@ import {
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -683,6 +734,7 @@ export default defineComponent({
     "shouldRefreshWithoutCache",
     "showLegendsButton",
     "isTimeRangeWaiting",
+    "injectedPanelData",
     "layoutMode",
     "kiosk",
   ],
@@ -713,6 +765,12 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    const panelTitle = usePanelTitle({
+      title: () => props.data?.title,
+      variablesData: () => props.variablesData,
+      context: () => ({ tabId: props.tabId, panelId: props.data?.id }),
+    });
+    const panelFileName = computed(() => toPanelFileName(panelTitle.value));
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -745,6 +803,7 @@ export default defineComponent({
       curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
     );
     // Both halves are already translated; joining them widens to string without untranslating either.
+    const injectedNotice = computed(() => props.injectedPanelData?.notice);
     const curatedBadgeTooltip = computed(() =>
       raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
     );
@@ -778,6 +837,22 @@ export default defineComponent({
         ? PanleSchemaRendererRef.value?.exemplarsError || ""
         : "",
     );
+    const failedAnnotationSourcesLabel = computed(() => {
+      const failed = PanleSchemaRendererRef.value?.failedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.failedOnPanel",
+        { names: failed.join(", ") },
+        failed.length,
+      );
+    });
+    const truncatedAnnotationSourcesLabel = computed(() => {
+      const truncated = PanleSchemaRendererRef.value?.truncatedAnnotationSources ?? [];
+      return t(
+        "dashboard.annotationSources.truncatedOnPanel",
+        { names: truncated.join(", "), limit: ANNOTATION_SOURCE_ROW_LIMIT },
+        truncated.length,
+      );
+    });
 
     // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
     // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
@@ -833,11 +908,14 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      sankeyNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -895,7 +973,16 @@ export default defineComponent({
     const canEditFromNotice = computed(
       () => !props.viewOnly && !props.simplifiedPanelView && !isLayoutEditing.value,
     );
-    const canRefreshFromNotice = computed(() => !props.simplifiedPanelView);
+    // An injected result (the public viewer) has no query to re-run, so its notices offer no Refresh.
+    const canRefreshFromNotice = computed(
+      () => !props.simplifiedPanelView && !props.injectedPanelData,
+    );
+    // The public viewer's server marks a panel partial itself; it reads as the server's Partial notice.
+    const injectedPartial = computed(() => !!props.injectedPanelData?.serverPartial);
+    const panelNoticeProps = computed(() => ({
+      ...noticeProps.value,
+      serverPartial: noticeProps.value.serverPartial || injectedPartial.value,
+    }));
     const canInspectFromNotice = computed(
       () => !props.simplifiedPanelView && (metaData.value?.queries?.length ?? 0) > 0,
     );
@@ -912,7 +999,11 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
+        !!sankeyNotice.value?.returnLinks ||
+        !!sankeyNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
+        injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
     );
@@ -1277,11 +1368,11 @@ export default defineComponent({
       const panelId = props.data?.id;
       if (panelId) {
         panelDownloadRegistry.set(panelId, () =>
-          PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+          PanleSchemaRendererRef.value?.logDataAsJSON(panelTitle.value),
         );
         panelCsvRegistry.set(
           panelId,
-          () => PanleSchemaRendererRef.value?.getPanelCsvData(props.data?.title) ?? null,
+          () => PanleSchemaRendererRef.value?.getPanelCsvData(panelTitle.value) ?? null,
         );
       }
     });
@@ -1355,6 +1446,8 @@ export default defineComponent({
     const alertDisabledReason = computed(() => {
       const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
       if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // The alert form offers no enrichment-table stream type, so the prefill would be rejected.
+      if (isEnrichmentTablePanel(props.data)) return t("panel.enrichmentTableAlertUnsupported");
       // A formula's stream comes from its inputs' text; any other query needs its own.
       if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
         return t("panel.panelQueryMustHaveStream");
@@ -1370,15 +1463,20 @@ export default defineComponent({
       setExemplarOverride,
       exemplarToggleAtRest,
       exemplarErrorMessage,
+      failedAnnotationSourcesLabel,
+      truncatedAnnotationSourcesLabel,
       curatedBadge,
       curatedBadgeParams,
       curatedBadgeText,
       curatedBadgeTooltip,
+      injectedNotice,
       curatedNoData,
       curatedAllClear,
       curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
+      panelTitle,
+      panelFileName,
       alertDisabledReason,
       onEditPanel,
       onNoticeEditPanel,
@@ -1436,8 +1534,11 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
+      panelNoticeProps,
       canInspectFromNotice,
     };
   },

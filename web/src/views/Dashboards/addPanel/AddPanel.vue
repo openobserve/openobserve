@@ -42,6 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="title"
               :placeholder="t('panel.namePlaceholder')"
               :aria-label="t('panel.name')"
+              :suggestions="titleSuggestions"
+              delimiter="dollar"
               :edit-hint="
                 panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('panel.renameHint')
               "
@@ -81,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="dateTimePickerRef"
               :disable="disable"
               :auto-apply-dashboard="true"
+              calendar-presets
               class="max-md:[&_.date-time-label]:hidden"
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
@@ -369,7 +372,9 @@ import {
 } from "@/utils/dashboard/panelValidation";
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import { getVariableSuggestions } from "@/utils/dashboard/variableSuggestions";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
@@ -1331,10 +1336,12 @@ export default defineComponent({
         end_time: endTime,
       };
     };
-    // A relative range is the same selection whatever "now" it last ended at.
+    // A relative range is the same selection whatever "now" it ended at; a calendar one also keys on its zone-dependent start.
     const dateSelectionKey = (date: any) =>
       date?.valueType === "relative"
-        ? `relative:${date.relativeTimePeriod}`
+        ? parseCalendarToken(date.relativeTimePeriod)
+          ? `relative:${date.relativeTimePeriod}:${date.startTime}`
+          : `relative:${date.relativeTimePeriod}`
         : `absolute:${date?.startTime}:${date?.endTime}`;
     const appliedDateKey = ref<string | null>(null);
     const isTimeChangePending = computed(
@@ -1472,9 +1479,9 @@ export default defineComponent({
 
     const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
-        // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+        // CRITICAL: Clear panelRefreshTargets to ensure panel refreshes
         // In add/edit panel mode, when time changes, this panel should always refresh
-        panelIdToBeRefreshed.value = null;
+        panelRefreshTargets.clear();
 
         // In add/edit panel mode, ALWAYS use global date time picker for chart rendering.
         // Config date time (panel_time_range) is ONLY saved for view mode default.
@@ -1483,11 +1490,16 @@ export default defineComponent({
         const effectiveTime = {
           start_time: new Date(date.startTime),
           end_time: new Date(date.endTime),
+          relativeTimePeriod: date.relativeTimePeriod,
         };
 
         // Set the effective time for chart rendering
         dashboardPanelData.meta.dateTime = effectiveTime;
-        appliedDateKey.value = dateSelectionKey(selectedDate.value);
+        // Keyed from the resolved window: selectedDate.value only gets its startTime backfilled after this call.
+        appliedDateKey.value = dateSelectionKey({
+          ...selectedDate.value,
+          startTime: date.startTime,
+        });
 
         // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -2076,6 +2088,13 @@ export default defineComponent({
       return dashboardPanelData.data.id || "current_panel";
     });
 
+    const titleSuggestions = computed(() =>
+      getVariableSuggestions(currentDashboardData.data?.variables?.list, t, {
+        tabId: currentTabId.value,
+        panelId: currentPanelId.value,
+      }),
+    );
+
     const getLiveVariables = (): any[] => {
       if (variablesManager && variablesManager.variablesData.isInitialized) {
         return variablesManager.getVariablesForPanel(
@@ -2366,6 +2385,7 @@ export default defineComponent({
 
     return {
       t,
+      titleSuggestions,
       isMobile,
       updateDateTime,
       goBack,
@@ -2378,6 +2398,8 @@ export default defineComponent({
       chartData,
       editMode,
       selectedDate,
+      appliedDateKey,
+      isTimeChangePending,
       errorData,
       handleChartApiError,
       variablesDataUpdated,

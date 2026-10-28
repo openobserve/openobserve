@@ -19,6 +19,7 @@ const SECTION_DEFS = [
   { id: "legend", icon: "format-list-bulleted" },
   { id: "data", icon: "data-object" },
   { id: "stateTimeline", icon: "timeline" },
+  { id: "hostmap", icon: "grid-on" },
   { id: "axis", icon: "analytics" },
   { id: "labels", icon: "label" },
   { id: "lineStyle", icon: "show-chart" },

@@ -31,6 +31,7 @@
           clearable
           autofocus
           data-test="test-match-model-input"
+          @keydown.enter="onModelNameEnter"
         >
           <template #icon-left>
             <OIcon name="smart-toy" size="sm" class="shrink-0 opacity-[0.35]" />
@@ -458,6 +459,12 @@ async function runTest() {
   hasRun.value = true;
   await callTestApi();
   testing.value = false;
+}
+
+// Mirrors the Test match button, which is disabled while a test is running; an IME Enter only commits text.
+function onModelNameEnter(event: KeyboardEvent) {
+  if (event.isComposing || testing.value) return;
+  runTest();
 }
 
 watch(testModelName, (val) => {

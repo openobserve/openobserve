@@ -21,7 +21,7 @@
         class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
         <OTruncatedText data-test="dashboard-viewpanel-title">
-          {{ dashboardPanelData.data.title }}
+          {{ panelTitle }}
         </OTruncatedText>
         <ExemplarToggle
           v-if="viewExemplarsEligible"
@@ -49,6 +49,7 @@
           class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
+          calendar-presets
           @update:model-value="timeGate.onPick"
           @show="timeGate.onShow"
           @hide="onTimePickerHide"
@@ -225,6 +226,8 @@
                   @result-metadata-update="handleResultMetadataUpdate"
                   @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                   @series-limit-update="handleSeriesLimitUpdate"
+                  @region-join-update="handleRegionJoinUpdate"
+                  @sankey-notice-update="handleSankeyNoticeUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
@@ -271,6 +274,7 @@ import {
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -301,7 +305,7 @@ import {
   DASHBOARD_FRESH_PANEL_TIME,
   freshTimeFromAppliedRange,
 } from "@/composables/dashboard/dashboardFreshPanelTime";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -466,6 +470,8 @@ export default defineComponent({
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -832,9 +838,9 @@ export default defineComponent({
       const appliedTime = pickerValueToTimeObj(selectedDate.value);
       if (!appliedTime) return;
 
-      // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+      // CRITICAL: Clear panelRefreshTargets to ensure panel refreshes
       // In view panel mode, when time changes, this panel should always refresh
-      panelIdToBeRefreshed.value = null;
+      panelRefreshTargets.clear();
 
       dashboardPanelData.meta.dateTime = appliedTime;
 
@@ -959,6 +965,12 @@ export default defineComponent({
       return props.panelId;
     });
 
+    const panelTitle = usePanelTitle({
+      title: () => dashboardPanelData.data.title,
+      variablesData: () => currentVariablesDataRef,
+      context: () => ({ tabId: currentTabId.value, panelId: currentPanelId.value }),
+    });
+
     // Same session key as the dashboard header, so the full-screen choice carries back to the grid.
     const viewExemplarsEligible = computed(() => isExemplarEligible(chartData.value));
     const {
@@ -1015,6 +1027,7 @@ export default defineComponent({
       goBack,
       currentDashboard,
       dashboardPanelData,
+      panelTitle,
       chartData,
       selectedDate,
       errorData,
@@ -1056,6 +1069,8 @@ export default defineComponent({
       noticeProps,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,

@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="destructive"
                         icon-left="delete"
                         :data-test="`downtime-list-${row.id}-delete`"
-                        @select="askDelete(row.id)"
+                        @select="askDelete(row)"
                       >
                         {{ t("alerts.downtimes.actions.delete") }}
                       </ODropdownItem>
@@ -489,7 +489,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="deleteOpen"
       :title="t('alerts.downtimes.confirmDelete.title')"
-      :message="t('alerts.downtimes.confirmDelete.message')"
+      message-keypath="alerts.downtimes.confirmDelete.message"
+      :message-name="pendingDeleteName"
+      ok-variant="destructive"
       @update:ok="confirmDelete"
       @update:cancel="deleteOpen = false"
     />
@@ -976,6 +978,7 @@ const cancelOpen = ref(false);
 const pendingCancel = ref<string[]>([]);
 const deleteOpen = ref(false);
 const pendingDelete = ref("");
+const pendingDeleteName = ref("");
 
 const cancellableSelection = computed(() =>
   allRows.value
@@ -1032,8 +1035,9 @@ const confirmCancel = async () => {
   await cancelIds(pendingCancel.value);
 };
 
-const askDelete = (id: string) => {
-  pendingDelete.value = id;
+const askDelete = (row: DowntimeListItem) => {
+  pendingDelete.value = row.id;
+  pendingDeleteName.value = row.name;
   deleteOpen.value = true;
 };
 

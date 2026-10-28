@@ -41,6 +41,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams/_analytics",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "GetServiceStreamAnalytics",
     params(
@@ -100,6 +101,7 @@ pub async fn get_dimension_analytics(
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "ListServiceStreams",
     params(
@@ -327,6 +329,7 @@ pub struct CorrelationRequest {
 #[utoipa::path(
     get,
     path = "/{org_id}/service_streams/config/identity",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "GetServiceIdentityConfig",
     params(("org_id" = String, Path, description = "Organization ID")),
@@ -368,6 +371,7 @@ pub async fn get_identity_config(
 #[utoipa::path(
     put,
     path = "/{org_id}/service_streams/config/identity",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "SaveServiceIdentityConfig",
     params(("org_id" = String, Path, description = "Organization ID")),

@@ -2,6 +2,23 @@ import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { HEATMAP_MAX_ROWS, isHeatmapColorRangeInverted } from "@/utils/dashboard/heatmapDefaults";
+import {
+  heatmapYBucketError,
+  isHeatmapYRangeInverted,
+  isNumericYField,
+} from "@/utils/dashboard/heatmapYAxis";
+import { addCommasToNumber } from "@/utils/formatters";
+import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
+import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
+import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
+import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
+import {
+  shouldShowBarWidthConfig,
+  shouldShowScatterPointConfig,
+} from "@/utils/dashboard/configUtils";
+import { SYMBOL_SIZE_MAX, isScatterSymbolSizeValid } from "@/utils/dashboard/scatterPointStyle";
+import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 
 /**
  * Validates a single condition item
@@ -493,6 +510,26 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "hostmap": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      if ((fields?.breakdown?.length ?? 0) > HOSTMAP_MAX_GROUP_LEVELS) {
+        errors.push(t("dashboard.utils.hostmapTooManyGroups", { count: HOSTMAP_MAX_GROUP_LEVELS }));
+      }
+      break;
+    }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
@@ -782,6 +819,20 @@ export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[])
   }
 };
 
+const validateGaugeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
+  if (panel?.type !== "gauge") return;
+  const queries = panel?.queries ?? [];
+  queries.forEach((query: { config?: GaugeQueryConfig }, index: number) => {
+    if (isGaugeFixedRangeValid(query?.config)) return;
+    const error = t("dashboard.utils.gaugeMinBelowMax");
+    errors.push(
+      queries.length > 1
+        ? t("dashboard.utils.queryErrorPrefix", { index: index + 1, error })
+        : error,
+    );
+  });
+};
+
 /**
  * Validates panel fields without validating stream field existence
  *
@@ -854,6 +905,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "h-stacked",
     "heatmap",
     "state-timeline",
+    "hostmap",
     "metric",
     "gauge",
     "geomap",
@@ -892,6 +944,34 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
   return errors;
 };
 
+/** Heatmap settings the renderer would silently ignore, or under which the builder generates an empty query. */
+const validateHeatmapConfig = (
+  t: TranslateFn,
+  panelData: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  if (panelData?.data?.type !== "heatmap") return;
+  const config = panelData.data.config;
+  if (isHeatmapColorRangeInverted(config)) {
+    errors.push(t("dashboard.utils.heatmapColorRangeInverted"));
+  }
+  if (isPromQLMode || !config?.heatmap_y_bucket?.mode) return;
+  // Only a builder query over a numeric y column is bucketed; elsewhere the setting is hidden and unused.
+  const bucketed = (panelData.data.queries ?? []).some(
+    (query: any) => !query?.customQuery && isNumericYField(query?.fields?.y?.[0], panelData),
+  );
+  if (!bucketed) return;
+  const bucketError = heatmapYBucketError(config);
+  if (bucketError === "invalidSize") errors.push(t("dashboard.utils.heatmapYBucketSizeInvalid"));
+  if (bucketError === "tooManyBuckets") {
+    errors.push(
+      t("dashboard.utils.heatmapYBucketTooMany", { max: addCommasToNumber(HEATMAP_MAX_ROWS) }),
+    );
+  }
+  if (isHeatmapYRangeInverted(config)) errors.push(t("dashboard.utils.heatmapYRangeInverted"));
+};
+
 /**
  * Validates a dashboard panel's configuration
  * @param {object} panelData - The panel data object to validate
@@ -918,6 +998,30 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
+  validateHeatmapConfig(t, panelData, errors, isPromQLMode);
+
+  if (
+    ["area", "area-stacked", "line"].includes(panelData?.data?.type) &&
+    !isValidLineThickness(panelData?.data?.config?.line_thickness)
+  ) {
+    errors.push(t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }));
+  }
+
+  if (
+    panelData?.data &&
+    shouldShowScatterPointConfig(panelData) &&
+    !isScatterSymbolSizeValid(panelData.data.config?.symbol_size)
+  ) {
+    errors.push(t("dashboard.pointSizeInvalid", { max: SYMBOL_SIZE_MAX }));
+  }
+
+  if (
+    panelData?.data &&
+    shouldShowBarWidthConfig(panelData, isPromQLMode) &&
+    !isBarWidthValid(panelData.data.config?.bar_width)
+  ) {
+    errors.push(t("dashboard.barWidthInvalid", { max: BAR_WIDTH_MAX }));
+  }
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {
@@ -931,6 +1035,8 @@ export const validatePanel = (
       }
     });
   }
+
+  validateGaugeRanges(t, panelData?.data, errors);
 
   if (isPromQLMode) {
     // 1. Chart type: only specific chart types are supported for PromQL
@@ -949,6 +1055,7 @@ export const validatePanel = (
       "maps",
       "heatmap",
       "state-timeline",
+      "hostmap",
       "geomap",
       "donut",
       "pie",
@@ -1061,6 +1168,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }),
     );
   }
+
+  errors.push(...validateAnnotationSources(t, dashboardJson?.annotationSources));
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {

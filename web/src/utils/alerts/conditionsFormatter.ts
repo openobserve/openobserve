@@ -36,6 +36,8 @@ export interface FormatOptions {
   formatValues?: boolean;
   // Stream fields map for type checking (required if formatValues is true)
   streamFieldsMap?: StreamFieldsMap;
+  // Quotes the column identifier in the output; omitted by callers that want alerts' existing output unchanged.
+  quoteColumn?: (_column: string) => string;
 }
 
 // Keys tolerate the backend's serde aliases ("IsNull", ...) alongside the
@@ -209,7 +211,9 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
     addWherePrefix = false,
     formatValues = false,
     streamFieldsMap,
+    quoteColumn,
   } = options;
+  const outputColumn = (column: string): string => (quoteColumn ? quoteColumn(column) : column);
 
   // Recursive function to parse group/condition nodes
   const parseNode = (node: any): string => {
@@ -247,7 +251,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
 
           // Step 2: Build the condition string (column operator value)
           conditionStr = getFormattedCondition(
-            item.column,
+            outputColumn(item.column),
             item.operator,
             formattedValue,
             sqlMode,
@@ -287,7 +291,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
         : sqlLiteral(node.value);
 
       return getFormattedCondition(
-        node.column,
+        outputColumn(node.column),
         node.operator,
         formattedValue,
         sqlMode,
