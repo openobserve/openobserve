@@ -1161,14 +1161,16 @@ export function stopConsequence(
   return { takers, gap: spansOf(minutes) };
 }
 
-/** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
+/** Whether the server refuses `a` and `b` side by side: identical windows, or tied keys with hours and validity that meet. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
   const left = a.restrictions ?? [];
   const right = b.restrictions ?? [];
+  if ((a.priority ?? 0) !== (b.priority ?? 0) || left.length !== right.length) return false;
+  if (left.every((w, i) => sameWindow(w, right[i]))) return true;
   return (
-    (a.priority ?? 0) === (b.priority ?? 0) &&
-    left.length === right.length &&
-    left.every((w, i) => sameWindow(w, right[i]))
+    a.anchor_micros === b.anchor_micros &&
+    validityMeets(a, b) &&
+    spansMeet(weekCoverage(a), weekCoverage(b))
   );
 }
 
@@ -1247,6 +1249,13 @@ function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
     left.length === right.length &&
     left.every((day, i) => day === right[i])
   );
+}
+
+/** Whether the two rules' `[starts_at, ends_at)` validity periods intersect; a missing bound is open. */
+function validityMeets(a: ShiftRule, b: ShiftRule): boolean {
+  const start = Math.max(a.starts_at ?? -Infinity, b.starts_at ?? -Infinity);
+  const end = Math.min(a.ends_at ?? Infinity, b.ends_at ?? Infinity);
+  return start < end;
 }
 
 /** The team-local minutes of the week a rule covers, as `[start, end)` spans. */

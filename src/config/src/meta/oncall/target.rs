@@ -32,6 +32,7 @@ pub enum RotationMode {
     /// Everyone on the rotation's winning shift rule, on shift or not — the
     /// broadcast before the whole team. The away are left out: an absence is not
     /// being there at all, and `WholeTeam` below ignores that on purpose.
+    /// The cover holder is kept even when marked away, because a cover outranks an absence.
     All,
 }
 

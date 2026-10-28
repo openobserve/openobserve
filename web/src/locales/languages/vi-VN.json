@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Khi trùng với {names}:",
     "ruleOverlapThisWins": "Quy tắc này thắng",
     "ruleOverlapOthersWin": "{names} thắng | {names} thắng",
-    "ruleClash": "{name} có cùng khung giờ và không quy tắc nào thắng. Hãy chọn quy tắc thắng.",
+    "ruleClash": "{name} trùng các khung giờ này với cùng mức ưu tiên, nên không quy tắc nào thắng. Hãy chọn quy tắc thắng.",
     "upcomingUntil": "Đến {end}",
     "upcomingFrom": "Từ {start}",
     "upcomingNoChange": "Không có thay đổi trong khoảng đang xem",

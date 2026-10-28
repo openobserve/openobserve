@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Bei Überschneidung mit {names}:",
     "ruleOverlapThisWins": "Diese Regel hat Vorrang",
     "ruleOverlapOthersWin": "{names} hat Vorrang | {names} haben Vorrang",
-    "ruleClash": "{name} hat dieselben Stunden und keine der beiden Regeln hat Vorrang. Wählen Sie, welche Vorrang hat.",
+    "ruleClash": "{name} überschneidet sich mit diesen Stunden bei gleicher Priorität, daher hat keine der beiden Regeln Vorrang. Wählen Sie, welche Vorrang hat.",
     "upcomingUntil": "Bis {end}",
     "upcomingFrom": "Ab {start}",
     "upcomingNoChange": "Keine Änderung im Zeitraum",

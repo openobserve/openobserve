@@ -2038,9 +2038,27 @@ describe("rotation editor: how several shift rules add up", () => {
       ],
       ["different priority, same hours", shiftRule("A", { priority: 1 }), shiftRule("B"), false],
       [
-        "days in a different order are different",
+        "days in a different order still share their hours",
         shiftRule("A", { restrictions: [window([0, 1], 0, 60)] }),
         shiftRule("B", { restrictions: [window([1, 0], 0, 60)] }),
+        true,
+      ],
+      [
+        "same priority, window count and anchor, overlapping hours",
+        shiftRule("A", { restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { restrictions: [window([], 180, 300)] }),
+        true,
+      ],
+      [
+        "overlapping hours with a different anchor",
+        shiftRule("A", { restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { anchor_micros: MON + 1, restrictions: [window([], 180, 300)] }),
+        false,
+      ],
+      [
+        "overlapping hours in validity periods that never meet",
+        shiftRule("A", { ends_at: MON + MICROS_PER_WEEK, restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { starts_at: MON + MICROS_PER_WEEK, restrictions: [window([], 180, 300)] }),
         false,
       ],
     ])("%s", (_name, a, b, expected) => {

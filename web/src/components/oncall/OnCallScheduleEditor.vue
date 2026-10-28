@@ -745,7 +745,7 @@ const minuteOptions = computed(() =>
 // The server refuses a window starting at 24:00.
 const fromMinuteOptions = computed(() => minuteOptions.value.slice(0, -1));
 
-// The server refuses two rules of one rotation only when priority and hours are both identical.
+// Mirrors the server's tie refusal (spec S3), so Save is off for exactly what it would refuse.
 function priorityClashFor(rule: ShiftRule): I18nText | "" {
   const rules = active.value?.shift_rules ?? [];
   const at = rules.indexOf(rule);

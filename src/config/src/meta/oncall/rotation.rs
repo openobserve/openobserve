@@ -1164,7 +1164,7 @@ fn holder_at(
 
 /// Every instant in `[from, to)` at which the answer could change, sorted and
 /// deduplicated, always beginning with `from`.
-fn candidate_boundaries(
+pub(super) fn candidate_boundaries(
     rotation: &Rotation,
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],

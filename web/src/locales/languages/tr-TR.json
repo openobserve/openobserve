@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Bu kural {names} ile çakıştığında:",
     "ruleOverlapThisWins": "Bu kural kazanır",
     "ruleOverlapOthersWin": "{names} kazanır | {names} kazanır",
-    "ruleClash": "{name} aynı saatlere sahip ve hiçbir kural kazanmıyor. Hangisinin kazanacağını seçin.",
+    "ruleClash": "{name} bu saatlerle aynı öncelikte çakışıyor, bu yüzden hiçbir kural kazanmıyor. Hangisinin kazanacağını seçin.",
     "upcomingUntil": "Bitiş: {end}",
     "upcomingFrom": "Başlangıç: {start}",
     "upcomingNoChange": "Görünümde değişiklik yok",

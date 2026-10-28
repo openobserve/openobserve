@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "与 {names} 重叠时：",
     "ruleOverlapThisWins": "此规则优先",
     "ruleOverlapOthersWin": "{names} 优先 | {names} 优先",
-    "ruleClash": "{name} 的时段相同，且没有规则优先。请选择优先的规则。",
+    "ruleClash": "{name} 以相同优先级与这些时段重叠，因此没有规则优先。请选择优先的规则。",
     "upcomingUntil": "至 {end}",
     "upcomingFrom": "从 {start}",
     "upcomingNoChange": "视图内无变化",

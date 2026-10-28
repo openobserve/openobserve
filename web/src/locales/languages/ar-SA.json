@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "عند تداخل هذه مع {names}:",
     "ruleOverlapThisWins": "الأولوية لهذه القاعدة",
     "ruleOverlapOthersWin": "الأولوية لـ {names} | الأولوية لـ {names}",
-    "ruleClash": "{name} لها نفس الساعات ولا تتقدّم أي من القاعدتين. اختر القاعدة التي لها الأولوية.",
+    "ruleClash": "{name} تتداخل مع هذه الساعات بنفس الأولوية، لذا لا تتقدّم أي من القاعدتين. اختر القاعدة التي لها الأولوية.",
     "upcomingUntil": "حتى {end}",
     "upcomingFrom": "من {start}",
     "upcomingNoChange": "لا تغيير في العرض",

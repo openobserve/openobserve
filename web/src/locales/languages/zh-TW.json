@@ -24457,7 +24457,7 @@
     "ruleOverlapQuestion": "與 {names} 重疊時：",
     "ruleOverlapThisWins": "此規則優先",
     "ruleOverlapOthersWin": "{names} 優先 | {names} 優先",
-    "ruleClash": "{name} 的時段相同，且沒有規則優先。請選擇優先的規則。",
+    "ruleClash": "{name} 以相同優先級與這些時段重疊，因此沒有規則優先。請選擇優先的規則。",
     "upcomingUntil": "至 {end}",
     "upcomingFrom": "從 {start}",
     "upcomingNoChange": "檢視範圍內無變動",

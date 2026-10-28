@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "{names} と重なる場合:",
     "ruleOverlapThisWins": "このルールを優先",
     "ruleOverlapOthersWin": "{names} を優先 | {names} を優先",
-    "ruleClash": "{name} は同じ時間帯で、どちらのルールも優先されません。優先するルールを選択してください。",
+    "ruleClash": "{name} は同じ優先度でこの時間帯と重なるため、どちらのルールも優先されません。優先するルールを選択してください。",
     "upcomingUntil": "{end} まで",
     "upcomingFrom": "{start} から",
     "upcomingNoChange": "表示期間内に変更なし",

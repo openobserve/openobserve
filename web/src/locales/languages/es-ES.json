@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Cuando se solapa con {names}:",
     "ruleOverlapThisWins": "Esta regla prevalece",
     "ruleOverlapOthersWin": "{names} prevalece | {names} prevalecen",
-    "ruleClash": "{name} tiene las mismas horas y ninguna regla prevalece. Elige cuál prevalece.",
+    "ruleClash": "{name} se solapa con estas horas con la misma prioridad, así que ninguna regla prevalece. Elige cuál prevalece.",
     "upcomingUntil": "Hasta {end}",
     "upcomingFrom": "Desde {start}",
     "upcomingNoChange": "Sin cambios en el periodo visible",

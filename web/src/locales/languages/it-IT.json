@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Quando si sovrappone a {names}:",
     "ruleOverlapThisWins": "Questa regola prevale",
     "ruleOverlapOthersWin": "{names} prevale | {names} prevalgono",
-    "ruleClash": "{name} ha le stesse ore e nessuna delle due regole prevale. Scegli quale prevale.",
+    "ruleClash": "{name} si sovrappone a queste ore con la stessa priorità, quindi nessuna delle due regole prevale. Scegli quale prevale.",
     "upcomingUntil": "Fino a {end}",
     "upcomingFrom": "Da {start}",
     "upcomingNoChange": "Nessuna modifica nel periodo visibile",

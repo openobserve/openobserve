@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Когда это правило пересекается с {names}:",
     "ruleOverlapThisWins": "Это правило побеждает",
     "ruleOverlapOthersWin": "{names} побеждает | {names} побеждают",
-    "ruleClash": "{name}: те же часы, и ни одно из правил не побеждает. Выберите, какое побеждает.",
+    "ruleClash": "{name} пересекается с этими часами при том же приоритете, поэтому ни одно из правил не побеждает. Выберите, какое побеждает.",
     "upcomingUntil": "До {end}",
     "upcomingFrom": "С {start}",
     "upcomingNoChange": "Без изменений в видимом периоде",

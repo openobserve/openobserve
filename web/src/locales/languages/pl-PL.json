@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Gdy ta reguła nakłada się na {names}:",
     "ruleOverlapThisWins": "Ta reguła wygrywa",
     "ruleOverlapOthersWin": "{names} wygrywa | {names} wygrywają",
-    "ruleClash": "{name} ma te same godziny i żadna reguła nie wygrywa. Wybierz, która wygrywa.",
+    "ruleClash": "{name} nakłada się na te godziny z tym samym priorytetem, więc żadna reguła nie wygrywa. Wybierz, która wygrywa.",
     "upcomingUntil": "Do {end}",
     "upcomingFrom": "Od {start}",
     "upcomingNoChange": "Brak zmian w widoku",

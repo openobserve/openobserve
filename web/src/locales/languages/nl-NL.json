@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "Bij overlap met {names}:",
     "ruleOverlapThisWins": "Deze regel wint",
     "ruleOverlapOthersWin": "{names} wint | {names} winnen",
-    "ruleClash": "{name} heeft dezelfde uren en geen van beide regels wint. Kies welke wint.",
+    "ruleClash": "{name} overlapt deze uren met dezelfde prioriteit, dus geen van beide regels wint. Kies welke wint.",
     "upcomingUntil": "Tot {end}",
     "upcomingFrom": "Vanaf {start}",
     "upcomingNoChange": "Geen wijziging in beeld",

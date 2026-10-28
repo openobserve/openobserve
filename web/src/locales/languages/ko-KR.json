@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "{names}와(과) 겹칠 때:",
     "ruleOverlapThisWins": "이 규칙 우선",
     "ruleOverlapOthersWin": "{names} 우선 | {names} 우선",
-    "ruleClash": "{name}와(과) 시간이 같고 우선하는 규칙이 없습니다. 우선할 규칙을 선택하세요.",
+    "ruleClash": "{name}와(과) 같은 우선순위로 이 시간대가 겹쳐 우선하는 규칙이 없습니다. 우선할 규칙을 선택하세요.",
     "upcomingUntil": "{end}까지",
     "upcomingFrom": "{start}부터",
     "upcomingNoChange": "표시 기간 내 변경 없음",

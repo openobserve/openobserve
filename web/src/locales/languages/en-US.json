@@ -24460,7 +24460,7 @@
     "ruleOverlapQuestion": "When this overlaps {names}:",
     "ruleOverlapThisWins": "This rule wins",
     "ruleOverlapOthersWin": "{names} wins | {names} win",
-    "ruleClash": "{name} has the same hours and neither rule wins. Choose which one wins.",
+    "ruleClash": "{name} overlaps these hours at the same priority, so neither rule wins. Choose which one wins.",
     "upcomingUntil": "Until {end}",
     "upcomingFrom": "From {start}",
     "upcomingNoChange": "No change in view",

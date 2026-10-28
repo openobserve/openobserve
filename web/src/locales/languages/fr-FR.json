@@ -24462,7 +24462,7 @@
     "ruleOverlapQuestion": "En cas de chevauchement avec {names} :",
     "ruleOverlapThisWins": "Cette règle l'emporte",
     "ruleOverlapOthersWin": "{names} l'emporte | {names} l'emportent",
-    "ruleClash": "{name} a les mêmes heures et aucune des deux règles ne l'emporte. Choisissez celle qui l'emporte.",
+    "ruleClash": "{name} chevauche ces heures avec la même priorité, donc aucune des deux règles ne l'emporte. Choisissez celle qui l'emporte.",
     "upcomingUntil": "Jusqu'à {end}",
     "upcomingFrom": "À partir de {start}",
     "upcomingNoChange": "Aucun changement sur la période affichée",
