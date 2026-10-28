@@ -775,6 +775,51 @@ describe("SessionsList — auto mode is decided per org", () => {
     expect(wrapper.find("[data-test='sessions-empty-no-agents']").exists()).toBe(false);
     expect(mockFetchPage.mock.calls.at(-1)?.[0]).toBe("test-stream");
   });
+
+  it("decides an auto mode again only when the user picks a window", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentA] });
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    // A forced reload that is not a window pick keeps the decided mode.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await (wrapper.vm as any).refresh(3000, 4000, true);
+    await flushPromises();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    await (wrapper.vm as any).refresh(5000, 6000, true, true);
+    await flushPromises();
+    expect(mockListAgents).toHaveBeenLastCalledWith("test-org", 5000, 6000);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+
+  it("keeps an explicit Agent choice when the user picks a window with no agents", async () => {
+    mockRouteQuery = { type: "agent" };
+    mockListAgents.mockResolvedValue({ agents: [agentA] });
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await (wrapper.vm as any).refresh(5000, 6000, true, true);
+    await flushPromises();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+  });
+
+  it("does not let a module-scoped list from another window settle the mode", async () => {
+    // A back-navigation remount: the module-scoped list (from an earlier window)
+    // holds agents and shows Agent mode, but the next load that runs decides
+    // from its own window's list.
+    mockAgents.value = [agentA];
+    mockAgentsLoaded.value = true;
+    mockAgentsOrg.value = "test-org";
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountComponent();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    await refreshComponent(wrapper);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
 });
 
 describe("SessionsList — agents list fails to load", () => {

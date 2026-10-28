@@ -222,12 +222,16 @@ fn blank(column: &str) -> String {
     format!("({column} IS NULL OR {column} = '')")
 }
 
-fn check_pred(id: CheckId, cols: &Columns) -> Pred {
+/// The predicate of check `id`. With model pricing disabled nothing is priced, so no span is
+/// unpriced: the check passes and does not point at the hidden Model Pricing page.
+fn check_pred(id: CheckId, cols: &Columns, pricing_enabled: bool) -> Pred {
     match id {
-        CheckId::UnpricedModels if cols.has(COST_STATUS_COLUMN) => Pred::Sql(format!(
-            "{COST_STATUS_COLUMN} = {}",
-            quote_str(CostStatus::Unpriced.as_str())
-        )),
+        CheckId::UnpricedModels if pricing_enabled && cols.has(COST_STATUS_COLUMN) => {
+            Pred::Sql(format!(
+                "{COST_STATUS_COLUMN} = {}",
+                quote_str(CostStatus::Unpriced.as_str())
+            ))
+        }
         CheckId::UnpricedModels => Pred::Never,
         CheckId::MissingAgentIdentity => {
             let present: Vec<String> = [AGENT_NAME_COLUMN, AGENT_ID_COLUMN]
@@ -570,7 +574,11 @@ async fn compute_checks(
         return Ok(all_pass(0, include_samples));
     };
     let stream = &query.stream_name;
-    let preds: Vec<Pred> = CHECK_IDS.iter().map(|&id| check_pred(id, &cols)).collect();
+    let pricing_enabled = config::get_config().common.model_pricing_enabled;
+    let preds: Vec<Pred> = CHECK_IDS
+        .iter()
+        .map(|&id| check_pred(id, &cols, pricing_enabled))
+        .collect();
 
     let rows = run_sql(
         org_id,
@@ -636,8 +644,20 @@ async fn compute_checks(
     Ok(checks)
 }
 
-static CACHE: LazyLock<Mutex<HashMap<String, DataHealthResponse>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+/// A cached value and the time it was computed, for the [`CACHE_TTL_MICROS`] caches here.
+trait CheckedAt {
+    fn checked_at(&self) -> i64;
+}
+
+impl CheckedAt for DataHealthResponse {
+    fn checked_at(&self) -> i64 {
+        self.checked_at
+    }
+}
+
+type TtlCache<V> = LazyLock<Mutex<HashMap<String, V>>>;
+
+static CACHE: TtlCache<DataHealthResponse> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Keyed by the window after the caller's max query range, so callers with different range
 /// limits never share an entry.
@@ -655,29 +675,33 @@ fn cache_key(org_id: &str, q: &DataHealthQuery, window: &Window) -> String {
     )
 }
 
-fn cache_get(key: &str, now: i64) -> Option<DataHealthResponse> {
-    let cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+fn cache_get<V: CheckedAt + Clone>(
+    cache: &Mutex<HashMap<String, V>>,
+    key: &str,
+    now: i64,
+) -> Option<V> {
+    let cache = cache.lock().unwrap_or_else(|e| e.into_inner());
     cache
         .get(key)
-        .filter(|r| now - r.checked_at < CACHE_TTL_MICROS)
+        .filter(|r| now - r.checked_at() < CACHE_TTL_MICROS)
         .cloned()
 }
 
 /// Inserts `value`, first dropping expired entries and then, if the map is still full, only
 /// the oldest entry, so one new scope never evicts every warm one.
-fn insert_bounded(
-    cache: &mut HashMap<String, DataHealthResponse>,
+fn insert_bounded<V: CheckedAt>(
+    cache: &mut HashMap<String, V>,
     key: String,
-    value: DataHealthResponse,
+    value: V,
     max_entries: usize,
 ) {
-    let now = value.checked_at;
-    cache.retain(|_, r| now - r.checked_at < CACHE_TTL_MICROS);
+    let now = value.checked_at();
+    cache.retain(|_, r| now - r.checked_at() < CACHE_TTL_MICROS);
     if cache.len() >= max_entries
         && !cache.contains_key(&key)
         && let Some(oldest) = cache
             .iter()
-            .min_by_key(|(_, r)| r.checked_at)
+            .min_by_key(|(_, r)| r.checked_at())
             .map(|(k, _)| k.clone())
     {
         cache.remove(&oldest);
@@ -685,8 +709,8 @@ fn insert_bounded(
     cache.insert(key, value);
 }
 
-fn cache_put(key: String, value: DataHealthResponse) {
-    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+fn cache_put<V: CheckedAt>(cache: &Mutex<HashMap<String, V>>, key: String, value: V) {
+    let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
     insert_bounded(&mut cache, key, value, CACHE_MAX_ENTRIES);
 }
 
@@ -769,7 +793,7 @@ pub async fn get_data_health(
     let key = cache_key(&org_id, &query, &window);
     let now = now_micros();
     if !query.refresh
-        && let Some(cached) = cache_get(&key, now)
+        && let Some(cached) = cache_get(&CACHE, &key, now)
     {
         return MetaHttpResponse::json(cached);
     }
@@ -779,7 +803,7 @@ pub async fn get_data_health(
                 checked_at: now,
                 checks,
             };
-            cache_put(key, resp.clone());
+            cache_put(&CACHE, key, resp.clone());
             MetaHttpResponse::json(resp)
         }
         Err(e) => {
@@ -813,6 +837,15 @@ pub struct UnpricedModelRow {
     pub agents: Vec<String>,
 }
 
+/// The spans the Unpriced tab lists: marked unpriced or approximate. `free` spans have a price.
+fn listed_status_pred() -> String {
+    format!(
+        "{COST_STATUS_COLUMN} IN ({}, {})",
+        quote_str(CostStatus::Unpriced.as_str()),
+        quote_str(CostStatus::Approximate.as_str())
+    )
+}
+
 fn unpriced_list_sql(stream: &str, cols: &Columns) -> Option<String> {
     if !cols.has(COST_STATUS_COLUMN) {
         return None;
@@ -835,10 +868,11 @@ fn unpriced_list_sql(stream: &str, cols: &Columns) -> Option<String> {
     };
     Some(format!(
         "SELECT {select}{COST_STATUS_COLUMN} AS status, COUNT(*) AS spans, {} AS tokens, \
-         {cost} AS cost, {agents} AS agents FROM {} WHERE {COST_STATUS_COLUMN} IS NOT NULL \
+         {cost} AS cost, {agents} AS agents FROM {} WHERE {} \
          GROUP BY {group} ORDER BY tokens DESC LIMIT {MAX_UNPRICED_ROWS}",
         cols.tokens_expr(),
-        quote_ident(stream)
+        quote_ident(stream),
+        listed_status_pred(),
     ))
 }
 
@@ -869,7 +903,7 @@ fn parse_unpriced_row(hit: &json::Value) -> Option<UnpricedModelRow> {
 
 /// The models ingest marked unpriced or approximate in a window: the [`MAX_UNPRICED_ROWS`]
 /// (model, status) rows with the most tokens, and totals over every marked span.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct UnpricedModels {
     pub rows: Vec<UnpricedModelRow>,
     /// Distinct models behind every marked span (spans without a model name count as one).
@@ -898,7 +932,55 @@ fn unpriced_listing(hits: &[json::Value], totals: Option<&json::Value>) -> Unpri
     }
 }
 
-/// Models in `stream` that ingest marked unpriced or approximate during the window.
+/// A cached [`UnpricedModels`] listing; today's prices are applied after the cache, so a
+/// price added or muted shows on the next request.
+#[derive(Clone)]
+struct CachedUnpriced {
+    checked_at: i64,
+    listing: UnpricedModels,
+}
+
+impl CheckedAt for CachedUnpriced {
+    fn checked_at(&self) -> i64 {
+        self.checked_at
+    }
+}
+
+static UNPRICED_CACHE: TtlCache<CachedUnpriced> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Keyed by org, stream and the window after the caller's max query range, to the minute.
+fn unpriced_cache_key(org_id: &str, stream: &str, window: &Window) -> String {
+    format!(
+        "{org_id}\u{1f}{stream}\u{1f}{}\u{1f}{}",
+        window.start / WINDOW_QUANTUM_MICROS,
+        window.end / WINDOW_QUANTUM_MICROS,
+    )
+}
+
+/// The cached listing under `key` when it is younger than [`CACHE_TTL_MICROS`], else the
+/// result of `compute`, cached on success.
+async fn cached_unpriced(
+    key: String,
+    now: i64,
+    compute: impl Future<Output = Result<UnpricedModels, anyhow::Error>>,
+) -> Result<UnpricedModels, anyhow::Error> {
+    if let Some(cached) = cache_get(&UNPRICED_CACHE, &key, now) {
+        return Ok(cached.listing);
+    }
+    let listing = compute.await?;
+    cache_put(
+        &UNPRICED_CACHE,
+        key,
+        CachedUnpriced {
+            checked_at: now,
+            listing: listing.clone(),
+        },
+    );
+    Ok(listing)
+}
+
+/// Models in `stream` that ingest marked unpriced or approximate during the window, cached
+/// for [`CACHE_TTL_MICROS`] per org, stream and window.
 pub async fn unpriced_models(
     org_id: &str,
     user_id: &str,
@@ -910,11 +992,7 @@ pub async fn unpriced_models(
     let Some(sql) = unpriced_list_sql(&query.stream_name, &cols) else {
         return Ok(UnpricedModels::default());
     };
-    let totals_sql = breakdown_totals_sql(
-        &query.stream_name,
-        &format!("{COST_STATUS_COLUMN} IS NOT NULL"),
-        &cols,
-    );
+    let totals_sql = breakdown_totals_sql(&query.stream_name, &listed_status_pred(), &cols);
     let window = Window::for_stream(
         org_id,
         user_id,
@@ -923,11 +1001,15 @@ pub async fn unpriced_models(
         query.end_time,
     )
     .await;
-    let (hits, totals) = tokio::try_join!(
-        run_sql(org_id, user_id, sql, &window, MAX_UNPRICED_ROWS),
-        run_sql(org_id, user_id, totals_sql, &window, 1),
-    )?;
-    Ok(unpriced_listing(&hits, totals.first()))
+    let key = unpriced_cache_key(org_id, &query.stream_name, &window);
+    cached_unpriced(key, now_micros(), async {
+        let (hits, totals) = tokio::try_join!(
+            run_sql(org_id, user_id, sql, &window, MAX_UNPRICED_ROWS),
+            run_sql(org_id, user_id, totals_sql, &window, 1),
+        )?;
+        Ok(unpriced_listing(&hits, totals.first()))
+    })
+    .await
 }
 
 /// Validates the window and applies the trace endpoints' search allowance and stream access
@@ -988,25 +1070,63 @@ mod tests {
     fn missing_columns_degrade_per_check() {
         // A stream written before the cost marker, with no agent or session columns.
         let c = cols(&["gen_ai_operation_name", "duration"]);
-        assert_eq!(check_pred(CheckId::UnpricedModels, &c), Pred::Never);
-        assert_eq!(check_pred(CheckId::MissingAgentIdentity, &c), Pred::Always);
-        assert_eq!(check_pred(CheckId::MissingSessionId, &c), Pred::Always);
+        assert_eq!(check_pred(CheckId::UnpricedModels, &c, true), Pred::Never);
         assert_eq!(
-            check_pred(CheckId::ZeroDurationSpans, &c),
+            check_pred(CheckId::MissingAgentIdentity, &c, true),
+            Pred::Always
+        );
+        assert_eq!(
+            check_pred(CheckId::MissingSessionId, &c, true),
+            Pred::Always
+        );
+        assert_eq!(
+            check_pred(CheckId::ZeroDurationSpans, &c, true),
             Pred::Sql("duration = 0".into())
         );
         // Only the present identity column is tested.
         let c = cols(&["gen_ai_operation_name", "gen_ai_agent_name"]);
         assert_eq!(
-            check_pred(CheckId::MissingAgentIdentity, &c),
+            check_pred(CheckId::MissingAgentIdentity, &c, true),
             Pred::Sql("(gen_ai_agent_name IS NULL OR gen_ai_agent_name = '')".into())
         );
     }
 
     #[test]
+    fn unpriced_check_passes_when_pricing_is_disabled() {
+        let c = cols(FULL);
+        assert!(matches!(
+            check_pred(CheckId::UnpricedModels, &c, true),
+            Pred::Sql(_)
+        ));
+        // Spans marked unpriced before pricing was turned off do not count.
+        let pred = check_pred(CheckId::UnpricedModels, &c, false);
+        assert_eq!(pred, Pred::Never);
+        let row = json::json!({ "total": 10, "c0": 7 });
+        let check = HealthCheck::new(
+            CheckId::UnpricedModels,
+            affected_from(&pred, &row, 0, 10),
+            10,
+            false,
+        );
+        assert_eq!(check.status, CheckStatus::Pass);
+        assert_eq!(check.affected, 0);
+        // No breakdown query runs, so there is no model to fix.
+        let base = base_where(&c, &query()).unwrap();
+        let preds: Vec<Pred> = CHECK_IDS
+            .iter()
+            .map(|&id| check_pred(id, &c, false))
+            .collect();
+        let (_, unpriced) = follow_up_sql("default", &base, &c, &preds, &[check], false);
+        assert!(unpriced.is_none());
+    }
+
+    #[test]
     fn counts_sql_only_selects_sql_predicates() {
         let c = cols(&["gen_ai_operation_name", "duration"]);
-        let preds: Vec<Pred> = CHECK_IDS.iter().map(|&id| check_pred(id, &c)).collect();
+        let preds: Vec<Pred> = CHECK_IDS
+            .iter()
+            .map(|&id| check_pred(id, &c, true))
+            .collect();
         let base = base_where(&c, &query()).unwrap();
         let sql = counts_sql("default", &base, &preds);
         assert_eq!(
@@ -1107,6 +1227,14 @@ mod tests {
         assert!(sql.contains("GROUP BY gen_ai_response_model, gen_ai_usage_cost_status"));
         // Model-less spans are listed too, as one row per status.
         assert!(!sql.contains("gen_ai_response_model IS NOT NULL"));
+        // Free (exact $0) spans have a price: they are not listed or counted.
+        assert!(sql.contains("WHERE gen_ai_usage_cost_status IN ('unpriced', 'approximate')"));
+        assert!(
+            parse_unpriced_row(&json::json!({
+                "model": "acme-internal-llm", "status": "free", "spans": 1, "tokens": 10
+            }))
+            .is_none()
+        );
         let row = parse_unpriced_row(&json::json!({
             "model": "acme-internal-llm", "status": "unpriced", "spans": 3, "tokens": 900,
             "cost": null, "agents": ["research-agent"]
@@ -1139,7 +1267,10 @@ mod tests {
     }
 
     fn failing_checks(cols: &Columns) -> (Vec<Pred>, Vec<HealthCheck>) {
-        let preds: Vec<Pred> = CHECK_IDS.iter().map(|&id| check_pred(id, cols)).collect();
+        let preds: Vec<Pred> = CHECK_IDS
+            .iter()
+            .map(|&id| check_pred(id, cols, true))
+            .collect();
         let checks = CHECK_IDS
             .iter()
             .map(|&id| HealthCheck::new(id, 5, 10, false))
@@ -1341,5 +1472,50 @@ mod tests {
         let mut keys: Vec<_> = cache.keys().cloned().collect();
         keys.sort();
         assert_eq!(keys, ["late", "mid", "next"]);
+    }
+
+    #[tokio::test]
+    async fn unpriced_listing_is_cached_per_org_stream_and_window() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let runs = AtomicUsize::new(0);
+        let compute = |tokens: i64| {
+            let runs = &runs;
+            async move {
+                runs.fetch_add(1, Ordering::SeqCst);
+                Ok(UnpricedModels {
+                    tokens,
+                    ..Default::default()
+                })
+            }
+        };
+        let window = Window::clamped(120_000_000, 86_520_000_000, 0);
+        let key = unpriced_cache_key("cache_hit_org", "default", &window);
+        let now = 1_000 * CACHE_TTL_MICROS;
+
+        let first = cached_unpriced(key.clone(), now, compute(7)).await.unwrap();
+        assert_eq!(first.tokens, 7);
+        // Within the TTL: served from the cache, the search does not run again.
+        let hit = cached_unpriced(key.clone(), now + CACHE_TTL_MICROS - 1, compute(9))
+            .await
+            .unwrap();
+        assert_eq!(hit.tokens, 7);
+        assert_eq!(runs.load(Ordering::SeqCst), 1);
+        // Another stream misses.
+        let other = unpriced_cache_key("cache_hit_org", "other", &window);
+        assert_eq!(
+            cached_unpriced(other, now, compute(3))
+                .await
+                .unwrap()
+                .tokens,
+            3
+        );
+        assert_eq!(runs.load(Ordering::SeqCst), 2);
+        // Expired: recomputed.
+        let fresh = cached_unpriced(key, now + CACHE_TTL_MICROS, compute(9))
+            .await
+            .unwrap();
+        assert_eq!(fresh.tokens, 9);
+        assert_eq!(runs.load(Ordering::SeqCst), 3);
     }
 }

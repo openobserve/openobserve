@@ -248,7 +248,8 @@ const modeExplicit = ref(explicitMode !== null);
 // the graph mounts only after it, exactly once.
 const scopeReady = ref(false);
 // Whether an agents list has decided the mode. A failed agents load decides
-// nothing, so the next load after it decides again.
+// nothing, so the next load after it decides again; so does a window the user
+// picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
 // Seeded once from the URL after the first agents load, then cleared.
 let pendingUrlScope: { env: string; name: string; version: string } | null =
@@ -432,10 +433,10 @@ function effectiveWindow() {
 // load the Stream picker, whose options can change with the list. The cascade
 // itself is reconciled against the fresh list by useAgentScope. `force` (the
 // load-error retry) bypasses the agents cache.
-async function loadAgents(force = false) {
+async function loadAgents(force = false, windowPicked = false) {
   const { startTime, endTime } = effectiveWindow();
   await Promise.all([loadAgentList(startTime, endTime, force), ensureStreamsLoaded()]);
-  if (!modeSettled && !modeExplicit.value) {
+  if ((!modeSettled || windowPicked) && !modeExplicit.value) {
     filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
   }
   if (!agentsError.value) modeSettled = true;
@@ -454,10 +455,12 @@ async function loadAgents(force = false) {
 }
 
 // Date-only state update is owned by useAiDateController; the page's extra
-// effect on a date change is to reload the agent list for the new window.
+// effect on a date change is to reload the agent list for the new window. A
+// user's pick also re-decides an auto mode for that window, as Agent Behavior
+// does; the replay DateTime fires on mount does not.
 function onDateChange(value: any) {
   onDateStateChange(value);
-  loadAgents();
+  loadAgents(false, value?.userChangedValue === true);
 }
 
 onMounted(() => {

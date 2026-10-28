@@ -1024,7 +1024,10 @@ pub struct ExperimentResponseBody {
     /// Resolved from the Dataset the experiment pinned, so callers do not have
     /// to fetch the Dataset list just to label a run. None when it was deleted.
     pub dataset_name: Option<String>,
+    /// The pinned `global_version`: the row cut every Slot reads.
     pub dataset_version: i64,
+    /// The Dataset version to display for that pin: one per write request.
+    pub dataset_write_version: i64,
     pub dataset_filter: Option<DatasetSnapshotFilterBody>,
     pub task: ExperimentTaskBody,
     pub scorers: Vec<PinnedExperimentScorerBody>,
@@ -1055,10 +1058,10 @@ impl ExperimentResponseBody {
         self.dataset_name = dataset_name;
         self
     }
-}
 
-impl From<Experiment> for ExperimentResponseBody {
-    fn from(value: Experiment) -> Self {
+    /// `dataset_write_version` is what the pin shows as, resolved by the
+    /// handler from the Dataset's rows.
+    pub fn new(value: Experiment, dataset_write_version: i64) -> Self {
         Self {
             id: value.id,
             org_id: value.org_id,
@@ -1067,6 +1070,7 @@ impl From<Experiment> for ExperimentResponseBody {
             dataset_id: value.dataset_id,
             dataset_name: None,
             dataset_version: value.dataset_version,
+            dataset_write_version,
             dataset_filter: value.dataset_filter.map(Into::into),
             task: value.task.into(),
             scorers: value.scorers.into_iter().map(Into::into).collect(),
@@ -1151,6 +1155,7 @@ pub struct ExperimentRowDetailResponseBody {
 pub struct ExperimentRowSnapshotBody {
     pub dataset_id: String,
     pub dataset_version: i64,
+    pub dataset_write_version: i64,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -1614,10 +1619,10 @@ pub struct CreateExperimentResponseBody {
     pub created: bool,
 }
 
-impl From<CreateExperimentResult> for CreateExperimentResponseBody {
-    fn from(value: CreateExperimentResult) -> Self {
+impl CreateExperimentResponseBody {
+    pub fn new(value: CreateExperimentResult, dataset_write_version: i64) -> Self {
         Self {
-            experiment: value.experiment.into(),
+            experiment: ExperimentResponseBody::new(value.experiment, dataset_write_version),
             preview: value.preview.into(),
             created: value.created,
         }
@@ -1798,37 +1803,40 @@ mod tests {
 
     #[test]
     fn execution_only_response_uses_explicit_execution_field_names() {
-        let body = ExperimentResponseBody::from(Experiment {
-            id: "experiment-1".to_string(),
-            org_id: "org-1".to_string(),
-            name: "Contract".to_string(),
-            description: None,
-            dataset_id: "dataset-1".to_string(),
-            dataset_version: 1,
-            dataset_filter: None,
-            task: ExperimentTaskConfig::Sdk {
-                task_fingerprint: "sha256:test".to_string(),
-                config: serde_json::json!({}),
+        let body = ExperimentResponseBody::new(
+            Experiment {
+                id: "experiment-1".to_string(),
+                org_id: "org-1".to_string(),
+                name: "Contract".to_string(),
+                description: None,
+                dataset_id: "dataset-1".to_string(),
+                dataset_version: 1,
+                dataset_filter: None,
+                task: ExperimentTaskConfig::Sdk {
+                    task_fingerprint: "sha256:test".to_string(),
+                    config: serde_json::json!({}),
+                },
+                scorers: Vec::new(),
+                trial_count: 1,
+                metadata: None,
+                status: ExperimentStatus::Completed,
+                status_reason: Some("done".to_string()),
+                deadline_at: 1,
+                completed_at: Some(2),
+                lifecycle_version: 1,
+                retry_count: 0,
+                scores_settled_at: Some(2),
+                idempotency_key: None,
+                is_baseline: false,
+                prompt_id: Some("prompt-1".to_string()),
+                prompt_name: Some("Support answer".to_string()),
+                prompt_version: Some(3),
+                prompt_content_hash: Some("sha256:content".to_string()),
+                created_by: "owner@example.com".to_string(),
+                created_at: 1,
             },
-            scorers: Vec::new(),
-            trial_count: 1,
-            metadata: None,
-            status: ExperimentStatus::Completed,
-            status_reason: Some("done".to_string()),
-            deadline_at: 1,
-            completed_at: Some(2),
-            lifecycle_version: 1,
-            retry_count: 0,
-            scores_settled_at: Some(2),
-            idempotency_key: None,
-            is_baseline: false,
-            prompt_id: Some("prompt-1".to_string()),
-            prompt_name: Some("Support answer".to_string()),
-            prompt_version: Some(3),
-            prompt_content_hash: Some("sha256:content".to_string()),
-            created_by: "owner@example.com".to_string(),
-            created_at: 1,
-        });
+            1,
+        );
 
         let value = serde_json::to_value(body).unwrap();
 
@@ -1860,6 +1868,7 @@ mod tests {
             dataset_id: "dataset-1".to_string(),
             dataset_name: Some("Dataset".to_string()),
             dataset_version: 1,
+            dataset_write_version: 1,
             dataset_filter: None,
             task: ExperimentTaskBody::Sdk {
                 task_fingerprint: "sha256:test".to_string(),

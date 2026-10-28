@@ -667,7 +667,7 @@ describe("ExperimentDetailPage", () => {
     const state = mounted.$.setupState;
     state.selectedRowDetail = {
       experimentId: "exp-1",
-      snapshot: { datasetId: "ds-1", datasetVersion: 1 },
+      snapshot: { datasetId: "ds-1", datasetVersion: 1, datasetWriteVersion: 1 },
       navigation: {
         rowIndex: 0,
         totalRows: 1,

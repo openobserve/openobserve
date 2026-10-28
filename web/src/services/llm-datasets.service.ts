@@ -36,9 +36,12 @@ export interface LlmDataset {
   orgId?: string;
   name: string;
   description: string | null;
-  /** Dataset-wide MVCC sequence — bumped once per write request (a batch
-   *  upsert or import is one bump, whatever its item count). */
+  /** Per-row MVCC counter — every stored item row takes the next one. This is
+   *  the value an experiment pins; never display it. */
   globalVersion: number;
+  /** The version shown for the dataset: one per write request (a batch upsert
+   *  or import is one version, whatever its item count). */
+  writeVersion: number;
   /** Count of live (non-deleted) items. Derived server-side per read; the
    *  Dataset row stores no counter, so this cannot drift. */
   itemCount: number;
@@ -83,8 +86,11 @@ export interface LlmDatasetItem {
   rawExpectedOutput: unknown;
   source: LlmDatasetItemSource;
   tags: string[];
-  /** Dataset-wide MVCC sequence this row was written at (server-owned). */
+  /** Dataset-wide MVCC sequence this row was written at (server-owned). Orders
+   *  an item's history; not for display. */
   version: number;
+  /** The dataset version of the write that stored this row — what to display. */
+  writeVersion: number;
   /** Free-form dimensions stored on the item — what subset filters read. */
   metadata: Record<string, unknown> | null;
   /** Lineage — the trace id a telemetry-pushed golden was distilled from. */
@@ -160,6 +166,7 @@ function normalize(d: any): LlmDataset {
     name: d.name,
     description: d.description ?? null,
     globalVersion: d.global_version ?? d.globalVersion ?? 0,
+    writeVersion: d.write_version ?? d.writeVersion ?? 0,
     itemCount: d.item_count ?? d.itemCount ?? 0,
     tags: Array.isArray(d.tags) ? d.tags : [],
     sources: {
@@ -248,6 +255,7 @@ function normalizeItem(d: any): LlmDatasetItem {
     source: (d.source ?? "manual") as LlmDatasetItemSource,
     tags: Array.isArray(d.tags) ? d.tags : [],
     version: Number(d.globalVersion ?? d.global_version ?? 0),
+    writeVersion: Number(d.writeVersion ?? d.write_version ?? 0),
     metadata: objectOrNull(d.metadata),
     // Lineage stays as FOUR separate pointers: an annotation push carries both a
     // trace ref and a review submission, so collapsing them loses half the story.

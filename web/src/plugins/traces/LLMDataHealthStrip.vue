@@ -61,7 +61,14 @@ const store = useStore();
 const drawerOpen = ref(false);
 const focusedCheck = ref<DataHealthCheckId | null>(null);
 
-const checks = computed(() => sortChecks(props.health?.checks ?? []));
+// With model pricing off (ZO_MODEL_PRICING_ENABLED=false) nothing is priced and
+// Model Pricing is hidden in Settings, so there is no unpriced check to show or fix.
+const pricingEnabled = computed(() => !!store.state.zoConfig?.model_pricing_enabled);
+const checks = computed(() =>
+  sortChecks(
+    (props.health?.checks ?? []).filter((c) => c.id !== "unpriced_models" || pricingEnabled.value),
+  ),
+);
 const counts = computed(() => healthCounts(checks.value));
 const visible = computed(() => !!props.health && counts.value.errors + counts.value.warnings > 0);
 const checkedAgo = computed(() =>

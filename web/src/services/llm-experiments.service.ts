@@ -170,6 +170,9 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   orgId: string;
   /** Resolved server-side from the pinned dataset; null when it was deleted. */
   datasetName: string | null;
+  /** What the pinned `datasetVersion` shows as — the dataset's write version.
+   *  Display this; `datasetVersion` is the pin key. */
+  datasetWriteVersion: number;
   scorers: PinnedExperimentScorer[];
   /** Consolidated execution + scoring lifecycle when summary data is available. */
   status: ExperimentStatus;
@@ -230,7 +233,7 @@ export interface ExperimentExecution {
 
 export interface ExperimentRowDetail {
   experimentId: string;
-  snapshot: { datasetId: string; datasetVersion: number };
+  snapshot: { datasetId: string; datasetVersion: number; datasetWriteVersion: number };
   navigation: {
     rowIndex: number;
     totalRows: number;
@@ -671,6 +674,7 @@ function normalizeExperiment(input: any): LlmExperiment {
     datasetId: value(input, "datasetId", "dataset_id", ""),
     datasetName: value(input, "datasetName", "dataset_name", null),
     datasetVersion: Number(value(input, "datasetVersion", "dataset_version", 0)),
+    datasetWriteVersion: Number(value(input, "datasetWriteVersion", "dataset_write_version", 0)),
     datasetFilter: value(input, "datasetFilter", "dataset_filter", null),
     task: input.task,
     scorers: (input.scorers ?? []).map((scorer: any) => ({
@@ -995,6 +999,9 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
     snapshot: {
       datasetId: value(snapshot, "datasetId", "dataset_id", ""),
       datasetVersion: Number(value(snapshot, "datasetVersion", "dataset_version", 0)),
+      datasetWriteVersion: Number(
+        value(snapshot, "datasetWriteVersion", "dataset_write_version", 0),
+      ),
     },
     navigation: {
       rowIndex: Number(value(navigation, "rowIndex", "row_index", 0)),

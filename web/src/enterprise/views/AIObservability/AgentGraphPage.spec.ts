@@ -257,6 +257,40 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     expect(wrapper.find('[data-test="agent-graph-no-agents"]').exists()).toBe(true);
   });
 
+  async function pickWindow(wrapper: any, userChangedValue: boolean, startTime: number) {
+    wrapper.findComponent({ name: "AiPageShell" }).vm.$emit("date-change", {
+      valueType: "absolute",
+      startTime,
+      endTime: startTime + 1_000_000,
+      userChangedValue,
+    });
+    await flushPromises();
+  }
+
+  it("decides an auto mode again when the user picks a window with no agents", async () => {
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+    const wrapper = await mountPage();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    // A replay (not the user's pick) of a window with no agents decides nothing.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await pickWindow(wrapper, false, 1_600_000_000_000_000);
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    await pickWindow(wrapper, true, 1_500_000_000_000_000);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+
+  it("keeps an explicit Agent choice when the user picks a window with no agents", async () => {
+    mockRouteQuery.type = "agent";
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+    const wrapper = await mountPage();
+
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await pickWindow(wrapper, true, 1_500_000_000_000_000);
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+  });
+
   it("opens on the agent, env and version named in the URL, not the first agent", async () => {
     mockRouteQuery.agent = "omp";
     mockRouteQuery.env = "production";

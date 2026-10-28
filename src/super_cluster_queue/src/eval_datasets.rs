@@ -90,7 +90,6 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
         }
         if dataset_items::Entity::find()
             .filter(dataset_items::Column::DatasetId.eq(&item.dataset_id))
-            .filter(dataset_items::Column::LogicalId.eq(&item.logical_id))
             .filter(dataset_items::Column::GlobalVersion.eq(item.global_version))
             .one(&txn)
             .await?

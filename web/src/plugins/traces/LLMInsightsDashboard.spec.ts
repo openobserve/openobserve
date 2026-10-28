@@ -737,6 +737,42 @@ describe("LLMInsightsDashboard — scope resolution", () => {
 
     expect(mockListAgents).toHaveBeenCalledTimes(1);
   });
+
+  it("decides an auto mode again when the user picks a window with no agents", async () => {
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+    const wrapper = await mountAndEnter();
+    const vm = wrapper.vm as any;
+    expect(vm.filterMode).toBe("agent");
+
+    // A mount-time replay of another window decides nothing.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await vm.refresh(1_600_000_000_000_000, 1_600_001_000_000_000, false);
+    await flushPromises();
+    expect(vm.filterMode).toBe("agent");
+
+    // The user's own pick does: the new window has no agents, so Stream.
+    await vm.refresh(1_500_000_000_000_000, 1_500_001_000_000_000, true, true);
+    await flushPromises();
+    expect(vm.filterMode).toBe("stream");
+    expect(mockFetchAll.mock.calls.at(-1)).toEqual([
+      "default",
+      1_500_000_000_000_000,
+      1_500_001_000_000_000,
+      null,
+    ]);
+  });
+
+  it("keeps an explicit Agent choice when the user picks a window with no agents", async () => {
+    mockRouteQuery.type = "agent";
+    mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "1")] });
+    const wrapper = await mountAndEnter();
+    const vm = wrapper.vm as any;
+
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await vm.refresh(1_500_000_000_000_000, 1_500_001_000_000_000, true, true);
+    await flushPromises();
+    expect(vm.filterMode).toBe("agent");
+  });
 });
 
 describe("LLMInsightsDashboard — Total Cost tile", () => {

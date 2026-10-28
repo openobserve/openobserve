@@ -37,6 +37,9 @@ describe("costKind", () => {
   it("is exact without unpriced tokens, partial with some, unknown when nothing is priced", () => {
     expect(costKind(0.5, 100, 0)).toBe("exact");
     expect(costKind(0, 0, 0)).toBe("exact");
+    // An exactly matched free/muted price has tokens and a real $0 cost, but
+    // contributes no unpriced tokens to the cell's aggregate.
+    expect(costKind(0, 100, 0)).toBe("exact");
     expect(costKind(0.5, 100, 40)).toBe("partial");
     expect(costKind(0, 100, 40)).toBe("unknown");
     expect(costKind(0.5, 100, 100)).toBe("unknown");
