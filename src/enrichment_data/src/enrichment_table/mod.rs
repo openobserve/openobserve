@@ -84,6 +84,12 @@ pub async fn save_enrichment_data(
             format!("enrichment table [{stream_name}] is being deleted"),
         ));
     }
+    // before a replace deletes the old table, since check_for_schema would reject the new one
+    if let Some(violation) =
+        schema::stream_key_violation(org_id, StreamType::EnrichmentTables, &stream_name)
+    {
+        return Ok(MetaHttpResponse::bad_request(violation));
+    }
 
     // Estimate the size of the payload in json format in bytes
     let mut bytes_in_payload = 0;
@@ -905,5 +911,17 @@ mod tests {
         assert!(has_jane);
         assert!(has_age_25);
         assert!(has_age_30);
+    }
+
+    #[tokio::test]
+    async fn test_save_enrichment_data_rejects_too_long_table() {
+        if !schema::file_list_keys_bounded() || !LOCAL_NODE.is_ingester() {
+            return;
+        }
+        let name = "t".repeat(schema::STREAM_KEY_MAX_LEN);
+        let resp = save_enrichment_data("org", &name, Vec::new(), false)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }

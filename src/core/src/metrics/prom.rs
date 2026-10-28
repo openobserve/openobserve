@@ -145,6 +145,7 @@ pub async fn remote_write(
     let mut skipped_records: u32 = 0;
     // checked per series before the columnar append, so cached to count each stream once a batch
     let mut stream_too_long: HashMap<String, bool> = HashMap::new();
+    let mut too_long_records: u32 = 0;
 
     // parse metadata
     for item in request.metadata {
@@ -393,6 +394,7 @@ pub async fn remote_write(
             }
         };
         if too_long {
+            too_long_records += 1;
             continue;
         }
 
@@ -532,6 +534,12 @@ pub async fn remote_write(
             "[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
         );
     }
+    // remote write has no partial success, and an error status would drop the valid series too
+    if too_long_records > 0 {
+        log::warn!(
+            "[METRICS:PROM] Dropped {too_long_records} records of streams whose name is too long, org_id: {org_id}"
+        );
+    }
 
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
@@ -572,7 +580,11 @@ pub async fn remote_write(
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
-        if ingest::reject_long_stream(org_id, &stream_name).is_some() {
+        if let Some(message) = ingest::reject_long_stream(org_id, &stream_name) {
+            log::warn!(
+                "[METRICS:PROM] Dropped {} records: {message}",
+                json_data.len()
+            );
             continue;
         }
         #[cfg(feature = "vectorscan")]

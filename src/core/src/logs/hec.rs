@@ -196,6 +196,9 @@ pub async fn preflight_streams(
         if let Some(reason) = stream_rejection(stream, user) {
             return Err(Error::IngestionError(reason));
         }
+        if let Some(violation) = schema::stream_key_violation(org_id, StreamType::Logs, stream) {
+            return Err(Error::IngestionError(violation));
+        }
         check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
     }
     // Every group at once, so a collector batch is refused before its first group is written.
@@ -956,5 +959,24 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn preflight_rejects_a_too_long_stream_before_any_write() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
+        let user = IngestUser::User("hec-abc@hec.local".to_string());
+        let streams = vec![
+            ("good".to_string(), vec![json::json!({"log": "a"})]),
+            (
+                "s".repeat(schema::STREAM_KEY_MAX_LEN),
+                vec![json::json!({"log": "b"})],
+            ),
+        ];
+        let err = preflight_streams("test-org", &streams, &user)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("Stream name too long"), "{err}");
     }
 }

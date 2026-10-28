@@ -205,6 +205,18 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         job.job_id,
         job.offset
     );
+    let dump_stream_name = generate_dump_stream_name(job.stream_type, &job.stream_name);
+    // the dump key is longer than its source's, so its insert can fail where the source fits
+    if schema::is_stream_key_too_long(&job.org_id, StreamType::Filelist, &dump_stream_name) {
+        log::debug!("[COMPACTOR::DUMP] skip {stream}: dump stream key too long for file_list");
+        if let Err(e) = infra_file_list::set_job_dumped_status(&[job.job_id], true).await {
+            log::error!(
+                "[COMPACTOR::DUMP] error in setting dumped = true for job with id {}, error: {e}",
+                job.job_id,
+            );
+        }
+        return Ok(());
+    }
 
     // check offset
     let partition_time_level = get_partition_time_level(job.stream_type);
@@ -259,7 +271,6 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     }
 
     // check if the schema need to be updated
-    let dump_stream_name = generate_dump_stream_name(job.stream_type, &job.stream_name);
     let dump_stream_key = format!(
         "{}/{}/{}",
         job.org_id,
@@ -1838,5 +1849,28 @@ mod tests {
             "every pair must carry that record's own stored (id, date), in input order"
         );
         assert!(dump_delete_pairs(&[]).is_empty());
+    }
+
+    /// A source key that fits can still have a dump key past the limit; that job is skipped.
+    #[tokio::test]
+    async fn test_dump_skips_too_long_dump_stream() {
+        if !schema::file_list_keys_bounded() {
+            return;
+        }
+        // "org/logs/" is 9 characters
+        let stream_name = "s".repeat(schema::STREAM_KEY_MAX_LEN - 9);
+        assert!(!schema::is_stream_key_too_long(
+            "org",
+            StreamType::Logs,
+            &stream_name
+        ));
+        let job = DumpJob {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name,
+            job_id: 1,
+            offset: 1_000_000,
+        };
+        assert!(dump(&job).await.is_ok());
     }
 }

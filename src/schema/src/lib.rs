@@ -134,8 +134,7 @@ pub fn is_stream_key_too_long(org_id: &str, stream_type: StreamType, stream_name
     stream_key_violation(org_id, stream_type, stream_name).is_some()
 }
 
-/// Rejects a stream whose file_list key or org cannot be stored, so its files would never be
-/// listed.
+/// Rejects a stream whose file_list key or org cannot be stored, counting it as an ingest error.
 pub fn check_stream_key_len(
     org_id: &str,
     stream_type: StreamType,
