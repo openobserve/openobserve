@@ -1518,6 +1518,7 @@
     "searchNoMatches": "無相符項目",
     "runQuery": "執行查詢",
     "runOptions": "執行選項",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "剖析值隨時間變化",
     "breakdown": "細分",
     "breakdownNone": "無",

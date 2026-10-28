@@ -1518,6 +1518,7 @@
     "searchNoMatches": "Совпадений нет",
     "runQuery": "Выполнить запрос",
     "runOptions": "Параметры запуска",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "Значения профиля во времени",
     "breakdown": "Разбивка",
     "breakdownNone": "Нет",
