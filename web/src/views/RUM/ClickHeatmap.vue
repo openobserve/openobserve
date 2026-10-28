@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ pageUrl || t("rum.heatmap.pagePlaceholder") }}
                 </span>
                 <span
-                  class="text-text-muted text-xs font-normal"
+                  class="text-text-secondary text-xs font-normal"
                   data-test="rum-heatmap-page-count"
                 >
                   {{ t("rum.heatmap.pageCount", { count: pageRows.length }, pageRows.length) }}
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                class="text-text-muted grid grid-cols-[minmax(0,1fr)_4.5rem_5rem] gap-2 px-3 py-1.5 text-xs font-semibold"
+                class="text-text-secondary grid grid-cols-[minmax(0,1fr)_4.5rem_5rem] gap-2 px-3 py-1.5 text-xs font-semibold"
               >
                 <span>{{ t("rum.heatmap.pageColPage") }}</span>
                 <span class="text-right">{{ t("rum.heatmap.colClicks") }}</span>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <p
                   v-if="!visiblePages.length"
-                  class="text-text-muted px-3 py-4 text-center text-xs"
+                  class="text-text-secondary px-3 py-4 text-center text-xs"
                   data-test="rum-heatmap-page-none"
                 >
                   {{ t("rum.heatmap.pageNone") }}
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <span class="min-w-0 truncate font-bold">
               {{ summary.top.name || summary.top.selector }}
-              <span class="text-text-muted font-normal">{{
+              <span class="text-text-secondary font-normal">{{
                 t("rum.heatmap.statTopShare", {
                   pct: sharePercent(summary.top.clicks, summary.clicks),
                 })
@@ -294,7 +294,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ chip.label }}
                 </OBadge>
-                <span class="text-text-muted ms-auto text-xs" data-test="rum-heatmap-element-count">
+                <span
+                  class="text-text-secondary ms-auto text-xs"
+                  data-test="rum-heatmap-element-count"
+                >
                   {{
                     t("rum.heatmap.elementCount", { count: visibleRows.length }, visibleRows.length)
                   }}
@@ -335,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTruncatedText class="text-sm font-semibold">{{ row.feature }}</OTruncatedText>
                     <OTruncatedText
                       v-if="row.name"
-                      class="text-text-muted font-mono text-xs"
+                      class="text-text-secondary font-mono text-xs"
                       data-test="rum-heatmap-selector"
                     >
                       {{ row.selector }}
@@ -390,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTable>
             </div>
             <div
-              class="border-border-default text-text-muted flex flex-wrap gap-x-1 border-t px-3 py-2 text-xs"
+              class="border-border-default text-text-secondary flex flex-wrap gap-x-1 border-t px-3 py-2 text-xs"
               data-test="rum-heatmap-footer"
             >
               <span v-if="limitedText" data-test="rum-heatmap-limited">{{ limitedText }}</span>
@@ -709,7 +712,7 @@ const statItems = computed<StatCell[]>(() => {
       key: "frustrated",
       label: t("rum.heatmap.statFrustrated"),
       value: addCommasToNumber(frustrated),
-      valueClass: frustrated ? "text-status-warning-text" : "text-text-disabled",
+      valueClass: frustrated ? "text-status-warning-text" : "text-text-secondary",
       dataTest: "rum-heatmap-stat-frustrated",
     },
   ];
