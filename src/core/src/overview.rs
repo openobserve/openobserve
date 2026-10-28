@@ -394,8 +394,12 @@ fn build_streams_data(streams: Vec<Stream>, top_n: usize) -> StreamsData {
             stream_type: stream_type.to_string(),
             count: of_type.len() as u64,
             doc_num: of_type.iter().map(|s| s.stats.doc_num).sum(),
-            storage_size_mb: of_type.iter().map(|s| s.stats.storage_size).sum(),
-            compressed_size_mb: of_type.iter().map(|s| s.stats.compressed_size).sum(),
+            storage_size_mb: of_type
+                .iter()
+                .fold(0.0, |acc, s| acc + s.stats.storage_size),
+            compressed_size_mb: of_type
+                .iter()
+                .fold(0.0, |acc, s| acc + s.stats.compressed_size),
             top: of_type
                 .iter()
                 .take(top_n)
@@ -409,7 +413,7 @@ fn build_streams_data(streams: Vec<Stream>, top_n: usize) -> StreamsData {
     }
     StreamsData {
         total_streams: by_type.iter().map(|t| t.count).sum(),
-        total_storage_size_mb: by_type.iter().map(|t| t.storage_size_mb).sum(),
+        total_storage_size_mb: by_type.iter().fold(0.0, |acc, t| acc + t.storage_size_mb),
         by_type,
     }
 }
@@ -601,6 +605,8 @@ mod tests {
         let top: Vec<&str> = logs.top.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(top, vec!["big", "mid"]);
         assert_eq!(data.by_type[2].count, 0);
+        assert!(data.by_type[2].storage_size_mb.is_sign_positive());
+        assert!(data.by_type[2].compressed_size_mb.is_sign_positive());
     }
 
     #[test]
