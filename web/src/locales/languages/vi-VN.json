@@ -26427,7 +26427,6 @@
     "update": "Cập nhật",
     "disconnect": "Ngắt kết nối",
     "deploymentTitle": "Tài khoản {provider} của triển khai này",
-    "deploymentNote": "Tin nhắn và cuộc gọi đã hoạt động. Do quản trị viên thiết lập; không cần làm gì ở đây.",
     "useOwn": "Dùng tài khoản {provider} của riêng bạn thay thế",
     "connectTitle": "Kết nối {provider}",
     "updateTitle": "Cập nhật {provider}",

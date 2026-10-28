@@ -88,6 +88,7 @@ const card = (id: string) =>
   document.querySelector<HTMLElement>(`[data-test="telephony-card-${id}"]`);
 const cardText = (id: string) => card(id)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
 const PRESS4 = "Call keys (4 acknowledge, 6 resolve, 8 escalate)";
+const NOTE = "Set by the operator, so there is nothing to configure here.";
 const dialog = (id: string) =>
   document.querySelector<HTMLInputElement>(`[data-test="telephony-account-dialog-${id}-field"]`);
 
@@ -156,9 +157,7 @@ describe("TelephonySettings", () => {
       expect(body).toContain("This deployment's Twilio account");
       expect(cardText("status")).toBe("Connected");
       expect(cardText("meta")).toBe("From +18335550199");
-      expect(body).toContain(
-        "Texts and calls already work. Set by the operator; nothing to do here.",
-      );
+      expect(body).toContain(NOTE);
       expect(text("press4")).toBe(PRESS4);
       expect(q("hero")).toBeNull();
 
@@ -217,6 +216,8 @@ describe("TelephonySettings", () => {
       expect(cardText("status")).toBe("Not working");
       expect(card("problem")).not.toBeNull();
       expect(card("problem-update")).toBeNull();
+      expect(text("deployment")).toContain(NOTE);
+      expect(text("deployment")).not.toContain("already work");
     });
 
     it("an unreachable Twilio reads Couldn't check, not Not working", async () => {

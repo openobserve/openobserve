@@ -26427,7 +26427,6 @@
     "update": "업데이트",
     "disconnect": "연결 해제",
     "deploymentTitle": "이 배포의 {provider} 계정",
-    "deploymentNote": "문자와 통화는 이미 작동합니다. 운영자가 설정하므로 여기서 할 일은 없습니다.",
     "useOwn": "대신 자체 {provider} 계정 사용",
     "connectTitle": "{provider} 연결",
     "updateTitle": "{provider} 업데이트",

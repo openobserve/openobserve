@@ -26427,7 +26427,6 @@
     "update": "更新",
     "disconnect": "切断",
     "deploymentTitle": "このデプロイメントの {provider} アカウント",
-    "deploymentNote": "SMS と通話はすでに動作しています。運用担当者が設定済みのため、ここで行う操作はありません。",
     "useOwn": "代わりに独自の {provider} アカウントを使用する",
     "connectTitle": "{provider} を接続",
     "updateTitle": "{provider} を更新",

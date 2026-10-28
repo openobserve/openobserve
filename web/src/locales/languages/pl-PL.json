@@ -26427,7 +26427,6 @@
     "update": "Aktualizuj",
     "disconnect": "Rozłącz",
     "deploymentTitle": "Konto {provider} tego wdrożenia",
-    "deploymentNote": "Wiadomości SMS i połączenia już działają. Ustawione przez operatora; nie ma tu nic do zrobienia.",
     "useOwn": "Użyj własnego konta {provider}",
     "connectTitle": "Połącz {provider}",
     "updateTitle": "Zaktualizuj {provider}",

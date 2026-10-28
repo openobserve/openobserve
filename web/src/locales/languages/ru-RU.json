@@ -26427,7 +26427,6 @@
     "update": "Обновить",
     "disconnect": "Отключить",
     "deploymentTitle": "Аккаунт {provider} этого развертывания",
-    "deploymentNote": "Сообщения и звонки уже работают. Настроено оператором; здесь ничего делать не нужно.",
     "useOwn": "Использовать свой аккаунт {provider}",
     "connectTitle": "Подключить {provider}",
     "updateTitle": "Обновить {provider}",

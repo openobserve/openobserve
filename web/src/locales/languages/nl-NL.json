@@ -26427,7 +26427,6 @@
     "update": "Bijwerken",
     "disconnect": "Loskoppelen",
     "deploymentTitle": "Het {provider}-account van deze deployment",
-    "deploymentNote": "Sms'jes en gesprekken werken al. Ingesteld door de beheerder; hier is niets te doen.",
     "useOwn": "Gebruik in plaats daarvan je eigen {provider}-account",
     "connectTitle": "{provider} koppelen",
     "updateTitle": "{provider} bijwerken",

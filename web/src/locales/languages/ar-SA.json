@@ -26427,7 +26427,6 @@
     "update": "تحديث",
     "disconnect": "فصل",
     "deploymentTitle": "حساب {provider} الخاص بهذا النشر",
-    "deploymentNote": "الرسائل النصية والمكالمات تعمل بالفعل. تم إعدادها بواسطة المشغّل؛ لا شيء لفعله هنا.",
     "useOwn": "استخدم حساب {provider} الخاص بك بدلاً من ذلك",
     "connectTitle": "ربط {provider}",
     "updateTitle": "تحديث {provider}",

@@ -26427,7 +26427,6 @@
     "update": "Actualizar",
     "disconnect": "Desconectar",
     "deploymentTitle": "La cuenta de {provider} de esta implementación",
-    "deploymentNote": "Los mensajes y las llamadas ya funcionan. Configurado por el operador; no hay nada que hacer aquí.",
     "useOwn": "Usar tu propia cuenta de {provider} en su lugar",
     "connectTitle": "Conectar {provider}",
     "updateTitle": "Actualizar {provider}",

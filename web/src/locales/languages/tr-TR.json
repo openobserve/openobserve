@@ -26427,7 +26427,6 @@
     "update": "Güncelle",
     "disconnect": "Bağlantıyı kes",
     "deploymentTitle": "Bu dağıtımın {provider} hesabı",
-    "deploymentNote": "Mesajlar ve aramalar zaten çalışıyor. Operatör tarafından ayarlandı; burada yapılacak bir şey yok.",
     "useOwn": "Bunun yerine kendi {provider} hesabınızı kullanın",
     "connectTitle": "{provider} Bağla",
     "updateTitle": "{provider} Güncelle",

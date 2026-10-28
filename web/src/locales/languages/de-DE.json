@@ -26427,7 +26427,6 @@
     "update": "Aktualisieren",
     "disconnect": "Trennen",
     "deploymentTitle": "Das {provider}-Konto dieser Bereitstellung",
-    "deploymentNote": "SMS und Anrufe funktionieren bereits. Vom Betreiber festgelegt; hier ist nichts zu tun.",
     "useOwn": "Stattdessen ein eigenes {provider}-Konto verwenden",
     "connectTitle": "{provider} verbinden",
     "updateTitle": "{provider} aktualisieren",

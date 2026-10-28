@@ -26425,7 +26425,7 @@
     "update": "Update",
     "disconnect": "Disconnect",
     "deploymentTitle": "This deployment's {provider} account",
-    "deploymentNote": "Texts and calls already work. Set by the operator; nothing to do here.",
+    "deploymentOwner": "Set by the operator, so there is nothing to configure here.",
     "useOwn": "Use your own {provider} account instead",
     "connectTitle": "Connect {provider}",
     "updateTitle": "Update {provider}",

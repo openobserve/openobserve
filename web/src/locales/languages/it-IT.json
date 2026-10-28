@@ -26427,7 +26427,6 @@
     "update": "Aggiorna",
     "disconnect": "Disconnetti",
     "deploymentTitle": "Account {provider} di questa distribuzione",
-    "deploymentNote": "SMS e chiamate funzionano già. Configurati dall'operatore; nessuna azione necessaria qui.",
     "useOwn": "Usa invece il tuo account {provider}",
     "connectTitle": "Connetti {provider}",
     "updateTitle": "Aggiorna {provider}",

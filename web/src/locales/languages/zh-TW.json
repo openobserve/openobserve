@@ -26422,7 +26422,6 @@
     "update": "更新",
     "disconnect": "中斷連線",
     "deploymentTitle": "此部署的 {provider} 帳戶",
-    "deploymentNote": "簡訊與通話已可運作。由操作人員設定；此處無需任何操作。",
     "useOwn": "改用您自己的 {provider} 帳戶",
     "connectTitle": "連接 {provider}",
     "updateTitle": "更新 {provider}",
