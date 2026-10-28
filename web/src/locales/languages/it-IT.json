@@ -1531,7 +1531,7 @@
     "viewCompare": "Confronta",
     "compareLabel": "Confronta per etichetta",
     "compareFrom": "Confronta da",
-    "compareTo": "Confronta a",
+    "compareTo": "Confronta con",
     "compareSwap": "Scambia i lati",
     "compareNeedsLabel": "Nessuna etichetta per il confronto. Aggiungi un'etichetta ai tuoi profili, ad esempio service.version.",
     "compareNeedsTwoValues": "Questa etichetta ha meno di due valori nell'intervallo di tempo. Scegli un'altra etichetta o un intervallo di tempo più ampio.",

@@ -1531,7 +1531,7 @@
     "viewCompare": "Comparar",
     "compareLabel": "Comparar por etiqueta",
     "compareFrom": "Comparar desde",
-    "compareTo": "Comparar hasta",
+    "compareTo": "Comparar con",
     "compareSwap": "Intercambiar lados",
     "compareNeedsLabel": "No hay ninguna etiqueta por la que comparar. Añade una etiqueta a tus perfiles, como service.version.",
     "compareNeedsTwoValues": "Esta etiqueta tiene menos de dos valores en el intervalo de tiempo. Elige otra etiqueta o un intervalo de tiempo más amplio.",

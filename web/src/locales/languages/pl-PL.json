@@ -1531,7 +1531,7 @@
     "viewCompare": "Porównaj",
     "compareLabel": "Porównuj według etykiety",
     "compareFrom": "Porównaj od",
-    "compareTo": "Porównaj do",
+    "compareTo": "Porównaj z",
     "compareSwap": "Zamień strony",
     "compareNeedsLabel": "Brak etykiety do porównania. Dodaj etykietę do swoich profili, np. service.version.",
     "compareNeedsTwoValues": "Ta etykieta ma mniej niż dwie wartości w zakresie czasu. Wybierz inną etykietę lub szerszy zakres czasu.",

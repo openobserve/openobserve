@@ -1531,7 +1531,7 @@
     "viewCompare": "Vergelijken",
     "compareLabel": "Vergelijken op label",
     "compareFrom": "Vergelijken vanaf",
-    "compareTo": "Vergelijken tot",
+    "compareTo": "Vergelijken met",
     "compareSwap": "Zijden omwisselen",
     "compareNeedsLabel": "Geen label om op te vergelijken. Voeg een label toe aan je profielen, zoals service.version.",
     "compareNeedsTwoValues": "Dit label heeft minder dan twee waarden in het tijdsbereik. Kies een ander label of een breder tijdsbereik.",
