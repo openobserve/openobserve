@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-verdict-below"
       class="text-text-secondary text-compact m-0 font-semibold"
     >
-      {{ belowHeadline }}
+      <RcaInlineText :text="belowHeadline" />
     </p>
 
     <!-- Several root causes: each with its onset and its own band. -->
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="max-w-95 min-w-0">
         <dt class="text-text-secondary text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
         <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
-          {{ impactText }}
+          <RcaInlineText :text="impactText" />
         </dd>
       </div>
       <div v-if="impactedServices.length" class="max-w-105 min-w-0">

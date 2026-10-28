@@ -442,7 +442,7 @@ const props = withDefaults(
     status: RcaReadStatus;
     /** The thread's run is running or waiting for input. */
     runLive: boolean;
-    /** State of the thread's run; a run that is not live gets the final note. */
+    /** State of the thread's run; a run that is not live gets the closing note. */
     runState: RcaRunState | null;
     /** Resume can continue the thread's run, so its note is not final. */
     canResume?: boolean;

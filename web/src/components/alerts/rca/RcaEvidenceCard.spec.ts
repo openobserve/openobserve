@@ -244,4 +244,24 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
       '<a href="https://evil.example">click</a>',
     );
   });
+
+  it("agent inline code in the reading shows as code, never as backticks", () => {
+    const wrapper = mountCard(
+      rcaEvidenceEntry({
+        citations: [
+          {
+            hypothesis_id: "h1",
+            evidence_id: "e1",
+            polarity: "supports",
+            strength: "decisive",
+            observation: "`GET /api/data` errors start at the toggle",
+          },
+        ],
+      }),
+    );
+
+    const citation = byTest(wrapper, "rca-evidence-citation");
+    expect(citation.text()).not.toContain("`");
+    expect(citation.find("code").text()).toBe("GET /api/data");
+  });
 });
