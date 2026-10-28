@@ -37,23 +37,30 @@ function bandSql(editorBand) {
   return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
 }
 
+// A 35%–75% brush on the 15m range spans ~9.75–3.75 min ago; spread ages so data stays inside as tests run later.
+const BRUSH_WINDOW_AGES_MS = [5, 6.5, 8].map((min) => min * 60 * 1000);
+
+test.beforeAll(async ({ browser }) => {
+  test.setTimeout(120000);
+  const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+  const page = await context.newPage();
+  try {
+    const batches = [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }];
+    for (const ageMs of BRUSH_WINDOW_AGES_MS) {
+      batches.push({ count: 2, forceScenario: 'error', ageMs }, { count: 3, forceScenario: 'success', ageMs });
+    }
+    for (const { count, ...options } of batches) {
+      const seeded = await ingestTraces(page, count, options);
+      expect(seeded.failed, `Seeding ${options.forceScenario} traces must succeed`).toBe(0);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 test.describe('Traces triage loop', () => {
   let pm;
   let queries;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120000);
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    try {
-      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
-        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
-        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
-      }
-    } finally {
-      await context.close();
-    }
-  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);

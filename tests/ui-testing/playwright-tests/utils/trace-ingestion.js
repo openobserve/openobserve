@@ -34,6 +34,7 @@ function getTimestampNs() {
  *   one. Used by tests that must guarantee error traces exist (e.g. the traces
  *   error-only toggle), removing the data-dependent flake where a random draw
  *   produced no error spans.
+ * @param {number} [options.ageMs] - Start the trace this many ms in the past.
  * @returns {Object} OTLP trace data
  */
 function generateTrace(iteration, options = {}) {
@@ -43,7 +44,7 @@ function generateTrace(iteration, options = {}) {
   const clientSpanId = generateHexId(8);
   const serverSpanId = generateHexId(8);
 
-  const startTime = getTimestampNs();
+  const startTime = String((Date.now() - (options.ageMs || 0)) * 1000000);
 
   // Randomly choose scenario
   const scenarios = [
@@ -254,7 +255,7 @@ function generateTrace(iteration, options = {}) {
  * @returns {Promise<Object>} Ingestion result
  */
 async function ingestTraces(page, traceCount = 10, options = {}) {
-  testLogger.info(`Starting trace ingestion`, { traceCount, forceScenario: options.forceScenario });
+  testLogger.info(`Starting trace ingestion`, { traceCount, forceScenario: options.forceScenario, ageMs: options.ageMs });
 
   const orgId = getOrgIdentifier() || "default";
   const headers = getAuthHeaders();
