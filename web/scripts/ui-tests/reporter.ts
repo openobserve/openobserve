@@ -2,7 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cpus, platform, arch } from "node:os";
 import { ReportersMap, type Reporter, type TestModule, type TestRunEndReason } from "vitest/node";
-import type { Vitest } from "vitest/node";
+import type { TestCase, Vitest } from "vitest/node";
 import type { SerializedError } from "@vitest/utils";
 import { digest, identity, inventory, partition, verifyFiles } from "./partition.mjs";
 import { runIdentity, timings } from "./runtime.mjs";
@@ -36,11 +36,10 @@ export default class ShardReporter implements Reporter {
   onTestModuleCollected(module: TestModule) {
     this.collected.set(
       module.id,
-      [...module.children.allTests()].map((test) => ({
-        id: test.id,
-        name: test.fullName,
-        mode: test.options.mode,
-      })),
+      [...module.children.allTests()].map((test) => {
+        const { id, name, mode } = reportedTest(test);
+        return { id, name, mode };
+      }),
     );
   }
 
@@ -60,12 +59,7 @@ export default class ShardReporter implements Reporter {
       state: module.state(),
       collected: this.collected.get(module.id),
       diagnostic: module.diagnostic(),
-      tests: [...module.children.allTests()].map((test) => ({
-        id: test.id,
-        name: test.fullName,
-        mode: test.options.mode,
-        state: test.result().state,
-      })),
+      tests: [...module.children.allTests()].map(reportedTest),
     }));
     if (reason === "passed") {
       verifyFiles(
@@ -95,4 +89,21 @@ export default class ShardReporter implements Reporter {
     await mkdir(this.directory, { recursive: true });
     await writeFile(join(this.directory, "metadata.json"), JSON.stringify(metadata));
   }
+}
+
+export function reportedTest(test: TestCase) {
+  let mode = test.options.mode;
+  for (let parent = test.parent; parent.type === "suite"; parent = parent.parent) {
+    if (parent.options.mode === "skip" || parent.options.mode === "todo") {
+      mode = parent.options.mode;
+    }
+  }
+  const state = test.result().state;
+  return {
+    id: test.id,
+    name: test.fullName,
+    mode,
+    // Vitest can leave descendants pending when a skipped ancestor stops traversal.
+    state: state === "pending" && (mode === "skip" || mode === "todo") ? "skipped" : state,
+  };
 }

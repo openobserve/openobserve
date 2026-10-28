@@ -16,11 +16,32 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { configurationDigest, environmentDigest, timings } from "./runtime.mjs";
 import { validateReports } from "./validate.mjs";
+import { reportedTest } from "./reporter.ts";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("reporting preserves genuinely pending runnable tests and terminal failures", () => {
+  const pending = {
+    id: "required",
+    fullName: "required test",
+    options: { mode: "run" },
+    parent: { type: "module" },
+    result: () => ({ state: "pending" }),
+  };
+  assert.deepEqual(reportedTest(pending), {
+    id: "required",
+    name: "required test",
+    mode: "run",
+    state: "pending",
+  });
+  const parent = { type: "suite", options: { mode: "skip" }, parent: pending.parent };
+  for (const state of ["failed", "passed"]) {
+    assert.equal(reportedTest({ ...pending, parent, result: () => ({ state }) }).state, state);
+  }
+});
+
 test(
-  "real Vitest blobs preserve skipped/todo cases and merge covered shards",
+  "real Vitest blobs preserve nested skipped/todo cases and merge covered shards",
   { timeout: 60000 },
   () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "ui-shard-report-")));
@@ -50,13 +71,28 @@ test(
       writeFileSync(join(root, "src/value.ts"), "export const value = (n: number) => n + 1;");
       for (const [name, body] of Object.entries({
         a: 'it("passes", () => expect(value(1)).toBe(2));',
-        b: 'it.skip("skips", () => expect(value(1)).toBe(0));',
-        c: 'it.todo("todo");',
-        d: 'it("also passes", () => expect(value(3)).toBe(4));',
+        b: `it.skip("skips", () => expect(value(1)).toBe(0));
+            describe.skip("outer skip", () => {
+              describe("middle", () => {
+                describe.skip("inner skip", () => {
+                  it("inherits skip", () => { throw new Error("must stay skipped"); });
+                });
+              });
+            });`,
+        c: `it.todo("todo");
+            describe.todo("outer todo", () => {
+              describe("middle", () => {
+                describe.skip("inner", () => {
+                  it("inherits todo", () => { throw new Error("must stay todo"); });
+                });
+              });
+            });`,
+        d: `it("also passes", () => expect(value(3)).toBe(4));
+            it("dynamic skip", ({ skip }) => skip());`,
       })) {
         writeFileSync(
           join(root, `src/${name}.spec.ts`),
-          `import { it, expect } from "vitest"; import { value } from "./value"; ${body}`,
+          `import { describe, it, expect } from "vitest"; import { value } from "./value"; ${body}`,
         );
       }
       const config = {
@@ -109,9 +145,24 @@ test(
       };
       assert.deepEqual(validateReports(reports, expected), {
         files: 4,
-        tests: 4,
-        dispositions: { passed: 2, skipped: 1, todo: 1 },
+        tests: 7,
+        dispositions: { passed: 2, skipped: 3, todo: 2 },
       });
+      const tests = reports.flatMap(({ metadata }) => metadata.files.flatMap((file) => file.tests));
+      for (const mode of ["skip", "todo"]) {
+        const inherited = tests.find((entry) => entry.name.endsWith(`inherits ${mode}`));
+        assert.equal(inherited.mode, mode);
+        assert.equal(inherited.state, "skipped");
+      }
+      const unfinished = reports.map(({ metadata, blob }) => ({
+        metadata: structuredClone(metadata),
+        blob,
+      }));
+      const required = unfinished
+        .flatMap(({ metadata }) => metadata.files.flatMap((file) => file.tests))
+        .find((entry) => entry.state === "passed");
+      required.state = "pending";
+      assert.throws(() => validateReports(unfinished, expected), /Incomplete test/);
       mkdirSync(join(root, "blobs"));
       for (const report of reports)
         writeFileSync(join(root, "blobs", `${report.metadata.index}.json`), report.blob);
