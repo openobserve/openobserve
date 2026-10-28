@@ -14,9 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OButtonGroup
-    class="function-selector element-box-shadow border-button-outline-border float-left me-1 border p-0"
-  >
+  <OButtonGroup class="function-selector border-button-outline-border float-left me-1 border p-0">
     <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
