@@ -88,6 +88,10 @@ pub fn run() {
                 continue;
             }
 
+            // Before the job-cluster gate: ack retention deletes are not replicated, so each
+            // region sweeps its own copy.
+            sweep_ended_acks().await;
+
             // Within-cluster election is not enough once state rows replicate
             // across a super cluster: every region's leader would then sweep
             // the same rows. Only the elected job cluster may — its evaluator
@@ -323,6 +327,22 @@ async fn sweep_alert(
     Ok((resolved, reaped, 0))
 }
 
+/// Deletes the acks of firings that are no longer current, once the reap grace has passed.
+async fn sweep_ended_acks() {
+    let grace_secs = get_config().limit.alert_group_reap_grace_secs;
+    let cutoff = ended_ack_cutoff(now_micros(), grace_secs);
+    match infra::table::alert_acks::delete_ended_before(cutoff).await {
+        Ok(0) => {}
+        Ok(n) => log::info!("[ALERT_GROUP_REAPER] deleted {n} acks of ended firings"),
+        Err(e) => log::error!("[ALERT_GROUP_REAPER] ack sweep failed: {e}"),
+    }
+}
+
+/// The instant before which an ack of an ended firing may go: the reap grace before `now`. [pure]
+fn ended_ack_cutoff(now: i64, grace_secs: i64) -> i64 {
+    now.saturating_sub(grace_secs.saturating_mul(1_000_000))
+}
+
 /// PromQL series grouping also keeps per-group state rows alive.
 fn still_multi(alert: Option<&Alert>) -> bool {
     alert.is_some_and(|a| a.query_condition.multi_alert_enabled())
@@ -371,6 +391,16 @@ mod tests {
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         assert!(still_multi(Some(&alert)));
+    }
+
+    #[test]
+    fn an_ended_firings_ack_goes_once_the_reap_grace_has_passed() {
+        let now = 1_750_000_000_000_000;
+        assert_eq!(ended_ack_cutoff(now, 3600), now - 3600 * 1_000_000);
+        assert_eq!(
+            ended_ack_cutoff(now, i64::MAX),
+            now.saturating_sub(i64::MAX)
+        );
     }
 
     #[test]
