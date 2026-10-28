@@ -354,7 +354,13 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     await slack.settings.goto(org);
     const outbound = byTest('slack-workspace-outbound');
     await expect(outbound).toBeVisible({ timeout: 40000 });
-    await expect(outbound).toContainText(/Alert messages: [1-9]\d* queued, oldest|No alert messages queued/);
+    // The line must show the depth the installation reports, not either wording.
+    const listed = await api.listInstallations(apiContext, org);
+    const depth = listed.installations.find((i) => i.id === install.id)?.health?.outbound_depth;
+    expect(typeof depth).toBe('number');
+    await expect(outbound).toContainText(
+      depth === 0 ? 'No alert messages queued' : `Alert messages: ${depth} queued, oldest`,
+    );
 
     const switchAll = byTest('slack-switch-all');
     await expect(switchAll).toBeVisible();
