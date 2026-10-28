@@ -277,10 +277,11 @@ and prints each check with the page that fixes it. Show its output to the user a
     ✓ Missing agent identity    0 of 14 spans
     ✓ Spans without session id  0 of 14 spans
     ✓ Zero-duration spans       0 of 14 spans
-    ! Unpriced models           acme-internal-llm · 3,420 tokens counted as $0
+    ✗ Unpriced models           acme-internal-llm · 3,420 tokens counted as $0
                                 Fix in LLM Model Pricing: https://<openobserve>/web/settings/model_pricing?tab=unpriced&stream=default&org_identifier=default
 
   3 of 4 checks pass. Fix the items above, then run the checks again.
+  Exit code: 1 (data-health checks found an error).
 ```
 
 Exit codes: `0` GenAI spans arrived and no check is in error, `1` a check is in error, `2`

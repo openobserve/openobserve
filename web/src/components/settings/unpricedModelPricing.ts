@@ -45,7 +45,7 @@ export function buildKeepPricesPayload(model: string, matched: PricingMatch): Ne
   };
 }
 
-/** An exact org price of $0 for `model`: its spans count as free and it leaves the Unpriced tab. */
+/** An exact org price of $0 for new spans; historical gaps keep their recorded cost. */
 export function buildMutePayload(model: string): NewPricingDefinition {
   return {
     name: `${model} (muted)`,

@@ -533,9 +533,10 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // The one agents loader for every Monitor page. Calls for the same org and
   // minute bucket (the query key's own quantization) while a request is in
   // flight join it, so the several callers on page entry (date replay, mode
-  // resolution, a refresh) cost one `gen_ai/agents` request. A settled bucket is
-  // served by the query cache; `force` (a user refresh) invalidates it first.
+  // resolution) cost one request. A forced refresh waits for any request for
+  // the same key, then invalidates and fetches again rather than reusing it.
   let inFlight: { key: string; promise: Promise<void> } | null = null;
+  let requestSequence = 0;
   async function loadAgents(start?: number, end?: number, force = false): Promise<void> {
     const org = opts.orgId();
     const win = opts.getWindow();
@@ -544,12 +545,14 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     if (!org || !startTime || !endTime) return;
     const bucket = quantizeRange(startTime, endTime);
     const key = `${org}::${bucket.start}-${bucket.end}`;
-    if (inFlight?.key === key) return inFlight.promise;
-    // The user may switch org while the request is in flight; the old org's
-    // answer (or failure) must not land in the new org's list, mode or stream.
-    const orgChanged = () => opts.orgId() !== org;
+    const previous = inFlight?.key === key ? inFlight.promise : null;
+    if (!force && previous) return previous;
+    const sequence = ++requestSequence;
+    // Only the latest window/org request owns the visible list and load state.
+    const superseded = () => sequence !== requestSequence || opts.orgId() !== org;
     const promise = (async () => {
       try {
+        if (force && previous) await previous;
         const options = genAiAgentsQuery(org, startTime, endTime);
         if (force) {
           await queryClient.invalidateQueries({
@@ -559,7 +562,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
           });
         }
         const res = await queryClient.fetchQuery(options);
-        if (orgChanged()) return;
+        if (superseded()) return;
         agents.value = res.agents ?? [];
         agentsError.value = null;
         if (allAgents) {
@@ -575,13 +578,13 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
           activeAgent.value = agentOptionKey(agents.value[0]);
         }
       } catch (e) {
-        if (orgChanged()) return;
+        if (superseded()) return;
         console.warn("Failed to load GenAI agents", e);
         agents.value = [];
         agentsError.value = isAxiosError(e) && e.response?.status === 403 ? "forbidden" : "failed";
         if (allAgents) activeAgent.value = ALL_AGENTS_VALUE;
       } finally {
-        if (!orgChanged()) agentsLoaded.value = true;
+        if (!superseded()) agentsLoaded.value = true;
       }
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;

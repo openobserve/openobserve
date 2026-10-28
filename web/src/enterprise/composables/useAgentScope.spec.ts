@@ -275,6 +275,54 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     expect(scope.agentsError.value).toBeNull();
     expect(agentsLoaded.value).toBe(false);
   });
+
+  it.each(["success", "failure"])(
+    "keeps the newer window after an older request finishes with %s",
+    async (outcome) => {
+      const scope = useAgentScope({
+        filterMode: ref("agent"),
+        activeStream: ref(""),
+        orgId: () => `window-race-${outcome}`,
+        getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+        allAgents: true,
+        t,
+      });
+      const old = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+      const latest = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+      listAgents.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+      const oldLoad = scope.loadAgents();
+      const latestLoad = scope.loadAgents(180_000_000, 240_000_000);
+      await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2));
+      latest.resolve({ agents: [agentB] });
+      await latestLoad;
+      if (outcome === "success") old.resolve({ agents: [agentA] });
+      else old.reject(new Error("old window failed"));
+      await oldLoad;
+      expect(scope.agents.value).toEqual([agentB]);
+      expect(scope.agentsError.value).toBeNull();
+      expect(scope.agentsLoaded.value).toBe(true);
+    },
+  );
+
+  it("refreshes after an in-flight cached load rather than reusing its response", async () => {
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => "forced-load-after-entry",
+      getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+      allAgents: true,
+      t,
+    });
+    const entry = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    listAgents.mockReturnValueOnce(entry.promise).mockResolvedValueOnce({ agents: [agentB] });
+    const initialLoad = scope.loadAgents();
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(1));
+    const refresh = scope.loadAgents(undefined, undefined, true);
+    entry.resolve({ agents: [agentA] });
+    await Promise.all([initialLoad, refresh]);
+    expect(listAgents).toHaveBeenCalledTimes(2);
+    expect(scope.agents.value).toEqual([agentB]);
+  });
 });
 
 describe("resolveScopeMode", () => {

@@ -81,7 +81,7 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
             .one(&txn)
             .await?
         {
-            if current != item {
+            if !compatible_item_rows(current, item) {
                 return Err(Error::Message(
                     "Dataset Item row ID contains conflicting data".to_string(),
                 ));
@@ -107,6 +107,19 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
     Ok(())
 }
 
+/// Older nodes omit the display label when echoing an otherwise identical immutable row.
+fn compatible_item_rows(
+    mut current: dataset_items::Model,
+    mut incoming: dataset_items::Model,
+) -> bool {
+    if current.write_version.is_none() {
+        current.write_version = incoming.write_version;
+    } else if incoming.write_version.is_none() {
+        incoming.write_version = current.write_version;
+    }
+    current == incoming
+}
+
 async fn apply_delete(org_id: &str, dataset_id: &str) -> Result<()> {
     let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
@@ -122,4 +135,45 @@ async fn apply_delete(org_id: &str, dataset_id: &str) -> Result<()> {
         .await?;
     txn.commit().await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(write_version: Option<i64>) -> dataset_items::Model {
+        serde_json::from_value(serde_json::json!({
+            "row_id": "row-1",
+            "logical_id": "item-1",
+            "org_id": "org-1",
+            "dataset_id": "dataset-1",
+            "input": "question",
+            "expected_output": "answer",
+            "global_version": 59,
+            "write_version": write_version,
+            "is_deleted": false,
+            "source": "telemetry",
+            "updated_by": "owner@example.com",
+            "updated_at": 100
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn an_older_node_can_echo_a_row_without_its_display_label() {
+        assert!(compatible_item_rows(row(Some(57)), row(None)));
+        assert!(compatible_item_rows(row(None), row(Some(57))));
+        assert!(compatible_item_rows(row(Some(57)), row(Some(57))));
+        assert!(!compatible_item_rows(row(Some(57)), row(Some(58))));
+    }
+
+    #[test]
+    fn missing_display_labels_do_not_hide_immutable_content_conflicts() {
+        let mut changed = row(None);
+        changed.input = serde_json::json!("different question");
+        assert!(!compatible_item_rows(row(Some(57)), changed));
+        let mut changed = row(None);
+        changed.global_version = 60;
+        assert!(!compatible_item_rows(row(Some(57)), changed));
+    }
 }
