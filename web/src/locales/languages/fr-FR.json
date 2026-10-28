@@ -10488,6 +10488,7 @@
         "leadsNotEvidence": "Des pistes, pas des preuves",
         "working": "En cours. Les messages envoyés maintenant seront lus après ce tour.",
         "finalNote": "Ce rapport est définitif et ne changera pas. Pour réorienter l'agent, utilisez Réanalyser. Cela crée une nouvelle version dans l'historique des rapports.",
+        "resumableNote": "Cette exécution s'est arrêtée avant la fin. Reprendre l'exécution repart de la dernière étape terminée.",
         "copy": "Copier le fil",
         "copied": "Fil copié dans le presse-papiers",
         "copyFailed": "Impossible de copier le fil",
