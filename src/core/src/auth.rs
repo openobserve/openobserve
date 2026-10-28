@@ -1031,10 +1031,7 @@ mod tests {
             panic!("an ingestion write with credentials must extract");
         };
         assert!(auth.bypass_check);
-        assert_eq!(
-            auth.feature,
-            Some(&[Feature::Logs, Feature::OtlpIngestion][..])
-        );
+        assert_eq!(auth.feature, Some(&[Feature::Logs][..]));
     }
 
     #[tokio::test]
