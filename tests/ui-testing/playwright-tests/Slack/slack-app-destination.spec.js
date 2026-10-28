@@ -212,7 +212,10 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
         await remove(`/api/${org}/alerts/destinations/${encodeURIComponent(name)}`, { missingOk: true });
       }
     }
-    for (const id of [org, emptyOrg].filter(Boolean)) await remove(`/api/organizations/${id}`);
+    // The org delete route is Cloud-only (src/api/http/src/handler/http/router/mod.rs:2126); self-hosted cannot remove an org.
+    if (buildType === 'cloud') {
+      for (const id of [org, emptyOrg].filter(Boolean)) await remove(`/api/organizations/${id}`);
+    }
     await apiContext.dispose();
     expect(left, 'cleanup left resources behind').toEqual([]);
   });
@@ -363,13 +366,15 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
   });
 
   test('Settings › Slack: switch all, the unlinked on-call list with Remind, and the outbound queue line (MK-6b)', async () => {
+    // The leader writes the queue depth every 10 s and the page reads it once, so wait for the first write.
+    const depthNow = async () =>
+      (await api.listInstallations(apiContext, org)).installations.find((i) => i.id === install.id)?.health?.outbound_depth;
+    await expect.poll(depthNow, { timeout: 40000 }).toEqual(expect.any(Number));
     await slack.settings.goto(org);
     const outbound = byTest('slack-workspace-outbound');
-    await expect(outbound).toBeVisible({ timeout: 40000 });
+    await expect(outbound).toBeVisible({ timeout: 20000 });
     // The line must show the depth the installation reports, not either wording.
-    const listed = await api.listInstallations(apiContext, org);
-    const depth = listed.installations.find((i) => i.id === install.id)?.health?.outbound_depth;
-    expect(typeof depth).toBe('number');
+    const depth = await depthNow();
     await expect(outbound).toContainText(
       depth === 0 ? 'No alert messages queued' : `Alert messages: ${depth} queued, oldest`,
     );
