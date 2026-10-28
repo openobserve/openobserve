@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref } from "vue";
 import type { Ref } from "vue";
+import type { LocationQuery } from "vue-router";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { ALL_AGENTS_VALUE } from "@/enterprise/components/onlineEvals/utils/agentFilterSql";
 import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
@@ -30,7 +31,14 @@ vi.mock("@/services/gen-ai-agent-mapping.service", async (importOriginal) => {
   };
 });
 
-import { useAgentScope, resolveScopeMode, UNSET } from "./useAgentScope";
+import {
+  useAgentScope,
+  resolveScopeMode,
+  UNSET,
+  scopeUrlQuery,
+  readUrlScope,
+  explicitScopeMode,
+} from "./useAgentScope";
 
 const t = (k: string) => k;
 
@@ -277,6 +285,29 @@ describe("resolveScopeMode", () => {
     expect(resolveScopeMode(null, 0, "failed")).toBe("agent");
     expect(resolveScopeMode(null, 0, "forbidden")).toBe("agent");
     expect(resolveScopeMode("stream", 0, "failed")).toBe("stream");
+  });
+});
+
+describe("scopeUrlQuery", () => {
+  const agent = { name: "support-bot", env: "prod", version: "v2" };
+
+  beforeEach(() => localStorage.clear());
+
+  it("leaves an auto-picked agent out of the URL, so a reload with no agents ends in Stream", () => {
+    const query = scopeUrlQuery(
+      { from: "1" },
+      { mode: "agent", explicit: false, stream: "", agent },
+    );
+    expect(query).toEqual({ from: "1" });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(resolveScopeMode(explicitScopeMode(reloaded), 0)).toBe("stream");
+  });
+
+  it("writes an explicit agent scope, which a reload keeps", () => {
+    const query = scopeUrlQuery({}, { mode: "agent", explicit: true, stream: "", agent });
+    expect(query).toEqual({ type: "agent", agent: "support-bot", env: "prod", version: "v2" });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(resolveScopeMode(explicitScopeMode(reloaded), 0)).toBe("agent");
   });
 });
 

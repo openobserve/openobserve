@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="models"
         :columns="columns"
         :row-key="rowKey"
-        :loading="loading"
+        :loading="showSkeleton"
+        :error="error ? t('emptyState.loadError.title') : null"
         pagination="none"
         sorting="client"
         :default-columns="false"
@@ -155,9 +156,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <template #error>
+          <OEmptyState
+            size="block"
+            preset="load-error"
+            data-test="model-pricing-unpriced-error"
+            @action="emit('refresh')"
+          />
+        </template>
         <template #empty>
           <OEmptyState
-            v-if="streamsLoaded && !streams.length"
+            v-if="noStreams"
             size="block"
             illustration="stream-select"
             :title="t('modelPricing.unpriced.noStreamsTitle')"
@@ -165,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="model-pricing-unpriced-no-streams"
           />
           <OEmptyState
-            v-else
+            v-else-if="loaded"
             size="block"
             illustration="check"
             :title="t('modelPricing.unpriced.emptyTitle')"
@@ -221,12 +230,16 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
-defineProps<{
+const props = defineProps<{
   models: UnpricedModel[];
   /** Cold read with nothing to show yet: the table skeleton. */
   loading: boolean;
   /** Any read in flight: the refresh button's spinner. */
   fetching: boolean;
+  /** The last read failed: the load-error state, whose Retry emits `refresh`. */
+  error: boolean;
+  /** A read for the current stream succeeded, so zero rows means everything is priced. */
+  loaded: boolean;
   lastRunAt: number;
   streams: string[];
   streamsLoaded: boolean;
@@ -247,6 +260,13 @@ const orgIdentifier = computed(() => store.state.selectedOrganization?.identifie
 // price list both refetch after Keep or Mute with no wiring of their own.
 const saveModelPricing = useMutation(() => saveModelPricingMutation(orgIdentifier.value));
 const pendingModel = ref("");
+
+const noStreams = computed(() => props.streamsLoaded && !props.streams.length);
+// Until the stream list and a read resolve there is nothing to judge, so the
+// skeleton holds instead of a premature "everything is priced".
+const showSkeleton = computed(
+  () => !props.error && !noStreams.value && (props.loading || !props.loaded),
+);
 
 const columns: OTableColumnDef<UnpricedModel>[] = [
   {
@@ -299,13 +319,16 @@ function seenBy(row: UnpricedModel): I18nText {
 }
 
 function perMillion(pricePerToken: number | undefined): string {
-  return `$${((pricePerToken ?? 0) * 1_000_000).toFixed(2)}`;
+  if (pricePerToken === undefined || !Number.isFinite(pricePerToken)) {
+    return t("modelPricing.unpriced.notPriced");
+  }
+  return `$${(pricePerToken * 1_000_000).toFixed(2)}`;
 }
 
 /** The input/output prices of the default tier the model is priced at today. */
 function matchedPrices(row: UnpricedModel): I18nText | "" {
   const prices = row.matched ? defaultTier(row.matched.tiers)?.prices : undefined;
-  if (!prices || (prices.input === undefined && prices.output === undefined)) return "";
+  if (!prices || (!Number.isFinite(prices.input) && !Number.isFinite(prices.output))) return "";
   return t("modelPricing.unpriced.defaultTierPrices", {
     input: perMillion(prices.input),
     output: perMillion(prices.output),

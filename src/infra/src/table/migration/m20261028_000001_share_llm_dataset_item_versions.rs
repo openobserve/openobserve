@@ -13,11 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Lets every row of one Dataset write request share that request's version.
-//!
-//! A version was unique per Dataset, so a batch had to take one version per
-//! row. It is now unique per logical Item chain within a Dataset. Existing
-//! rows are untouched, so every existing pin resolves to the same rows.
+//! Makes Dataset item versions unique per Item chain, so one write's rows share its version.
+//! Schema 122 is one-way after a shared-version write: `down` cannot restore the old index.
+//! Rolling upgrade: older nodes assume per-Dataset unique versions; upgrade all before writes.
 
 use sea_orm_migration::prelude::*;
 
@@ -59,8 +57,7 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    /// Fails if a write request has already shared a version across rows:
-    /// the old per-Dataset uniqueness cannot hold for that data.
+    /// Fails once a write has shared a version across rows: per-Dataset uniqueness cannot hold.
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .create_index(
@@ -159,5 +156,28 @@ mod tests {
         assert!(!insert(&db, "row-3", "item-1", 1).await);
         // Re-running is harmless.
         Migration.up(&SchemaManager::new(&db)).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn down_fails_after_a_shared_version_write() {
+        let db = items_db().await;
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        assert!(insert(&db, "row-1", "item-1", 1).await);
+        assert!(insert(&db, "row-2", "item-2", 1).await);
+
+        assert!(Migration.down(&manager).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn down_succeeds_without_shared_versions() {
+        let db = items_db().await;
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        assert!(insert(&db, "row-1", "item-1", 1).await);
+        assert!(insert(&db, "row-2", "item-2", 2).await);
+
+        Migration.down(&manager).await.unwrap();
+        assert!(!insert(&db, "row-3", "item-3", 2).await);
     }
 }

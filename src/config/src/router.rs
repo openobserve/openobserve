@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 38] = [
+const QUERIER_ROUTES: [(&str, usize); 40] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -51,11 +51,13 @@ const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
-    ("discovery", 2),         // /api/{org_id}/discovery
-    ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
-    ("playground", 2),        // /api/{org_id}/playground/...
-    ("service_streams", 2),   // /api/{org_id}/service_streams/...
-    ("node/list", 2),         // /api/_meta/node/list
+    ("discovery", 2),           // /api/{org_id}/discovery
+    ("annotation_queues", 2),   // /api/{org_id}/annotation_queues/...
+    ("playground", 2),          // /api/{org_id}/playground/...
+    ("service_streams", 2),     // /api/{org_id}/service_streams/...
+    ("node/list", 2),           // /api/_meta/node/list
+    ("gen_ai/data_health", 2),  // /api/{org_id}/gen_ai/data_health
+    ("llm/models/unpriced", 2), // /api/{org_id}/llm/models/unpriced
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",

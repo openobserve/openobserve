@@ -116,9 +116,10 @@ export function resolveScopeMode(
 }
 
 /**
- * The page query with the scope written in. `type` is written only when the
- * mode was explicit: an auto-picked mode left in the URL would read as a choice
- * on reload and stop the page from re-deciding once agents appear.
+ * The page query with the scope written in. `type` and the agent
+ * (`agent`/`env`/`version`) are written only when the scope was explicit (URL,
+ * toggle or agent pick): an auto-picked scope left in the URL would read as a
+ * choice on reload and stop the page from re-deciding once agents change.
  */
 export function scopeUrlQuery(
   current: LocationQuery,
@@ -137,7 +138,7 @@ export function scopeUrlQuery(
   delete query.version;
   delete query.stream;
   if (scope.mode === "agent") {
-    if (scope.agent?.name) {
+    if (scope.explicit && scope.agent?.name) {
       query.agent = scope.agent.name;
       query.env = scope.agent.env;
       query.version = scope.agent.version;

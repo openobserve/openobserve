@@ -117,11 +117,15 @@ function detail(check: DataHealthCheck): I18nText {
   switch (check.id) {
     case "unpriced_models": {
       const models = check.models ?? [];
-      return t("llmDataTrust.health.checks.unpriced_models.detail", {
-        count: models.length,
-        spans: check.affected.toLocaleString(),
-        tokens: formatTokens(models.reduce((s, m) => s + (Number(m.tokens) || 0), 0)),
-      });
+      return t(
+        "llmDataTrust.health.checks.unpriced_models.detail",
+        {
+          count: models.length,
+          spans: check.affected.toLocaleString(),
+          tokens: formatTokens(models.reduce((s, m) => s + (Number(m.tokens) || 0), 0)),
+        },
+        models.length,
+      );
     }
     case "missing_agent_identity":
       return t("llmDataTrust.health.checks.missing_agent_identity.detail", params);
@@ -247,8 +251,8 @@ function viewTrace(traceId: string) {
         type="button"
         class="rounded-default border-border-default hover:bg-surface-subtle inline-flex items-center gap-1 border px-2 py-0.5"
         :class="{
-          'text-text-error': check.status === 'error',
-          'text-text-warning': check.status === 'warning',
+          'text-status-error-text': check.status === 'error',
+          'text-status-warning-text': check.status === 'warning',
           'text-text-secondary': check.status === 'pass',
         }"
         :data-test="`llm-data-health-chip-${check.id}`"
@@ -287,7 +291,7 @@ function viewTrace(traceId: string) {
         v-for="check in checks"
         :key="check.id"
         class="rounded-default border-border-default flex flex-col gap-1.5 border p-3"
-        :class="{ 'ring-primary ring-1': focusedCheck === check.id }"
+        :class="{ 'ring-accent ring-1': focusedCheck === check.id }"
         :data-test="`llm-data-health-card-${check.id}`"
       >
         <div class="flex items-center justify-between gap-2">

@@ -28,14 +28,19 @@ export function defaultTier(tiers: PricingTier[]): PricingTier | undefined {
 // The descriptions below are persisted with the definition, so they stay English
 // for every locale, like the editor's "Default" tier name.
 
-/** An exact org price for `model` that copies the prices it matches approximately today. */
+/** An exact org price for `model` that copies the prices it matches approximately today; a side the match leaves unpriced stays unset, never $0. */
 export function buildKeepPricesPayload(model: string, matched: PricingMatch): NewPricingDefinition {
   return {
     name: model,
     match_pattern: exactModelPattern(model),
     enabled: true,
     // JSON round-trip, not structuredClone: query data may be a Vue proxy, which structuredClone rejects.
-    tiers: JSON.parse(JSON.stringify(matched.tiers)),
+    tiers: (JSON.parse(JSON.stringify(matched.tiers)) as PricingTier[]).map((tier) => ({
+      ...tier,
+      prices: Object.fromEntries(
+        Object.entries(tier.prices ?? {}).filter(([, price]) => Number.isFinite(price)),
+      ),
+    })),
     description: `Prices copied from "${matched.name}" from the Unpriced tab.`,
   };
 }
