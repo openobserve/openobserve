@@ -1518,6 +1518,7 @@
     "searchNoMatches": "No matches",
     "runQuery": "Run query",
     "runOptions": "Run Options",
+    "runNeedsProfileType": "Pick a stream and a profile type with data in this time range",
     "timeSeriesTitle": "Profile values over time",
     "breakdown": "Breakdown",
     "breakdownNone": "None",
