@@ -43,6 +43,7 @@ import {
 import { sigmaLogsourceLabel } from "@/utils/security/sourceTypes";
 import { blockedReason, caveat } from "@/utils/security/sigma";
 import { useSigmaRules } from "@/composables/security/useSigmaRules";
+import { withRecentActivity } from "@/composables/security/streamActivity";
 import {
   addToSqlWhere,
   eventKey,
@@ -73,6 +74,7 @@ import {
   loadTaggedStreams,
   saveTaggedStreams,
   securityStreamNames,
+  widerPeriodFor,
   sourceHealth,
   type SourceHealth,
 } from "@/utils/security/streams";
@@ -272,7 +274,17 @@ const secStreamNames = computed(() =>
 const otherStreamNames = computed(() =>
   allStreamNames.value.filter((n) => !secStreamNames.value.includes(n)),
 );
-const streamStats = computed(() => new Map(streamList.value.map((s) => [String(s.name), s.stats])));
+/** Stats re-read from the data for sources the stream stats have not caught up on. */
+const freshStats = ref<Map<string, any>>(new Map());
+const streamStats = computed(
+  () =>
+    new Map(
+      streamList.value.map((s) => [
+        String(s.name),
+        freshStats.value.get(String(s.name)) ?? s.stats,
+      ]),
+    ),
+);
 
 const streamOptions = computed(() => {
   const opts: { label: string; value: string; header?: boolean }[] = [];
@@ -1049,15 +1061,30 @@ function syncUrl() {
 }
 
 // ── Loading ──────────────────────────────────────────────────────────────────
+let streamsSeq = 0;
 async function loadStreams() {
+  const seq = ++streamsSeq;
   streamsLoading.value = true;
+  // The previous load's checks describe the previous list.
+  freshStats.value = new Map();
   try {
     const res = await streamService.nameList(orgId.value, "logs", false);
-    streamList.value = res.data?.list ?? [];
+    const list = res.data?.list ?? [];
+    streamList.value = list;
     const wanted = initialState.stream;
     if (wanted && allStreamNames.value.includes(wanted)) selectedStream.value = wanted;
     else if (secStreamNames.value.length) selectedStream.value = secStreamNames.value[0];
     else if (allStreamNames.value.length) selectedStream.value = allStreamNames.value[0];
+    // In the background: the sidebar's health dots and counts, from the data
+    // itself where the stream stats lag ingestion.
+    withRecentActivity(orgId.value, list, secStreamNames.value)
+      .then((fresh) => {
+        if (seq !== streamsSeq) return;
+        freshStats.value = new Map(fresh.map((s: any) => [String(s.name), s.stats]));
+      })
+      .catch(() => {});
+  } catch {
+    streamList.value = [];
   } finally {
     streamsLoading.value = false;
   }
@@ -1287,6 +1314,37 @@ const filtersActive = computed(
 );
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") clearFilters();
+  else if (widerPeriod.value) widenTo(widerPeriod.value);
+}
+
+// An empty result over a window the stream has simply not reported in yet is
+// not "no events": say when it last reported and offer the window that reaches it.
+const lastReportedUs = computed(() =>
+  Number(streamStats.value.get(selectedStream.value ?? "")?.doc_time_max ?? 0),
+);
+const widerPeriod = computed(() =>
+  // A filter or a hand-written query can empty the page on its own; the stream's
+  // last event says nothing about either.
+  filtersActive.value || (sqlMode.value && sqlQuery.value.trim())
+    ? null
+    : widerPeriodFor(lastReportedUs.value, timeRange.value.start),
+);
+const emptyHint = computed(() => {
+  if (!widerPeriod.value) return t("siem.events.noEventsHint");
+  const mins = Math.max(0, Math.round((Date.now() * 1000 - lastReportedUs.value) / 60_000_000));
+  const ago =
+    mins < 60
+      ? t("siem.detections.ago.minutes", { n: mins })
+      : mins < 1440
+        ? t("siem.detections.ago.hours", { n: Math.round(mins / 60) })
+        : t("siem.detections.ago.days", { n: Math.round(mins / 1440) });
+  return t("siem.events.noEventsLastReported", { stream: selectedStream.value, ago });
+});
+function widenTo(period: string) {
+  dateState.value = { type: "relative", period, absolute: null };
+  timeRange.value = rangeFor(dateState.value);
+  dateKey.value += 1;
+  void runSearch();
 }
 </script>
 
@@ -1979,8 +2037,13 @@ function onEmptyAction(id?: string) {
             size="block"
             icon="search-off"
             :title="t('siem.events.noEvents')"
-            :description="t('siem.events.noEventsHint')"
+            :description="emptyHint"
             :filtered="filtersActive"
+            :action-label="
+              widerPeriod ? t('siem.events.searchWider', { period: widerPeriod }) : undefined
+            "
+            action-icon="history"
+            data-test="security-events-empty"
             @action="onEmptyAction"
           />
         </template>

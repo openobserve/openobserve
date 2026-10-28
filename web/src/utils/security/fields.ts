@@ -21,6 +21,12 @@
 //
 // Mirrors `format_key` in src/config/src/utils/flatten.rs.
 
+/**
+ * How many levels of nesting ingest flattens into columns before storing the
+ * rest as JSON text: ZO_INGEST_FLATTEN_LEVEL, 3 unless the server overrides it.
+ */
+export const INGEST_FLATTEN_LEVEL = 3;
+
 /** A producer's field path as the ingested column name. */
 export function toColumnName(path: string): string {
   let out = "";
@@ -68,5 +74,23 @@ export class FieldIndex {
 
   has(path: string): boolean {
     return this.resolve(path) !== null;
+  }
+
+  /**
+   * A path that ingest did not flatten all the way. Past ZO_INGEST_FLATTEN_LEVEL
+   * (3 by default) the rest of an object is stored as JSON text in the deepest
+   * column it reached, so OCSF's `process.parent_process.file.path` lives in
+   * `process_parent_process_file` as `{"path": ...}`. Returns that column and
+   * the keys still to read inside it, in the producer's own spelling because
+   * JSON keys are not rewritten. Null when no prefix of the path is a column.
+   */
+  resolveNested(path: string): { column: string; keys: string[] } | null {
+    // Only the column at exactly the flatten depth holds a JSON remainder. A
+    // shallower column with a matching name is a plain value, and reading a
+    // path into it would claim a field the stream does not have.
+    const parts = path.split(".");
+    if (parts.length <= INGEST_FLATTEN_LEVEL) return null;
+    const column = this.resolve(parts.slice(0, INGEST_FLATTEN_LEVEL).join("."));
+    return column ? { column, keys: parts.slice(INGEST_FLATTEN_LEVEL) } : null;
   }
 }

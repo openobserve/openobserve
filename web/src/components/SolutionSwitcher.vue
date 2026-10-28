@@ -12,22 +12,29 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 const store = useStore();
 const router = useRouter();
 
 const mode = computed(() => store.state.solutionMode as "observability" | "security");
 
-const SOLUTIONS = [
+const SOLUTIONS: {
+  key: "observability" | "security";
+  label: string;
+  icon: IconName;
+  description: string;
+  route: string;
+}[] = [
   {
-    key: "observability" as const,
+    key: "observability",
     label: "Observability",
     icon: "monitor-heart",
     description: "Logs, metrics, traces, dashboards",
     route: "/",
   },
   {
-    key: "security" as const,
+    key: "security",
     label: "Security",
     icon: "verified-user",
     description: "SIEM · OCSF · Sigma rules",
@@ -84,7 +91,8 @@ function switchTo(solution: typeof SOLUTIONS[0]) {
         <OIcon
           v-if="solution.key === mode"
           name="task-alt"
-          style="width:14px;height:14px;color:var(--o2-accent,#6d5ce0);flex-shrink:0"
+          class="text-accent shrink-0"
+          style="width:14px;height:14px"
         />
       </div>
     </ODropdownItem>

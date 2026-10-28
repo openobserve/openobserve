@@ -7,8 +7,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      refused with the reason, never saved as a detection that silently never
      fires. -->
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -20,6 +21,7 @@ import OCode from "@/lib/core/Code/OCode.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -30,12 +32,14 @@ import { SOURCE_TYPE_BY_ID, sigmaLogsourceLabel } from "@/utils/security/sourceT
 import {
   blockedReason,
   caveat,
-  compileSigmaRule,
+  compileForSource,
+  matchesLogsource,
+  ocsfProfileFor,
   parseSigmaRule,
+  ruleAppliesTo,
   sigmaCatalog,
   type SigmaRule,
 } from "@/utils/security/sigma";
-import { KEYWORD_FIELDS, SIGMA_FIELD_MAPS } from "@/utils/security/sigma/catalog";
 import { buildDetectionAlert } from "@/utils/security/detection";
 import { severityTagValue, toneLabelKey, toneOfSigmaLevel } from "@/utils/security/severity";
 
@@ -130,14 +134,44 @@ const draftSource = computed(() => {
 const draftCompiled = computed(() => {
   const rule = draftRule.value;
   if (!rule || !streamFields.value.length || fieldsStream.value !== pickedStream.value) return null;
-  const sourceId = draftSource.value?.id ?? "";
-  return compileSigmaRule(rule, {
-    fieldMap: SIGMA_FIELD_MAPS[sourceId],
-    availableFields: streamFields.value,
-    keywordFields:
-      KEYWORD_FIELDS[sourceId] ??
-      ["message", "log"].filter((f) => streamFields.value.some((name) => name.toLowerCase() === f)),
+  // The same compile the catalog uses, so a pasted SigmaHQ rule gets the
+  // source's field map, and on OCSF data the OCSF bridge and its class guard.
+  return compileForSource(rule, draftSource.value, streamFields.value);
+});
+
+/**
+ * A rule written for a different kind of log than the picked stream. It may
+ * still compile on shared field names, so this warns rather than blocks.
+ */
+const logsourceMismatch = computed(() => {
+  const rule = draftRule.value;
+  const source = draftSource.value;
+  if (!rule || !source || ruleAppliesTo(rule, source)) return "";
+  return t("siem.detections.logsourceMismatch", {
+    rule: sigmaLogsourceLabel(rule.logsource),
+    stream: pickedStream.value,
+    source: source.label,
   });
+});
+
+/** Set when an OCSF stream runs the rule through the OCSF bridge. */
+const ocsfBridge = computed(() => {
+  const rule = draftRule.value;
+  if (!rule || draftSource.value?.id !== "ocsf_native") return null;
+  // Rules written for OCSF itself need no bridge.
+  if (matchesLogsource(rule, draftSource.value.sigma)) return null;
+  return ocsfProfileFor(rule);
+});
+
+/** The bridge's whole guard, in words: class, and activity or product when set. */
+const ocsfBridgeText = computed(() => {
+  const profile = ocsfBridge.value;
+  if (!profile) return "";
+  const guard = [t("siem.detections.ocsfGuard.class", { uid: profile.classUid })];
+  if (profile.activityId !== undefined)
+    guard.push(t("siem.detections.ocsfGuard.activity", { id: profile.activityId }));
+  if (profile.product) guard.push(t("siem.detections.ocsfGuard.product", { name: profile.product }));
+  return t("siem.detections.ocsfBridge", { stream: pickedStream.value, guard: guard.join(", ") });
 });
 
 /**
@@ -201,7 +235,11 @@ async function loadStreams() {
   }
 }
 
+let destinationsSeq = 0;
 async function loadDestinations() {
+  // Focus and the Refresh button can overlap; only the latest answer lands, and
+  // a failed refresh keeps the list that last loaded.
+  const seq = ++destinationsSeq;
   try {
     const res = await destinationService.list({
       org_identifier: props.orgId,
@@ -211,6 +249,7 @@ async function loadDestinations() {
       desc: false,
       module: "alert",
     });
+    if (seq !== destinationsSeq) return;
     const list = res.data?.list ?? res.data ?? [];
     destinations.value = (Array.isArray(list) ? list : []).map((d: any) => String(d.name));
     // One destination is the common case; pre-picking it saves a click without
@@ -219,9 +258,9 @@ async function loadDestinations() {
       pickedDestinations.value = [...destinations.value];
     }
   } catch {
-    destinations.value = [];
+    if (seq === destinationsSeq && !destinationsLoaded.value) destinations.value = [];
   } finally {
-    destinationsLoaded.value = true;
+    if (seq === destinationsSeq) destinationsLoaded.value = true;
   }
 }
 
@@ -250,6 +289,23 @@ watch(pickedStream, (name) => {
   void loadStreamFields(name);
 });
 
+// A fresh install has no destination, and the alerts API will not save a
+// detection without one. The analyst creates it in a new tab; coming back to
+// this one re-reads the list, so the dialog never has to be closed and redone.
+const router = useRouter();
+function createDestination() {
+  const { href } = router.resolve({
+    name: "alertDestinations",
+    query: { org_identifier: props.orgId, action: "add" },
+  });
+  window.open(href, "_blank", "noopener");
+}
+const onFocus = () => {
+  if (props.open && destinationsLoaded.value && !destinations.value.length) void loadDestinations();
+};
+window.addEventListener("focus", onFocus);
+onUnmounted(() => window.removeEventListener("focus", onFocus));
+
 // Everything is (re)loaded on open, so a destination created meanwhile shows up.
 watch(
   () => props.open,
@@ -262,6 +318,16 @@ watch(
       mode.value = "library";
       pickedRuleId.value = preset.sigmaId;
       catalogFilter.value = "";
+      // The rule picked from Content may sit below the fold of the list.
+      // The dialog may still be rendering, so look for a few frames.
+      const id = preset.sigmaId;
+      const selector = `[data-test="security-detections-new-rule-${CSS.escape(id)}"]`;
+      const reveal = (tries: number) => {
+        const row = document.querySelector(selector);
+        if (row) row.scrollIntoView({ block: "nearest" });
+        else if (tries > 0) requestAnimationFrame(() => reveal(tries - 1));
+      };
+      void nextTick(() => reveal(30));
     }
     presetStream = preset?.stream ?? "";
     presetSource.value =
@@ -435,6 +501,25 @@ const toNumber = (v: string | number) => {
         data-test="security-detections-new-no-destination"
       >
         {{ t("siem.detections.noDestinations") }}
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-right="open-in-new"
+            :aria-label="t('siem.detections.createDestinationAria')"
+            data-test="security-detections-new-create-destination"
+            @click="createDestination"
+            >{{ t("siem.detections.createDestination") }}</OButton
+          >
+          <OButton
+            variant="ghost"
+            size="sm"
+            icon-left="refresh"
+            data-test="security-detections-new-reload-destinations"
+            @click="loadDestinations"
+            >{{ t("siem.detections.reloadDestinations") }}</OButton
+          >
+        </template>
       </OBanner>
 
       <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -466,6 +551,25 @@ const toNumber = (v: string | number) => {
           @update:model-value="(v: string | number) => (silence = toNumber(v))"
         />
       </div>
+
+      <OBanner
+        v-if="logsourceMismatch"
+        variant="warning"
+        icon="warning-amber"
+        dense
+        data-test="security-detections-new-logsource-mismatch"
+      >
+        {{ logsourceMismatch }}
+      </OBanner>
+      <OBanner
+        v-else-if="ocsfBridge && draftCompiled?.runnable"
+        variant="info"
+        icon="info-outline"
+        dense
+        data-test="security-detections-new-ocsf-bridge"
+      >
+        {{ ocsfBridgeText }}
+      </OBanner>
 
       <!-- Whether it will run, decided before anything is saved -->
       <OBanner

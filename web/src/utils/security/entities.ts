@@ -15,6 +15,7 @@
 import type { SourceType } from "./sourceTypes";
 import { FieldIndex } from "./fields";
 import { failurePredicate, outcomeInterpretable } from "./outcome";
+import { quoteString } from "./sql";
 
 export type EntityKind = "user" | "ip" | "host";
 export const ENTITY_KINDS: EntityKind[] = ["user", "ip", "host"];
@@ -64,7 +65,7 @@ export interface StreamPlan {
 }
 
 export const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
-export const quoteString = (value: string) => `'${value.replace(/'/g, "''")}'`;
+export { quoteString };
 
 function resolveFirst(index: FieldIndex, paths: string[] | undefined): string | null {
   for (const path of paths ?? []) {
@@ -105,6 +106,18 @@ export function planStream(
       failure: presence
         .map((c) => `(${quoteIdent(c)} IS NOT NULL AND CAST(${quoteIdent(c)} AS VARCHAR) != '')`)
         .join(" OR "),
+    };
+  }
+  // An OCSF status_id is an enum, so it needs no sampling: 2 is Failure.
+  const ocsfStatus = resolveFirst(index, source?.ocsfStatusFields);
+  if (ocsfStatus) {
+    return {
+      stream,
+      sourceLabel: source?.label ?? null,
+      columns,
+      outcomeColumn: null,
+      // Through DOUBLE so an integer, a float column (2.0) and the text "2" all match.
+      failure: `TRY_CAST(${quoteIdent(ocsfStatus)} AS DOUBLE) = 2`,
     };
   }
   const outcomeColumn =

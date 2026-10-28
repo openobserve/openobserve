@@ -1174,15 +1174,26 @@ tags:
  * no entry, and the compiler falls back to a case-insensitive column match.
  */
 export const SIGMA_FIELD_MAPS: Record<string, Record<string, string>> = {
+  // Targets offer `a|b`: whichever column the access log really has. The full
+  // request line (`GET /x HTTP/1.1`) is not a URI, so it is never a target:
+  // equality and endswith would silently never match it. The query fields try
+  // the columns that carry the query string first and fall back to the path,
+  // which in most shippers' JSON nginx/Apache formats is $request_uri, query
+  // string included.
   webserver_access: {
-    "c-uri": "path",
-    "cs-uri": "path",
-    "cs-uri-stem": "path",
-    "cs-method": "method",
-    "sc-status": "status",
-    "c-ip": "remote_addr",
-    "cs-host": "host",
-    "cs-user-agent": "user_agent",
+    "c-uri": "path|uri|request_uri|url",
+    "cs-uri": "path|uri|request_uri|url",
+    "cs-uri-stem": "path|uri|request_uri|url",
+    "cs-uri-query": "query_string|args|request_uri|path|uri|url",
+    "c-uri-query": "query_string|args|request_uri|path|uri|url",
+    "cs-method": "method|request_method|verb",
+    "sc-status": "status|status_code|response_code",
+    "c-ip": "remote_addr|client_ip|src_ip",
+    "cs-host": "host|server_name",
+    "cs-user-agent": "user_agent|http_user_agent",
+    "c-useragent": "user_agent|http_user_agent",
+    "cs-referer": "referer|http_referer",
+    "cs-username": "remote_user|user",
   },
   dns_query: {
     query: "query",
@@ -1197,6 +1208,9 @@ export const SIGMA_FIELD_MAPS: Record<string, Record<string, string>> = {
 
 /** The columns a bare-string search looks in, per source type. */
 export const KEYWORD_FIELDS: Record<string, string[]> = {
+  // A web log's free text is its request line.
+  webserver_access: ["path", "uri", "request_uri", "url", "request", "message"],
+  proxy_access: ["url", "uri", "path", "request", "message"],
   linux_auth: ["message"],
   syslog_generic: ["message"],
   application_log: ["message"],

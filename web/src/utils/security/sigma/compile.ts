@@ -31,6 +31,7 @@ import type { SigmaRule, SigmaSearch } from "./types";
 import type { ConditionNode } from "./condition";
 import { expandPattern, parseCondition } from "./condition";
 import { FieldIndex } from "../fields";
+import { quoteString } from "../sql";
 
 export interface CompileOptions {
   /** Sigma field name to stream column, for sources that spell things differently. */
@@ -39,6 +40,12 @@ export interface CompileOptions {
   availableFields?: string[];
   /** Columns a bare-string (keyword) search looks in. */
   keywordFields?: string[];
+  /**
+   * Only fields the map names exist. Set when a rule runs on data in another
+   * schema (OCSF): a Sigma name that happens to equal one of its columns
+   * (`status`, `type`, `message`) means something else there.
+   */
+  strictFieldMap?: boolean;
 }
 
 export interface CompiledSigma {
@@ -88,10 +95,11 @@ const SUPPORTED_MODIFIERS = new Set([
   "gte",
   "exists",
   "windash",
+  "fieldref",
+  "base64offset",
 ]);
 
 const quoteIdent = (field: string) => `"${field.replace(/"/g, '""')}"`;
-const quoteString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 /** `%` and `_` are LIKE metacharacters; a literal one has to be escaped. */
 const escapeLikeLiteral = (char: string) =>
@@ -161,27 +169,67 @@ function windashVariants(value: string): string[] {
 }
 
 /**
- * A CIDR block as a string prefix.
+ * An IPv4 CIDR block as a predicate on the address text.
  *
- * Only the byte-aligned masks compile, because those are the ones where "is this
- * address in this block" is the same question as "does this text start with this
- * prefix". Anything else needs real address arithmetic and is refused rather
- * than approximated, since an approximate network match is a wrong one.
+ * The whole octets the mask keeps are a string prefix; a mask that ends inside
+ * an octet adds a numeric range on that octet, so /17 or /22 is exact rather
+ * than rounded to the nearest byte. IPv6 is refused: its text form can be
+ * compressed several ways, so no prefix of the text is a prefix of the address.
  */
-function cidrPrefix(value: string): string | null {
-  const [address, bitsText] = value.split("/");
+function cidrPredicate(identifier: string, value: string): string | null {
+  const [address, bitsText, extra] = value.split("/");
   const bits = Number(bitsText);
-  if (!address || !Number.isInteger(bits)) return null;
-  if (address.includes(":")) return null; // IPv6 text form is not prefix-comparable
-  const octets = address.split(".");
-  if (octets.length !== 4 || bits % 8 !== 0 || bits < 8 || bits > 32) return null;
-  const kept = octets.slice(0, bits / 8);
-  return bits === 32 ? kept.join(".") : `${kept.join(".")}.`;
+  if (!address || extra !== undefined || !Number.isInteger(bits)) return null;
+  if (address.includes(":")) return null;
+  const octets = address.split(".").map((octet) => (/^\d{1,3}$/.test(octet) ? Number(octet) : NaN));
+  if (octets.length !== 4 || octets.some((o) => !(o >= 0 && o <= 255))) return null;
+  if (bits < 0 || bits > 32) return null;
+
+  // Dotted-quad shape, so `10.example.com` is not in 10.0.0.0/8 and an IPv6
+  // address is in no IPv4 block.
+  const shape = `re_match(CAST(${identifier} AS VARCHAR), '^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')`;
+  if (bits === 0) return shape;
+  const whole = Math.floor(bits / 8);
+  const rest = bits % 8;
+  const kept = octets.slice(0, whole).join(".");
+  if (whole === 4) return `${identifier} = ${quoteString(kept)}`;
+  const parts = [shape];
+  if (whole) parts.push(`${identifier} LIKE ${quoteString(`${kept}.%`)}`);
+  if (rest) {
+    const low = octets[whole] & (0xff << (8 - rest)) & 0xff;
+    const high = low + (1 << (8 - rest)) - 1;
+    const octet = `TRY_CAST(split_part(CAST(${identifier} AS VARCHAR), '.', ${whole + 1}) AS INT)`;
+    parts.push(`${octet} BETWEEN ${low} AND ${high}`);
+  }
+  return `(${parts.join(" AND ")})`;
 }
 
+/**
+ * The three base64 encodings of a value, one per byte offset it could start at
+ * inside a longer encoded string, trimmed to the characters that do not depend
+ * on the neighbouring bytes. Same derivation as pySigma's base64offset.
+ */
+function base64OffsetVariants(value: string): string[] {
+  const bytes = Array.from(new TextEncoder().encode(value));
+  const encode = (data: number[]) => btoa(String.fromCharCode(...data));
+  const starts = [0, 2, 3];
+  const ends = [0, -3, -2];
+  return [0, 1, 2].map((offset) => {
+    const encoded = encode([...Array(offset).fill(0x20), ...bytes]);
+    const end = ends[(bytes.length + offset) % 3];
+    return encoded.slice(starts[offset], end || undefined);
+  });
+}
+
+/** A column read as a number whatever its stored type; text that is not one is NULL. */
+const asNumber = (identifier: string) => `TRY_CAST(${identifier} AS DOUBLE)`;
+
 interface FieldResolution {
+  /** The stream column the value is read from. */
   column: string;
   known: boolean;
+  /** The SQL that reads the value: the column, or a JSON read into it. */
+  sql: string;
 }
 
 class Compiler {
@@ -193,8 +241,10 @@ class Compiler {
   private readonly available: FieldIndex | null;
   private readonly fieldMap: Record<string, string>;
   private readonly keywordFields: string[];
+  private readonly strict: boolean;
 
   constructor(options: CompileOptions) {
+    this.strict = !!options.strictFieldMap;
     this.fieldMap = options.fieldMap ?? {};
     this.keywordFields = options.keywordFields ?? [];
     this.available = options.availableFields ? new FieldIndex(options.availableFields) : null;
@@ -210,12 +260,28 @@ class Compiler {
    */
   resolveField(name: string): FieldResolution {
     const mapped = this.fieldMap[name] ?? this.fieldMap[name.toLowerCase()];
-    const candidate = mapped ?? name;
-    if (!this.available) return { column: candidate, known: true };
-    const column = this.available.resolve(candidate);
-    if (column) return { column, known: true };
-    this.assumedAbsent.add(candidate);
-    return { column: candidate, known: false };
+    const plain = (column: string, known: boolean) => ({ column, known, sql: quoteIdent(column) });
+    if (this.strict && mapped === undefined) {
+      this.assumedAbsent.add(name);
+      return plain(name, false);
+    }
+    // A mapping may offer `a|b`: whichever spelling the stream actually has.
+    const candidates = (mapped ?? name).split("|");
+    if (!this.available) return plain(candidates[0], true);
+    for (const candidate of candidates) {
+      const column = this.available.resolve(candidate);
+      if (column) return plain(column, true);
+    }
+    // Deeper than ingest flattens: read it out of the JSON column it stopped at.
+    for (const candidate of candidates) {
+      const nested = this.available.resolveNested(candidate);
+      if (!nested) continue;
+      const keys = nested.keys.map(quoteString).join(", ");
+      // json_as_text, not json_get_str: the latter is NULL for numbers and booleans.
+      return { column: nested.column, known: true, sql: `json_as_text(${quoteIdent(nested.column)}, ${keys})` };
+    }
+    this.assumedAbsent.add(candidates[0]);
+    return plain(candidates[0], false);
   }
 
   /** One `field|modifiers: value` entry. */
@@ -230,15 +296,30 @@ class Compiler {
       }
     }
 
-    const { column, known } = this.resolveField(name);
+    const { column, known, sql } = this.resolveField(name);
     if (!known) return this.absentField(modifiers, value);
     this.fields.add(column);
-    const identifier = quoteIdent(column);
+    const identifier = sql;
 
     if (modifiers.has("exists")) {
       return value === false || value === "false"
         ? `${identifier} IS NULL`
         : `${identifier} IS NOT NULL`;
+    }
+
+    if (modifiers.has("fieldref")) {
+      if (modifiers.size > 1) {
+        this.unsupported.add("fieldref combined with another modifier");
+        return null;
+      }
+      const refs = (Array.isArray(value) ? value : [value]).map((entry) => {
+        const target = this.resolveField(String(entry));
+        // A field the stream lacks holds no value, so nothing equals it.
+        if (!target.known) return FALSE;
+        this.fields.add(target.column);
+        return `CAST(${identifier} AS VARCHAR) = CAST(${target.sql} AS VARCHAR)`;
+      });
+      return joinClauses(refs, "OR");
     }
 
     // A list is OR by default; `all` is the modifier that makes it AND, which is
@@ -285,12 +366,24 @@ class Compiler {
     }
 
     if (modifiers.has("cidr")) {
-      const prefix = cidrPrefix(String(value));
-      if (prefix === null) {
+      const predicate = cidrPredicate(identifier, String(value));
+      if (predicate === null) {
         this.unsupported.add(`cidr: ${String(value)}`);
         return null;
       }
-      return `${identifier} LIKE ${quoteString(`${prefix.replace(/([%_\\])/g, "\\$1")}%`)}`;
+      return predicate;
+    }
+
+    if (modifiers.has("base64offset")) {
+      if (!modifiers.has("contains")) {
+        this.unsupported.add("base64offset without contains");
+        return null;
+      }
+      const variants = base64OffsetVariants(String(value)).map(
+        // Base64 is case-sensitive, so these compare exactly.
+        (variant) => `${identifier} LIKE ${quoteString(`%${toLikePattern(variant).pattern}%`)}`,
+      );
+      return joinClauses(variants, "OR");
     }
 
     for (const [modifier, operator] of [
@@ -305,15 +398,22 @@ class Compiler {
         this.unsupported.add(`${modifier} on a non-numeric value`);
         return null;
       }
-      return `${identifier} ${operator} ${numeric}`;
+      return `${asNumber(identifier)} ${operator} ${numeric}`;
     }
 
     if (typeof value === "boolean") return `${identifier} = ${value}`;
-    // A bare number compares numerically. Wrapping it in lower() would ask
-    // DataFusion to run a string function on an integer column, which errors.
-    if (typeof value === "number") return `${identifier} = ${value}`;
+    // A bare number compares numerically, through TRY_CAST because the column
+    // may hold it as text (an EventID or port shipped as a string). A bare
+    // `col = 2` on a text column is a cast error, and lower() on an integer
+    // column is a function error, so neither spelling is safe on its own.
+    // A string modifier means the number is text to look for: `contains: 1337`.
+    const textual = ["contains", "startswith", "endswith", "windash"].some((m) => modifiers.has(m));
+    if (typeof value === "number" && !textual) return `${asNumber(identifier)} = ${value}`;
 
     const text = String(value);
+    // A number under a string modifier is text to find; lower() on an integer
+    // column is a function error, so the column is read as text first.
+    if (typeof value === "number") identifier = `CAST(${identifier} AS VARCHAR)`;
     if (modifiers.has("windash")) {
       const parts = windashVariants(text).map((variant) =>
         this.stringComparison(identifier, modifiers, variant),
@@ -344,9 +444,18 @@ class Compiler {
       return null;
     }
     const { pattern } = toLikePattern(String(value));
-    const parts = this.keywordFields.map((field) => {
-      const { column, known } = this.resolveField(field);
-      if (!known) return FALSE;
+    // Keyword columns are the stream's own free text, not Sigma fields: they are
+    // looked up directly (never through a field map, so the OCSF bridge does not
+    // refuse them), and a candidate the stream lacks is skipped, not reported as
+    // an assumption, because the list is a set of guesses by design.
+    const columns = this.keywordFields
+      .map((field) => (this.available ? this.available.resolve(field) : field))
+      .filter((column, i, all): column is string => !!column && all.indexOf(column) === i);
+    if (!columns.length) {
+      this.unsupported.add("keyword search (stream has no full-text field)");
+      return null;
+    }
+    const parts = columns.map((column) => {
       this.fields.add(column);
       return `lower(${quoteIdent(column)}) LIKE ${quoteString(`%${pattern}%`.toLowerCase())}`;
     });

@@ -8,7 +8,7 @@
 // viewing preference, not configuration, so it does not need a backend store.
 
 export const SECURITY_STREAM_RE =
-  /security|audit|siem|event|login|auth|access|cloudtrail|okta|firewall|vpc|cdc/i;
+  /security|audit|siem|event|login|auth|access|cloudtrail|okta|firewall|vpc|cdc|ocsf|sysmon|edr|waf|guardduty/i;
 
 const taggedKey = (orgId: string) => `oo_sec_streams_${orgId}`;
 
@@ -55,3 +55,27 @@ export function sourceHealth(
   if (!docs || !last) return "never";
   return nowUs - last > QUIET_AFTER_US ? "quiet" : "live";
 }
+
+/** Relative windows the Events page offers when the current one is empty. */
+const WIDER_PERIODS: [string, number][] = [
+  ["1h", 3_600_000_000],
+  ["24h", 24 * 3_600_000_000],
+  ["7d", 7 * 24 * 3_600_000_000],
+  ["30d", 30 * 24 * 3_600_000_000],
+];
+
+/**
+ * The smallest relative window that reaches a stream's last event, when the
+ * window being searched does not. An empty page then says "this source last
+ * reported 3h ago" with a one-click way there, instead of looking broken.
+ */
+export function widerPeriodFor(
+  lastUs: number | null | undefined,
+  windowStartUs: number,
+  nowUs: number = Date.now() * 1000,
+): string | null {
+  const last = Number(lastUs ?? 0);
+  if (!last || last >= windowStartUs) return null;
+  return WIDER_PERIODS.find(([, span]) => nowUs - span <= last)?.[0] ?? null;
+}
+

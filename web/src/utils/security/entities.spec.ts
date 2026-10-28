@@ -30,6 +30,18 @@ const ctFields = [
 const authFields = ["_timestamp", "user", "src_ip", "host", "outcome", "level", "message"];
 
 describe("planStream", () => {
+  it("reads an OCSF status_id as the enum it is, with no sampling", () => {
+    const ocsf = SOURCE_TYPE_BY_ID.get("ocsf_native")!;
+    const plan = planStream(
+      "ocsf",
+      ["_timestamp", "class_uid", "status_id", "actor_user_name", "src_endpoint_ip"],
+      ocsf,
+    );
+    expect(plan.outcomeColumn).toBeNull();
+    expect(plan.failure).toBe(`TRY_CAST("status_id" AS DOUBLE) = 2`);
+    expect(plan.columns.user).toBe("actor_user_name");
+  });
+
   it("reads entity columns from the source's field map", () => {
     const plan = planStream("ct", ctFields, cloudtrail);
     expect(plan.columns.user).toBe("useridentity_username");

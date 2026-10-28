@@ -61,6 +61,21 @@ describe("capabilities", () => {
     expect(capabilitiesOf(source({ security: false }))).toEqual([]);
     expect(capabilitiesOf(source({ sourceId: null }))).toEqual([]);
   });
+
+  it("reads an OCSF-native source's capabilities from the classes it carries", () => {
+    const ocsf = (classes?: number[]) =>
+      capabilitiesOf(source({ sourceId: "ocsf_native", ocsfClasses: classes }));
+    // Classes not read yet: nothing is claimed.
+    expect(ocsf()).toEqual([]);
+    expect(ocsf([3002]).sort()).toEqual(["authentication"]);
+    expect(ocsf([3002, 3001, 4001, 1007]).sort()).toEqual(
+      ["admin", "authentication", "endpoint", "network"],
+    );
+    expect(ocsf([6003]).sort()).toEqual(["admin", "cloud"]);
+    // Findings are verdicts, not activity; an extension class keeps its base.
+    expect(ocsf([2004])).toEqual([]);
+    expect(ocsf([201001])).toEqual(["endpoint"]);
+  });
 });
 
 describe("evaluateRequirement", () => {

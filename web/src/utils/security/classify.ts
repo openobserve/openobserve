@@ -15,7 +15,7 @@
 
 import type { SourceType, ValueSignal } from "./sourceTypes";
 import { SOURCE_TYPES } from "./sourceTypes";
-import { FieldIndex, toColumnName } from "./fields";
+import { FieldIndex, INGEST_FLATTEN_LEVEL, toColumnName } from "./fields";
 
 export interface Classification {
   source: SourceType;
@@ -51,10 +51,31 @@ export function readPath(row: Record<string, unknown> | null | undefined, path: 
 
   let node: unknown = row;
   for (const part of path.split(".")) {
-    if (node == null || typeof node !== "object") return undefined;
+    if (node == null || typeof node !== "object") return readFlattenedJson(row, path);
     node = (node as Record<string, unknown>)[part];
   }
-  return node;
+  return node === undefined ? readFlattenedJson(row, path) : node;
+}
+
+/**
+ * A path deeper than ingest flattened: the remainder sits as JSON text in the
+ * deepest column it reached (`process_parent_process_file` = `{"path": ...}`).
+ */
+function readFlattenedJson(row: Record<string, unknown>, path: string): unknown {
+  const parts = path.split(".");
+  if (parts.length <= INGEST_FLATTEN_LEVEL) return undefined;
+  const text = row[toColumnName(parts.slice(0, INGEST_FLATTEN_LEVEL).join("."))];
+  if (typeof text !== "string" || !text.startsWith("{")) return undefined;
+  try {
+    let node: unknown = JSON.parse(text);
+    for (const key of parts.slice(INGEST_FLATTEN_LEVEL)) {
+      if (node == null || typeof node !== "object") return undefined;
+      node = (node as Record<string, unknown>)[key];
+    }
+    return node;
+  } catch {
+    return undefined;
+  }
 }
 
 const isPresent = (value: unknown) =>

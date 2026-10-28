@@ -13,7 +13,7 @@
 // at an actor or a source IP is worse than one that admits it does not know.
 
 import type { NormalizedEvent } from "./ocsf";
-import { ocsfClass, toOcsfSeverity, toOcsfStatus } from "./ocsf";
+import { fromOcsfStatusId, ocsfClass, toOcsfSeverity, toOcsfStatus } from "./ocsf";
 import type { SourceType } from "./sourceTypes";
 import { readPath } from "./classify";
 import { FieldIndex } from "./fields";
@@ -86,11 +86,14 @@ export function normalizeEvent(
   // A source that reports failure by attaching an error says nothing at all on
   // the happy path, so absence is the success signal.
   const failureFields = source?.failureWhenPresent;
+  const ocsfStatus = firstOf(raw, source?.ocsfStatusFields);
   const statusId = failureFields
     ? isPresent(firstOf(raw, failureFields))
       ? 2
       : 1
-    : toOcsfStatus(firstOf(raw, map.statusId as string[]));
+    : isPresent(ocsfStatus)
+      ? fromOcsfStatusId(ocsfStatus)
+      : toOcsfStatus(firstOf(raw, map.statusId as string[]));
   const severityId = isPresent(rawSeverity)
     ? toOcsfSeverity(rawSeverity)
     : severityFromOutcome(statusId, classUid);

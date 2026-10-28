@@ -38,6 +38,12 @@ export interface SourceType {
    * this is what decides which of the corpus can run against the stream.
    */
   sigma: { category?: string; product?: string; service?: string };
+  /**
+   * Other logsources this source also satisfies. SigmaHQ files sshd rules under
+   * `service: sshd` and Kubernetes audit rules under `category: application`,
+   * so one triple per source would leave those rules unreachable.
+   */
+  sigmaAliases?: { category?: string; product?: string; service?: string }[];
   /** OCSF class events from this source are mapped onto. */
   ocsfClass: number;
   /** Every one of these must be present. `a|b` accepts either spelling. */
@@ -64,6 +70,12 @@ export interface SourceType {
    * its value ("AccessDenied") is a reason, not a verdict.
    */
   failureWhenPresent?: string[];
+  /**
+   * Fields that already hold an OCSF status_id (1 Success, 2 Failure, 99 Other).
+   * They are read as that enum, never as a word or an HTTP code: to the generic
+   * reader a bare 2 is neither, so OCSF failures would otherwise vanish.
+   */
+  ocsfStatusFields?: string[];
   /** True for sources that carry no security semantics of their own. */
   telemetryOnly?: boolean;
 }
@@ -81,6 +93,7 @@ export const SOURCE_TYPES: SourceType[] = [
     required: ["class_uid"],
     signals: ["severity_id", "activity_id", "metadata.version", "actor.user.name", "class_name"],
     weight: 1.3,
+    ocsfStatusFields: ["status_id"],
     map: {
       time: TIME,
       classUid: ["class_uid"],
@@ -94,13 +107,28 @@ export const SOURCE_TYPES: SourceType[] = [
       srcPort: ["src_endpoint.port"],
       dstIp: ["dst_endpoint.ip"],
       dstPort: ["dst_endpoint.port"],
-      host: ["device.hostname", "device.name"],
-      process: ["actor.process.name", "process.name"],
+      host: ["device.hostname", "device.name", "http_request.url.hostname"],
+      process: ["process.file.name", "process.name", "actor.process.name", "actor.process.file.name"],
       product: ["metadata.product.name"],
       vendor: ["metadata.product.vendor_name", "metadata.product.vendor"],
-      operation: ["api.operation", "activity_name"],
-      resource: ["resource.name", "api.service.name"],
-      message: ["message", "raw_data"],
+      operation: ["api.operation", "http_request.http_method", "activity_name"],
+      // The object each class acts on: a resource, URL, DNS name, file or command.
+      resource: [
+        "resource.name",
+        "api.service.name",
+        "http_request.url.path",
+        "query.hostname",
+        "file.path",
+        "process.file.path",
+      ],
+      message: [
+        "message",
+        "finding_info.title",
+        "process.cmd_line",
+        "http_request.url.url_string",
+        "query.hostname",
+        "raw_data",
+      ],
     },
   },
 
@@ -248,6 +276,7 @@ export const SOURCE_TYPES: SourceType[] = [
     label: "Kubernetes audit",
     vendor: "Kubernetes",
     sigma: { product: "kubernetes", service: "audit" },
+    sigmaAliases: [{ category: "application", product: "kubernetes", service: "audit" }],
     ocsfClass: 6003,
     required: ["verb", "objectRef.resource|objectRef.name"],
     signals: [
@@ -412,6 +441,10 @@ export const SOURCE_TYPES: SourceType[] = [
     label: "Linux authentication (sshd, sudo)",
     vendor: "Linux",
     sigma: { product: "linux", service: "auth" },
+    sigmaAliases: [
+      { product: "linux", service: "sshd" },
+      { product: "linux", service: "sudo" },
+    ],
     ocsfClass: 3002,
     required: ["message|msg"],
     signals: ["program", "SYSLOG_IDENTIFIER", "hostname", "facility", "unit", "_SYSTEMD_UNIT"],

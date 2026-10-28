@@ -25,6 +25,11 @@ export interface SourceSignal {
    * (of actor, time, outcome). Empty means all three map to real columns.
    */
   unmappedFields: NormalizedField[];
+  /**
+   * OCSF class uids the stream carries, for an OCSF-native source. Its classifier
+   * id says only "OCSF"; what it records is decided by the classes in it.
+   */
+  ocsfClasses?: number[];
 }
 
 export type NormalizedField = "actor" | "time" | "outcome";
@@ -80,8 +85,40 @@ export const SOURCE_CAPABILITIES: Record<string, Capability[]> = {
   ids_alert: ["network"],
 };
 
+/**
+ * What an OCSF class records, by class uid or, failing that, by category.
+ * Authentication and Authorize Session are sign-ins; Account Change, User Access
+ * and Group Management are admin changes; API Activity is a control plane.
+ * Findings (category 2) are a product's verdicts, not a record of activity.
+ */
+const OCSF_CLASS_CAPABILITIES: Record<number, Capability[]> = {
+  3001: ["admin"],
+  3002: ["authentication"],
+  3003: ["authentication"],
+  3004: ["admin"],
+  3005: ["admin"],
+  3006: ["admin"],
+  6003: ["admin", "cloud"],
+};
+const OCSF_CATEGORY_CAPABILITIES: Record<number, Capability[]> = {
+  1: ["endpoint"],
+  4: ["network"],
+};
+
+export function ocsfCapabilities(classUids: number[]): Capability[] {
+  const out = new Set<Capability>();
+  for (const uid of classUids) {
+    const base = uid > 100000 ? uid % 100000 : uid;
+    const caps =
+      OCSF_CLASS_CAPABILITIES[base] ?? OCSF_CATEGORY_CAPABILITIES[Math.floor(base / 1000)] ?? [];
+    caps.forEach((cap) => out.add(cap));
+  }
+  return [...out];
+}
+
 export function capabilitiesOf(source: SourceSignal): Capability[] {
   if (!source.security || !source.sourceId) return [];
+  if (source.sourceId === "ocsf_native") return ocsfCapabilities(source.ocsfClasses ?? []);
   return SOURCE_CAPABILITIES[source.sourceId] ?? [];
 }
 

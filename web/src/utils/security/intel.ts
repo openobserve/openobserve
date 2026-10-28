@@ -11,6 +11,8 @@
 // columns that can carry it, with batched IN lists. No fuzzy or suffix match —
 // a sighting shown here is a value that literally appeared in an event.
 
+import { quoteString } from "./sql";
+
 export const INDICATOR_TYPES = ["ip", "cidr", "domain", "url", "hash", "email"] as const;
 export type IndicatorType = (typeof INDICATOR_TYPES)[number];
 
@@ -462,7 +464,6 @@ export function candidateColumns(
 const CASE_FOLDED: SweepType[] = ["ip", "domain", "hash", "email"];
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
-const quoteString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 /** Server caps an IN list well above this; batches keep each query modest. */
 export const SWEEP_BATCH = 400;

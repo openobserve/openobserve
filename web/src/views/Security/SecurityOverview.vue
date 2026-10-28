@@ -31,6 +31,7 @@ import incidentsService, { type Incident } from "@/services/incidents";
 import streamService from "@/services/stream";
 import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
+import { withRecentActivity } from "@/composables/security/streamActivity";
 import { bucketMsFor, bucketize, isFiring, type HistoryRow } from "@/utils/security/history";
 import { firingKey } from "@/utils/security/firings";
 import { tacticCoverage } from "@/utils/security/mitre";
@@ -146,15 +147,29 @@ async function fetchCases(seq: number) {
   }
 }
 
+let streamsSeq = 0;
 async function fetchStreams() {
+  const seq = ++streamsSeq;
   streamsLoading.value = true;
   try {
     const res = await streamService.nameList(orgId.value, "logs", false);
-    streams.value = res.data?.list ?? [];
-  } catch {
-    streams.value = [];
-  } finally {
+    // A newer load owns the list; this one only writes while it is the latest.
+    if (seq !== streamsSeq) return;
+    const list = res.data?.list ?? [];
+    streams.value = list;
+    // The panel can render now; the freshness check below only patches it.
     streamsLoading.value = false;
+    // Stats lag ingestion; a source that is receiving data must not read as silent.
+    const names = securityStreamNames(
+      list.map((s: any) => String(s.name)),
+      loadTaggedStreams(orgId.value),
+    );
+    const fresh = await withRecentActivity(orgId.value, list, names);
+    if (seq === streamsSeq) streams.value = fresh;
+  } catch {
+    if (seq === streamsSeq) streams.value = [];
+  } finally {
+    if (seq === streamsSeq) streamsLoading.value = false;
   }
 }
 

@@ -8,7 +8,7 @@ import { bestMatch } from "./classify";
 import type { DetectionRow } from "@/composables/security/useSiemDetections";
 import { isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { isFiring, type HistoryRow } from "./history";
-import { applicableRules, matchesLogsource, type CompiledSigma, type SigmaRule } from "./sigma";
+import { applicableRules, ruleAppliesTo, type CompiledSigma, type SigmaRule } from "./sigma";
 import {
   SOURCE_TYPES,
   SOURCE_TYPE_BY_ID,
@@ -53,12 +53,12 @@ export function sourcesForRule(
   rule: SigmaRule,
   sources: SourceType[] = SOURCE_TYPES,
 ): SourceType[] {
-  return sources.filter((source) => matchesLogsource(rule, source.sigma));
+  return sources.filter((source) => ruleAppliesTo(rule, source));
 }
 
 /** Rules written for a source type. */
 export function rulesForSource(source: SourceType, rules: SigmaRule[]): SigmaRule[] {
-  return rules.filter((rule) => matchesLogsource(rule, source.sigma));
+  return rules.filter((rule) => ruleAppliesTo(rule, source));
 }
 
 /** The org's streams a rule could run on, via the source types it applies to. */

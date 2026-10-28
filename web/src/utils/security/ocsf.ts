@@ -211,6 +211,13 @@ export function toOcsfStatus(value: unknown): number {
   return 99;
 }
 
+/** An OCSF status_id as stored (number or numeric string); 99 when it is not one. */
+export function fromOcsfStatusId(value: unknown): number {
+  if (value == null || value === "") return 0;
+  const id = Number(String(value).trim());
+  return id === 0 || id === 1 || id === 2 || id === 99 ? id : 99;
+}
+
 export function ocsfStatusName(id: number | undefined | null): string {
   return OCSF_STATUS.find((s) => s.id === Number(id ?? 0))?.name ?? "Unknown";
 }

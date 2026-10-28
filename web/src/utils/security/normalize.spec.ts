@@ -195,3 +195,30 @@ describe("buildFacets", () => {
     expect(buildFacets(events).severity[0].id).toBe(3);
   });
 });
+
+describe("OCSF-native status", () => {
+  const ocsf = SOURCE_TYPE_BY_ID.get("ocsf_native")!;
+  const row = (status_id: unknown, extra: Record<string, unknown> = {}) => ({
+    _timestamp: 1787065456851000,
+    class_uid: 3002,
+    severity_id: 3,
+    status_id,
+    ...extra,
+  });
+
+  it("reads status_id 2 as Failure and 1 as Success, as number or string", () => {
+    expect(normalizeEvent(row(2), ocsf).statusId).toBe(2);
+    expect(normalizeEvent(row("2"), ocsf).statusId).toBe(2);
+    expect(normalizeEvent(row(1), ocsf).statusId).toBe(1);
+    expect(normalizeEvent(row(99), ocsf).statusId).toBe(99);
+    expect(normalizeEvent(row(7), ocsf).statusId).toBe(99);
+  });
+
+  it("falls back to the status word when status_id is absent", () => {
+    const event = normalizeEvent(
+      { _timestamp: 1787065456851000, class_uid: 3002, status: "Failure" },
+      ocsf,
+    );
+    expect(event.statusId).toBe(2);
+  });
+});

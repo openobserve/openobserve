@@ -32,6 +32,8 @@ import SecurityRecordDrawer, {
 } from "@/components/security/SecurityRecordDrawer.vue";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
 import { fetchHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import { ocsfClassesIn, withRecentActivity } from "@/composables/security/streamActivity";
+import { runPool } from "@/composables/security/useSecurityStreamPlans";
 import incidentsService from "@/services/incidents";
 import config from "@/aws-exports";
 import streamService from "@/services/stream";
@@ -142,17 +144,68 @@ async function loadCaseCount() {
   }
 }
 
+/** OCSF class uids per OCSF-native stream, over the last week. */
+const ocsfClasses = ref<Map<string, number[]>>(new Map());
+let streamsSeq = 0;
 async function loadStreams() {
+  const seq = ++streamsSeq;
+  const org = orgId.value;
   streamsLoading.value = true;
   try {
     // One call carries schema (to identify each source), settings (retention) and stats.
-    const res = await streamService.nameList(orgId.value, "logs", true);
-    streams.value = res.data?.list ?? [];
+    const res = await streamService.nameList(org, "logs", true);
+    if (seq !== streamsSeq) return;
+    const list = res.data?.list ?? [];
+    streams.value = list;
+    ocsfClasses.value = new Map();
+    const names = securityStreamNames(
+      list.map((s: any) => String(s.name)),
+      loadTaggedStreams(org),
+    );
+    // Stats lag ingestion, and an OCSF stream says what it records only through
+    // the classes in it, so both are read from the data and patched in after.
+    const [fresh, classes] = await Promise.all([
+      withRecentActivity(org, list, names),
+      loadOcsfClasses(org, list, names),
+    ]);
+    if (seq !== streamsSeq) return;
+    streams.value = fresh;
+    ocsfClasses.value = classes;
   } catch {
-    streams.value = [];
+    if (seq === streamsSeq) streams.value = [];
   } finally {
-    streamsLoading.value = false;
+    if (seq === streamsSeq) streamsLoading.value = false;
   }
+}
+
+const OCSF_CLASS_WINDOW_US = 7 * 24 * 3_600_000_000;
+async function loadOcsfClasses(
+  org: string,
+  list: any[],
+  names: string[],
+): Promise<Map<string, number[]>> {
+  const wanted = new Set(names);
+  const ocsf = list
+    .filter((s) => wanted.has(String(s.name)))
+    .map((s) => {
+      const fields = (s.schema ?? []).map((f: any) => String(f.name));
+      const match = fields.length ? bestMatch(fields) : null;
+      return match?.source.id === "ocsf_native"
+        ? { name: String(s.name), column: match.matchedRequired[0] ?? "class_uid" }
+        : null;
+    })
+    .filter((x): x is { name: string; column: string } => !!x);
+  const endUs = Date.now() * 1000;
+  const settled = await runPool(
+    ocsf.map(
+      (s) => () => ocsfClassesIn(org, s.name, s.column, endUs - OCSF_CLASS_WINDOW_US, endUs),
+    ),
+  );
+  const out = new Map<string, number[]>();
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") out.set(ocsf[i].name, r.value);
+  });
+  return out;
 }
 
 let refreshSeq = 0;
@@ -193,6 +246,7 @@ const sources = computed<SourceSignal[]>(() => {
         store.state.zoConfig?.data_retention_days,
       ),
       unmappedFields: unmappedNormalizedFields(match?.source ?? null, fields),
+      ocsfClasses: ocsfClasses.value.get(name),
     };
   });
 });

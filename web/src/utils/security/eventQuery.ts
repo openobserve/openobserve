@@ -5,6 +5,7 @@
 
 import { toOcsfSeverity } from "./ocsf";
 import { toneOfSeverityId, type SeverityTone } from "./severity";
+import { quoteString } from "./sql";
 
 export type FilterOp = "=" | "!=" | "contains" | "not_contains";
 
@@ -24,7 +25,6 @@ export interface EventFilters {
 }
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
-const quoteString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 /** Backslash is the engine's default LIKE escape, so a typed `%` or `_` stays literal. */
 const likePattern = (value: string) => quoteString(`%${value.replace(/[\\%_]/g, "\\$&")}%`);
 

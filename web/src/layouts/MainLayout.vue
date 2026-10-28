@@ -190,7 +190,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView } from "vue-router";
+import { solutionModeForPath } from "@/utils/security/solutionMode";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
@@ -535,6 +536,18 @@ export default defineComponent({
           }
           // If snapshot is empty, filterMenus() will re-init the observability nav normally
         }
+      },
+      { immediate: true },
+    );
+
+    // The URL decides the mode, so a shared /security link or a jump into
+    // /logs from a detection shows the matching nav.
+    const route = useRoute();
+    watch(
+      () => route.path,
+      (path: string) => {
+        const mode = solutionModeForPath(path, store.state.solutionMode);
+        if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
       },
       { immediate: true },
     );

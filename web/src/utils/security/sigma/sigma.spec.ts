@@ -202,7 +202,7 @@ describe("expandPattern", () => {
 describe("compileSigmaRule", () => {
   it("compiles an exact match case-insensitively", () => {
     const { where, runnable } = compile(RULE("  s: {EventID: 4625}\n  condition: s"));
-    expect(where).toBe(`"EventID" = 4625`);
+    expect(where).toBe(`TRY_CAST("EventID" AS DOUBLE) = 4625`);
     expect(runnable).toBe(true);
   });
 
@@ -220,7 +220,7 @@ describe("compileSigmaRule", () => {
 
   it("turns a list into OR and the all modifier into AND", () => {
     const anyOf = compile(RULE("  s:\n    EventID: [4625, 4624]\n  condition: s"));
-    expect(anyOf.where).toBe(`("EventID" = 4625 OR "EventID" = 4624)`);
+    expect(anyOf.where).toBe(`(TRY_CAST("EventID" AS DOUBLE) = 4625 OR TRY_CAST("EventID" AS DOUBLE) = 4624)`);
 
     const allOf = compile(
       RULE("  s:\n    CommandLine|contains|all: ['delete', 'shadows']\n  condition: s"),
@@ -232,14 +232,14 @@ describe("compileSigmaRule", () => {
 
   it("ANDs the entries of one map", () => {
     const { where } = compile(RULE("  s: {EventID: 4625, LogonType: 3}\n  condition: s"));
-    expect(where).toBe(`("EventID" = 4625 AND "LogonType" = 3)`);
+    expect(where).toBe(`(TRY_CAST("EventID" AS DOUBLE) = 4625 AND TRY_CAST("LogonType" AS DOUBLE) = 3)`);
   });
 
   it("ORs a list of maps", () => {
     const { where } = compile(
       RULE("  s:\n    - {EventID: 4625}\n    - {EventID: 4740}\n  condition: s"),
     );
-    expect(where).toBe(`("EventID" = 4625 OR "EventID" = 4740)`);
+    expect(where).toBe(`(TRY_CAST("EventID" AS DOUBLE) = 4625 OR TRY_CAST("EventID" AS DOUBLE) = 4740)`);
   });
 
   it("compiles the string modifiers to the right side of the wildcard", () => {
@@ -290,8 +290,8 @@ describe("compileSigmaRule", () => {
   });
 
   it("compiles the numeric comparisons", () => {
-    expect(compile(RULE("  s: {status|gte: 500}\n  condition: s")).where).toBe(`"status" >= 500`);
-    expect(compile(RULE("  s: {count|lt: 3}\n  condition: s")).where).toBe(`"count" < 3`);
+    expect(compile(RULE("  s: {status|gte: 500}\n  condition: s")).where).toBe(`TRY_CAST("status" AS DOUBLE) >= 500`);
+    expect(compile(RULE("  s: {count|lt: 3}\n  condition: s")).where).toBe(`TRY_CAST("count" AS DOUBLE) < 3`);
   });
 
   it("compiles a regex, with the case-insensitive flag inline", () => {
@@ -303,16 +303,53 @@ describe("compileSigmaRule", () => {
     );
   });
 
-  it("compiles byte-aligned CIDR to a prefix and refuses the rest", () => {
+  it("compiles IPv4 CIDR exactly, including masks inside an octet", () => {
+    const shape = `re_match(CAST("src_ip" AS VARCHAR), '^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')`;
     const aligned = compile(RULE("  s: {src_ip|cidr: '10.0.0.0/8'}\n  condition: s"));
-    expect(aligned.where).toBe(`"src_ip" LIKE '10.%'`);
+    expect(aligned.where).toBe(`(${shape} AND "src_ip" LIKE '10.%')`);
     expect(aligned.runnable).toBe(true);
 
-    // A /26 is not a text prefix, and approximating it would silently widen or
-    // narrow the rule.
-    const odd = compile(RULE("  s: {src_ip|cidr: '10.0.0.0/26'}\n  condition: s"));
-    expect(odd.runnable).toBe(false);
-    expect(odd.unsupported[0]).toMatch(/cidr/);
+    expect(compile(RULE("  s: {src_ip|cidr: '10.1.2.3/32'}\n  condition: s")).where).toBe(
+      `"src_ip" = '10.1.2.3'`,
+    );
+    // Any IPv4 address, and nothing that is not one.
+    expect(compile(RULE("  s: {src_ip|cidr: '0.0.0.0/0'}\n  condition: s")).where).toBe(shape);
+
+    // A /17 keeps two octets and splits the third: 128..255.
+    expect(compile(RULE("  s: {src_ip|cidr: '40.108.128.0/17'}\n  condition: s")).where).toBe(
+      `(${shape} AND "src_ip" LIKE '40.108.%' AND TRY_CAST(split_part(CAST("src_ip" AS VARCHAR), '.', 3) AS INT) BETWEEN 128 AND 255)`,
+    );
+    // A /26 inside the last octet: 64..127.
+    expect(compile(RULE("  s: {src_ip|cidr: '10.0.0.64/26'}\n  condition: s")).where).toBe(
+      `(${shape} AND "src_ip" LIKE '10.0.0.%' AND TRY_CAST(split_part(CAST("src_ip" AS VARCHAR), '.', 4) AS INT) BETWEEN 64 AND 127)`,
+    );
+  });
+
+  it("refuses IPv6 and malformed CIDR rather than approximating", () => {
+    for (const block of ["2603:1006:2000::/48", "10.0.0/8", "300.0.0.0/8", "10.0.0.0/33"]) {
+      const compiled = compile(RULE(`  s: {src_ip|cidr: '${block}'}\n  condition: s`));
+      expect(compiled.runnable).toBe(false);
+      expect(compiled.unsupported[0]).toMatch(/cidr/);
+    }
+  });
+
+  it("compiles fieldref as equality between two columns", () => {
+    const { where, runnable } = compile(
+      RULE("  s: {TargetUserName|fieldref: SubjectUserName}\n  condition: s"),
+    );
+    expect(runnable).toBe(true);
+    expect(where).toBe(`CAST("TargetUserName" AS VARCHAR) = CAST("SubjectUserName" AS VARCHAR)`);
+  });
+
+  it("compiles base64offset|contains to pySigma's three encodings", () => {
+    const { where, runnable } = compile(
+      RULE("  s: {CommandLine|base64offset|contains: /bin/bash}\n  condition: s"),
+    );
+    expect(runnable).toBe(true);
+    // The values pySigma produces for the same input.
+    for (const variant of ["L2Jpbi9iYXNo", "9iaW4vYmFza", "vYmluL2Jhc2"]) {
+      expect(where).toContain(`"CommandLine" LIKE '%${variant}%'`);
+    }
   });
 
   it("expands windash into the dash forms Windows accepts", () => {
@@ -326,21 +363,21 @@ describe("compileSigmaRule", () => {
 
   it("negates through COALESCE so a null column does not swallow the row", () => {
     const { where } = compile(RULE("  s: {a: 1}\n  f: {b: 2}\n  condition: s and not f"));
-    expect(where).toBe(`("a" = 1 AND NOT COALESCE("b" = 2, false))`);
+    expect(where).toBe(`(TRY_CAST("a" AS DOUBLE) = 1 AND NOT COALESCE(TRY_CAST("b" AS DOUBLE) = 2, false))`);
   });
 
   it("compiles 1 of, all of, and N of", () => {
     const body = "  sel_a: {a: 1}\n  sel_b: {b: 2}\n  sel_c: {c: 3}\n  condition: ";
-    expect(compile(RULE(`${body}1 of sel_*`)).where).toBe(`("a" = 1 OR "b" = 2 OR "c" = 3)`);
-    expect(compile(RULE(`${body}all of them`)).where).toBe(`("a" = 1 AND "b" = 2 AND "c" = 3)`);
+    expect(compile(RULE(`${body}1 of sel_*`)).where).toBe(`(TRY_CAST("a" AS DOUBLE) = 1 OR TRY_CAST("b" AS DOUBLE) = 2 OR TRY_CAST("c" AS DOUBLE) = 3)`);
+    expect(compile(RULE(`${body}all of them`)).where).toBe(`(TRY_CAST("a" AS DOUBLE) = 1 AND TRY_CAST("b" AS DOUBLE) = 2 AND TRY_CAST("c" AS DOUBLE) = 3)`);
     expect(compile(RULE(`${body}2 of sel_*`)).where).toBe(
-      `(CASE WHEN "a" = 1 THEN 1 ELSE 0 END + CASE WHEN "b" = 2 THEN 1 ELSE 0 END + CASE WHEN "c" = 3 THEN 1 ELSE 0 END) >= 2`,
+      `(CASE WHEN TRY_CAST("a" AS DOUBLE) = 1 THEN 1 ELSE 0 END + CASE WHEN TRY_CAST("b" AS DOUBLE) = 2 THEN 1 ELSE 0 END + CASE WHEN TRY_CAST("c" AS DOUBLE) = 3 THEN 1 ELSE 0 END) >= 2`,
     );
   });
 
   it("ORs a rule that carries several conditions", () => {
     const { where } = compile(RULE("  a: {x: 1}\n  b: {y: 2}\n  condition:\n    - a\n    - b"));
-    expect(where).toBe(`("x" = 1 OR "y" = 2)`);
+    expect(where).toBe(`(TRY_CAST("x" AS DOUBLE) = 1 OR TRY_CAST("y" AS DOUBLE) = 2)`);
   });
 
   it("searches the configured full-text columns for a keyword rule", () => {
@@ -374,7 +411,7 @@ describe("compileSigmaRule", () => {
     const { where } = compile(RULE("  s: {eventid: 4625}\n  condition: s"), {
       availableFields: ["EventID"],
     });
-    expect(where).toBe(`"EventID" = 4625`);
+    expect(where).toBe(`TRY_CAST("EventID" AS DOUBLE) = 4625`);
   });
 
   it("targets the column ingest produced, not the one the rule was written against", () => {
@@ -422,22 +459,20 @@ describe("compileSigmaRule", () => {
     });
     // exists:false on a column that does not exist is true for every row, so it
     // drops out of the AND rather than killing it.
-    expect(present.where).toBe(`"a" = 1`);
+    expect(present.where).toBe(`TRY_CAST("a" AS DOUBLE) = 1`);
     expect(present.runnable).toBe(true);
 
     const orBranch = compile(RULE("  s:\n    - {a: 1}\n    - {gone: 2}\n  condition: s"), {
       availableFields: ["a"],
     });
     // The absent branch is false everywhere, so the OR keeps only the live one.
-    expect(orBranch.where).toBe(`"a" = 1`);
+    expect(orBranch.where).toBe(`TRY_CAST("a" AS DOUBLE) = 1`);
   });
 
   it("refuses an unknown modifier by name instead of ignoring it", () => {
-    const compiled = compile(
-      RULE("  s: {CommandLine|base64offset|contains: whoami}\n  condition: s"),
-    );
+    const compiled = compile(RULE("  s: {CommandLine|utf16le|contains: whoami}\n  condition: s"));
     expect(compiled.runnable).toBe(false);
-    expect(compiled.unsupported).toContain("modifier: base64offset");
+    expect(compiled.unsupported).toContain("modifier: utf16le");
   });
 
   it("refuses an aggregation rule rather than running its filter half alone", () => {
@@ -446,7 +481,7 @@ describe("compileSigmaRule", () => {
     );
     // The predicate is still there for a caller that wants to build the
     // aggregate itself, but the rule is not runnable as a plain search.
-    expect(compiled.where).toBe(`"EventID" = 4625`);
+    expect(compiled.where).toBe(`TRY_CAST("EventID" AS DOUBLE) = 4625`);
     expect(compiled.runnable).toBe(false);
     expect(compiled.unsupported[0]).toMatch(/aggregation/);
   });
@@ -555,5 +590,109 @@ describe("applicableRules", () => {
 
     expect(traversal.compiled.runnable).toBe(true);
     expect(traversal.compiled.where).toContain(`lower("path")`);
+  });
+});
+
+describe("OCSF bridge", () => {
+  // Imported here so the section reads on its own.
+  const load = async () => {
+    const { compileForSource, ruleAppliesTo } = await import("./index");
+    const { SOURCE_TYPE_BY_ID } = await import("../sourceTypes");
+    return { compileForSource, ruleAppliesTo, ocsf: SOURCE_TYPE_BY_ID.get("ocsf_native")! };
+  };
+  const winRule = rule(`title: Office spawns a shell
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    ParentImage|endswith: '\\winword.exe'
+    Image|endswith: '\\cmd.exe'
+  condition: 1 of them`);
+  // Ingest flattens three levels; the parent's path stays JSON one level up.
+  const fields = ["_timestamp", "class_uid", "activity_id", "process_file_path", "process_parent_process_file"];
+
+  it("applies process-creation rules to OCSF data", async () => {
+    const { ruleAppliesTo, ocsf } = await load();
+    expect(ruleAppliesTo(winRule, ocsf)).toBe(true);
+  });
+
+  it("maps fields onto OCSF paths, reads past the flatten depth, and guards the class", async () => {
+    const { compileForSource, ocsf } = await load();
+    const compiled = compileForSource(winRule, ocsf, fields);
+    expect(compiled.runnable).toBe(true);
+    expect(compiled.where).toBe(
+      `((TRY_CAST("class_uid" AS DOUBLE) = 1007 AND TRY_CAST("activity_id" AS DOUBLE) = 1)) AND ` +
+        `((lower(json_as_text("process_parent_process_file", 'path')) LIKE '%\\\\winword.exe' AND lower("process_file_path") LIKE '%\\\\cmd.exe'))`,
+    );
+  });
+
+  it("refuses to run unguarded when the stream has no class column", async () => {
+    const { compileForSource, ocsf } = await load();
+    // Both of the rule's own fields are present; only the guard columns are not.
+    const compiled = compileForSource(winRule, ocsf, [
+      "_timestamp",
+      "process_file_path",
+      "process_parent_process_file",
+    ]);
+    expect(compiled.runnable).toBe(false);
+    expect(compiled.where).toBe("");
+    expect(compiled.assumedAbsent).toEqual(expect.arrayContaining(["class_uid", "activity_id"]));
+  });
+
+  it("treats a Sigma field with no OCSF mapping as absent, even if a column shares its name", async () => {
+    const { compileForSource, ocsf } = await load();
+    const r = rule(`title: t
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    Image|endswith: '\\cmd.exe'
+    Hashes|contains: 'abc'
+  condition: selection`);
+    const compiled = compileForSource(r, ocsf, [...fields, "hashes"]);
+    expect(compiled.assumedAbsent).toContain("Hashes");
+    expect(compiled.runnable).toBe(false);
+  });
+});
+
+describe("flatten-depth JSON fallback", () => {
+  it("reads only a path deeper than the flatten level, from the level-3 column", () => {
+    const deep = compile(RULE("  s: {a.b.c.d: x}\n  condition: s"), { availableFields: ["a_b_c"] });
+    expect(deep.where).toBe(`lower(json_as_text("a_b_c", 'd')) = 'x'`);
+    // A shallower column of the same name is a plain value: the field is absent.
+    const shallow = compile(RULE("  s: {missing.deep.field.x: 1}\n  condition: s"), {
+      availableFields: ["missing"],
+    });
+    expect(shallow.runnable).toBe(false);
+    expect(shallow.assumedAbsent).toContain("missing.deep.field.x");
+  });
+
+  it("keeps a number under a string modifier as text, readable from an integer column", () => {
+    expect(compile(RULE("  s: {CommandLine|contains: 1337}\n  condition: s")).where).toBe(
+      `lower(CAST("CommandLine" AS VARCHAR)) LIKE '%1337%'`,
+    );
+  });
+
+  it("runs keyword rules on OCSF through the stream's own text column, without false caveats", async () => {
+    const { compileForSource } = await import("./index");
+    const { SOURCE_TYPE_BY_ID } = await import("../sourceTypes");
+    const r = rule(`title: k
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  keywords:
+    - mimikatz
+  condition: keywords`);
+    const compiled = compileForSource(r, SOURCE_TYPE_BY_ID.get("ocsf_native")!, [
+      "class_uid",
+      "activity_id",
+      "message",
+    ]);
+    expect(compiled.runnable).toBe(true);
+    expect(compiled.where).toContain(`lower("message") LIKE '%mimikatz%'`);
+    expect(compiled.assumedAbsent).toEqual([]);
   });
 });

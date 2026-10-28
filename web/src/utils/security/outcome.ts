@@ -11,6 +11,7 @@
 // otherwise produce "0 failures" that is not a fact but a failure to read.
 
 import { toOcsfStatus } from "./ocsf";
+import { quoteString } from "./sql";
 
 export const OUTCOME_FAILURE_WORDS = [
   "failure",
@@ -45,7 +46,6 @@ export function classifyOutcome(value: unknown): number {
 }
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
-const quoteString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 /** SQL predicate: the outcome column says this event failed. */
 export function failurePredicate(column: string): string {

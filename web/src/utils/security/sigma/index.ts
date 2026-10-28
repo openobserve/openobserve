@@ -16,7 +16,9 @@
 import type { SourceType } from "../sourceTypes";
 import type { CompiledSigma } from "./compile";
 import type { SigmaRule } from "./types";
-import { KEYWORD_FIELDS, SIGMA_FIELD_MAPS, rulesForLogsource } from "./catalog";
+import { KEYWORD_FIELDS, SIGMA_FIELD_MAPS, sigmaCatalog } from "./catalog";
+import { matchesLogsource } from "./parse";
+import { ocsfGuardSearch, ocsfProfileFor } from "./ocsf";
 import { compileSigmaRule } from "./compile";
 import { SIGMA_LEVELS } from "./types";
 
@@ -59,18 +61,80 @@ const levelRank = (rule: SigmaRule) =>
  * within that, the severe before the routine.
  */
 export function applicableRules(source: SourceType, fields: string[]): ApplicableRule[] {
-  const options = {
-    fieldMap: SIGMA_FIELD_MAPS[source.id],
-    availableFields: fields,
-    keywordFields: KEYWORD_FIELDS[source.id] ?? defaultKeywordFields(fields),
-  };
-
-  return rulesForLogsource(source.sigma)
-    .map((rule) => ({ rule, compiled: compileSigmaRule(rule, options) }))
+  return sigmaCatalog()
+    .filter((rule) => ruleAppliesTo(rule, source))
+    .map((rule) => ({ rule, compiled: compileForSource(rule, source, fields) }))
     .sort((a, b) => {
       if (a.compiled.runnable !== b.compiled.runnable) return a.compiled.runnable ? -1 : 1;
       return levelRank(b.rule) - levelRank(a.rule);
     });
+}
+
+/**
+ * Whether a rule was written for what this source records: its own logsource,
+ * an alias the source also answers to, or, for OCSF-native data, an OCSF class
+ * that carries the rule's logsource.
+ */
+export function ruleAppliesTo(rule: Pick<SigmaRule, "logsource">, source: SourceType): boolean {
+  if (matchesLogsource(rule, source.sigma)) return true;
+  if ((source.sigmaAliases ?? []).some((alias) => matchesLogsource(rule, alias))) return true;
+  return source.id === "ocsf_native" && ocsfProfileFor(rule) !== null;
+}
+
+/**
+ * A rule compiled against one stream of a known source: the source's field map
+ * and keyword columns, or for OCSF-native data, the OCSF profile for the rule's
+ * logsource with its class guard AND-ed on. This is the one compile path, so
+ * the catalog, the Content page and a pasted rule all agree on what runs.
+ */
+export function compileForSource(
+  rule: SigmaRule,
+  source: SourceType | null,
+  fields: string[],
+): CompiledSigma {
+  const keywordFields =
+    (source ? KEYWORD_FIELDS[source.id] : undefined) ?? defaultKeywordFields(fields);
+  const profile =
+    source?.id === "ocsf_native" && !matchesLogsource(rule, source.sigma)
+      ? ocsfProfileFor(rule)
+      : null;
+  if (!profile) {
+    return compileSigmaRule(rule, {
+      fieldMap: source ? SIGMA_FIELD_MAPS[source.id] : undefined,
+      availableFields: fields,
+      keywordFields,
+    });
+  }
+
+  const compiled = compileSigmaRule(rule, {
+    fieldMap: profile.fieldMap,
+    availableFields: fields,
+    keywordFields,
+    strictFieldMap: true,
+  });
+  const guard = compileSigmaRule(
+    {
+      ...rule,
+      searches: { ocsf_class: ocsfGuardSearch(profile) },
+      condition: ["ocsf_class"],
+    },
+    { availableFields: fields },
+  );
+  // Without the guard columns the rule cannot be kept to its class, and running
+  // it unguarded on a mixed stream would match the wrong events.
+  if (!guard.runnable) {
+    return {
+      ...compiled,
+      where: "",
+      runnable: false,
+      assumedAbsent: [...new Set([...guard.assumedAbsent, ...compiled.assumedAbsent])],
+    };
+  }
+  return {
+    ...compiled,
+    where: compiled.where ? `(${guard.where}) AND (${compiled.where})` : "",
+    fields: [...new Set([...guard.fields, ...compiled.fields])],
+  };
 }
 
 /**
@@ -88,6 +152,7 @@ function defaultKeywordFields(fields: string[]): string[] {
 export { compileSigmaRule } from "./compile";
 export { matchesLogsource, parseSigmaRule, sigmaLevelToSeverity } from "./parse";
 export { catalogErrors, catalogTechniques, rulesForLogsource, sigmaCatalog } from "./catalog";
+export { OCSF_SIGMA_PROFILES, ocsfProfileFor } from "./ocsf";
 export { parseCondition, referencedIdentifiers } from "./condition";
 export type { CompiledSigma, CompileOptions } from "./compile";
 export type { SigmaLevel, SigmaLogsource, SigmaRule, SigmaStatus } from "./types";
