@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 h-[2.125rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
+              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow h-[2.125rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
