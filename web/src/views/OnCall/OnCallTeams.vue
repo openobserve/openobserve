@@ -88,6 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-name="{ row }">
         <span class="flex min-w-0 items-center gap-2">
           <OTruncatedText>{{ row.name }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="teamDraftSavedAt(row.id) !== null"
+            :saved-at="teamDraftSavedAt(row.id)"
+            :data-test="`oncall-teams-draft-dot-${row.id}`"
+          />
           <OTag
             v-if="row.id === defaultTeamId"
             variant="primary-soft"
@@ -326,6 +331,10 @@ import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { dropScheduleDrafts, useScheduleDraftTimes } from "@/components/oncall/scheduleDrafts";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -367,6 +376,17 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
 
 const deleteTeamWrite = useMutation(() => deleteTeamMutation(orgId.value));
+
+const scheduleDraftAt = useScheduleDraftTimes();
+const policyDrafts = useEditorDraftIds("oncall_policy");
+
+/// A team's schedule and its policy are both edited from the team, so one dot carries the newer draft.
+function teamDraftSavedAt(teamId: string): number | null {
+  const times = [scheduleDraftAt(teamId), policyDrafts.savedAt(teamId)].filter(
+    (at): at is number => at !== null,
+  );
+  return times.length ? Math.max(...times) : null;
+}
 const setRoutingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
 
 // Named handler: `@click="fetchTeams"` would hand the MouseEvent to `force`.
@@ -572,6 +592,8 @@ async function deleteTeam() {
   if (!team) return;
   try {
     await deleteTeamWrite.mutateAsync(team.id);
+    deleteEditorDraftsFor({ kind: "oncall_policy", org: orgId.value, entityId: team.id });
+    dropScheduleDrafts({ org: orgId.value, teamId: team.id });
     toast({ variant: "success", message: t("oncall.teamDeleted") });
     // Unforced: the mutation expired the scope, so this read reaches the server
     // and repaints the rows this page holds in its own ref.

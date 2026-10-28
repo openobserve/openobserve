@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
         <div class="min-h-0 flex-1 overflow-hidden">
           <GroupUsers
+            :key="`users-${membersKey}`"
             data-test="edit-role-users-section"
             v-show="activeTab === 'users'"
             :groupUsers="roleUsers"
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <GroupServiceAccounts
             v-if="store.state.zoConfig.service_account_enabled"
+            :key="`service-accounts-${membersKey}`"
             data-test="edit-role-users-section"
             v-show="activeTab === 'serviceAccounts'"
             :groupUsers="roleUsers"
@@ -225,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="edit-role-save-btn"
               variant="primary"
               size="sm-action"
-              @click="saveRole"
+              @click="saveRoleAndMark"
             >
               {{ t("alerts.save") }}
             </OButton>
@@ -239,13 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :changes="pendingChanges"
     @undo="(keys) => keys.forEach(updatePermissionMappings)"
   />
-  <ConfirmDialog
-    :title="t('iam.editRole.leaveConfirm.title')"
-    :message="t('iam.editRole.leaveConfirm.message')"
-    @update:ok="onLeaveConfirm(true)"
-    @update:cancel="onLeaveConfirm(false)"
-    v-model="leaveConfirm.show"
-  />
+  <EditorDraftDialogs :draft="roleDraft" />
 </template>
 
 <script setup lang="ts">
@@ -274,9 +270,11 @@ import {
   buildRoleModules,
   GROUP_LABEL_KEYS,
 } from "@/components/iam/roles/roleModules";
-import { useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
 import { useRolePermissionRows } from "@/composables/iam/useRolePermissionRows";
@@ -295,6 +293,16 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+interface RoleDraftData {
+  added: string[];
+  removed: string[];
+  addedUsers: string[];
+  removedUsers: string[];
+  addedServiceAccounts: string[];
+  removedServiceAccounts: string[];
+  tab: string;
+}
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -374,27 +382,8 @@ const isAnyDirty = computed(
   () => isPermissionsDirty.value || isUsersDirty.value || isServiceAccountsDirty.value,
 );
 
-// Route-leave guard: warn before discarding unsaved permission/membership
-// changes. The pending navigation is held until the user resolves the dialog.
-const leaveConfirm = ref<{
-  show: boolean;
-  resolve: ((proceed: boolean) => void) | null;
-}>({ show: false, resolve: null });
-
-const onLeaveConfirm = (proceed: boolean) => {
-  leaveConfirm.value.show = false;
-  leaveConfirm.value.resolve?.(proceed);
-  leaveConfirm.value.resolve = null;
-};
-
-onBeforeRouteLeave(() => {
-  if (!isAnyDirty.value) return true;
-
-  return new Promise<boolean>((resolve) => {
-    leaveConfirm.value.resolve = resolve;
-    leaveConfirm.value.show = true;
-  });
-});
+// Bumped when a draft is restored: the member lists read staged picks only when they mount.
+const membersKey = ref(0);
 
 const tabs = computed(() => {
   const baseTabs = [
@@ -537,7 +526,9 @@ const getRoleDetails = () => {
       await updateRolePermissions(permissions.value);
       isFetchingInitialRoles.value = false;
 
-      if (selectedPermissionsHash.value.size === 0) {
+      const restored = await startRoleDraft();
+
+      if (!restored && selectedPermissionsHash.value.size === 0) {
         // A preset only stages PENDING "added" permissions, so the user can still tweak them before saving.
         const preset = router.currentRoute.value.query.preset;
         if (preset === "readonly") {
@@ -553,6 +544,13 @@ const getRoleDetails = () => {
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
+      if (error?.response?.status === 404) {
+        deleteEditorDraftsFor({
+          kind: "iam_role",
+          org: store.state.selectedOrganization.identifier,
+          entityId: editingRole.value,
+        });
+      }
       toast({
         message:
           error?.response?.status === 404
@@ -831,6 +829,69 @@ const { saveRole } = useRoleSave({
   updateRoleOne,
   t,
 });
+
+const sortedStrings = (values: Iterable<unknown>) => [...values].map(String).sort();
+
+const roleDraftSnapshot = (): RoleDraftData => ({
+  added: sortedStrings(Object.keys(grants.added.value)),
+  removed: sortedStrings(Object.keys(grants.removed.value)),
+  addedUsers: sortedStrings(addedUsers.value),
+  removedUsers: sortedStrings(removedUsers.value),
+  addedServiceAccounts: sortedStrings(addedServiceAccounts.value),
+  removedServiceAccounts: sortedStrings(removedServiceAccounts.value),
+  tab: activeTab.value,
+});
+
+let draftRestored = false;
+
+// Staged against what the role holds now, so a grant or member the server already matches is skipped.
+const applyRoleDraft = (data: RoleDraftData) => {
+  draftRestored = true;
+  [...Object.keys(grants.added.value), ...Object.keys(grants.removed.value)].forEach((key) =>
+    grants.toggle(key),
+  );
+  data.added.filter((key) => !grants.saved.value.has(key)).forEach((key) => grants.toggle(key));
+  data.removed.filter((key) => grants.saved.value.has(key)).forEach((key) => grants.toggle(key));
+  const members = new Set(roleUsers.value);
+  addedUsers.value = new Set(data.addedUsers.filter((user) => !members.has(user)));
+  removedUsers.value = new Set(data.removedUsers.filter((user) => members.has(user)));
+  addedServiceAccounts.value = new Set(
+    data.addedServiceAccounts.filter((user) => !members.has(user)),
+  );
+  removedServiceAccounts.value = new Set(
+    data.removedServiceAccounts.filter((user) => members.has(user)),
+  );
+  if (tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
+  membersKey.value += 1;
+};
+
+const roleDraft = useEditorDraft<RoleDraftData>({
+  kind: "iam_role",
+  entityLabel: () => t("common.editorDraft.entities.iam_role"),
+  entityId: () => editingRole.value,
+  snapshot: roleDraftSnapshot,
+  apply: applyRoleDraft,
+  base: () => ({
+    grants: sortedStrings(grants.saved.value),
+    users: sortedStrings(roleUsers.value),
+  }),
+  hasChanges: () => isAnyDirty.value,
+  save: () => saveRole(),
+});
+
+const startRoleDraft = async (): Promise<boolean> => {
+  draftRestored = false;
+  await roleDraft.start();
+  // Baselined now rather than on first input, so preset grants staged next count as unsaved.
+  if (!draftRestored && !roleDraft.hasUnsavedChanges()) roleDraft.discard();
+  return draftRestored;
+};
+
+const saveRoleAndMark = (): Promise<boolean> =>
+  saveRole().then((saved) => {
+    if (saved) roleDraft.markSaved();
+    return saved;
+  });
 
 const toggleHelpSection = async () => {
   isHelpOpen.value = !isHelpOpen.value;

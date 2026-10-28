@@ -54,7 +54,8 @@ export const useRoleSave = (deps: SaveDeps) => {
     t,
   } = deps;
 
-  const saveRole = () => {
+  /** Resolves true once the backend accepted the changes; false when there was nothing to send or it failed. */
+  const saveRole = (): Promise<boolean> => {
     if (permissionsUiType.value === "json") updateJsonInTable();
 
     // Users and service accounts are both sent as users; merge the two staging
@@ -80,11 +81,11 @@ export const useRoleSave = (deps: SaveDeps) => {
         message: t("iam.editRole.noUpdatesDetected"),
       });
 
-      return;
+      return Promise.resolve(false);
     }
 
     // Was: invalidate, then update — the refetch raced the write.
-    updateRoleOne
+    return updateRoleOne
       .mutateAsync({ role_id: editingRole.value, payload })
       .then(async () => {
         analytics.track("role_updated", {
@@ -121,6 +122,7 @@ export const useRoleSave = (deps: SaveDeps) => {
         addedServiceAccounts.value = new Set([]);
 
         removedServiceAccounts.value = new Set([]);
+        return true;
       })
       .catch((err) => {
         if (err.response.status != 403) {
@@ -130,6 +132,7 @@ export const useRoleSave = (deps: SaveDeps) => {
           });
         }
         console.log(err);
+        return false;
       });
   };
 

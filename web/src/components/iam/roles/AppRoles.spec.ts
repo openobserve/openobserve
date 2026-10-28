@@ -41,6 +41,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, updateRole } from "@/services/iam";
 import users from "@/services/users";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app-roles-test");
@@ -700,5 +701,57 @@ describe("list view state", () => {
       sortBy: "role_name",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("AppRoles - editor drafts", () => {
+  const draftOf = (entityId: string) => ({
+    kind: "iam_role" as const,
+    org: store.state.selectedOrganization.identifier,
+    entityId,
+    userEmail: store.state.userInfo.email,
+  });
+
+  beforeEach(() => localStorage.clear());
+
+  it("dots the row of a role with an unsaved draft, and only that row", async () => {
+    writeEditorDraft(draftOf("Viewer"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="iam-roles-draft-dot-Viewer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="iam-roles-draft-dot-Admin"]').exists()).toBe(false);
+  });
+
+  it("drops a deleted role's draft", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).deleteConformDialog.data = { role_name: "Admin" };
+    (wrapper.vm as any)._deleteRole();
+    await flushPromises();
+
+    expect(readEditorDraft(draftOf("Admin"))).toBeNull();
+  });
+
+  it("drops the drafts of the roles a bulk delete removed, and keeps the rest", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    writeEditorDraft(draftOf("Editor"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).selectedRoleNames = ["Admin", "Viewer"];
+    await (wrapper.vm as any).bulkDeleteUserRoles();
+
+    expect(readEditorDraft(draftOf("Admin"))).toBeNull();
+    expect(readEditorDraft(draftOf("Editor"))).not.toBeNull();
+  });
+
+  it("keeps the draft when the delete fails", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    vi.mocked(deleteRole).mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).deleteConformDialog.data = { role_name: "Admin" };
+    (wrapper.vm as any)._deleteRole();
+    await flushPromises();
+
+    expect(readEditorDraft(draftOf("Admin"))).not.toBeNull();
   });
 });
