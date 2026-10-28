@@ -217,6 +217,10 @@
           <OUserCell v-if="awayEmail" :value="awayEmail" />
         </span>
         <p class="text-text-muted text-sm">{{ t("oncall.awayHint") }}</p>
+        <!-- The times below are the team's clock, said the way the Schedule tab says it. -->
+        <span class="text-text-secondary text-xs" data-test="oncall-members-away-zone">
+          {{ zoneCaption(timezone, localZone, Date.now() * 1000, t) }}
+        </span>
         <div class="flex flex-col gap-1">
           <span class="o-input-label text-sm leading-tight font-semibold">
             {{ t("oncall.awayFrom") }}
@@ -339,7 +343,13 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
-import { formatInZone, listInLocale, rotationMembers } from "@/utils/oncall";
+import {
+  formatInZone,
+  fromZonedInputValue,
+  listInLocale,
+  rotationMembers,
+  zoneCaption,
+} from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -471,14 +481,20 @@ function awayOf(email: string): Unavailability | null {
   return mine[0] ?? null;
 }
 
+// The team's clock, the same one the absence was entered on.
 function awayLabel(absence: Unavailability): I18nText {
   const fmt = (micros: number) =>
-    new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
-      new Date(micros / 1000),
-    );
+    formatInZone(micros, props.timezone, { day: "numeric", month: "short" });
   return Date.now() * 1000 >= absence.start_at
     ? t("oncall.awayUntil", { date: raw(fmt(absence.end_at)) })
     : t("oncall.awayWindow", { from: raw(fmt(absence.start_at)), to: raw(fmt(absence.end_at)) });
+}
+
+const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/// The form's date and time read on the team's clock; the Save button stays disabled until both are filled.
+function zonedMicros(date: string, time: string): number {
+  return fromZonedInputValue(`${date}T${time}`, props.timezone) ?? Number.NaN;
 }
 
 function openAway(email: string) {
@@ -496,8 +512,8 @@ async function saveAbsence() {
   try {
     await createAbsenceWrite.mutateAsync({
       user_email: awayEmail.value,
-      start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
-      end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
+      start_at: zonedMicros(awayFromDate.value, awayFromTime.value),
+      end_at: zonedMicros(awayToDate.value, awayToTime.value),
       ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
     });
     awayOpen.value = false;

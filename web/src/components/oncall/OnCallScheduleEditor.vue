@@ -440,6 +440,7 @@ import {
   coverageHoursSummary,
   effectiveRivals,
   effectiveWeekCoverage,
+  formatInZone,
   formatMinuteOfDay,
   formatStamp,
   overlappingRules,
@@ -613,10 +614,9 @@ function awayClashesFor(rule: ShiftRule): Unavailability[] {
 
 const stamp = (micros: number) => formatStamp(micros, props.timezone);
 
+// The team's clock, the same one the roster's away chip uses.
 function shortDate(micros: number): string {
-  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
-    new Date(micros / 1000),
-  );
+  return formatInZone(micros, props.timezone, { day: "numeric", month: "short" });
 }
 
 function editRotation(rotation: Rotation) {

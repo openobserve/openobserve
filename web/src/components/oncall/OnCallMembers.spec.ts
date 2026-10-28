@@ -140,6 +140,7 @@ interface RenderOpts {
   onCallNow?: any[];
   reachability?: any;
   load?: any;
+  timezone?: string;
 }
 
 function render(arg: OnCallTeamMember[] | RenderOpts = []) {
@@ -150,7 +151,7 @@ function render(arg: OnCallTeamMember[] | RenderOpts = []) {
       teamName: "Payments",
       members: opts.members ?? [],
       rotations: opts.rotations ?? [],
-      timezone: "UTC",
+      timezone: opts.timezone ?? "UTC",
       onCallNow: opts.onCallNow ?? [],
       reachability: opts.reachability ?? null,
       load: opts.load ?? null,
@@ -690,6 +691,59 @@ describe("OnCallMembers", () => {
       // The rota moves the away person's turn — the schedule tab's answer
       // changed with it.
       expect(wrapper.emitted("changed")).toBeTruthy();
+    });
+
+    // #3149-2: an absence is entered and shown on the team's clock, whatever the browser's zone (tests pin UTC).
+    it("stores the times as the team's wall clock and says which zone they are in", async () => {
+      oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
+      const wrapper = render({ members: [member], timezone: "Asia/Kolkata" });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+      expect(wrapper.find('[data-test="oncall-members-away-zone"]').text()).toContain(
+        "times in Asia/Kolkata",
+      );
+      await wrapper
+        .find('[data-test="oncall-members-away-from-date"] input')
+        .setValue("2026-11-02");
+      await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("00:00");
+      await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-11-03");
+      await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("00:00");
+      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
+      await flushPromises();
+
+      const sent = (oncall.createUnavailability.mock.calls[0][0] as any).data;
+      expect(sent.start_at).toBe(Date.UTC(2026, 10, 1, 18, 30) * 1000);
+      expect(sent.end_at).toBe(Date.UTC(2026, 10, 2, 18, 30) * 1000);
+    });
+
+    it("labels the absence with the team-zone date", async () => {
+      const now = Date.now() * 1000;
+      // 20:00 UTC is already the next day in Kolkata (01:30).
+      const endsAt = Date.UTC(2026, 10, 2, 20, 0) * 1000;
+      oncall.listUnavailability.mockResolvedValue({
+        data: [
+          {
+            id: "u1",
+            org_id: "default",
+            user_email: "ana@o2.ai",
+            start_at: now - 1,
+            end_at: Math.max(endsAt, now + 1),
+            created_by: "ana@o2.ai",
+            created_at: now,
+          },
+        ],
+      } as any);
+      const wrapper = render({ members: [member], timezone: "Asia/Kolkata" });
+      await flushPromises();
+
+      const label = wrapper.find('[data-test="oncall-members-away-m1"]').text();
+      const expected = new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "short",
+        timeZone: "Asia/Kolkata",
+      }).format(new Date(Math.max(endsAt, now + 1) / 1000));
+      expect(label).toBe(`Away until ${expected}`);
     });
   });
 

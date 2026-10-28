@@ -679,6 +679,36 @@ describe("OnCallScheduleEditor", () => {
     expect((service.setSchedule.mock.calls[0][0] as any).data.rotations).toHaveLength(1);
   });
 
+  // R11-1: the away line uses the team's clock, like the roster chip (tests pin TZ=UTC).
+  it("dates an away clash in the team's zone", async () => {
+    const from = Date.UTC(2023, 10, 15, 20, 0) * 1000;
+    const to = Date.UTC(2023, 10, 16, 20, 0) * 1000;
+    service.listUnavailability.mockResolvedValue({
+      data: [
+        {
+          id: "u1",
+          org_id: "default",
+          user_email: "ana@o2.ai",
+          start_at: from,
+          end_at: to,
+          created_by: "ana@o2.ai",
+          created_at: 0,
+        },
+      ],
+    } as any);
+    const wrapper = render({ schedule: schedule([rota("Primary")]), timezone: "Asia/Kolkata" });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    const day = (micros: number) =>
+      new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "short",
+        timeZone: "Asia/Kolkata",
+      }).format(new Date(micros / 1000));
+    expect(wrapper.text()).toContain(`ana@o2.ai is away ${day(from)} – ${day(to)}.`);
+  });
+
   /// The absence horizon is anchored on the clock, so an unbucketed key would
   /// miss on every open and make a drawer somebody flicks in and out of cost a
   /// request each time.

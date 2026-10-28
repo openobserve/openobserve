@@ -2042,6 +2042,22 @@ export function samePhone(a: string, b: string): boolean {
   return compact(a) !== "" && compact(a) === compact(b);
 }
 
+/** "times in {zone}", plus the reader's own clock when it is a different zone; the schedule's zone caption. [pure] */
+export function zoneCaption(
+  timezone: string,
+  localZone: string,
+  nowMicros: number,
+  t: TranslateFn,
+): I18nText {
+  if (localZone === timezone) return t("oncall.schedZoneSame", { zone: raw(timezone) });
+  const local = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(nowMicros / 1000));
+  return t("oncall.schedZoneDiff", { zone: raw(timezone), local: raw(local) });
+}
+
 /** Whether the server's `to_e164` would take this: `+`, 7 to 15 digits, no leading 0, once spaces and `-().` go. [pure] */
 export function isInternationalPhone(typed: string): boolean {
   const compact = typed.trim().replace(/[ \-().]/g, "");
