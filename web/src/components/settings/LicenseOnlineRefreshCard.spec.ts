@@ -100,7 +100,7 @@ describe("LicenseOnlineRefreshCard", () => {
   it.each<[string, RefreshBody, string]>([
     ["up to date", { outcome: "unchanged" }, "License is up to date"],
     ["renewal applied", { outcome: "renewed" }, "A renewed license was applied"],
-    ["key conflict", { error: "key_conflict" }, "registered with another key"],
+    ["key conflict", { error: "key_conflict" }, "registered with a different registration key"],
     ["rate limited", { error: "rate_limited", retry_after_s: 30 }, "Try again in 30 s"],
     ["another click running", { code: 409, reason: "refresh_in_progress" }, "already running"],
   ])("renders the %s panel", async (_, body, text) => {
@@ -156,7 +156,7 @@ describe("LicenseOnlineRefreshCard", () => {
   });
   it("plaintext shows the master-key hint", () => {
     expect(card({ key_at_rest: "plaintext" }).text()).toContain(
-      "Set O2_MASTER_ENCRYPTION_KEY to encrypt it, then rotate the key.",
+      "Set O2_MASTER_ENCRYPTION_KEY to encrypt it, then rotate the registration key.",
     );
   });
   it("copy renewed key only with stored_key, env and root rights", async () => {
@@ -179,7 +179,9 @@ describe("LicenseOnlineRefreshCard", () => {
   });
   it("rotate hint uses the OpenObserve-asked copy and rotation endpoint", async () => {
     const w = card({ rotate_recommended: true });
-    expect(w.text()).toContain("OpenObserve has asked this installation to rotate its key.");
+    expect(w.text()).toContain(
+      "OpenObserve has asked this installation to rotate its registration key.",
+    );
     await w.get('[data-test="license-online-rotate"]').trigger("click");
     expect(rotate).toHaveBeenCalledTimes(1);
     expect(refresh).not.toHaveBeenCalled();
@@ -220,11 +222,11 @@ describe("LicenseOnlineRefreshCard", () => {
   });
 });
 
-it("rotation confirms the installation key changed", async () => {
+it("rotation confirms the registration key changed", async () => {
   const w = card();
   await w.get('[data-test="license-online-rotate"]').trigger("click");
   await flushPromises();
-  expect(w.get('[data-test="license-online-outcome"]').text()).toBe("Installation key rotated.");
+  expect(w.get('[data-test="license-online-outcome"]').text()).toBe("Registration key rotated.");
 });
 it("does not attribute an earlier success to the latest failed-attempt actor", () => {
   const w = card({
@@ -266,7 +268,9 @@ it("shows the proxy hint once when a saved network error and click outcome overl
 
 it("env-key root can rotate when OpenObserve requests rotation", () => {
   const w = card({ stored_key: "fetched-key", rotate_recommended: true }, { envKeyActive: true });
-  expect(w.text()).toContain("OpenObserve has asked this installation to rotate its key.");
+  expect(w.text()).toContain(
+    "OpenObserve has asked this installation to rotate its registration key.",
+  );
   expect(w.find('[data-test="license-online-rotate"]').exists()).toBe(true);
   expect(w.find('[data-test="license-online-copy"]').exists()).toBe(true);
 });
@@ -279,7 +283,7 @@ it("env-key root without a rotation request keeps copy in place of rotate", () =
 
 it.each([
   ["refresh", "A renewed license was applied. It now expires on Nov 2, 2027."],
-  ["rotate", "Installation key rotated."],
+  ["rotate", "Registration key rotated."],
 ])("a newer server attempt replaces the clicked %s outcome", async (action, clicked) => {
   const body = { outcome: "renewed", renewed: { license_id: "old", expires_at: 1825113600000000 } };
   refresh.mockResolvedValue({ ok: true, body: { ...body, attempt_at: 1792748520000000 } });
@@ -409,7 +413,7 @@ describe("clicked outcome versus newer server attempts", () => {
         last_outcome: { error: "blocked" },
       }),
     });
-    expect(outcomeText(w)).toBe("Installation key rotated.");
+    expect(outcomeText(w)).toBe("Registration key rotated.");
   });
 
   it("adopts a later completed attempt within the same second as the click's own", async () => {
@@ -427,7 +431,7 @@ describe("clicked outcome versus newer server attempts", () => {
         last_outcome: { outcome: "updated" },
       }),
     });
-    expect(outcomeText(w)).toBe("Installation key rotated.");
+    expect(outcomeText(w)).toBe("Registration key rotated.");
     await w.setProps({ refresh: blocked(atSecond(1792748530) + 700_000) });
     expect(outcomeText(w)).toContain("blocked");
   });
@@ -467,7 +471,7 @@ describe("clicked outcome versus newer server attempts", () => {
         last_outcome: { outcome: "updated", waivers_added: 0, waivers_removed: 0 },
       }),
     });
-    expect(outcomeText(w)).toBe("Installation key rotated.");
+    expect(outcomeText(w)).toBe("Registration key rotated.");
   });
 
   it("an older server's rotation keeps its confirmation when its own status arrives", async () => {
@@ -476,7 +480,7 @@ describe("clicked outcome versus newer server attempts", () => {
     const w = card();
     await w.get('[data-test="license-online-rotate"]').trigger("click");
     await flushPromises();
-    expect(outcomeText(w)).toBe("Installation key rotated.");
+    expect(outcomeText(w)).toBe("Registration key rotated.");
     await w.setProps({
       refresh: status({
         last_attempt_at: 1792748529100000,
@@ -484,7 +488,7 @@ describe("clicked outcome versus newer server attempts", () => {
         last_outcome: { outcome: "updated", waivers_added: 0, waivers_removed: 0 },
       }),
     });
-    expect(outcomeText(w)).toBe("Installation key rotated.");
+    expect(outcomeText(w)).toBe("Registration key rotated.");
   });
 
   it("an older server's failed click is not replaced by a pre-click attempt seen during the request", async () => {
