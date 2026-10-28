@@ -213,8 +213,9 @@ app reports a missing key that `.env` has, `unset` the empty variable in the she
 python3 <skill dir>/scripts/verify.py --env-file .env --stream <stream> --since "$START" --service <agent name>
 ```
 
-The script waits up to 120 s for spans, prints the span count and the link to the first trace, then
-calls `GET <url>/api/<org>/gen_ai/data_health?stream_name=…&start_time=…&end_time=…&refresh=true`
+The script waits up to 120 s for GenAI spans (those with `gen_ai.operation.name`; HTTP or database
+spans alone do not count), prints the span count and the link to the first trace, then calls
+`GET <url>/api/<org>/gen_ai/data_health?stream_name=…&start_time=…&end_time=…&refresh=true&include_samples=true`
 and prints each check with the page that fixes it. Show its output to the user as is:
 
 ```
@@ -233,9 +234,10 @@ and prints each check with the page that fixes it. Show its output to the user a
   3 of 4 checks pass. Fix the items above, then run the checks again.
 ```
 
-Exit codes: `0` spans arrived and no check is in error, `1` a check is in error, `2` configuration
-problem or no spans before the timeout. On `2` with no spans: confirm the init lines run before the
-client import, the process exits cleanly, and the stream name matches.
+Exit codes: `0` GenAI spans arrived and no check is in error, `1` a check is in error, `2`
+configuration problem, or no GenAI span before the timeout (every check covering 0 spans counts as
+none). On `2` with no GenAI spans: confirm the OpenAI/Anthropic instrumentor is installed, the init
+lines run before the client import, the process exits cleanly, and the stream name matches.
 
 What each failed check means and where to fix it:
 

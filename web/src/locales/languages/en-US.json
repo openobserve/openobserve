@@ -15639,7 +15639,10 @@
       "emptyTitle": "Every model in this stream's last 24 h has an exact price.",
       "noStreamsTitle": "No LLM trace streams",
       "noStreamsDesc": "Models appear here once gen_ai spans reach a traces stream.",
-      "recordedCostNote": "New prices apply to spans ingested after you save. Older spans keep their recorded cost."
+      "recordedCostNote": "New prices apply to spans ingested after you save. Older spans keep their recorded cost.",
+      "noModelName": "(no model name)",
+      "noModelHint": "No model to price: set gen_ai.request.model",
+      "instrumentationDocs": "Instrumentation guide"
     }
   },
   "aiObservability": {
@@ -27251,6 +27254,7 @@
     }
   },
   "llmDataTrust": {
+    "noModelName": "(no model name)",
     "cost": {
       "partial": "partial",
       "unknown": "cost unknown",

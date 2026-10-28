@@ -544,6 +544,9 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     const bucket = quantizeRange(startTime, endTime);
     const key = `${org}::${bucket.start}-${bucket.end}`;
     if (inFlight?.key === key) return inFlight.promise;
+    // The user may switch org while the request is in flight; the old org's
+    // answer (or failure) must not land in the new org's list, mode or stream.
+    const orgChanged = () => opts.orgId() !== org;
     const promise = (async () => {
       try {
         const options = genAiAgentsQuery(org, startTime, endTime);
@@ -555,6 +558,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
           });
         }
         const res = await queryClient.fetchQuery(options);
+        if (orgChanged()) return;
         agents.value = res.agents ?? [];
         agentsError.value = null;
         if (allAgents) {
@@ -570,12 +574,13 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
           activeAgent.value = agentOptionKey(agents.value[0]);
         }
       } catch (e) {
+        if (orgChanged()) return;
         console.warn("Failed to load GenAI agents", e);
         agents.value = [];
         agentsError.value = isAxiosError(e) && e.response?.status === 403 ? "forbidden" : "failed";
         if (allAgents) activeAgent.value = ALL_AGENTS_VALUE;
       } finally {
-        agentsLoaded.value = true;
+        if (!orgChanged()) agentsLoaded.value = true;
       }
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;
