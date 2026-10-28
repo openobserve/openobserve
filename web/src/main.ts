@@ -28,16 +28,10 @@ import "./styles/rtl.css";
 import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
 
-import { openobserveRum } from "@openobserve/browser-rum";
-import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
-import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
-import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
-import { scrubAuthParams } from "./utils/rum/scrubAuthParams";
-import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
@@ -80,27 +74,8 @@ interface ConfigResponse {
     telemetry_enabled?: boolean;
     build_type?: string;
     commit_hash?: string;
-    rum?: {
-      enabled: boolean;
-      client_token: string;
-      application_id: string;
-      site: string;
-      service: string;
-      env: string;
-      version?: string;
-      organization_identifier: string;
-      insecure_http?: boolean;
-      api_version?: string;
-    };
   };
 }
-
-// Only the three dot-separated parts make a token, so a bare eyJ inside a word (surveyJsonBtn) is kept.
-const JWT_PATTERN = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
-
-// Anonymous public-link viewers are not app users, so their sessions stay out of RUM.
-const isPublicDashboard =
-  router.resolve(router.options.history.location).name === "publicDashboard";
 
 const getConfig = async () => {
   // Seeds the shared bootstrap `/config` query — Login and the version checker
@@ -121,129 +96,6 @@ const getConfig = async () => {
     // Store initial commit hash for version checking
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
-    }
-    if (res.data.rum?.enabled && !isPublicDashboard) {
-      const options = {
-        clientToken: res.data.rum.client_token,
-        applicationId: res.data.rum.application_id,
-        site: res.data.rum.site,
-        service: res.data.rum.service,
-        env: res.data.rum.env,
-        version: res.data.rum.version || "0.0.1",
-        organizationIdentifier: res.data.rum.organization_identifier,
-        insecureHTTP: res.data.rum.insecure_http || false,
-        apiVersion: res.data.rum.api_version || "v1",
-      };
-
-      openobserveRum.init({
-        applicationId: options.applicationId, // required, any string identifying your application
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        trackResources: true,
-        trackLongTasks: true,
-        trackUserInteractions: true,
-        actionNameAttribute: "data-test",
-        apiVersion: options.apiVersion,
-        insecureHTTP: options.insecureHTTP,
-        defaultPrivacyLevel: "allow",
-        // Session renewal drops the forced replay start, so sampling must keep every renewed session recording.
-        sessionReplaySampleRate: 100,
-        startSessionReplayRecordingManually: true,
-        // Same-origin only: cross-origin (dev against a remote cluster) the
-        // injected headers fail the CORS preflight and kill every API call.
-        // See shouldPropagateTracing.
-        allowedTracingUrls: shouldPropagateTracing(store.state.API_ENDPOINT, window.location.origin)
-          ? [
-              {
-                match: store.state.API_ENDPOINT + "/api",
-                propagatorTypes: ["openobserve", "tracecontext"],
-              },
-            ]
-          : [],
-        beforeSend: (event) => {
-          event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
-          event.view.referrer = scrubAuthParams(event.view.referrer);
-          if (event.type === "resource") {
-            event.resource.url = scrubAuthParams(event.resource.url) ?? event.resource.url;
-          }
-          if (event.type === "error") {
-            event.error.message = scrubAuthParams(event.error.message) ?? event.error.message;
-            if (event.error.resource) {
-              event.error.resource.url =
-                scrubAuthParams(event.error.resource.url) ?? event.error.resource.url;
-            }
-          }
-          if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
-          if (event.type === "action" && event.action.target?.name) {
-            event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
-          }
-          // Filter out specific errors before sending to RUM
-          if (event.type === "error") {
-            const errorMessage = event.error?.message || "";
-            const errorStack = event.error?.stack || "";
-
-            // List of error patterns to ignore
-            const ignoredErrorPatterns = [
-              /ResizeObserver loop/i,
-              /reo.dev/i,
-              /Cannot set properties of null \(setting 'innerHTML'\)/,
-            ];
-
-            // Check if error matches any ignored pattern
-            const shouldIgnore = ignoredErrorPatterns.some(
-              (pattern) => pattern.test(errorMessage) || pattern.test(errorStack),
-            );
-
-            if (shouldIgnore || isIgnoredNoise(errorMessage, errorStack)) {
-              return false; // Don't send this error
-            }
-          }
-
-          // Allow all other events to be sent
-          return true;
-        },
-      });
-
-      openobserveLogs.init({
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        forwardErrorsToLogs: true,
-        insecureHTTP: options.insecureHTTP,
-        apiVersion: options.apiVersion,
-        beforeSend: (log) => {
-          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
-          if (log.view?.referrer) log.view.referrer = scrubAuthParams(log.view.referrer);
-          if (log.http?.url) log.http.url = scrubAuthParams(log.http.url) ?? log.http.url;
-          log.message = scrubAuthParams(log.message) ?? log.message;
-          // Filter out specific logs before sending
-          const logMessage = log.message || "";
-
-          // List of log patterns to ignore
-          const ignoredLogPatterns = [/ResizeObserver loop/i];
-
-          // Check if log matches any ignored pattern
-          const shouldIgnore = ignoredLogPatterns.some((pattern) => pattern.test(logMessage));
-
-          if (shouldIgnore || isIgnoredNoise(logMessage)) {
-            return false; // Don't send this log
-          }
-
-          // Allow all other logs to be sent
-          return true;
-        },
-      });
-
-      // Don't start session replay automatically - it will be started after login
-      // to avoid capturing login page with "Unknown" user
-      // Session replay will be started in Login.vue and MainLayout.vue after user is authenticated
     }
   });
 };
