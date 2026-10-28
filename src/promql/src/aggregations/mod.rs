@@ -723,7 +723,7 @@ mod tests {
         }
         for (values, avg, variance) in [
             (vec![1.0, 2.0, 3.0], 2.0, 2.0 / 3.0),
-            (vec![1e308, 1e308], f64::INFINITY, f64::INFINITY),
+            (vec![1e308, 1e308], f64::INFINITY, 0.0),
             (vec![f64::INFINITY, f64::INFINITY], f64::INFINITY, f64::NAN),
             (vec![f64::INFINITY, f64::NEG_INFINITY], f64::NAN, f64::NAN),
             (vec![f64::NAN, 1.0], f64::NAN, f64::NAN),

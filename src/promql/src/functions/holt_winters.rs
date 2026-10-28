@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use datafusion::error::{DataFusionError, Result};
 
 use crate::{common::calculate_trend, functions::RangeFunc, scalar_param::ScalarParam};
 
@@ -28,6 +28,22 @@ pub(crate) fn holt_winters(
     eval_ctx: &EvalContext,
     pinned: Option<i64>,
 ) -> Result<Value> {
+    // Prometheus checks the factors per series with samples, so an empty selection never errors
+    let has_samples =
+        matches!(&data, Value::Matrix(matrix) if matrix.iter().any(|s| !s.samples.is_empty()));
+    for (factor, name, short) in [
+        (&scaling_factor, "smoothing", "sf"),
+        (&trend_factor, "trend", "tf"),
+    ] {
+        if let ScalarParam::Const(value) = *factor
+            && has_samples
+            && (value <= 0.0 || value >= 1.0)
+        {
+            return Err(DataFusionError::Execution(format!(
+                "invalid {name} factor. Expected: 0 < {short} < 1, got: {value:.6}"
+            )));
+        }
+    }
     super::eval_range_at(
         data,
         HoltWintersFunc::new(scaling_factor, trend_factor),
@@ -116,6 +132,51 @@ mod tests {
             &eval_ctx,
             None,
         )
+    }
+
+    #[test]
+    fn test_holt_winters_rejects_constant_factors_outside_zero_one() {
+        let series = |samples: Vec<Sample>| {
+            Value::Matrix(vec![RangeValue {
+                labels: Labels::default(),
+                samples,
+                exemplars: None,
+                time_window: Some(TimeWindow::new(Duration::from_secs(2))),
+            }])
+        };
+        let data = || series(vec![Sample::new(2000, 10.0), Sample::new(3000, 20.0)]);
+        for (sf, tf, expected) in [
+            (
+                1.5,
+                0.5,
+                "invalid smoothing factor. Expected: 0 < sf < 1, got: 1.500000",
+            ),
+            (
+                0.0,
+                0.5,
+                "invalid smoothing factor. Expected: 0 < sf < 1, got: 0.000000",
+            ),
+            (
+                0.5,
+                0.0,
+                "invalid trend factor. Expected: 0 < tf < 1, got: 0.000000",
+            ),
+            (
+                0.5,
+                1.0,
+                "invalid trend factor. Expected: 0 < tf < 1, got: 1.000000",
+            ),
+        ] {
+            let err = holt_winters_test_helper(data(), sf, tf).unwrap_err();
+            assert!(
+                matches!(&err, DataFusionError::Execution(message) if message == expected),
+                "{err}"
+            );
+        }
+        // as in Prometheus, an empty selection is never checked and NaN fails no comparison
+        assert!(holt_winters_test_helper(series(vec![]), 1.5, 0.5).is_ok());
+        assert!(holt_winters_test_helper(Value::None, 1.5, 0.5).is_ok());
+        assert!(holt_winters_test_helper(data(), f64::NAN, 0.5).is_ok());
     }
 
     #[test]

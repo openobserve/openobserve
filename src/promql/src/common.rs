@@ -23,21 +23,20 @@ pub fn std_variance(data: &[f64]) -> Option<f64> {
     variance(data.iter().copied())
 }
 
-pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64> + Clone) -> Option<f64> {
-    let count = values.len() as i64;
-    if count == 0 {
+/// Population variance by Welford's update with Kahan compensation, as Prometheus computes it.
+pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64>) -> Option<f64> {
+    if values.len() == 0 {
         return None;
     }
-    let mean = values.clone().sum::<f64>() / count as f64;
-    Some(
-        values
-            .map(|value| {
-                let diff = mean - value;
-                diff * diff
-            })
-            .sum::<f64>()
-            / count as f64,
-    )
+    let (mut count, mut mean, mut mean_c, mut aux, mut aux_c) = (0.0, 0.0, 0.0, 0.0, 0.0);
+    for value in values {
+        count += 1.0;
+        // a running mean never overflows, a sum of values near f64::MAX does
+        let delta = value - (mean + mean_c);
+        (mean, mean_c) = kahan_sum_increment(delta / count, mean, mean_c);
+        (aux, aux_c) = kahan_sum_increment(delta * (value - (mean + mean_c)), aux, aux_c);
+    }
+    Some((aux + aux_c) / count)
 }
 
 pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
@@ -156,7 +155,7 @@ mod tests {
             (vec![], None),
             (vec![5.0], Some(0.0)),
             (vec![1.0, 5.0], Some(4.0)),
-            (vec![f64::MAX, f64::MAX], Some(f64::INFINITY)),
+            (vec![f64::MAX, f64::MAX], Some(0.0)),
             (vec![f64::INFINITY, 1.0], Some(f64::NAN)),
             (vec![f64::NAN, 1.0], Some(f64::NAN)),
         ] {
@@ -168,6 +167,17 @@ mod tests {
                 assert_eq!(actual, expected);
             }
         }
+    }
+
+    #[test]
+    fn test_variance_matches_prometheus_where_two_pass_overflows_or_drifts() {
+        // #14924 O8/O15: the sum of two 1e308 overflows, the running mean does not
+        assert_eq!(std_variance(&[1e308, 1e308]), Some(0.0));
+        assert_eq!(std_deviation(&[1e308, 1e308, 1e308]), Some(0.0));
+        // Prometheus #4927: identical values must give exactly 0, not rounding noise
+        assert_eq!(std_variance(&[1.5990505637277868; 3]), Some(0.0));
+        let variance = std_variance(&[0.0, 8.0, 8.0, 2.0, 3.0]).unwrap();
+        assert!((variance - 10.56).abs() < 1e-12, "{variance}");
     }
 
     #[test]

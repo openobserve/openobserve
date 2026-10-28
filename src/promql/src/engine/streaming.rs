@@ -581,6 +581,17 @@ mod tests {
             .map(|(value, _)| value)
     }
 
+    async fn exec_instant(at: i64, query: &str) -> (Value, Option<String>) {
+        let mut engine = engine_at(provider(false, false), 30, at, 0, None);
+        // `engine_at` ends every range at `BASE + 180 s`
+        engine.eval_ctx.end = at;
+        let mut ctx = (*engine.ctx).clone();
+        ctx.end = at;
+        engine.ctx = Arc::new(ctx);
+        let expr = promql_parser::parser::parse(query).unwrap();
+        engine.exec(&expr).await.unwrap()
+    }
+
     /// The generic instant path on its own: `eval_vector_selector` over the plain table.
     async fn generic_instant_selector(provider: StreamingProvider, selector: &str) -> Value {
         generic_instant_selector_on(engine(provider, 30), selector).await
@@ -1524,22 +1535,38 @@ mod tests {
 
     #[tokio::test]
     async fn test_at_modifier_on_the_root_range_selector_of_an_instant_query() {
-        let exec_instant = async |at: i64, query: &str| {
-            let mut engine = engine_at(provider(false, false), 30, at, 0, None);
-            // `engine_at` ends every range at `BASE + 180 s`
-            engine.eval_ctx.end = at;
-            let mut ctx = (*engine.ctx).clone();
-            ctx.end = at;
-            engine.ctx = Arc::new(ctx);
-            let expr = promql_parser::parser::parse(query).unwrap();
-            engine.exec(&expr).await.unwrap()
-        };
         let (expected, _) = exec_instant(BASE + 100 * SECOND, "m[1m]").await;
         let (pinned, result_type) = exec_instant(BASE + 180 * SECOND, "m[1m] @ 1100").await;
         assert_eq!(result_type.as_deref(), Some("matrix"));
         let last = canonical(pinned.clone())[0].1.last().copied();
         assert_eq!(last, Some((BASE + 100 * SECOND, 15.0)));
         assert_same_matrix(expected, pinned, "m[1m] @ 1100");
+    }
+
+    #[tokio::test]
+    async fn test_root_range_selector_of_an_instant_query_reads_a_left_open_window() {
+        // #14924 O19: samples every 20 s worth 3 per step; a sample on `t - 1m` is outside
+        let at = |second: i64| BASE + second * SECOND;
+        let in_window = [(at(60), 9.0), (at(80), 12.0), (at(100), 15.0)];
+        let raw_offset = [(at(40), 6.0), (at(60), 9.0), (at(80), 12.0)];
+        for (eval_ts, query, expected) in [
+            (at(100), "m[1m]", in_window),
+            (at(100), "(m[1m])", in_window),
+            (at(180), "m[1m] @ 1100", in_window),
+            // an offset reads the earlier window and answers with the samples' own times
+            (at(100), "m[1m] offset 20s", raw_offset),
+            (at(180), "m[1m] @ 1100 offset 20s", raw_offset),
+        ] {
+            let (value, _) = exec_instant(eval_ts, query).await;
+            let series = canonical(value);
+            assert_eq!(series.len(), 2, "{query}");
+            for (_, samples) in series {
+                assert_eq!(samples, expected, "{query}");
+            }
+        }
+        // a window holding only the sample on its left edge selects nothing
+        let (value, _) = exec_instant(at(181), "m[1s]").await;
+        assert!(matches!(value, Value::None), "{}", value.get_type());
     }
 
     #[tokio::test]
