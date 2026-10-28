@@ -156,6 +156,35 @@ describe("UnpricedModelsTab", () => {
     });
   });
 
+  it("lists spans without a model name as one row that links to the instrumentation guide", async () => {
+    const noModel: UnpricedModel = {
+      model: null,
+      status: "unpriced",
+      spans: 4,
+      tokens: 1200,
+      cost: 0,
+      agents: [],
+      matched: null,
+    };
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    wrapper = mountTab([noModel, ...unpricedResponse.models]);
+    const row = await waitForRow(wrapper, "(no model name)");
+
+    expect(wrapper.findAll('[data-test="model-pricing-unpriced-row"]')).toHaveLength(3);
+    // Nothing to price: no Create price or Mute, a pointer to the fix instead.
+    expect(row.find('[data-test="model-pricing-unpriced-create-btn"]').exists()).toBe(false);
+    expect(row.find('[data-test="model-pricing-unpriced-mute-btn"]').exists()).toBe(false);
+    expect(row.find('[data-test="model-pricing-unpriced-no-model"]').exists()).toBe(true);
+    await row.find('[data-test="model-pricing-unpriced-docs-btn"]').trigger("click");
+    expect(open).toHaveBeenCalledWith(
+      "https://openobserve.ai/docs/integration/ai/",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    expect(routerPushMock).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
   it("Keep saves an exact org price that copies the matched tiers", async () => {
     wrapper = mountTab();
     const row = await waitForRow(wrapper, "gpt-5.4-mini");

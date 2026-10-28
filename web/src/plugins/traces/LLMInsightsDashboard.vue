@@ -261,7 +261,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="dataHealthLoading"
           :error="dataHealthError"
           :stream="effectiveStream"
+          :samples="dataHealthSamples"
+          :samples-loading="dataHealthSamplesLoading"
           @rerun="loadDataHealth(true)"
+          @load-samples="fetchSamples"
           @view-trace="onViewTrace"
         />
         <!-- KPI strip: keep a skeleton until the first KPI result lands so the
@@ -506,11 +509,15 @@ const {
   health: dataHealth,
   loading: dataHealthLoading,
   error: dataHealthError,
+  samples: dataHealthSamples,
+  samplesLoading: dataHealthSamplesLoading,
   fetchHealth,
+  fetchSamples,
 } = useLLMDataHealth();
 const unpriced = computed(() => unpricedSummary(dataHealth.value));
 const unpricedModelNames = computed(
-  () => unpriced.value?.models.map((m) => m.model).join(", ") ?? "",
+  () =>
+    unpriced.value?.models.map((m) => m.model ?? t("llmDataTrust.noModelName")).join(", ") ?? "",
 );
 function loadDataHealth(refresh = false, start = props.startTime, end = props.endTime) {
   const agent = effectiveAgent.value;

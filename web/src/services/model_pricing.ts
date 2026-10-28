@@ -43,7 +43,8 @@ export interface NewPricingDefinition {
 
 /** A model seen in spans that matched no price, or only part of a pattern. */
 export interface UnpricedModel {
-  model: string;
+  /** Null for spans that carry tokens but no model name: nothing to price. */
+  model: string | null;
   status: "unpriced" | "approximate";
   spans: number;
   tokens: number;

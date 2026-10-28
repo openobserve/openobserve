@@ -623,15 +623,19 @@ pub struct UnpricedModelsResponse {
 
 /// Joins the spans' ingest-time status with today's definitions: a model that now has an exact
 /// price (created, kept or muted since) is dropped; the rest carry what they resolve to now.
+/// Spans with no model name have nothing to match, so they stay unpriced.
 fn resolve_unpriced(
     rows: Vec<crate::request::gen_ai_health::UnpricedModelRow>,
     entries: &[CachedModelPricing],
     now_micros: i64,
 ) -> Vec<UnpricedModel> {
-    let mut by_model: HashMap<String, UnpricedModel> = HashMap::new();
+    let mut by_model: HashMap<Option<String>, UnpricedModel> = HashMap::new();
     let mut order = Vec::new();
     for row in rows {
-        let resolved = model_pricing::find_pricing_sync_at(entries, &row.model, Some(now_micros));
+        let resolved = row
+            .model
+            .as_deref()
+            .and_then(|m| model_pricing::find_pricing_sync_at(entries, m, Some(now_micros)));
         if matches!(&resolved, Some(r) if r.match_kind == MatchKind::Exact) {
             continue;
         }
@@ -678,7 +682,7 @@ fn resolve_unpriced(
     tag = "LLM",
     operation_id = "ListUnpricedModels",
     summary = "List models seen in traces with no price or an approximate one",
-    description = "Models in the stream's spans that ingest marked unpriced or approximately priced during the window, with spans, tokens and recorded cost. Models that resolve to an exact price today are omitted.",
+    description = "Models in the stream's spans that ingest marked unpriced or approximately priced during the window, with spans, tokens and recorded cost. Models that resolve to an exact price today are omitted. Spans with tokens but no model name are listed as one row with a null model.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -687,6 +691,8 @@ fn resolve_unpriced(
     responses(
         (status = 200, description = "Success", body = UnpricedModelsResponse),
         (status = 400, description = "Invalid query"),
+        (status = 403, description = "Forbidden"),
+        (status = 429, description = "Search not allowed for the organization"),
         (status = 500, description = "Internal server error"),
     ),
 )]
@@ -1600,7 +1606,7 @@ mod tests {
         tokens: i64,
     ) -> crate::request::gen_ai_health::UnpricedModelRow {
         crate::request::gen_ai_health::UnpricedModelRow {
-            model: model.to_string(),
+            model: Some(model.to_string()),
             status,
             spans: 1,
             tokens,
@@ -1624,13 +1630,31 @@ mod tests {
             unpriced_row("gpt-5.4-mini", CostStatus::Unpriced, 20),
         ];
         let out = resolve_unpriced(rows, &entries, 0);
-        let models: Vec<_> = out.iter().map(|m| m.row.model.as_str()).collect();
-        assert_eq!(models, ["acme-internal-llm", "gpt-5.4-mini"]);
+        let models: Vec<_> = out.iter().map(|m| m.row.model.as_deref()).collect();
+        assert_eq!(models, [Some("acme-internal-llm"), Some("gpt-5.4-mini")]);
         assert!(out[0].matched.is_none());
         assert_eq!(out[0].row.status, CostStatus::Unpriced);
         assert_eq!(out[1].row.status, CostStatus::Approximate);
         assert_eq!(out[1].row.tokens, 50);
         assert_eq!(out[1].matched.as_ref().unwrap().name, "GPT-5.4");
+    }
+
+    #[test]
+    fn test_resolve_unpriced_keeps_spans_without_a_model_name() {
+        use config::meta::model_pricing::CostStatus;
+        let mut no_model = unpriced_row("x", CostStatus::Unpriced, 70);
+        no_model.model = None;
+        let mut no_model_again = no_model.clone();
+        no_model_again.tokens = 30;
+        let out = resolve_unpriced(vec![no_model, no_model_again], &built_in_gpt_4o(), 0);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].row.model, None);
+        assert_eq!(out[0].row.status, CostStatus::Unpriced);
+        assert_eq!(out[0].row.tokens, 100);
+        assert!(out[0].matched.is_none());
+        // The model is null on the wire, not an empty name.
+        let wire = config::utils::json::to_value(&out[0]).unwrap();
+        assert_eq!(wire.get("model"), Some(&config::utils::json::Value::Null));
     }
 
     #[test]

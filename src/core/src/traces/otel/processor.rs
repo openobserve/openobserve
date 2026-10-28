@@ -312,7 +312,11 @@ impl OtelIngestionProcessor {
             let (billable_usage, tier_usage) = build_pricing_usage(&usage, input_includes_cache);
 
             // Resolve only for spans without a client-reported cost; the lookup runs regexes.
-            if cost.is_empty()
+            // A span with tokens but no model name has nothing to price: it is unpriced, not
+            // free. One without tokens stays unmarked.
+            if cost.is_empty() && extracted.model_name.is_none() && usage.values().any(|&v| v > 0) {
+                cost_status = Some(CostStatus::Unpriced);
+            } else if cost.is_empty()
                 && let Some(model_name) = extracted.model_name.as_deref()
             {
                 let resolved = crate::db::model_pricing::find_pricing_sync_at(
@@ -1716,6 +1720,32 @@ mod tests {
                 .and_then(|v| v.as_f64()),
             Some(noisy)
         );
+    }
+
+    #[test]
+    fn test_no_model_with_tokens_is_unpriced_without_tokens_unmarked() {
+        let processor = OtelIngestionProcessor::new();
+        let mut with_tokens = chat_span("x");
+        with_tokens.remove("gen_ai.request.model");
+        processor.process_span(&mut with_tokens, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&with_tokens), Some("unpriced"));
+        assert!(!with_tokens.contains_key(GenAiAttributes::USAGE_COST));
+        assert_eq!(
+            with_tokens.get(GenAiAttributes::USAGE_TOTAL_TOKENS),
+            Some(&json::json!(1500))
+        );
+
+        let mut no_tokens = HashMap::new();
+        no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        processor.process_span(&mut no_tokens, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&no_tokens), None);
+
+        // A client-reported cost still wins over the missing model.
+        let mut client_cost = chat_span("x");
+        client_cost.remove("gen_ai.request.model");
+        client_cost.insert("gen_ai.usage.cost".to_string(), json::json!(0.25));
+        processor.process_span(&mut client_cost, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&client_cost), None);
     }
 
     #[test]
