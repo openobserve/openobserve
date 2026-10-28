@@ -58,7 +58,7 @@ describe("roleCompanions - rules", () => {
     },
   );
 
-  it.each(["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"])(
+  it.each(["AllowAll", "AllowGet", "AllowPost", "AllowPut"])(
     "flags Streams List and Get for %s on Dashboard Folders",
     (action) => {
       expect(summary(gapsFor([`dfolder:${ALL}:${action}`]))).toEqual([
@@ -66,6 +66,14 @@ describe("roleCompanions - rules", () => {
       ]);
     },
   );
+
+  it.each([
+    `dfolder:${ALL}:AllowList`,
+    `dfolder:${ALL}:AllowDelete`,
+    "dashboard:default/old:AllowDelete",
+  ])("does not flag Streams for %s, which reads no panel data", (key) => {
+    expect(gapsFor([key])).toEqual([]);
+  });
 
   it("merges two rules that need Streams into one entry and names each module that needs it", () => {
     const gaps = gapsFor([`afolder:${ALL}:AllowPut`, `dfolder:${ALL}:AllowGet`]);
@@ -171,6 +179,38 @@ describe("roleCompanions - met", () => {
     ]);
   });
 
+  it("needs List on each stream type the role reads, not on any one type", () => {
+    const keys = [
+      `afolder:${ALL}:AllowPost`,
+      `destination:${ALL}:AllowAll`,
+      `template:${ALL}:AllowAll`,
+      `metrics:${ALL}:AllowList`,
+      "logs:app:AllowGet",
+    ];
+    expect(summary(gapsFor(keys))).toEqual(["stream: AllowList"]);
+    expect(gapsFor([...keys, `logs:${ALL}:AllowList`])).toEqual([]);
+  });
+
+  it("is met for List by the stream wildcard whatever types the role reads", () => {
+    expect(
+      gapsFor([
+        `dfolder:${ALL}:AllowGet`,
+        `stream:${ALL}:AllowList`,
+        "logs:app:AllowGet",
+        "metrics:cpu:AllowGet",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("needs List on every stream type once the stream wildcard grants Get", () => {
+    const keys = [`dfolder:${ALL}:AllowGet`, `stream:${ALL}:AllowGet`, `metrics:${ALL}:AllowList`];
+    expect(summary(gapsFor(keys))).toEqual(["stream: AllowList"]);
+    expect(gapsFor([...keys, `stream:${ALL}:AllowList`])).toEqual([]);
+    expect(
+      gapsFor([...keys, ...["logs", "traces", "index"].map((type) => `${type}:${ALL}:AllowList`)]),
+    ).toEqual([]);
+  });
+
   it("does not read a stream named like the wildcard as the wildcard", () => {
     expect(summary(gapsFor([`dfolder:${ALL}:AllowGet`, "logs:_all_x:AllowAll"]))).toEqual([
       "stream: AllowList",
@@ -178,7 +218,7 @@ describe("roleCompanions - met", () => {
   });
 
   it("flags only the action still missing", () => {
-    expect(summary(gapsFor([`dfolder:${ALL}:AllowList`, `stream:${ALL}:AllowList`]))).toEqual([
+    expect(summary(gapsFor([`dfolder:${ALL}:AllowGet`, `stream:${ALL}:AllowList`]))).toEqual([
       "stream: AllowGet",
     ]);
   });

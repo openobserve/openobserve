@@ -34,7 +34,7 @@ const WRITES: readonly PermissionType[] = ["AllowAll", "AllowPost", "AllowPut"];
 
 const ACTION_ORDER: CompanionAction[] = ["AllowList", "AllowGet"];
 
-// Alert save checks stream access (background_access/mod.rs), the alert form lists destinations, every destination needs a template, and panels query streams; destination and template lists keep only items the user can Get.
+// Alert save checks stream access (background_access/mod.rs), the alert form lists destinations, every destination needs a template, and opening or building a dashboard queries its panels' streams; destination and template lists keep only items the user can Get.
 const COMPANION_RULES: CompanionRule[] = [
   {
     trigger: "afolder",
@@ -65,7 +65,7 @@ const COMPANION_RULES: CompanionRule[] = [
   },
   {
     trigger: "dfolder",
-    on: ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"],
+    on: ["AllowAll", "AllowGet", "AllowPost", "AllowPut"],
     needs: [
       {
         module: "stream",
@@ -76,11 +76,13 @@ const COMPANION_RULES: CompanionRule[] = [
   },
 ];
 
+const STREAM_TYPES = ["logs", "metrics", "traces", "index"];
+
 // Item grants live on child resources, so a saved `alert:f1/a9` or `metrics:cpu` counts even before its list loads.
 const RESOURCES_OF: Record<string, string[]> = {
   afolder: ["afolder", "alert"],
   dfolder: ["dfolder", "dashboard"],
-  stream: ["stream", "logs", "metrics", "traces", "index"],
+  stream: ["stream", ...STREAM_TYPES],
 };
 
 // A hand-built role picks its streams; one Add here must not open every stream in the org.
@@ -94,10 +96,25 @@ const indexAction = (index: ActionIndex, resource: string, action: string) => {
   index.set(resource, actions);
 };
 
+const holds = (index: ActionIndex, resource: string, actions: readonly string[]) =>
+  actions.some((action) => index.get(resource)?.has(action));
+
 const holdsAny = (index: ActionIndex, module: string, actions: readonly string[]) =>
-  (RESOURCES_OF[module] ?? [module]).some((resource) =>
-    actions.some((action) => index.get(resource)?.has(action)),
-  );
+  (RESOURCES_OF[module] ?? [module]).some((resource) => holds(index, resource, actions));
+
+// FGA checks List per stream type, so List on metrics lists none of the logs streams the role can read.
+const listsReadStreams = (anyItem: ActionIndex, moduleWide: ActionIndex) => {
+  const list = ["AllowList", "AllowAll"];
+  const read = ["AllowGet", "AllowAll"];
+  if (holds(moduleWide, "stream", list)) return true;
+  // The stream wildcard's Get reads every type, so each type must list.
+  const readTypes = holds(moduleWide, "stream", read)
+    ? STREAM_TYPES
+    : STREAM_TYPES.filter((type) => holds(anyItem, type, read));
+  return readTypes.length
+    ? readTypes.every((type) => holds(moduleWide, type, list))
+    : STREAM_TYPES.some((type) => holds(moduleWide, type, list));
+};
 
 /** Modules a role's grants need to work but lacks: List needs a module-wide grant, Get any item's, All counting for both. */
 export function findCompanionGaps(
@@ -125,12 +142,13 @@ export function findCompanionGaps(
       .filter((need) => availableModules.has(need.module))
       .forEach((need) => {
         // FGA checks List on the org wildcard, so one item's grant opens that item but lists nothing.
-        const missing = need.actions.filter(
-          (action) =>
-            !holdsAny(action === "AllowList" ? moduleWide : anyItem, need.module, [
-              action,
-              "AllowAll",
-            ]),
+        const missing = need.actions.filter((action) =>
+          action === "AllowList" && need.module === "stream"
+            ? !listsReadStreams(anyItem, moduleWide)
+            : !holdsAny(action === "AllowList" ? moduleWide : anyItem, need.module, [
+                action,
+                "AllowAll",
+              ]),
         );
         if (!missing.length) return;
         const gap = gaps.get(need.module) ?? { module: need.module, actions: [], neededBy: [] };
