@@ -469,6 +469,59 @@ describe("OnCallPhoneCard", () => {
   });
 
   // S10: a phone can be taken off, after one line saying what that means.
+  // Review finding 4: Remove is offered whenever a number is saved, whatever its verification or the provider.
+  describe("which states offer Remove", () => {
+    it.each([
+      ["verified", VERIFIED, true],
+      ["a saved unverified number after a reload", UNVERIFIED, true],
+      [
+        "a saved number with no provider",
+        contact({ phone: PHONE, phone_provider_available: false }),
+        true,
+      ],
+      ["no number", contact(), false],
+    ] as const)("%s", async (_case, read, shown) => {
+      const w = await render(read);
+      expect(find(w, "remove").exists()).toBe(shown);
+    });
+
+    it("a code sent", async () => {
+      const w = await render(contact());
+      service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+      service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+      service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+      await find(w, "input").setValue(PHONE);
+      await find(w, "send").trigger("click");
+      await flushPromises();
+
+      expect(find(w, "code").exists()).toBe(true);
+      expect(find(w, "remove").exists()).toBe(true);
+    });
+
+    it("clears an unverified number through its own confirm, showing it is busy meanwhile", async () => {
+      const w = await render(UNVERIFIED);
+      let finish: (v: unknown) => void = () => {};
+      service.setContact.mockReturnValue(new Promise((resolve) => (finish = resolve)) as any);
+
+      await find(w, "remove").trigger("click");
+      expect(w.find('[data-test="confirm"]').text()).toBe(
+        "Remove your phone? Pages will reach you by email only.",
+      );
+      w.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+      expect(w.findComponent('[data-test="oncall-phone-remove"]').props("loading")).toBe(true);
+
+      service.getContact.mockResolvedValue({ data: contact() } as any);
+      finish({ data: contact() });
+      await flushPromises();
+      expect(service.setContact).toHaveBeenCalledWith({
+        org_identifier: ORG,
+        user_email: EMAIL,
+        data: { phone: "" },
+      });
+    });
+  });
+
   it("verified: Remove clears the number after a confirm", async () => {
     const w = await render(VERIFIED);
     service.setContact.mockResolvedValue({ data: contact() } as any);

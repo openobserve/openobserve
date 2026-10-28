@@ -117,6 +117,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.cancel") }}
         </OButton>
+        <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
+        <OButton
+          v-if="contact.phone && !editing"
+          variant="outline-destructive"
+          size="xs"
+          :loading="removing"
+          data-test="oncall-phone-remove"
+          @click="removeOpen = true"
+        >
+          {{ t("oncall.phoneRemove") }}
+        </OButton>
         <OText v-if="state === 'empty'" variant="meta">{{ t("oncall.phoneSendHint") }}</OText>
       </span>
 
