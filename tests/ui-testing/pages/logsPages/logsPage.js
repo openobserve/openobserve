@@ -12491,7 +12491,7 @@ export class LogsPage {
             } catch {
                 return false;
             }
-        }, { timeout }).catch(() => {
+        }, undefined, { timeout }).catch(() => {
             testLogger.warn('streamKeywords hydration not observed — autocomplete may still work via cached state');
         });
     }
@@ -12525,7 +12525,7 @@ export class LogsPage {
             } catch {
                 return false;
             }
-        }, { timeout }).catch(() => {
+        }, undefined, { timeout }).catch(() => {
             testLogger.warn('field keywords hydration not observed — field suggestions may be absent');
         });
     }

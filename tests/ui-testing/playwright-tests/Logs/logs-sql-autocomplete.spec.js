@@ -33,8 +33,6 @@ const logData = require('../../fixtures/log.json');
 // ============================================================================
 
 test.describe("SQL Autocomplete — Logs", () => {
-    test.describe.configure({ mode: 'serial' });
-
     let pm;
     const streamName = 'e2e_automate';
     const orgName = process.env['ORGNAME'] || 'default';
