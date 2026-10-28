@@ -92,7 +92,9 @@ describe("ClickHeatmap", () => {
         disconnect() {}
       },
     );
-    h.getStream.mockResolvedValue({ schema: [] });
+    h.getStream.mockImplementation(async (name: string) => ({
+      schema: name === "_sessionreplay" ? [{ name: "has_full_snapshot" }] : [],
+    }));
   });
 
   it("shows the load error banner and not the empty state when the app list fails", async () => {
@@ -314,6 +316,16 @@ describe("ClickHeatmap", () => {
     const flags = h.run.mock.calls.find((c) => c[0] === "replay-flags");
     expect(flags?.[1].sql).toContain("GROUP BY view_id");
     expect(flags?.[1].sql).toContain("bool_or(has_full_snapshot)");
+  });
+
+  it("skips the snapshot flag query when _sessionreplay has no has_full_snapshot column", async () => {
+    h.getStream.mockResolvedValue({ schema: [] });
+    answer({ "replay-views": () => ok([{ view_id: "v1" }, { view_id: "v2" }]) });
+    await mountPage();
+
+    expect(ids()).not.toContain("replay-flags");
+    const segments = h.run.mock.calls.find((c) => c[0] === "replay-segments");
+    expect(segments?.[1].sql).toContain("v1");
   });
 
   it("runs the snapshot lookups through the real search helper without a stream rejection", async () => {

@@ -203,3 +203,22 @@ describe("identity exclusions", () => {
     expect(rankingSql(sc, "/pricing", "all")).toContain(RULE);
   });
 });
+
+describe("streams without action_id", () => {
+  const { action_id: _a, ...schema } = FULL;
+  const bare = scope({ schema });
+
+  it("keys distinct clicks on the timestamp in every query", () => {
+    const sqls = [
+      pageListSql(bare),
+      deviceSplitSql(bare, "/pricing"),
+      totalsSql(bare, "/pricing", "all"),
+      rankingSql(bare, "/pricing", "all") as string,
+    ];
+    for (const sql of sqls) {
+      expect(sql).not.toContain("action_id");
+      expect(sql).toContain("COUNT(DISTINCT _timestamp)");
+    }
+    expect(sqls[3]).toContain("THEN _timestamp END");
+  });
+});

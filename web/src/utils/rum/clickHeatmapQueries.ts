@@ -33,6 +33,10 @@ const NO_SIGNAL = "('', '[]')";
 
 const has = (scope: AnalyticsScope, field: string): boolean => scope.schema[field] === true;
 
+// Streams without action_id still have one row per click, so the timestamp stands in as the key.
+const clickKey = (scope: AnalyticsScope): string =>
+  has(scope, "action_id") ? "action_id" : "_timestamp";
+
 const present = (scope: AnalyticsScope, field: string): string | null => {
   const names = rumFieldNames(field).filter((n) => has(scope, n));
   if (!names.length) return null;
@@ -44,12 +48,12 @@ const widthExpr = (scope: AnalyticsScope): string =>
 
 const frustrationHas = (scope: AnalyticsScope, signal: string): string =>
   has(scope, FRUSTRATION)
-    ? `COUNT(DISTINCT CASE WHEN ${FRUSTRATION} LIKE '%${signal}%' THEN action_id END)`
+    ? `COUNT(DISTINCT CASE WHEN ${FRUSTRATION} LIKE '%${signal}%' THEN ${clickKey(scope)} END)`
     : "0";
 
 const frustratedExpr = (scope: AnalyticsScope): string =>
   has(scope, FRUSTRATION)
-    ? `COUNT(DISTINCT CASE WHEN ${FRUSTRATION} IS NOT NULL AND ${FRUSTRATION} NOT IN ${NO_SIGNAL} THEN action_id END)`
+    ? `COUNT(DISTINCT CASE WHEN ${FRUSTRATION} IS NOT NULL AND ${FRUSTRATION} NOT IN ${NO_SIGNAL} THEN ${clickKey(scope)} END)`
     : "0";
 
 /** The expression naming a clicked element, or null when the stream records no target. */
@@ -81,19 +85,19 @@ const pageRows = (scope: AnalyticsScope, url: string, device: DeviceClass): stri
 
 /** Clicks per page, for the page picker. */
 export function pageListSql(scope: AnalyticsScope): string {
-  return `SELECT view_url, COUNT(DISTINCT action_id) AS clicks FROM "_rumdata" WHERE ${clickRows(scope)} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT ${PAGE_LIST_LIMIT}`;
+  return `SELECT view_url, COUNT(DISTINCT ${clickKey(scope)}) AS clicks FROM "_rumdata" WHERE ${clickRows(scope)} AND view_url IS NOT NULL AND view_url <> '' GROUP BY view_url ORDER BY clicks DESC, view_url ASC LIMIT ${PAGE_LIST_LIMIT}`;
 }
 
 /** Clicks per device class on one page; clicks without a width land in `unknown`. */
 export function deviceSplitSql(scope: AnalyticsScope, url: string): string {
   const w = widthExpr(scope);
   const cls = `CASE WHEN ${w} >= ${DESKTOP_MIN_WIDTH} THEN 'desktop' WHEN ${w} >= ${TABLET_MIN_WIDTH} THEN 'tablet' WHEN ${w} > 0 THEN 'phone' ELSE 'unknown' END`;
-  return `SELECT ${cls} AS cls, COUNT(DISTINCT action_id) AS clicks FROM "_rumdata" WHERE ${clickRows(scope)} AND view_url = ${sqlLiteral(url)} GROUP BY cls ORDER BY cls ASC`;
+  return `SELECT ${cls} AS cls, COUNT(DISTINCT ${clickKey(scope)}) AS clicks FROM "_rumdata" WHERE ${clickRows(scope)} AND view_url = ${sqlLiteral(url)} GROUP BY cls ORDER BY cls ASC`;
 }
 
 /** Distinct clicks, distinct sessions and frustrated clicks for one page and device. */
 export function totalsSql(scope: AnalyticsScope, url: string, device: DeviceClass): string {
-  return `SELECT COUNT(DISTINCT action_id) AS clicks, COUNT(DISTINCT session_id) AS sessions, ${frustratedExpr(scope)} AS frustrated FROM "_rumdata" WHERE ${pageRows(scope, url, device)}`;
+  return `SELECT COUNT(DISTINCT ${clickKey(scope)}) AS clicks, COUNT(DISTINCT session_id) AS sessions, ${frustratedExpr(scope)} AS frustrated FROM "_rumdata" WHERE ${pageRows(scope, url, device)}`;
 }
 
 /** Per-element clicks, sessions and frustration split; null when the stream records no target. */
@@ -104,7 +108,7 @@ export function rankingSql(scope: AnalyticsScope, url: string, device: DeviceCla
   const cols = [
     `${sel} AS selector`,
     `${name} AS name`,
-    "COUNT(DISTINCT action_id) AS clicks",
+    `COUNT(DISTINCT ${clickKey(scope)}) AS clicks`,
     "COUNT(DISTINCT session_id) AS sessions",
     `${frustrationHas(scope, "rage_click")} AS rage`,
     `${frustrationHas(scope, "dead_click")} AS dead`,

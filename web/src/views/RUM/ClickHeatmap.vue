@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex min-w-0 flex-col" :data-test="`rum-heatmap-feature-${row.selector}`">
                 <span
                   v-if="row.firstUnused"
-                  class="text-text-secondary text-xs font-medium uppercase"
+                  class="text-text-secondary text-xs font-medium"
                   data-test="rum-heatmap-unused-heading"
                 >
                   {{ t("rum.heatmap.unusedHeading") }}
@@ -573,7 +573,11 @@ async function loadApps() {
       APP_LIMIT,
       windowMicros(RANGE_HOURS[rangeKey.value]),
     );
-    if (token !== loadToken || !rows) return;
+    if (token !== loadToken) return;
+    if (!rows) {
+      loading.value = false;
+      return;
+    }
     appOptions.value = rows.map((r) => ({ label: raw(r.app), value: r.app }));
     if (!appOptions.value.some((o) => o.value === appId.value)) {
       appId.value = appOptions.value[0]?.value ?? "";
@@ -742,6 +746,12 @@ async function pickReplayView(token: number): Promise<string | null> {
     30,
   );
   if (!views.length || token !== loadToken) return null;
+  const replayStream = await getStream("_sessionreplay", "logs", true);
+  if (token !== loadToken) return null;
+  // Older and mobile streams have no has_full_snapshot column, so any view may hold a snapshot.
+  if (!(replayStream?.schema ?? []).some((f: any) => f?.name === "has_full_snapshot")) {
+    return String(views[0].view_id);
+  }
   const ids = views.map((v) => sqlLiteral(String(v.view_id))).join(",");
   const rows = await replayRows(
     "replay-flags",
