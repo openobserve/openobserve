@@ -44,7 +44,7 @@ use bytes::Bytes;
 use config::{
     get_config,
     meta::stream::{FileKey, FileListDeleted, StreamType},
-    utils::{inverted_index::to_tantivy_name, time::now_micros},
+    utils::{inverted_index::to_tantivy_name, parquet::parse_file_key_columns, time::now_micros},
 };
 use infra::{
     bloom::{BloomWriter, FieldBloom, path::bloom_path},
@@ -80,7 +80,7 @@ pub(crate) async fn build_for_stream(
     orphan_blooms: Vec<i64>,
 ) -> Result<bool> {
     let cfg = get_config();
-    if !cfg.common.bloom_filter_enabled {
+    if !cfg.common.bloom_filter_enabled || bloom_key_too_long(org_id, stream_type, stream_name) {
         return Ok(false);
     }
 
@@ -174,6 +174,10 @@ pub(crate) fn bloom_files_deleted(
     stream_name: &str,
     bloom_hours: impl IntoIterator<Item = (String, i64)>,
 ) -> Vec<FileListDeleted> {
+    // such a `.bf` is left in storage so the batch still queues the stream's data files
+    if bloom_key_too_long(org_id, stream_type, stream_name) {
+        return vec![];
+    }
     bloom_hours
         .into_iter()
         .filter(|(_, bloom_ver)| *bloom_ver > 0)
@@ -203,6 +207,12 @@ fn bloom_file_deleted(
         mindex_file: false,
         flattened: false,
     }
+}
+
+/// Whether the stream's `.bf` key, 6 characters longer than its own, is too long to store.
+fn bloom_key_too_long(org_id: &str, stream_type: StreamType, stream_name: &str) -> bool {
+    let path = bloom_path(org_id, stream_type, stream_name, "1970/01/01/00", 1);
+    parse_file_key_columns(&path).is_ok_and(|(key, ..)| schema::is_file_list_key_too_long(&key))
 }
 
 // B for this chunk is sized from the chunk's MAX record count, used as

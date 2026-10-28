@@ -918,6 +918,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_deleted_items_skip_a_too_long_bloom_key() {
+        // the source key fits at 251 characters, its bloom key does not at 257
+        let stream = "s".repeat(242);
+        assert!(!schema::is_stream_key_too_long(
+            "org",
+            StreamType::Logs,
+            &stream
+        ));
+        let files = [FileKey::new(
+            0,
+            String::new(),
+            format!("files/org/logs/{stream}/2026/08/19/07/a.parquet"),
+            FileMeta {
+                bloom_ver: 7,
+                ..Default::default()
+            },
+            true,
+        )];
+
+        let deleted = deleted_items("org", StreamType::Logs, &stream, &files).unwrap();
+
+        let expected = if schema::file_list_keys_bounded() {
+            1
+        } else {
+            2
+        };
+        assert_eq!(deleted.len(), expected);
+        assert!(deleted[0].file.ends_with("a.parquet"));
+    }
+
     #[tokio::test]
     async fn test_populate_time_ranges() {
         let now = Utc::now();

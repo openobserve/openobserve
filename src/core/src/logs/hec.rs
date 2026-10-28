@@ -967,12 +967,13 @@ mod tests {
             return;
         }
         let user = IngestUser::User("hec-abc@hec.local".to_string());
+        // long stream first, so the good one's admission checks cannot decide the result
         let streams = vec![
-            ("good".to_string(), vec![json::json!({"log": "a"})]),
             (
                 "s".repeat(schema::STREAM_KEY_MAX_LEN),
                 vec![json::json!({"log": "b"})],
             ),
+            ("good".to_string(), vec![json::json!({"log": "a"})]),
         ];
         let err = preflight_streams("test-org", &streams, &user)
             .await

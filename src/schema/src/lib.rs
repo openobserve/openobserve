@@ -158,6 +158,11 @@ pub fn is_stream_key_too_long(org_id: &str, stream_type: StreamType, stream_name
     stream_key_violation(org_id, stream_type, stream_name).is_some()
 }
 
+/// Whether a derived file_list stream key, such as a bloom key, is too long to store.
+pub fn is_file_list_key_too_long(stream_key: &str) -> bool {
+    file_list_keys_bounded() && stream_key.chars().count() > STREAM_KEY_MAX_LEN
+}
+
 /// Rejects a stream whose file_list key or org cannot be stored, counting it as an ingest error.
 pub fn check_stream_key_len(
     org_id: &str,
