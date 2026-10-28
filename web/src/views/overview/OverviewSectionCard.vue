@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         block
         icon-left="lock"
-        class="justify-start text-left"
+        class="h-auto! justify-start! px-3! py-3! text-start whitespace-normal!"
         :data-test="`overview-${section}-locked`"
         @click="emit('unlock')"
       >
