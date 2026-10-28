@@ -262,7 +262,7 @@ export interface FlameGraphNode {
   self?: number;
   /** Baseline side of a diff tree; total and self are then the comparison side. */
   before_total?: number;
-  /** Comparison side, set when the drawn tree is the baseline side (Side by Side). */
+  /** Comparison side, set when the drawn tree is the baseline side (Side by side). */
   after_total?: number;
   children?: FlameGraphNode[];
 }
@@ -357,6 +357,8 @@ const chartRendererRef = ref<{
     setOption: (option: object) => void;
     dispatchAction: (action: object) => void;
     getDom: () => HTMLElement;
+    getWidth?: () => number;
+    getHeight?: () => number;
     resize: () => void;
   };
 } | null>(null);
@@ -796,7 +798,7 @@ const openMenuFromButton = (event: MouseEvent) => {
   nextTick(fitMenu);
 };
 
-// A one-time hint for the wheel zoom; "Don't Show Again" keeps it closed.
+// A one-time hint for the wheel zoom; "Don't show again" keeps it closed.
 const ZOOM_HINT_KEY = "o2_flame_zoom_hint_hidden";
 const zoomKey = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 const readHintHidden = () => {
@@ -918,7 +920,15 @@ let resizeObserver: ResizeObserver | null = null;
 let resizeFrame = 0;
 const resizeChart = () => {
   resizeFrame = 0;
-  chartRendererRef.value?.chart?.resize?.();
+  const chart = chartRendererRef.value?.chart;
+  const dom = chart?.getDom?.();
+  if (!chart || !dom) return;
+  const width = dom.clientWidth;
+  const height = dom.clientHeight;
+  // ChartRenderer may already have resized for the same change; a second resize redraws for nothing.
+  if (width <= 0 || height <= 0) return;
+  if (width === chart.getWidth?.() && height === chart.getHeight?.()) return;
+  chart.resize?.();
 };
 
 onMounted(() => {

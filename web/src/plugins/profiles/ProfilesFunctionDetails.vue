@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Function Details panel beside the Profiles results; the header copies the Traces span sidebar. -->
+<!-- Function details panel beside the Profiles results; the header copies the Traces span sidebar. -->
 <template>
   <aside class="bg-surface-panel flex min-h-0 flex-col" data-test="profiles-function-details">
     <div class="border-border-default flex h-8 shrink-0 items-center gap-1 border-b ps-3 pe-1">

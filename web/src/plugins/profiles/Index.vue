@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("profiles.partialResult", { percent: sampledPercent }) }}
           </OBanner>
-          <!-- Views on the left, Function Details beside them (below them on phones). -->
+          <!-- Views on the left, Function details beside them (below them on phones). -->
           <div class="md:flex md:min-h-0 md:flex-1">
             <div class="md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col">
               <OTable
@@ -792,7 +792,7 @@ const resultsExpanded = ref(false);
 const flameGraphRef = ref<{ focus: (path: string) => void } | null>(null);
 // The function the Sandwich view shows; null means the one with the most self samples.
 const sandwichFunction = ref<string | null>(null);
-// The function in the Function Details panel; null hides the panel.
+// The function in the Function details panel; null hides the panel.
 const detailsName = ref<string | null>(null);
 // The focused flame graph frame, kept here so it outlives a view switch and goes into the URL.
 const flameFocus = ref<string | null>(null);
@@ -1144,7 +1144,7 @@ const treeCoverage = (name: string | null, drawn: number) => {
 const sandwichCoverage = computed(() =>
   treeCoverage(sandwichName.value, sandwichCallees.value?.total ?? 0),
 );
-// Function Details: exact Self and Total from the Top list, callers and callees from the drawn tree.
+// Function details: exact Self and Total from the Top list, callers and callees from the drawn tree.
 const detailsRow = computed(
   () => mergeResult.value?.top.find((row) => row.name === detailsName.value) ?? null,
 );

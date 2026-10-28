@@ -815,7 +815,6 @@ describe("Profiles page", () => {
       window.dispatchEvent(new CustomEvent("themeColorChanged"));
       await nextTick();
       expect(colorOf()).toBe("rgb(7, 8, 9)");
-      wrapper.unmount();
     } finally {
       html.style.removeProperty("--color-chart-series-1");
     }
@@ -1017,7 +1016,7 @@ describe("Profiles page", () => {
     expect(wrapper.find('[data-test="profiles-sandwich-coverage"]').text()).toContain("50.00%");
   });
 
-  it("shows Function Details for a row and closes them", async () => {
+  it("shows Function details for a row and closes them", async () => {
     mocks.merge.mockResolvedValue({
       data: {
         ...mergeResponse.data,

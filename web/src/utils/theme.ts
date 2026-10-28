@@ -76,8 +76,8 @@ export const switchThemeMode = (mode: "light" | "dark", applyChanges: () => void
  * Resolve a design-token CSS custom property to its concrete value at runtime.
  *
  * Charts (ECharts options, SVG data-URI symbols, canvas) can't use CSS `var()` —
- * they need a literal color string. This reads the token from the document root
- * so the single source of truth stays the token layer (`lib/styles/tokens/*`),
+ * they need a literal color string. This reads the token from `body` first (where
+ * theme presets write it), then the document root, so the single source of truth stays the token layer (`lib/styles/tokens/*`),
  * not a hardcoded hex. `fallback` is returned when the token is unset or the DOM
  * is unavailable (SSR / unit tests), so callers still get a sensible value.
  *

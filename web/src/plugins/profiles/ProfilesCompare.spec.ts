@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, nextTick, ref } from "vue";
 import { createStore, type Store } from "vuex";
 import i18n from "@/locales";
@@ -105,6 +105,8 @@ const mountCompare = (initial: Partial<CompareState> = {}, store?: Store<{ theme
   return { wrapper, state };
 };
 
+enableAutoUnmount(afterEach);
+
 describe("ProfilesCompare", () => {
   beforeEach(() => {
     mocks.tagValues.mockReset().mockResolvedValue({
@@ -191,7 +193,7 @@ describe("ProfilesCompare", () => {
     expect(headers).toEqual(["Functions", "v1.4.0", "v1.5.0", "v1.4.0 %", "v1.5.0 %", "Change"]);
   });
 
-  it("draws each side as its own flame graph in Side by Side", async () => {
+  it("draws each side as its own flame graph in Side by side", async () => {
     mocks.diff.mockResolvedValue({
       data: {
         ...diffResponse.data,
@@ -321,7 +323,6 @@ describe("ProfilesCompare", () => {
       window.dispatchEvent(new CustomEvent("themeColorChanged"));
       await nextTick();
       expect(moreSwatch()).toBe("rgb(7, 8, 9)");
-      wrapper.unmount();
     } finally {
       html.style.removeProperty("--color-status-negative");
     }
