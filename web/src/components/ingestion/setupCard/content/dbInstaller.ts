@@ -28,7 +28,8 @@ import type {
 import { applySubs, applySubsMasked } from "../subs";
 import { DBM_CONTRIB_VERSION } from "./dbmShared";
 
-const SCRIPT_BASE = "https://raw.githubusercontent.com/openobserve/o2-datasource/main/databases";
+const SCRIPT_BASE =
+  "https://raw.githubusercontent.com/openobserve/o2-datasource/d23d6b7cfb34b6c09f2583318063da82c84eafa3/databases";
 
 /** The installer's `--db` values. */
 export type InstallerDb = "postgres" | "mysql" | "mariadb" | "sqlserver" | "mongodb" | "redis";
@@ -60,7 +61,7 @@ export interface DbQuickInstallOptions {
 
 const SERVICE_INPUT = "serviceName";
 
-// `{flag:<id>}` becomes a quoted `--x='v'` line or nothing when cleared; the password is read from the terminal.
+// `{flag:<id>}` becomes a quoted `--x='v'` line or nothing when cleared; the key travels as an env var so it stays out of `ps`.
 const installCommand = (opts: DbQuickInstallOptions, withDbm: boolean) => {
   const userFlags = stepInputs(opts)
     .map((i) => `{flag:${i.id}}`)
@@ -68,12 +69,11 @@ const installCommand = (opts: DbQuickInstallOptions, withDbm: boolean) => {
   const dbmFlags = withDbm
     ? ` \\\n  --dbm${opts.dbmLogPath !== undefined ? "{flag:logpath}" : ""}`
     : "";
-  return `curl -sSLo o2-db-install.sh ${SCRIPT_BASE}/install.sh && \\
-sudo bash o2-db-install.sh \\
+  return `curl -fsSLo o2-db-install.sh ${SCRIPT_BASE}/install.sh && \\
+O2_ACCESS_KEY={token} sudo --preserve-env=O2_ACCESS_KEY bash o2-db-install.sh \\
   --db=${opts.db}${userFlags} \\
   --o2-url={url} \\
-  --org-id={org} \\
-  --access-key={token}${dbmFlags}`;
+  --org-id={org}${dbmFlags}`;
 };
 
 const codeFor = (template: string, subs: CardSubstitutions) => ({
@@ -127,8 +127,8 @@ const stepInputs = (opts: DbQuickInstallOptions): RichCardInput[] => [
     // Shown as the script will name the service, so the uninstall command matches it.
     sanitize: "slug",
     labelKey: "ingestion.setupCard.dbInstallerServiceNameLabel",
-    default: opts.db,
-    placeholder: raw(opts.db),
+    default: "",
+    placeholder: raw(`${opts.db}-<host>-<port>`),
     helpKey: "ingestion.setupCard.dbInstallerServiceNameHelp",
   },
 ];
@@ -156,7 +156,7 @@ export function dbQuickInstallStep(
           id: "metrics",
           labelKey: "common.metrics",
           code: codeFor(installCommand(opts, false), subs),
-          note,
+          note: raw(`${t("ingestion.setupCard.dbInstallerMetricsOnlyNote")} ${note}`),
         },
         {
           id: "metrics-dbm",
@@ -202,7 +202,7 @@ export function dbUninstallExtra(): NonNullable<RichCardExtras["uninstall"]> {
     descriptionKey: "ingestion.setupCard.dbUninstallDesc",
     code: {
       lang: "bash",
-      raw: `curl -sSLo o2-db-uninstall.sh ${SCRIPT_BASE}/uninstall.sh && \\
+      raw: `curl -fsSLo o2-db-uninstall.sh ${SCRIPT_BASE}/uninstall.sh && \\
 sudo bash o2-db-uninstall.sh{flag:${SERVICE_INPUT}}`,
     },
   };

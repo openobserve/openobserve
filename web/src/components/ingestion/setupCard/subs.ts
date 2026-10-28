@@ -55,7 +55,13 @@ export const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
 
 /** Applies the input's `sanitize` rule to a value before it reaches a command. */
 export const sanitizeInput = (inp: RichCardInput, value: string): string =>
-  inp.sanitize === "slug" ? value.toLowerCase().replace(/[^a-z0-9-]/g, "-") : value;
+  inp.sanitize === "slug"
+    ? value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+    : value;
 
 /** The `{flag:<id>}` expansion; a blank value drops the flag so the script's own default applies. */
 export const cliFlagArg = (inp: RichCardInput, value: string): string => {

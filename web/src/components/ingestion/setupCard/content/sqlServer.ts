@@ -138,6 +138,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         hostLabelKey: "ingestion.setupCard.sqlServerHostLabel",
         defaultPort: "1433",
         defaultUser: "otel",
+        defaultDatabase: "master",
         dbm: true,
       }),
       // Pinned so all four Tier-1 cards install the same collector.

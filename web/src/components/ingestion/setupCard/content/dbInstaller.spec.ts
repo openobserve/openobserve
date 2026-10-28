@@ -29,7 +29,8 @@ import mongodbCard from "./mongodb";
 import redisCard from "./redis";
 
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
-const SCRIPT = "https://raw.githubusercontent.com/openobserve/o2-datasource/main/databases";
+const SCRIPT =
+  "https://raw.githubusercontent.com/openobserve/o2-datasource/d23d6b7cfb34b6c09f2583318063da82c84eafa3/databases";
 
 const CARDS = {
   postgres: postgresCard(SUBS, gt),
@@ -64,9 +65,9 @@ describe("dbQuickInstallStep", () => {
     expect(step).toMatchObject({ id: "quick-install", mode: "auto", required: true });
     expect(step.completeOn).toBe("copy");
     const raw = step.code!.raw;
-    expect(raw).toContain(`curl -sSLo o2-db-install.sh ${SCRIPT}/install.sh`);
+    expect(raw).toContain(`curl -fsSLo o2-db-install.sh ${SCRIPT}/install.sh`);
     // Downloaded, not piped: the script reads the password from the terminal.
-    expect(raw).toContain("sudo bash o2-db-install.sh");
+    expect(raw).toContain("bash o2-db-install.sh");
     expect(raw).not.toContain("| bash");
     for (const flag of [
       "--db=mongodb",
@@ -76,7 +77,7 @@ describe("dbQuickInstallStep", () => {
       "{flag:user}",
       `--o2-url=${SUBS.url}`,
       `--org-id=${SUBS.org}`,
-      `--access-key=${SUBS.token}`,
+      `O2_ACCESS_KEY=${SUBS.token} sudo --preserve-env=O2_ACCESS_KEY bash`,
     ]) {
       expect(raw).toContain(flag);
     }
@@ -93,7 +94,22 @@ describe("dbQuickInstallStep", () => {
     });
     expect(step.code!.masked).toBeDefined();
     expect(step.code!.masked).not.toContain(SUBS.token);
-    expect(step.code!.masked).toContain("--access-key=");
+    expect(step.code!.masked).toContain("O2_ACCESS_KEY=");
+    expect(step.code!.raw).not.toContain("--access-key");
+  });
+
+  it("tells the Metrics-only variant that the DBM steps need the other command", () => {
+    const step = dbQuickInstallStep(gt, SUBS, {
+      db: "postgres",
+      hostLabelKey: "ingestion.setupCard.postgresHostLabel",
+      defaultPort: "5432",
+      defaultUser: "myuser",
+      dbm: true,
+    });
+    expect(variant(step, "metrics").note).toBeDefined();
+    expect(JSON.stringify(variant(step, "metrics").note)).toContain(
+      "Metrics + Database Monitoring",
+    );
   });
 
   it("names the collector version the script installs and links to the manual mode", () => {
@@ -192,6 +208,22 @@ describe("command values", () => {
     expect(gt("ingestion.setupCard.dbUninstallDesc")).toContain("the name the installer printed");
   });
 
+  it.each([
+    ["My  DB", "--name='my-db'"],
+    ["--db--", "--name='db'"],
+    ["a__b", "--name='a-b'"],
+  ])("mirrors install.sh sanitize_name: %s", (typed, flag) => {
+    expect(command({ serviceName: typed })).toContain(flag);
+  });
+
+  it("drops --name when nothing is left after sanitizing", () => {
+    expect(command({ serviceName: "!!!" })).not.toContain("--name");
+  });
+
+  it("derives the name in the installer when left empty, so two instances never collide", () => {
+    expect(command({ serviceName: "" })).not.toContain("--name");
+  });
+
   it("is shown in the automatic mode only", () => {
     expect(dbUninstallExtra().mode).toBe("auto");
   });
@@ -227,10 +259,16 @@ describe("the six database cards (defaults)", () => {
       inputs: ["host", "port", "user", "database", "serviceName"],
     },
     sqlserver: {
-      flags: ["--db=sqlserver", "--host='localhost'", "--port='1433'", "--db-user='otel'"],
-      absent: ["--database", "--log-path"],
+      flags: [
+        "--db=sqlserver",
+        "--host='localhost'",
+        "--port='1433'",
+        "--db-user='otel'",
+        "--database='master'",
+      ],
+      absent: ["--log-path"],
       dbm: true,
-      inputs: ["server", "port", "user", "serviceName"],
+      inputs: ["server", "port", "user", "database", "serviceName"],
     },
     mongodb: {
       flags: ["--db=mongodb", "--port='27017'", "--db-user='otel'"],
@@ -253,7 +291,8 @@ describe("the six database cards (defaults)", () => {
       const { flags, absent, dbm, inputs } = EXPECTED[db];
       expect(step.inputs!.map((i) => i.id)).toEqual(inputs);
       const command = fill(metricsCode(step).raw, step.inputs!);
-      for (const flag of [...flags, `--name='${db}'`]) expect(command).toContain(flag);
+      for (const flag of flags) expect(command).toContain(flag);
+      expect(command).not.toContain("--name");
       for (const flag of absent) expect(command).not.toContain(flag);
       expect(!!step.variants).toBe(dbm);
     },
@@ -309,10 +348,9 @@ describe("the six database cards (defaults)", () => {
       expect(card.extras?.uninstall).toEqual(dbUninstallExtra());
       const code = card.extras!.uninstall!.code.raw;
       expect(code).toContain(`${SCRIPT}/uninstall.sh`);
-      expect(fill(code, quick(card).inputs!)).toContain(
-        `sudo bash o2-db-uninstall.sh \\\n  --name='${db}'`,
+      expect(fill(code, quick(card).inputs!, { serviceName: `My ${db}` })).toContain(
+        `sudo bash o2-db-uninstall.sh \\\n  --name='my-${db}'`,
       );
-      expect(quick(card).inputs!.find((i) => i.id === "serviceName")!.default).toBe(db);
     },
   );
 });
