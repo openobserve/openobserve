@@ -22,6 +22,8 @@ import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStre
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import { normalizeTraceId, rumFieldEqualsAnySql, traceIdLookupVariants } from "@/utils/rum/fields";
 
+const SEARCH_STREAM_NOT_FOUND = 20002;
+
 export interface TraceCorrelationData {
   trace_id: string;
   session_id: string | null;
@@ -163,14 +165,18 @@ export default function useTraceCorrelation(
             query: traceQuery,
             page_type: "traces",
           },
-          "APM",
+          "RUM",
         );
 
         backendSpans = traceResponse.data.hits || [];
         hasTrace = backendSpans.length > 0;
       } catch (traceError) {
-        // Backend trace not found or stream doesn't exist - this is okay
-        console.debug("Backend trace not found:", traceError);
+        const code = (traceError as { response?: { data?: { code?: number } } })?.response?.data
+          ?.code;
+        // An org without a traces stream is normal; any other rejection must not stay invisible.
+        if (code !== SEARCH_STREAM_NOT_FOUND) {
+          console.warn("Backend trace search failed:", traceError);
+        }
       }
 
       // Calculate performance breakdown

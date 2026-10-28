@@ -156,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="!hasBackendTrace"
+            data-test="trace-correlation-card-view-details-btn"
             @click="viewTraceDetails"
           >
             <OIcon name="git-branch" size="sm" class="me-1" />
@@ -171,7 +172,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Missing trace notice -->
-        <div v-if="!hasBackendTrace && traceId" class="bg-surface-accent rounded-default mt-3 p-2">
+        <div
+          v-if="!hasBackendTrace && traceId"
+          class="bg-surface-accent rounded-default mt-3 p-2"
+          data-test="trace-correlation-card-not-available"
+        >
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="me-2" />
             <div class="text-text-secondary text-xs">
