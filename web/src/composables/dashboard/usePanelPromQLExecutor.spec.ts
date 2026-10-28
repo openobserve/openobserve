@@ -372,6 +372,33 @@ describe("usePanelPromQLExecutor", () => {
       expect(state.loadingProgressPercentage).toBe(42);
       expect(state.isPartialData).toBe(true);
     });
+
+    it("shows the mean progress of all queries instead of the last stream's percent", async () => {
+      const { ctx, fetchQueryDataWithHttpStream, state, panelSchema } = makeCtx();
+      panelSchema.value.queries = [
+        { query: "up", config: {} },
+        { query: "down", config: {} },
+      ];
+      const streams: any[] = [];
+      fetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        streams.push(handlers);
+      });
+
+      const { executePromQL } = usePanelPromQLExecutor(ctx);
+      await executePromQL(0, 300_000_000, null);
+
+      streams[0].data({}, { type: "event_progress", content: { percent: 90 } });
+      expect(state.loadingProgressPercentage).toBe(45);
+
+      streams[1].data({}, { type: "event_progress", content: { percent: 40 } });
+      expect(state.loadingProgressPercentage).toBe(65);
+
+      streams[0].complete({}, {});
+      expect(state.loadingProgressPercentage).toBe(70);
+
+      streams[1].error({}, { content: { message: "boom" } });
+      expect(state.loadingProgressPercentage).toBe(100);
+    });
   });
 });
 
@@ -561,13 +588,13 @@ describe("a superseded run cannot write over the newer one (#14350)", () => {
     await executePromQL(0, 300_000_000, abortController);
 
     handlers.data({}, { type: "event_progress", content: { percent: 40 } });
+    expect(state.loadingProgressPercentage).toBe(40);
     handlers.data(
       {},
       { type: "promql_response", content: { results: { result: [{ metric: {}, values: [] }] } } },
     );
     handlers.complete({}, {});
 
-    expect(state.loadingProgressPercentage).toBe(40);
     expect(state.data[0].result).toHaveLength(1);
     expect(state.loading).toBe(false);
   });
