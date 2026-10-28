@@ -24615,6 +24615,7 @@
     "teamFilterUnavailable": "Team list unavailable",
     "bulkSnoozeDone": "Snoozed {count} pages",
     "bulkSnoozePartial": "{count} pages could not be snoozed",
+    "bulkSnoozeNoTeam": "{count} page has no team, so it was not snoozed. Hand it off to a team first. | {count} pages have no team, so they were not snoozed. Hand them off to a team first.",
     "bulkResolveDone": "Resolved {count} pages",
     "bulkResolvePartial": "{count} pages could not be resolved",
     "bulkResolveConfirm": "Resolve {count} pages? This closes each record and stops further escalation.",

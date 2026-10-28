@@ -49,7 +49,7 @@ function render(
     deliveriesTotal?: number | null;
     progress?: Partial<EscalationProgress> | null;
     smtpConfigured?: boolean | null;
-    teamDeleted?: boolean;
+    noTeam?: boolean;
   } = {},
 ) {
   const deliveries = options.deliveries ?? [delivery()];
@@ -69,21 +69,36 @@ function render(
               ...options.progress,
             },
       smtpConfigured: options.smtpConfigured ?? null,
-      teamDeleted: options.teamDeleted ?? false,
+      noTeam: options.noTeam ?? false,
     },
     global: { plugins: [i18n], stubs },
   });
 }
 
 describe("OnCallReachAlarm", () => {
-  /// The reachability check lives on the team, and a deleted team has no screen to open.
-  it("drops the reachability link for a deleted team", () => {
+  /// The server refuses Escalate on an unrouted page, so the alarm offers none.
+  it("drops Escalate when the page cannot be escalated", () => {
+    const deliveries = [delivery(), delivery({ recipient: "bo@o2.ai" })];
+    expect(render({ deliveries }).find('[data-test="oncall-reach-alarm-escalate"]').exists()).toBe(
+      true,
+    );
+
+    const wrapper = mount(OnCallReachAlarm, {
+      props: { state: "triggered", deliveries, deliveriesTotal: 2, escalatable: false },
+      global: { plugins: [i18n], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-reach-alarm-escalate"]').exists()).toBe(false);
+  });
+
+  /// The reachability check lives on the team, and a deleted or missing team has no screen to open.
+  it("drops the reachability link when there is no team screen", () => {
     const deliveries = [delivery(), delivery({ recipient: "bo@o2.ai" })];
     expect(
       render({ deliveries }).find('[data-test="oncall-reach-alarm-reachability"]').exists(),
     ).toBe(true);
 
-    const wrapper = render({ deliveries, teamDeleted: true });
+    const wrapper = render({ deliveries, noTeam: true });
     expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-reach-alarm-reachability"]').exists()).toBe(false);
   });

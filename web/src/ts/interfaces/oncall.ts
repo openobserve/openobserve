@@ -529,7 +529,8 @@ export interface OnCallResponse {
   id: string;
   org_id: string;
   subject: SubjectRef;
-  team_id: string;
+  /** `null` for a page nothing routed to a team (04-responses R6.1). */
+  team_id: string | null;
   priority: number;
   state: ResponseState;
   opened_at: number;

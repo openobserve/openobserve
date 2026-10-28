@@ -1126,7 +1126,7 @@ const teamNameById = computed<Record<string, string>>(() =>
   Object.fromEntries(teams.value.map((team) => [team.id, team.name])),
 );
 
-const teamIsDeleted = (teamId: string) =>
+const teamIsDeleted = (teamId: string | null) =>
   isDeletedTeam(teamId, teamsLoaded.value ? teams.value.map((team) => team.id) : null);
 
 // A ksuid asks the reader to look it up somewhere else, same as team_id
@@ -1227,8 +1227,10 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     id: "team",
     header: t("oncall.team"),
     size: 160,
-    accessorFn: (row: PageRow) =>
-      teamNameById.value[row.latest.team_id] ?? row.latest.team_id ?? "",
+    accessorFn: (row: PageRow) => {
+      const teamId = row.latest.team_id;
+      return teamId ? (teamNameById.value[teamId] ?? teamId) : "";
+    },
     sortable: true,
     hideable: true,
   },
@@ -1350,7 +1352,7 @@ const mineScope = computed(() => mineOnly.value && !!viewerEmail.value);
 /// after handover.
 function isMine(record: OnCallResponse): boolean {
   return (
-    myTeamIds.value.has(record.team_id) ||
+    (!!record.team_id && myTeamIds.value.has(record.team_id)) ||
     (!!record.acked_by && record.acked_by.toLowerCase() === viewerEmail.value)
   );
 }
@@ -1453,8 +1455,9 @@ function isImpactedRow(record: OnCallResponse): boolean {
 /// The channels this record's priority pages on, per its team's policy.
 function channelsFor(record: OnCallResponse): Channel[] {
   return (
-    policyByTeam.value[record.team_id]?.rungs.find((rung) => rung.priority === record.priority)
-      ?.channels ?? []
+    (record.team_id ? policyByTeam.value[record.team_id] : undefined)?.rungs.find(
+      (rung) => rung.priority === record.priority,
+    )?.channels ?? []
   );
 }
 
@@ -1462,7 +1465,7 @@ function channelsFor(record: OnCallResponse): Channel[] {
 /// "Level 2 of 3". Undefined when the policy could not be read, which the cell
 /// renders as a level with no denominator rather than a guessed total.
 function totalRungsFor(record: OnCallResponse): number | null {
-  const rungs = policyByTeam.value[record.team_id]?.rungs ?? [];
+  const rungs = (record.team_id ? policyByTeam.value[record.team_id] : undefined)?.rungs ?? [];
   return rungs.find((rung) => rung.priority === record.priority)?.steps.length ?? null;
 }
 
@@ -1680,8 +1683,18 @@ async function bulkAcknowledge() {
 /// Snooze quiets an escalating record WITHOUT claiming it, so it only applies
 /// to the ones still climbing the ladder.
 async function bulkSnooze(minutes: number) {
+  // The server refuses Snooze on a page with no team (one-ack AK-4), so those are left out and named.
+  const teamless = selectedRecords((r) => r.escalating.filter((e) => !e.team_id)).length;
+  if (teamless) {
+    toast({
+      variant: "warning",
+      message: t("oncall.bulkSnoozeNoTeam", { count: teamless }, teamless),
+    });
+  }
+  const ids = selectedRecords((r) => r.escalating.filter((e) => !!e.team_id));
+  if (!ids.length) return;
   await runBulk(
-    selectedRecords((r) => r.escalating),
+    ids,
     (id) => snoozeWrite.mutateAsync({ responseId: id, minutes }),
     "bulkSnoozeDone",
     "bulkSnoozePartial",

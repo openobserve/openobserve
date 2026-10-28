@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "チームリストを利用できません",
     "bulkSnoozeDone": "{count} 件の呼び出しをスヌーズしました",
     "bulkSnoozePartial": "{count} 件の呼び出しをスヌーズできませんでした",
+    "bulkSnoozeNoTeam": "チームのない {count} 件はスヌーズしませんでした。先にチームへ引き継いでください。",
     "bulkResolveDone": "{count} 件の呼び出しを解決しました",
     "bulkResolvePartial": "{count} 件の呼び出しを解決できませんでした",
     "bulkResolveConfirm": "{count} 件の呼び出しを解決しますか？各レコードをクローズし、それ以上のエスカレーションを停止します。",

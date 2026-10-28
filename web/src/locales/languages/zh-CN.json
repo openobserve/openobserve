@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "团队列表不可用",
     "bulkSnoozeDone": "已暂停 {count} 个通知",
     "bulkSnoozePartial": "{count} 个通知无法暂停",
+    "bulkSnoozeNoTeam": "{count} 个没有团队的呼叫未暂停。请先转交给团队。",
     "bulkResolveDone": "已解决 {count} 个通知",
     "bulkResolvePartial": "{count} 个通知无法解决",
     "bulkResolveConfirm": "是否解决 {count} 个通知？此操作将关闭每条记录并停止进一步升级。",

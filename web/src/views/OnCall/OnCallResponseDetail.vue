@@ -24,8 +24,14 @@
         data-test="oncall-response-subtitle"
       >
         <template #team>
+          <span
+            v-if="!response.team_id"
+            class="text-status-error-text shrink-0"
+            data-test="oncall-response-team-none"
+            >{{ t("oncall.statUnrouted") }}</span
+          >
           <OTag
-            v-if="teamDeleted"
+            v-else-if="teamDeleted"
             variant="default-soft"
             size="sm"
             data-test="oncall-response-team-deleted"
@@ -112,7 +118,7 @@
         </OButton>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canAcknowledge && lgUp">
+        <ODropdown v-if="canSnooze && lgUp">
           <template #trigger>
             <OButton
               variant="outline"
@@ -138,7 +144,8 @@
              them had a button. A disabled button that does not say why is a
              dead end — the ladder's own explanation for why there is nobody
              left to escalate to belongs right where the button went grey. -->
-        <span v-if="lgUp" class="inline-flex">
+        <!-- Not on an unrouted page: the server refuses it there, and Hand off is the next step. -->
+        <span v-if="lgUp && canEscalate" class="inline-flex">
           <OButton
             variant="outline"
             size="sm-action"
@@ -218,7 +225,7 @@
             data-test="oncall-response-more-btn"
           />
         </template>
-        <ODropdownGroup v-if="canAcknowledge" :label="t('oncall.snoozeFor')">
+        <ODropdownGroup v-if="canSnooze" :label="t('oncall.snoozeFor')">
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
@@ -228,9 +235,9 @@
             {{ raw(opt.label) }}
           </ODropdownItem>
         </ODropdownGroup>
-        <ODropdownSeparator v-if="canAcknowledge" />
+        <ODropdownSeparator v-if="canSnooze" />
         <ODropdownItem
-          v-if="isOpenState"
+          v-if="isOpenState && canEscalate"
           :disabled="escalation?.exhausted"
           data-test="oncall-response-escalate-btn-menu"
           @select="escalateNow"
@@ -302,7 +309,8 @@
           :progress="escalation"
           :smtp-configured="smtpConfigured"
           :escalating="escalatingNow"
-          :team-deleted="teamDeleted"
+          :no-team="!response.team_id || teamDeleted"
+          :escalatable="canEscalate"
           @escalate="escalateNow"
           @open-reachability="openReachability"
         />
@@ -362,6 +370,7 @@
           {{ t("oncall.holdBanner", { n: holdSecondsLeft }) }}
           <template #actions>
             <OButton
+              v-if="canEscalate"
               variant="outline"
               size="sm"
               :loading="escalatingNow"
@@ -485,7 +494,9 @@
           </div>
 
           <div class="flex flex-col gap-4">
+            <!-- An unrouted page has no rotation to read, so there is no one to list. -->
             <OnCallWhoIsOn
+              v-if="response.team_id"
               :positions="onCallPositions"
               :deliveries="deliveries"
               :handover-at="handoverAt"
@@ -1054,6 +1065,10 @@ const canAcknowledge = computed(() => !!response.value && isEscalating(response.
 /// Whether the compact header's menu has anything in it: a closed page already tied to an incident has no verb left.
 const hasMoreActions = computed(() => isOpenState.value || !response.value?.incident_id);
 
+/// The server refuses Escalate and Snooze on a page with no team (AK-4); Hand off is the next step there.
+const canEscalate = computed(() => !!response.value?.team_id);
+const canSnooze = computed(() => canAcknowledge.value && canEscalate.value);
+
 /// Where the team-name link in the subtitle goes — same target and tab
 /// OnCallAboutPage's own team row links to, so the two agree on what
 /// clicking the team means.
@@ -1331,7 +1346,8 @@ async function refreshPage() {
 async function fetchTeamName() {
   const r = response.value;
   if (!r) return;
-  teamName.value = r.team_id;
+  teamName.value = r.team_id ?? "";
+  if (!r.team_id) return;
   try {
     const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, r.team_id), false);
     if (team?.name) teamName.value = team.name;
@@ -1448,8 +1464,12 @@ async function handoffRecord() {
 async function fetchHandoffTargets() {
   const r = response.value;
   if (!r) return;
+  // An unrouted page has no members to hand to, but the team list below still offers a team.
+  const teamId = r.team_id;
   try {
-    const members = await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, r.team_id), false);
+    const members = teamId
+      ? await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, teamId), false)
+      : [];
     memberOptions.value = members.map((m) => ({
       label: raw(m.user_email),
       value: m.user_email,
@@ -1554,16 +1574,24 @@ async function fetchDeliveries() {
 async function fetchTeamContext() {
   const r = response.value;
   if (!r) return;
+  const teamId = r.team_id;
+  if (!teamId) {
+    onCallPositions.value = [];
+    policy.value = null;
+    smtpConfigured.value = null;
+    onCallPositionsLoading.value = false;
+    return;
+  }
   onCallPositionsLoading.value = true;
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
       // A closed record asks about its own last moment — the live rotation is not its history.
       read<OnCallPosition[]>(
-        whoIsOnCallQuery(orgId.value, r.team_id, r.closed_at ?? undefined),
+        whoIsOnCallQuery(orgId.value, teamId, r.closed_at ?? undefined),
         false,
       ),
-      read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, r.team_id), false),
-      read<TeamReachability | null>(teamReachabilityQuery(orgId.value, r.team_id), false),
+      read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, teamId), false),
+      read<TeamReachability | null>(teamReachabilityQuery(orgId.value, teamId), false),
     ]);
     onCallPositions.value = slots.status === "fulfilled" ? slots.value : [];
     policy.value = policyRes.status === "fulfilled" ? policyRes.value : null;
@@ -1582,7 +1610,7 @@ async function fetchHandover() {
   handoverAt.value = null;
   handoverTo.value = null;
   const r = response.value;
-  if (!r) return;
+  if (!r?.team_id) return;
   // Who inherits the pager next is advice for a page somebody still has to
   // carry. On a closed one it is a fact about next week's rota that nobody
   // opened this record to read.
@@ -1663,7 +1691,7 @@ async function escalateNow() {
 /// The two rail links out. Both land on the tab that answers the question the
 /// reader had when they clicked, rather than on the team's front page.
 function openReachability() {
-  if (!response.value) return;
+  if (!response.value?.team_id) return;
   router.push({
     name: "onCallTeamDetail",
     params: { teamId: response.value.team_id, tab: "members" },

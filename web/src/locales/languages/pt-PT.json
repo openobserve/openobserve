@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "Lista de equipas indisponível",
     "bulkSnoozeDone": "Adiados {count} acionamentos",
     "bulkSnoozePartial": "{count} acionamentos não puderam ser adiados",
+    "bulkSnoozeNoTeam": "Não adiados: {count} sem equipa. Passe-os primeiro a uma equipa.",
     "bulkResolveDone": "Resolvidos {count} acionamentos",
     "bulkResolvePartial": "{count} acionamentos não puderam ser resolvidos",
     "bulkResolveConfirm": "Resolver {count} acionamentos? Isto encerra cada registo e interrompe qualquer escalonamento adicional.",

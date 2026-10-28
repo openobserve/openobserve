@@ -147,6 +147,14 @@ describe("OnCallAboutPage", () => {
   /// The id here IS the rule that woke somebody, and the trip to change it was
   /// a copy-paste into the alert list's search box. The editor lives on the
   /// list route behind `action=update` — `AlertDetail` navigates the same way.
+  /// An unrouted page has no team to link to; a link with a null id throws in the router.
+  it("says a page with no team is unrouted, without a link", () => {
+    const wrapper = render({ teamId: null, teamName: "" });
+
+    expect(wrapper.find('[data-test="oncall-about-team-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-none"]').text()).toBe("Unrouted");
+  });
+
   it("says the team was deleted instead of linking to it", () => {
     const wrapper = render({ teamName: "team_1", teamDeleted: true });
 

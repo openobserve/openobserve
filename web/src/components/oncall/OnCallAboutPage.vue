@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    the prose around it is not, so it is dropped rather than
                    shown verbatim. -->
               <router-link
-                v-if="fallbackRoutedId"
+                v-if="fallbackRoutedId && teamId"
                 class="text-accent font-medium"
                 :to="{
                   name: 'onCallTeamDetail',
@@ -87,8 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem :label="t('oncall.team')">
+          <span v-if="!teamId" class="text-status-error-text" data-test="oncall-about-team-none">{{
+            t("oncall.statUnrouted")
+          }}</span>
           <OTag
-            v-if="teamDeleted"
+            v-else-if="teamDeleted"
             variant="default-soft"
             size="sm"
             data-test="oncall-about-team-deleted"
@@ -211,7 +214,8 @@ import { copyToClipboard } from "@/utils/clipboard";
 const props = withDefaults(
   defineProps<{
     orgId: string;
-    teamId: string;
+    /** `null` for an unrouted page, which has no team to link to. */
+    teamId: string | null;
     teamName: string;
     /** The team is gone from the team list, so there is nothing to link to. */
     teamDeleted?: boolean;

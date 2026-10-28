@@ -161,7 +161,15 @@ const stubs = {
   OnCallVerdictCard: { name: "OnCallVerdictCard", props: ["events"], template: "<div />" },
   OnCallReachAlarm: {
     name: "OnCallReachAlarm",
-    props: ["state", "deliveries", "deliveriesTotal", "progress", "smtpConfigured", "teamDeleted"],
+    props: [
+      "state",
+      "deliveries",
+      "deliveriesTotal",
+      "progress",
+      "smtpConfigured",
+      "noTeam",
+      "escalatable",
+    ],
     template: "<div />",
   },
   OnCallWhoIsOn: {
@@ -1744,12 +1752,11 @@ describe("OnCallResponseDetail — responding", () => {
       );
       expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("teamDeleted")).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
     });
 
     /// An unrouted page has no team at all, which is a routing fact, not a deleted team.
     it.each([
-      ["teamless", "", [{ id: "team_2", name: "Payments" }], false],
       ["present", "team_1", [{ id: "team_1", name: "Platform" }], false],
       ["team list unavailable", "team_1", null, false],
     ] as const)(
@@ -1760,10 +1767,99 @@ describe("OnCallResponseDetail — responding", () => {
         const wrapper = await renderWith({ team_id: teamId });
 
         expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(expected);
-        for (const name of ["OnCallAboutPage", "OnCallWhoIsOn", "OnCallReachAlarm"]) {
+        for (const name of ["OnCallAboutPage", "OnCallWhoIsOn"]) {
           expect(wrapper.findComponent({ name }).props("teamDeleted"), name).toBe(expected);
+        }
+        expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(expected);
+      },
+    );
+  });
+
+  /// An unrouted page has `team_id: null` on the wire (04-responses R6.1); there is no team to ask about or link to.
+  describe("a page with no team", () => {
+    /// The server refuses Escalate and Snooze on a page with no team (AK-4); Acknowledge, Resolve and Hand off stay.
+    it.each([
+      [
+        "desktop",
+        true,
+        "oncall-response-escalate-btn",
+        "oncall-response-snooze-btn",
+        "oncall-response-handoff-btn",
+      ],
+      [
+        "phone",
+        false,
+        "oncall-response-escalate-btn-menu",
+        "oncall-response-snooze-15-menu",
+        "oncall-response-handoff-btn-menu",
+      ],
+    ] as const)(
+      "offers Hand off but not Escalate or Snooze on %s",
+      async (_name, lgUp, escalate, snooze, handoff) => {
+        mockViewport.lgUp = lgUp;
+        mockViewport.mdUp = lgUp;
+        try {
+          service.escalationProgress.mockResolvedValue({
+            data: {
+              fired: [],
+              next_targets: [],
+              next_at: null,
+              exhausted: false,
+              held_until_micros: Date.now() * 1000 + 60_000_000,
+            },
+          } as any);
+          const teamless = await renderWith({ team_id: null });
+          expect(teamless.find(`[data-test="${escalate}"]`).exists()).toBe(false);
+          expect(teamless.find(`[data-test="${handoff}"]`).exists()).toBe(true);
+          expect(teamless.find(`[data-test="${snooze}"]`).exists()).toBe(false);
+          expect(teamless.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(true);
+          expect(teamless.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(true);
+          expect(teamless.find('[data-test="oncall-response-hold-page-now"]').exists()).toBe(false);
+          expect(teamless.findComponent({ name: "OnCallReachAlarm" }).props("escalatable")).toBe(
+            false,
+          );
+          teamless.unmount();
+
+          queryClient.clear();
+          const routed = await renderWith();
+          expect(routed.find(`[data-test="${escalate}"]`).exists()).toBe(true);
+          expect(routed.find(`[data-test="${snooze}"]`).exists()).toBe(true);
+          expect(routed.find('[data-test="oncall-response-hold-page-now"]').exists()).toBe(true);
+          expect(routed.findComponent({ name: "OnCallReachAlarm" }).props("escalatable")).toBe(
+            true,
+          );
+        } finally {
+          mockViewport.lgUp = true;
+          mockViewport.mdUp = true;
         }
       },
     );
+
+    it("asks no team endpoint, links nowhere, and draws no who-is-on card", async () => {
+      const wrapper = await renderWith({ team_id: null });
+
+      for (const call of [
+        service.getTeam,
+        service.listMembers,
+        service.whoIsOnCall,
+        service.getPolicy,
+        service.teamReachability,
+        service.resolvedSchedule,
+      ]) {
+        expect(call).not.toHaveBeenCalled();
+      }
+      // Hand-off to a team still needs the team list.
+      expect(service.listTeams).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="oncall-response-team-none"]').text()).toBe("Unrouted");
+      expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamId")).toBeNull();
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
+      for (const link of wrapper.findAllComponents({ name: "RouterLink" })) {
+        const to = link.props("to") as any;
+        if (to?.name === "onCallTeamDetail") expect(to.params.teamId).toBeTruthy();
+      }
+    });
   });
 });

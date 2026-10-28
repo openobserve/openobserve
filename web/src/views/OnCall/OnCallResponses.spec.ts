@@ -24,6 +24,13 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+// A pass-through spy: every other test keeps the real toast.
+vi.mock("@/lib/feedback/Toast/useToast", async (original) => {
+  const real = await original<typeof import("@/lib/feedback/Toast/useToast")>();
+  return { ...real, toast: vi.fn((...args: Parameters<typeof real.toast>) => real.toast(...args)) };
+});
 
 vi.mock("@/services/oncall", () => ({
   RESPONSE_PAGE_LIMIT: 200,
@@ -601,7 +608,7 @@ describe("OnCallResponses", () => {
     /// Claiming is only offered while something is still escalating; a page
     /// nobody owns is a routing fix rather than a triage.
     it("offers a team assignment instead of triage when nothing owns the page", async () => {
-      const wrapper = await withPages([page({ team_id: "" })]);
+      const wrapper = await withPages([page({ team_id: null })]);
 
       expect(wrapper.find('[data-test^="oncall-row-assign-"]').exists()).toBe(true);
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
@@ -1054,7 +1061,7 @@ describe("OnCallResponses", () => {
   });
 
   it("says an unrouted page is unrouted, never a deleted team", async () => {
-    const wrapper = await withPages([page({ team_id: "" })]);
+    const wrapper = await withPages([page({ team_id: null })]);
 
     expect(wrapper.find('[data-test="oncall-row-team-deleted"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Unrouted");
@@ -1377,6 +1384,45 @@ describe("OnCallResponses", () => {
 
       expect(service.snoozeResponse).toHaveBeenCalledTimes(2);
       expect(service.snoozeResponse).toHaveBeenCalledWith(expect.objectContaining({ minutes: 30 }));
+    });
+
+    /// The server refuses Snooze on a page with no team (one-ack AK-4), so bulk leaves it out and says why.
+    it("leaves a teamless page out of a bulk snooze, and says so", async () => {
+      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: null }, "al_pay"),
+      ]);
+
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-snooze-30"]').trigger("click");
+      await flushPromises();
+
+      expect(service.snoozeResponse).toHaveBeenCalledTimes(1);
+      expect(service.snoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "a" }),
+      );
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "warning",
+        message: "1 page has no team, so it was not snoozed. Hand it off to a team first.",
+      });
+    });
+
+    it("snoozes nothing when every selected page has no team", async () => {
+      const wrapper = await withPages([page({ id: "b", team_id: null }, "al_pay")]);
+
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:selectedIds", ["alert:al_pay"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-snooze-30"]').trigger("click");
+      await flushPromises();
+
+      expect(service.snoozeResponse).not.toHaveBeenCalled();
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success" }),
+      );
     });
 
     /// Closing records in bulk is irreversible, so it asks first.

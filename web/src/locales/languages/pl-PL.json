@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "Lista zespołów niedostępna",
     "bulkSnoozeDone": "Odroczone wezwania: {count}",
     "bulkSnoozePartial": "Nie udało się odroczyć wezwań: {count}",
+    "bulkSnoozeNoTeam": "Nie odroczono wezwań bez zespołu: {count}. Najpierw przekaż je zespołowi.",
     "bulkResolveDone": "Rozwiązane wezwania: {count}",
     "bulkResolvePartial": "Nie udało się rozwiązać wezwań: {count}",
     "bulkResolveConfirm": "Rozwiązać wybrane wezwania ({count})? Spowoduje to zamknięcie każdego rekordu i zatrzymanie dalszej eskalacji.",

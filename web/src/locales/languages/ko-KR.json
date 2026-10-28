@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "팀 목록을 사용할 수 없습니다",
     "bulkSnoozeDone": "{count}개의 호출을 스누즈했습니다",
     "bulkSnoozePartial": "{count}개의 호출을 스누즈할 수 없었습니다",
+    "bulkSnoozeNoTeam": "팀이 없는 {count}개는 스누즈하지 않았습니다. 먼저 팀에 넘기세요.",
     "bulkResolveDone": "{count}개의 호출을 해결했습니다",
     "bulkResolvePartial": "{count}개의 호출을 해결할 수 없었습니다",
     "bulkResolveConfirm": "호출 {count}개를 해결하시겠습니까? 이 작업은 각 레코드를 닫고 추가 에스컬레이션을 중단합니다.",

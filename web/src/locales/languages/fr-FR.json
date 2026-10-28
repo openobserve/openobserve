@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "Liste des équipes indisponible",
     "bulkSnoozeDone": "{count} notifications mises en pause",
     "bulkSnoozePartial": "{count} notifications n'ont pas pu être mises en pause",
+    "bulkSnoozeNoTeam": "Non mises en pause : {count} sans équipe. Transférez-les d'abord à une équipe.",
     "bulkResolveDone": "{count} notifications résolues",
     "bulkResolvePartial": "{count} notifications n'ont pas pu être résolues",
     "bulkResolveConfirm": "Résoudre {count} notifications ? Cette action clôt chaque enregistrement et arrête toute escalade ultérieure.",

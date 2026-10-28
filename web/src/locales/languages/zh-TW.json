@@ -24612,6 +24612,7 @@
     "teamFilterUnavailable": "無法取得團隊清單",
     "bulkSnoozeDone": "已暫停 {count} 個警示",
     "bulkSnoozePartial": "無法暫停 {count} 個警示",
+    "bulkSnoozeNoTeam": "{count} 個沒有團隊的呼叫未暫停。請先轉交給團隊。",
     "bulkResolveDone": "已解決 {count} 個警示",
     "bulkResolvePartial": "無法解決 {count} 個警示",
     "bulkResolveConfirm": "要解決 {count} 個警示嗎？這會關閉每筆記錄並停止後續升級。",

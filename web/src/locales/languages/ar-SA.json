@@ -24617,6 +24617,7 @@
     "teamFilterUnavailable": "قائمة الفرق غير متاحة",
     "bulkSnoozeDone": "تم تأجيل {count} من النداءات",
     "bulkSnoozePartial": "تعذّر تأجيل {count} من النداءات",
+    "bulkSnoozeNoTeam": "لم يُؤجَّل {count} من الاستدعاءات بلا فريق. سلّمها إلى فريق أولًا.",
     "bulkResolveDone": "تم حل {count} من النداءات",
     "bulkResolvePartial": "تعذّر حل {count} من النداءات",
     "bulkResolveConfirm": "هل تريد حل {count} من النداءات؟ سيؤدي هذا إلى إغلاق كل سجل وإيقاف المزيد من التصعيد.",
