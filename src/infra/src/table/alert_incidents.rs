@@ -343,6 +343,10 @@ pub async fn update_status_with<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
+    // Like `acknowledge()`, an ack only takes an open incident, so a replica cannot undo a resolve.
+    if status == "acknowledged" && incident.status != "open" {
+        return Ok(incident);
+    }
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.status = Set(status.to_string());
     active.updated_at = Set(now);
@@ -1490,6 +1494,7 @@ mod tests {
         let acked = update_status_with(&db, "acme", &incident.id, "acknowledged")
             .await
             .unwrap();
+        assert_eq!(acked.status, "resolved");
         assert_eq!(acked.resolved_at, resolved.resolved_at);
 
         let reopened = update_status_with(&db, "acme", &incident.id, "open")
