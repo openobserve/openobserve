@@ -20,6 +20,9 @@ import { formatDistanceToNowStrict } from "date-fns";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { FirstDataStream } from "@/composables/firstEvent/useFirstDataNotice";
 
@@ -58,6 +61,9 @@ const openLabel = computed(() => {
       return t("ingestion.firstEvent.openInLogs");
   }
 });
+const { isLocked, lockedReason } = useLicenseLocks();
+const openFeature = computed(() => streamTypeFeature(props.stream?.streamType));
+const openLocked = computed(() => isLocked(openFeature.value));
 </script>
 
 <template>
@@ -93,15 +99,20 @@ const openLabel = computed(() => {
         >
           {{ t("ingestion.firstDataNotice.dismiss") }}
         </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          icon-left="open-in-new"
-          data-test="first-data-notice-open-btn"
-          @click="emit('open')"
-        >
-          {{ openLabel }}
-        </OButton>
+        <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
+          <span class="inline-flex">
+            <OButton
+              variant="primary"
+              size="sm-action"
+              :icon-left="openLocked ? 'lock' : 'open-in-new'"
+              :disabled="openLocked"
+              data-test="first-data-notice-open-btn"
+              @click="emit('open')"
+            >
+              {{ openLabel }}
+            </OButton>
+          </span>
+        </OTooltip>
       </div>
     </template>
   </OBanner>

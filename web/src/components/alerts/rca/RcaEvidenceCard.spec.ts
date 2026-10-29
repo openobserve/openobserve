@@ -21,6 +21,7 @@ vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
 import type { RcaEvidenceEntry, RcaSummaryHypothesis } from "@/services/incidents";
 import { rcaEvidenceLink } from "@/utils/incidents/rcaEvidenceLinks";
@@ -165,6 +166,45 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
 
     await open.trigger("click");
     expect(push).toHaveBeenCalledWith(rcaEvidenceLink(entry.link, "default")!.route);
+  });
+
+  it.each([
+    ["logs", rcaEvidenceEntry()],
+    ["metrics", rcaEvidenceEntry({ link: { signal: "metrics", streams: [], promql: "up" } })],
+    [
+      "traces",
+      rcaEvidenceEntry({ link: { signal: "traces", streams: ["default"], filter: "a=1" } }),
+    ],
+  ] as const)("%s locked: the open button is disabled with a lock", async (feature, entry) => {
+    store.state.zoConfig.features = { [feature]: "locked" };
+    try {
+      const wrapper = mount(RcaEvidenceCard, {
+        props: { entry, hypotheses: HYPOTHESES, org: "default" },
+        global: { plugins: [i18n, store] },
+      });
+      const open = byTest(wrapper, "rca-evidence-open");
+      expect(open.attributes("disabled")).toBeDefined();
+      expect(byTest(wrapper, "rca-evidence-open-lock").exists()).toBe(true);
+      await open.trigger("click");
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("another signal locked: the open button stays live", async () => {
+    store.state.zoConfig.features = { traces: "locked" };
+    try {
+      const wrapper = mount(RcaEvidenceCard, {
+        props: { entry: rcaEvidenceEntry(), hypotheses: HYPOTHESES, org: "default" },
+        global: { plugins: [i18n, store] },
+      });
+      expect(byTest(wrapper, "rca-evidence-open-lock").exists()).toBe(false);
+      await byTest(wrapper, "rca-evidence-open").trigger("click");
+      expect(push).toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
   });
 
   it.each([

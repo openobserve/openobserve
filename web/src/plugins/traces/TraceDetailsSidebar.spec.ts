@@ -2888,3 +2888,34 @@ describe("TraceDetailsSidebar — correlation license lock", () => {
     w.unmount();
   });
 });
+
+describe("TraceDetailsSidebar — logs license lock", () => {
+  const VIEW_LOGS = '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]';
+
+  afterEach(() => {
+    delete mockStore.state.zoConfig.features;
+  });
+
+  it("disables View Logs with a lock and the logs reason while logs is locked", async () => {
+    mockStore.state.zoConfig.features = { logs: "locked" };
+    mockNavigateToLogs.mockClear();
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await flushPromises();
+    const btn = w.find(VIEW_LOGS);
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(w.vm.logsLocked).toBe(true);
+    expect(w.vm.viewLogsTooltipContent).toMatch(/needs logs/i);
+    await btn.trigger("click");
+    await flushPromises();
+    expect(mockNavigateToLogs).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("keeps View Logs enabled while logs is licensed", async () => {
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await flushPromises();
+    expect(w.vm.logsLocked).toBe(false);
+    expect(w.vm.viewLogsTooltipContent).toBe("View Logs");
+    w.unmount();
+  });
+});

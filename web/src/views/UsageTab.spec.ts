@@ -459,6 +459,47 @@ describe("UsageTab", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+  describe("explore links under a license lock", () => {
+    let originalZoConfig: Record<string, unknown>;
+
+    beforeEach(() => {
+      originalZoConfig = { ...store.state.zoConfig };
+    });
+
+    afterEach(() => {
+      store.commit("setConfig", originalZoConfig);
+    });
+
+    const link = (signal: string) => wrapper.find(`[data-test="home-usage-tab-explore-${signal}"]`);
+
+    it("renders a locked signal as a disabled non-link and keeps the others as links", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      // the tab refreshes /config on mount, so the license state lands after it
+      store.commit("setConfig", { ...store.state.zoConfig, features: { metrics: "locked" } });
+      await flushPromises();
+
+      expect(link("metrics").element.tagName).toBe("DIV");
+      expect(link("metrics").attributes("aria-disabled")).toBe("true");
+      const icons = wrapper.findAllComponents(".OIcon-stub").map((i) => i.props("name"));
+      expect(icons).toContain("lock");
+      expect(link("logs").element.tagName).toBe("A");
+      expect(link("logs").attributes("aria-disabled")).toBeUndefined();
+      expect(link("traces").element.tagName).toBe("A");
+    });
+
+    it("renders every signal as a link when none is locked", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      for (const signal of ["logs", "traces", "metrics"]) {
+        expect(link(signal).element.tagName).toBe("A");
+      }
+      const icons = wrapper.findAllComponents(".OIcon-stub").map((i) => i.props("name"));
+      expect(icons).not.toContain("lock");
+    });
+  });
+
   describe("summary failure with the empty-data flag on", () => {
     let originalZoConfig: Record<string, unknown>;
 

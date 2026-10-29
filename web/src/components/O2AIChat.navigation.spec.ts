@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildNavigationRoute,
   generateNavigationFromToolResult,
+  navigationFeature,
   navigationPageName,
 } from "@/components/O2AIChat.navigation";
 import type { NavigationAction } from "@/ts/interfaces/chat";
@@ -324,6 +325,25 @@ describe("buildNavigationRoute", () => {
         { resource_type: "alert", action: "noop" as any, label: raw("l"), target: {} },
         "org1",
       ),
+    ).toBeNull();
+  });
+});
+
+describe("navigationFeature", () => {
+  it.each([
+    ["logs", "logs"],
+    ["metrics", "metrics"],
+    ["traces", "traces"],
+    ["enrichment_tables", null],
+  ])("keys a %s query to %s", (type, key) => {
+    expect(
+      navigationFeature({ action: "load_query", resource_type: type, target: {} } as any),
+    ).toBe(key);
+  });
+
+  it("never keys a direct navigation", () => {
+    expect(
+      navigationFeature({ action: "navigate_direct", resource_type: "alert", target: {} } as any),
     ).toBeNull();
   });
 });

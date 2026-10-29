@@ -364,6 +364,23 @@ describe("TraceTree", () => {
       '[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]',
     );
     expect(viewLogsBtn.exists()).toBe(true);
+    expect(viewLogsBtn.attributes("disabled")).toBeUndefined();
+  });
+
+  it("disables the row view logs button with a lock while logs is locked", async () => {
+    const lockedStore = createStore({
+      state: {
+        ...mockStore.state,
+        zoConfig: { timestamp_column: "@timestamp", features: { logs: "locked" } },
+      },
+    });
+    const locked = mountTraceTree({}, lockedStore);
+    const btn = locked.find('[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]');
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+    await btn.trigger("click");
+    expect(locked.emitted("view-correlated-logs")).toBeUndefined();
+    locked.unmount();
   });
 
   describe("Span selection", () => {

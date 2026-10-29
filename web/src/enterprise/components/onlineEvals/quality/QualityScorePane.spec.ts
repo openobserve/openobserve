@@ -235,6 +235,31 @@ describe("QualityScorePane", () => {
     );
   });
 
+  it("locks both trace actions and navigates nowhere while the traces license is locked", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = { ...saved, features: { traces: "locked" } };
+    try {
+      const wrapper = mountPane();
+      for (const id of ["quality-score-pane-open-target", "quality-score-pane-open-evaluator"]) {
+        const button = wrapper.find(`[data-test="${id}"]`);
+        expect(button.attributes("disabled")).toBeDefined();
+        expect(wrapper.find(`[data-test="${id}-lock"]`).exists()).toBe(true);
+        await button.trigger("click");
+      }
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      store.state.zoConfig = saved;
+    }
+  });
+
+  it("keeps both trace actions live when the license enables traces", () => {
+    const wrapper = mountPane();
+    expect(wrapper.find('[data-test="quality-score-pane-open-target-lock"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-score-pane-open-evaluator-lock"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("hides an action whose link cannot be built", () => {
     const wrapper = mountPane({ score: score({ evaluatorTraceId: null }) });
     expect(wrapper.find('[data-test="quality-score-pane-open-evaluator"]').exists()).toBe(false);

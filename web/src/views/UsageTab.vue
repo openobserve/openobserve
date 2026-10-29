@@ -252,78 +252,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("home.explore") }}
             </div>
             <nav class="flex flex-col">
-              <router-link
+              <OTooltip
                 v-if="canView('logs')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'logs',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-explore-logs"
+                :content="lockedReason('logs')"
+                :disabled="!isLocked('logs')"
               >
-                <span
-                  class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
+                <component
+                  :is="isLocked('logs') ? 'div' : 'router-link'"
+                  v-bind="exploreLinkAttrs('logs')"
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors aria-disabled:cursor-not-allowed"
+                  data-test="home-usage-tab-explore-logs"
                 >
-                  <OIcon name="search" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  t("menu.search")
-                }}</OTruncatedText>
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
-              <router-link
+                  <span
+                    class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="search" size="sm" />
+                  </span>
+                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
+                    t("menu.search")
+                  }}</OTruncatedText>
+                  <OIcon
+                    :name="isLocked('logs') ? 'lock' : 'chevron-right'"
+                    size="sm"
+                    class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  />
+                </component>
+              </OTooltip>
+              <OTooltip
                 v-if="canView('traces')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'traces',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-explore-traces"
+                :content="lockedReason('traces')"
+                :disabled="!isLocked('traces')"
               >
-                <span
-                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
+                <component
+                  :is="isLocked('traces') ? 'div' : 'router-link'"
+                  v-bind="exploreLinkAttrs('traces')"
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors aria-disabled:cursor-not-allowed"
+                  data-test="home-usage-tab-explore-traces"
                 >
-                  <OIcon name="account-tree" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  t("menu.traces")
-                }}</OTruncatedText>
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
-              <router-link
+                  <span
+                    class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="account-tree" size="sm" />
+                  </span>
+                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
+                    t("menu.traces")
+                  }}</OTruncatedText>
+                  <OIcon
+                    :name="isLocked('traces') ? 'lock' : 'chevron-right'"
+                    size="sm"
+                    class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  />
+                </component>
+              </OTooltip>
+              <OTooltip
                 v-if="canView('metrics')"
-                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
-                :to="{
-                  name: 'metrics',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
-                }"
-                data-test="home-usage-tab-explore-metrics"
+                :content="lockedReason('metrics')"
+                :disabled="!isLocked('metrics')"
               >
-                <span
-                  class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
-                  aria-hidden="true"
+                <component
+                  :is="isLocked('metrics') ? 'div' : 'router-link'"
+                  v-bind="exploreLinkAttrs('metrics')"
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors aria-disabled:cursor-not-allowed"
+                  data-test="home-usage-tab-explore-metrics"
                 >
-                  <OIcon name="bar-chart" size="sm" />
-                </span>
-                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
-                  t("menu.metrics")
-                }}</OTruncatedText>
-                <OIcon
-                  name="chevron-right"
-                  size="sm"
-                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
-                />
-              </router-link>
+                  <span
+                    class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="bar-chart" size="sm" />
+                  </span>
+                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
+                    t("menu.metrics")
+                  }}</OTruncatedText>
+                  <OIcon
+                    :name="isLocked('metrics') ? 'lock' : 'chevron-right'"
+                    size="sm"
+                    class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  />
+                </component>
+              </OTooltip>
               <router-link
                 v-if="canView('RUM')"
                 class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
@@ -592,10 +601,18 @@ import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const { isLocked, lockedReason } = useLicenseLocks();
+
+const exploreLinkAttrs = (name: string) =>
+  isLocked(name)
+    ? { role: "link", "aria-disabled": "true" }
+    : { to: { name, query: { org_identifier: store.state.selectedOrganization?.identifier } } };
 
 const summary = ref<any>([]);
 const no_data_ingest = ref(false);

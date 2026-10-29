@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:selected-ids="selectedIds = $event"
         @update:current-page="onPageChange"
         @update:page-size="onPageSizeChange"
-        @row-click="openTarget"
+        v-on="rowClickListeners"
       >
         <!-- Search stretches so the queue filter and the column toggle OTable
              injects after this slot both sit at the right edge. -->
@@ -123,39 +123,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-span="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <OTruncatedText class="font-mono text-xs">{{
-              textOrDash(row.operationName)
-            }}</OTruncatedText>
-            <OTruncatedText v-if="row.traceId" class="text-text-secondary text-2xs">
-              {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
-            </OTruncatedText>
+          <div class="flex min-w-0 items-center">
+            <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+              <span class="me-1.5 inline-flex shrink-0">
+                <OIcon name="lock" size="sm" data-test="ai-discovery-row-lock" />
+              </span>
+            </OTooltip>
+            <div class="flex min-w-0 flex-col">
+              <OTruncatedText class="font-mono text-xs">{{
+                textOrDash(row.operationName)
+              }}</OTruncatedText>
+              <OTruncatedText v-if="row.traceId" class="text-text-secondary text-2xs">
+                {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
+              </OTruncatedText>
+            </div>
           </div>
         </template>
 
         <template #cell-trace="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <OTruncatedText class="font-mono text-xs">{{
-              textOrDash(row.operationName)
-            }}</OTruncatedText>
-            <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
-            <OTruncatedText
-              v-if="row.traceId || row.targetId"
-              class="text-text-secondary text-2xs font-mono"
-            >
-              {{ raw(row.traceId || row.targetId) }}
-            </OTruncatedText>
+          <div class="flex min-w-0 items-center">
+            <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+              <span class="me-1.5 inline-flex shrink-0">
+                <OIcon name="lock" size="sm" data-test="ai-discovery-row-lock" />
+              </span>
+            </OTooltip>
+            <div class="flex min-w-0 flex-col">
+              <OTruncatedText class="font-mono text-xs">{{
+                textOrDash(row.operationName)
+              }}</OTruncatedText>
+              <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
+              <OTruncatedText
+                v-if="row.traceId || row.targetId"
+                class="text-text-secondary text-2xs font-mono"
+              >
+                {{ raw(row.traceId || row.targetId) }}
+              </OTruncatedText>
+            </div>
           </div>
         </template>
 
         <template #cell-session="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <OTruncatedText class="font-mono text-xs">{{
-              textOrDash(row.sessionId)
-            }}</OTruncatedText>
-            <OTruncatedText v-if="row.userEmail" class="text-text-secondary text-2xs">
-              {{ raw(row.userEmail) }}
-            </OTruncatedText>
+          <div class="flex min-w-0 items-center">
+            <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+              <span class="me-1.5 inline-flex shrink-0">
+                <OIcon name="lock" size="sm" data-test="ai-discovery-row-lock" />
+              </span>
+            </OTooltip>
+            <div class="flex min-w-0 flex-col">
+              <OTruncatedText class="font-mono text-xs">{{
+                textOrDash(row.sessionId)
+              }}</OTruncatedText>
+              <OTruncatedText v-if="row.userEmail" class="text-text-secondary text-2xs">
+                {{ raw(row.userEmail) }}
+              </OTruncatedText>
+            </div>
           </div>
         </template>
 
@@ -276,12 +297,18 @@ import llmDiscoveryService, {
 import llmQueuesService, { type LlmQueue } from "@/services/llm-queues.service";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 defineOptions({ name: "AIDiscoveryPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
+// Without a row-click listener OTable drops the pointer cursor, so locked rows stop looking clickable.
+const rowClickListeners = computed(() => (tracesLock.locked.value ? {} : { rowClick: openTarget }));
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgQuery = computed(() => ({ org_identifier: orgId.value }));
@@ -639,6 +666,7 @@ function onDateChange(value: any) {
 const TRACE_WINDOW_US = 3_600_000_000;
 
 function openTarget(row: LlmDiscoveryItem) {
+  if (tracesLock.locked.value) return;
   // The detail views read stream + from/to straight off the URL — without them
   // the search has no stream and a NaN window, which renders as "trace not
   // found". `sourceStream` is the stream the row was discovered in.

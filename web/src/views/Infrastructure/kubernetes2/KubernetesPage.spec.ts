@@ -737,6 +737,18 @@ describe("KubernetesPage", () => {
         query: { query_type: "promql", stream_name: "k8s_pod_cpu_usage" },
       });
     });
+
+    it.each(["traces", "metrics"])(
+      "does not leave for %s when its license is locked",
+      async (type) => {
+        await mountPage({ view: "pods", cluster: "alpha" });
+        store.state.zoConfig = { features: { [type]: "locked" } };
+        const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        wrapper.findComponent(ListStub).vm.$emit("action", type, pod);
+        await flushPromises();
+        expect(push).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("wiring", () => {

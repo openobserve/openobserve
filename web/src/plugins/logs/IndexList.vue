@@ -22,17 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          list itself deliberately runs flush to the divider so its scrollbar lands
          on the panel edge — only the rows inside it carry the gutter. -->
     <div class="px-page-edge flex max-w-full items-center gap-2">
-      <OButton
+      <FeatureLockExempt
         v-if="searchObj.data.stream.streamType && searchObj.data.stream.streamType !== 'logs'"
-        data-test="log-search-index-list-back-to-logs-btn"
-        variant="outline"
-        size="icon-sm"
-        class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
-        @click="onStreamTypeChange('logs')"
+        class="shrink-0"
       >
-        <OIcon name="swap-horiz" size="sm" />
-        <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
-      </OButton>
+        <OButton
+          data-test="log-search-index-list-back-to-logs-btn"
+          variant="outline"
+          size="icon-sm"
+          class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
+          @click="onStreamTypeChange('logs')"
+        >
+          <OIcon name="swap-horiz" size="sm" />
+          <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
+        </OButton>
+      </FeatureLockExempt>
       <div class="min-w-0 flex-1">
         <OSelect
           ref="streamSelect"
@@ -285,6 +289,8 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -322,6 +328,7 @@ export default defineComponent({
       () => import("@/components/common/FieldListPagination.vue"),
     ),
     OButton,
+    FeatureLockExempt,
     OSelect,
     OIcon,
     OTooltip,
@@ -356,6 +363,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
+    const pageLock = useFeatureLock();
     const { t } = useI18nTyped();
     const { reorderSelectedFields, getFilterExpressionByFieldType, extractValueQuery } = useLogs(t);
 
@@ -457,6 +465,12 @@ export default defineComponent({
       searchObj.data.stream.selectedStream = [];
       searchObj.data.stream.selectedStreamFields = [];
       saveLogsStreamType(org, newType);
+      // A locked page cannot run the search that would update `stream_type`, which the lock reads from the URL.
+      if (pageLock.locked.value) {
+        void router.replace({
+          query: { ...router.currentRoute.value.query, stream_type: newType, stream: undefined },
+        });
+      }
       const isCurrent = () =>
         token === currentSelectionToken() &&
         searchObj.data.stream.streamType === newType &&

@@ -2648,6 +2648,12 @@ describe("useRoutes (router.ts)", () => {
       ["infraKubernetes", "kubernetes_monitoring"],
       ["infraKubernetes2", "kubernetes_monitoring"],
       ["infraHosts", "host_monitoring"],
+      ["traces", "traces"],
+      ["traceDetails", "traces"],
+      ["sessionDetails", "traces"],
+      ["metrics", "metrics"],
+      ["metricsEditor", "metrics"],
+      ["promqlBuilder", "metrics"],
     ])("tags %s with meta.licenseFeature %s", (name, feature) => {
       expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
     });
@@ -2664,10 +2670,19 @@ describe("useRoutes (router.ts)", () => {
       "importFunction",
       "enrichmentTables",
       "logs",
-      "traces",
+      "logstreams",
     ])("leaves %s untagged", (name) => {
       expect(findRoute(useRoutes().homeChildRoutes, name).meta?.licenseFeature).toBeUndefined();
     });
+
+    it.each(["logs", "searchJobInspector", "searchHistory", "searchScheduler", "streamExplorer"])(
+      "locks %s by its stream_type query instead of a static key",
+      (name) => {
+        const { meta } = findRoute(useRoutes().homeChildRoutes, name);
+        expect(meta.licenseFeatureFromStreamType).toBe(true);
+        expect(meta.licenseFeature).toBeUndefined();
+      },
+    );
 
     it("leaves the logged-out public dashboard untagged", () => {
       const route = useRoutes().parentRoutes.find((r: any) => r.name === "publicDashboard");

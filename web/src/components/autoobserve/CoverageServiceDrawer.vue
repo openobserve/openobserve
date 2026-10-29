@@ -39,24 +39,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <span class="text-text-secondary block truncate text-xs">{{ subTitle }}</span>
         </div>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="timeline"
-          :aria-label="t('autoobserve.coverage.openTraces')"
-          data-test="autoobserve-coverage-drawer-traces"
-          @click="openTraces()"
-          ><span class="max-md:sr-only">{{ t("autoobserve.coverage.openTraces") }}</span></OButton
-        >
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="hub"
-          :aria-label="t('autoobserve.coverage.openCatalog')"
-          data-test="autoobserve-coverage-drawer-catalog"
-          @click="openTraces('services-catalog')"
-          ><span class="max-md:sr-only">{{ t("autoobserve.coverage.openCatalog") }}</span></OButton
-        >
+        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              :icon-left="tracesLock.locked.value ? 'lock' : 'timeline'"
+              :disabled="tracesLock.locked.value"
+              :aria-label="t('autoobserve.coverage.openTraces')"
+              data-test="autoobserve-coverage-drawer-traces"
+              @click="openTraces()"
+              ><span class="max-md:sr-only">{{
+                t("autoobserve.coverage.openTraces")
+              }}</span></OButton
+            >
+          </span>
+        </OTooltip>
+        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              :icon-left="tracesLock.locked.value ? 'lock' : 'hub'"
+              :disabled="tracesLock.locked.value"
+              :aria-label="t('autoobserve.coverage.openCatalog')"
+              data-test="autoobserve-coverage-drawer-catalog"
+              @click="openTraces('services-catalog')"
+              ><span class="max-md:sr-only">{{
+                t("autoobserve.coverage.openCatalog")
+              }}</span></OButton
+            >
+          </span>
+        </OTooltip>
       </div>
     </template>
 
@@ -243,6 +257,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -289,6 +305,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
 const store = useStore();
 
 const HEX_POINTS = "18.23,14.75 10,19.5 1.77,14.75 1.77,5.25 10,0.5 18.23,5.25";

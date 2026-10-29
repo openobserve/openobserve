@@ -261,7 +261,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
-import { featureState, menuState, type FeatureState } from "@/utils/featureGate";
+import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -493,7 +493,10 @@ export default defineComponent({
     const features = computed(() => store.state.zoConfig?.features);
     // `route.meta` merges every matched record, so a gated parent locks its child pages too.
     const lockedFeature = computed<string | null>(() => {
-      const key = router.currentRoute.value.meta?.licenseFeature;
+      const { meta, query } = router.currentRoute.value;
+      const key = meta?.licenseFeatureFromStreamType
+        ? streamTypeFeature(query.stream_type as string | undefined)
+        : meta?.licenseFeature;
       return typeof key === "string" && featureState(features.value, key) === "locked" ? key : null;
     });
     const isIncidentsEnabled = computed(
@@ -1025,6 +1028,9 @@ export default defineComponent({
 
     // Static rail entries owned by a license feature: locked keeps the entry with a lock, hidden drops it.
     const LICENSED_LINKS: Record<string, string> = {
+      logs: "logs",
+      metrics: "metrics",
+      traces: "traces",
       rum: "rum",
       productAnalytics: "product_analytics",
       dashboards: "dashboards",

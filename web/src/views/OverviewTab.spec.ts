@@ -263,6 +263,42 @@ describe("OverviewTab", () => {
     vi.clearAllMocks();
   });
 
+  describe("signal entry points under a license lock", () => {
+    const LOGS_CARD = '[data-test="overview-empty-logs-card"]';
+    const TRACES_CARD = '[data-test="overview-empty-traces-card"]';
+
+    it("locks the Traces card and keeps Logs live while traces is locked", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { traces: "locked" } });
+      const push = vi.spyOn(router, "push");
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(TRACES_CARD).exists()).toBe(true);
+      expect(wrapper.find(TRACES_CARD).attributes("aria-disabled")).toBe("true");
+      expect(wrapper.find('[data-test="overview-empty-traces-card-lock"]').exists()).toBe(true);
+      await wrapper.find(TRACES_CARD).trigger("click");
+      expect(push).not.toHaveBeenCalled();
+
+      expect(wrapper.find(LOGS_CARD).attributes("aria-disabled")).toBeUndefined();
+      await wrapper.find(LOGS_CARD).trigger("click");
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "logs" }));
+      push.mockRestore();
+    });
+
+    it("locks the Logs card while logs is locked", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { logs: "locked" } });
+      const push = vi.spyOn(router, "push");
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOGS_CARD).attributes("aria-disabled")).toBe("true");
+      await wrapper.find(LOGS_CARD).trigger("click");
+      expect(push).not.toHaveBeenCalled();
+      expect(wrapper.find(TRACES_CARD).attributes("aria-disabled")).toBeUndefined();
+      push.mockRestore();
+    });
+  });
+
   describe("loaded with no data", () => {
     beforeEach(async () => {
       wrapper = mountOverviewTab();

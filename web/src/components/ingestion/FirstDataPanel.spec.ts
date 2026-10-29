@@ -19,6 +19,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamKeys } from "@/services/stream.querykeys";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -711,6 +712,21 @@ describe("FirstDataPanel — first data arrived strip (e5)", () => {
     expect(open.text()).toBe("Open in Logs");
     await open.trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it("disables Open in Logs with a lock while the logs license is locked", async () => {
+    await mountPanel({
+      signal: "any",
+      variant: "compact",
+      arrived: { streamName: "default", streamType: "logs", count: 1, rangeStart: 0, rangeEnd: 1 },
+    });
+    store.state.zoConfig.features = { logs: "locked" };
+    await nextTick();
+    const open = q("first-data-panel-arrived-open-btn");
+    expect(open.attributes("disabled")).toBeDefined();
+    expect(open.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("lock");
+    await open.trigger("click");
+    expect(wrapper.emitted("open")).toBeUndefined();
   });
 
   it("states the records and stream, and closes", async () => {

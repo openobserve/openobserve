@@ -25,6 +25,7 @@ import {
   provideFeatureLock,
   useFeatureLock,
   useLicenseLock,
+  useLicenseLocks,
   useLockedDisabled,
   type FeatureLock,
 } from "./useFeatureLock";
@@ -366,5 +367,43 @@ describe("useLicenseLock", () => {
     expect(licenseLockOf("dashboards", { features: {} }).locked.value).toBe(false);
     wrapper?.unmount();
     expect(licenseLockOf("dashboards", {}).locked.value).toBe(false);
+  });
+});
+
+describe("useLicenseLocks", () => {
+  const licenseLocksOf = (zoConfig: Record<string, unknown>) => {
+    let result: ReturnType<typeof useLicenseLocks> | undefined;
+    const Probe = defineComponent({
+      setup() {
+        result = useLicenseLocks();
+        return () => null;
+      },
+    });
+    const store = createStore({ state: () => ({ zoConfig }) });
+    wrapper = mount(Probe, { global: { plugins: [i18n, store] } });
+    return result!;
+  };
+
+  it("locks only the runtime keys the license marks locked", () => {
+    const { isLocked } = licenseLocksOf({
+      features: { logs: "locked", metrics: "enabled", traces: "hidden" },
+    });
+    expect(isLocked("logs")).toBe(true);
+    expect(isLocked("metrics")).toBe(false);
+    expect(isLocked("traces")).toBe(false);
+  });
+
+  it("never locks a null key, the key of a stream type the license does not cover", () => {
+    const { isLocked } = licenseLocksOf({ features: { logs: "locked" } });
+    expect(isLocked(null)).toBe(false);
+    expect(isLocked(undefined)).toBe(false);
+  });
+
+  it("names the feature in the reason", () => {
+    const { lockedReason } = licenseLocksOf({
+      features: { traces: "locked" },
+      feature_names: { traces: "Traces" },
+    });
+    expect(lockedReason("traces")).toContain("Traces");
   });
 });

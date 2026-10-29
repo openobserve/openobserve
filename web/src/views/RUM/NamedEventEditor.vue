@@ -89,7 +89,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-secondary flex flex-wrap items-center gap-1 text-xs"
                   data-test="rum-analytics-named-events-preview-no-param"
                   >{{ t("rum.analytics.events.previewNoParam") }}
+                  <OTooltip v-if="logsLock.locked.value" :content="logsLock.lockedReason.value">
+                    <span class="inline-flex">
+                      <OButton
+                        variant="ghost-primary"
+                        size="xs"
+                        disabled
+                        data-test="rum-analytics-named-events-preview-logs-link"
+                      >
+                        <template #icon-left>
+                          <OIcon
+                            name="lock"
+                            size="sm"
+                            data-test="rum-analytics-named-events-preview-logs-link-lock"
+                          />
+                        </template>
+                        {{ t("rum.analytics.events.openInLogs") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
                   <OButton
+                    v-else
                     as="a"
                     variant="ghost-primary"
                     size="xs"
@@ -142,6 +162,9 @@ import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
@@ -279,6 +302,8 @@ const noParamMatch = computed(() => {
   const p = previewPanel.value;
   return p.status === "ok" && !Number(p.rows[0]?.e0_sessions ?? 0) && paramRules.value.length > 0;
 });
+
+const logsLock = useLicenseLock("logs");
 
 // Logs gets the same predicate the preview counted, so the analyst can read the raw URLs.
 const logsHref = computed(() => {

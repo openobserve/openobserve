@@ -25,6 +25,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
@@ -80,6 +82,8 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18nTyped();
+const tracesLock = useLicenseLock("traces");
+const metricsLock = useLicenseLock("metrics");
 
 const EVENT_LIMIT = 100;
 
@@ -325,8 +329,26 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
             @click="act('yaml')"
             >{{ t("infra.k8s2.drawerActionYaml") }}</OButton
           >
+          <OTooltip
+            v-if="hasTraces && tracesLock.locked.value"
+            :content="tracesLock.lockedReason.value"
+          >
+            <span class="inline-flex">
+              <OButton
+                variant="outline"
+                size="sm-action"
+                disabled
+                data-test="k8s2-drawer-action-traces"
+              >
+                <template #icon-left>
+                  <OIcon name="lock" size="sm" data-test="k8s2-drawer-action-traces-lock" />
+                </template>
+                {{ t("infra.k8s2.drawerActionTraces") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
-            v-if="hasTraces"
+            v-else-if="hasTraces"
             variant="outline"
             size="sm-action"
             icon-left="account-tree"
@@ -337,7 +359,23 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
             >{{ t("infra.k8s2.drawerActionTraces") }}
             <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
           /></OButton>
+          <OTooltip v-if="metricsLock.locked.value" :content="metricsLock.lockedReason.value">
+            <span class="inline-flex">
+              <OButton
+                variant="outline"
+                size="sm-action"
+                disabled
+                data-test="k8s2-drawer-action-metrics"
+              >
+                <template #icon-left>
+                  <OIcon name="lock" size="sm" data-test="k8s2-drawer-action-metrics-lock" />
+                </template>
+                {{ t("infra.k8s2.drawerActionMetrics") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
+            v-else
             variant="outline"
             size="sm-action"
             icon-left="show-chart"

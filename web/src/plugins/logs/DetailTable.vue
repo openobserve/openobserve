@@ -147,27 +147,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              stays reachable from every tab. JsonPreview is told to hide its own
              copy via `hide-view-trace`. -->
         <div
-          v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+          v-if="
+            showViewTraceBtn && (tracesLocked || tracesStreams.length || isTracesStreamsLoading)
+          "
           class="flex shrink-0 items-center gap-2"
         >
-          <OSelect
-            data-test="log-detail-view-trace-stream-select"
-            v-model="searchObj.meta.selectedTraceStream"
-            :options="tracesStreams"
-            class="w-40! shrink-0"
-            :loading="isTracesStreamsLoading"
-            :disabled="isTracesStreamsLoading"
-            size="sm"
-          />
-          <OButton
-            data-test="log-detail-view-trace-btn"
-            size="xs"
-            variant="outline"
-            icon-left="account-tree"
-            :disabled="pageLoading"
-            @click="viewTrace"
-            >{{ t("search.viewTrace") }}</OButton
-          >
+          <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+            <span class="inline-flex">
+              <OButton
+                data-test="log-detail-view-trace-btn"
+                size="xs"
+                variant="outline"
+                icon-left="lock"
+                disabled
+                >{{ t("search.viewTrace") }}</OButton
+              >
+            </span>
+          </OTooltip>
+          <template v-else>
+            <OSelect
+              data-test="log-detail-view-trace-stream-select"
+              v-model="searchObj.meta.selectedTraceStream"
+              :options="tracesStreams"
+              class="w-40! shrink-0"
+              :loading="isTracesStreamsLoading"
+              :disabled="isTracesStreamsLoading"
+              size="sm"
+            />
+            <OButton
+              data-test="log-detail-view-trace-btn"
+              size="xs"
+              variant="outline"
+              icon-left="account-tree"
+              :disabled="pageLoading"
+              @click="viewTrace"
+              >{{ t("search.viewTrace") }}</OButton
+            >
+          </template>
         </div>
         <OSwitch
           v-show="tab === 'table'"
@@ -888,6 +904,8 @@ export default defineComponent({
       tracesStreams,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       setViewTraceBtn: setViewTraceBtnFor,
     } = useViewTraceAction(t, searchObj);
 
@@ -1442,6 +1460,8 @@ export default defineComponent({
       tracesStreams,
       isTracesStreamsLoading,
       showViewTraceBtn,
+      tracesLocked,
+      tracesLockedReason,
       hasAggregationQuery,
       canSearchAroundStream,
       scopeHighlightQuery,

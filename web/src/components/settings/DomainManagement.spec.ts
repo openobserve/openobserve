@@ -729,6 +729,45 @@ describe("DomainManagement Component", () => {
     });
   });
 
+  describe("Show more errors under a logs license lock", () => {
+    const openErrors = async () => {
+      // the lock composable was loaded before this file mocked vuex, so it injects the store
+      wrapper = mount(DomainManagement, {
+        attachTo: `#${uniqueNodeId}`,
+        global: { plugins: [i18n], provide: { store: mockStore } },
+      });
+      await flushPromises();
+      wrapper.vm.claimParserFunction = "parse";
+      wrapper.vm.showVrlInfo = true;
+      await flushPromises();
+      wrapper.vm.loadingErrors = false;
+      wrapper.vm.recentErrors = [{ error: "boom", _timestamp: 1 }];
+      await flushPromises();
+      return document.querySelector<HTMLButtonElement>(
+        '[data-test="domain-management-view-all-errors"]',
+      );
+    };
+
+    afterEach(() => {
+      delete (mockStore.state.zoConfig as Record<string, unknown>).features;
+    });
+
+    it("disables Show more while logs is locked", async () => {
+      (mockStore.state.zoConfig as Record<string, unknown>).features = { logs: "locked" };
+      const btn = await openErrors();
+      expect(btn?.disabled).toBe(true);
+    });
+
+    it("opens Logs from Show more when logs is enabled", async () => {
+      const push = vi.fn();
+      (mockRouter as Record<string, unknown>).push = push;
+      const btn = await openErrors();
+      expect(btn?.disabled).toBe(false);
+      btn?.click();
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ path: "/logs" }));
+    });
+  });
+
   describe("Component Cleanup", () => {
     it("should emit cancel event", async () => {
       wrapper = createWrapper();

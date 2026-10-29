@@ -168,12 +168,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</strong>
           </span>
         </div>
-        <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
-          @click="goToServiceGraph"
-        >
-          {{ t("overview.viewAll") }} {{ "→" }}
-        </button>
+        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+          <button
+            class="text-text-link aria-disabled:text-text-disabled inline-flex cursor-pointer items-center gap-1 border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100 aria-disabled:cursor-not-allowed aria-disabled:no-underline"
+            :aria-disabled="tracesLock.locked.value || undefined"
+            data-test="overview-services-view-all"
+            @click="goToServiceGraph"
+          >
+            <OIcon
+              v-if="tracesLock.locked.value"
+              name="lock"
+              size="sm"
+              data-test="overview-services-view-all-lock"
+            />
+            {{ t("overview.viewAll") }}
+            <template v-if="!tracesLock.locked.value">{{ "→" }}</template>
+          </button>
+        </OTooltip>
       </div>
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
@@ -221,11 +232,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-heading block flex-1 cursor-default text-sm font-medium"
                 >{{ svc.label }}</OTruncatedText
               >
-              <span class="ms-1 inline-flex shrink-0 items-center">
+              <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
+                  <OButton
+                    variant="ghost-muted"
+                    size="icon"
+                    disabled
+                    :aria-label="t('traces.servicesCatalog.viewTraces')"
+                    data-test="overview-service-view-traces"
+                  >
+                    <OIcon name="lock" size="sm" data-test="overview-service-view-traces-lock" />
+                  </OButton>
+                </span>
+              </OTooltip>
+              <span v-else class="ms-1 inline-flex shrink-0 items-center">
                 <OButton
                   variant="ghost-muted"
                   size="icon"
                   :title="t('traces.servicesCatalog.viewTraces')"
+                  data-test="overview-service-view-traces"
                   @click="goToService(svc, $event)"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -499,14 +524,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="overview-not-monitored-anomaly-card"
           @click="goToAnomalies"
         />
-        <EmptyStateActionCard
+        <OTooltip
           v-if="showLogsCard"
-          icon="search"
-          :label="t('overview.emptyActionLogs')"
-          :sublabel="t('overview.emptyActionLogsDesc')"
-          data-test="overview-not-monitored-logs-card"
-          @click="goToLogs"
-        />
+          :content="logsLock.lockedReason.value"
+          :disabled="!logsLock.locked.value"
+        >
+          <EmptyStateActionCard
+            :icon="logsLock.locked.value ? 'lock' : 'search'"
+            :label="t('overview.emptyActionLogs')"
+            :sublabel="t('overview.emptyActionLogsDesc')"
+            :unavailable="logsLock.locked.value"
+            data-test="overview-not-monitored-logs-card"
+            @click="goToLogs"
+          />
+        </OTooltip>
       </template>
     </OEmptyState>
 
@@ -553,59 +584,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </button>
         <!-- Explore logs -->
-        <button
+        <OTooltip
           v-if="showLogsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-logs-card"
-          @click="goToLogs"
+          :content="logsLock.lockedReason.value"
+          :disabled="!logsLock.locked.value"
         >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+          <button
+            type="button"
+            class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2 aria-disabled:cursor-not-allowed"
+            :aria-disabled="logsLock.locked.value || undefined"
+            data-test="overview-empty-logs-card"
+            @click="goToLogs"
           >
-            <OIcon name="search" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionLogs")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionLogsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
+            <span
+              class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+            >
+              <OIcon name="search" size="md" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
+                t("overview.emptyActionLogs")
+              }}</OTruncatedText>
+              <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
+                t("overview.emptyActionLogsDesc")
+              }}</span>
+            </span>
+            <OIcon
+              v-if="logsLock.locked.value"
+              name="lock"
+              size="sm"
+              class="text-text-disabled shrink-0"
+              data-test="overview-empty-logs-card-lock"
+            />
+            <OIcon
+              v-else
+              name="chevron-right"
+              size="sm"
+              class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+            />
+          </button>
+        </OTooltip>
         <!-- Explore traces -->
-        <button
+        <OTooltip
           v-if="showTracesCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-traces-card"
-          @click="goToTraces"
+          :content="tracesLock.lockedReason.value"
+          :disabled="!tracesLock.locked.value"
         >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+          <button
+            type="button"
+            class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2 aria-disabled:cursor-not-allowed"
+            :aria-disabled="tracesLock.locked.value || undefined"
+            data-test="overview-empty-traces-card"
+            @click="goToTraces"
           >
-            <OIcon name="account-tree" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionTraces")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionTracesDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
+            <span
+              class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+            >
+              <OIcon name="account-tree" size="md" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
+                t("overview.emptyActionTraces")
+              }}</OTruncatedText>
+              <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
+                t("overview.emptyActionTracesDesc")
+              }}</span>
+            </span>
+            <OIcon
+              v-if="tracesLock.locked.value"
+              name="lock"
+              size="sm"
+              class="text-text-disabled shrink-0"
+              data-test="overview-empty-traces-card-lock"
+            />
+            <OIcon
+              v-else
+              name="chevron-right"
+              size="sm"
+              class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+            />
+          </button>
+        </OTooltip>
       </template>
     </OEmptyState>
 
@@ -644,6 +703,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -677,6 +737,8 @@ const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_d
 // a deployment with anomaly detection off answers 403 by design, which is no load failure
 const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
 const { locked: alertsLocked } = useLicenseLock("alerts");
+const logsLock = useLicenseLock("logs");
+const tracesLock = useLicenseLock("traces");
 const anomalyEnabled = computed(
   () => store.state.zoConfig?.anomaly_detection_enabled === true && !anomalyLocked.value,
 );
@@ -1325,6 +1387,8 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
   e?.stopPropagation();
+  // the service panel's View traces emits here too, outside this file's lock markup
+  if (tracesLock.locked.value) return;
   let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
@@ -1393,14 +1457,17 @@ const goToAnomalies = () => {
 };
 
 const goToLogs = () => {
+  if (logsLock.locked.value) return;
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToTraces = () => {
+  if (tracesLock.locked.value) return;
   router.push({ name: "traces", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
+  if (tracesLock.locked.value) return;
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     tab: "service-graph",
