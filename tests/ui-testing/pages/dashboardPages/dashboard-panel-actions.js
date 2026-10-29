@@ -898,12 +898,24 @@ export default class DashboardactionPage {
             try {
               const option = chart.getOption() ?? {};
               charts.push({
+                width: chart.getWidth(),
+                height: chart.getHeight(),
+                hostWidth: host.clientWidth,
+                hostHeight: host.clientHeight,
                 xAxis: axesOf(option.xAxis),
                 yAxis: axesOf(option.yAxis),
                 series: (option.series ?? []).map((s) => ({
                   name: s?.name ? String(s.name) : "",
+                  type: s?.type ?? null,
                   stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  radius: s?.radius ?? null,
+                  center: Array.isArray(s?.center) ? s.center.map(String) : null,
+                  min: numberOrNull(s?.min),
+                  max: numberOrNull(s?.max),
                   points: (s?.data ?? []).map(pointOf),
+                  pointNames: (s?.data ?? []).map((point) =>
+                    point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
+                  ),
                 })),
                 legendEntries: legendEntriesOf(option),
               });
@@ -919,6 +931,89 @@ export default class DashboardactionPage {
       walk(document.querySelector("#app")?._vnode, 0);
       return charts;
     }, scopeSelector);
+  }
+
+  /**
+   * Geometry problems of the rendered gauge dials, empty when every dial is well-formed and fits its canvas.
+   * @param {{count?: number, min?: number, max?: number}} expected
+   * @param {string} scopeSelector
+   * @returns {Promise<string[]>}
+   */
+  async getGaugeLayoutProblems(expected = {}, scopeSelector = '[data-test="chart-renderer"]') {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
+    const [chart] = charts;
+    const problems = [];
+    const { width, height } = chart;
+    if (!(width > 0 && height > 0)) problems.push(`canvas has no size: ${width}x${height}`);
+    // A dial sized against a stale container overflows the canvas, which is the distortion itself.
+    if (Math.abs(width - chart.hostWidth) > 1 || Math.abs(height - chart.hostHeight) > 1) {
+      problems.push(`canvas ${width}x${height} does not match its container ${chart.hostWidth}x${chart.hostHeight}`);
+    }
+    const dials = chart.series;
+    if (expected.count !== undefined && dials.length !== expected.count) {
+      problems.push(`expected ${expected.count} dials, found ${dials.length}`);
+    }
+    if (dials.length === 0) problems.push("no gauge series");
+    const placed = [];
+    dials.forEach((dial, i) => {
+      const label = `dial ${i} (${dial.name || "unnamed"})`;
+      if (dial.type !== "gauge") problems.push(`${label}: type is ${dial.type}`);
+      const radius = parseFloat(dial.radius);
+      if (!/px$/.test(String(dial.radius)) || !Number.isFinite(radius) || radius <= 0) {
+        problems.push(`${label}: bad radius ${dial.radius}`);
+        return;
+      }
+      const [cxPct, cyPct] = (dial.center ?? []).map((c) => parseFloat(c));
+      if (!Number.isFinite(cxPct) || !Number.isFinite(cyPct) || cxPct < 0 || cxPct > 100 || cyPct < 0 || cyPct > 100) {
+        problems.push(`${label}: bad center ${JSON.stringify(dial.center)}`);
+        return;
+      }
+      const cx = (cxPct * width) / 100;
+      const cy = (cyPct * height) / 100;
+      if (cx - radius < -2 || cx + radius > width + 2 || cy - radius < -2 || cy + radius > height + 2) {
+        problems.push(`${label}: radius ${radius}px at (${cx.toFixed(0)},${cy.toFixed(0)}) overflows ${width}x${height}`);
+      }
+      for (const other of placed) {
+        if (Math.hypot(cx - other.cx, cy - other.cy) < radius + other.radius - 2) {
+          problems.push(`${label}: overlaps dial ${other.i}`);
+        }
+      }
+      placed.push({ i, cx, cy, radius });
+      if (dial.min === null || dial.max === null || !(dial.min < dial.max)) {
+        problems.push(`${label}: bad range ${dial.min}..${dial.max}`);
+      }
+      if (expected.min !== undefined && dial.min !== expected.min) problems.push(`${label}: min ${dial.min}, expected ${expected.min}`);
+      if (expected.max !== undefined && dial.max !== expected.max) problems.push(`${label}: max ${dial.max}, expected ${expected.max}`);
+      const value = dial.points[0];
+      if (typeof value !== "number" || !Number.isFinite(value)) problems.push(`${label}: value is ${value}`);
+    });
+    return problems;
+  }
+
+  /**
+   * Polls until the rendered gauge has no layout problems, failing with the last list seen.
+   * @param {Function} expect - Playwright expect function
+   * @param {{count?: number, min?: number, max?: number}} expected
+   * @param {string} scopeSelector
+   */
+  async expectGaugeWellFormed(expect, expected = {}, scopeSelector = '[data-test="chart-renderer"]') {
+    await expect
+      .poll(() => this.getGaugeLayoutProblems(expected, scopeSelector), {
+        timeout: 20000,
+        intervals: [500, 1000, 1000, 2000],
+      })
+      .toEqual([]);
+  }
+
+  /**
+   * Labels of the dials the rendered gauge draws, one per dial.
+   * @param {string} scopeSelector
+   * @returns {Promise<string[]>}
+   */
+  async getGaugeDialNames(scopeSelector = '[data-test="chart-renderer"]') {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart ? chart.series.filter((s) => s.type === "gauge").map((s) => s.pointNames[0] ?? "") : [];
   }
 
   /**
