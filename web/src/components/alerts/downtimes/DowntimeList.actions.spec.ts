@@ -111,8 +111,13 @@ const mountList = async (stubs: Record<string, unknown> = {}) => {
     global: { plugins: [store, router], stubs },
     attachTo: document.body,
   });
+  // The rows land a variable number of ticks after mount, so wait for every one of them.
   await vi.waitFor(
-    () => expect(wrapper.find('[data-test="downtime-list-scheduled-name"]').exists()).toBe(true),
+    () => {
+      expect(wrapper.findAll('[data-test^="downtime-list-"][data-test$="-actions"]')).toHaveLength(
+        ROWS.length,
+      );
+    },
     { timeout: 3000 },
   );
   return wrapper;

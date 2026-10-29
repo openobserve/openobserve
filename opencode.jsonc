@@ -1,128 +1,147 @@
 {
-  // OpenCode configuration for this repo's CI agents.
-  // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
-  //   for PR code review. ONE shared set, run once per provider by the matrix in
-  //   .github/workflows/ai-code-review.yml (DeepSeek-V4-Pro). The model is
-  //   supplied per-call by the runner, so the agents themselves are provider-agnostic.
-  // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
+  // Loaded from the trusted base-branch checkout via OPENCODE_CONFIG, so a PR cannot change its own review.
+  // The read-only default (REVIEW_OPENCODE_CONFIG=default); opencode.ci.jsonc is the full-permission CI variant.
   "$schema": "https://opencode.ai/config.json",
 
-  "provider": {
-    // DeepSeek provider for PR review (DEEPSEEK_API_KEY).
+  // Nothing here may reach into the PR tree: no `instructions`, no `skills`, no plugins.
+  "update": "disable",
+  "share": "disabled",
+  "snapshots": false,
+  // LSP servers would build the PR (rust-analyzer runs build scripts and proc macros).
+  "lsp": false,
+  "formatter": false,
+
+  // Policies refuse every other provider, including the bundled free ones; a review talks to one endpoint only.
+  "policies": [
+    { "action": "provider.use", "resource": "*", "effect": "deny" },
+    { "action": "provider.use", "resource": "deepseek-review", "effect": "allow" }
+  ],
+
+  "providers": {
     "deepseek-review": {
-      "npm": "@ai-sdk/openai-compatible",
       "name": "DeepSeek (review)",
-      "options": {
-        "baseURL": "https://api.deepseek.com",
-        "apiKey": "{env:DEEPSEEK_API_KEY}"
-      },
+      // Bundled in the opencode binary, so nothing is installed at run time.
+      "package": "@opencode/ai/providers/openai-compatible",
+      "env": ["DEEPSEEK_API_KEY"],
+      "settings": { "baseURL": "https://api.deepseek.com" },
+      // DeepSeek reads max_tokens and returns its reasoning as reasoning_content.
+      "compatibility": { "maxTokensField": "max_tokens", "reasoningField": "reasoning_content" },
       "models": {
-        "deepseek-v4-pro": {
-          "name": "DeepSeek-V4-Pro",
-          "limit": { "context": 1048576, "output": 262144 }
+        "deepseek-flash": {
+          "name": "DeepSeek-V4.1-Flash",
+          // Selected with REVIEW_MODEL_VARIANT=max (the workflow matrix); opencode sends "reasoning_effort": "max".
+          "variants": [{ "id": "max", "settings": { "reasoningEffort": "max" } }],
+          "limit": { "context": 1048576, "output": 393216 },
+          // USD per 1M tokens at peak rate; models fetch is disabled, so without this every cost reads 0.
+          // TODO: these are still the V4-Pro rates; replace them with the Flash price list.
+          "cost": { "input": 1.32, "output": 3.96, "cache": { "read": 0.044 } }
         }
       }
     }
   },
 
-  // Default model for runs that don't pass --model explicitly. run-review.mjs sends an explicit
-  // model per call, so this is only a fallback for local/manual runs.
-  "model": "deepseek-review/deepseek-v4-pro",
+  "model": "deepseek-review/deepseek-flash",
 
-  "agent": {
-    // PR review agents. Prompts are assembled at call time in run-review.mjs
-    // (shared-rules.md + agents/<key>.md) and sent via the `system` override on
-    // session.prompt, so no `prompt` is registered here.
-    //
-    // ONE shared agent set drives every provider. run-review.mjs sends an explicit
-    // `model: {providerID, modelID}` (and `variant` when REVIEW_MODEL_VARIANT is set) on each
-    // session.prompt call, which overrides whatever is declared here — so the `model` below is
-    // only a default for local/manual `opencode` runs. Do NOT fork these into per-provider
-    // copies: identical agents are exactly what makes a model-vs-model comparison meaningful,
-    // and duplicated blocks drift.
-    //
-    // Tool policy is an ALLOWLIST-by-negation, not just "no write/edit/bash": PR diff
-    // content is untrusted (any external contributor can put prompt-injection text in a
-    // diff) and is fed directly into these agents' prompts, with output auto-posted to the
-    // PR. Only read/glob/grep are needed to inspect real repo context around the diff.
-    // Everything else — especially webfetch/websearch (SSRF / exfiltration via injected
-    // instructions) and task (spawning subagents that may not inherit these restrictions)
-    // — is explicitly denied. Deny the full known opencode tool-id set (see
-    // `opencode serve` + `GET /experimental/tool/ids`) rather than only the obvious ones,
-    // so a newly added tool doesn't silently become available by omission.
+  // Last match wins, so the "*" deny must come first; src/opencode.mjs selfCheck refuses any other allowed tool.
+  "agents": {
     "ai-review-security": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "ai-review-correctness": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
     "ai-review-code-quality": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
     "ai-review-performance": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
     "ai-review-documentation": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
     "ai-review-release": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
-    // Reads .claude/skills/ui-architect/references/*.md on demand, so `read`/`glob`/`grep`
-    // are load-bearing here rather than incidental — same deny list as the rest.
     "ai-review-frontend": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
     "ai-review-qa": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     },
     "ai-review-coordinator": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-v4-pro",
-      "tools": {
-        "read": true, "glob": true, "grep": true,
-        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
-        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
-      }
+      "model": "deepseek-review/deepseek-flash",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" }
+      ]
     }
   }
 }

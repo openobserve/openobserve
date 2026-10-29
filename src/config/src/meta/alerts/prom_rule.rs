@@ -104,6 +104,7 @@ pub fn plan_rule_updates(
         at,
     );
     if let Some(s) = rollup.state.as_mut() {
+        close_cycle_on_pending(s);
         s.groups_observed = Some(classification.groups.len());
         s.groups_firing = Some(firing);
         s.groups_observed_is_lower_bound = Some(false);
@@ -126,10 +127,20 @@ pub fn apply_rule_rollup_outcome(
     value: Option<&str>,
 ) -> StateUpdate {
     let mut update = apply_outcome(alert_id, ROLLUP_GROUP_KEY, previous, outcome, level, at);
+    if let Some(state) = update.state.as_mut() {
+        close_cycle_on_pending(state);
+    }
     if let Some(transition) = update.transition.as_mut() {
         transition.rule_value = value.map(str::to_string);
     }
     update
+}
+
+/// Firing → Pending without passing Normal still ends the firing cycle (R-116).
+fn close_cycle_on_pending(rollup: &mut AlertState) {
+    if rollup.last_outcome == Some(RunOutcome::Pending) {
+        rollup.firing_started_at = None;
+    }
 }
 
 fn rule_outcome(previous: Option<&AlertState>, at: i64, pending_sec: i64) -> RunOutcome {
@@ -290,5 +301,52 @@ mod tests {
             .unwrap();
         assert_eq!(t.rule_value.as_deref(), Some("+Inf"));
         assert_eq!(t.value, None);
+    }
+
+    /// AC-P2.1.4
+    #[test]
+    fn a_rollup_that_falls_back_to_pending_closes_its_firing_cycle() {
+        let mut previous = HashMap::new();
+        run(&mut previous, &["a"], 0, 240);
+        run(&mut previous, &["a"], 240, 240);
+        let fired = Some(240_000_000);
+        assert_eq!(previous[ROLLUP_GROUP_KEY].firing_started_at, fired);
+        assert_eq!(state(&previous, "a").firing_started_at, fired);
+
+        // "a" vanished and "b" is still pending: groups exist, none fires.
+        run(&mut previous, &["b"], 300, 240);
+        assert_eq!(
+            previous[ROLLUP_GROUP_KEY].last_outcome,
+            Some(RunOutcome::Pending)
+        );
+        assert_eq!(previous[ROLLUP_GROUP_KEY].firing_started_at, None);
+        assert_eq!(state(&previous, "a").firing_started_at, None);
+        assert_eq!(state(&previous, "b").firing_started_at, None);
+    }
+
+    #[test]
+    fn the_single_row_rule_rollup_also_closes_on_pending() {
+        let fired = apply_rule_rollup_outcome(
+            "rule",
+            None,
+            RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            100,
+            None,
+        )
+        .state
+        .unwrap();
+        assert_eq!(fired.firing_started_at, Some(100));
+        let pending = apply_rule_rollup_outcome(
+            "rule",
+            Some(&fired),
+            RunOutcome::Pending,
+            Some(AlertLevel::Critical),
+            200,
+            None,
+        )
+        .state
+        .unwrap();
+        assert_eq!(pending.firing_started_at, None);
     }
 }

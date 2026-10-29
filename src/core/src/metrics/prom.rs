@@ -1094,11 +1094,17 @@ fn metadata_sql(
         .map(|mat| {
             let name = quote_identifier(&mat.name);
             let value = quote_sql_string(&mat.value);
-            match &mat.op {
+            let predicate = match &mat.op {
                 MatchOp::Equal => format!("{name} = {value}"),
                 MatchOp::NotEqual => format!("{name} != {value}"),
                 MatchOp::Re(_) => format!("re_match({name}, {value})"),
                 MatchOp::NotRe(_) => format!("re_not_match({name}, {value})"),
+            };
+            // A NULL label is an absent label, which PromQL reads as "".
+            if mat.is_match("") {
+                format!("({name} IS NULL OR {predicate})")
+            } else {
+                predicate
             }
         })
         .collect::<Vec<_>>();
@@ -1498,9 +1504,9 @@ mod tests {
                         assert_eq!(literals, 1);
                         let predicate = match op {
                             "=" => "\"job\" = ''",
-                            "!=" => "\"job\" <> ''",
+                            "!=" => "(\"job\" IS NULL OR \"job\" <> '')",
                             "=~" => "re_match(\"job\", '')",
-                            "!~" => "re_not_match(\"job\", '')",
+                            "!~" => "(\"job\" IS NULL OR re_not_match(\"job\", ''))",
                             _ => unreachable!(),
                         };
                         assert_eq!(
@@ -1580,6 +1586,65 @@ mod tests {
                     "{sql}"
                 );
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_sql_reads_null_label_as_empty() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{array::StringArray, record_batch::RecordBatch},
+            prelude::SessionContext,
+        };
+        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCH_UDF.clone());
+        ctx.register_udf(REGEX_NOT_MATCH_UDF.clone());
+        let batch = RecordBatch::try_from_iter(vec![
+            (
+                HASH_LABEL,
+                Arc::new(StringArray::from(vec!["a", "b", "c"])) as _,
+            ),
+            (
+                "job",
+                Arc::new(StringArray::from(vec![Some("api"), Some(""), None])) as _,
+            ),
+        ])
+        .unwrap();
+        let schema = batch.schema();
+        ctx.register_batch("up", batch).unwrap();
+        for (query, expected) in [
+            (r#"up{job="api"}"#, vec!["a"]),
+            (r#"up{job=""}"#, vec!["b", "c"]),
+            (r#"up{job!="api"}"#, vec!["b", "c"]),
+            (r#"up{job!=""}"#, vec!["a"]),
+            (r#"up{job=~".*"}"#, vec!["a", "b", "c"]),
+            (r#"up{job=~"a.*"}"#, vec!["a"]),
+            (r#"up{job!~"a.*"}"#, vec!["b", "c"]),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let sql = series_sql("up", &schema, Some(&selector)).unwrap();
+            let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+            let mut hashes = batches
+                .iter()
+                .flat_map(|batch| {
+                    batch
+                        .column_by_name(HASH_LABEL)
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .iter()
+                        .map(|hash| hash.unwrap().to_string())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            hashes.sort();
+            assert_eq!(hashes, expected, "{query}");
         }
     }
 

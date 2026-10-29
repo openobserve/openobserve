@@ -38,12 +38,17 @@ vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
     shortcuts.defs = defs;
   },
 }));
-vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn(), search: vi.fn() } }));
+vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn() } }));
+vi.mock("@/composables/useStreamingSearch", async () => {
+  const { streamSearchApi } = await import("./__fixtures__/streamSearchMock");
+  return { default: () => streamSearchApi((args) => streamSearch(args)) };
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams, getStream }) }));
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
-const search = vi.mocked(searchService.search);
+const search = vi.hoisted(() => vi.fn());
+const streamSearch = (args: any) => search(args);
 
 const ALL_IDS = Object.keys(QUERY_STREAM) as QueryId[];
 const ALL_STREAMS = [...new Set(Object.values(QUERY_STREAM))];

@@ -23,9 +23,9 @@ import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   confirmConnectionMutation,
   connectInstallationMutation,
@@ -34,7 +34,7 @@ import {
   slackInstallationsQuery,
   startConnectionMutation,
 } from "@/services/slack.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   SlackAlreadyInstalledResponse,
   SlackAvailableInstallation,
@@ -60,8 +60,9 @@ const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConf
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { isMobile } = useBreakpoint();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-const orgName = computed<string>(() => store.state.selectedOrganization?.name || org.value);
+const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 
 // Row 9's `instance`: an instance workspace on this server that does not serve this org (M4).
 const installations = useQuery(() => slackInstallationsQuery(org.value));
@@ -161,6 +162,46 @@ const connectWithTicket = async (): Promise<void> => {
 
 const candidate = computed(() => props.upgradeCandidates[0] ?? null);
 const addToSlackSrcset = `${addToSlackImage2x} 2x`;
+
+const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
+  props.isCloud
+    ? [
+        { title: t("slackApp.connect.stepAddTitle"), detail: t("slackApp.connect.popupHint") },
+        {
+          title: t("slackApp.connect.stepLinkTitle"),
+          detail: t("slackApp.connect.stepLinkDetail"),
+        },
+      ]
+    : isMobile.value
+      ? [
+          {
+            title: t("slackApp.connect.stepCheckTitle"),
+            detail: t("slackApp.connect.stepCheckDetailShort"),
+          },
+          {
+            title: t("slackApp.connect.stepCreateTitle"),
+            detail: t("slackApp.connect.stepCreateDetailShort"),
+          },
+          {
+            title: t("slackApp.connect.stepInstallTitle"),
+            detail: t("slackApp.connect.stepInstallDetailShort"),
+          },
+        ]
+      : [
+          {
+            title: t("slackApp.connect.stepCheckTitle"),
+            detail: t("slackApp.connect.stepCheckDetail"),
+          },
+          {
+            title: t("slackApp.connect.stepCreateTitle"),
+            detail: t("slackApp.connect.stepCreateDetail"),
+          },
+          {
+            title: t("slackApp.connect.stepInstallTitle"),
+            detail: t("slackApp.connect.stepInstallDetail"),
+          },
+        ],
+);
 </script>
 
 <template>
@@ -261,7 +302,9 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
         size="block"
         illustration="connect"
         :title="t('slackApp.connect.title')"
-        :description="t('slackApp.connect.description')"
+        :description="
+          isCloud ? t('slackApp.connect.description') : t('slackApp.connect.descriptionSelfHosted')
+        "
         :backdrop="false"
       >
         <template #actions>
@@ -293,20 +336,34 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
           </OButton>
         </template>
         <template #extra>
-          <ul class="text-text-body m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            <li class="flex items-center gap-2">
-              <OIcon name="check" size="sm" class="text-status-positive" />
-              {{ t("slackApp.connect.featureQuestions") }}
+          <span class="text-text-label text-2xs font-semibold">
+            {{ t("slackApp.connect.nextTitle", { minutes: isCloud ? 2 : 5 }) }}
+          </span>
+          <ol
+            class="m-0 grid w-full max-w-2xl list-none grid-cols-1 gap-3 p-0 text-start"
+            :class="nextSteps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'"
+            role="list"
+            data-test="slack-connect-steps"
+          >
+            <li
+              v-for="(item, index) in nextSteps"
+              :key="index"
+              class="border-border-subtle bg-surface-panel rounded-default flex items-start gap-2.5 border p-3"
+              data-test="slack-connect-step"
+            >
+              <span
+                class="bg-surface-subtle text-text-secondary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+              >
+                {{ index + 1 }}
+              </span>
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="text-text-heading text-compact font-medium">{{ item.title }}</span>
+                <span class="text-text-secondary text-xs">{{ item.detail }}</span>
+              </span>
             </li>
-          </ul>
-          <span class="text-text-secondary text-xs">
-            {{
-              isCloud
-                ? t("slackApp.connect.popupHint")
-                : instance
-                  ? t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name })
-                  : t("slackApp.connect.selfHostedHint")
-            }}
+          </ol>
+          <span v-if="!isCloud && instance" class="text-text-secondary text-xs">
+            {{ t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name }) }}
           </span>
           <span class="text-text-secondary text-xs">
             {{ t("slackApp.connect.permissionHint") }}
@@ -315,7 +372,7 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
             variant="info"
             dense
             icon="verified-user"
-            class="max-w-xl text-start"
+            class="w-full max-w-2xl text-start"
             data-test="slack-connect-consent"
           >
             {{ t("slackApp.connect.consent") }}
