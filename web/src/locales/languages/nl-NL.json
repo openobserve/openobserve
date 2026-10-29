@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Toe te voegen personen",
     "mineTeamsLoadFailed": "Kon je teams niet laden",
     "myDeliveriesLoadFailed": "Kon niet laden wat naar je is verzonden",
-    "bulkSnoozeNoTeam": "Niet gesnoozd: {count} zonder team. Draag ze eerst over aan een team.",
+    "bulkSnoozeNoTeam": "Niet gesnoozd: {count} zonder team. Draag ze eerst over aan een team. | Niet gesnoozd: {count} zonder team. Draag ze eerst over aan een team.",
     "exhaustedBanner": "Niemand reageerde. Alle stappen zijn uitgevoerd vóór {time}. Bevestig om hem over te nemen, of draag hem over.",
     "holdBanner": "AI-triage controleert eerst · oproep binnen {n} s",
     "pageNow": "Nu oproepen",

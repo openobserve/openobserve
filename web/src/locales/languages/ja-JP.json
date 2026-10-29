@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "追加するメンバー",
     "mineTeamsLoadFailed": "あなたのチームを読み込めませんでした",
     "myDeliveriesLoadFailed": "あなたに送信された内容を読み込めませんでした",
-    "bulkSnoozeNoTeam": "チームのない {count} 件はスヌーズしませんでした。先にチームへ引き継いでください。",
+    "bulkSnoozeNoTeam": "チームのない {count} 件はスヌーズしませんでした。先にチームへ引き継いでください。 | チームのない {count} 件はスヌーズしませんでした。先にチームへ引き継いでください。",
     "exhaustedBanner": "誰も応答しませんでした。{time} までにすべての段階が実行されました。確認して引き受けるか、引き継いでください。",
     "holdBanner": "AI トリアージが先に確認中 · {n} 秒以内に呼び出し",
     "pageNow": "今すぐ呼び出す",

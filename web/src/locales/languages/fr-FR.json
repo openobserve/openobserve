@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Personnes à ajouter",
     "mineTeamsLoadFailed": "Impossible de charger vos équipes",
     "myDeliveriesLoadFailed": "Impossible de charger ce qui vous a été envoyé",
-    "bulkSnoozeNoTeam": "Non mises en pause : {count} sans équipe. Transférez-les d'abord à une équipe.",
+    "bulkSnoozeNoTeam": "Non mises en pause : {count} sans équipe. Transférez-les d'abord à une équipe. | Non mises en pause : {count} sans équipe. Transférez-les d'abord à une équipe.",
     "exhaustedBanner": "Personne n'a répondu. Toutes les étapes ont été exécutées avant {time}. Accusez réception pour la prendre en charge, ou transférez-la.",
     "holdBanner": "Le triage IA vérifie d'abord · notification d'ici {n} s au plus",
     "pageNow": "Notifier maintenant",

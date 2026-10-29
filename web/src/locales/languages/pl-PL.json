@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Osoby do dodania",
     "mineTeamsLoadFailed": "Nie udało się wczytać Twoich zespołów",
     "myDeliveriesLoadFailed": "Nie udało się wczytać tego, co do Ciebie wysłano",
-    "bulkSnoozeNoTeam": "Nie odroczono wezwań bez zespołu: {count}. Najpierw przekaż je zespołowi.",
+    "bulkSnoozeNoTeam": "Nie odroczono wezwań bez zespołu: {count}. Najpierw przekaż je zespołowi. | Nie odroczono wezwań bez zespołu: {count}. Najpierw przekaż je zespołowi.",
     "exhaustedBanner": "Nikt nie odpowiedział. Wszystkie kroki wykonano do {time}. Potwierdź, aby je przejąć, albo przekaż je dalej.",
     "holdBanner": "Triage AI sprawdza najpierw · wezwanie w ciągu {n} s",
     "pageNow": "Wezwij teraz",

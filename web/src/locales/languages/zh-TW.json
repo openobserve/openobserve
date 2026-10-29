@@ -25507,7 +25507,7 @@
     "membersPickerLabel": "要新增的人員",
     "mineTeamsLoadFailed": "無法載入你的團隊",
     "myDeliveriesLoadFailed": "無法載入傳送給你的內容",
-    "bulkSnoozeNoTeam": "{count} 個沒有團隊的呼叫未暫停。請先轉交給團隊。",
+    "bulkSnoozeNoTeam": "{count} 個沒有團隊的呼叫未暫停。請先轉交給團隊。 | {count} 個沒有團隊的呼叫未暫停。請先轉交給團隊。",
     "exhaustedBanner": "無人回應。所有層級已在 {time} 前執行完畢。確認以接手，或轉交他人。",
     "holdBanner": "AI 分診正在先行檢查 · {n} 秒內呼叫",
     "pageNow": "立即呼叫",

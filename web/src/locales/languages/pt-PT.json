@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Pessoas a adicionar",
     "mineTeamsLoadFailed": "Não foi possível carregar as suas equipas",
     "myDeliveriesLoadFailed": "Não foi possível carregar o que lhe foi enviado",
-    "bulkSnoozeNoTeam": "Não adiados: {count} sem equipa. Passe-os primeiro a uma equipa.",
+    "bulkSnoozeNoTeam": "Não adiados: {count} sem equipa. Passe-os primeiro a uma equipa. | Não adiados: {count} sem equipa. Passe-os primeiro a uma equipa.",
     "exhaustedBanner": "Ninguém respondeu. Todas as etapas foram executadas até às {time}. Confirme para o assumir ou passe-o a outra pessoa.",
     "holdBanner": "A triagem por IA verifica primeiro · acionamento dentro de {n} s",
     "pageNow": "Acionar agora",

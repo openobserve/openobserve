@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Persone da aggiungere",
     "mineTeamsLoadFailed": "Impossibile caricare i tuoi team",
     "myDeliveriesLoadFailed": "Impossibile caricare ciò che ti è stato inviato",
-    "bulkSnoozeNoTeam": "Non posticipate: {count} senza team. Passale prima a un team.",
+    "bulkSnoozeNoTeam": "Non posticipate: {count} senza team. Passale prima a un team. | Non posticipate: {count} senza team. Passale prima a un team.",
     "exhaustedBanner": "Nessuno ha risposto. Tutti i passaggi sono stati eseguiti entro le {time}. Conferma per prenderla in carico o passala ad altri.",
     "holdBanner": "Il triage AI controlla prima · notifica entro {n} s",
     "pageNow": "Notifica ora",

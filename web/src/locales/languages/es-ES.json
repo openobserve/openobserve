@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Personas para añadir",
     "mineTeamsLoadFailed": "No se pudieron cargar tus equipos",
     "myDeliveriesLoadFailed": "No se pudo cargar lo que se te envió",
-    "bulkSnoozeNoTeam": "Sin posponer: {count} sin equipo. Pásalos antes a un equipo.",
+    "bulkSnoozeNoTeam": "Sin posponer: {count} sin equipo. Pásalos antes a un equipo. | Sin posponer: {count} sin equipo. Pásalos antes a un equipo.",
     "exhaustedBanner": "Nadie respondió. Todos los pasos se ejecutaron antes de las {time}. Confírmalo para hacerte cargo o pásalo a otra persona.",
     "holdBanner": "El triaje de IA revisa primero · aviso en {n} s como máximo",
     "pageNow": "Avisar ahora",

@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "要添加的人员",
     "mineTeamsLoadFailed": "无法加载你的团队",
     "myDeliveriesLoadFailed": "无法加载发送给你的内容",
-    "bulkSnoozeNoTeam": "{count} 个没有团队的呼叫未暂停。请先转交给团队。",
+    "bulkSnoozeNoTeam": "{count} 个没有团队的呼叫未暂停。请先转交给团队。 | {count} 个没有团队的呼叫未暂停。请先转交给团队。",
     "exhaustedBanner": "无人响应。所有层级已在 {time} 前执行完毕。确认以接手，或转交他人。",
     "holdBanner": "AI 分诊正在先行检查 · {n} 秒内呼叫",
     "pageNow": "立即呼叫",

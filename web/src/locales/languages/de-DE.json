@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Hinzuzufügende Personen",
     "mineTeamsLoadFailed": "Ihre Teams konnten nicht geladen werden",
     "myDeliveriesLoadFailed": "Was an Sie gesendet wurde, konnte nicht geladen werden",
-    "bulkSnoozeNoTeam": "Nicht pausiert: {count} ohne Team. Übergeben Sie sie zuerst an ein Team.",
+    "bulkSnoozeNoTeam": "Nicht pausiert: {count} ohne Team. Übergeben Sie sie zuerst an ein Team. | Nicht pausiert: {count} ohne Team. Übergeben Sie sie zuerst an ein Team.",
     "exhaustedBanner": "Niemand hat geantwortet. Alle Stufen liefen bis {time}. Bestätigen Sie, um sie zu übernehmen, oder übergeben Sie sie.",
     "holdBanner": "KI-Triage prüft zuerst · Alarmierung spätestens in {n} s",
     "pageNow": "Jetzt alarmieren",

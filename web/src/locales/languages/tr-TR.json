@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Eklenecek kişiler",
     "mineTeamsLoadFailed": "Ekipleriniz yüklenemedi",
     "myDeliveriesLoadFailed": "Size gönderilenler yüklenemedi",
-    "bulkSnoozeNoTeam": "Ekibi olmayan {count} çağrı ertelenmedi. Önce bir ekibe devredin.",
+    "bulkSnoozeNoTeam": "Ekibi olmayan {count} çağrı ertelenmedi. Önce bir ekibe devredin. | Ekibi olmayan {count} çağrı ertelenmedi. Önce bir ekibe devredin.",
     "exhaustedBanner": "Kimse yanıt vermedi. Tüm kademeler {time} itibarıyla çalıştı. Üstlenmek için onaylayın ya da devredin.",
     "holdBanner": "Yapay Zeka triyajı önce kontrol ediyor · en geç {n} sn içinde çağrı",
     "pageNow": "Şimdi çağır",

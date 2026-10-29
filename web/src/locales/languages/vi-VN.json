@@ -25512,7 +25512,7 @@
     "membersPickerLabel": "Người cần thêm",
     "mineTeamsLoadFailed": "Không thể tải các nhóm của bạn",
     "myDeliveriesLoadFailed": "Không thể tải những gì đã gửi cho bạn",
-    "bulkSnoozeNoTeam": "{count} thông báo trực không có nhóm nên chưa tạm hoãn. Hãy bàn giao cho một nhóm trước.",
+    "bulkSnoozeNoTeam": "{count} thông báo trực không có nhóm nên chưa tạm hoãn. Hãy bàn giao cho một nhóm trước. | {count} thông báo trực không có nhóm nên chưa tạm hoãn. Hãy bàn giao cho một nhóm trước.",
     "exhaustedBanner": "Không ai phản hồi. Mọi bậc đã chạy xong lúc {time}. Xác nhận để nhận xử lý, hoặc bàn giao.",
     "holdBanner": "AI đang phân loại trước · gửi thông báo trong vòng {n} giây",
     "pageNow": "Gửi ngay",
