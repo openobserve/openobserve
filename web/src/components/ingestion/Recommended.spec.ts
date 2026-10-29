@@ -364,6 +364,69 @@ describe("Recommended: Get started pick", () => {
     wrapper.unmount();
   });
 
+  describe("license-gated guides", () => {
+    const mountLicensed = async (features: Record<string, string>) => {
+      const store = createStore({
+        state: {
+          selectedOrganization: { identifier: ORG },
+          userInfo: { email: "test@example.com" },
+          zoConfig: { ai_enabled: false, features },
+        },
+      });
+      const router = createRouter({
+        history: createWebHistory(),
+        routes: guides.map((name) => ({
+          path: `/${name}`,
+          name,
+          component: { template: "<div />" },
+        })),
+      });
+      await router.push("/ingestFromLinux");
+      await router.isReady();
+      const wrapper = mount(Recommended, {
+        global: { plugins: [i18n, store, router], stubs: { "router-view": true } },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+    const tab = (wrapper: ReturnType<typeof mount>, name: string) =>
+      wrapper.find(`[data-test="ingestion-recommended-tab-${name}"]`);
+
+    it.each([
+      ["frontendMonitoring", "rum"],
+      ["recommendedMcp", "mcp"],
+    ])("keeps the %s tab with a lock when %s is locked", async (name, feature) => {
+      localStorage.clear();
+      const wrapper = await mountLicensed({ [feature]: "locked" });
+      expect(tab(wrapper, name).exists()).toBe(true);
+      expect(tab(wrapper, name).find(".text-warning-600").exists()).toBe(true);
+      expect(tab(wrapper, "ingestFromLinux").find(".text-warning-600").exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it.each([
+      ["frontendMonitoring", "rum"],
+      ["recommendedMcp", "mcp"],
+    ])("drops the %s tab when %s is hidden", async (name, feature) => {
+      localStorage.clear();
+      const wrapper = await mountLicensed({ [feature]: "hidden" });
+      expect(tab(wrapper, name).exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("shows both guides without a lock when the license enables them", async () => {
+      localStorage.clear();
+      const wrapper = await mountLicensed({});
+      for (const name of ["frontendMonitoring", "recommendedMcp"]) {
+        expect(tab(wrapper, name).exists()).toBe(true);
+        expect(tab(wrapper, name).find(".text-warning-600").exists()).toBe(false);
+      }
+      // No pick: no route name leaks as a native tooltip.
+      expect(wrapper.findAll('[data-test^="ingestion-recommended-tab-"][title]')).toHaveLength(0);
+      wrapper.unmount();
+    });
+  });
+
   it("pins nothing for Not sure yet or a pick stored for another org", async () => {
     localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, "unsure");
     localStorage.setItem("o2.onboarding.firstSource.other", "kubernetes");

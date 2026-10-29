@@ -1,6 +1,7 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import { withLicenseFeature } from "@/utils/featureGate";
 import { oncallRouteGuard } from "./oncallRouteGuard";
 import { slackRouteGuard } from "./slackRouteGuard";
 
@@ -108,6 +109,7 @@ const useManagementRoutes = () => {
       keepAlive: true,
       titleKey: "routeTitles.syntheticsLocations",
       allowOnEmptyData: true,
+      licenseFeature: "synthetics",
     },
     beforeEnter(to: any, from: any, next: any) {
       routeGuard(to, from, next);
@@ -119,44 +121,52 @@ const useManagementRoutes = () => {
   // security pages below are all always registered; a direct URL redirects
   // to the shared locked page (see `withFeatureGate`) when the edition
   // doesn't unlock them, instead of landing on the real page or a 404.
-  routes[0].children.push({
-    path: "model_pricing",
-    name: "modelPricing",
-    meta: {
-      keepAlive: true,
-      titleKey: "settings.llmModelPricing",
-    },
-    component: () => import("@/components/settings/ModelPricingList.vue"),
-    beforeEnter: withFeatureGate("modelPricing", routeGuard),
-  });
-  routes[0].children.push({
-    path: "model_pricing/edit",
-    name: "modelPricingEditor",
-    meta: {
-      titleKey: "routeTitles.modelPricingEditor",
-    },
-    component: () => import("@/components/settings/ModelPricingEditor.vue"),
-    beforeEnter: withFeatureGate("modelPricing", routeGuard),
-  });
-  routes[0].children.push({
-    path: "llm_providers",
-    name: "llmProviders",
-    component: () => import("@/components/settings/LlmProvidersSettings.vue"),
-    meta: {
-      titleKey: "llmProviders.title",
-    },
-    beforeEnter: withFeatureGate("llmProviders", routeGuard),
-  });
-  routes[0].children.push({
-    path: "gen_ai_agent_mapping",
-    name: "genAiAgentMapping",
-    component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
-    meta: {
-      keepAlive: true,
-      titleKey: "settings.genAiAgentMapping.title",
-    },
-    beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
-  });
+  routes[0].children.push(
+    withLicenseFeature("ai_observability", {
+      path: "model_pricing",
+      name: "modelPricing",
+      meta: {
+        keepAlive: true,
+        titleKey: "settings.llmModelPricing",
+      },
+      component: () => import("@/components/settings/ModelPricingList.vue"),
+      beforeEnter: withFeatureGate("modelPricing", routeGuard),
+    }),
+  );
+  routes[0].children.push(
+    withLicenseFeature("ai_observability", {
+      path: "model_pricing/edit",
+      name: "modelPricingEditor",
+      meta: {
+        titleKey: "routeTitles.modelPricingEditor",
+      },
+      component: () => import("@/components/settings/ModelPricingEditor.vue"),
+      beforeEnter: withFeatureGate("modelPricing", routeGuard),
+    }),
+  );
+  routes[0].children.push(
+    withLicenseFeature("ai_observability", {
+      path: "llm_providers",
+      name: "llmProviders",
+      component: () => import("@/components/settings/LlmProvidersSettings.vue"),
+      meta: {
+        titleKey: "llmProviders.title",
+      },
+      beforeEnter: withFeatureGate("llmProviders", routeGuard),
+    }),
+  );
+  routes[0].children.push(
+    withLicenseFeature("ai_observability", {
+      path: "gen_ai_agent_mapping",
+      name: "genAiAgentMapping",
+      component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
+      meta: {
+        keepAlive: true,
+        titleKey: "settings.genAiAgentMapping.title",
+      },
+      beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
+    }),
+  );
   // Registered in every build; slackRouteGuard and the rail both hide it unless the org config turns Slack on.
   routes[0].children.push({
     path: "slack",
@@ -188,6 +198,7 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             titleKey: "settings.queryManagement",
+            licenseFeature: "query_management",
           },
           beforeEnter: withFeatureGate("queryManagement", routeGuard),
         },
@@ -201,7 +212,7 @@ const useManagementRoutes = () => {
           },
           beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
-        {
+        withLicenseFeature("ai_toolsets", {
           path: "ai_toolsets",
           name: "aiToolsets",
           component: () => import("@/components/settings/AiToolsets.vue"),
@@ -210,7 +221,7 @@ const useManagementRoutes = () => {
             titleKey: "aiToolset.header",
           },
           beforeEnter: withFeatureGate("aiToolsets", routeGuard),
-        },
+        }),
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
@@ -236,6 +247,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             titleKey: "routeTitles.storageSettings",
+            licenseFeature: "byob",
           },
           beforeEnter: withFeatureGate("storageSettings", routeGuard),
         },

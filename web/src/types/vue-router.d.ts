@@ -20,5 +20,7 @@ declare module "vue-router" {
     allowOnEmptyData?: boolean;
     /** Resource key of this route's main list; a 403 on it replaces the page with the no-access state. */
     accessResource?: string;
+    /** License feature key the page needs; a `locked` key renders the page with every control disabled. */
+    licenseFeature?: string;
   }
 }

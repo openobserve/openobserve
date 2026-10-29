@@ -41,27 +41,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   so drilling into a query does not unlight the tab it was opened from.
 -->
 <template>
-  <OTabs :model-value="activeTab" align="left" data-test="dbm-section-tabs" @change="navigate">
-    <OTab
-      v-for="section in sections"
-      :key="section.key"
-      :name="section.key"
-      :disable="section.disabled"
-      :data-test="`dbm-section-tab-${section.key}`"
-    >
-      <span>{{ section.label }}</span>
-      <!-- The lock is what makes a disabled tab READ as gated rather than
+  <!-- Section navigation stays live on a license-locked page; edition-gated tabs keep their own `disable`. -->
+  <FeatureLockExempt class="contents">
+    <OTabs :model-value="activeTab" align="left" data-test="dbm-section-tabs" @change="navigate">
+      <OTab
+        v-for="section in sections"
+        :key="section.key"
+        :name="section.key"
+        :disable="section.disabled"
+        :data-test="`dbm-section-tab-${section.key}`"
+      >
+        <span>{{ section.label }}</span>
+        <!-- The lock is what makes a disabled tab READ as gated rather than
            broken: dimmed text alone says "unavailable", not "available on
            another plan". It is decorative for AT — the tooltip carries the
            sentence, and TabsTrigger already exposes aria-disabled. -->
-      <OIcon
-        v-if="section.disabled"
-        name="lock"
-        size="xs"
-        aria-hidden="true"
-        :data-test="`dbm-section-tab-lock-${section.key}`"
-      />
-      <!-- The count is what the tab is about, so the reader can see the shape
+        <OIcon
+          v-if="section.disabled"
+          name="lock"
+          size="xs"
+          aria-hidden="true"
+          :data-test="`dbm-section-tab-lock-${section.key}`"
+        />
+        <!-- The count is what the tab is about, so the reader can see the shape
            of the other views without opening them.
 
            An OVERLAP count (calls) carries its vantage as a suffix on the
@@ -71,26 +73,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            absent for the counts that exist in one vantage only: qualifying a
            deadlock count would imply a choice between feeds that was never
            available. -->
-      <span
-        v-if="section.count != null"
-        class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
-        :class="
-          section.key === activeTab
-            ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
-            : 'bg-surface-subtle text-text-secondary'
-        "
-        :data-test="`dbm-section-tab-badge-${section.key}`"
-        ><span>{{ section.count }}</span
-        ><span
-          v-if="section.vantageLabel"
-          class="text-3xs font-normal opacity-80"
-          :data-test="`dbm-section-tab-vantage-${section.key}`"
-          >{{ section.vantageLabel }}</span
-        ></span
-      >
-      <OTooltip v-if="section.hint" side="bottom" :content="section.hint" />
-    </OTab>
-  </OTabs>
+        <span
+          v-if="section.count != null"
+          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
+          :class="
+            section.key === activeTab
+              ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
+              : 'bg-surface-subtle text-text-secondary'
+          "
+          :data-test="`dbm-section-tab-badge-${section.key}`"
+          ><span>{{ section.count }}</span
+          ><span
+            v-if="section.vantageLabel"
+            class="text-3xs font-normal opacity-80"
+            :data-test="`dbm-section-tab-vantage-${section.key}`"
+            >{{ section.vantageLabel }}</span
+          ></span
+        >
+        <OTooltip v-if="section.hint" side="bottom" :content="section.hint" />
+      </OTab>
+    </OTabs>
+  </FeatureLockExempt>
 </template>
 
 <script setup lang="ts">
@@ -102,6 +105,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { badgeCount, countVantage, type DbmCountClaim } from "@/utils/dbm/format";
 import {

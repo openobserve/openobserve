@@ -138,6 +138,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
@@ -326,7 +327,7 @@ const lastUpdatedAt = rolesList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = rolesList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond

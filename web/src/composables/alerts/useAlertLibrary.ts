@@ -17,6 +17,7 @@ import { computed, readonly, ref } from "vue";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
+import { featureState } from "@/utils/featureGate";
 import {
   ALERT_LIBRARY_MANIFEST_URL,
   SUPPORTED_MANIFEST_MAJOR,
@@ -44,7 +45,8 @@ import type {
 // `id` / `stream_type` values end up as object keys, so every lookup here goes
 // through hasOwn rather than a bare index.
 
-export type AnomalyLibraryAccess = "enabled" | "locked" | "hidden";
+// "locked" is the edition upsell; "licenseLocked" is a license without anomaly detection, which never upsells.
+export type AnomalyLibraryAccess = "enabled" | "locked" | "licenseLocked" | "hidden";
 
 /**
  * Machine-readable failure kinds, so callers can map to i18n copy.
@@ -333,6 +335,9 @@ export function useAnomalyLibraryAccess() {
     const entitled =
       store.state.zoConfig?.build_type !== "opensource" && config.isEnterprise === "true";
     if (!entitled) return "locked";
+    if (featureState(store.state.zoConfig?.features, "anomaly_detection") === "locked") {
+      return "licenseLocked";
+    }
     return store.state.zoConfig?.anomaly_detection_enabled === true ? "enabled" : "hidden";
   });
 }

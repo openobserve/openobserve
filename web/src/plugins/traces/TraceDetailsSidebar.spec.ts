@@ -2823,4 +2823,68 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     expect(w.find(BUTTON).exists()).toBe(true);
     w.unmount();
   });
+
+  it("skips discovery and shows a disabled locked button when continuous_profiling is locked", async () => {
+    setStreams({ prof: FULL_SCHEMA });
+    profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
+    mockStore.state.zoConfig.features = { continuous_profiling: "locked" };
+    try {
+      const w = await mountWith();
+      expect(mockStreamNameList).not.toHaveBeenCalled();
+      expect(profileCalls()).toHaveLength(0);
+      expect(w.find(BUTTON).attributes("disabled")).toBeDefined();
+      expect(w.find(BUTTON).findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      w.unmount();
+    } finally {
+      delete mockStore.state.zoConfig.features;
+    }
+  });
+});
+
+describe("TraceDetailsSidebar — correlation license lock", () => {
+  const LOGS_TAB = '[data-test="trace-details-sidebar-tabs-correlated-logs"]';
+
+  afterEach(() => {
+    delete mockStore.state.zoConfig.features;
+    mockFindRelatedTelemetry.mockClear();
+  });
+
+  it("shows locked tabs and LicenseDeniedState without a correlation lookup when locked", async () => {
+    mockStore.state.zoConfig.features = { correlation: "locked" };
+    const w = mountSidebar({
+      streamName: "default",
+      serviceStreamsEnabled: true,
+      activeTab: "correlated-logs",
+    });
+    await w.setProps({ span: { ...mockSpan, span_id: "another" } });
+    await flushPromises();
+    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(
+      w.find('[data-test="trace-details-sidebar-correlated-logs-license-denied"]').exists(),
+    ).toBe(true);
+    expect(mockFindRelatedTelemetry).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens View Logs as a plain logs search when correlation is locked", async () => {
+    mockStore.state.zoConfig.features = { correlation: "locked" };
+    mockNavigateToLogs.mockClear();
+    const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
+    await w
+      .find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]')
+      .trigger("click");
+    await flushPromises();
+    expect(mockNavigateToLogs).toHaveBeenCalled();
+    expect(mockFindRelatedTelemetry).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("keeps the correlation lookup and unlocked tabs when correlation is enabled", async () => {
+    const w = mountSidebar({ streamName: "default", serviceStreamsEnabled: true });
+    await w.setProps({ activeTab: "correlated-logs" });
+    await flushPromises();
+    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(mockFindRelatedTelemetry).toHaveBeenCalled();
+    w.unmount();
+  });
 });

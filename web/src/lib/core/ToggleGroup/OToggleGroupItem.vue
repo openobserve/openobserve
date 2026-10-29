@@ -14,6 +14,7 @@ import { computed, inject, useAttrs, useId, type ComputedRef } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 defineOptions({ inheritAttrs: false });
 
@@ -34,7 +35,8 @@ const menu = inject(ToggleGroupMenuKey, null);
 const attrs = useAttrs();
 const reasonId = `${useId()}-reason`;
 const labelId = `${useId()}-label`;
-const unavailable = computed(() => props.disabled && props.focusableUnavailable);
+const isDisabled = useLockedDisabled(() => props.disabled);
+const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
 const menuItemTestId = computed(() =>
   attrs["data-test"] ? `${attrs["data-test"]}-item` : `o-toggle-group-item-${String(props.value)}`,
 );
@@ -51,7 +53,7 @@ const dragKey = computed<string>(() => String(props.value));
 
 // Disabled items are never draggable — they can't be interacted with at all.
 const isReorderable = computed<boolean>(
-  () => (context?.value.reorderable ?? false) && !props.disabled,
+  () => (context?.value.reorderable ?? false) && !isDisabled.value,
 );
 /** This item is the one being dragged → dim it. */
 const isDragging = computed<boolean>(
@@ -97,7 +99,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
   </template>
   <ODropdownItem
     v-else-if="menu"
-    :disabled="props.disabled"
+    :disabled="isDisabled"
     :focusable-unavailable="props.focusableUnavailable"
     :description="unavailable ? props.tooltip : undefined"
     :data-test="menuItemTestId"
@@ -119,7 +121,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
   -->
   <span
     v-else
-    :class="props.disabled ? 'cursor-not-allowed' : 'contents'"
+    :class="isDisabled ? 'cursor-not-allowed' : 'contents'"
     :tabindex="unavailable ? 0 : undefined"
     :role="unavailable ? 'button' : undefined"
     :aria-disabled="unavailable || undefined"
@@ -130,11 +132,11 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
     :aria-describedby="unavailable && props.tooltip ? reasonId : undefined"
   >
     <!-- First child when disabled: with nothing before it, the tooltip binds to this wrapper, the only element that gets the hover. -->
-    <OTooltip v-if="props.tooltip && props.disabled" :content="props.tooltip" />
+    <OTooltip v-if="props.tooltip && isDisabled" :content="props.tooltip" />
     <ToggleGroupItem
       v-bind="$attrs"
       :value="props.value"
-      :disabled="props.disabled"
+      :disabled="isDisabled"
       :aria-hidden="unavailable || undefined"
       :class="[
         // Layout
@@ -200,6 +202,6 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
     <span v-if="unavailable && props.tooltip" :id="reasonId" aria-hidden="true" class="sr-only">{{
       props.tooltip
     }}</span>
-    <OTooltip v-if="props.tooltip && !props.disabled" :content="props.tooltip" />
+    <OTooltip v-if="props.tooltip && !isDisabled" :content="props.tooltip" />
   </span>
 </template>
