@@ -19,6 +19,23 @@ pub use serde_json::{
     Error, Map, Number, Value, from_slice, from_str, from_value, json, to_string, to_value, to_vec,
 };
 
+const OTLP_ANY_VALUE_FIELDS: [&str; 7] = [
+    "stringValue",
+    "boolValue",
+    "intValue",
+    "doubleValue",
+    "arrayValue",
+    "kvlistValue",
+    "bytesValue",
+];
+
+/// Strict-decode errors from opentelemetry-proto 0.32 that a normalized retry can repair.
+const OTLP_RECOVERABLE_ERRORS: [&str; 3] = [
+    "invalid type: map, expected f64",
+    "Invalid data for Value, no known keys found",
+    "missing field `values`",
+];
+
 /// Bytes this value occupies in a JSON document, counted as `estimate_json_bytes` counts it.
 pub trait JsonBytesExt {
     fn json_bytes(&self) -> usize;
@@ -240,21 +257,89 @@ pub fn canonicalize_floats(value: &mut Value) {
     }
 }
 
-/// Decodes JSON whose flattened `f64` fields may arrive as an arbitrary-precision number map.
-pub fn from_slice_lenient_floats<T: DeserializeOwned>(body: &[u8]) -> Result<T, Error> {
+/// Rewrites spec-valid empty OTLP `AnyValue` shapes that opentelemetry-proto 0.32 rejects.
+pub fn normalize_otlp_empty_values(value: &mut Value) {
+    match value {
+        Value::Array(items) => items.iter_mut().for_each(normalize_otlp_empty_values),
+        Value::Object(map) => {
+            for (key, field) in map.iter_mut() {
+                match key.as_str() {
+                    "attributes" | "filteredAttributes" => normalize_otlp_key_values(field),
+                    "body" => {}
+                    _ => normalize_otlp_empty_values(field),
+                }
+            }
+            if map
+                .get_mut("body")
+                .is_some_and(|body| !normalize_otlp_any_value(body))
+            {
+                map.remove("body");
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Decodes OTLP/JSON, retrying with normalized floats and empty values on a known 0.32 gap.
+pub fn from_slice_lenient_otlp<T: DeserializeOwned>(body: &[u8]) -> Result<T, Error> {
     let err = match from_slice::<T>(body) {
         Ok(decoded) => return Ok(decoded),
         Err(err) => err,
     };
     // any other failure keeps the strict from_slice result, so e.g. duplicate fields stay rejected
-    if !err.to_string().contains("invalid type: map, expected f64") {
+    let message = err.to_string();
+    if !OTLP_RECOVERABLE_ERRORS
+        .iter()
+        .any(|known| message.contains(known))
+    {
         return Err(err);
     }
     let Ok(mut value) = from_slice::<Value>(body) else {
         return Err(err);
     };
     canonicalize_floats(&mut value);
+    normalize_otlp_empty_values(&mut value);
     from_value(value).map_err(|_| err)
+}
+
+fn normalize_otlp_key_values(key_values: &mut Value) {
+    let Value::Array(items) = key_values else {
+        return;
+    };
+    for key_value in items.iter_mut() {
+        if let Value::Object(key_value) = key_value
+            && key_value
+                .get_mut("value")
+                .is_some_and(|value| !normalize_otlp_any_value(value))
+        {
+            key_value.remove("value");
+        }
+    }
+}
+
+/// Returns false when the `AnyValue` holds no value, so the caller must drop it.
+fn normalize_otlp_any_value(any_value: &mut Value) -> bool {
+    let Value::Object(map) = any_value else {
+        return true;
+    };
+    if let Some(Value::Object(array)) = map.get_mut("arrayValue")
+        && let Value::Array(items) = array
+            .entry("values")
+            .or_insert_with(|| Value::Array(vec![]))
+    {
+        // a repeated AnyValue cannot hold an empty one through serde, so it is dropped
+        items.retain_mut(normalize_otlp_any_value);
+    }
+    if let Some(Value::Object(kvlist)) = map.get_mut("kvlistValue") {
+        normalize_otlp_key_values(
+            kvlist
+                .entry("values")
+                .or_insert_with(|| Value::Array(vec![])),
+        );
+    }
+    OTLP_ANY_VALUE_FIELDS
+        .iter()
+        .any(|field| map.contains_key(*field))
 }
 
 fn json_string_bytes(s: &str) -> usize {
@@ -730,12 +815,28 @@ mod tests {
     }
 
     #[test]
-    fn test_from_slice_lenient_floats_keeps_other_errors() {
+    fn test_normalize_otlp_empty_values() {
+        let mut value: Value = from_str(
+            r#"{"resource":{"attributes":[{"key":"a","value":{}},{"key":"b","value":{"futureValue":1}},{"key":"c","value":{"stringValue":"x"}},{"key":"d"}]},"logRecords":[{"body":{"arrayValue":{"values":[{},{"intValue":"1"},{"kvlistValue":{}}]}},"attributes":[{"key":"e","value":{"kvlistValue":{"values":[{"key":"f","value":{}}]}}}]},{"body":{}}],"name":"body","value":{}}"#,
+        )
+        .unwrap();
+        normalize_otlp_empty_values(&mut value);
+        let expected: Value = from_str(
+            r#"{"resource":{"attributes":[{"key":"a"},{"key":"b"},{"key":"c","value":{"stringValue":"x"}},{"key":"d"}]},"logRecords":[{"body":{"arrayValue":{"values":[{"intValue":"1"},{"kvlistValue":{"values":[]}}]}},"attributes":[{"key":"e","value":{"kvlistValue":{"values":[{"key":"f"}]}}}]},{}],"name":"body","value":{}}"#,
+        )
+        .unwrap();
+        assert_eq!(value, expected);
+        let once = value.clone();
+        normalize_otlp_empty_values(&mut value);
+        assert_eq!(value, once);
+    }
+
+    #[test]
+    fn test_from_slice_lenient_otlp_keeps_other_errors() {
         for body in [&b"[1,2"[..], br#"{"a":"x"}"#, br#"{"a":1} trailing"#] {
             let strict = from_slice::<std::collections::BTreeMap<String, u64>>(body).map(|_| ());
-            let lenient =
-                from_slice_lenient_floats::<std::collections::BTreeMap<String, u64>>(body)
-                    .map(|_| ());
+            let lenient = from_slice_lenient_otlp::<std::collections::BTreeMap<String, u64>>(body)
+                .map(|_| ());
             assert!(strict.is_err());
             assert_eq!(
                 strict.map_err(|e| e.to_string()),

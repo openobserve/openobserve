@@ -31,6 +31,7 @@
 //! - `Exemplar`'s value oneof is not flattened, so a spec-form top-level `asInt`/`asDouble` key is
 //!   ignored
 //! - `arbitrary_precision` floats not in canonical spelling (`1e0`, `1.50`) drop flattened data
+//! - an empty `AnyValue` (`{}`) or an `arrayValue`/`kvlistValue` without `values` fails the request
 
 use config::utils::json;
 
@@ -39,6 +40,7 @@ use config::utils::json;
 /// deserialization errors (HTTP 400) later.
 pub fn normalize(body: &mut json::Value) {
     json::canonicalize_floats(body);
+    json::normalize_otlp_empty_values(body);
     let resource_metrics = match body
         .get_mut("resourceMetrics")
         .and_then(|v| v.as_array_mut())
@@ -459,6 +461,38 @@ mod tests {
             point.exemplars[0].value,
             Some(exemplar::Value::AsDouble(9.5))
         );
+    }
+
+    #[test]
+    fn test_empty_any_values_keep_metric_data() {
+        let mut body = json::from_str::<json::Value>(
+            r#"{"resourceMetrics":[{"resource":{"attributes":[{"key":"region","value":{}}]},"scopeMetrics":[{"metrics":[{"name":"g","gauge":{"dataPoints":[{
+                "timeUnixNano":"1700000005000000000","asInt":"3",
+                "attributes":[{"key":"tags","value":{"arrayValue":{}}}],
+                "exemplars":[{"timeUnixNano":"1700000005000000000","asDouble":1.0,"filteredAttributes":[{"key":"e","value":{}}]}]
+            }]}}]}]}]}"#,
+        )
+        .unwrap();
+        normalize(&mut body);
+        let request: ExportMetricsServiceRequest = json::from_value(body).unwrap();
+        let resource_metrics = &request.resource_metrics[0];
+        assert_eq!(
+            resource_metrics.resource.as_ref().unwrap().attributes[0].value,
+            None
+        );
+        let Some(Data::Gauge(gauge)) = &resource_metrics.scope_metrics[0].metrics[0].data else {
+            panic!("expected gauge");
+        };
+        let point = &gauge.data_points[0];
+        assert_eq!(point.value, Some(number_data_point::Value::AsInt(3)));
+        assert_eq!(
+            point.attributes[0]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.clone()),
+            Some(any_value::Value::ArrayValue(Default::default()))
+        );
+        assert_eq!(point.exemplars[0].filtered_attributes[0].value, None);
     }
 
     #[test]
