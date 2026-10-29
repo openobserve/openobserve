@@ -35,8 +35,6 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
-#[cfg(feature = "enterprise")]
-pub mod alert_grouping;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -1405,8 +1403,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
     tokio::task::spawn(scheduler::run());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(infra::cache::file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/jobs/src/job/files/parquet.rs:queue_services_from_data_file for
