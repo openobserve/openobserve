@@ -76,6 +76,33 @@ export default class ChartTypeSelector {
     return this.htmlRenderer.locator("script");
   }
 
+  getHtmlRendererElement(selector) {
+    return this.htmlRenderer.locator(selector);
+  }
+
+  // Page-wide, since an escaped element would land outside the renderer
+  getInjectedOnErrorImages() {
+    return this.page.locator("img[onerror]");
+  }
+
+  async getHtmlPanelSentinel() {
+    return this.page.evaluate(() => window.__o2HtmlPanelSentinel);
+  }
+
+  // Click an element in the rendered HTML and return the tab it opens
+  async clickHtmlRendererElementForPopup(selector) {
+    const [popup] = await Promise.all([
+      this.page.context().waitForEvent("page"),
+      this.getHtmlRendererElement(selector).click(),
+    ]);
+    await popup.waitForLoadState("domcontentloaded");
+    return popup;
+  }
+
+  async isPopupOpenerNull(popup) {
+    return popup.evaluate(() => window.opener === null);
+  }
+
   // Returns the field-list row for a given field name
   getFieldListRow(fieldName) {
     return this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
