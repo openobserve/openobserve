@@ -30,9 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-toolsets-add-btn"
           variant="primary"
           size="sm-action"
+          :aria-label="
+            toolsetDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
+              : undefined
+          "
           @click="addToolset"
-          >{{ t("aiToolset.add") }}</OButton
-        >
+          >{{ t("aiToolset.add") }}
+          <EditorDraftDot
+            v-if="toolsetDrafts.hasNew"
+            :saved-at="toolsetDrafts.savedAt(null)"
+            corner
+            data-test="ai-toolsets-add-draft-dot"
+        /></OButton>
       </template>
 
       <!-- Table -->
@@ -87,6 +97,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filtered="!!filterQuery"
               @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addToolset())"
             />
+          </template>
+
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <EditorDraftDot
+                v-if="toolsetDrafts.ids.has(row.id)"
+                :saved-at="toolsetDrafts.savedAt(row.id)"
+                :data-test="`ai-toolsets-${row.name}-draft-dot`"
+              />
+            </div>
           </template>
 
           <template #cell-kind="{ row }">
@@ -151,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Add / Edit form -->
     <div v-else>
-      <AddAiToolset @cancel:hideform="hideAddDialog" />
+      <AddAiToolset @cancel:hideform="hideAddDialog" @update:list="refreshData" />
     </div>
   </div>
 
@@ -194,6 +215,10 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useListViewState } from "@/composables/useListViewState";
 import aiToolsetsService from "@/services/ai_toolsets";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -209,11 +234,14 @@ export default defineComponent({
     OTag,
     OSearchInput,
     OTable,
+    OTruncatedText,
+    EditorDraftDot,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18nTyped();
+    const toolsetDrafts = useEditorDraftIds("ai_toolset");
 
     const orgIdForList = useOrgId();
     const toolsetsList = useQuery(() =>
@@ -434,13 +462,14 @@ export default defineComponent({
       });
     };
 
+    // The route goes first: while it still says add/edit, onUpdated would remount the editor and re-offer its draft.
     const hideAddDialog = async () => {
-      showAddDialog.value = false;
-      await getData(true);
-      router.push({
+      await router.push({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+      showAddDialog.value = false;
+      await getData(true);
     };
 
     // -----------------------------------------------------------------------
@@ -467,6 +496,11 @@ export default defineComponent({
       aiToolsetsService
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
+          deleteEditorDraftsFor({
+            kind: "ai_toolset",
+            org: store.state.selectedOrganization.identifier,
+            entityId: row.id,
+          });
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
           // Drop the row from the cache first so it disappears now, not when
           // the refetch lands; the forced reload re-persists the list.
@@ -495,6 +529,7 @@ export default defineComponent({
 
     return {
       refreshData,
+      toolsetDrafts,
       t,
       store,
       loading,

@@ -30,19 +30,14 @@ import { SEEDS } from "@/components/fleet/editor/editorGraph.fixtures";
 import { setPendingImport } from "@/components/fleet/useFleetApi";
 import FleetConfigEditor from "./FleetConfigEditor.vue";
 
-const { toastMock, focusMock, revealMock, canvasMounts, confirmMock, routeGuards } = vi.hoisted(
-  () => ({
-    toastMock: vi.fn(),
-    focusMock: vi.fn(),
-    revealMock: vi.fn(),
-    canvasMounts: vi.fn(),
-    confirmMock: vi.fn(),
-    routeGuards: { leave: [] as any[], update: [] as any[] },
-  }),
-);
+type CapturedGuard = (to?: unknown, from?: unknown) => unknown;
 
-vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: confirmMock }),
+const { toastMock, focusMock, revealMock, canvasMounts, routeGuards } = vi.hoisted(() => ({
+  toastMock: vi.fn(),
+  focusMock: vi.fn(),
+  revealMock: vi.fn(),
+  canvasMounts: vi.fn(),
+  routeGuards: { leave: [] as CapturedGuard[], update: [] as CapturedGuard[] },
 }));
 
 // The editor is mounted outside a router-view, so the guards are captured and called directly.
@@ -50,8 +45,8 @@ vi.mock("vue-router", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    onBeforeRouteLeave: (guard: unknown) => routeGuards.leave.push(guard),
-    onBeforeRouteUpdate: (guard: unknown) => routeGuards.update.push(guard),
+    onBeforeRouteLeave: (guard: CapturedGuard) => routeGuards.leave.push(guard),
+    onBeforeRouteUpdate: (guard: CapturedGuard) => routeGuards.update.push(guard),
   };
 });
 
@@ -476,41 +471,63 @@ describe("FleetConfigEditor", () => {
   });
 
   describe("unsaved changes", () => {
-    const leave = () => routeGuards.leave.at(-1)();
+    const last = (guards: CapturedGuard[]): CapturedGuard => {
+      const guard = guards.at(-1);
+      if (!guard) throw new Error("The editor registered no route guard");
+      return guard;
+    };
+    interface DraftVm {
+      configDraft: {
+        state: { leaveOpen: boolean };
+        chooseLeave: (choice: "stay" | "discard") => void;
+      };
+    }
+    const controller = () => (wrapper.vm as unknown as DraftVm).configDraft;
+    /** Runs a guard and answers the leave dialog when it opens. */
+    const run = async (
+      guard: CapturedGuard,
+      answer: "stay" | "discard" = "stay",
+      to?: unknown,
+      from?: unknown,
+    ) => {
+      const pending = guard(to, from);
+      await flushPromises();
+      const asked = controller().state.leaveOpen;
+      if (asked) controller().chooseLeave(answer);
+      return { asked, allowed: await pending };
+    };
+    const leave = (answer?: "stay" | "discard") => run(last(routeGuards.leave), answer);
     const unload = () => {
       const e = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(e);
       return e.defaultPrevented;
     };
+    // The draft baseline is the editor as it was at the first input, as in the browser.
     const edit = async (w: VueWrapper, text: string) => {
+      window.dispatchEvent(new Event("pointerdown"));
       await toYaml(w);
       w.findComponent({ name: "FleetCodeEditor" }).vm.$emit("update:code", text);
       await flushPromises();
     };
 
     beforeEach(() => {
+      localStorage.clear();
       routeGuards.leave.length = 0;
       routeGuards.update.length = 0;
-      confirmMock.mockResolvedValue(false);
     });
 
     it("lets the user leave without a prompt when nothing changed", async () => {
       wrapper = await mountEditor("edge");
-      expect(await leave()).toBe(true);
+      expect(await leave()).toEqual({ asked: false, allowed: true });
       expect(unload()).toBe(false);
-      expect(confirmMock).not.toHaveBeenCalled();
     });
 
-    it("asks before leaving or closing with an unsaved edit, and stays on cancel", async () => {
+    it("asks before leaving or closing with an unsaved edit, and stays on close", async () => {
       wrapper = await mountEditor("edge");
       await edit(wrapper, "first: 1\n");
-      expect(await leave()).toBe(false);
-      expect(confirmMock).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "Unsaved changes", confirmLabel: "Discard changes" }),
-      );
+      expect(await leave()).toEqual({ asked: true, allowed: false });
       expect(unload()).toBe(true);
-      confirmMock.mockResolvedValue(true);
-      expect(await leave()).toBe(true);
+      expect(await leave("discard")).toEqual({ asked: true, allowed: true });
     });
 
     it("does not prompt once an edit is undone back to the loaded text", async () => {
@@ -518,7 +535,7 @@ describe("FleetConfigEditor", () => {
       await edit(wrapper, "first: 1\n");
       wrapper.findComponent({ name: "FleetCodeEditor" }).vm.$emit("update:code", VALID);
       await flushPromises();
-      expect(await leave()).toBe(true);
+      expect(await leave()).toEqual({ asked: false, allowed: true });
       expect(unload()).toBe(false);
     });
 
@@ -528,7 +545,7 @@ describe("FleetConfigEditor", () => {
       await wrapper.find('[data-test="fleet-config-editor-save"]').trigger("click");
       await flushPromises();
       expect(fleet.saveConfigDraft).toHaveBeenCalled();
-      expect(await leave()).toBe(true);
+      expect(await leave()).toEqual({ asked: false, allowed: true });
       expect(unload()).toBe(false);
     });
 
@@ -540,16 +557,16 @@ describe("FleetConfigEditor", () => {
       await edit(wrapper, VALID + "# edited\n");
       await publish(wrapper);
       expect(fleet.publishConfigVersion).toHaveBeenCalled();
-      expect(await leave()).toBe(true);
+      expect(await leave()).toEqual({ asked: false, allowed: true });
     });
 
     it("leaves without a prompt after deleting the config", async () => {
       vi.mocked(fleet.deleteConfig).mockResolvedValue({ status: 204 } as any);
       wrapper = await mountEditor("edge");
       await edit(wrapper, "first: 1\n");
-      let allowed: unknown;
+      let result: unknown;
       const push = vi.spyOn(router, "push").mockImplementation(async () => {
-        allowed = await leave();
+        result = await leave();
       });
       await wrapper.find('[data-test="fleet-config-editor-delete"]').trigger("click");
       await flushPromises();
@@ -558,18 +575,19 @@ describe("FleetConfigEditor", () => {
         .trigger("click");
       await flushPromises();
       expect(push).toHaveBeenCalled();
-      expect(allowed).toBe(true);
-      expect(confirmMock).not.toHaveBeenCalled();
       push.mockRestore();
+      await vi.waitFor(() => expect(result).toEqual({ asked: false, allowed: true }));
     });
 
     it("moves to a newly saved config without a prompt", async () => {
       vi.mocked(fleet.createConfig).mockResolvedValue({ data: detail({ id: "fresh" }) } as any);
       wrapper = await mountEditor("new");
       await edit(wrapper, "first: 1\n");
-      let allowed: unknown;
+      let result: unknown;
       const replace = vi.spyOn(router, "replace").mockImplementation(async () => {
-        allowed = await routeGuards.update.at(-1)(
+        result = await run(
+          last(routeGuards.update),
+          "stay",
           { params: { id: "fresh" } },
           { params: { id: "new" } },
         );
@@ -579,9 +597,8 @@ describe("FleetConfigEditor", () => {
       (wrapper.findComponent(OForm).vm as any).form.setFieldValue("id", "fresh");
       await submitForm(wrapper);
       expect(replace).toHaveBeenCalled();
-      expect(allowed).toBe(true);
-      expect(confirmMock).not.toHaveBeenCalled();
       replace.mockRestore();
+      await vi.waitFor(() => expect(result).toEqual({ asked: false, allowed: true }));
     });
 
     it("removes its beforeunload listener on unmount", async () => {
@@ -612,8 +629,7 @@ describe("FleetConfigEditor", () => {
       await edit(wrapper, "first: 1\n");
       release({ data: { at: 1 } });
       await flushPromises();
-      expect(await leave()).toBe(false);
-      expect(confirmMock).toHaveBeenCalled();
+      expect(await leave()).toEqual({ asked: true, allowed: false });
     });
 
     it("does not mark another config saved when an earlier publish replies late", async () => {
@@ -633,8 +649,7 @@ describe("FleetConfigEditor", () => {
       await edit(wrapper, "first: 1\n");
       release({ data: { version: 2, warnings: {} } });
       await flushPromises();
-      expect(await leave()).toBe(false);
-      expect(confirmMock).toHaveBeenCalled();
+      expect(await leave()).toEqual({ asked: true, allowed: false });
     });
 
     it("ignores a trailing newline the code editor trims", async () => {
@@ -643,26 +658,24 @@ describe("FleetConfigEditor", () => {
       await edit(wrapper, "first: 1\n");
       wrapper.findComponent({ name: "FleetCodeEditor" }).vm.$emit("update:code", VALID.trimEnd());
       await flushPromises();
-      expect(await leave()).toBe(true);
-      expect(confirmMock).not.toHaveBeenCalled();
+      expect(await leave()).toEqual({ asked: false, allowed: true });
     });
 
     it("counts an imported file as unsaved", async () => {
       setPendingImport("receivers:\n  otlp: {}\n");
       wrapper = await mountEditor("new");
-      expect(await leave()).toBe(false);
-      expect(confirmMock).toHaveBeenCalled();
+      expect(await leave()).toEqual({ asked: true, allowed: false });
       expect(unload()).toBe(true);
     });
 
     it("asks only when the route moves to another config", async () => {
       wrapper = await mountEditor("edge");
       await edit(wrapper, "first: 1\n");
-      const update = routeGuards.update.at(-1);
+      const update = last(routeGuards.update);
       expect(update({ params: { id: "edge" } }, { params: { id: "edge" } })).toBe(true);
-      expect(confirmMock).not.toHaveBeenCalled();
-      expect(await update({ params: { id: "other" } }, { params: { id: "edge" } })).toBe(false);
-      expect(confirmMock).toHaveBeenCalledTimes(1);
+      expect(
+        await run(update, "stay", { params: { id: "other" } }, { params: { id: "edge" } }),
+      ).toEqual({ asked: true, allowed: false });
     });
   });
 

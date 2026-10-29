@@ -88,6 +88,18 @@
           </OButton>
         </template>
 
+        <template #cell-name="{ row }">
+          <div class="flex min-w-0 items-center gap-2">
+            <OTruncatedText>{{ row.name }}</OTruncatedText>
+            <EditorDraftDot
+              v-if="jobDrafts.ids.has(String(row.id))"
+              :saved-at="jobDrafts.savedAt(String(row.id))"
+              class="shrink-0"
+              :data-test="`eval-job-list-${row.id}-draft-dot`"
+            />
+          </div>
+        </template>
+
         <template #cell-status="{ row }">
           <OTag type="evalStatus" :value="statusOf(row)" :label="statusLabel(statusOf(row))" />
         </template>
@@ -262,6 +274,9 @@ import { formatDate } from "@/utils/date";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 
 const props = defineProps<{
   rows: EvalJob[];
@@ -299,6 +314,7 @@ function canPause(status: EvalJobStatus): boolean {
 }
 
 const { t } = useI18nTyped();
+const jobDrafts = useEditorDraftIds("eval_job");
 const statusFilter = ref<EvalJobStatus | null>(null);
 const selectedIds = ref<string[]>([]);
 
@@ -337,6 +353,7 @@ const columns = computed(() =>
       accessorKey: "name",
       sortable: true,
       size: COL.name,
+      minSize: 160,
       // `flex` (not `autoWidth`): fills leftover width on load AND stays
       // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
       meta: { align: "left", flex: true },

@@ -113,6 +113,7 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 
 export default defineComponent({
   name: "CorrelationSettings",
@@ -318,6 +319,7 @@ export default defineComponent({
 
     onBeforeRouteLeave(async () => {
       if (!isFieldAliasesDirty.value) return true;
+      if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
       return await confirmDiscardUnsaved();
     });
 
