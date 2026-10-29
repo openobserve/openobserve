@@ -351,10 +351,8 @@ pub async fn update_status_with<C: ConnectionTrait>(
         active.resolved_at = Set(Some(now));
         // A manual reopen must run as a live incident, not stay muted forever.
         active.muted_by_downtime_id = Set(None);
-    } else {
+    } else if status == "open" {
         active.resolved_at = Set(None);
-    }
-    if status == "open" {
         active.acknowledged_by = Set(None);
         active.acknowledged_at = Set(None);
     }
@@ -1487,6 +1485,12 @@ mod tests {
             .unwrap();
         assert!(resolved.resolved_at.is_some());
         assert_eq!(resolved.acknowledged_by.as_deref(), Some("ana@example.com"));
+
+        // A replicated ack never clears the resolve; only a reopen does.
+        let acked = update_status_with(&db, "acme", &incident.id, "acknowledged")
+            .await
+            .unwrap();
+        assert_eq!(acked.resolved_at, resolved.resolved_at);
 
         let reopened = update_status_with(&db, "acme", &incident.id, "open")
             .await
