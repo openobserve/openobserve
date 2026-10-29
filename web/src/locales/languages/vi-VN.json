@@ -27257,7 +27257,7 @@
       "title": "Một cửa hàng trực tuyến thực tế, sẵn sàng để khám phá",
       "body": "Tải nhật ký, trace và chỉ số trong {hours} giờ qua từ một ứng dụng thương mại điện tử gồm 10 dịch vụ trên Kubernetes, kèm bảng điều khiển, cảnh báo và hàm đã được thiết lập sẵn. Có sự cố ở bước thanh toán: hãy thử tìm ra nguyên nhân.",
       "loadedTitle": "Đã tải dữ liệu mẫu",
-      "loadedBody": "Dữ liệu telemetry và tài nguyên của cửa hàng nằm trong tổ chức này. Chọn nơi để bắt đầu hoặc xóa tất cả khi bạn hoàn tất."
+      "loadedBody": "Dữ liệu telemetry và tài nguyên của cửa hàng nằm trong tổ chức này. Tham gia chuyến tham quan có hướng dẫn để điều tra sự cố thanh toán, hoặc chọn nơi để bắt đầu."
     },
     "included": {
       "title": "Những gì được tạo",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Tổng quan dịch vụ, KPIs kinh doanh, lưu lượng web và hạ tầng",
       "alerts": "5 cảnh báo",
       "alertsDetail": "Cảnh báo SQL theo lịch, một trong số đó đang kích hoạt do sự cố đang diễn ra",
-      "functions": "Hàm và làm giàu dữ liệu",
-      "functionsDetail": "2 hàm VRL và một bảng làm giàu dữ liệu về người phụ trách dịch vụ"
+      "pipeline": "Pipeline và hàm",
+      "pipelineDetail": "Một pipeline thời gian thực phân tích mọi nhật ký truy cập bằng VRL, 2 hàm và một bảng làm giàu dữ liệu về người phụ trách dịch vụ"
     },
     "footnote": "Luồng và hàm bắt đầu bằng {prefix}, bảng điều khiển và cảnh báo nằm trong thư mục \"Sample data\", và dữ liệu bao gồm {hours} giờ qua. Xóa tất cả từ trang này chỉ với một cú nhấp.",
     "steps": {
+      "functions": "Đang tạo hàm",
+      "pipeline": "Đang tạo pipeline thời gian thực",
       "telemetry": "Đang tạo và gửi nhật ký, trace và chỉ số",
       "dashboards": "Đang tạo bảng điều khiển",
       "alerts": "Đang tạo cảnh báo",
-      "functions": "Đang tạo hàm",
       "enrichment": "Đang tải lên bảng người phụ trách dịch vụ"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "Tốc độ yêu cầu, độ trễ và mức bão hòa với PromQL",
       "alerts": "Cảnh báo",
       "alertsDesc": "Năm cảnh báo trong thư mục \"Sample data\"",
-      "functions": "Hàm",
-      "functionsDesc": "Các hàm VRL bạn có thể áp dụng cho kết quả tìm kiếm"
+      "pipeline": "Pipeline",
+      "pipelineDesc": "Xử lý thời gian thực bằng VRL khi dữ liệu đến"
     },
     "removeConfirm": {
       "title": "Xóa dữ liệu mẫu?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Không thể xóa toàn bộ dữ liệu mẫu"
     },
     "entry": {
-      "homeTitle": "Khám phá với dữ liệu mẫu",
-      "homeDesc": "Chưa có dữ liệu? Tải một cửa hàng demo với bảng điều khiển và cảnh báo",
       "ingestionBtn": "Dùng thử dữ liệu mẫu",
       "onboardingSource": "Khám phá dữ liệu mẫu"
+    },
+    "callout": {
+      "title": "Chưa sẵn sàng gửi dữ liệu?",
+      "body": "Hãy khám phá {product} trước với một cửa hàng trực tuyến mẫu: một sự cố đang diễn ra và chuyến tham quan có hướng dẫn qua bảng điều khiển, cảnh báo, nhật ký, trace, chỉ số và pipeline.",
+      "cta": "Khám phá với dữ liệu mẫu",
+      "loading": "Đang tải dữ liệu mẫu…",
+      "details": "Bao gồm những gì"
+    },
+    "homeBanner": {
+      "message": "Bạn đang khám phá dữ liệu mẫu. Theo chuyến tham quan có hướng dẫn để điều tra sự cố thanh toán.",
+      "manage": "Quản lý dữ liệu mẫu",
+      "cleanup": {
+        "message": "Dữ liệu của riêng bạn đang đến. Hãy xóa dữ liệu mẫu để nó không lẫn vào bảng điều khiển, cảnh báo và tìm kiếm của bạn.",
+        "keep": "Tạm giữ lại",
+        "remove": "Xóa dữ liệu mẫu"
+      }
+    },
+    "welcome": {
+      "title": "Chào mừng bạn đến với {product}",
+      "subtitle": "Gửi nhật ký, chỉ số và trace của bạn để bắt đầu.",
+      "sample": {
+        "title": "Khám phá với dữ liệu mẫu",
+        "body": "Chưa sẵn sàng kết nối? Hãy thử một cửa hàng trực tuyến đông khách đang gặp sự cố.",
+        "point1": "{hours} giờ nhật ký, trace và chỉ số từ 10 dịch vụ",
+        "point2": "4 bảng điều khiển, 5 cảnh báo, một pipeline và các hàm VRL",
+        "point3": "Một chuyến tham quan có hướng dẫn, và một cú nhấp để xóa tất cả",
+        "cta": "Khám phá với dữ liệu mẫu"
+      },
+      "connect": {
+        "title": "Kết nối dữ liệu",
+        "body": "Gửi nhật ký, chỉ số và trace từ {p1}, {p2}, {p3}, {p4} và hơn 100 nguồn khác.",
+        "point1": "Hướng dẫn thiết lập từng bước cho mỗi nguồn",
+        "point2": "Nhật ký, chỉ số và trace ở cùng một nơi",
+        "point3": "Xem các sự kiện đầu tiên chỉ trong vài phút",
+        "cta": "Chọn nguồn dữ liệu"
+      },
+      "skip": "Bỏ qua lúc này",
+      "continueInBackground": "Tiếp tục trong nền",
+      "progress": {
+        "title": "Đang xây dựng cửa hàng mẫu của bạn",
+        "body": "Quá trình này mất khoảng một phút. Bạn có thể đóng cửa sổ này và việc tải vẫn tiếp tục."
+      },
+      "ready": {
+        "title": "Cửa hàng mẫu của bạn đã hoạt động",
+        "body": "Thanh toán bắt đầu thất bại từ 35 phút trước. Chuyến tham quan có hướng dẫn sẽ giúp bạn tìm ra nguyên nhân.",
+        "covers": "Chuyến tham quan bao gồm",
+        "capabilities": {
+          "dashboards": "Phát hiện đột biến, rồi xem nó gây thiệt hại bao nhiêu",
+          "alerts": "Xem cảnh báo nào đã kích hoạt và vì sao",
+          "logs": "Lọc lỗi và tìm ra lần triển khai có vấn đề",
+          "traces": "Theo dõi một lượt thanh toán chậm đến tận cơ sở dữ liệu",
+          "metrics": "Vẽ biểu đồ độ trễ p95 bằng PromQL",
+          "pipelines": "Làm giàu nhật ký theo thời gian thực bằng VRL"
+        },
+        "startTour": "Bắt đầu chuyến tham quan",
+        "ownWay": "Tự khám phá"
+      },
+      "errorBody": "Đã xảy ra lỗi khi tải. Hãy thử lại: những gì đã được tạo sẽ được tái sử dụng, không bị trùng lặp."
+    },
+    "tour": {
+      "label": "Chuyến tham quan có hướng dẫn",
+      "position": "Chuyến tham quan · bước {current} / {total}",
+      "pill": "Tham quan {current}/{total}",
+      "done": "Đã hoàn tất chuyến tham quan",
+      "minimize": "Thu nhỏ chuyến tham quan",
+      "close": "Kết thúc chuyến tham quan",
+      "showMe": "Cho tôi xem",
+      "next": "Tiếp",
+      "capabilities": {
+        "dashboards": "Bảng điều khiển",
+        "alerts": "Cảnh báo",
+        "logs": "Tìm kiếm nhật ký",
+        "traces": "Truy vết",
+        "metrics": "Chỉ số và PromQL",
+        "pipelines": "Pipeline"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Phát hiện vấn đề",
+          "body": "Đây là tổng quan dịch vụ của cửa hàng. Tỷ lệ lỗi và độ trễ thanh toán đều tăng vọt trong 35 phút qua.",
+          "look": "Mỗi bảng là một truy vấn SQL. Di chuột lên biểu đồ để so sánh các chuỗi, kéo qua để thu phóng hoặc mở menu của bảng để chỉnh sửa truy vấn."
+        },
+        "alert": {
+          "title": "Cảnh báo đã kích hoạt",
+          "body": "Một cảnh báo về lỗi thanh toán chạy truy vấn SQL trên nhật ký theo lịch và đã kích hoạt ngay khi lỗi vượt ngưỡng.",
+          "look": "Mở một cảnh báo để xem truy vấn, ngưỡng và lịch chạy. Đích mẫu là một webhook giữ chỗ nên các lần gửi hiển thị là thất bại: hãy trỏ nó tới Slack, email hoặc PagerDuty để nhận thông báo thật."
+        },
+        "logs": {
+          "title": "Tìm kiếm các lỗi",
+          "body": "Nhật ký được lọc theo lỗi thanh toán. Gần như tất cả đều cùng một nội dung: hết thời gian chờ khi lấy kết nối từ pool.",
+          "look": "Mở rộng một bản ghi để xem mọi trường. Nhấp vào giá trị của trường để lọc theo nó, hoặc chuyển sang chế độ SQL để nhóm và tổng hợp."
+        },
+        "deploy": {
+          "title": "Tìm ra điều đã thay đổi",
+          "body": "Payment v2.15.0 được triển khai một phút trước khi lỗi bắt đầu, và ghi chú phát hành của nó đã giảm pool kết nối xuống 20.",
+          "look": "Đó là nguyên nhân gốc, được tìm ra chỉ bằng một lần tìm kiếm trên cùng nhật ký. Tìm kiếm toàn văn và tìm kiếm SQL chạy trên cùng dữ liệu."
+        },
+        "traces": {
+          "title": "Theo dõi một yêu cầu thất bại",
+          "body": "Mỗi trace theo dõi một lần thanh toán qua các dịch vụ. Mở một trace: biểu đồ thác nước cho thấy dịch vụ thanh toán chờ 3 giây để có kết nối cơ sở dữ liệu.",
+          "look": "Nhật ký mang cùng ID trace, nên bạn có thể chuyển qua lại giữa một span và nhật ký của nó theo cả hai chiều."
+        },
+        "metrics": {
+          "title": "Xác nhận bằng PromQL",
+          "body": "Độ trễ p95 của mọi dịch vụ, truy vấn bằng PromQL. Thanh toán và đặt hàng cùng tăng.",
+          "look": "Chỉ số nằm trong cùng công cụ với nhật ký và trace, vì vậy bảng điều khiển Hạ tầng được xây dựng hoàn toàn bằng PromQL."
+        },
+        "pipeline": {
+          "title": "Xử lý dữ liệu khi đến",
+          "body": "Một pipeline thời gian thực chạy hàm VRL trên mọi nhật ký truy cập, thêm client_os và is_mobile trước khi bản ghi được lưu.",
+          "look": "Mở pipeline để xem sơ đồ. Pipeline có thể lọc, làm giàu, định tuyến và che dữ liệu mà không cần chỉnh sửa ứng dụng của bạn."
+        },
+        "business": {
+          "title": "Đo lường tác động kinh doanh",
+          "body": "Cùng nhật ký đó cung cấp dữ liệu cho bảng điều khiển kinh doanh: thanh toán thất bại, doanh thu và đơn hàng theo phương thức thanh toán.",
+          "look": "Không cần công cụ phân tích riêng. Bất cứ thứ gì trong nhật ký của bạn đều có thể trở thành KPI."
+        }
+      },
+      "finale": {
+        "title": "Bạn đã tìm ra nguyên nhân gốc",
+        "body": "Chỉ trong vài phút, bạn đã đi từ một đỉnh tăng vọt trên bảng điều khiển đến lần triển khai gây ra nó, với mọi tín hiệu ở cùng một nơi.",
+        "connect": "Kết nối dữ liệu của bạn",
+        "restart": "Bắt đầu lại chuyến tham quan",
+        "finish": "Hoàn tất chuyến tham quan"
+      }
     }
   }
 }

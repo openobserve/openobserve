@@ -23,6 +23,7 @@ import {
   isUserDataStream,
   type UserDataStreamType,
 } from "@/utils/internalStreams";
+import { isSampleStreamName } from "@/utils/sampleData/catalog";
 import { rangeRoute, recordRange, type TimeWindowUs } from "./confirmQuery";
 
 const MAX_PAGES_PER_TYPE = 5;
@@ -185,6 +186,11 @@ export function useFirstDataNotice(
     const now = Date.now();
     const record = readFirstDataRecord(orgId);
     const hasData = source.length > 0;
+    // a user who loaded sample data has already seen data flow; the sample cleanup banner greets their own
+    if (source.some((s) => isSampleStreamName(s.name))) {
+      writeFirstDataRecord(orgId, { ...record, lastVisit: now, hadData: true });
+      return;
+    }
     if (!record) {
       writeFirstDataRecord(orgId, { lastVisit: now, hadData: hasData });
       return;

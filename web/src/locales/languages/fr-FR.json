@@ -27257,7 +27257,7 @@
       "title": "Une boutique en ligne réaliste, prête à être explorée",
       "body": "Charge les logs, traces et métriques des {hours} dernières heures d'une application e-commerce de 10 services sur Kubernetes, avec des tableaux de bord, des alertes et des fonctions déjà configurés. Quelque chose ne va pas lors du paiement : essayez de trouver pourquoi.",
       "loadedTitle": "Les données d'exemple sont chargées",
-      "loadedBody": "La télémétrie et les ressources de la boutique se trouvent dans cette organisation. Choisissez par où commencer, ou supprimez tout lorsque vous avez terminé."
+      "loadedBody": "La télémétrie et les ressources de la boutique se trouvent dans cette organisation. Suivez la visite guidée pour enquêter sur l'incident du paiement, ou choisissez par où commencer."
     },
     "included": {
       "title": "Ce qui est créé",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Vue d'ensemble du service, KPIs métier, trafic web et infrastructure",
       "alerts": "5 alertes",
       "alertsDetail": "Alertes SQL planifiées, dont une se déclenche sur l'incident en cours",
-      "functions": "Fonctions et enrichissement",
-      "functionsDetail": "2 fonctions VRL et une table d'enrichissement des responsables de service"
+      "pipeline": "Pipeline et fonctions",
+      "pipelineDetail": "Un pipeline en temps réel qui analyse chaque log d'accès avec VRL, 2 fonctions et une table d'enrichissement des responsables de service"
     },
     "footnote": "Les flux et les fonctions commencent par {prefix}, les tableaux de bord et les alertes se trouvent dans un dossier « Sample data », et les données couvrent les {hours} dernières heures. Supprimez le tout depuis cette page en un clic.",
     "steps": {
+      "functions": "Création des fonctions",
+      "pipeline": "Création d'un pipeline en temps réel",
       "telemetry": "Génération et envoi des logs, traces et métriques",
       "dashboards": "Création des tableaux de bord",
       "alerts": "Création des alertes",
-      "functions": "Création des fonctions",
       "enrichment": "Envoi de la table des responsables de service"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "Taux de requêtes, latence et saturation avec PromQL",
       "alerts": "Alertes",
       "alertsDesc": "Cinq alertes dans le dossier « Sample data »",
-      "functions": "Fonctions",
-      "functionsDesc": "Fonctions VRL que vous pouvez appliquer aux résultats de recherche"
+      "pipeline": "Pipelines",
+      "pipelineDesc": "Traitement en temps réel avec VRL dès l'arrivée des données"
     },
     "removeConfirm": {
       "title": "Supprimer les données d'exemple ?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Impossible de supprimer toutes les données d'exemple"
     },
     "entry": {
-      "homeTitle": "Explorer avec des données d'exemple",
-      "homeDesc": "Pas encore de données ? Chargez une boutique de démonstration avec des tableaux de bord et des alertes",
       "ingestionBtn": "Essayer les données d'exemple",
       "onboardingSource": "Explorer les données d'exemple"
+    },
+    "callout": {
+      "title": "Pas encore prêt à envoyer des données ?",
+      "body": "Découvrez d'abord {product} avec une boutique en ligne d'exemple : un incident en cours et une visite guidée des tableaux de bord, alertes, logs, traces, métriques et pipelines.",
+      "cta": "Explorer avec des données d'exemple",
+      "loading": "Chargement des données d'exemple…",
+      "details": "Ce qui est inclus"
+    },
+    "homeBanner": {
+      "message": "Vous explorez des données d'exemple. Suivez la visite guidée pour enquêter sur l'incident du paiement.",
+      "manage": "Gérer les données d'exemple",
+      "cleanup": {
+        "message": "Vos propres données commencent à arriver. Supprimez les données d'exemple pour qu'elles ne se mélangent pas à vos tableaux de bord, alertes et recherches.",
+        "keep": "Conserver pour l'instant",
+        "remove": "Supprimer les données d'exemple"
+      }
+    },
+    "welcome": {
+      "title": "Bienvenue dans {product}",
+      "subtitle": "Envoyez vos logs, métriques et traces pour commencer.",
+      "sample": {
+        "title": "Explorer avec des données d'exemple",
+        "body": "Pas encore prêt à connecter vos données ? Essayez une boutique en ligne très fréquentée avec un incident en cours.",
+        "point1": "{hours} heures de logs, traces et métriques issus de 10 services",
+        "point2": "4 tableaux de bord, 5 alertes, un pipeline et des fonctions VRL",
+        "point3": "Une visite guidée, et un clic pour tout supprimer",
+        "cta": "Explorer avec des données d'exemple"
+      },
+      "connect": {
+        "title": "Connecter vos données",
+        "body": "Envoyez des logs, métriques et traces depuis {p1}, {p2}, {p3}, {p4} et plus de 100 autres sources.",
+        "point1": "Configuration pas à pas pour chaque source",
+        "point2": "Logs, métriques et traces au même endroit",
+        "point3": "Voyez vos premiers événements en quelques minutes",
+        "cta": "Choisir une source de données"
+      },
+      "skip": "Passer pour l'instant",
+      "continueInBackground": "Continuer en arrière-plan",
+      "progress": {
+        "title": "Création de votre boutique d'exemple",
+        "body": "Cela prend environ une minute. Vous pouvez fermer cette fenêtre, le chargement continue."
+      },
+      "ready": {
+        "title": "Votre boutique d'exemple est en ligne",
+        "body": "Le paiement a commencé à échouer il y a 35 minutes. La visite guidée vous aide à en trouver la cause.",
+        "covers": "La visite guidée couvre",
+        "capabilities": {
+          "dashboards": "Repérez le pic, puis voyez ce qu'il a coûté",
+          "alerts": "Voyez quelles alertes se sont déclenchées, et pourquoi",
+          "logs": "Filtrez les erreurs et trouvez le déploiement fautif",
+          "traces": "Suivez un paiement lent jusqu'à la base de données",
+          "metrics": "Tracez la latence p95 avec PromQL",
+          "pipelines": "Enrichissez les logs en temps réel avec VRL"
+        },
+        "startTour": "Démarrer la visite guidée",
+        "ownWay": "Explorer par moi-même"
+      },
+      "errorBody": "Une erreur s'est produite pendant le chargement. Réessayez : tout ce qui a déjà été créé est réutilisé, pas dupliqué."
+    },
+    "tour": {
+      "label": "Visite guidée",
+      "position": "Visite guidée · étape {current} sur {total}",
+      "pill": "Visite {current}/{total}",
+      "done": "Visite terminée",
+      "minimize": "Réduire la visite",
+      "close": "Terminer la visite",
+      "showMe": "Montrez-moi",
+      "next": "Suivant",
+      "capabilities": {
+        "dashboards": "Tableaux de bord",
+        "alerts": "Alertes",
+        "logs": "Recherche de logs",
+        "traces": "Traçage",
+        "metrics": "Métriques et PromQL",
+        "pipelines": "Pipelines"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Repérer le problème",
+          "body": "Voici la vue d'ensemble des services de la boutique. Le taux d'erreur et la latence du paiement ont tous deux bondi au cours des 35 dernières minutes.",
+          "look": "Chaque panneau est une requête SQL. Survolez un graphique pour comparer les séries, faites glisser pour zoomer, ou ouvrez le menu d'un panneau pour modifier sa requête."
+        },
+        "alert": {
+          "title": "L'alerte s'est déjà déclenchée",
+          "body": "Une alerte sur les erreurs de paiement exécute une requête SQL sur les logs selon une planification, et s'est déclenchée dès que les erreurs ont dépassé son seuil.",
+          "look": "Ouvrez une alerte pour voir sa requête, son seuil et sa planification. La destination d'exemple est un webhook fictif, donc les envois apparaissent en échec : dirigez-la vers Slack, l'e-mail ou PagerDuty pour recevoir de vraies notifications."
+        },
+        "logs": {
+          "title": "Rechercher les erreurs",
+          "body": "Logs filtrés sur les erreurs de paiement. Presque tous disent la même chose : délai dépassé lors de l'obtention d'une connexion depuis le pool.",
+          "look": "Dépliez un enregistrement pour voir tous ses champs. Cliquez sur la valeur d'un champ pour filtrer dessus, ou passez en mode SQL pour regrouper et agréger."
+        },
+        "deploy": {
+          "title": "Trouver ce qui a changé",
+          "body": "Payment v2.15.0 a été déployé une minute avant le début des erreurs, et ses notes de version réduisaient le pool de connexions à 20.",
+          "look": "C'est la cause racine, trouvée avec une seule recherche sur les mêmes logs. La recherche plein texte et la recherche SQL portent sur les mêmes données."
+        },
+        "traces": {
+          "title": "Suivre une requête en échec",
+          "body": "Chaque trace suit un paiement à travers les services. Ouvrez-en une : la cascade montre le service de paiement attendant 3 secondes une connexion à la base de données.",
+          "look": "Les logs portent le même ID de trace, vous pouvez donc passer d'un span à ses logs dans les deux sens."
+        },
+        "metrics": {
+          "title": "Confirmer avec PromQL",
+          "body": "La latence p95 de chaque service, interrogée avec PromQL. Le paiement et la commande grimpent ensemble.",
+          "look": "Les métriques sont dans le même moteur que les logs et les traces, si bien que le tableau de bord Infrastructure est entièrement construit avec PromQL."
+        },
+        "pipeline": {
+          "title": "Traiter les données dès leur arrivée",
+          "body": "Un pipeline en temps réel exécute une fonction VRL sur chaque log d'accès et ajoute client_os et is_mobile avant que l'enregistrement soit stocké.",
+          "look": "Ouvrez le pipeline pour voir son graphe. Les pipelines peuvent filtrer, enrichir, router et masquer les données sans toucher à vos applications."
+        },
+        "business": {
+          "title": "Mesurer l'impact métier",
+          "body": "Les mêmes logs alimentent les tableaux de bord métier : paiements échoués, chiffre d'affaires et commandes par moyen de paiement.",
+          "look": "Pas besoin d'un outil d'analyse séparé. Tout ce qui se trouve dans vos logs peut devenir un KPI."
+        }
+      },
+      "finale": {
+        "title": "Vous avez trouvé la cause racine",
+        "body": "En quelques minutes, vous êtes passé d'un pic sur un tableau de bord au déploiement qui l'a causé, avec tous les signaux au même endroit.",
+        "connect": "Connecter vos propres données",
+        "restart": "Recommencer la visite",
+        "finish": "Finir la visite"
+      }
     }
   }
 }

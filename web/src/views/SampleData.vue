@@ -66,16 +66,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("sampleData.load") }}
         </OButton>
-        <OButton
-          v-else-if="state === 'loaded' && overviewDashboardId"
-          variant="primary"
-          size="sm-action"
-          icon-left="dashboard"
-          data-test="sample-data-open-overview-btn"
-          @click="openOverview"
-        >
-          {{ t("sampleData.openOverview") }}
-        </OButton>
+        <div v-else-if="state === 'loaded'" class="flex shrink-0 flex-wrap gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="dashboard"
+            data-test="sample-data-open-overview-btn"
+            @click="openTarget('dashboard')"
+          >
+            {{ t("sampleData.openOverview") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            icon-left="flag"
+            data-test="sample-data-start-tour-btn"
+            @click="startTour"
+          >
+            {{ t("sampleData.welcome.ready.startTour") }}
+          </OButton>
+        </div>
       </OCard>
 
       <OBanner v-if="loadError" variant="error" dense inline-actions data-test="sample-data-error">
@@ -90,42 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OCard
         v-if="state === 'loading' || (state === 'loaded' && justLoaded)"
         variant="outlined"
-        class="gap-3 p-5"
-        data-test="sample-data-progress"
+        class="p-5"
       >
-        <div class="flex items-center justify-between gap-3">
-          <strong class="text-text-heading">{{
-            state === "loading" ? t("sampleData.progress.loading") : t("sampleData.progress.done")
-          }}</strong>
-          <span class="text-text-secondary text-xs" data-test="sample-data-progress-counts">{{
-            countsLine
-          }}</span>
-        </div>
-        <OProgressBar
-          :value="overallFraction"
-          :variant="state === 'loaded' ? 'success' : 'default'"
-          size="sm"
-        />
-        <ul class="m-0 flex list-none flex-col gap-2 p-0">
-          <li
-            v-for="step in steps"
-            :key="step.id"
-            class="flex items-center gap-2 text-sm"
-            :data-test="`sample-data-step-${step.id}`"
-            :data-status="step.status"
-          >
-            <OIcon :name="stepIcon(step.status)" size="sm" :class="stepIconClass(step.status)" />
-            <span :class="step.status === 'pending' ? 'text-text-secondary' : 'text-text-body'">{{
-              step.label
-            }}</span>
-            <OTag
-              v-if="step.status === 'failed'"
-              :label="t('sampleData.progress.skipped')"
-              variant="warning"
-              size="sm"
-            />
-          </li>
-        </ul>
+        <SampleDataProgress />
       </OCard>
 
       <template v-if="state === 'loaded'">
@@ -188,46 +165,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import SampleDataProgress from "@/components/sampleData/SampleDataProgress.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { streamNameListQuery } from "@/services/stream.queries";
-import { foldersQuery } from "@/services/common.queries";
-import { dashboardsSearchQuery, type DashboardSearchHit } from "@/services/dashboards.queries";
-import { loadSampleDataMutation, removeSampleDataMutation } from "@/services/sample_data.queries";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import { sampleWindowHours } from "@/utils/sampleData/loader";
+import { SAMPLE_METRICS, SAMPLE_STREAMS } from "@/utils/sampleData/catalog";
 import {
-  SAMPLE_STEPS,
-  sampleWindowHours,
-  type SampleCounts,
-  type SampleProgress,
-  type SampleStepId,
-} from "@/utils/sampleData/loader";
-import {
-  SAMPLE_FOLDER_NAME,
-  SAMPLE_METRICS,
-  SAMPLE_OVERVIEW_TITLE,
-  SAMPLE_STREAMS,
-} from "@/utils/sampleData/catalog";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-
-type StepStatus = "pending" | "running" | "done" | "failed";
+  SAMPLE_TOUR_STEPS,
+  resolveTourTarget,
+  type SampleTourStepId,
+} from "@/utils/sampleData/tour";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const session = useSampleDataSession();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const hours = computed(() => sampleWindowHours(store.state.zoConfig?.ingest_allowed_upto));
@@ -238,82 +204,20 @@ const alreadyLoaded = computed(() =>
   (logStreams.data.value ?? []).some((s: { name?: string }) => s?.name === SAMPLE_STREAMS.appLogs),
 );
 
-const loadWrite = useMutation(() => loadSampleDataMutation(org.value));
-const removeWrite = useMutation(() => removeSampleDataMutation(org.value));
-
-const loading = ref(false);
 const removing = ref(false);
-const justLoaded = ref(false);
 const confirmRemove = ref(false);
-const loadError = ref<I18nText | null>(null);
-const loadedOverviewId = ref<string>();
-const loadedFolderId = ref<string>();
-const counts = reactive<SampleCounts>({ logs: 0, spans: 0, metrics: 0 });
-const stepStatus = reactive<Record<SampleStepId, StepStatus>>({
-  telemetry: "pending",
-  dashboards: "pending",
-  alerts: "pending",
-  functions: "pending",
-  enrichment: "pending",
+const ownSession = computed(() => session.loadingOrg.value === org.value);
+const justLoaded = computed(() => ownSession.value && session.status.value === "loaded");
+const loadError = computed<I18nText | null>(() => {
+  if (!ownSession.value || session.status.value !== "failed") return null;
+  return raw(session.error.value ?? "") || t("sampleData.toast.loadFailed");
 });
-const telemetryFraction = ref(0);
-
-const overviewSearch = useQuery(
-  computed(() => ({
-    ...dashboardsSearchQuery(org.value, SAMPLE_OVERVIEW_TITLE),
-    enabled: alreadyLoaded.value || justLoaded.value,
-  })),
-);
-const overviewHit = computed(() =>
-  (overviewSearch.data.value ?? []).find(
-    (hit: DashboardSearchHit) => hit.title === SAMPLE_OVERVIEW_TITLE,
-  ),
-);
-const overviewDashboardId = computed(
-  () => loadedOverviewId.value ?? overviewHit.value?.dashboardId,
-);
-const dashboardFolderId = computed(() => loadedFolderId.value ?? overviewHit.value?.folderId);
-
-const alertFolders = useQuery(
-  computed(() => ({
-    ...foldersQuery(org.value, "alerts"),
-    enabled: alreadyLoaded.value || justLoaded.value,
-  })),
-);
-const sampleAlertFolderId = computed(
-  () => (alertFolders.data.value ?? []).find((f) => f.name === SAMPLE_FOLDER_NAME)?.folderId,
-);
 
 const state = computed<"idle" | "loading" | "loaded">(() => {
-  if (loading.value) return "loading";
+  if (ownSession.value && session.status.value === "loading") return "loading";
   if (justLoaded.value || alreadyLoaded.value) return "loaded";
   return "idle";
 });
-
-const stepLabels = computed<Record<SampleStepId, I18nText>>(() => ({
-  telemetry: t("sampleData.steps.telemetry"),
-  dashboards: t("sampleData.steps.dashboards"),
-  alerts: t("sampleData.steps.alerts"),
-  functions: t("sampleData.steps.functions"),
-  enrichment: t("sampleData.steps.enrichment"),
-}));
-const steps = computed(() =>
-  SAMPLE_STEPS.map((id) => ({ id, label: stepLabels.value[id], status: stepStatus[id] })),
-);
-const overallFraction = computed(() => {
-  // telemetry dominates the wall time, so it carries most of the bar
-  const assetsDone = SAMPLE_STEPS.slice(1).filter((s) =>
-    ["done", "failed"].includes(stepStatus[s]),
-  ).length;
-  return telemetryFraction.value * 0.8 + (assetsDone / (SAMPLE_STEPS.length - 1)) * 0.2;
-});
-const countsLine = computed(() =>
-  t("sampleData.progress.counts", {
-    logs: raw(counts.logs.toLocaleString()),
-    spans: raw(counts.spans.toLocaleString()),
-    metrics: raw(counts.metrics.toLocaleString()),
-  }),
-);
 
 const heroTitle = computed(() =>
   state.value === "loaded" ? t("sampleData.hero.loadedTitle") : t("sampleData.hero.title"),
@@ -323,19 +227,6 @@ const heroBody = computed(() =>
     ? t("sampleData.hero.loadedBody")
     : t("sampleData.hero.body", { hours: raw(String(hours.value)) }),
 );
-
-const stepIcon = (status: StepStatus): IconName => {
-  if (status === "done") return "check-circle";
-  if (status === "failed") return "warning-amber";
-  if (status === "running") return "progress-activity";
-  return "radio-button-unchecked";
-};
-const stepIconClass = (status: StepStatus) => {
-  if (status === "done") return "text-status-success-text";
-  if (status === "failed") return "text-icon-chip-warning-text";
-  if (status === "running") return "text-accent animate-spin";
-  return "text-text-secondary";
-};
 
 const included = computed<
   { id: string; icon: IconName; tint: string; label: I18nText; detail: I18nText }[]
@@ -381,26 +272,22 @@ const included = computed<
     detail: t("sampleData.included.alertsDetail"),
   },
   {
-    id: "functions",
-    icon: "functions",
+    id: "pipeline",
+    icon: "alt-route",
     tint: "bg-tabs-active-bg text-tabs-active-text",
-    label: t("sampleData.included.functions"),
-    detail: t("sampleData.included.functionsDetail"),
+    label: t("sampleData.included.pipeline"),
+    detail: t("sampleData.included.pipelineDetail"),
   },
 ]);
 
-const go = (name: string, query: Record<string, string> = {}) =>
-  router.push({ name, query: { org_identifier: org.value, ...query } }).catch(() => {});
+const openTarget = (id: SampleTourStepId) =>
+  resolveTourTarget(org.value, id)
+    .then((to) => router.push(to))
+    .catch(() => {});
 
-const openOverview = () => {
-  if (!overviewDashboardId.value) {
-    go("dashboards");
-    return;
-  }
-  go("viewDashboard", {
-    dashboard: overviewDashboardId.value,
-    folder: dashboardFolderId.value ?? "default",
-  });
+const startTour = () => {
+  session.startTour(org.value);
+  openTarget(SAMPLE_TOUR_STEPS[0].id);
 };
 
 const tours = computed<
@@ -411,112 +298,52 @@ const tours = computed<
     icon: "dashboard",
     label: t("sampleData.explore.dashboards"),
     sublabel: t("sampleData.explore.dashboardsDesc"),
-    go: openOverview,
+    go: () => openTarget("dashboard"),
   },
   {
     id: "logs",
     icon: "search",
     label: t("sampleData.explore.logs"),
     sublabel: t("sampleData.explore.logsDesc"),
-    go: () =>
-      go("logs", {
-        stream: SAMPLE_STREAMS.appLogs,
-        stream_type: "logs",
-        period: "1h",
-        refresh: "0",
-        sql_mode: "false",
-        query: b64EncodeUnicode("service_name = 'payment' AND level = 'error'") ?? "",
-        type: "logs",
-      }),
+    go: () => openTarget("logs"),
   },
   {
     id: "traces",
     icon: "account-tree",
     label: t("sampleData.explore.traces"),
     sublabel: t("sampleData.explore.tracesDesc"),
-    go: () =>
-      go("traces", {
-        stream: SAMPLE_STREAMS.traces,
-        period: "1h",
-        query: b64EncodeUnicode("span_status = 'ERROR'") ?? "",
-      }),
+    go: () => openTarget("traces"),
   },
   {
     id: "metrics",
     icon: "bar-chart",
     label: t("sampleData.explore.metrics"),
     sublabel: t("sampleData.explore.metricsDesc"),
-    go: () => go("metrics", { metric: SAMPLE_METRICS.requests }),
+    go: () => openTarget("metrics"),
   },
   {
     id: "alerts",
     icon: "notifications",
     label: t("sampleData.explore.alerts"),
     sublabel: t("sampleData.explore.alertsDesc"),
-    go: () =>
-      go("alertList", sampleAlertFolderId.value ? { folder: sampleAlertFolderId.value } : {}),
+    go: () => openTarget("alert"),
   },
   {
-    id: "functions",
-    icon: "functions",
-    label: t("sampleData.explore.functions"),
-    sublabel: t("sampleData.explore.functionsDesc"),
-    go: () => go("functionList"),
+    id: "pipeline",
+    icon: "alt-route",
+    label: t("sampleData.explore.pipeline"),
+    sublabel: t("sampleData.explore.pipelineDesc"),
+    go: () => openTarget("pipeline"),
   },
 ]);
 
-const onProgress = (p: SampleProgress) => {
-  Object.assign(counts, p.counts);
-  if (p.step === "telemetry") {
-    telemetryFraction.value = p.fraction;
-    stepStatus.telemetry = p.fraction >= 1 ? "done" : "running";
-    return;
-  }
-  if (p.fraction === 0) stepStatus[p.step] = "running";
-};
-
-const resetProgress = () => {
-  for (const id of SAMPLE_STEPS) stepStatus[id] = "pending";
-  telemetryFraction.value = 0;
-  Object.assign(counts, { logs: 0, spans: 0, metrics: 0 });
-};
-
-const startLoad = async () => {
-  if (loading.value) return;
-  loadError.value = null;
-  justLoaded.value = false;
-  resetProgress();
-  loading.value = true;
-  try {
-    const result = await loadWrite.mutateAsync({
-      ingestAllowedUptoHours: store.state.zoConfig?.ingest_allowed_upto,
-      onProgress,
-    });
-    for (const id of SAMPLE_STEPS.slice(1)) {
-      stepStatus[id] = result.failedSteps.includes(id) ? "failed" : "done";
-    }
-    loadedOverviewId.value = result.overviewDashboardId;
-    loadedFolderId.value = result.dashboardFolderId;
-    justLoaded.value = true;
-    store.dispatch("setIsDataIngested", true);
-    toast({ variant: "success", message: t("sampleData.toast.loaded") });
-  } catch (e: any) {
-    stepStatus.telemetry = "failed";
-    loadError.value = raw(e?.response?.data?.message) || t("sampleData.toast.loadFailed");
-  } finally {
-    loading.value = false;
-  }
-};
+const startLoad = () => session.start(org.value, store.state.zoConfig?.ingest_allowed_upto);
 
 const removeAll = async () => {
   confirmRemove.value = false;
   removing.value = true;
   try {
-    await removeWrite.mutateAsync();
-    justLoaded.value = false;
-    loadedOverviewId.value = undefined;
-    loadedFolderId.value = undefined;
-    resetProgress();
+    await session.remove(org.value);
     toast({ variant: "success", message: t("sampleData.toast.removed") });
   } catch (e: any) {
     toast({

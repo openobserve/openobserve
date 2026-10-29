@@ -27255,7 +27255,7 @@
       "title": "A realistic storefront, ready to explore",
       "body": "Loads the last {hours} hours of logs, traces and metrics from a 10-service e-commerce app on Kubernetes, with dashboards, alerts and functions already set up. Something is going wrong in checkout: see if you can find out why.",
       "loadedTitle": "Sample data is loaded",
-      "loadedBody": "The storefront's telemetry and assets are in this organization. Pick a place to start, or remove everything when you are done."
+      "loadedBody": "The storefront's telemetry and assets are in this organization. Take the guided tour to investigate the checkout incident, or pick a place to start."
     },
     "included": {
       "title": "What gets created",
@@ -27269,15 +27269,16 @@
       "dashboardsDetail": "Service overview, business KPIs, web traffic and infrastructure",
       "alerts": "5 alerts",
       "alertsDetail": "Scheduled SQL alerts, one of them firing on the ongoing incident",
-      "functions": "Functions and enrichment",
-      "functionsDetail": "2 VRL functions and a service owners enrichment table"
+      "pipeline": "Pipeline and functions",
+      "pipelineDetail": "A real-time pipeline that parses every access log with VRL, 2 functions and a service owners enrichment table"
     },
     "footnote": "Streams and functions start with {prefix}, dashboards and alerts sit in a Sample data folder, and the data covers the last {hours} hours. Remove all of it from this page in one click.",
     "steps": {
+      "functions": "Creating functions",
+      "pipeline": "Creating a real-time pipeline",
       "telemetry": "Generating and sending logs, traces and metrics",
       "dashboards": "Creating dashboards",
       "alerts": "Creating alerts",
-      "functions": "Creating functions",
       "enrichment": "Uploading the service owners table"
     },
     "progress": {
@@ -27299,8 +27300,8 @@
       "metricsDesc": "Request rates, latency and saturation with PromQL",
       "alerts": "Alerts",
       "alertsDesc": "Five alerts in the Sample data folder",
-      "functions": "Functions",
-      "functionsDesc": "VRL functions you can apply to search results"
+      "pipeline": "Pipelines",
+      "pipelineDesc": "Real-time processing with VRL as data arrives"
     },
     "removeConfirm": {
       "title": "Remove sample data?",
@@ -27313,10 +27314,133 @@
       "removeFailed": "Could not remove all sample data"
     },
     "entry": {
-      "homeTitle": "Explore with sample data",
-      "homeDesc": "No data yet? Load a demo storefront with dashboards and alerts",
       "ingestionBtn": "Try sample data",
       "onboardingSource": "Explore sample data"
+    },
+    "callout": {
+      "title": "Not ready to send data yet?",
+      "body": "Explore {product} with a sample online store first: an incident in progress, and a guided tour through dashboards, alerts, logs, traces, metrics and pipelines.",
+      "cta": "Explore with sample data",
+      "loading": "Loading sample data…",
+      "details": "What's included"
+    },
+    "homeBanner": {
+      "message": "You're exploring sample data. Follow the guided tour to investigate the checkout incident.",
+      "manage": "Manage sample data",
+      "cleanup": {
+        "message": "Your own data is arriving. Remove the sample data so it does not mix into your dashboards, alerts and searches.",
+        "keep": "Keep for now",
+        "remove": "Remove sample data"
+      }
+    },
+    "welcome": {
+      "title": "Welcome to {product}",
+      "subtitle": "Send your logs, metrics and traces to get started.",
+      "sample": {
+        "title": "Explore with sample data",
+        "body": "Not ready to connect yet? Try a busy online store with an incident in progress.",
+        "point1": "{hours} hours of logs, traces and metrics from 10 services",
+        "point2": "4 dashboards, 5 alerts, a pipeline and VRL functions",
+        "point3": "A guided tour, and one click to remove it all",
+        "cta": "Explore with sample data"
+      },
+      "connect": {
+        "title": "Connect your data",
+        "body": "Send logs, metrics and traces from {p1}, {p2}, {p3}, {p4} and 100+ other sources.",
+        "point1": "Step-by-step setup for each source",
+        "point2": "Logs, metrics and traces in one place",
+        "point3": "See your first events within minutes",
+        "cta": "Choose a data source"
+      },
+      "skip": "Skip for now",
+      "continueInBackground": "Continue in the background",
+      "progress": {
+        "title": "Building your sample store",
+        "body": "This takes about a minute. You can close this window and loading carries on."
+      },
+      "ready": {
+        "title": "Your sample store is live",
+        "body": "Checkout started failing 35 minutes ago. The guided tour walks you through finding out why.",
+        "covers": "The guided tour covers",
+        "capabilities": {
+          "dashboards": "Spot the spike, then see what it cost",
+          "alerts": "See which alerts fired, and why",
+          "logs": "Filter the errors and find the bad deploy",
+          "traces": "Follow a slow checkout to the database",
+          "metrics": "Chart p95 latency with PromQL",
+          "pipelines": "Enrich logs in real time with VRL"
+        },
+        "startTour": "Start the guided tour",
+        "ownWay": "Explore on my own"
+      },
+      "errorBody": "Something went wrong while loading. Try again: anything already created is reused, not duplicated."
+    },
+    "tour": {
+      "label": "Guided tour",
+      "position": "Guided tour · step {current} of {total}",
+      "pill": "Tour {current}/{total}",
+      "done": "Tour complete",
+      "minimize": "Minimize tour",
+      "close": "End tour",
+      "showMe": "Show me",
+      "next": "Next",
+      "capabilities": {
+        "dashboards": "Dashboards",
+        "alerts": "Alerts",
+        "logs": "Log search",
+        "traces": "Tracing",
+        "metrics": "Metrics and PromQL",
+        "pipelines": "Pipelines"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Spot the problem",
+          "body": "This is the storefront's service overview. Error rate and checkout latency both jumped in the last 35 minutes.",
+          "look": "Every panel is a SQL query. Hover a chart to compare series, drag across it to zoom, or open a panel's menu to edit its query."
+        },
+        "alert": {
+          "title": "The alert already fired",
+          "body": "An alert on payment errors runs a SQL query against the logs on a schedule, and fired as soon as errors crossed its threshold.",
+          "look": "Open an alert to see its query, threshold and schedule. The sample destination is a placeholder webhook, so deliveries show as failed: point it at Slack, email or PagerDuty to get real notifications."
+        },
+        "logs": {
+          "title": "Search the errors",
+          "body": "Logs filtered to payment errors. Nearly all of them say the same thing: timeout acquiring a connection from the pool.",
+          "look": "Expand a record to see every field. Click a field value to filter by it, or switch to SQL mode to group and aggregate."
+        },
+        "deploy": {
+          "title": "Find what changed",
+          "body": "Payment v2.15.0 rolled out one minute before the errors began, and its release notes cut the connection pool to 20.",
+          "look": "That is the root cause, found with one search on the same logs. Full-text and SQL search run on the same data."
+        },
+        "traces": {
+          "title": "Follow a failing request",
+          "body": "Each trace follows one checkout across services. Open one: the waterfall shows the payment service waiting 3 seconds for a database connection.",
+          "look": "Logs carry the same trace ID, so you can jump between a span and its logs in either direction."
+        },
+        "metrics": {
+          "title": "Confirm with PromQL",
+          "body": "The p95 latency of every service, queried with PromQL. Payment and checkout climb together.",
+          "look": "Metrics live in the same engine as logs and traces, so the Infrastructure dashboard is built entirely from PromQL."
+        },
+        "pipeline": {
+          "title": "Process data as it arrives",
+          "body": "A real-time pipeline runs a VRL function on every access log, adding client_os and is_mobile before the record is stored.",
+          "look": "Open the pipeline to see its graph. Pipelines can filter, enrich, route and redact data without touching your apps."
+        },
+        "business": {
+          "title": "Measure the business impact",
+          "body": "The same logs power business dashboards: failed checkouts, revenue, and orders by payment method.",
+          "look": "No separate analytics tool needed. Anything in your logs can become a KPI."
+        }
+      },
+      "finale": {
+        "title": "You found the root cause",
+        "body": "In a few minutes you went from a spike on a dashboard to the deploy that caused it, with every signal in one place.",
+        "connect": "Connect your own data",
+        "restart": "Restart tour",
+        "finish": "Finish tour"
+      }
     }
   }
 }

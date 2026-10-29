@@ -31,12 +31,26 @@ export const SAMPLE_METRICS = {
 
 export const SAMPLE_ENRICHMENT_TABLE = "sample_service_owners";
 export const SAMPLE_FOLDER_NAME = "Sample data";
-export const SAMPLE_OVERVIEW_TITLE = "Storefront · Service overview";
+export const SAMPLE_DASHBOARD_TITLES = {
+  overview: "Storefront · Service overview",
+  business: "Storefront · Business KPIs",
+  traffic: "Storefront · Web traffic",
+  infra: "Storefront · Infrastructure",
+} as const;
+export const SAMPLE_OVERVIEW_TITLE = SAMPLE_DASHBOARD_TITLES.overview;
 export const SAMPLE_ALERT_TEMPLATE = "sample_alert_template";
 export const SAMPLE_ALERT_DESTINATION = "sample_webhook";
 export const SAMPLE_FUNCTIONS = ["sample_classify_latency", "sample_parse_user_agent"] as const;
+export const SAMPLE_PIPELINE = "sample_enrich_access_logs";
 
 export const SAMPLE_NAMESPACE = "storefront";
+
+const SAMPLE_STREAM_NAMES: ReadonlySet<string> = new Set([
+  ...Object.values(SAMPLE_STREAMS),
+  ...Object.values(SAMPLE_METRICS),
+]);
+
+export const isSampleStreamName = (name: string) => SAMPLE_STREAM_NAMES.has(name);
 
 export type SampleServiceName =
   | "frontend"

@@ -20,6 +20,7 @@ import commonService from "@/services/common";
 import dashboardService from "@/services/dashboards";
 import { toSearchHit } from "@/services/dashboards.queries";
 import jsTransformService from "@/services/jstransform";
+import pipelineService from "@/services/pipelines";
 import sampleDataService from "@/services/sample_data";
 import streamService from "@/services/stream";
 import {
@@ -30,9 +31,11 @@ import {
   SAMPLE_FUNCTIONS,
   SAMPLE_METRICS,
   SAMPLE_OVERVIEW_TITLE,
+  SAMPLE_PIPELINE,
   SAMPLE_STREAMS,
 } from "./catalog";
 import {
+  sampleAccessLogPipeline,
   sampleAlertDestination,
   sampleAlertTemplate,
   sampleAlerts,
@@ -42,13 +45,16 @@ import {
 } from "./assets";
 import { createSampleGenerator } from "./generator";
 
-export type SampleStepId = "telemetry" | "dashboards" | "alerts" | "functions" | "enrichment";
+export type SampleStepId =
+  "functions" | "pipeline" | "telemetry" | "dashboards" | "alerts" | "enrichment";
 
+// the pipeline must exist before the first access log arrives, so it can rewrite every record
 export const SAMPLE_STEPS: readonly SampleStepId[] = [
+  "functions",
+  "pipeline",
   "telemetry",
   "dashboards",
   "alerts",
-  "functions",
   "enrichment",
 ];
 
@@ -172,6 +178,20 @@ const createFunctions = async (org: string) => {
   }
 };
 
+const findPipelineId = async (org: string): Promise<string | undefined> => {
+  const res = await pipelineService.getPipelines(org);
+  const hit = (res.data?.list ?? []).find((p: any) => p.name === SAMPLE_PIPELINE);
+  return hit?.pipeline_id;
+};
+
+const createPipeline = async (org: string) => {
+  if (await findPipelineId(org)) return;
+  await pipelineService.createPipeline({
+    org_identifier: org,
+    data: sampleAccessLogPipeline(org),
+  });
+};
+
 const createEnrichmentTable = async (org: string) => {
   const form = new FormData();
   form.append(
@@ -190,11 +210,6 @@ export const loadSampleData = async (
   const hours = sampleWindowHours(ingestAllowedUptoHours);
   const failedSteps: SampleStepId[] = [];
   let counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
-  onProgress({ step: "telemetry", fraction: 0, counts });
-  counts = await ingestTelemetry(org, hours, (fraction, c) =>
-    onProgress({ step: "telemetry", fraction, counts: c }),
-  );
-
   const result: SampleLoadResult = { counts, hours, failedSteps };
   const run = async (step: SampleStepId, fn: () => Promise<void>) => {
     onProgress({ step, fraction: 0, counts });
@@ -206,13 +221,21 @@ export const loadSampleData = async (
     }
     onProgress({ step, fraction: 1, counts });
   };
+  await run("functions", () => createFunctions(org));
+  await run("pipeline", () => createPipeline(org));
+
+  onProgress({ step: "telemetry", fraction: 0, counts });
+  counts = await ingestTelemetry(org, hours, (fraction, c) =>
+    onProgress({ step: "telemetry", fraction, counts: c }),
+  );
+  result.counts = counts;
+
   await run("dashboards", async () => {
     const { folderId, overviewId } = await createDashboards(org);
     result.dashboardFolderId = folderId;
     result.overviewDashboardId = overviewId;
   });
   await run("alerts", () => createAlerts(org));
-  await run("functions", () => createFunctions(org));
   await run("enrichment", () => createEnrichmentTable(org));
   return result;
 };
@@ -269,6 +292,12 @@ export const removeSampleData = async (org: string) => {
   await removeAlerts(org);
   await removeAlertDelivery(org);
   await removeDashboards(org);
+  const pipelineId = await findPipelineId(org);
+  if (pipelineId) {
+    await ignoreMissing(() =>
+      pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
+    );
+  }
   for (const name of SAMPLE_FUNCTIONS) {
     await ignoreMissing(() => jsTransformService.delete(org, name, true));
   }

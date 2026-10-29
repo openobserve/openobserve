@@ -27257,7 +27257,7 @@
       "title": "Un negozio online realistico, pronto da esplorare",
       "body": "Carica log, tracce e metriche delle ultime {hours} ore di un'app di e-commerce con 10 servizi su Kubernetes, con dashboard, avvisi e funzioni già configurati. Qualcosa non va nel checkout: prova a scoprire perché.",
       "loadedTitle": "I dati di esempio sono caricati",
-      "loadedBody": "La telemetria e le risorse del negozio si trovano in questa organizzazione. Scegli da dove iniziare oppure rimuovi tutto quando hai finito."
+      "loadedBody": "La telemetria e le risorse del negozio si trovano in questa organizzazione. Segui il tour guidato per indagare sull'incidente del checkout oppure scegli da dove iniziare."
     },
     "included": {
       "title": "Cosa viene creato",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Panoramica del servizio, KPIs di business, traffico web e infrastruttura",
       "alerts": "5 avvisi",
       "alertsDetail": "Avvisi SQL pianificati, uno dei quali scatta per l'incidente in corso",
-      "functions": "Funzioni e arricchimento",
-      "functionsDetail": "2 funzioni VRL e una tabella di arricchimento con i responsabili dei servizi"
+      "pipeline": "Pipeline e funzioni",
+      "pipelineDetail": "Una pipeline in tempo reale che analizza ogni log di accesso con VRL, 2 funzioni e una tabella di arricchimento con i responsabili dei servizi"
     },
     "footnote": "Stream e funzioni iniziano con {prefix}, dashboard e avvisi si trovano nella cartella «Sample data» e i dati coprono le ultime {hours} ore. Rimuovi tutto da questa pagina con un clic.",
     "steps": {
+      "functions": "Creazione delle funzioni",
+      "pipeline": "Creazione di una pipeline in tempo reale",
       "telemetry": "Generazione e invio di log, tracce e metriche",
       "dashboards": "Creazione delle dashboard",
       "alerts": "Creazione degli avvisi",
-      "functions": "Creazione delle funzioni",
       "enrichment": "Caricamento della tabella dei responsabili dei servizi"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "Tassi di richieste, latenza e saturazione con PromQL",
       "alerts": "Avvisi",
       "alertsDesc": "Cinque avvisi nella cartella «Sample data»",
-      "functions": "Funzioni",
-      "functionsDesc": "Funzioni VRL che puoi applicare ai risultati di ricerca"
+      "pipeline": "Pipeline",
+      "pipelineDesc": "Elaborazione in tempo reale con VRL all'arrivo dei dati"
     },
     "removeConfirm": {
       "title": "Rimuovere i dati di esempio?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Impossibile rimuovere tutti i dati di esempio"
     },
     "entry": {
-      "homeTitle": "Esplora con dati di esempio",
-      "homeDesc": "Ancora nessun dato? Carica un negozio demo con dashboard e avvisi",
       "ingestionBtn": "Prova i dati di esempio",
       "onboardingSource": "Esplora dati di esempio"
+    },
+    "callout": {
+      "title": "Non sei ancora pronto a inviare dati?",
+      "body": "Esplora prima {product} con un negozio online di esempio: un incidente in corso e un tour guidato tra dashboard, avvisi, log, tracce, metriche e pipeline.",
+      "cta": "Esplora con dati di esempio",
+      "loading": "Caricamento dei dati di esempio…",
+      "details": "Cosa è incluso"
+    },
+    "homeBanner": {
+      "message": "Stai esplorando dati di esempio. Segui il tour guidato per indagare sull'incidente del checkout.",
+      "manage": "Gestisci dati di esempio",
+      "cleanup": {
+        "message": "Stanno arrivando i tuoi dati. Rimuovi i dati di esempio per non mescolarli con dashboard, avvisi e ricerche.",
+        "keep": "Mantieni per ora",
+        "remove": "Rimuovi dati di esempio"
+      }
+    },
+    "welcome": {
+      "title": "Benvenuto in {product}",
+      "subtitle": "Invia log, metriche e tracce per iniziare.",
+      "sample": {
+        "title": "Esplora con dati di esempio",
+        "body": "Non sei ancora pronto a collegare i tuoi dati? Prova un negozio online molto trafficato con un incidente in corso.",
+        "point1": "{hours} ore di log, tracce e metriche da 10 servizi",
+        "point2": "4 dashboard, 5 avvisi, una pipeline e funzioni VRL",
+        "point3": "Un tour guidato e un clic per rimuovere tutto",
+        "cta": "Esplora con dati di esempio"
+      },
+      "connect": {
+        "title": "Collega i tuoi dati",
+        "body": "Invia log, metriche e tracce da {p1}, {p2}, {p3}, {p4} e oltre 100 altre origini.",
+        "point1": "Configurazione passo passo per ogni origine",
+        "point2": "Log, metriche e tracce in un unico posto",
+        "point3": "Vedi i tuoi primi eventi in pochi minuti",
+        "cta": "Scegli un'origine dati"
+      },
+      "skip": "Salta per ora",
+      "continueInBackground": "Continua in background",
+      "progress": {
+        "title": "Creazione del tuo negozio di esempio",
+        "body": "Ci vuole circa un minuto. Puoi chiudere questa finestra e il caricamento continuerà."
+      },
+      "ready": {
+        "title": "Il tuo negozio di esempio è attivo",
+        "body": "Il checkout ha iniziato a non riuscire 35 minuti fa. Il tour guidato ti aiuta a scoprire perché.",
+        "covers": "Il tour guidato include",
+        "capabilities": {
+          "dashboards": "Individua il picco e scopri quanto è costato",
+          "alerts": "Scopri quali avvisi sono scattati e perché",
+          "logs": "Filtra gli errori e trova il deploy difettoso",
+          "traces": "Segui un checkout lento fino al database",
+          "metrics": "Traccia la latenza p95 con PromQL",
+          "pipelines": "Arricchisci i log in tempo reale con VRL"
+        },
+        "startTour": "Avvia il tour guidato",
+        "ownWay": "Esplora da solo"
+      },
+      "errorBody": "Si è verificato un errore durante il caricamento. Riprova: ciò che è già stato creato viene riutilizzato, non duplicato."
+    },
+    "tour": {
+      "label": "Tour guidato",
+      "position": "Tour guidato · passaggio {current} di {total}",
+      "pill": "Tour {current}/{total}",
+      "done": "Tour completato",
+      "minimize": "Riduci tour",
+      "close": "Termina tour",
+      "showMe": "Mostrami",
+      "next": "Avanti",
+      "capabilities": {
+        "dashboards": "Dashboard",
+        "alerts": "Avvisi",
+        "logs": "Ricerca nei log",
+        "traces": "Tracciamento",
+        "metrics": "Metriche e PromQL",
+        "pipelines": "Pipeline"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Individua il problema",
+          "body": "Questa è la panoramica dei servizi del negozio. Il tasso di errore e la latenza del checkout sono aumentati entrambi negli ultimi 35 minuti.",
+          "look": "Ogni pannello è una query SQL. Passa il mouse su un grafico per confrontare le serie, trascina per eseguire lo zoom o apri il menu di un pannello per modificarne la query."
+        },
+        "alert": {
+          "title": "L'avviso è già scattato",
+          "body": "Un avviso sugli errori di pagamento esegue una query SQL sui log secondo una pianificazione ed è scattato non appena gli errori hanno superato la soglia.",
+          "look": "Apri un avviso per vedere query, soglia e pianificazione. La destinazione di esempio è un webhook segnaposto, quindi gli invii risultano non riusciti: puntala su Slack, email o PagerDuty per ricevere notifiche reali."
+        },
+        "logs": {
+          "title": "Cerca gli errori",
+          "body": "Log filtrati sugli errori di pagamento. Quasi tutti dicono la stessa cosa: timeout durante l'acquisizione di una connessione dal pool.",
+          "look": "Espandi un record per vederne tutti i campi. Fai clic sul valore di un campo per filtrare in base a esso o passa alla modalità SQL per raggruppare e aggregare."
+        },
+        "deploy": {
+          "title": "Scopri cosa è cambiato",
+          "body": "Payment v2.15.0 è stato rilasciato un minuto prima dell'inizio degli errori e le sue note di rilascio riducevano il pool di connessioni a 20.",
+          "look": "Questa è la causa principale, trovata con una sola ricerca sugli stessi log. La ricerca full-text e quella SQL operano sugli stessi dati."
+        },
+        "traces": {
+          "title": "Segui una richiesta non riuscita",
+          "body": "Ogni traccia segue un checkout attraverso i servizi. Aprine una: il diagramma a cascata mostra il servizio di pagamento in attesa di una connessione al database per 3 secondi.",
+          "look": "I log contengono lo stesso ID traccia, quindi puoi passare da uno span ai suoi log e viceversa."
+        },
+        "metrics": {
+          "title": "Conferma con PromQL",
+          "body": "La latenza p95 di ogni servizio, interrogata con PromQL. Pagamento e checkout salgono insieme.",
+          "look": "Le metriche risiedono nello stesso motore di log e tracce, per questo la dashboard Infrastruttura è costruita interamente con PromQL."
+        },
+        "pipeline": {
+          "title": "Elabora i dati all'arrivo",
+          "body": "Una pipeline in tempo reale esegue una funzione VRL su ogni log di accesso, aggiungendo client_os e is_mobile prima che il record venga salvato.",
+          "look": "Apri la pipeline per vederne il grafo. Le pipeline possono filtrare, arricchire, instradare e oscurare i dati senza modificare le tue app."
+        },
+        "business": {
+          "title": "Misura l'impatto sul business",
+          "body": "Gli stessi log alimentano le dashboard di business: checkout non riusciti, ricavi e ordini per metodo di pagamento.",
+          "look": "Non serve uno strumento di analisi separato. Qualsiasi dato nei tuoi log può diventare un KPI."
+        }
+      },
+      "finale": {
+        "title": "Hai trovato la causa principale",
+        "body": "In pochi minuti sei passato da un picco su una dashboard al rilascio che lo ha causato, con tutti i segnali in un unico posto.",
+        "connect": "Collega i tuoi dati",
+        "restart": "Riavvia il tour",
+        "finish": "Concludi il tour"
+      }
     }
   }
 }

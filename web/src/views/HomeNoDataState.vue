@@ -93,14 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="go('prometheus')"
       />
 
-      <EmptyStateIngestionCard
-        icon="science"
-        :label="t('sampleData.entry.homeTitle')"
-        :sublabel="t('sampleData.entry.homeDesc')"
-        icon-variant="amber"
-        data-test="home-no-data-sample-data-card"
-        @click="go('sampleData')"
-      />
+      <div class="flex basis-full justify-center">
+        <SampleDataCallout class="max-w-200" />
+      </div>
     </template>
 
     <template #extra>
@@ -182,6 +177,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import SampleDataCallout from "@/components/sampleData/SampleDataCallout.vue";
 import { getImageURL } from "@/utils/zincutils";
 import DOMPurify from "dompurify";
 

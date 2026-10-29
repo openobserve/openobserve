@@ -19,7 +19,9 @@ import {
   SAMPLE_ALERT_TEMPLATE,
   SAMPLE_FUNCTIONS,
   SAMPLE_METRICS,
+  SAMPLE_DASHBOARD_TITLES,
   SAMPLE_OVERVIEW_TITLE,
+  SAMPLE_PIPELINE,
   SAMPLE_SERVICES,
   SAMPLE_STREAMS,
 } from "./catalog";
@@ -342,7 +344,7 @@ const overviewDashboard = () =>
 
 const businessDashboard = () =>
   dashboard(
-    "Storefront · Business KPIs",
+    SAMPLE_DASHBOARD_TITLES.business,
     "Orders, revenue and conversion, computed from checkout and payment logs.",
     [
       sqlPanel({
@@ -436,7 +438,7 @@ const businessDashboard = () =>
 
 const webTrafficDashboard = () =>
   dashboard(
-    "Storefront · Web traffic",
+    SAMPLE_DASHBOARD_TITLES.traffic,
     "Edge traffic from the nginx access logs: status codes, geography, clients and bandwidth.",
     [
       sqlPanel({
@@ -509,7 +511,7 @@ const webTrafficDashboard = () =>
 
 const infraDashboard = () =>
   dashboard(
-    "Storefront · Infrastructure",
+    SAMPLE_DASHBOARD_TITLES.infra,
     "Kubernetes workload metrics queried with PromQL: saturation, throughput and queue lag.",
     [
       promPanel({
@@ -773,6 +775,56 @@ export const sampleFunctions = () => [
     transType: 0,
   },
 ];
+
+const PIPELINE_NODE_IDS = {
+  source: "5a3e1c20-0b6f-4d8e-9c41-000000000001",
+  fn: "5a3e1c20-0b6f-4d8e-9c41-000000000002",
+  sink: "5a3e1c20-0b6f-4d8e-9c41-000000000003",
+};
+
+/** Real-time pipeline that tags every access log with its client OS before it is stored. */
+export const sampleAccessLogPipeline = (org: string) => {
+  const stream = {
+    node_type: "stream",
+    stream_name: SAMPLE_STREAMS.accessLogs,
+    stream_type: "logs",
+    org_id: org,
+  };
+  const edge = (source: string, target: string) => ({ id: `e${source}-${target}`, source, target });
+  return {
+    name: SAMPLE_PIPELINE,
+    description: "Parses the user agent of every storefront access log at ingest time",
+    source: { source_type: "realtime" },
+    nodes: [
+      {
+        id: PIPELINE_NODE_IDS.source,
+        type: "input",
+        io_type: "input",
+        data: stream,
+        position: { x: 160, y: 40 },
+      },
+      {
+        id: PIPELINE_NODE_IDS.fn,
+        type: "default",
+        io_type: "default",
+        data: { node_type: "function", name: SAMPLE_FUNCTIONS[1], after_flatten: true },
+        position: { x: 160, y: 180 },
+      },
+      {
+        id: PIPELINE_NODE_IDS.sink,
+        type: "output",
+        io_type: "output",
+        data: stream,
+        position: { x: 160, y: 320 },
+      },
+    ],
+    edges: [
+      edge(PIPELINE_NODE_IDS.source, PIPELINE_NODE_IDS.fn),
+      edge(PIPELINE_NODE_IDS.fn, PIPELINE_NODE_IDS.sink),
+    ],
+    org,
+  };
+};
 
 export const sampleServiceOwnersCsv = () =>
   [

@@ -27257,7 +27257,7 @@
       "title": "Keşfetmeye hazır, gerçekçi bir çevrimiçi mağaza",
       "body": "Kubernetes üzerinde çalışan 10 servisli bir e-ticaret uygulamasının son {hours} saatlik günlüklerini, izlerini ve metriklerini; hazır gösterge panoları, uyarılar ve fonksiyonlarla birlikte yükler. Ödeme adımında bir şeyler ters gidiyor: nedenini bulabilecek misiniz?",
       "loadedTitle": "Örnek veriler yüklendi",
-      "loadedBody": "Mağazanın telemetrisi ve varlıkları bu organizasyonda. Başlamak için bir yer seçin veya işiniz bittiğinde hepsini kaldırın."
+      "loadedBody": "Mağazanın telemetrisi ve varlıkları bu organizasyonda. Ödeme olayını incelemek için rehberli turu başlatın veya başlamak için bir yer seçin."
     },
     "included": {
       "title": "Neler oluşturulur",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Servis genel bakışı, iş KPIs, web trafiği ve altyapı",
       "alerts": "5 uyarı",
       "alertsDetail": "Biri devam eden olay nedeniyle tetiklenen zamanlanmış SQL uyarıları",
-      "functions": "Fonksiyonlar ve zenginleştirme",
-      "functionsDetail": "2 VRL fonksiyonu ve bir servis sahipleri zenginleştirme tablosu"
+      "pipeline": "İşlem hattı ve fonksiyonlar",
+      "pipelineDetail": "Her erişim günlüğünü VRL ile ayrıştıran gerçek zamanlı bir işlem hattı, 2 fonksiyon ve bir servis sahipleri zenginleştirme tablosu"
     },
     "footnote": "Akışlar ve fonksiyonlar {prefix} ile başlar, gösterge panoları ve uyarılar \"Sample data\" klasöründedir ve veriler son {hours} saati kapsar. Hepsini bu sayfadan tek tıklamayla kaldırabilirsiniz.",
     "steps": {
+      "functions": "Fonksiyonlar oluşturuluyor",
+      "pipeline": "Gerçek zamanlı işlem hattı oluşturuluyor",
       "telemetry": "Günlükler, izler ve metrikler oluşturuluyor ve gönderiliyor",
       "dashboards": "Gösterge panoları oluşturuluyor",
       "alerts": "Uyarılar oluşturuluyor",
-      "functions": "Fonksiyonlar oluşturuluyor",
       "enrichment": "Servis sahipleri tablosu yükleniyor"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "PromQL ile istek oranları, gecikme ve doygunluk",
       "alerts": "Uyarılar",
       "alertsDesc": "\"Sample data\" klasöründe beş uyarı",
-      "functions": "Fonksiyonlar",
-      "functionsDesc": "Arama sonuçlarına uygulayabileceğiniz VRL fonksiyonları"
+      "pipeline": "İşlem hatları",
+      "pipelineDesc": "Veriler gelirken VRL ile gerçek zamanlı işleme"
     },
     "removeConfirm": {
       "title": "Örnek veriler kaldırılsın mı?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Örnek verilerin tamamı kaldırılamadı"
     },
     "entry": {
-      "homeTitle": "Örnek verilerle keşfedin",
-      "homeDesc": "Henüz veri yok mu? Gösterge panoları ve uyarılarla bir demo mağaza yükleyin",
       "ingestionBtn": "Örnek verileri deneyin",
       "onboardingSource": "Örnek verileri keşfedin"
+    },
+    "callout": {
+      "title": "Henüz veri göndermeye hazır değil misiniz?",
+      "body": "{product} platformunu önce örnek bir çevrimiçi mağazayla keşfedin: devam eden bir olay ve gösterge panoları, uyarılar, günlükler, izler, metrikler ve işlem hatları boyunca rehberli bir tur.",
+      "cta": "Örnek verilerle keşfedin",
+      "loading": "Örnek veriler yükleniyor…",
+      "details": "Neler dahil"
+    },
+    "homeBanner": {
+      "message": "Örnek verileri keşfediyorsunuz. Ödeme olayını incelemek için rehberli turu izleyin.",
+      "manage": "Örnek verileri yönet",
+      "cleanup": {
+        "message": "Kendi verileriniz gelmeye başladı. Gösterge panolarınıza, uyarılarınıza ve aramalarınıza karışmaması için örnek verileri kaldırın.",
+        "keep": "Şimdilik tut",
+        "remove": "Örnek verileri kaldır"
+      }
+    },
+    "welcome": {
+      "title": "{product} uygulamasına hoş geldiniz",
+      "subtitle": "Başlamak için günlüklerinizi, metriklerinizi ve izlerinizi gönderin.",
+      "sample": {
+        "title": "Örnek verilerle keşfedin",
+        "body": "Henüz bağlanmaya hazır değil misiniz? Devam eden bir olayı olan yoğun bir çevrimiçi mağazayı deneyin.",
+        "point1": "10 servisten {hours} saatlik günlük, iz ve metrik",
+        "point2": "4 gösterge panosu, 5 uyarı, bir işlem hattı ve VRL fonksiyonları",
+        "point3": "Rehberli bir tur ve hepsini tek tıkla kaldırma",
+        "cta": "Örnek verilerle keşfedin"
+      },
+      "connect": {
+        "title": "Verilerinizi bağlayın",
+        "body": "{p1}, {p2}, {p3}, {p4} ve 100'den fazla kaynaktan günlük, metrik ve iz gönderin.",
+        "point1": "Her kaynak için adım adım kurulum",
+        "point2": "Günlükler, metrikler ve izler tek bir yerde",
+        "point3": "İlk olaylarınızı dakikalar içinde görün",
+        "cta": "Bir veri kaynağı seçin"
+      },
+      "skip": "Şimdilik atla",
+      "continueInBackground": "Arka planda devam et",
+      "progress": {
+        "title": "Örnek mağazanız oluşturuluyor",
+        "body": "Bu yaklaşık bir dakika sürer. Bu pencereyi kapatabilirsiniz, yükleme devam eder."
+      },
+      "ready": {
+        "title": "Örnek mağazanız yayında",
+        "body": "Ödeme 35 dakika önce başarısız olmaya başladı. Rehberli tur, nedenini bulmanızda size yol gösterir.",
+        "covers": "Rehberli tur şunları kapsar",
+        "capabilities": {
+          "dashboards": "Ani artışı fark edin, ardından maliyetini görün",
+          "alerts": "Hangi uyarıların neden tetiklendiğini görün",
+          "logs": "Hataları filtreleyin ve hatalı dağıtımı bulun",
+          "traces": "Yavaş bir ödemeyi veritabanına kadar izleyin",
+          "metrics": "PromQL ile p95 gecikmesinin grafiğini çizin",
+          "pipelines": "Günlükleri VRL ile gerçek zamanlı zenginleştirin"
+        },
+        "startTour": "Rehberli turu başlat",
+        "ownWay": "Kendim keşfedeyim"
+      },
+      "errorBody": "Yükleme sırasında bir sorun oluştu. Tekrar deneyin: zaten oluşturulmuş her şey yeniden kullanılır, çoğaltılmaz."
+    },
+    "tour": {
+      "label": "Rehberli tur",
+      "position": "Rehberli tur · adım {current}/{total}",
+      "pill": "Tur {current}/{total}",
+      "done": "Tur tamamlandı",
+      "minimize": "Turu küçült",
+      "close": "Turu bitir",
+      "showMe": "Göster",
+      "next": "İleri",
+      "capabilities": {
+        "dashboards": "Gösterge panoları",
+        "alerts": "Uyarılar",
+        "logs": "Günlük arama",
+        "traces": "İzleme",
+        "metrics": "Metrikler ve PromQL",
+        "pipelines": "İşlem hatları"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Sorunu fark edin",
+          "body": "Bu, mağazanın servis genel bakışı. Hata oranı ve ödeme gecikmesi son 35 dakikada birlikte yükseldi.",
+          "look": "Her panel bir SQL sorgusudur. Serileri karşılaştırmak için grafiğin üzerine gelin, yakınlaştırmak için üzerinde sürükleyin veya sorgusunu düzenlemek için panelin menüsünü açın."
+        },
+        "alert": {
+          "title": "Uyarı zaten tetiklendi",
+          "body": "Ödeme hataları için bir uyarı, günlüklerde zamanlanmış bir SQL sorgusu çalıştırır ve hatalar eşiği aşar aşmaz tetiklendi.",
+          "look": "Sorgusunu, eşiğini ve zamanlamasını görmek için bir uyarı açın. Örnek hedef yer tutucu bir webhook olduğundan teslimatlar başarısız olarak görünür: gerçek bildirimler almak için onu Slack, e-posta veya PagerDuty'ye yönlendirin."
+        },
+        "logs": {
+          "title": "Hataları arayın",
+          "body": "Ödeme hatalarına göre filtrelenmiş günlükler. Neredeyse hepsi aynı şeyi söylüyor: havuzdan bağlantı alınırken zaman aşımı.",
+          "look": "Tüm alanları görmek için bir kaydı genişletin. Bir alan değerine tıklayarak filtreleyin veya gruplamak ve toplamak için SQL moduna geçin."
+        },
+        "deploy": {
+          "title": "Neyin değiştiğini bulun",
+          "body": "Payment v2.15.0, hatalar başlamadan bir dakika önce yayına alındı ve sürüm notları bağlantı havuzunu 20'ye düşürdü.",
+          "look": "Kök neden bu ve aynı günlüklerde tek bir aramayla bulundu. Tam metin ve SQL araması aynı veriler üzerinde çalışır."
+        },
+        "traces": {
+          "title": "Başarısız bir isteği takip edin",
+          "body": "Her iz, bir ödeme işlemini servisler boyunca takip eder. Birini açın: şelale görünümü, ödeme servisinin bir veritabanı bağlantısı için 3 saniye beklediğini gösteriyor.",
+          "look": "Günlükler aynı iz kimliğini taşır, böylece bir span ile günlükleri arasında iki yönde de geçiş yapabilirsiniz."
+        },
+        "metrics": {
+          "title": "PromQL ile doğrulayın",
+          "body": "Her servisin p95 gecikmesi, PromQL ile sorgulandı. Ödeme ve sipariş tamamlama birlikte yükseliyor.",
+          "look": "Metrikler, günlükler ve izlerle aynı motorda bulunur; bu yüzden Altyapı gösterge panosu tamamen PromQL ile oluşturulmuştur."
+        },
+        "pipeline": {
+          "title": "Verileri gelirken işleyin",
+          "body": "Gerçek zamanlı bir işlem hattı, her erişim günlüğünde bir VRL fonksiyonu çalıştırarak kayıt depolanmadan önce client_os ve is_mobile ekler.",
+          "look": "Grafiğini görmek için işlem hattını açın. İşlem hatları uygulamalarınıza dokunmadan verileri filtreleyebilir, zenginleştirebilir, yönlendirebilir ve maskeleyebilir."
+        },
+        "business": {
+          "title": "İş etkisini ölçün",
+          "body": "Aynı günlükler iş gösterge panolarını da besler: başarısız ödemeler, gelir ve ödeme yöntemine göre siparişler.",
+          "look": "Ayrı bir analiz aracına gerek yok. Günlüklerinizdeki her şey bir KPI'ya dönüşebilir."
+        }
+      },
+      "finale": {
+        "title": "Kök nedeni buldunuz",
+        "body": "Birkaç dakika içinde bir gösterge panosundaki ani artıştan ona neden olan dağıtıma ulaştınız; tüm sinyaller tek bir yerde.",
+        "connect": "Kendi verilerinizi bağlayın",
+        "restart": "Turu yeniden başlat",
+        "finish": "Turu tamamla"
+      }
     }
   }
 }

@@ -27257,7 +27257,7 @@
       "title": "Ein realistischer Onlineshop, bereit zum Erkunden",
       "body": "Lädt die Logs, Traces und Metriken der letzten {hours} Stunden aus einer E-Commerce-App mit 10 Services auf Kubernetes, inklusive bereits eingerichteter Dashboards, Alarme und Funktionen. Im Checkout läuft etwas schief: Finden Sie heraus, warum.",
       "loadedTitle": "Beispieldaten sind geladen",
-      "loadedBody": "Die Telemetriedaten und Assets des Onlineshops befinden sich in dieser Organisation. Wählen Sie einen Einstiegspunkt oder entfernen Sie alles, wenn Sie fertig sind."
+      "loadedBody": "Die Telemetriedaten und Assets des Onlineshops befinden sich in dieser Organisation. Starten Sie die geführte Tour, um den Checkout-Vorfall zu untersuchen, oder wählen Sie einen Einstiegspunkt."
     },
     "included": {
       "title": "Was erstellt wird",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Service-Übersicht, Business-KPIs, Webtraffic und Infrastruktur",
       "alerts": "5 Alarme",
       "alertsDetail": "Geplante SQL-Alarme, von denen einer beim laufenden Vorfall auslöst",
-      "functions": "Funktionen und Anreicherung",
-      "functionsDetail": "2 VRL-Funktionen und eine Anreicherungstabelle mit Service-Verantwortlichen"
+      "pipeline": "Pipeline und Funktionen",
+      "pipelineDetail": "Eine Echtzeit-Pipeline, die jedes Zugriffslog mit VRL parst, 2 Funktionen und eine Anreicherungstabelle mit Service-Verantwortlichen"
     },
     "footnote": "Streams und Funktionen beginnen mit {prefix}, Dashboards und Alarme liegen im Ordner „Sample data“, und die Daten umfassen die letzten {hours} Stunden. Entfernen Sie alles mit einem Klick auf dieser Seite.",
     "steps": {
+      "functions": "Funktionen werden erstellt",
+      "pipeline": "Echtzeit-Pipeline wird erstellt",
       "telemetry": "Logs, Traces und Metriken werden erzeugt und gesendet",
       "dashboards": "Dashboards werden erstellt",
       "alerts": "Alarme werden erstellt",
-      "functions": "Funktionen werden erstellt",
       "enrichment": "Tabelle der Service-Verantwortlichen wird hochgeladen"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "Anfrageraten, Latenz und Auslastung mit PromQL",
       "alerts": "Alarme",
       "alertsDesc": "Fünf Alarme im Ordner „Sample data“",
-      "functions": "Funktionen",
-      "functionsDesc": "VRL-Funktionen, die Sie auf Suchergebnisse anwenden können"
+      "pipeline": "Pipelines",
+      "pipelineDesc": "Echtzeitverarbeitung mit VRL beim Eintreffen der Daten"
     },
     "removeConfirm": {
       "title": "Beispieldaten entfernen?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Nicht alle Beispieldaten konnten entfernt werden"
     },
     "entry": {
-      "homeTitle": "Mit Beispieldaten erkunden",
-      "homeDesc": "Noch keine Daten? Laden Sie einen Demo-Onlineshop mit Dashboards und Alarmen",
       "ingestionBtn": "Beispieldaten ausprobieren",
       "onboardingSource": "Beispieldaten erkunden"
+    },
+    "callout": {
+      "title": "Noch nicht bereit, Daten zu senden?",
+      "body": "Erkunden Sie {product} zuerst mit einem Beispiel-Onlineshop: ein laufender Vorfall und eine geführte Tour durch Dashboards, Alarme, Logs, Traces, Metriken und Pipelines.",
+      "cta": "Mit Beispieldaten erkunden",
+      "loading": "Beispieldaten werden geladen…",
+      "details": "Was enthalten ist"
+    },
+    "homeBanner": {
+      "message": "Sie erkunden Beispieldaten. Folgen Sie der geführten Tour, um den Checkout-Vorfall zu untersuchen.",
+      "manage": "Beispieldaten verwalten",
+      "cleanup": {
+        "message": "Ihre eigenen Daten treffen ein. Entfernen Sie die Beispieldaten, damit sie sich nicht mit Ihren Dashboards, Alarmen und Suchen vermischen.",
+        "keep": "Vorerst behalten",
+        "remove": "Beispieldaten entfernen"
+      }
+    },
+    "welcome": {
+      "title": "Willkommen bei {product}",
+      "subtitle": "Senden Sie Ihre Logs, Metriken und Traces, um loszulegen.",
+      "sample": {
+        "title": "Mit Beispieldaten erkunden",
+        "body": "Noch nicht bereit, Daten anzubinden? Testen Sie einen gut besuchten Onlineshop mit einem laufenden Vorfall.",
+        "point1": "{hours} Stunden Logs, Traces und Metriken aus 10 Services",
+        "point2": "4 Dashboards, 5 Alarme, eine Pipeline und VRL-Funktionen",
+        "point3": "Eine geführte Tour, und mit einem Klick ist alles wieder entfernt",
+        "cta": "Mit Beispieldaten erkunden"
+      },
+      "connect": {
+        "title": "Ihre Daten anbinden",
+        "body": "Senden Sie Logs, Metriken und Traces aus {p1}, {p2}, {p3}, {p4} und über 100 weiteren Quellen.",
+        "point1": "Schritt-für-Schritt-Einrichtung für jede Quelle",
+        "point2": "Logs, Metriken und Traces an einem Ort",
+        "point3": "Sehen Sie Ihre ersten Events innerhalb von Minuten",
+        "cta": "Datenquelle auswählen"
+      },
+      "skip": "Vorerst überspringen",
+      "continueInBackground": "Im Hintergrund fortsetzen",
+      "progress": {
+        "title": "Ihr Beispielshop wird aufgebaut",
+        "body": "Das dauert etwa eine Minute. Sie können dieses Fenster schließen, das Laden läuft weiter."
+      },
+      "ready": {
+        "title": "Ihr Beispielshop ist live",
+        "body": "Der Checkout schlägt seit 35 Minuten fehl. Die geführte Tour zeigt Ihnen, wie Sie die Ursache finden.",
+        "covers": "Die geführte Tour umfasst",
+        "capabilities": {
+          "dashboards": "Den Ausschlag erkennen und sehen, was er gekostet hat",
+          "alerts": "Sehen, welche Alarme ausgelöst haben und warum",
+          "logs": "Fehler filtern und das fehlerhafte Deployment finden",
+          "traces": "Einem langsamen Checkout bis zur Datenbank folgen",
+          "metrics": "p95-Latenz mit PromQL darstellen",
+          "pipelines": "Logs in Echtzeit mit VRL anreichern"
+        },
+        "startTour": "Geführte Tour starten",
+        "ownWay": "Selbst erkunden"
+      },
+      "errorBody": "Beim Laden ist ein Fehler aufgetreten. Versuchen Sie es erneut: Bereits Erstelltes wird wiederverwendet, nicht dupliziert."
+    },
+    "tour": {
+      "label": "Geführte Tour",
+      "position": "Geführte Tour · Schritt {current} von {total}",
+      "pill": "Tour {current}/{total}",
+      "done": "Tour abgeschlossen",
+      "minimize": "Tour minimieren",
+      "close": "Tour beenden",
+      "showMe": "Zeig es mir",
+      "next": "Weiter",
+      "capabilities": {
+        "dashboards": "Dashboards",
+        "alerts": "Alarme",
+        "logs": "Logsuche",
+        "traces": "Tracing",
+        "metrics": "Metriken und PromQL",
+        "pipelines": "Pipelines"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Das Problem erkennen",
+          "body": "Das ist die Service-Übersicht des Onlineshops. Fehlerrate und Checkout-Latenz sind in den letzten 35 Minuten beide sprunghaft gestiegen.",
+          "look": "Jedes Panel ist eine SQL-Abfrage. Fahren Sie mit der Maus über ein Diagramm, um Reihen zu vergleichen, ziehen Sie darüber, um zu zoomen, oder öffnen Sie das Panel-Menü, um die Abfrage zu bearbeiten."
+        },
+        "alert": {
+          "title": "Der Alarm hat bereits ausgelöst",
+          "body": "Ein Alarm für Zahlungsfehler führt nach Zeitplan eine SQL-Abfrage auf den Logs aus und hat ausgelöst, sobald die Fehler den Schwellenwert überschritten.",
+          "look": "Öffnen Sie einen Alarm, um Abfrage, Schwellenwert und Zeitplan zu sehen. Das Beispielziel ist ein Platzhalter-Webhook, daher werden Zustellungen als fehlgeschlagen angezeigt: Richten Sie es auf Slack, E-Mail oder PagerDuty aus, um echte Benachrichtigungen zu erhalten."
+        },
+        "logs": {
+          "title": "Die Fehler durchsuchen",
+          "body": "Logs, gefiltert auf Zahlungsfehler. Fast alle sagen dasselbe: Zeitüberschreitung beim Abrufen einer Verbindung aus dem Pool.",
+          "look": "Klappen Sie einen Eintrag auf, um alle Felder zu sehen. Klicken Sie auf einen Feldwert, um danach zu filtern, oder wechseln Sie in den SQL-Modus, um zu gruppieren und zu aggregieren."
+        },
+        "deploy": {
+          "title": "Herausfinden, was sich geändert hat",
+          "body": "Payment v2.15.0 wurde eine Minute vor Beginn der Fehler ausgerollt, und laut Release Notes wurde der Verbindungspool auf 20 reduziert.",
+          "look": "Das ist die Ursache, gefunden mit einer einzigen Suche in denselben Logs. Volltext- und SQL-Suche laufen auf denselben Daten."
+        },
+        "traces": {
+          "title": "Einer fehlgeschlagenen Anfrage folgen",
+          "body": "Jeder Trace verfolgt einen Checkout über alle Services. Öffnen Sie einen: Das Wasserfalldiagramm zeigt, dass der Payment-Service 3 Sekunden auf eine Datenbankverbindung wartet.",
+          "look": "Logs tragen dieselbe Trace-ID, sodass Sie in beide Richtungen zwischen einem Span und seinen Logs wechseln können."
+        },
+        "metrics": {
+          "title": "Mit PromQL bestätigen",
+          "body": "Die p95-Latenz jedes Service, abgefragt mit PromQL. Payment und Checkout steigen gemeinsam an.",
+          "look": "Metriken liegen in derselben Engine wie Logs und Traces, daher ist das Infrastruktur-Dashboard vollständig mit PromQL gebaut."
+        },
+        "pipeline": {
+          "title": "Daten beim Eintreffen verarbeiten",
+          "body": "Eine Echtzeit-Pipeline führt auf jedem Zugriffslog eine VRL-Funktion aus und ergänzt client_os und is_mobile, bevor der Eintrag gespeichert wird.",
+          "look": "Öffnen Sie die Pipeline, um ihren Graphen zu sehen. Pipelines können Daten filtern, anreichern, weiterleiten und schwärzen, ohne Ihre Apps anzufassen."
+        },
+        "business": {
+          "title": "Die geschäftlichen Auswirkungen messen",
+          "body": "Dieselben Logs speisen Business-Dashboards: fehlgeschlagene Checkouts, Umsatz und Bestellungen nach Zahlungsart.",
+          "look": "Kein separates Analysetool nötig. Alles in Ihren Logs kann zu einem KPI werden."
+        }
+      },
+      "finale": {
+        "title": "Sie haben die Ursache gefunden",
+        "body": "In wenigen Minuten sind Sie von einer Spitze in einem Dashboard zum verursachenden Deployment gelangt, mit allen Signalen an einem Ort.",
+        "connect": "Eigene Daten anbinden",
+        "restart": "Tour neu starten",
+        "finish": "Tour abschließen"
+      }
     }
   }
 }

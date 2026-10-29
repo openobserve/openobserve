@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
+        <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
           signal="any"
@@ -244,6 +245,7 @@ import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import SampleDataHomeBanner from "@/components/sampleData/SampleDataHomeBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -489,6 +491,7 @@ export default defineComponent({
     FirstDataPanel,
     FirstDataNotice,
     HomeNoDataState,
+    SampleDataHomeBanner,
     HomeViewSkeleton,
     TrialPeriod,
     OEmptyState,

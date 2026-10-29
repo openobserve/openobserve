@@ -35,6 +35,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -216,6 +217,13 @@ const connectDataSource = () => {
   });
 };
 
+const sampleSession = useSampleDataSession();
+const exploreSampleData = () => {
+  track("onboarding_prompt_sample_data_clicked");
+  isOpen.value = false;
+  sampleSession.openWelcome();
+};
+
 const dismiss = () => {
   track("onboarding_prompt_dismissed");
   isOpen.value = false;
@@ -279,6 +287,16 @@ const handleOpenChange = (open: boolean) => {
         @click="connectDataSource"
       >
         {{ t("connectDataSourcePopup.connectButton") }}
+      </OButton>
+
+      <OButton
+        data-test="connect-data-source-popup-sample-btn"
+        variant="outline"
+        icon-left="science"
+        class="w-full"
+        @click="exploreSampleData"
+      >
+        {{ t("sampleData.welcome.sample.title") }}
       </OButton>
 
       <OButton

@@ -27257,7 +27257,7 @@
       "title": "Realistyczny sklep internetowy, gotowy do eksploracji",
       "body": "Wczytuje logi, trace i metryki z ostatnich {hours} godz. z aplikacji e-commerce złożonej z 10 usług w Kubernetes, z gotowymi pulpitami, alertami i funkcjami. Coś jest nie tak z procesem płatności: sprawdź, czy uda ci się ustalić dlaczego.",
       "loadedTitle": "Przykładowe dane są wczytane",
-      "loadedBody": "Telemetria i zasoby sklepu znajdują się w tej organizacji. Wybierz, od czego zacząć, lub usuń wszystko, gdy skończysz."
+      "loadedBody": "Telemetria i zasoby sklepu znajdują się w tej organizacji. Rozpocznij przewodnik, aby zbadać incydent w procesie płatności, lub wybierz, od czego zacząć."
     },
     "included": {
       "title": "Co zostanie utworzone",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Przegląd usługi, biznesowe KPIs, ruch w sieci i infrastruktura",
       "alerts": "5 alertów",
       "alertsDetail": "Zaplanowane alerty SQL, z których jeden uruchamia się w związku z trwającym incydentem",
-      "functions": "Funkcje i wzbogacanie",
-      "functionsDetail": "2 funkcje VRL i tabela wzbogacania z właścicielami usług"
+      "pipeline": "Potok i funkcje",
+      "pipelineDetail": "Potok czasu rzeczywistego, który parsuje każdy log dostępu za pomocą VRL, 2 funkcje i tabela wzbogacania z właścicielami usług"
     },
     "footnote": "Strumienie i funkcje zaczynają się od {prefix}, pulpity i alerty znajdują się w folderze „Sample data”, a dane obejmują ostatnie {hours} godz. Usuń je wszystkie z tej strony jednym kliknięciem.",
     "steps": {
+      "functions": "Tworzenie funkcji",
+      "pipeline": "Tworzenie potoku czasu rzeczywistego",
       "telemetry": "Generowanie i wysyłanie logów, trace i metryk",
       "dashboards": "Tworzenie pulpitów",
       "alerts": "Tworzenie alertów",
-      "functions": "Tworzenie funkcji",
       "enrichment": "Przesyłanie tabeli właścicieli usług"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "Liczba żądań, opóźnienia i nasycenie z PromQL",
       "alerts": "Alerty",
       "alertsDesc": "Pięć alertów w folderze „Sample data”",
-      "functions": "Funkcje",
-      "functionsDesc": "Funkcje VRL, które możesz zastosować do wyników wyszukiwania"
+      "pipeline": "Potoki",
+      "pipelineDesc": "Przetwarzanie w czasie rzeczywistym za pomocą VRL w miarę napływu danych"
     },
     "removeConfirm": {
       "title": "Usunąć przykładowe dane?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Nie udało się usunąć wszystkich przykładowych danych"
     },
     "entry": {
-      "homeTitle": "Poznaj platformę na przykładowych danych",
-      "homeDesc": "Nie masz jeszcze danych? Wczytaj demonstracyjny sklep z pulpitami i alertami",
       "ingestionBtn": "Wypróbuj przykładowe dane",
       "onboardingSource": "Poznaj przykładowe dane"
+    },
+    "callout": {
+      "title": "Nie chcesz jeszcze wysyłać danych?",
+      "body": "Najpierw poznaj {product} na przykładowym sklepie internetowym: trwający incydent i przewodnik po pulpitach, alertach, logach, trace, metrykach i potokach.",
+      "cta": "Poznaj na przykładowych danych",
+      "loading": "Wczytywanie przykładowych danych…",
+      "details": "Co zawiera"
+    },
+    "homeBanner": {
+      "message": "Przeglądasz przykładowe dane. Skorzystaj z przewodnika, aby zbadać incydent w procesie płatności.",
+      "manage": "Zarządzaj przykładowymi danymi",
+      "cleanup": {
+        "message": "Napływają Twoje własne dane. Usuń przykładowe dane, aby nie mieszały się z Twoimi pulpitami, alertami i wyszukiwaniami.",
+        "keep": "Na razie zachowaj",
+        "remove": "Usuń przykładowe dane"
+      }
+    },
+    "welcome": {
+      "title": "Witaj w {product}",
+      "subtitle": "Wyślij logi, metryki i trace, aby zacząć.",
+      "sample": {
+        "title": "Poznaj na przykładowych danych",
+        "body": "Nie chcesz jeszcze łączyć danych? Wypróbuj ruchliwy sklep internetowy z trwającym incydentem.",
+        "point1": "{hours} godz. logów, trace i metryk z 10 usług",
+        "point2": "4 pulpity, 5 alertów, potok i funkcje VRL",
+        "point3": "Przewodnik i usuwanie wszystkiego jednym kliknięciem",
+        "cta": "Poznaj na przykładowych danych"
+      },
+      "connect": {
+        "title": "Połącz swoje dane",
+        "body": "Wysyłaj logi, metryki i trace z {p1}, {p2}, {p3}, {p4} i ponad 100 innych źródeł.",
+        "point1": "Konfiguracja krok po kroku dla każdego źródła",
+        "point2": "Logi, metryki i trace w jednym miejscu",
+        "point3": "Pierwsze zdarzenia zobaczysz w ciągu kilku minut",
+        "cta": "Wybierz źródło danych"
+      },
+      "skip": "Pomiń na razie",
+      "continueInBackground": "Kontynuuj w tle",
+      "progress": {
+        "title": "Tworzenie przykładowego sklepu",
+        "body": "To potrwa około minuty. Możesz zamknąć to okno, a wczytywanie będzie kontynuowane."
+      },
+      "ready": {
+        "title": "Przykładowy sklep działa",
+        "body": "Płatności zaczęły się nie udawać 35 minut temu. Przewodnik pomoże ci ustalić dlaczego.",
+        "covers": "Przewodnik obejmuje",
+        "capabilities": {
+          "dashboards": "Wychwyć skok i sprawdź, ile kosztował",
+          "alerts": "Zobacz, które alerty się uruchomiły i dlaczego",
+          "logs": "Odfiltruj błędy i znajdź wadliwe wdrożenie",
+          "traces": "Prześledź wolną płatność aż do bazy danych",
+          "metrics": "Narysuj wykres opóźnienia p95 w PromQL",
+          "pipelines": "Wzbogacaj logi w czasie rzeczywistym za pomocą VRL"
+        },
+        "startTour": "Rozpocznij przewodnik",
+        "ownWay": "Poznam sam"
+      },
+      "errorBody": "Podczas wczytywania wystąpił błąd. Spróbuj ponownie: wszystko, co już utworzono, zostanie użyte ponownie, a nie zduplikowane."
+    },
+    "tour": {
+      "label": "Przewodnik",
+      "position": "Przewodnik · krok {current} z {total}",
+      "pill": "Przewodnik {current}/{total}",
+      "done": "Przewodnik ukończony",
+      "minimize": "Zminimalizuj przewodnik",
+      "close": "Zakończ przewodnik",
+      "showMe": "Pokaż",
+      "next": "Dalej",
+      "capabilities": {
+        "dashboards": "Pulpity",
+        "alerts": "Alerty",
+        "logs": "Wyszukiwanie logów",
+        "traces": "Śledzenie",
+        "metrics": "Metryki i PromQL",
+        "pipelines": "Potoki"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Znajdź problem",
+          "body": "To przegląd usług sklepu. Wskaźnik błędów i opóźnienie płatności gwałtownie wzrosły w ciągu ostatnich 35 minut.",
+          "look": "Każdy panel to zapytanie SQL. Najedź na wykres, aby porównać serie, przeciągnij po nim, aby powiększyć, lub otwórz menu panelu, aby edytować jego zapytanie."
+        },
+        "alert": {
+          "title": "Alert już się uruchomił",
+          "body": "Alert dotyczący błędów płatności wykonuje zapytanie SQL na logach zgodnie z harmonogramem i uruchomił się, gdy tylko błędy przekroczyły próg.",
+          "look": "Otwórz alert, aby zobaczyć jego zapytanie, próg i harmonogram. Przykładowym miejscem docelowym jest zastępczy webhook, więc dostarczenia są oznaczone jako nieudane: skieruj go na Slack, e-mail lub PagerDuty, aby otrzymywać prawdziwe powiadomienia."
+        },
+        "logs": {
+          "title": "Wyszukaj błędy",
+          "body": "Logi przefiltrowane do błędów płatności. Prawie wszystkie mówią to samo: przekroczono limit czasu podczas pobierania połączenia z puli.",
+          "look": "Rozwiń rekord, aby zobaczyć wszystkie pola. Kliknij wartość pola, aby według niej filtrować, lub przełącz się na tryb SQL, aby grupować i agregować."
+        },
+        "deploy": {
+          "title": "Znajdź, co się zmieniło",
+          "body": "Payment v2.15.0 został wdrożony minutę przed pojawieniem się błędów, a jego informacje o wydaniu zmniejszyły pulę połączeń do 20.",
+          "look": "To jest przyczyna źródłowa, znaleziona jednym wyszukiwaniem w tych samych logach. Wyszukiwanie pełnotekstowe i SQL działają na tych samych danych."
+        },
+        "traces": {
+          "title": "Prześledź nieudane żądanie",
+          "body": "Każdy trace śledzi jedną płatność przez wszystkie usługi. Otwórz jeden: wykres kaskadowy pokazuje, że usługa płatności czeka 3 sekundy na połączenie z bazą danych.",
+          "look": "Logi mają ten sam identyfikator trace, więc możesz przechodzić między spanem a jego logami w obu kierunkach."
+        },
+        "metrics": {
+          "title": "Potwierdź za pomocą PromQL",
+          "body": "Opóźnienie p95 każdej usługi, odpytane za pomocą PromQL. Płatności i finalizacja zamówień rosną razem.",
+          "look": "Metryki są w tym samym silniku co logi i trace, dlatego pulpit infrastruktury jest zbudowany w całości z PromQL."
+        },
+        "pipeline": {
+          "title": "Przetwarzaj dane w miarę napływu",
+          "body": "Potok czasu rzeczywistego uruchamia funkcję VRL na każdym logu dostępu, dodając client_os i is_mobile przed zapisaniem rekordu.",
+          "look": "Otwórz potok, aby zobaczyć jego graf. Potoki mogą filtrować, wzbogacać, kierować i maskować dane bez zmian w twoich aplikacjach."
+        },
+        "business": {
+          "title": "Zmierz wpływ na biznes",
+          "body": "Te same logi zasilają pulpity biznesowe: nieudane płatności, przychody i zamówienia według metody płatności.",
+          "look": "Nie potrzebujesz osobnego narzędzia analitycznego. Wszystko w twoich logach może stać się KPI."
+        }
+      },
+      "finale": {
+        "title": "Udało ci się znaleźć przyczynę źródłową",
+        "body": "W kilka minut przeszedłeś od skoku na pulpicie do wdrożenia, które go spowodowało, mając wszystkie sygnały w jednym miejscu.",
+        "connect": "Połącz własne dane",
+        "restart": "Uruchom przewodnik ponownie",
+        "finish": "Ukończ przewodnik"
+      }
     }
   }
 }

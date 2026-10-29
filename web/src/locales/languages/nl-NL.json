@@ -27257,7 +27257,7 @@
       "title": "Een realistische webwinkel, klaar om te verkennen",
       "body": "Laadt de logs, traces en metrieken van de afgelopen {hours} uur van een e-commerce-app met 10 services op Kubernetes, met dashboards, alarmen en functies die al zijn ingesteld. Er gaat iets mis bij het afrekenen: kijk of je kunt achterhalen waarom.",
       "loadedTitle": "Voorbeelddata is geladen",
-      "loadedBody": "De telemetrie en assets van de webwinkel staan in deze organisatie. Kies waar je wilt beginnen, of verwijder alles als je klaar bent."
+      "loadedBody": "De telemetrie en assets van de webwinkel staan in deze organisatie. Volg de rondleiding om het checkout-incident te onderzoeken, of kies waar je wilt beginnen."
     },
     "included": {
       "title": "Wat er wordt aangemaakt",
@@ -27271,15 +27271,16 @@
       "dashboardsDetail": "Serviceoverzicht, zakelijke KPIs, webverkeer en infrastructuur",
       "alerts": "5 alarmen",
       "alertsDetail": "Geplande SQL-alarmen, waarvan er één afgaat op het lopende incident",
-      "functions": "Functies en verrijking",
-      "functionsDetail": "2 VRL-functies en een verrijkingstabel met service-eigenaren"
+      "pipeline": "Pipeline en functies",
+      "pipelineDetail": "Een realtime pipeline die elk toegangslog met VRL parseert, 2 functies en een verrijkingstabel met service-eigenaren"
     },
     "footnote": "Streams en functies beginnen met {prefix}, dashboards en alarmen staan in de map 'Sample data' en de data beslaat de afgelopen {hours} uur. Verwijder alles met één klik vanaf deze pagina.",
     "steps": {
+      "functions": "Functies aanmaken",
+      "pipeline": "Realtime pipeline aanmaken",
       "telemetry": "Logs, traces en metrieken genereren en verzenden",
       "dashboards": "Dashboards aanmaken",
       "alerts": "Alarmen aanmaken",
-      "functions": "Functies aanmaken",
       "enrichment": "Tabel met service-eigenaren uploaden"
     },
     "progress": {
@@ -27301,8 +27302,8 @@
       "metricsDesc": "Verzoeksnelheden, latentie en verzadiging met PromQL",
       "alerts": "Alarmen",
       "alertsDesc": "Vijf alarmen in de map 'Sample data'",
-      "functions": "Functies",
-      "functionsDesc": "VRL-functies die je op zoekresultaten kunt toepassen"
+      "pipeline": "Pipelines",
+      "pipelineDesc": "Realtime verwerking met VRL zodra data binnenkomt"
     },
     "removeConfirm": {
       "title": "Voorbeelddata verwijderen?",
@@ -27315,10 +27316,133 @@
       "removeFailed": "Kan niet alle voorbeelddata verwijderen"
     },
     "entry": {
-      "homeTitle": "Verkennen met voorbeelddata",
-      "homeDesc": "Nog geen data? Laad een demowebwinkel met dashboards en alarmen",
       "ingestionBtn": "Voorbeelddata proberen",
       "onboardingSource": "Voorbeelddata verkennen"
+    },
+    "callout": {
+      "title": "Nog niet klaar om data te versturen?",
+      "body": "Verken {product} eerst met een voorbeeldwebwinkel: een lopend incident en een rondleiding langs dashboards, alarmen, logs, traces, metrieken en pipelines.",
+      "cta": "Verkennen met voorbeelddata",
+      "loading": "Voorbeelddata laden…",
+      "details": "Wat erin zit"
+    },
+    "homeBanner": {
+      "message": "Je verkent voorbeelddata. Volg de rondleiding om het checkout-incident te onderzoeken.",
+      "manage": "Voorbeelddata beheren",
+      "cleanup": {
+        "message": "Je eigen data komt binnen. Verwijder de voorbeelddata zodat die niet door je dashboards, alarmen en zoekopdrachten heen loopt.",
+        "keep": "Voorlopig behouden",
+        "remove": "Voorbeelddata verwijderen"
+      }
+    },
+    "welcome": {
+      "title": "Welkom bij {product}",
+      "subtitle": "Verstuur je logs, metrieken en traces om te beginnen.",
+      "sample": {
+        "title": "Verkennen met voorbeelddata",
+        "body": "Nog niet klaar om je data te koppelen? Probeer een drukke webwinkel met een lopend incident.",
+        "point1": "{hours} uur aan logs, traces en metrieken van 10 services",
+        "point2": "4 dashboards, 5 alarmen, een pipeline en VRL-functies",
+        "point3": "Een rondleiding, en met één klik alles weer verwijderd",
+        "cta": "Verkennen met voorbeelddata"
+      },
+      "connect": {
+        "title": "Je data koppelen",
+        "body": "Stuur logs, metrieken en traces vanuit {p1}, {p2}, {p3}, {p4} en meer dan 100 andere bronnen.",
+        "point1": "Stapsgewijze installatie voor elke bron",
+        "point2": "Logs, metrieken en traces op één plek",
+        "point3": "Zie je eerste events binnen enkele minuten",
+        "cta": "Kies een gegevensbron"
+      },
+      "skip": "Nu overslaan",
+      "continueInBackground": "Doorgaan op de achtergrond",
+      "progress": {
+        "title": "Je voorbeeldwinkel wordt opgebouwd",
+        "body": "Dit duurt ongeveer een minuut. Je kunt dit venster sluiten, het laden gaat door."
+      },
+      "ready": {
+        "title": "Je voorbeeldwinkel is live",
+        "body": "De checkout begon 35 minuten geleden te falen. De rondleiding helpt je uitzoeken waarom.",
+        "covers": "De rondleiding behandelt",
+        "capabilities": {
+          "dashboards": "Spot de piek en zie wat die heeft gekost",
+          "alerts": "Zie welke alarmen afgingen, en waarom",
+          "logs": "Filter de fouten en vind de foute deploy",
+          "traces": "Volg een trage checkout tot aan de database",
+          "metrics": "Breng p95-latentie in kaart met PromQL",
+          "pipelines": "Verrijk logs in realtime met VRL"
+        },
+        "startTour": "Rondleiding starten",
+        "ownWay": "Zelf verkennen"
+      },
+      "errorBody": "Er ging iets mis tijdens het laden. Probeer het opnieuw: wat al is aangemaakt wordt hergebruikt, niet gedupliceerd."
+    },
+    "tour": {
+      "label": "Rondleiding",
+      "position": "Rondleiding · stap {current} van {total}",
+      "pill": "Rondleiding {current}/{total}",
+      "done": "Rondleiding voltooid",
+      "minimize": "Rondleiding minimaliseren",
+      "close": "Rondleiding beëindigen",
+      "showMe": "Laat zien",
+      "next": "Volgende",
+      "capabilities": {
+        "dashboards": "Dashboards",
+        "alerts": "Alarmen",
+        "logs": "Logs zoeken",
+        "traces": "Tracing",
+        "metrics": "Metrieken en PromQL",
+        "pipelines": "Pipelines"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Zie het probleem",
+          "body": "Dit is het serviceoverzicht van de webwinkel. Het foutpercentage en de checkout-latentie zijn de afgelopen 35 minuten allebei gestegen.",
+          "look": "Elk paneel is een SQL-query. Beweeg over een grafiek om reeksen te vergelijken, sleep eroverheen om in te zoomen, of open het menu van een paneel om de query te bewerken."
+        },
+        "alert": {
+          "title": "Het alarm is al afgegaan",
+          "body": "Een alarm op betaalfouten voert volgens een schema een SQL-query uit op de logs en ging af zodra de fouten de drempel overschreden.",
+          "look": "Open een alarm om de query, drempel en het schema te zien. De voorbeeldbestemming is een placeholder-webhook, dus leveringen worden als mislukt getoond: richt hem op Slack, e-mail of PagerDuty om echte meldingen te krijgen."
+        },
+        "logs": {
+          "title": "Zoek de fouten",
+          "body": "Logs gefilterd op betaalfouten. Bijna allemaal zeggen ze hetzelfde: time-out bij het ophalen van een verbinding uit de pool.",
+          "look": "Klap een record uit om alle velden te zien. Klik op een veldwaarde om erop te filteren, of schakel naar de SQL-modus om te groeperen en aggregeren."
+        },
+        "deploy": {
+          "title": "Vind wat er veranderd is",
+          "body": "Payment v2.15.0 werd een minuut voordat de fouten begonnen uitgerold, en volgens de release notes werd de verbindingspool verlaagd naar 20.",
+          "look": "Dat is de hoofdoorzaak, gevonden met één zoekopdracht in dezelfde logs. Volledige-tekst- en SQL-zoekopdrachten draaien op dezelfde data."
+        },
+        "traces": {
+          "title": "Volg een mislukt verzoek",
+          "body": "Elke trace volgt één checkout over alle services. Open er een: de waterval laat zien dat de betaalservice 3 seconden wacht op een databaseverbinding.",
+          "look": "Logs bevatten dezelfde trace-ID, dus je kunt in beide richtingen springen tussen een span en zijn logs."
+        },
+        "metrics": {
+          "title": "Bevestig met PromQL",
+          "body": "De p95-latentie van elke service, opgevraagd met PromQL. Betaling en checkout stijgen samen.",
+          "look": "Metrieken zitten in dezelfde engine als logs en traces, daarom is het infrastructuurdashboard volledig met PromQL gebouwd."
+        },
+        "pipeline": {
+          "title": "Verwerk data zodra die binnenkomt",
+          "body": "Een realtime pipeline voert een VRL-functie uit op elk toegangslog en voegt client_os en is_mobile toe voordat het record wordt opgeslagen.",
+          "look": "Open de pipeline om de graaf te zien. Pipelines kunnen data filteren, verrijken, routeren en afschermen zonder je apps aan te passen."
+        },
+        "business": {
+          "title": "Meet de zakelijke impact",
+          "body": "Dezelfde logs voeden zakelijke dashboards: mislukte checkouts, omzet en bestellingen per betaalmethode.",
+          "look": "Geen aparte analysetool nodig. Alles in je logs kan een KPI worden."
+        }
+      },
+      "finale": {
+        "title": "Je hebt de hoofdoorzaak gevonden",
+        "body": "In een paar minuten ging je van een piek op een dashboard naar de deploy die hem veroorzaakte, met elk signaal op één plek.",
+        "connect": "Je eigen data koppelen",
+        "restart": "Rondleiding opnieuw starten",
+        "finish": "Rondleiding afronden"
+      }
     }
   }
 }
