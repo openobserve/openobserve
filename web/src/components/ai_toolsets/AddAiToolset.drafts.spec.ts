@@ -56,7 +56,9 @@ const QueryEditorStub = {
 
 interface ToolsetForm {
   state: {
-    values: Record<string, unknown> & { mcp: { headers: { key: string; value: string }[] } };
+    values: Record<string, unknown> & {
+      mcp: { url: string; headers: { key: string; value: string }[] };
+    };
   };
   setFieldValue: (k: string, v: unknown) => void;
   getFieldMeta: (k: string) => { errors?: unknown[] } | undefined;
@@ -280,6 +282,54 @@ describe("AddAiToolset drafts", () => {
     expect(vi.mocked(aiToolsetsService.update).mock.calls[0][2]).toMatchObject({
       data: { headers: { "X-Team": "sre-team", Authorization: "Bearer typed-again" } },
     });
+  });
+
+  it("never stores an endpoint URL that carries a credential, and refills it when unchanged", async () => {
+    vi.mocked(aiToolsetsService.get).mockResolvedValue({
+      data: {
+        ...serverToolset(),
+        data: { ...serverToolset().data, url: "https://mcp.example.com/sse?api_key=saved-key" },
+      },
+    } as never);
+    await mountPage({ action: "edit", id: "ts1" });
+    await edit({ description: "Edited" });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(localStorage.getItem(editorDraftKey(editScope))).not.toContain("saved-key");
+
+    await remount({ action: "edit", id: "ts1" });
+    expect(byTest("editor-draft-changed-on-server")).toBeNull();
+    expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    expect(form().state.values).toMatchObject({
+      description: "Edited",
+      mcp: { url: "https://mcp.example.com/sse?api_key=saved-key" },
+    });
+  });
+
+  it("blanks a changed credential URL, names it in the restore note and blocks Save until re-entered", async () => {
+    await mountPage({ action: "edit", id: "ts1" });
+    await edit({ "mcp.url": "https://bot:typed-token@mcp.example.com/sse" });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(localStorage.getItem(editorDraftKey(editScope))).not.toContain("typed-token");
+
+    await remount({ action: "edit", id: "ts1" });
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain(
+      "Your change to the Endpoint URL was not kept.",
+    );
+    byTest("editor-draft-continue")?.click();
+    await flushPromises();
+    expect(form().state.values.mcp.url).toBe("");
+    expect(form().getFieldMeta("mcp.url")?.errors?.length).toBeGreaterThan(0);
+
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.update).not.toHaveBeenCalled();
+
+    await edit({ "mcp.url": "https://mcp.example.com/sse" });
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.update).toHaveBeenCalledTimes(1);
   });
 
   it("warns when the toolset changed on the server", async () => {

@@ -365,6 +365,7 @@ import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft";
+import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import {
   makeAddAiToolsetSchema,
@@ -740,10 +741,16 @@ export default defineComponent({
     const secretRows = (data: SecretRowsSource, list: SecretList): SecretRow[] =>
       (list === "headers" ? data.mcp?.headers : data.cli?.[list]) ?? [];
 
-    // Header and env values carry auth and credential files are kubeconfigs, so no value is drafted.
+    const MCP_URL_PATH = "/mcp/url";
+
+    // Header and env values carry auth, credential files are kubeconfigs and a URL can embed a token, so none is drafted.
     const redactToolsetDraft = (data: AiToolsetDraftData) => {
       const copy = JSON.parse(JSON.stringify(data)) as AiToolsetDraftData;
       const paths: string[] = [];
+      if (copy.mcp?.url && urlCarriesCredential(copy.mcp.url)) {
+        copy.mcp.url = "";
+        paths.push(MCP_URL_PATH);
+      }
       for (const list of Object.keys(SECRET_SECTION) as SecretList[]) {
         secretRows(copy, list).forEach((row, index) => {
           if (!row.value) return;
@@ -763,6 +770,7 @@ export default defineComponent({
 
     const describeRedactedToolset = (paths: string[], data: AiToolsetDraftData): I18nText[] => {
       const fields = paths.flatMap((path): I18nText[] => {
+        if (path === MCP_URL_PATH) return [t("aiToolset.mcpUrl")];
         const row = rowOf(path, data);
         if (!row) return [];
         if (row.list === "headers") {
@@ -793,6 +801,7 @@ export default defineComponent({
     };
 
     const fieldNameFor = (path: string): FormFieldPath<AddAiToolsetForm> | null => {
+      if (path === MCP_URL_PATH) return "mcp.url";
       const row = notKeptRows.value.get(path);
       if (!row) return null;
       const index = currentRowIndex(path);

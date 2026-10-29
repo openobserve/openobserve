@@ -580,6 +580,7 @@ import {
   type AddDestinationForm,
 } from "./AddDestination.schema";
 import { useEditorDraft } from "@/composables/useEditorDraft";
+import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 
 const props = defineProps({
@@ -1532,33 +1533,8 @@ let leaveSave: { saved: boolean } | null = null;
 
 // These types' URL is the webhook itself, so the URL is the credential.
 const SECRET_URL_TYPES = new Set(["slack", "discord", "msteams"]);
-// Webhook hosts whose path carries the token.
-const SECRET_WEBHOOK_HOST =
-  /(^|\.)(hooks\.slack\.com|discord(app)?\.com|webhook\.office\.com|logic\.azure\.com|api\.telegram\.org|hooks\.zapier\.com)$/i;
-// A long path segment with a digit (Mattermost or Rocket.Chat hook keys), or a Telegram `bot<id>:` token.
-const TOKEN_SEGMENT = /^(?=.*\d)[\w:-]{20,}$|^bot\d/i;
-
-const parseUrl = (url: string): URL | null => {
-  for (const text of [url, `https://${url}`]) {
-    try {
-      return new URL(text);
-    } catch {
-      continue;
-    }
-  }
-  return null;
-};
-
-const urlCarriesSecret = (url: string, destinationType: string): boolean => {
-  if (SECRET_URL_TYPES.has(destinationType)) return true;
-  const parsed = parseUrl(url.trim());
-  if (!parsed) return /[@?]/.test(url);
-  return (
-    !!(parsed.username || parsed.password || parsed.search) ||
-    SECRET_WEBHOOK_HOST.test(parsed.hostname) ||
-    parsed.pathname.split("/").some((segment) => TOKEN_SEGMENT.test(segment))
-  );
-};
+const urlCarriesSecret = (url: string, destinationType: string): boolean =>
+  SECRET_URL_TYPES.has(destinationType) || urlCarriesCredential(url);
 
 // Header values carry auth, and a URL that can hold a token is one, so neither is drafted.
 const redactDestinationDraft = (data: AddDestinationForm) => {

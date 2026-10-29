@@ -293,6 +293,63 @@ describe("useEditorDraft", () => {
       expect(readEditorDraft(editScope)).toBeNull();
     });
 
+    it("builds no snapshot per change while the write is debounced", async () => {
+      vi.useFakeTimers();
+      const snapshot = vi.fn(() => ({ ...form }));
+      overrides = { snapshot };
+      await startHost();
+      userInput();
+      snapshot.mockClear();
+      for (let i = 0; i < 50; i++) await edit({ name: `typed ${i}` });
+      expect(snapshot.mock.calls.length).toBeLessThanOrEqual(1);
+
+      vi.advanceTimersByTime(1100);
+      expect(readEditorDraft<Form>(editScope)?.data.name).toBe("typed 49");
+      expect(snapshot.mock.calls.length).toBeLessThanOrEqual(4);
+    });
+
+    describe("state the snapshot reaches only after a change", () => {
+      type Row = { v: string };
+      let rows: Row[];
+      const rowsOf = () => readEditorDraft<Form & { rows: Row[] }>(editScope)?.data.rows;
+
+      beforeEach(() => {
+        rows = reactive<Row[]>([]);
+        // Holds the rows by reference, so only a deep read tracks a row's own field.
+        overrides = { snapshot: () => Object.assign({ ...form }, { rows }) };
+      });
+
+      it("drafts a later change to a row added since the last snapshot", async () => {
+        vi.useFakeTimers();
+        await startHost();
+        userInput();
+        rows.push({ v: "a" });
+        await nextTick();
+        vi.advanceTimersByTime(1100);
+        expect(rowsOf()).toEqual([{ v: "a" }]);
+
+        rows[0].v = "b";
+        await nextTick();
+        vi.advanceTimersByTime(1100);
+        expect(rowsOf()).toEqual([{ v: "b" }]);
+      });
+
+      it("drafts a change to such a row after a discard cancelled the pending write", async () => {
+        vi.useFakeTimers();
+        const draft = await startHost();
+        userInput();
+        rows.push({ v: "a" });
+        await nextTick();
+        draft.discard();
+        expect(readEditorDraft(editScope)).toBeNull();
+
+        rows[0].v = "b";
+        await nextTick();
+        vi.advanceTimersByTime(1100);
+        expect(rowsOf()).toEqual([{ v: "b" }]);
+      });
+    });
+
     it("writes the pending draft under the old org when the org switches", async () => {
       await startHost();
       userInput();
@@ -1269,7 +1326,7 @@ describe("useEditorDraft", () => {
       type Req = { headers: { key: string; value: string }[] };
       const req = reactive<Req>({
         headers: [
-          { key: "Cookie", value: "sid=1" },
+          { key: "X-Honeycomb-Team", value: "sid=1" },
           { key: "X-Team", value: "core" },
         ],
       });
@@ -1303,7 +1360,7 @@ describe("useEditorDraft", () => {
       wrapper.unmount();
 
       req.headers = [
-        { key: "Cookie", value: "sid=1" },
+        { key: "X-Honeycomb-Team", value: "sid=1" },
         { key: "X-Team", value: "core" },
       ];
       wrapper = mount(Host, { attachTo: document.body, global: { plugins: [store] } });
@@ -1313,7 +1370,7 @@ describe("useEditorDraft", () => {
       await started;
       expect(req.headers).toEqual([
         { key: "X-Team", value: "core" },
-        { key: "Cookie", value: "sid=1" },
+        { key: "X-Honeycomb-Team", value: "sid=1" },
       ]);
     });
   });

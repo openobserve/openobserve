@@ -19,10 +19,50 @@ export interface RedactedDraft<T> {
   paths: string[];
 }
 
-export const SECRET_KEY_PATTERN =
-  /password|passwd|secret|token|api[_-]?key|authorization|private[_-]?key|credential/i;
+// Matched against the key's words joined, so `api_key`, `apiKey` and `X-Api-Key` read alike.
+const SECRET_NAME =
+  /password|passwd|passphrase|secret|credential|authorization|bearer|cookie|(?:api|access|private|session|signing|encryption|master|license|subscription|account|client|app|auth|ssh)key/;
+
+// "token" also names an LLM count or an OAuth setting, so it is a secret only without one of these words.
+const TOKEN_QUALIFIERS = new Set([
+  "count",
+  "max",
+  "min",
+  "limit",
+  "usage",
+  "total",
+  "num",
+  "number",
+  "budget",
+  "length",
+  "size",
+  "cost",
+  "price",
+  "rate",
+  "per",
+  "input",
+  "output",
+  "prompt",
+  "completion",
+  "cached",
+  "reasoning",
+  "used",
+  "remaining",
+  "type",
+  "url",
+  "uri",
+  "endpoint",
+]);
 
 type Container = Record<string, unknown> | unknown[];
+
+const keyWords = (key: string): string[] =>
+  key
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z\d]+/)
+    .filter(Boolean);
 
 const isContainer = (value: unknown): value is Container =>
   value !== null && typeof value === "object";
@@ -52,7 +92,7 @@ const labelOf = (node: unknown): string | null => {
 
 const isSecretPair = (node: Record<string, unknown>): boolean => {
   const label = typeof node.key === "string" ? node.key : node.name;
-  return typeof label === "string" && SECRET_KEY_PATTERN.test(label);
+  return typeof label === "string" && isSecretKeyName(label);
 };
 
 const blankAt = (node: Container, key: string, segments: string[], paths: string[]) => {
@@ -86,7 +126,7 @@ const walk = (
   const pairIsSecret = isSecretPair(node);
   for (const [key, value] of Object.entries(node)) {
     const exempt = rules.exempt.has(key);
-    const keyIsSecret = !exempt && SECRET_KEY_PATTERN.test(key);
+    const keyIsSecret = !exempt && isSecretKeyName(key);
     const blank =
       typeof value === "string" &&
       value !== "" &&
@@ -140,6 +180,15 @@ const currentEntryValue = (
   // Two current entries with one label cannot tell which secret is whose, so neither is used.
   const matches = target.list.filter((item) => labelOf(item) === label);
   return matches.length === 1 && isRecord(matches[0]) ? matches[0][target.field] : undefined;
+};
+
+/** Whether a field or header named `key` holds a credential (`client_secret`, `X-Api-Key`, `refresh_token`), but not a count such as `max_tokens`. */
+export const isSecretKeyName = (key: string): boolean => {
+  const words = keyWords(key);
+  if (SECRET_NAME.test(words.join(""))) return true;
+  return (
+    words.some((word) => /tokens?$/.test(word)) && !words.some((word) => TOKEN_QUALIFIERS.has(word))
+  );
 };
 
 /** Blanks secret string values in a deep copy of `data` and reports where; with `containers`, every string under a secret-looking key too, and never one under an `exemptKeys` key. */

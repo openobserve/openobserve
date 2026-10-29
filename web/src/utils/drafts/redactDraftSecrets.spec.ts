@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   blankRedactedPaths,
   changedRedactedPaths,
+  isSecretKeyName,
   redactDraftSecrets,
   redactedEntryLabels,
   restoreRedacted,
@@ -129,6 +130,113 @@ describe("redactDraftSecrets", () => {
   it("escapes slashes and tildes in path segments", () => {
     const { paths } = redactDraftSecrets({ "a/b": { "~token": "x" } });
     expect(paths).toEqual(["/a~1b/~0token"]);
+  });
+});
+
+describe("isSecretKeyName", () => {
+  it.each([
+    "passphrase",
+    "ssh_passphrase",
+    "access_key",
+    "accessKey",
+    "AWS_ACCESS_KEY_ID",
+    "secret_key",
+    "client_secret",
+    "session_key",
+    "sessionKey",
+    "session_cookie",
+    "Cookie",
+    "Set-Cookie",
+    "bearer",
+    "bearer_token",
+    "refresh_token",
+    "id_token",
+    "x-api-key",
+    "X-Auth-Token",
+    "PRIVATE-TOKEN",
+    "Ocp-Apim-Subscription-Key",
+    "account_key",
+    "APIKey",
+    "db_password",
+  ])("treats %s as a secret", (key) => {
+    expect(isSecretKeyName(key)).toBe(true);
+  });
+
+  it.each([
+    "token_count",
+    "max_tokens",
+    "maxTokens",
+    "input_tokens",
+    "completion_tokens",
+    "token_limit",
+    "token_type",
+    "token_url",
+    "keyword",
+    "keywords",
+    "primary_key",
+    "partition_key",
+    "public_key",
+    "key",
+    "name",
+    "author",
+    "auth_type",
+    "tokenizer",
+  ])("does not treat %s as a secret", (key) => {
+    expect(isSecretKeyName(key)).toBe(false);
+  });
+});
+
+describe("redactDraftSecrets credential names", () => {
+  it("blanks common credential fields of a generic object and keeps look-alikes", () => {
+    const { data, paths } = redactDraftSecrets(
+      {
+        passphrase: "hunter2",
+        access_key: "AKIA123",
+        secret_key: "s",
+        client_secret: "cs",
+        sessionKey: "sk",
+        refresh_token: "rt",
+        headers: [
+          { key: "Cookie", value: "sid=1" },
+          { key: "x-api-key", value: "k" },
+          { key: "Accept", value: "json" },
+        ],
+        llm: { max_tokens: "512", token_count: "10", keyword: "error", primary_key: "id" },
+      },
+      { containers: false },
+    );
+    expect(data).toEqual({
+      passphrase: "",
+      access_key: "",
+      secret_key: "",
+      client_secret: "",
+      sessionKey: "",
+      refresh_token: "",
+      headers: [
+        { key: "Cookie", value: "" },
+        { key: "x-api-key", value: "" },
+        { key: "Accept", value: "json" },
+      ],
+      llm: { max_tokens: "512", token_count: "10", keyword: "error", primary_key: "id" },
+    });
+    expect(paths.sort()).toEqual(
+      [
+        "/passphrase",
+        "/access_key",
+        "/secret_key",
+        "/client_secret",
+        "/sessionKey",
+        "/refresh_token",
+        "/headers/0/value",
+        "/headers/1/value",
+      ].sort(),
+    );
+  });
+
+  it("does not treat a token-count container as a secret container", () => {
+    const { data, paths } = redactDraftSecrets({ max_tokens: { model: "gpt-4o", value: "512" } });
+    expect(data).toEqual({ max_tokens: { model: "gpt-4o", value: "512" } });
+    expect(paths).toEqual([]);
   });
 });
 

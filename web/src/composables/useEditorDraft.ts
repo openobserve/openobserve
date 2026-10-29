@@ -17,9 +17,11 @@ import {
   computed,
   Fragment,
   getCurrentInstance,
+  isRef,
   isVNode,
   onBeforeUnmount,
   reactive,
+  ReactiveEffect,
   shallowRef,
   Teleport,
   watch,
@@ -222,6 +224,14 @@ const rootElements = (instance: ComponentInternalInstance | null): Element[] =>
 // Never equal to a snapshot's JSON, so the form counts as changed until the next rebaseline.
 const CHANGED_BEFORE_START = "\u0000changed-before-start";
 
+// A snapshot may hold reactive objects by reference, so every nested value is read to track them.
+const touchDeep = (value: unknown, seen = new Set<unknown>()): void => {
+  if (isRef(value)) return touchDeep(value.value, seen);
+  if (value === null || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  Object.values(value).forEach((child) => touchDeep(child, seen));
+};
+
 /** Local drafts, restore dialog, leave dialog and autosave for one full-page editor. */
 export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraftController => {
   const store = useStore();
@@ -366,8 +376,31 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     });
   }
 
+  // A change only marks the snapshot stale; it is rebuilt, and its sources tracked again, once per autosave.
+  let snapshotStale = false;
+  const snapshotTracker = new ReactiveEffect(() => touchDeep(options.snapshot()));
+  snapshotTracker.scheduler = () => {
+    snapshotStale = true;
+    if (started && storageAvailable) autosave.schedule();
+  };
+  const retrackSnapshot = () => {
+    if (!snapshotStale) return;
+    snapshotStale = false;
+    snapshotTracker.run();
+  };
+
+  // A pending write was due to track the snapshot again, so a cancelled one does it now.
+  const releaseAutosave = () => {
+    autosave.release();
+    retrackSnapshot();
+  };
+
   const autosave = usePanelDraftAutosave({
-    isReady: () => storageAvailable && started && !disposed && !leaving && baselineJson !== null,
+    isReady: () => {
+      // State a stale run never read can only change after this pending write, so tracking again here misses no edit.
+      retrackSnapshot();
+      return storageAvailable && started && !disposed && !leaving && baselineJson !== null;
+    },
     hasChanges: hasUnsavedChanges,
     write: () => writeSessionDraft(),
     remove: () => removeSessionDraft(),
@@ -386,7 +419,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
 
   // A draft kept by Escape belongs to an earlier session, so this session's save or discard leaves it.
   const discardSessionDraft = () => {
-    autosave.release();
+    releaseAutosave();
     if (!keptDraftStillStored()) removeSessionDraft();
   };
 
@@ -517,7 +550,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     const edited = [...preStartEdits].some(
       ([field, value]) => field.isConnected && fieldValue(field) === value,
     );
-    autosave.release();
+    releaseAutosave();
     // Captured here, so an org switch still writes the draft under the org it was made in.
     scopeParts.org = String(store.state.selectedOrganization?.identifier ?? "");
     scopeParts.userEmail = String(store.state.userInfo?.email ?? "");
@@ -529,6 +562,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       if (disposed) return;
     }
     started = true;
+    retrackSnapshot();
     preStartEdits.clear();
     // The edit is already in the form, so a baseline taken now would hide it.
     if (baselineJson === null && edited) baselineJson = CHANGED_BEFORE_START;
@@ -599,7 +633,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
       });
       return false;
     }
-    autosave.release();
+    releaseAutosave();
     rebaseline();
     return true;
   };
@@ -684,13 +718,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     });
   }
 
-  watch(
-    () => options.snapshot(),
-    () => {
-      if (started && storageAvailable) autosave.schedule();
-    },
-    { deep: true },
-  );
+  snapshotTracker.run();
 
   // An org switch remounts the editor without a route leave, so the draft is written before the old org is gone.
   watch(
