@@ -970,14 +970,14 @@ pub async fn process_domain_org_mapping(
                     "domain org mapping for user {user_email} points at inactive org {}, skipping",
                     mapped.org_id
                 );
-                return Ok(false);
+                continue;
             }
             Err(e) => {
                 log::warn!(
                     "domain org mapping for user {user_email}: cannot read the status of org {}, skipping: {e}",
                     mapped.org_id
                 );
-                return Ok(false);
+                continue;
             }
         }
 
