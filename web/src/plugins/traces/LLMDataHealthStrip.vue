@@ -14,10 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- AI data health strip on LLM Insights: one chip per check with its count
-     for the current scope and window, and a "Review checks" drawer whose cards
-     link each problem to the setting or guide that fixes it. Hidden when every
-     check passes. -->
+<!-- AI data health strip on LLM Insights: one chip per failing check with its
+     count for the current scope and window, and a drawer whose cards link each
+     problem to the setting or guide that fixes it. Hidden when every check passes. -->
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -70,6 +69,8 @@ const checks = computed(() =>
   ),
 );
 const counts = computed(() => healthCounts(checks.value));
+// Passing checks fold into the "N passing" link; the drawer lists them all.
+const failing = computed(() => checks.value.filter((c) => c.status !== "pass"));
 const visible = computed(() => !!props.health && counts.value.errors + counts.value.warnings > 0);
 const checkedAgo = computed(() =>
   props.health?.checked_at
@@ -252,43 +253,32 @@ function viewTrace(traceId: string) {
       <OIcon name="monitor-heart" size="sm" />
       {{ t("llmDataTrust.health.title") }}
     </span>
-    <OBadge v-if="counts.errors" variant="error-soft" size="sm">{{
-      t("llmDataTrust.health.errors", { n: counts.errors }, counts.errors)
-    }}</OBadge>
-    <OBadge v-if="counts.warnings" variant="warning-soft" size="sm">{{
-      t("llmDataTrust.health.warnings", { n: counts.warnings }, counts.warnings)
-    }}</OBadge>
-    <span class="text-text-secondary">{{
-      t("llmDataTrust.health.passing", { n: counts.passing })
-    }}</span>
-    <div class="flex flex-wrap items-center gap-1.5">
-      <button
-        v-for="check in checks"
-        :key="check.id"
-        type="button"
-        class="rounded-default border-border-default hover:bg-surface-subtle inline-flex items-center gap-1 border px-2 py-0.5"
-        :class="{
-          'text-status-error-text': check.status === 'error',
-          'text-status-warning-text': check.status === 'warning',
-          'text-text-secondary': check.status === 'pass',
-        }"
-        :data-test="`llm-data-health-chip-${check.id}`"
-        @click="openDrawer(check.id)"
-      >
-        {{ LABELS[check.id] }} · {{ raw(chipCount(check)) }}
-      </button>
-    </div>
+    <!-- The icon carries the status, so it reads without the colour. -->
+    <button
+      v-for="check in failing"
+      :key="check.id"
+      type="button"
+      class="rounded-default border-border-default hover:bg-surface-subtle inline-flex items-center gap-1 border px-2 py-0.5"
+      :class="check.status === 'error' ? 'text-status-error-text' : 'text-status-warning-text'"
+      :data-test="`llm-data-health-chip-${check.id}`"
+      @click="openDrawer(check.id)"
+    >
+      <OIcon :name="check.status === 'error' ? 'error' : 'warning-amber'" size="xs" />
+      {{ LABELS[check.id] }} · {{ raw(chipCount(check)) }}
+    </button>
+    <button
+      v-if="counts.passing"
+      type="button"
+      class="text-text-secondary hover:text-text-primary inline-flex items-center"
+      data-test="llm-data-health-passing"
+      @click="openDrawer(null)"
+    >
+      {{ t("llmDataTrust.health.passing", { n: counts.passing }) }}
+      <OIcon name="chevron-right" size="xs" />
+    </button>
     <span v-if="checkedAgo" class="text-text-secondary ms-auto">{{
       t("llmDataTrust.health.checkedAgo", { ago: checkedAgo })
     }}</span>
-    <OButton
-      variant="outline"
-      size="xs"
-      data-test="llm-data-health-review"
-      :class="{ 'ms-auto': !checkedAgo }"
-      @click="openDrawer(null)"
-      >{{ t("llmDataTrust.health.review") }}</OButton
-    >
   </div>
 
   <ODrawer
