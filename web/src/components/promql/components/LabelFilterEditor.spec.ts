@@ -79,7 +79,9 @@ afterEach(() => {
 describe("LabelFilterEditor", () => {
   it("keeps its label and edits matchers with the PromQL builder profile", () => {
     mountEditor({ dashboardPanelData: panelData() });
-    expect(wrapper!.find('[data-test="promql-labelfilter-editor-label"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
+      "Label filters",
+    );
     expect(builder().props("profile")).toBe("promql-builder");
     expect(builder().props("dataTest")).toBe(DT);
   });

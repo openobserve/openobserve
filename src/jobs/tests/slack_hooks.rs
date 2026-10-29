@@ -29,7 +29,9 @@ use config::{
 };
 use o2_enterprise::enterprise::{
     common::auditor::{AuditMessage, Protocol, ResponseMeta},
-    slack::hooks::{ChartSeries, SlackHooks, WebhookDestination},
+    slack::hooks::{
+        AlertViewKey, ChartSeries, SlackAppDestination, SlackHooks, WebhookDestination,
+    },
 };
 use openobserve_jobs::job::slack_hooks;
 use proto::cluster_rpc;
@@ -293,6 +295,64 @@ fn domain_mappings_are_empty_outside_cloud() {
             .await
             .unwrap();
         assert!(domains.is_empty(), "{domains:?}");
+    });
+}
+
+#[test]
+fn alert_message_view_reads_a_deleted_alert_as_gone_and_a_malformed_id_as_none() {
+    run(async {
+        let key = |alert_id: &str| AlertViewKey {
+            org_id: "acme".to_string(),
+            alert_id: alert_id.to_string(),
+            group_key: String::new(),
+            firing_started_at: 1_760_000_000_000_000,
+        };
+        let none = (hooks().alert_message_view)(key("not-a-ksuid"))
+            .await
+            .unwrap();
+        assert!(none.is_none());
+        let gone = (hooks().alert_message_view)(key("2i4WBnxsiDiRR1dh7O4qcIfUyBW"))
+            .await
+            .unwrap()
+            .expect("a well-formed id always gets a view");
+        assert_eq!(
+            gone.phase,
+            config::meta::slack::AlertMessagePhase::Gone(
+                config::meta::slack::GoneKind::AlertDeleted
+            )
+        );
+        assert!(
+            gone.open_url
+                .ends_with("alert_id=2i4WBnxsiDiRR1dh7O4qcIfUyBW"),
+            "{}",
+            gone.open_url
+        );
+    });
+}
+
+#[test]
+fn create_slack_app_destination_goes_through_the_destination_checks() {
+    run(async {
+        let err = (hooks().create_slack_app_destination)(SlackAppDestination {
+            org_id: "acme".to_string(),
+            name: "slack-sre-prod".to_string(),
+            target: config::meta::destinations::SlackAppTarget {
+                installation_id: "I0FAKE00009".to_string(),
+                channel_id: "C0FAKE00001".to_string(),
+                channel_name: "sre-prod".to_string(),
+                ..Default::default()
+            },
+            created_by: "admin@acme.test".to_string(),
+        })
+        .await
+        .expect_err("Slack is off in this binary, so the save refuses");
+        assert!(err.to_string().contains("Slack"), "{err}");
+        assert!(
+            db::alerts::destinations::get("acme", "slack-sre-prod")
+                .await
+                .is_err(),
+            "nothing was written"
+        );
     });
 }
 

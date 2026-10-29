@@ -271,7 +271,7 @@ pub enum AlertError {
 
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
-    NotSupportedAlertDestinationType(Module),
+    NotSupportedAlertDestinationType(Box<Module>),
 
     #[error("Alert workflow {id} not found")]
     AlertWorkflowNotFound { id: String },
@@ -339,10 +339,6 @@ pub enum AlertError {
         destination: String,
         platform: String,
     },
-    #[error(
-        "Multi-alerts keep per-group state and open no recovery episode, so notify_on_recovery would never fire"
-    )]
-    RecoveryOnMultiAlert,
     #[error(
         "notification grouping batches several alerts into one message, which cannot carry this alert's correlation key — turn off one of grouping or notify_on_recovery"
     )]
@@ -541,11 +537,7 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         }
     }
 
-    // Both keep the alert out of the single-row path that owns the episode, so recovery would be
-    // stored and then silently never sent.
-    if alert.query_condition.multi_alert_enabled() {
-        return Err(AlertError::RecoveryOnMultiAlert);
-    }
+    // A batch carries no single alert's correlation key, so its recovery could close nothing.
     if alert
         .deduplication
         .as_ref()
@@ -625,12 +617,31 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
         return;
     };
+    let firing = infra::table::alert_states::firing_groups(&alert_id, None)
+        .await
+        .unwrap_or_default();
+    let groups = infra::table::alert_states::list_groups(&alert_id)
+        .await
+        .unwrap_or_default();
     match db::alerts::alert_states::delete_all_groups(&alert_id).await {
         Ok(0) => {}
-        Ok(n) => log::info!(
-            "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
-             without transitions"
-        ),
+        Ok(n) => {
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id,
+                &groups,
+                "deleted on opt-out",
+            );
+            log::info!(
+                "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
+                 without transitions"
+            );
+            let cleared = crate::alerts::lifecycle::deleted_clears(
+                &firing,
+                config::utils::time::now_micros(),
+                crate::alerts::lifecycle::ClearKind::GroupUntracked,
+            );
+            crate::alerts::lifecycle::on_all_cleared(&alert.org_id, &alert_id, &cleared).await;
+        }
         Err(e) => log::error!(
             "alert {alert_id}: could not drop group state rows after opt-out, leaving them to the \
              reaper: {e}"
@@ -818,7 +829,9 @@ async fn prepare_alert(
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
                 if !d.is_alert_destinations() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+                    return Err(AlertError::NotSupportedAlertDestinationType(Box::new(
+                        d.module,
+                    )));
                 }
             }
             Err(_) => {
@@ -1219,6 +1232,18 @@ pub fn record_suppressed_run(
     count_suppressed_run(&data.org, module);
 }
 
+/// A run an ack kept silent: `Suppressed` with who acked it, no delivery attempt, counted.
+pub fn record_ack_suppressed_run(
+    data: &mut config::meta::self_reporting::usage::TriggerData,
+    module: &str,
+    acked_by: String,
+) {
+    data.status = config::meta::self_reporting::usage::RunOutcome::Suppressed;
+    data.acked_by = Some(acked_by);
+    data.delivery_attempted = Some(false);
+    count_suppressed_run(&data.org, module);
+}
+
 /// Runs the checks [`create`] (given a folder) or [`update`] makes on a copy, writing nothing.
 pub async fn validate_save(
     org_id: &str,
@@ -1394,6 +1419,13 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let slo_effect =
         prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
+    let was_enabled = match alert.id {
+        Some(id) => get_by_id(conn, org_id, id)
+            .await
+            .ok()
+            .map(|(_, a)| a.enabled),
+        None => None,
+    };
 
     #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
@@ -1452,6 +1484,18 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
+    if let Some(id) = alert.id
+        && was_enabled.is_some_and(|was| was != alert.enabled)
+    {
+        let by = alert.last_edited_by.as_deref().unwrap_or_default();
+        crate::alerts::lifecycle::on_alert_enabled_changed(
+            org_id,
+            &id.to_string(),
+            by,
+            alert.enabled,
+        )
+        .await;
+    }
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled
@@ -1606,12 +1650,30 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
+            let firing = crate::alerts::lifecycle::firing_rows(&alert_id_str).await;
+            let groups = infra::table::alert_states::list_groups(&alert_id_str)
+                .await
+                .unwrap_or_default();
+            crate::alerts::recovery::log_orphaned_episodes(
+                &alert_id_str,
+                &groups,
+                "deleted with its alert",
+            );
             // Alert run state is owned by the alert's lifecycle (Part IV of
             // alerts.md), so it goes when the alert does. Best-effort: a
             // leftover state row must not fail the delete.
             if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
                 log::warn!("failed to delete alert state for {alert_id_str}: {e}");
             }
+            if let Err(e) = infra::table::alert_acks::delete_by_alert(org_id, &alert_id_str).await {
+                log::warn!("failed to delete alert acks for {alert_id_str}: {e}");
+            }
+            let cleared = crate::alerts::lifecycle::deleted_clears(
+                &firing,
+                config::utils::time::now_micros(),
+                crate::alerts::lifecycle::ClearKind::AlertDeleted,
+            );
+            crate::alerts::lifecycle::on_all_cleared(org_id, &alert_id_str, &cleared).await;
             // The availability ledger (S-16) is owned by the same lifecycle, so
             // org deletion inherits it through `delete_org_alerts` with no
             // dedicated cleanup step. Written straight to `infra`, unlike its
@@ -2262,8 +2324,14 @@ pub async fn enable_by_name(
                 return Err(AlertError::AlertNotFound);
             }
         };
+    let changed = alert.enabled != value;
     alert.enabled = value;
+    let alert_id = alert.id.map(|id| id.to_string());
+    let by = alert.last_edited_by.clone().unwrap_or_default();
     db::alerts::alert::set(org_id, alert, false).await?;
+    if changed && let Some(alert_id) = alert_id {
+        crate::alerts::lifecycle::on_alert_enabled_changed(org_id, &alert_id, &by, value).await;
+    }
     Ok(())
 }
 
@@ -2646,7 +2714,7 @@ impl AlertExt for Alert {
         //   2. A destination fetch failure becomes a per-destination failure instead of a `?` that
         //      aborts the remaining destinations — which, once an earlier destination had already
         //      sent, made the resulting all-fail return trigger a retry that re-sent it (§6.1).
-        let mut snapshot: Vec<(String, Option<(DestinationType, Option<Template>)>)> =
+        let mut snapshot: Vec<(String, Option<(String, DestinationType, Option<Template>)>)> =
             Vec::with_capacity(self.destinations.len());
         for dest_name in self.destinations.iter() {
             // Ledgered destinations already landed on a prior attempt.
@@ -2663,7 +2731,11 @@ impl AlertExt for Alert {
                         // `dest.name`: the ledger is matched against
                         // `self.destinations` on the next attempt, so the two
                         // must be the same string.
-                        snapshot.push((dest_name.clone(), Some((destination_type, dest_template))))
+                        let dest_id = dest.id.map(|id| id.to_string()).unwrap_or_default();
+                        snapshot.push((
+                            dest_name.clone(),
+                            Some((dest_id, destination_type, dest_template)),
+                        ))
                     }
                     _ => {
                         log::error!(
@@ -2717,7 +2789,7 @@ impl AlertExt for Alert {
         let mut chart_png: Option<Option<std::sync::Arc<Vec<u8>>>> = None;
 
         for (dest_name, resolved) in snapshot.iter() {
-            let Some((destination_type, dest_template)) = resolved else {
+            let Some((dest_id, destination_type, dest_template)) = resolved else {
                 continue; // already recorded as a resolution failure
             };
 
@@ -2771,11 +2843,13 @@ impl AlertExt for Alert {
                     // Bytes travel in the send itself only for email (CID
                     // attachment) and Discord (multipart upload); rendered at
                     // most once and shared.
-                    let needs_png = matches!(destination_type, DestinationType::Email(_))
-                        || matches!(
-                            derive_channel_format(destination_type),
-                            ChannelFormat::Discord
-                        );
+                    let needs_png = matches!(
+                        destination_type,
+                        DestinationType::Email(_) | DestinationType::SlackApp(_)
+                    ) || matches!(
+                        derive_channel_format(destination_type),
+                        ChannelFormat::Discord
+                    );
                     ctx.chart_png = if needs_png {
                         if chart_png.is_none() {
                             chart_png =
@@ -2792,9 +2866,7 @@ impl AlertExt for Alert {
                 }
             }
 
-            match send_to_destination(&self.org_id, &self.name, destination_type, template, ctx)
-                .await
-            {
+            match send_to_destination(self, dest_id, destination_type, template, ctx).await {
                 Ok(resp) => {
                     outcome.succeeded.push(dest_name.clone());
                     success_message = format!("{success_message} destination {dest_name} {resp};");
@@ -3019,12 +3091,13 @@ pub async fn send_recovery_notification(
         Some(event.opened_at),
         event.recovered_at,
         Some(config::meta::alerts::level::AlertLevel::Ok),
-        None,
-        None,
+        event.value,
+        event.group_label_set.as_ref(),
         Some(event.episode_id.clone()),
         true,
     )
     .await;
+    ctx.recovery_reason = event.reason.as_str().to_string();
 
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
         Some(name) => db::alerts::templates::get(&alert.org_id, name).await.ok(),
@@ -3043,12 +3116,16 @@ pub async fn send_recovery_notification(
         if !visited.insert(dest_name) {
             continue;
         }
-        let (destination_type, dest_template) =
+        let (dest_id, destination_type, dest_template) =
             match destinations::get_with_template(&alert.org_id, dest_name).await {
                 Ok((dest, tpl)) => match dest.module {
                     Module::Alert {
                         destination_type, ..
-                    } => (destination_type, tpl),
+                    } => (
+                        dest.id.map(|id| id.to_string()).unwrap_or_default(),
+                        destination_type,
+                        tpl,
+                    ),
                     _ => continue,
                 },
                 Err(e) => {
@@ -3056,6 +3133,10 @@ pub async fn send_recovery_notification(
                     continue;
                 }
             };
+        // Its thread reply goes out from `dispatch_recovery`, whatever `notify_on_recovery` says.
+        if matches!(destination_type, DestinationType::SlackApp(_)) {
+            continue;
+        }
         // A platform resolve is protocol, not a message, so the template is never rendered for it.
         if let (Some(platform), DestinationType::Http(endpoint)) =
             (platform_of(&destination_type), &destination_type)
@@ -3102,8 +3183,8 @@ pub async fn send_recovery_notification(
         // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
         // 202 to one it drops. Body at debug only: it can carry recipient data.
         match send_to_destination(
-            &alert.org_id,
-            &alert.name,
+            alert,
+            &dest_id,
             &destination_type,
             effective.template(),
             &mut ctx,
@@ -3208,6 +3289,34 @@ fn stamp_platform_key(
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
+    alert: &Alert,
+    destination_id: &str,
+    dest_type: &DestinationType,
+    template: &Template,
+    ctx: &mut NotificationContext,
+) -> Result<String, anyhow::Error> {
+    if matches!(dest_type, DestinationType::SlackApp(_)) {
+        ctx.metadata.clear();
+        let alert_id = alert.id.map(|id| id.to_string());
+        let send = crate::alerts::slack_publish::AlertSend {
+            org_id: &alert.org_id,
+            alert_id: alert_id.as_deref(),
+            is_real_time: alert.is_real_time,
+            destination_id,
+            template,
+        };
+        return crate::alerts::slack_publish::send_alert(
+            &crate::alerts::slack_publish::QueueSink,
+            &send,
+            ctx,
+        )
+        .await;
+    }
+    send_to_destination_type(&alert.org_id, &alert.name, dest_type, template, ctx).await
+}
+
+/// Transport for every destination type except the Slack app, which needs the alert itself.
+async fn send_to_destination_type(
     org_id: &str,
     sns_subject: &str,
     dest_type: &DestinationType,
@@ -3246,6 +3355,9 @@ async fn send_to_destination(
                 DestinationType::Sns(aws_sns) => {
                     send_sns_notification(sns_subject, aws_sns, msg).await
                 }
+                DestinationType::SlackApp(_) => Err(anyhow::anyhow!(
+                    "a Slack app destination is sent through slack_publish"
+                )),
             }
         }
         TemplateKind::Content => {
@@ -3325,7 +3437,17 @@ pub(crate) async fn send_templated_to_destination(
     let effective =
         crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
             .await;
-    send_to_destination(
+    if let DestinationType::SlackApp(target) = &destination_type {
+        return crate::alerts::slack_publish::send_templated_post(
+            &crate::alerts::slack_publish::QueueSink,
+            org_id,
+            target,
+            effective.template(),
+            ctx,
+        )
+        .await;
+    }
+    send_to_destination_type(
         org_id,
         sns_subject,
         &destination_type,
@@ -3358,6 +3480,16 @@ pub(crate) async fn dispatch_notification(
                 .map(|resp| note_skipped(resp, &skipped))
         }
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
+        DestinationType::SlackApp(target) => {
+            crate::alerts::slack_publish::send_post(
+                &crate::alerts::slack_publish::QueueSink,
+                org_id,
+                target,
+                subject,
+                &msg,
+            )
+            .await
+        }
     }
 }
 
@@ -3407,6 +3539,9 @@ pub(crate) async fn dispatch_test_message(
         }
         (RenderedMessage::Sns { subject, message }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(&subject, aws_sns, message).await
+        }
+        (RenderedMessage::Http { body }, DestinationType::SlackApp(target)) => {
+            crate::alerts::slack_publish::send_test_now(org_id, target, title, &body).await
         }
         (rendered, dest_type) => Err(anyhow::anyhow!(
             "Rendered message {rendered:?} does not match destination type {dest_type:?}"
@@ -4302,6 +4437,7 @@ async fn build_notification_context(
         }
         .to_string(),
         episode_id,
+        recovery_reason: String::new(),
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
         alert_threshold_crit: if alert.query_condition.promql_rule_mode {
@@ -5353,6 +5489,27 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_multi_alert_with_recovery_saves_but_not_with_notification_grouping() {
+        let mut alert = Alert::default();
+        alert.notify_on_recovery = true;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        assert!(validate_recovery_templates("default", &alert).await.is_ok());
+
+        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
+            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
+                enabled: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        assert!(matches!(
+            validate_recovery_templates("default", &alert).await,
+            Err(AlertError::RecoveryWithNotificationGrouping)
+        ));
+    }
 
     #[test]
     fn email_body_is_html_only_without_text() {
@@ -8549,6 +8706,7 @@ mod tests {
             name: "db upgrade".to_string(),
             ends_at: 0,
             incident_mode: Default::default(),
+            ..Default::default()
         });
         assert_eq!(
             suppressed.response_message(),

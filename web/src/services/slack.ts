@@ -49,6 +49,8 @@ import type {
   SlackManifestParams,
   SlackMyLinksResponse,
   SlackOidcCallbackRequest,
+  SlackOncallRemindResponse,
+  SlackOncallUnlinkedResponse,
   SlackOrgAccessRequest,
   SlackOrgAccessView,
   SlackPrerequisitesResponse,
@@ -161,6 +163,14 @@ const slack = {
     http().delete<void>(
       `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
     ),
+
+  listOncallUnlinked: (org: string, id: string) =>
+    http().get<SlackOncallUnlinkedResponse>(`${installation(org, id)}/oncall-unlinked`, {
+      silentForbidden: true,
+    }),
+
+  remindOncallUnlinked: (org: string, id: string) =>
+    http().post<SlackOncallRemindResponse>(`${installation(org, id)}/oncall-unlinked/remind`),
 
   getHelpContact: (org: string, id: string) =>
     http().get<SlackHelpContact>(`${installation(org, id)}/help-contact`),

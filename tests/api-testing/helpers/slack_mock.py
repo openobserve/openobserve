@@ -21,6 +21,8 @@ Control endpoints (JSON):
 - ``GET  /_mock/requests[?method=m]``    every recorded call: method, form, bearer, at, response (ok calls), error
 - ``POST /_mock/reset``                  forget calls, apps, tokens and failures; reseed the team
 - ``POST /_mock/fail``                   ``{"method", "error", "times"?, "http_status"?, "retry_after"?}``
+- ``POST /_mock/mode``                   ``{"method", "http_status", "error"?, "retry_after"?}``: every call of ``method``
+  (``*`` for all) fails that way until ``{"method", "clear": true}`` or a reset, like a Slack outage or a 429 storm
 - ``POST /_mock/apps``                   register an app: ``{"app_id", "client_id", "client_secret", "signing_secret"?}``
 - ``POST /_mock/teams``                  add or replace a team: ``{"team_id", "team_name", "channels"?, "members"?}``
 - ``POST /_mock/config_tokens``          ``{"refresh_token", "team_id"}``: ``tooling.tokens.rotate`` answers that team for the
@@ -169,6 +171,7 @@ class MockState:
         self.uninstall_settle: float | None = None
         self.outbox: list[tuple[str, str, bytes]] = []
         self.files: set[str] = set()
+        self.modes: dict[str, dict[str, Any]] = {}
 
     def next_id(self, prefix: str) -> str:
         return f"{prefix}{next(self.ids):06d}"
@@ -177,6 +180,9 @@ class MockState:
         self.calls.append({"method": method, "form": form, "bearer": bearer, "at": time.time()})
 
     def take_failure(self, method: str) -> None:
+        mode = self.modes.get(method) or self.modes.get("*")
+        if mode is not None:
+            raise SlackError(mode.get("error", "service_unavailable"), mode["http_status"], mode.get("retry_after"))
         queue = self.failures.get(method) or []
         if not queue:
             return
@@ -488,6 +494,16 @@ def m_users_info(st: MockState, form: dict[str, str], bearer: str | None) -> dic
     return {"user": user}
 
 
+def m_users_lookup_by_email(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    grant = st.bot(bearer)
+    email = (form.get("email") or "").lower()
+    user = next((m for m in st.team(grant["team_id"])["members"]
+                 if (m["profile"].get("email") or "").lower() == email), None)
+    if user is None:
+        raise SlackError("users_not_found")
+    return {"user": user}
+
+
 def m_conversations_info(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     grant = st.bot(bearer)
     channel = next((c for c in st.team(grant["team_id"])["channels"] if c["id"] == form.get("channel")), None)
@@ -601,6 +617,7 @@ METHODS: dict[str, Handler] = {
     "conversations.info": m_conversations_info,
     "users.list": m_users_list,
     "users.info": m_users_info,
+    "users.lookupByEmail": m_users_lookup_by_email,
     "chat.postMessage": m_chat_post_message,
     "chat.update": m_chat_update,
     "chat.postEphemeral": m_chat_post_ephemeral,
@@ -700,6 +717,11 @@ class SlackMockHandler(BaseHTTPRequestHandler):
             elif path == "/_mock/fail":
                 failure = {"times": 1, **body}
                 st.failures.setdefault(body["method"], []).append(failure)
+            elif path == "/_mock/mode":
+                if body.get("clear"):
+                    st.modes.pop(body["method"], None)
+                else:
+                    st.modes[body["method"]] = body
             elif path == "/_mock/apps":
                 st.apps[body["app_id"]] = {"signing_secret": "", "manifest": {}, **body}
             elif path == "/_mock/uninstall_events":

@@ -23,9 +23,34 @@ import {
   generatePrebuiltMetadata,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
+  destinationTypeTiles,
 } from "@/utils/prebuilt-templates";
 
 describe("Prebuilt Templates Index", () => {
+  describe("destinationTypeTiles (MK-7)", () => {
+    it("puts the Slack app tile first, tagged for alert response, then the relabelled webhook tile", () => {
+      const tiles = destinationTypeTiles(true);
+      expect(tiles.map((tile) => tile.id).slice(0, 3)).toEqual(["slack_app", "slack", "discord"]);
+      expect(tiles[0].name).toBe("Slack app");
+      expect(tiles[0].tag).toEqual({
+        label: "Recommended for alert response",
+        variant: "success-soft",
+      });
+      expect(tiles[1].name).toBe("Slack webhook");
+      expect(tiles[1].tag).toEqual({ label: "Post only", variant: "default-soft" });
+    });
+
+    it("keeps the unavailable Slack app disabled and the webhook selectable", () => {
+      const tiles = destinationTypeTiles(false);
+      expect(tiles.map((tile) => tile.id)).toEqual([
+        "slack_app",
+        ...PREBUILT_DESTINATION_TYPES.map((p) => p.id),
+      ]);
+      expect(tiles[0].disabled).toBe(true);
+      expect(tiles[1].disabled).not.toBe(true);
+    });
+  });
+
   describe("PREBUILT_DESTINATION_TYPES", () => {
     it("should contain all expected destination types", () => {
       const expectedTypes = [

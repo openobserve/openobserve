@@ -209,6 +209,7 @@ export class AlertsPage {
             alertCloneButton: '[data-test="alert-list-{alertName}-clone-alert"]',
             alertMoreOptions: '[data-test="alert-list-{alertName}-more-options"]',
             confirmButton: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+            confirmDialogProviderPrimary: '[data-test="confirm-dialog-provider"] [data-test="o-dialog-primary-btn"]',
 
             // Alert movement locators
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
@@ -2390,6 +2391,7 @@ export class AlertsPage {
         testLogger.info(`Target lifecycle row index: ${targetIndex}`);
 
         await allRows.nth(targetIndex).locator(this.locators.incidentAckButton).click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked acknowledge button');
     }
@@ -2411,6 +2413,7 @@ export class AlertsPage {
         const resolveButton = row.locator(this.locators.incidentResolveButton);
         await resolveButton.waitFor({ state: 'visible', timeout: 10000 });
         await resolveButton.click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked resolve button');
     }
@@ -2424,6 +2427,7 @@ export class AlertsPage {
         const reopenButton = row.locator(this.locators.incidentReopenButton);
         await reopenButton.waitFor({ state: 'visible', timeout: 10000 });
         await reopenButton.click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked reopen button');
     }

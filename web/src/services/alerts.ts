@@ -16,11 +16,38 @@
 import http from "./http";
 import analytics from "./product_analytics";
 import type {
+  AckAlertRequest,
+  AckAlertResponse,
+  AlertAcksResponse,
+  AlertActionError,
   CompositeAlertValidationRequest,
   CompositeAlertValidationResponse,
   CompositeAlertReferenceResponse,
   CompositeTimelineResponse,
+  ExtendAlertMuteRequest,
+  ExtendAlertMuteResponse,
+  MuteAlertRequest,
+  MuteAlertResponse,
+  UnackAlertRequest,
+  UnackAlertResponse,
 } from "@/ts/interfaces/alert";
+
+const alertPath = (org: string, alertId: string) =>
+  `/api/v2/${org}/alerts/${encodeURIComponent(alertId)}`;
+
+// The route permission check reads the alert folder from `?folder=`.
+const inFolder = (folder?: string) => (folder ? { params: { folder } } : {});
+
+const ALERT_ACTION_CODES = new Set<string>([
+  "ack_refused",
+  "mute_refused",
+  "not_firing",
+  "firing_changed",
+  "downtime_cap",
+  "already_muted",
+  "version_changed",
+  "not_a_quick_mute",
+]);
 
 const alerts = {
   list: (
@@ -52,7 +79,7 @@ const alerts = {
       url += `&folder=${folder_id}`;
     }
     if (query) {
-      url += `&alert_name_substring=${query}`;
+      url += `&alert_name_substring=${encodeURIComponent(query)}`;
     }
     if (alert_type) {
       url += `&alert_type=${alert_type}`;
@@ -375,9 +402,45 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts/${alert_id}/groups/transitions?${params.toString()}`,
     );
   },
+  ackAlert: (org: string, alertId: string, body: AckAlertRequest, folder?: string) =>
+    http().post<AckAlertResponse>(`${alertPath(org, alertId)}/ack`, body, inFolder(folder)),
+  unackAlert: (org: string, alertId: string, body: UnackAlertRequest, folder?: string) =>
+    http().post<UnackAlertResponse>(`${alertPath(org, alertId)}/unack`, body, inFolder(folder)),
+  listAlertAcks: (org: string, alertId: string, folder?: string) =>
+    http().get<AlertAcksResponse>(`${alertPath(org, alertId)}/acks`, inFolder(folder)),
+  muteAlert: (org: string, alertId: string, body: MuteAlertRequest, folder?: string) =>
+    http().post<MuteAlertResponse>(`${alertPath(org, alertId)}/mute`, body, inFolder(folder)),
+  extendAlertMute: (
+    org: string,
+    alertId: string,
+    downtimeId: string,
+    body: ExtendAlertMuteRequest,
+    folder?: string,
+  ) =>
+    http().post<ExtendAlertMuteResponse>(
+      `${alertPath(org, alertId)}/mute/${encodeURIComponent(downtimeId)}/extend`,
+      body,
+      inFolder(folder),
+    ),
+  cancelAlertMute: (org: string, alertId: string, downtimeId: string, folder?: string) =>
+    http().post(
+      `${alertPath(org, alertId)}/mute/${encodeURIComponent(downtimeId)}/cancel`,
+      undefined,
+      inFolder(folder),
+    ),
 };
 
 export default alerts;
+
+/** The typed 403/409 body of an ack or mute call, or null for any other failure. */
+export function alertActionErrorOf(error: unknown): AlertActionError | null {
+  const response = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+  if (response?.status !== 403 && response?.status !== 409) return null;
+  const code = (response.data as { code?: unknown } | null)?.code;
+  return typeof code === "string" && ALERT_ACTION_CODES.has(code)
+    ? (response.data as AlertActionError)
+    : null;
+}
 
 export interface AlertHistoryQuery {
   // string | number because the callers build these differently and the wrapper

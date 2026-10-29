@@ -91,6 +91,7 @@ vi.mock("../query/sqlUtils", () => ({
 }));
 
 vi.mock("./colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   ColorModeWithoutMinMax: vi.fn(),
   getSeriesColor: vi.fn(() => "#ff0000"),
   getSQLMinMaxValue: vi.fn(() => [0, 100]),
@@ -9648,6 +9649,51 @@ describe("convertSQLData", () => {
   });
 
   describe("Show Gridlines Configuration", () => {
+    it.each([
+      [true, true],
+      [false, false],
+      [undefined, true],
+    ])(
+      "h-bar with show_gridlines=%s draws value-axis gridlines=%s and none on the category axis",
+      async (showGridlines, expected) => {
+        const schema = {
+          ...mockPanelSchema,
+          type: "h-bar",
+          config: { ...mockPanelSchema.config, show_gridlines: showGridlines },
+          queries: [
+            {
+              fields: { x: [{ alias: "category" }], y: [{ alias: "value" }], z: [], breakdown: [] },
+            },
+          ],
+        };
+        const searchData = [
+          [
+            { category: "A", value: 100 },
+            { category: "B", value: 200 },
+          ],
+        ];
+
+        const result = await convertSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const valueAxes = [result.options.xAxis].flat();
+        const categoryAxes = [result.options.yAxis].flat();
+        expect(valueAxes[0].type).toBe("value");
+        expect(categoryAxes[0].type).toBe("category");
+        valueAxes.forEach((axis: any) => expect(axis.splitLine.show).toBe(expected));
+        categoryAxes.forEach((axis: any) => expect(axis.splitLine.show).toBe(false));
+      },
+    );
+
     it("should use default gridlines (true) when config is undefined", async () => {
       const schema = {
         ...mockPanelSchema,

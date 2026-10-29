@@ -26,8 +26,15 @@ body="$marker
 > [!NOTE]
 $note"
 
-comment_id="$(gh api "repos/$repo/issues/$pr/comments" --paginate \
-  | jq -rs --arg m "$marker" --arg login "$bot_login" '[.[][] | select(.user.login == $login and (.body | contains($m))) | .id] | last // empty')"
+existing="$(gh api "repos/$repo/issues/$pr/comments" --paginate \
+  | jq -cs --arg m "$marker" --arg login "$bot_login" '[.[][] | select(.user.login == $login and (.body | contains($m)))] | last // {}')"
+comment_id="$(jq -r '.id // empty' <<<"$existing")"
+# Keeps the PR's review count, so the pointer does not hand an unpaired PR a fresh set of reviews.
+pass_tag="$(jq -r '.body // ""' <<<"$existing" | grep -oE '<!-- *o2-review-pass:[0-9]+ *-->' | tail -1 || true)"
+if [ -n "$pass_tag" ]; then
+  body="$body
+$pass_tag"
+fi
 if [ -n "$comment_id" ]; then
   gh api -X PATCH "repos/$repo/issues/comments/$comment_id" -f body="$body" > /dev/null
 else

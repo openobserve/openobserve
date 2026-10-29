@@ -631,6 +631,11 @@ export const usePanelSQLExecutor = (ctx: {
                     processApiError(response?.content, "sql");
                   }
 
+                  if (response.type === "event_progress") {
+                    state.loadingProgressPercentage = response?.content?.percent ?? 0;
+                    state.isPartialData = true;
+                  }
+
                   if (response.type === "end") {
                     state.loading = false;
                     state.isPartialData = false;
@@ -640,6 +645,7 @@ export const usePanelSQLExecutor = (ctx: {
                 error: handleSearchError,
                 complete: async () => {
                   state.loading = false;
+                  state.isPartialData = false;
                   saveCurrentStateToCache();
                   removeTraceId(traceId);
                 },
@@ -1224,6 +1230,12 @@ export const usePanelSQLExecutor = (ctx: {
             processApiError(response?.content, "sql");
           }
 
+          // The multi-query stream already averages progress across its queries server-side.
+          if (response.type === "event_progress") {
+            state.loadingProgressPercentage = response?.content?.percent ?? 0;
+            state.isPartialData = true;
+          }
+
           if (response.type === "end") {
             state.loading = false;
             state.isPartialData = false;
@@ -1233,6 +1245,7 @@ export const usePanelSQLExecutor = (ctx: {
         error: handleSearchError,
         complete: async () => {
           state.loading = false;
+          state.isPartialData = false;
           saveCurrentStateToCache();
           removeTraceId(traceId);
         },
