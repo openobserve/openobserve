@@ -415,9 +415,9 @@ pub async fn update_destination(
     tag = "Alerts",
     operation_id = "GetDestination",
     summary = "Get alert destination",
-    description = "Retrieves the configuration details for a specific alert destination. Returns the complete destination \
-                   setup including delivery method, authentication credentials, notification settings, and other \
-                   configuration parameters. Used for reviewing and managing existing destination configurations.",
+    description = "Retrieves the configuration details for a specific alert destination: delivery method, notification \
+                   settings and other configuration parameters. Callers without PUT on the destination get the URL \
+                   cut to its origin and header values and credential metadata blanked.",
     security(
         ("Authorization"= [])
     ),
@@ -518,17 +518,7 @@ pub async fn list_destinations(
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
             let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
-            let writable = futures::future::join_all(
-                items
-                    .iter()
-                    .map(|d| can_write_destination(&org_id, &user_email.user_id, &d.name)),
-            )
-            .await;
-            for (item, writable) in items.iter_mut().zip(writable) {
-                if !writable {
-                    item.redact_secrets();
-                }
-            }
+            redact_unwritable(&org_id, &user_email.user_id, &mut items).await;
             if include_usage {
                 // Same all_usage() the delete guard uses, attached only to this response's rows.
                 match destinations::all_usage(&org_id).await {
@@ -845,6 +835,9 @@ pub async fn test_send(
     }
 }
 
+/// Per-destination PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
 /// The URL and headers can post as the org, so only a destination writer reads them whole.
 async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool {
     #[cfg(feature = "enterprise")]
@@ -858,13 +851,57 @@ async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool 
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, user_id, name);
+        true
+    }
+}
+
+/// Blanks the secrets of every destination the caller may not PUT, at most
+/// `PERMISSION_CONCURRENCY` checks at a time after the org-wide one.
+async fn redact_unwritable(org_id: &str, user_id: &str, items: &mut [Destination]) {
+    use futures::StreamExt;
+    if can_write_every_destination(org_id, user_id).await {
+        return;
+    }
+    let names: Vec<String> = items.iter().map(|d| d.name.clone()).collect();
+    let writable: Vec<bool> = futures::stream::iter(names)
+        .map(|name| async move { can_write_destination(org_id, user_id, &name).await })
+        .buffered(PERMISSION_CONCURRENCY)
+        .collect()
+        .await;
+    for (item, writable) in items.iter_mut().zip(writable) {
+        if !writable {
+            item.redact_secrets();
+        }
+    }
+}
+
+/// One check for standard writers and `_all_` grants.
+async fn can_write_every_destination(org_id: &str, user_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            "destinations",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id);
         true
     }
 }
