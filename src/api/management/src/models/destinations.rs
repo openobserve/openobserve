@@ -279,6 +279,14 @@ pub struct Destination {
 }
 
 impl Destination {
+    /// Whether [`Self::redact_secrets`] has anything to change, so a caller can skip the check.
+    pub fn has_secrets(&self) -> bool {
+        !self.url.is_empty()
+            || self.headers.as_ref().is_some_and(|h| !h.is_empty())
+            || !self.metadata.is_empty()
+            || self.slack_app.previous_webhook.is_some()
+    }
+
     /// Keeps the URL origin and field names; a full URL, header or routing key posts as the org.
     pub fn redact_secrets(&mut self) {
         self.url = url_origin(&self.url);

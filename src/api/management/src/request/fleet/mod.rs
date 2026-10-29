@@ -1915,7 +1915,8 @@ async fn permitted_fleets(
 #[cfg(feature = "enterprise")]
 const FLEET_CHECK_CONCURRENCY: usize = 16;
 
-/// An enrollment token ingests into the org, so only a caller who may change its fleet sees it.
+/// An enrollment token ingests into the org, so only a caller who may change its fleet sees it:
+/// one org-wide check for standard writers and `_all_` grants, then one per distinct fleet.
 #[cfg(feature = "enterprise")]
 async fn withhold_token_values(
     org_id: &str,
@@ -1929,6 +1930,9 @@ async fn withhold_token_values(
         .filter(|t| t.token.is_some())
         .map(|t| t.fleet.id.clone())
         .collect();
+    if fleets.is_empty() || allowed_on(FLEETS, org_id, user_id, "PUT").await {
+        return;
+    }
     fleets.sort_unstable();
     fleets.dedup();
     let writable: HashSet<String> = futures::stream::iter(fleets)
@@ -2481,10 +2485,21 @@ mod tests {
         assert_eq!(
             asked(),
             vec![
+                ("fleets".to_string(), "PUT".to_string()),
                 ("fleets:f".to_string(), "PUT".to_string()),
                 ("fleets:g".to_string(), "PUT".to_string()),
             ],
-            "one PUT check per fleet; reading a fleet does not reveal its tokens"
+            "one PUT check per fleet after the org-wide one; reading a fleet does not reveal its tokens"
+        );
+
+        let mut items = vec![token("t1", "f", Some("o2ft_f1"))];
+        openfga_on(&[(FLEETS, "PUT")], None);
+        withhold_token_values(ORG, custom, &mut items).await;
+        assert_eq!(items[0].token.as_deref(), Some("o2ft_f1"));
+        assert_eq!(
+            asked(),
+            vec![("fleets".to_string(), "PUT".to_string())],
+            "an org-wide writer needs no per-fleet check"
         );
         openfga_off();
         forget(custom, ORG);

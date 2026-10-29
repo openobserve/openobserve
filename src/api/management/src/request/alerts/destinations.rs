@@ -863,23 +863,34 @@ async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool 
     }
 }
 
-/// Blanks the secrets of every destination the caller may not PUT, at most
-/// `PERMISSION_CONCURRENCY` checks at a time after the org-wide one.
+/// Blanks the secrets of every destination the caller may not PUT: one org-wide check, then at
+/// most `PERMISSION_CONCURRENCY` checks at a time for destinations that hold something to redact.
 async fn redact_unwritable(org_id: &str, user_id: &str, items: &mut [Destination]) {
     use futures::StreamExt;
-    if can_write_every_destination(org_id, user_id).await {
+
+    let names: Vec<String> = items
+        .iter()
+        .filter(|d| d.has_secrets())
+        .map(|d| d.name.clone())
+        .collect();
+    if names.is_empty() || can_write_every_destination(org_id, user_id).await {
         return;
     }
-    let names: Vec<String> = items.iter().map(|d| d.name.clone()).collect();
-    let writable: Vec<bool> = futures::stream::iter(names)
-        .map(|name| async move { can_write_destination(org_id, user_id, &name).await })
-        .buffered(PERMISSION_CONCURRENCY)
+    let writable: std::collections::HashSet<String> = futures::stream::iter(names)
+        .map(|name| async move {
+            can_write_destination(org_id, user_id, &name)
+                .await
+                .then_some(name)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|name| async move { name })
         .collect()
         .await;
-    for (item, writable) in items.iter_mut().zip(writable) {
-        if !writable {
-            item.redact_secrets();
-        }
+    for item in items
+        .iter_mut()
+        .filter(|d| d.has_secrets() && !writable.contains(&d.name))
+    {
+        item.redact_secrets();
     }
 }
 
