@@ -110,6 +110,8 @@ static INSTANCE_ID: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
+static POOL_ROTATION: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 pub async fn run(stop: crate::StopToken) {
     let instance_id = INSTANCE_ID.as_str();
     tracing::info!(instance_id = %instance_id, "[synthetics dispatcher] started");
@@ -132,6 +134,13 @@ pub async fn run(stop: crate::StopToken) {
         let cap = max_inflight_per_tick();
         let mut leased_this_tick: i64 = 0;
         let mut active = dispatcher_pools().await;
+        // Rotate the starting pool every tick: with the cap reached, a fixed
+        // order would let the first pools take the whole budget every tick.
+        if !active.is_empty() {
+            let start =
+                POOL_ROTATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % active.len();
+            active.rotate_left(start);
+        }
         while !active.is_empty() {
             let mut still_active = Vec::with_capacity(active.len());
             for pool in active {

@@ -91,11 +91,20 @@ pub async fn preview_snapshot(
             .push(u);
     }
 
+    // Same state read as the rebuilder, so a preview of an all-Error component
+    // shows NoData exactly as the published snapshot does.
+    let preview_check_ids: Vec<String> = mappings
+        .iter()
+        .map(|m| m.synthetics_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let (states, _) = table::get_check_states(conn, &preview_check_ids, None).await?;
     let data = TickData {
         pages: vec![page.clone()],
         components,
         mappings,
-        states: Vec::new(),
+        states,
         snoozed: HashSet::new(),
         notices: notices.clone(),
     };
@@ -332,7 +341,13 @@ async fn load(
     // Delta by default; full sweep on the Nth tick. The sweep replaces the
     // cache wholesale (so deleted/unmapped checks drop out); the delta merges
     // only changed rows over the carried cache.
-    let full_sweep = rt.tick_count.is_multiple_of(FULL_SWEEP_TICKS);
+    // Always a full read of the mapped checks' state. The delta read keys on
+    // `updated_at`, which only moves on a status TRANSITION; a check that keeps
+    // failing (or keeps passing) advances only `last_triggered_at`, so the
+    // run-based streaks in `observe_run` would see a repeated result only on
+    // the periodic sweep and confirm many minutes late. The read is three
+    // scalar columns of the mapped checks only.
+    let full_sweep = FULL_SWEEP_TICKS > 0;
     rt.tick_count = rt.tick_count.wrapping_add(1);
     let since = if full_sweep { None } else { Some(rt.watermark) };
     let (changed, max_updated) = table::get_check_states(conn, &check_ids, since).await?;
