@@ -147,6 +147,17 @@ describe("FleetInstallCommand", () => {
     expect(code(w)).toContain("helm upgrade --install otel-fleet-collector openobserve/");
   });
 
+  it("asks for the cluster name only on Kubernetes and puts it in the command", async () => {
+    const w = mountCommand();
+    await flushPromises();
+    expect(w.find('[data-test="fleet-install-command-cluster-name"]').exists()).toBe(false);
+    await choose(w, "kubernetes");
+    expect(code(w)).toContain("--set-string clusterName='<cluster-name>'");
+    w.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "prod-us-east");
+    await w.vm.$nextTick();
+    expect(code(w)).toContain("--set-string clusterName='prod-us-east'");
+  });
+
   it("installs a gateway release and names its OTLP Service", async () => {
     const w = mountCommand();
     await choose(w, "kubernetes");

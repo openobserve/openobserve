@@ -27530,6 +27530,8 @@
       "joinsFleetNoConfig": "Collectors die met dit token zijn geïnstalleerd, voegen zich bij fleet {fleet}, die nog geen configuratie heeft.",
       "envRefNote": "Gebruik {ref}-verwijzingen voor inloggegevens in configuraties, zodat secrets op de host blijven.",
       "websocketTransport": "WebSocket gebruiken (stuurt configuratie direct door; de proxy moet het ondersteunen)",
+      "clusterName": "Clusternaam",
+      "clusterNameHint": "Wordt als {attribute} toegevoegd aan de gegevens van dit cluster.",
       "kubernetesNote": "Implementeert een DaemonSet die de supervisor en de collector in één container draait. Upgrade door de imagetag te wijzigen.",
       "kubernetesAgent": "Agent (DaemonSet)",
       "kubernetesGateway": "Gateway (StatefulSet)",

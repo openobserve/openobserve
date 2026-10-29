@@ -27530,6 +27530,8 @@
       "joinsFleetNoConfig": "이 토큰으로 설치된 수집기는 아직 구성이 없는 플릿 {fleet}에 합류합니다.",
       "envRefNote": "시크릿이 호스트에 머물도록 구성의 자격 증명에는 {ref} 참조를 사용하세요.",
       "websocketTransport": "WebSocket 사용 (구성을 즉시 전달, 프록시 지원 필요)",
+      "clusterName": "클러스터 이름",
+      "clusterNameHint": "이 클러스터의 데이터에 {attribute}(으)로 추가됩니다.",
       "kubernetesNote": "슈퍼바이저와 수집기를 하나의 컨테이너에서 실행하는 DaemonSet을 배포합니다. 이미지 태그를 변경하여 업그레이드하세요.",
       "kubernetesAgent": "에이전트(DaemonSet)",
       "kubernetesGateway": "게이트웨이(StatefulSet)",
