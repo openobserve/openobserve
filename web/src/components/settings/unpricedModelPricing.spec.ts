@@ -107,7 +107,7 @@ describe("buildMutePayload", () => {
       match_pattern: "^acme-internal-llm$",
       enabled: true,
       tiers: [{ name: "Default", condition: null, prices: { input: 0, output: 0 } }],
-      description: "Muted from the Unpriced tab: this model is treated as free.",
+      description: "Muted on Pricing gaps: this model is treated as free.",
     });
   });
 });

@@ -23,7 +23,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { costKind, unpricedTabRoute } from "./llmDataTrust.utils";
+import { costKind, pricingGapsRoute } from "./llmDataTrust.utils";
 
 const props = withDefaults(
   defineProps<{
@@ -67,7 +67,7 @@ const tooltip = computed(() => {
 });
 
 const fixRoute = computed(() =>
-  unpricedTabRoute(props.stream, store.state.selectedOrganization?.identifier ?? ""),
+  pricingGapsRoute(props.stream, store.state.selectedOrganization?.identifier ?? ""),
 );
 </script>
 

@@ -1601,6 +1601,18 @@ describe("ModelPricingEditor.vue", () => {
       });
     });
 
+    it("returns to Pricing gaps for the same stream when opened from there", async () => {
+      const wrapper = createWrapper({
+        query: { name: "acme-llm", match_pattern: "^acme-llm$", from: "gaps", stream: "llm" },
+      });
+      await flushPromises();
+      (wrapper.vm as any).goBack();
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "modelPricingGaps",
+        query: { org_identifier: "test-org", stream: "llm" },
+      });
+    });
+
     it("uses an empty org identifier when selectedOrganization is null", async () => {
       mockStore.state.selectedOrganization = null as any;
       const wrapper = createWrapper();

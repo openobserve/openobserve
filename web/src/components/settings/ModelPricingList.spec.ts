@@ -61,12 +61,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   getImageURL: (path: string) => `mock://${path}`,
 }));
 
-// The Unpriced tab's stream picker lists LLM trace streams.
-const mockGetStreams = vi.fn();
-vi.mock("@/composables/useStreams", () => ({
-  default: () => ({ getStreams: mockGetStreams }),
-}));
-
 import modelPricingService from "@/services/model_pricing";
 
 // ── Stubs for child components ───────────────────────────────────────────────
@@ -322,7 +316,7 @@ const mockI18n = createI18n({
           neverSynced: "never synced",
           lastSynced: "synced at {time}",
         },
-        unpriced: { tab: "Unpriced", tabWithCount: "Unpriced · {count}" },
+        unpriced: { title: "Pricing gaps" },
       },
     },
   },
@@ -380,7 +374,6 @@ describe("ModelPricingList.vue", () => {
     vi.mocked(modelPricingService.update).mockResolvedValue({} as any);
     vi.mocked(modelPricingService.delete).mockResolvedValue({} as any);
     vi.mocked(modelPricingService.refreshBuiltIn).mockResolvedValue({} as any);
-    mockGetStreams.mockResolvedValue({ list: [] });
     routerPushMock.mockReset();
     mockToastFn.mockReset();
   });
@@ -1641,50 +1634,11 @@ describe("list view state", () => {
   });
 });
 
-describe("Unpriced / approximate tab", () => {
-  const unpricedResponse = {
-    models: [
-      {
-        model: "acme-internal-llm",
-        status: "unpriced",
-        spans: 1870,
-        tokens: 2_330_000,
-        cost: 0,
-        agents: ["research-agent"],
-        agent_count: 1,
-        matched: null,
-      },
-      {
-        model: "gpt-5.4-mini",
-        status: "approximate",
-        spans: 1204,
-        tokens: 9_100_000,
-        cost: 41.22,
-        agents: ["support-bot"],
-        agent_count: 1,
-        matched: {
-          name: "GPT-5.4",
-          match_pattern: "^gpt-5\\.4",
-          source: "built_in",
-          tiers: [{ name: "Default", condition: null, prices: { input: 2.5e-6, output: 1.5e-5 } }],
-        },
-      },
-    ],
-  };
+describe("Route tabs and header", () => {
   let w: any;
 
   beforeEach(() => {
     vi.mocked(modelPricingService.list).mockResolvedValue({ data: mockModels } as any);
-    vi.mocked(modelPricingService.listUnpriced).mockResolvedValue({
-      data: unpricedResponse,
-    } as any);
-    mockGetStreams.mockResolvedValue({
-      list: [
-        { name: "default", settings: { is_llm_stream: true } },
-        { name: "llm", settings: {} },
-        { name: "plain", settings: { is_llm_stream: false } },
-      ],
-    });
   });
 
   afterEach(() => {
@@ -1692,81 +1646,33 @@ describe("Unpriced / approximate tab", () => {
     vi.clearAllMocks();
   });
 
-  it("opens from ?tab=unpriced&stream= and renders the rows of the unpriced response", async () => {
-    w = mountComponent({ query: { tab: "unpriced", stream: "llm" } });
-    await flushPromises();
-
-    expect(w.vm.selectedTab).toBe("unpriced");
-    const [org, params] = vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)!;
-    expect(org).toBe("test-org");
-    expect(params.stream_name).toBe("llm");
-    expect(params.end_time - params.start_time).toBe(24 * 60 * 60 * 1_000_000);
-
-    const tab = w.findComponent({ name: "UnpricedModelsTab" });
-    expect(tab.props("streams")).toEqual(["default", "llm"]);
-    await vi.waitFor(() =>
-      expect(w.findAll('[data-test="model-pricing-unpriced-row"]')).toHaveLength(2),
-    );
-    expect(w.find('[data-test="model-pricing-list-table"]').exists()).toBe(false);
-    expect(w.vm.tabOptions.find((o: any) => o.value === "unpriced").label).toBe("Unpriced · 2");
-  });
-
-  it("reads the first LLM stream when the link names none", async () => {
-    w = mountComponent({ query: { tab: "unpriced" } });
-    await flushPromises();
-    expect(vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)![1].stream_name).toBe(
-      "default",
-    );
-  });
-
   it("switching tab writes it to the route query, keeping the other params", async () => {
-    w = mountComponent({ query: { tab: "unpriced", stream: "llm" } });
+    w = mountComponent({ query: { tab: "all", org_identifier: "test-org" } });
     await flushPromises();
 
     w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "org");
     await flushPromises();
 
     expect(w.vm.selectedTab).toBe("org");
-    expect(routerReplaceMock).toHaveBeenLastCalledWith({ query: { tab: "org", stream: "llm" } });
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      query: { tab: "org", org_identifier: "test-org" },
+    });
+  });
+
+  it("Pricing gaps opens its own page", async () => {
+    w = mountComponent();
+    await flushPromises();
+    await w.find('[data-test="model-pricing-gaps-btn"]').trigger("click");
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "modelPricingGaps",
+      query: { org_identifier: "test-org" },
+    });
   });
 
   it("reopens the tab named in the route query after a reload", async () => {
     w = mountComponent({ query: { tab: "inherited" } });
     await flushPromises();
     expect(w.vm.selectedTab).toBe("inherited");
-  });
-
-  it("reads unpriced models only while the Unpriced tab is open", async () => {
-    w = mountComponent({ query: { tab: "all" } });
-    await flushPromises();
-    expect(w.vm.selectedTab).toBe("all");
-    expect(modelPricingService.listUnpriced).not.toHaveBeenCalled();
-
-    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "inherited");
-    await flushPromises();
-    expect(modelPricingService.listUnpriced).not.toHaveBeenCalled();
-
-    w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "unpriced");
-    await flushPromises();
-    await vi.waitFor(() => expect(modelPricingService.listUnpriced).toHaveBeenCalledTimes(1));
-  });
-
-  it("shows the load error when the unpriced read fails, and Retry reads again", async () => {
-    vi.mocked(modelPricingService.listUnpriced).mockRejectedValue({ response: { status: 400 } });
-    w = mountComponent({ query: { tab: "unpriced" } });
-    await vi.waitFor(() =>
-      expect(w.find('[data-test="model-pricing-unpriced-error"]').exists()).toBe(true),
-    );
-    expect(w.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
-    const calls = vi.mocked(modelPricingService.listUnpriced).mock.calls.length;
-
-    // A later timestamp gives the retried read a new window, so it never reuses the failed one.
-    const now = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 1000);
-    await w.find('[data-test="o2-empty-state-action-retry"]').trigger("click");
-    await flushPromises();
-    now.mockRestore();
-
-    expect(vi.mocked(modelPricingService.listUnpriced).mock.calls.length).toBeGreaterThan(calls);
   });
 
   it("says online sync has not run when the built-in list was never synced", async () => {

@@ -15613,8 +15613,8 @@
       "lastSynced": "Last synced online {time}."
     },
     "unpriced": {
-      "tab": "Unpriced / approximate",
-      "tabWithCount": "Unpriced / approximate · {count}",
+      "title": "Pricing gaps",
+      "subtitle": "Models in your LLM traces that had no price, or only an approximate one, at ingest",
       "banner": "{count} model had no price or an approximate price at ingest. Its recorded cost may be incomplete. | {count} models had no price or an approximate price at ingest. Their recorded costs may be incomplete.",
       "bannerTruncated": "{total} models in your traces had no price or an approximate one at ingest. Their cost may be wrong. Showing the top {shown} by tokens.",
       "streamLabel": "Stream",
