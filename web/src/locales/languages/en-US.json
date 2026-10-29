@@ -15630,6 +15630,7 @@
       "approximate": "Approximate",
       "pricedNow": "Priced for new spans",
       "historicalGap": "This window keeps its recorded pricing gap. New spans use the current price.",
+      "noActionNeeded": "No action needed",
       "defaultTierPrices": "in {input} / out {output} per 1M",
       "notPriced": "not priced",
       "createPrice": "Create price",
