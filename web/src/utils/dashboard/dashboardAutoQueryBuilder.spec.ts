@@ -1949,6 +1949,35 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("count > 100");
     });
 
+    it.each([
+      ["1); DROP TABLE logs; --", "count IN (1, '1); DROP TABLE logs; --')"],
+      ["1 OR 1=1", "count IN (1, '1 OR 1=1')"],
+      ["2' OR '1'='1", "count IN (1, '2'' OR ''1''=''1')"],
+    ])("quotes a non-numeric list value %s on a numeric column", (payload, expected) => {
+      const condition = { type: "list", column: { field: "count" }, values: ["1", payload] };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it("quotes a non-numeric comparison value on a numeric column", () => {
+      const condition = {
+        type: "condition",
+        operator: "=",
+        column: { field: "count" },
+        value: "1 OR 1=1",
+      };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe("count = '1 OR 1=1'");
+    });
+
+    it.each([
+      ["-1.5e3", "count IN (-1.5e3)"],
+      ["$count", "count IN ($count)"],
+      ["${count:csv}", "count IN (${count:csv})"],
+      ["true", "count IN (true)"],
+    ])("keeps %s bare on a numeric column", (value, expected) => {
+      const condition = { type: "list", column: { field: "count" }, values: [value] };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
     it("should escape single quotes in value", () => {
       const condition = {
         type: "condition",

@@ -9,6 +9,11 @@ import {
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 
+const BARE_NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+const BARE_BOOLEAN = /^(true|false)$/i;
+const BARE_PLACEHOLDER =
+  /^(\{\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}\}|\$\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}|\$[\w-]+)$/;
+
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
@@ -567,6 +572,9 @@ export function addMissingArgs(fields: any): any {
   };
 }
 
+const isBareSqlLiteral = (value: string) =>
+  BARE_NUMBER.test(value) || BARE_BOOLEAN.test(value) || BARE_PLACEHOLDER.test(value);
+
 /**
  * Format a value to be used in a SQL query.
  * @param value - the value to format
@@ -600,9 +608,12 @@ const formatValue = (
     tempValue = value.substring(1, value.length - 1);
   }
   // escape any single quotes in the value
-  tempValue = escapeSingleQuotes(tempValue);
+  tempValue = escapeSingleQuotes(String(tempValue));
   // Quote string values, leave numeric values unquoted
   if (columnType === "Utf8") {
+    tempValue = `'${tempValue}'`;
+  } else if (columnType !== undefined && !isBareSqlLiteral(tempValue)) {
+    // Anything but a plain number, boolean or lone $variable is quoted, so a value can never splice SQL into the query.
     tempValue = `'${tempValue}'`;
   } else if (columnType === undefined) {
     // Schema not loaded — infer from value: quote unless it's purely numeric
