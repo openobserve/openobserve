@@ -24,7 +24,6 @@ import {
   docsReferrerSource,
   firstSourceOption,
   firstSourcePickRoute,
-  isFirstSourceLocked,
   prefillFirstSource,
   readFirstSource,
   readPrefill,
@@ -274,18 +273,5 @@ describe("firstSourceOptions", () => {
     expect(firstSourceOption("agent")?.route).toBe("recommendedMcp");
     expect(firstSourceOption("missing")).toBeUndefined();
     expect(firstSourceOption(null)).toBeUndefined();
-  });
-
-  it("locks the agent and RUM options only while their feature is license-locked", () => {
-    const agent = firstSourceOption("agent")!;
-    const rum = firstSourceOption("rum")!;
-    const linux = firstSourceOption("linux")!;
-    const locked = { mcp: "locked", rum: "locked" } as const;
-
-    expect(isFirstSourceLocked(agent, locked)).toBe(true);
-    expect(isFirstSourceLocked(rum, locked)).toBe(true);
-    expect(isFirstSourceLocked(linux, locked)).toBe(false);
-    expect(isFirstSourceLocked(agent, { mcp: "enabled" })).toBe(false);
-    expect(isFirstSourceLocked(agent, undefined)).toBe(false);
   });
 });

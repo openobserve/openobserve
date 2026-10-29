@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { readonly, ref } from "vue";
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
-import { isPageLocked } from "@/composables/useFeatureLock";
 
 // Friendly name overrides. Keys, not text — this map is module scope, so it is
 // translated at display time in extractResourceInfo().
@@ -164,9 +162,8 @@ function flushGroupedToast(): void {
     onDismiss: onToastDismissed,
   });
 
-  // Found by its own dismiss hook: a toast that was never pushed must not adopt another one's record.
-  activeToastId = toastRecords.find((r) => r.open && r.onDismiss === onToastDismissed)?.id ?? null;
-  if (activeToastId === null) accumulatedErrors = [];
+  // Capture the record ID of the toast we just pushed
+  activeToastId = toastRecords[toastRecords.length - 1]?.id ?? null;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -193,32 +190,6 @@ export function addUnauthorizedError(responseUrl: string): void {
     debounceTimer = null;
     flushGroupedToast();
   }, 300);
-}
-
-// null while there is nothing to show; [] is a denial that named no feature.
-const licenseDenials = ref<string[] | null>(null);
-let pageChangedAt = 0;
-
-/** Record a license denial (403 + 40001) for the layout's top bar, kept apart from the RBAC access toast. */
-export function addLicenseDeniedError(features: string[], requestStartedAt = Date.now()): void {
-  // A locked page disables every action, so its denials only come from its own background loads.
-  if (requestStartedAt < pageChangedAt || isPageLocked()) return;
-  licenseDenials.value = [...new Set([...(licenseDenials.value ?? []), ...features])];
-}
-
-export function useLicenseDenials() {
-  return {
-    features: readonly(licenseDenials),
-    dismiss: () => {
-      licenseDenials.value = null;
-    },
-  };
-}
-
-/** Clears the top bar's license denials on navigation and ignores those of requests the old page started. */
-export function clearLicenseDenials(): void {
-  pageChangedAt = Date.now();
-  licenseDenials.value = null;
 }
 
 /**

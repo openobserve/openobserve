@@ -609,7 +609,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { ForbiddenState } from "@/utils/featureGate";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
 import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
@@ -651,7 +650,7 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
-    forbidden?: ForbiddenState;
+    forbidden?: boolean;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;

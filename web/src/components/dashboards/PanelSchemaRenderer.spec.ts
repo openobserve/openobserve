@@ -2832,19 +2832,6 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuValue).toBe(75);
     });
 
-    it("opens no alert menu while alerts is license-locked", () => {
-      const zoConfig = store.state.zoConfig as any;
-      const previous = zoConfig.features;
-      zoConfig.features = { alerts: "locked" };
-      try {
-        wrapper = createWrapper({ allowAlertCreation: true });
-        wrapper.vm.onChartDomContextMenu({ x: 150, y: 250, value: 75 });
-        expect(wrapper.vm.contextMenuVisible).toBe(false);
-      } finally {
-        zoConfig.features = previous;
-      }
-    });
-
     it("hides the chart tooltip when the alert menu opens, from a series or from empty chart area", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
       const dispatchAction = vi.fn();

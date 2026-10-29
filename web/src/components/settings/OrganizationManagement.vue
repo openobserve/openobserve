@@ -168,20 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('settings.organizationManagementPage.revoke')" />
               </OButton>
-              <OTooltip v-if="!row.org_storage_enabled && byobLocked" :content="byobLockedReason">
-                <span class="inline-flex max-md:hidden">
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-circle"
-                    icon-left="lock"
-                    disabled
-                    :aria-label="t('settings.organizationManagementPage.enableStorage')"
-                    data-test="org-management-storage-enable-btn"
-                  />
-                </span>
-              </OTooltip>
               <OButton
-                v-else-if="!row.org_storage_enabled"
+                v-if="!row.org_storage_enabled"
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="cloud-upload"
@@ -282,8 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="!row.org_storage_enabled"
-                  :icon-left="byobLocked ? 'lock' : 'cloud-upload'"
-                  :disabled="byobLocked"
+                  icon-left="cloud-upload"
                   class="md:hidden"
                   data-test="org-management-storage-enable-btn-menu"
                   @select="toggleOrgStorage(row)"
@@ -521,7 +508,6 @@ import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -586,7 +572,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const { confirm } = useConfirmDialog();
-    const { locked: byobLocked, lockedReason: byobLockedReason } = useLicenseLock("byob");
 
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
@@ -1206,7 +1191,6 @@ export default defineComponent({
     };
 
     const toggleOrgStorage = async (row: any) => {
-      if (byobLocked.value) return;
       const ok = await confirm({
         title: t("settings.organizationManagementPage.enableByobTitle"),
         message: t("settings.organizationManagementPage.enableByobMessage", { name: row.name }),
@@ -1363,8 +1347,6 @@ export default defineComponent({
       submitContract,
       confirmRevokeContract,
       toggleOrgStorage,
-      byobLocked,
-      byobLockedReason,
       formatMicrosToDate,
       formatCredits,
       filterQuery,

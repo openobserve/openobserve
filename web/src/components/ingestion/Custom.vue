@@ -18,55 +18,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DataSourceSidebarLayout v-model="tabs" :splitter-width="250" compact-mode="strip">
     <template #tabs>
-      <!-- The rail only navigates, so a license-locked guide still lets the reader move to a free one. -->
-      <FeatureLockExempt class="contents">
-        <ORouteTab
-          name="ingestLogs"
-          data-test="ingestion-custom-tab-ingestLogs"
-          :to="{
-            name: 'ingestLogs',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.logsLabel')"
-        />
-        <ORouteTab
-          name="ingestMetrics"
-          data-test="ingestion-custom-tab-ingestMetrics"
-          :to="{
-            name: 'ingestMetrics',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.metricsLabel')"
-        />
-        <ORouteTab
-          v-if="store.state.zoConfig?.profiling_enabled"
-          name="ingestProfiles"
-          data-test="ingestion-custom-tab-ingestProfiles"
-          :to="{
-            name: 'ingestProfiles',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.profilesLabel')"
-          :suffix-icon="profilesLocked ? 'lock' : undefined"
-        />
-        <ORouteTab
-          name="ingestTraces"
-          data-test="ingestion-custom-tab-ingestTraces"
-          :to="{
-            name: 'ingestTraces',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.tracesLabel')"
-        />
-      </FeatureLockExempt>
+      <ORouteTab
+        name="ingestLogs"
+        data-test="ingestion-custom-tab-ingestLogs"
+        :to="{
+          name: 'ingestLogs',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.logsLabel')"
+      />
+      <ORouteTab
+        name="ingestMetrics"
+        data-test="ingestion-custom-tab-ingestMetrics"
+        :to="{
+          name: 'ingestMetrics',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.metricsLabel')"
+      />
+      <ORouteTab
+        v-if="store.state.zoConfig?.profiling_enabled"
+        name="ingestProfiles"
+        data-test="ingestion-custom-tab-ingestProfiles"
+        :to="{
+          name: 'ingestProfiles',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.profilesLabel')"
+      />
+      <ORouteTab
+        name="ingestTraces"
+        data-test="ingestion-custom-tab-ingestTraces"
+        :to="{
+          name: 'ingestTraces',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.tracesLabel')"
+      />
     </template>
 
     <div class="h-full overflow-hidden">
@@ -92,12 +88,10 @@ import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { getImageURL } from "@/utils/zincutils";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 export default defineComponent({
   name: "CustomPage",
-  components: { ORouteTab, DataSourceSidebarLayout, FeatureLockExempt },
+  components: { ORouteTab, DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -108,7 +102,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
-    const { locked: profilesLocked } = useLicenseLock("continuous_profiling");
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const metricRoutes = [
       "prometheus",
@@ -235,7 +228,6 @@ export default defineComponent({
       traceRoutes,
       metricRoutes,
       profileRoutes,
-      profilesLocked,
     };
   },
 });

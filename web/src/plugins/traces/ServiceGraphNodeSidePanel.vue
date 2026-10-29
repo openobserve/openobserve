@@ -54,10 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            :disabled="correlationLocked"
-            :focusable-unavailable="correlationLocked"
-            :icon-left="correlationLocked ? 'lock' : undefined"
-            :description="correlationLocked ? correlationLockedReason : null"
             @select="viewRelatedLogs"
             data-test="service-graph-node-panel-view-related-logs-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.logs") }}</ODropdownItem
@@ -71,11 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                Database Monitoring already accepts a `service` scope; this is
                the entry point that sets it. Hidden when the feature is off. -->
           <ODropdownItem
-            v-if="dbmEnabled || dbmLocked"
-            :disabled="dbmLocked"
-            :focusable-unavailable="dbmLocked"
-            :icon-left="dbmLocked ? 'lock' : undefined"
-            :description="dbmLocked ? dbmLockedReason : null"
+            v-if="dbmEnabled"
             @select="viewRelatedDatabases"
             data-test="service-graph-node-panel-view-related-databases-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.databases") }}</ODropdownItem
@@ -218,7 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isInferred"
               name="metrics"
               :label="t('traces.serviceGraphNodeSidePanel.metrics')"
-              :suffix-icon="correlationLocked ? 'lock' : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-metrics"
             />
@@ -516,14 +507,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="panel-section mb-0! h-full! p-0!"
             data-test="service-graph-side-panel-metrics"
           >
-            <LicenseDeniedState
-              v-if="correlationLocked"
-              :features="['correlation']"
-              data-test="service-graph-side-panel-metrics-license-denied"
-            />
             <!-- Loading state — shimmer skeletons standing in for the metric charts -->
             <div
-              v-else-if="metricsCorrelationLoading"
+              v-if="metricsCorrelationLoading"
               class="px-page-edge flex flex-col gap-3 py-4"
               data-test="service-graph-side-panel-metrics-loading"
             >
@@ -619,8 +605,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -924,7 +908,6 @@ export default defineComponent({
     ODropdownItem,
     ODrawer,
     TelemetryCorrelationDashboard,
-    LicenseDeniedState,
     OTable,
     RenderDashboardCharts,
     OTooltip,
@@ -1288,10 +1271,6 @@ export default defineComponent({
       }
     };
 
-    const { locked: correlationLocked, lockedReason: correlationLockedReason } =
-      useLicenseLock("correlation");
-    const { locked: dbmLocked, lockedReason: dbmLockedReason } = useLicenseLock("db_monitoring");
-
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
     const correlationLoading = ref(false);
@@ -1333,7 +1312,7 @@ export default defineComponent({
     const metricsCorrelationLoaded = ref(false);
 
     const fetchCorrelatedStreams = async (force = false) => {
-      if (!props.selectedNode || correlationLocked.value) return;
+      if (!props.selectedNode) return;
       if (!force && correlationData.value) return;
 
       correlationLoading.value = true;
@@ -1419,7 +1398,7 @@ export default defineComponent({
 
     // Fetch correlated metric streams for the Metrics tab
     const fetchMetricsCorrelation = async (force = false) => {
-      if (!props.selectedNode || correlationLocked.value) return;
+      if (!props.selectedNode) return;
       if (!force && metricsCorrelationLoaded.value) return;
 
       metricsCorrelationLoading.value = true;
@@ -2256,7 +2235,7 @@ export default defineComponent({
 
       // Ensure the stream schema is resolved (shared with inferred tab resolution)
       await resolveStreamSchema();
-      if (streamFieldSet.value.size === 0 || correlationLocked.value) return;
+      if (streamFieldSet.value.size === 0) return;
 
       try {
         const org = store.state.selectedOrganization.identifier;
@@ -2450,7 +2429,7 @@ export default defineComponent({
     const viewRelatedDatabases = () => {
       const node = props.selectedNode;
       const serviceName = node?.name || node?.label || node?.id;
-      if (!serviceName || dbmLocked.value) return;
+      if (!serviceName) return;
       router.push({
         name: "dbmQueries",
         query: {
@@ -2464,7 +2443,7 @@ export default defineComponent({
 
     const viewRelatedLogs = async () => {
       const serviceName = buildServiceName();
-      if (!serviceName || correlationLocked.value) return;
+      if (!serviceName) return;
 
       const org = store.state.selectedOrganization.identifier;
 
@@ -2608,10 +2587,6 @@ export default defineComponent({
       viewRelatedTraces,
       viewRelatedLogs,
       dbmEnabled,
-      dbmLocked,
-      dbmLockedReason,
-      correlationLocked,
-      correlationLockedReason,
       viewRelatedDatabases,
       handleShowTelemetry,
       // RED Charts

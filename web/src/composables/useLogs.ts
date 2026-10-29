@@ -47,7 +47,6 @@ import type { RunReason } from "@/composables/useLogs/useAutoRun";
 import { resetTransient } from "@/utils/logs/transientSearchKeys";
 import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
-import { featureState } from "@/utils/featureGate";
 import {
   decodeColumns,
   initShownSearchFromUrl,
@@ -505,14 +504,11 @@ const useLogs = (t: TranslateFn) => {
       delete queryParams.type;
     }
 
-    const superCluster =
-      store.state.zoConfig?.super_cluster_enabled &&
-      featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
-    if (superCluster && queryParams.regions) {
+    if (store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
       searchObj.meta.regions = queryParams.regions.split(",");
     }
 
-    if (superCluster && queryParams.clusters) {
+    if (store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
       searchObj.meta.clusters = queryParams.clusters.split(",");
     }
 

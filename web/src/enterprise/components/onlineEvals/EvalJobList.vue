@@ -259,7 +259,6 @@ import type {
 import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
 import { relativeTime } from "./utils/evalFormat";
 import { formatDate } from "@/utils/date";
-import type { ForbiddenState } from "@/utils/featureGate";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
@@ -268,7 +267,7 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
-  forbidden?: ForbiddenState;
+  forbidden?: boolean;
   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */

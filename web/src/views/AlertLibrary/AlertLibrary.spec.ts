@@ -1176,43 +1176,6 @@ describe("AlertLibrary", () => {
       expect(card(wrapper).find('[data-test="alert-library-card-enterprise"]').exists()).toBe(true);
     });
 
-    it("shows anomaly alerts locked when anomaly_detection is license-locked", async () => {
-      setAccess("enabled");
-      store.state.zoConfig = {
-        ...store.state.zoConfig,
-        features: { anomaly_detection: "locked" },
-      } as typeof original.zoConfig;
-      const wrapper = await mountView();
-      expect(card(wrapper).find('[data-test="alert-library-card-enterprise"]').exists()).toBe(
-        false,
-      );
-      expect(card(wrapper).find('[data-test="alert-library-card-license-locked"]').exists()).toBe(
-        true,
-      );
-      const reasons = card(wrapper)
-        .findAllComponents({ name: "OTooltip" })
-        .map((tooltip) => String(tooltip.props("content")));
-      expect(reasons.some((reason) => reason.includes("anomaly_detection"))).toBe(true);
-
-      await card(wrapper).trigger("click");
-      await wrapper
-        .get(`[data-test="alert-library-select-${ANOMALY}"]`)
-        .get('[role="checkbox"]')
-        .trigger("click");
-      await flushPromises();
-      expect(upgrade.isOpen.value).toBe(false);
-      expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("open")).toBe(false);
-      expect(card(wrapper).attributes("data-selected")).toBe("false");
-    });
-
-    it("shows the edition badge, not the license lock, when the build is not entitled", async () => {
-      setAccess("locked");
-      const wrapper = await mountView();
-      expect(card(wrapper).find('[data-test="alert-library-card-license-locked"]').exists()).toBe(
-        false,
-      );
-    });
-
     it("opens the upgrade dialog instead of the drawer for a locked card", async () => {
       setAccess("locked");
       const wrapper = await mountView();

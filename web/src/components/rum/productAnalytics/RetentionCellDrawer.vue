@@ -77,20 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary text-xs">{{ fmt(row.last_seen) }}</span>
           </template>
           <template #cell-actions="{ row, index }">
-            <OTooltip v-if="rumLocked" :content="rumLockedReason">
-              <span class="inline-flex">
-                <OButton
-                  variant="ghost"
-                  size="sm"
-                  icon-left="lock"
-                  disabled
-                  :data-test="`rum-analytics-retention-user-${index}-sessions-btn`"
-                  >{{ t("rum.analytics.retention.viewInSessions") }}</OButton
-                >
-              </span>
-            </OTooltip>
             <OButton
-              v-else
               variant="ghost"
               size="sm"
               icon-right="arrow-forward"
@@ -116,8 +103,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
@@ -160,7 +145,6 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ "update:open": [boolean] }>();
 const { t } = useI18nTyped();
-const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
 const router = useRouter();
 const store = useStore();
 const pa = useProductAnalytics();

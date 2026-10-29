@@ -20,7 +20,6 @@ import useEnvRoutes from "./router";
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((_to: unknown, _from: unknown, next: () => void) => next()),
 }));
-vi.mock("@/stores", () => ({ default: { state: { zoConfig: {} } } }));
 vi.mock("@/enterprise/components/billings/Billing.vue", () => ({ default: { name: "Billing" } }));
 vi.mock("@/enterprise/components/billings/plans.vue", () => ({ default: { name: "Plans" } }));
 vi.mock("@/enterprise/components/billings/invoiceHistory.vue", () => ({
@@ -51,15 +50,6 @@ describe("enterprise routes: allowOnEmptyData", () => {
     "opens %s on an empty org, the children inheriting the billings meta",
     (path) => {
       expect(resolveMeta(path).allowOnEmptyData).toBe(true);
-    },
-  );
-});
-
-describe("enterprise routes: ai_observability license", () => {
-  it.each(["/ai/llm-insights", "/ai/sessions", "/ai/session-details"])(
-    "tags %s with meta.licenseFeature so a locked license renders it locked",
-    (path) => {
-      expect(resolveMeta(path).licenseFeature).toBe("ai_observability");
     },
   );
 });

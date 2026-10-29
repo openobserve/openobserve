@@ -59,15 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-toolbar"
-          :icon-left="dashboardsLocked ? 'lock' : 'dashboard-customize'"
-          :disabled="dashboardsLocked || eventsGate !== 'ready'"
+          icon-left="dashboard-customize"
+          :disabled="eventsGate !== 'ready'"
           :aria-label="t('rum.analytics.dashboard.add')"
           data-test="rum-analytics-trends-add-dashboard-btn"
           @click="dashboardOpen = true"
         />
-        <OTooltip
-          :content="dashboardsLocked ? dashboardsLockedReason : t('rum.analytics.dashboard.add')"
-        />
+        <OTooltip :content="t('rum.analytics.dashboard.add')" />
       </span>
     </div>
     <div v-if="series.length" class="flex flex-wrap items-center gap-1.5 px-4 pt-2">
@@ -158,7 +156,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNotice.vue";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
@@ -185,8 +182,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:series": [StepRef[]]; "retry-events": [] }>();
 const { t } = useI18nTyped();
-const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
-  useLicenseLock("dashboards");
 const metric = ref<"sessions" | "users">("sessions");
 // Users needs an identity, so losing it must not leave the toggle with nothing selected.
 watch(

@@ -37,8 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
           <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
           <div
-            v-if="locked || licenseLocked"
-            :data-test="licenseLocked ? `menu-link-${link}-license-lock` : undefined"
+            v-if="locked"
             class="bg-surface-base absolute -top-1 -right-1 z-1 flex h-3.5 w-3.5 items-center justify-center rounded-full"
           >
             <OIcon name="lock" size="xs" class="text-warning-600" />
@@ -218,11 +217,6 @@ export default defineComponent({
     lockedMessage: {
       type: String as unknown as PropType<I18nText>,
       default: raw(""),
-    },
-    // The license locks the feature: badge only, since the real page renders its own locked state.
-    licenseLocked: {
-      type: Boolean,
-      default: false,
     },
   },
   emits: ["trigger"],

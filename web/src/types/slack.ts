@@ -25,7 +25,7 @@ export type SlackAnswerMode = "thread" | "private";
 
 export type SlackSetFrom = "settings" | "install" | "destination";
 
-export type SlackDisabledReason = "edition" | "license" | "flag" | "master_key" | "super_cluster";
+export type SlackDisabledReason = "edition" | "flag" | "master_key" | "super_cluster";
 
 export type SlackInstallationStatus = "pending" | "revoked" | "degraded" | "healthy";
 

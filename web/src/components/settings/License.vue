@@ -87,34 +87,27 @@
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
               <div class="mb-3 text-xl font-semibold">{{ t("about.license_info") }}</div>
-              <!-- fixed layout so the label column keeps its width when the features cell grows or shrinks -->
-              <table
-                class="border-table-header-border w-full table-fixed border-collapse border border-solid wrap-break-word"
-              >
+              <table class="border-table-header-border w-full border-collapse border border-solid">
                 <tbody>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.installation_id") }}
                     </td>
-                    <td class="px-3 py-2 leading-[1.2] break-all">
-                      {{ licenseData.installation_id }}
-                    </td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.license_id") }}
                     </td>
-                    <td class="px-3 py-2 leading-[1.2] break-all">
-                      {{ licenseData.license.license_id }}
-                    </td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.status_lbl") }}
                     </td>
@@ -124,25 +117,9 @@
                       </OBadge>
                     </td>
                   </tr>
-                  <tr
-                    class="border-table-row-divider border-b border-solid"
-                    data-test="settings-license-features"
-                  >
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 align-top leading-[1.2] font-bold"
-                    >
-                      {{ t("about.features") }}
-                    </td>
-                    <td class="px-3 py-2 text-sm">
-                      <LicenseFeatures
-                        :license="licenseData.license"
-                        @request-access="redirectToGetLicense"
-                      />
-                    </td>
-                  </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.create_at_lbl") }}
                     </td>
@@ -152,7 +129,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.expires_at_lbl") }}
                     </td>
@@ -162,7 +139,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.company") }}
                     </td>
@@ -170,18 +147,18 @@
                   </tr>
                   <tr v-if="licenseData.key" class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.license_key") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span class="min-w-0 break-all">{{ getMaskedLicenseKey() }}</span>
+                      <div class="flex items-center gap-2">
+                        <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
                           :aria-label="t('common.reveal')"
                           variant="ghost"
                           size="icon"
-                          class="shrink-0"
+                          class="ms-2"
                           data-test="show-license-key-btn"
                           @click="showLicenseKeyModal = true"
                         >
@@ -195,7 +172,7 @@
                     class="border-table-row-divider border-b border-solid"
                   >
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.contact_name") }}
                     </td>
@@ -206,17 +183,15 @@
                     class="border-table-row-divider border-b border-solid"
                   >
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.contact_email") }}
                     </td>
-                    <td class="px-3 py-2 leading-[1.2] break-all">
-                      {{ licenseData.license.contact_email }}
-                    </td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
                     <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.environment_type") }}
                     </td>
@@ -520,7 +495,6 @@ import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import LicenseStatusCard from "./LicenseStatusCard.vue";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
-import LicenseFeatures from "./LicenseFeatures.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -547,7 +521,6 @@ export default defineComponent({
     LicensePeriod,
     LicenseStatusCard,
     LicenseWaiversCard,
-    LicenseFeatures,
     RenderDashboardCharts,
     OButton,
     ODialog,
@@ -713,8 +686,7 @@ export default defineComponent({
     const redirectToGetLicense = () => {
       const baseUrl = window.location.origin;
       const installationId = licenseData.value.installation_id || "";
-      const serverUrl = String(store.state.zoConfig.license_server_url ?? "").replace(/\/+$/, "");
-      const licenseUrl = `${serverUrl}/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
+      const licenseUrl = `${store.state.zoConfig.license_server_url}/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
       window.open(licenseUrl, "_blank");
     };
 

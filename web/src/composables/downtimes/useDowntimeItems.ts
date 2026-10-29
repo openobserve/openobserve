@@ -21,26 +21,6 @@ import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
 import { slosQuery } from "@/services/slos.queries";
 import type { TargetModule } from "@/services/downtimes";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-
-// SLOs are licensed under anomaly detection on the backend.
-export const TARGET_MODULE_FEATURES: Record<TargetModule, string> = {
-  alerts: "alerts",
-  anomaly_detections: "anomaly_detection",
-  synthetics: "synthetics",
-  slos: "anomaly_detection",
-};
-
-type ModuleLock = ReturnType<typeof useLicenseLock>;
-
-export function useTargetModuleLocks(): Record<TargetModule, ModuleLock> {
-  return {
-    alerts: useLicenseLock(TARGET_MODULE_FEATURES.alerts),
-    anomaly_detections: useLicenseLock(TARGET_MODULE_FEATURES.anomaly_detections),
-    synthetics: useLicenseLock(TARGET_MODULE_FEATURES.synthetics),
-    slos: useLicenseLock(TARGET_MODULE_FEATURES.slos),
-  };
-}
 
 export interface DowntimeItem {
   id: string;
@@ -96,10 +76,9 @@ export function useDowntimeItems(
   enabled: MaybeRefOrGetter<boolean> = true,
 ) {
   const orgId = useOrgId();
-  const locks = useTargetModuleLocks();
   const query = useQuery(() =>
     Object.assign(itemsQuery(toValue(module), orgId.value), {
-      enabled: !!orgId.value && toValue(enabled) && !locks[toValue(module)].locked.value,
+      enabled: !!orgId.value && toValue(enabled),
     }),
   );
   const items = computed(() => normalizeItems(toValue(module), query.data.value ?? []));

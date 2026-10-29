@@ -108,7 +108,6 @@ import usePermissions from "@/composables/iam/usePermissions";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { licenseDeniedFeatures } from "@/utils/featureGate";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -218,8 +217,6 @@ const getGroupDetails = () => {
     })
     .catch((err) => {
       console.log(err);
-      // The page stays and renders locked; the license bar explains the denial.
-      if (licenseDeniedFeatures(err)) return;
       toast({
         message: err?.message || t("iam.editGroup.groupNotFound"),
         variant: "error",

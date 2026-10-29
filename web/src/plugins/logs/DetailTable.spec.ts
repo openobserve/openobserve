@@ -1547,28 +1547,6 @@ describe("DetailTable Component", () => {
         await flushPromises();
         expect(traces()?.props("shortcutsActive")).toBe(true);
       });
-
-      describe("when the license locks correlation", () => {
-        beforeEach(() => {
-          store.state.zoConfig = { ...store.state.zoConfig, features: { correlation: "locked" } };
-        });
-        afterEach(() => {
-          const { features: _features, ...rest } = store.state.zoConfig;
-          store.state.zoConfig = rest;
-        });
-
-        it("opens the locked tab on LicenseDeniedState without loading correlation", async () => {
-          await mountFooter({ initialTab: "json" });
-          expect(wrapper.vm.tabOrder.find((t: any) => t.name === "correlated-logs")?.locked).toBe(
-            true,
-          );
-          wrapper.vm.onTabChange("correlated-logs");
-          await flushPromises();
-          expect(wrapper.vm.tab).toBe("correlated-logs");
-          expect(wrapper.findComponent({ name: "LicenseDeniedState" }).exists()).toBe(true);
-          expect(wrapper.emitted("load-correlation")).toBeUndefined();
-        });
-      });
     });
 
     it("never emits a locked correlated tab and bounces back from one", async () => {

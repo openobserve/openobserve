@@ -68,35 +68,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
       >
-        <FeatureLockExempt v-if="ownsSidebarTrigger" as="span" class="contents">
-          <OButton
-            variant="ghost"
-            size="icon-toolbar"
-            data-test="o-page-layout-mobile-sidebar-btn"
-            :aria-label="t('common.sidePanel')"
-            @click="layoutSidebar?.open()"
-          >
-            <OIcon name="menu" size="sm" />
-          </OButton>
-        </FeatureLockExempt>
+        <OButton
+          v-if="ownsSidebarTrigger"
+          variant="ghost"
+          size="icon-toolbar"
+          data-test="o-page-layout-mobile-sidebar-btn"
+          :aria-label="t('common.sidePanel')"
+          @click="layoutSidebar?.open()"
+        >
+          <OIcon name="menu" size="sm" />
+        </OButton>
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
            footprint, so the title's X never shifts between list and add/edit). -->
         <template v-if="hasBack()">
           <slot name="back">
-            <FeatureLockExempt as="span" class="contents">
-              <button
-                type="button"
-                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
-                :title="backLabel"
-                :aria-label="backLabel"
-                :data-test="props.back?.dataTest ?? 'app-page-header-back'"
-                @click="onBack"
-              >
-                <OIcon name="chevron-left" size="md" />
-              </button>
-            </FeatureLockExempt>
+            <button
+              type="button"
+              class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+              :title="backLabel"
+              :aria-label="backLabel"
+              :data-test="props.back?.dataTest ?? 'app-page-header-back'"
+              @click="onBack"
+            >
+              <OIcon name="chevron-left" size="md" />
+            </button>
           </slot>
         </template>
 
@@ -124,33 +121,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'md:max-lg:min-w-32'
           "
         >
-          <div class="flex min-w-0 items-center gap-1.5">
-            <h1
-              v-if="titleOverflow === 'visible'"
-              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-              :data-test="titleDataTest"
-            >
-              <slot name="title">{{ title }}</slot>
-            </h1>
-            <OTruncatedText
-              v-else
-              as="h1"
-              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-              :data-test="titleDataTest"
-            >
-              <slot name="title">{{ title }}</slot>
-            </OTruncatedText>
-            <span
-              v-if="locked"
-              role="img"
-              :aria-label="lockedLabel"
-              class="text-warning-600 inline-flex shrink-0"
-              data-test="app-page-header-locked"
-            >
-              <OIcon name="lock" size="sm" />
-              <OTooltip :content="lockedLabel" />
-            </span>
-          </div>
+          <h1
+            v-if="titleOverflow === 'visible'"
+            class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            :data-test="titleDataTest"
+          >
+            <slot name="title">{{ title }}</slot>
+          </h1>
+          <OTruncatedText
+            v-else
+            as="h1"
+            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            :data-test="titleDataTest"
+          >
+            <slot name="title">{{ title }}</slot>
+          </OTruncatedText>
           <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
@@ -243,11 +228,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useFeatureLock, useFeatureNames } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
-import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -298,16 +280,7 @@ const ROW_CLASS =
 const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
-const { featureName } = useFeatureNames();
 const { isMobile } = useBreakpoint();
-const { locked, feature: lockedFeature } = useFeatureLock();
-const lockedLabel = computed(() =>
-  t("featureLock.headerLocked", {
-    feature: raw(
-      lockedFeature.value ? (featureName(lockedFeature.value) ?? lockedFeature.value) : "",
-    ),
-  }),
-);
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
 const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);

@@ -2771,17 +2771,6 @@ describe("ServicesCatalog", () => {
       expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
     });
 
-    it("makes no anomaly calls and shows no strip when anomaly_detection is license-locked", async () => {
-      wrapper = mountServicesCatalog({
-        storeOverrides: { zoConfig: { features: { anomaly_detection: "locked" } } },
-      });
-      await flushPromises();
-      expect(anomaliesSchemaCalls()).toHaveLength(0);
-      expect(anomalyCalls()).toHaveLength(0);
-      expect(mockAnomalyList).not.toHaveBeenCalled();
-      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
-    });
-
     it("queries managed anomalies over the catalog time range, keeping below-direction rate ones", async () => {
       mockSearchObj.data.datetime.type = "absolute";
       await mountEnabled();

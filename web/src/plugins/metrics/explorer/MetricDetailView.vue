@@ -286,13 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('metrics.explorer.detail.drilldown.button')"
                 data-test="metrics-detail-drilldown"
               >
-                <template
-                  v-if="
-                    drilldown.availability.value === 'oss' ||
-                    drilldown.availability.value === 'licenseLocked'
-                  "
-                  #icon-left
-                >
+                <template v-if="drilldown.availability.value === 'oss'" #icon-left>
                   <OIcon name="lock" size="sm" data-test="metrics-detail-drilldown-lock" />
                 </template>
                 <span class="max-md:hidden">{{
@@ -647,7 +641,6 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useMetricDrilldown } from "@/composables/metrics/useMetricDrilldown";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
@@ -906,7 +899,6 @@ export default defineComponent({
     const overviewState = ref<OverviewState>(IDLE);
 
     const router = useRouter();
-    const correlationLock = useLicenseLock("correlation");
     const drilldown = useMetricDrilldown({
       org: () => store.state.selectedOrganization?.identifier ?? "",
       metric: () => (props.card ? { name: props.card.name, labels: props.card.labels } : null),
@@ -916,7 +908,6 @@ export default defineComponent({
       inapplicableFilters: () => props.inapplicableFilters,
       timeRange: () => props.timeRange,
       serviceStreamsEnabled: () => !!store.state.zoConfig?.service_streams_enabled,
-      licenseLocked: () => correlationLock.locked.value,
       router,
       store,
       onDropped: (labels) =>
@@ -931,7 +922,6 @@ export default defineComponent({
     const drilldownBlockedReason = computed(() => {
       const state = drilldown.availability.value;
       if (state === "oss") return t("metrics.explorer.detail.drilldown.enterprise");
-      if (state === "licenseLocked") return correlationLock.lockedReason.value;
       if (state === "discoveryOff") return t("metrics.explorer.detail.drilldown.discoveryOff");
       if (state === "pending") return t("metrics.explorer.detail.drilldown.checking");
       return t("metrics.explorer.detail.drilldown.forbidden");

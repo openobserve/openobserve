@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { defineComponent, h, nextTick, ref } from "vue";
+import { h, nextTick } from "vue";
 import OButton from "./OButton.vue";
-import { provideFeatureLock } from "@/composables/useFeatureLock";
 import type { ButtonVariant } from "./OButton.types";
 
 describe("OButton", () => {
@@ -635,45 +634,6 @@ describe("OButton", () => {
       mountIconOnly().unmount();
       vi.advanceTimersByTime(1000);
       expect(warn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("inside a license-locked page", () => {
-    const mountLocked = (props: Record<string, unknown> = {}) => {
-      const Locked = defineComponent({
-        setup(_, { slots }) {
-          provideFeatureLock(ref("workflows"));
-          return () => slots.default?.();
-        },
-      });
-      return mount(Locked, {
-        slots: { default: () => h(OButton, { ...props, "data-test": "btn" }, () => "Save") },
-      });
-    };
-
-    it("renders disabled and emits no click", async () => {
-      const wrapper = mountLocked();
-      const button = wrapper.findComponent(OButton);
-      expect(button.attributes("disabled")).toBeDefined();
-      expect(button.attributes("aria-disabled")).toBe("true");
-      await button.trigger("click");
-      expect(button.emitted("click")).toBeUndefined();
-    });
-
-    it("blocks an anchor button, which has no native disabled", async () => {
-      const wrapper = mountLocked({ as: "a", href: "#target" });
-      const button = wrapper.findComponent(OButton);
-      expect(button.classes()).toContain("cursor-not-allowed!");
-      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
-      button.element.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(true);
-      expect(button.emitted("click")).toBeUndefined();
-    });
-
-    it("stays enabled outside any provider", async () => {
-      const wrapper = mount(OButton, { slots: { default: "Save" } });
-      await wrapper.trigger("click");
-      expect(wrapper.emitted("click")).toHaveLength(1);
     });
   });
 });

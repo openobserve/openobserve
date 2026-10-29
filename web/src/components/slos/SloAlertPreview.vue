@@ -109,7 +109,6 @@ import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import sloService from "@/services/slos";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import { formatCoverage } from "@/composables/useSloFormat";
 import { type UptimeBandState, uptimeBands } from "@/utils/slos/alertSource";
 import type { AlertSliPreview } from "@/ts/interfaces/slo";
@@ -123,7 +122,6 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { locked: anomalyLocked } = useLicenseLock("anomaly_detection");
 
 const preview = ref<AlertSliPreview | null>(null);
 const loading = ref(false);
@@ -174,7 +172,7 @@ let latestRequest = 0;
 async function load() {
   const mine = ++latestRequest;
   const org = store.state.selectedOrganization?.identifier;
-  if (!org || !props.alertId || anomalyLocked.value) {
+  if (!org || !props.alertId) {
     preview.value = null;
     loading.value = false;
     return;

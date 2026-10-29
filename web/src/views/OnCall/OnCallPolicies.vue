@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       ref="oTableRef"
       :frame="false"
-      :forbidden="forbidden"
       :data="rows"
       :columns="columns"
       row-key="teamId"
@@ -165,7 +164,6 @@ import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { priorityLabel, priorityTagVariant, resolveLadder } from "@/utils/oncall";
-import { licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
 /// One team's ladder, reduced to the two questions this page exists to answer.
 interface PolicyRow {
@@ -185,7 +183,6 @@ const router = useRouter();
 const ABSENT = raw("—");
 
 const allRows = ref<PolicyRow[]>([]);
-const forbidden = ref<ForbiddenState>(false);
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const savedView = useListViewState("oncall-policies", {
@@ -346,7 +343,6 @@ async function fetchAll(force = false) {
     const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
     const settled = await Promise.all(teams.map((team) => fetchTeamRow(team, force)));
     allRows.value = settled.filter((row): row is PolicyRow => row !== null);
-    forbidden.value = false;
     // The oldest of the reads the rows are built from, so the age never claims the table is fresher than it is.
     lastUpdatedAt.value = Math.min(
       ...[
@@ -355,12 +351,6 @@ async function fetchAll(force = false) {
       ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
     );
   } catch (err: any) {
-    // A license denial is not a failed read: the table shows the license copy instead.
-    const denied = licenseDeniedFeatures(err);
-    if (denied) {
-      forbidden.value = denied;
-      return;
-    }
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadTeamsFailed"),

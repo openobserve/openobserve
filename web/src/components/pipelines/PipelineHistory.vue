@@ -478,7 +478,6 @@ import { pipelineHistoryQuery } from "@/services/pipelines.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, OTableExposed } from "@/lib/core/Table/OTable.types";
 
@@ -489,7 +488,7 @@ const { isMobile } = useBreakpoint();
 // Data
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
-const forbidden = ref<ForbiddenState>(false);
+const forbidden = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedPipeline = ref<any>();
@@ -766,7 +765,7 @@ const fetchPipelineHistory = async (force = false) => {
   } catch (error: any) {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
-    forbidden.value = forbiddenState(error);
+    forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({

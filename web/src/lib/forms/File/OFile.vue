@@ -3,7 +3,6 @@
 
 import type { FileProps, FileEmits, FileSlots, FileValue } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
-import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -32,8 +31,6 @@ const props = withDefaults(defineProps<FileProps>(), {
 const emit = defineEmits<FileEmits>();
 
 defineSlots<FileSlots>();
-
-const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
@@ -131,12 +128,12 @@ function removeFile(index: number, event?: Event) {
 }
 
 function openPicker() {
-  if (isDisabled.value) return;
+  if (props.disabled) return;
   inputRef.value?.click();
 }
 
 function onDragOver(event: DragEvent) {
-  if (isDisabled.value || !props.dropZone) return;
+  if (props.disabled || !props.dropZone) return;
   event.preventDefault();
   isDragging.value = true;
 }
@@ -173,7 +170,7 @@ function filterByAccept(files: File[], accept: string): File[] {
 }
 
 function onDrop(event: DragEvent) {
-  if (isDisabled.value || !props.dropZone) return;
+  if (props.disabled || !props.dropZone) return;
   event.preventDefault();
   isDragging.value = false;
   const dropped = event.dataTransfer?.files ?? null;
@@ -195,7 +192,7 @@ const wrapperClasses = computed(() => [
     : hasError.value
       ? "bg-file-bg border-file-error-border"
       : "bg-file-bg border-file-border hover:border-file-hover-border",
-  isDisabled.value
+  props.disabled
     ? "bg-file-disabled-bg border-file-disabled-border opacity-60 cursor-not-allowed"
     : "cursor-pointer",
   "focus-within:border-file-focus-border focus-within:ring-2 focus-within:ring-file-focus-ring",
@@ -236,7 +233,7 @@ const wrapperClasses = computed(() => [
         :name="name"
         :multiple="multiple"
         :accept="accept"
-        :disabled="isDisabled"
+        :disabled="disabled"
         :tabindex="inputTabindex"
         class="sr-only"
         :aria-invalid="hasError || undefined"
@@ -286,7 +283,7 @@ const wrapperClasses = computed(() => [
             {{ formatSize(file.size) }}
           </span>
           <button
-            v-if="!isDisabled"
+            v-if="!disabled"
             type="button"
             tabindex="-1"
             :aria-label="t('components.file.removeFile')"
@@ -310,7 +307,7 @@ const wrapperClasses = computed(() => [
       </div>
 
       <button
-        v-if="files.length > 0 && !isDisabled"
+        v-if="files.length > 0 && !disabled"
         type="button"
         tabindex="-1"
         :aria-label="t('components.file.clearAll')"

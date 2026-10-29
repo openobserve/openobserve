@@ -1775,25 +1775,6 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown({ selectedLabel: "method" });
       await flushPromises();
       expect(button(wrapper).text()).toBe("Add to dashboard");
-      expect(wrapper.find('[data-test="metrics-breakdown-add-to-dashboard-lock"]').exists()).toBe(
-        false,
-      );
-    });
-
-    it("is disabled with a lock and opens no dialog when the license locks dashboards", async () => {
-      store.state.zoConfig = { ...store.state.zoConfig, features: { dashboards: "locked" } };
-      try {
-        wrapper = mountBreakdown({ selectedLabel: "method" });
-        await flushPromises();
-        expect(button(wrapper).attributes("disabled")).toBeDefined();
-        expect(wrapper.find('[data-test="metrics-breakdown-add-to-dashboard-lock"]').exists()).toBe(
-          true,
-        );
-        await button(wrapper).trigger("click");
-        expect(dialog(wrapper).props("open")).toBeFalsy();
-      } finally {
-        store.state.zoConfig = { ...store.state.zoConfig, features: {} };
-      }
     });
 
     it("hands the dialog a panel that reproduces the focused chart", async () => {

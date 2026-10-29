@@ -118,31 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <QueryTypeSelector v-if="pageType === 'build'" :showQueryType="false" />
                     <div v-else />
                     <div class="flex items-center gap-2">
-                      <!-- A disabled button fires no pointer events, so the span is the tooltip's hover target. -->
-                      <OTooltip
-                        v-if="resolvedConfig.showAddToDashboardButton && dashboardsLocked"
-                        :content="dashboardsLockedReason"
-                      >
-                        <span class="inline-flex">
-                          <OButton
-                            data-test="panel-editor-add-to-dashboard-btn"
-                            variant="primary"
-                            size="xs"
-                            disabled
-                          >
-                            <template #icon-left>
-                              <OIcon
-                                name="lock"
-                                size="sm"
-                                data-test="panel-editor-add-to-dashboard-lock"
-                              />
-                            </template>
-                            {{ t("search.addToDashboard") }}
-                          </OButton>
-                        </span>
-                      </OTooltip>
                       <OButton
-                        v-else-if="resolvedConfig.showAddToDashboardButton"
+                        v-if="resolvedConfig.showAddToDashboardButton"
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
@@ -755,7 +732,6 @@ import { resolveConfig } from "./types/panelEditor";
 import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
 
@@ -845,9 +821,6 @@ const emit = defineEmits<PanelEditorEmits>();
 // ============================================================================
 
 const { t } = useI18nTyped();
-
-const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
-  useLicenseLock("dashboards");
 
 // Resolve configuration (merge props with presets)
 const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));

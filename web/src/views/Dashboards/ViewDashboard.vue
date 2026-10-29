@@ -411,27 +411,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
               @open="enterKiosk"
             />
-            <OTooltip v-if="!isFullscreen && reportsLocked" :content="reportsLockedReason">
-              <span v-show="store.state.printMode !== true" class="inline-flex">
-                <OButton
-                  variant="outline"
-                  size="icon-toolbar"
-                  disabled
-                  :aria-label="t('dashboard.scheduledDashboards')"
-                  data-test="view-dashboard-scheduled-reports"
-                >
-                  <template #icon-left>
-                    <OIcon
-                      name="lock"
-                      size="sm"
-                      data-test="view-dashboard-scheduled-reports-lock"
-                    />
-                  </template>
-                </OButton>
-              </span>
-            </OTooltip>
             <OButton
-              v-else-if="!isFullscreen"
+              v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
               size="icon-toolbar"
@@ -711,7 +692,6 @@ import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSav
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
@@ -847,7 +827,6 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const { locked: reportsLocked, lockedReason: reportsLockedReason } = useLicenseLock("reports");
 
     // Set before the first render so a reloaded TV never flashes the app chrome.
     if (isKioskEnabled(route.query.kiosk) && !store.state.kioskMode) {
@@ -2600,7 +2579,7 @@ export default defineComponent({
     watch(kioskMode, toggleKioskEscape, { immediate: true, flush: "sync" });
 
     const openScheduledReports = () => {
-      if (isLoadingReports.value || reportsLocked.value) return;
+      if (isLoadingReports.value) return;
 
       showScheduledReportsDialog.value = true;
       scheduledReports.value = [];
@@ -2897,8 +2876,6 @@ export default defineComponent({
       searchType,
       openScheduledReports,
       showScheduledReportsDialog,
-      reportsLocked,
-      reportsLockedReason,
       isLoadingReports,
       scheduledReports,
       dashboardId,

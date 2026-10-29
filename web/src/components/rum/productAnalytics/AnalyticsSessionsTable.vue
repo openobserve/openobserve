@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="none"
       :show-global-filter="false"
       :frame="false"
-      @row-click="(row: SessionRow) => !rumLocked && emit('open', row)"
+      @row-click="(row: SessionRow) => emit('open', row)"
     >
       <template #cell-replay="{ row, index }">
         <OTag
@@ -102,18 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </template>
       <template #cell-open="{ index }">
-        <OTooltip v-if="rumLocked" :content="rumLockedReason">
-          <span class="inline-flex">
-            <OIcon
-              name="lock"
-              size="sm"
-              class="text-text-secondary"
-              :data-test="`${dataTestPrefix}-row-${index}-locked`"
-            />
-          </span>
-        </OTooltip>
         <OIcon
-          v-else
           name="chevron-right"
           size="sm"
           class="text-text-secondary"
@@ -148,8 +137,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { durationFormatter } from "@/utils/formatters";
@@ -184,7 +171,6 @@ withDefaults(
 const emit = defineEmits<{ open: [SessionRow]; "load-more": [] }>();
 const { t } = useI18nTyped();
 const store = useStore();
-const { locked: rumLocked, lockedReason: rumLockedReason } = useLicenseLock("rum");
 const dash = raw("—");
 
 const tz = () => store.state.timezone || "UTC";

@@ -81,13 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #empty>
-            <LicenseDeniedState
-              v-if="toolsetsLocked"
-              :features="['ai_toolsets']"
-              data-test="ai-toolsets-license-denied"
-            />
             <OEmptyState
-              v-else
               size="hero"
               preset="no-ai-toolsets"
               :filtered="!!filterQuery"
@@ -198,16 +192,12 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 import aiToolsetsService from "@/services/ai_toolsets";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
 export default defineComponent({
   name: "PageAiToolsets",
   components: {
-    LicenseDeniedState,
     OPageLayout,
     OEmptyState,
     ConfirmDialog,
@@ -226,12 +216,8 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     const orgIdForList = useOrgId();
-    // the list endpoint is licensed under ai_assistant, so a locked page would raise the wrong feature
-    const { locked: toolsetsLocked } = useLicenseLock("ai_toolsets");
     const toolsetsList = useQuery(() =>
-      Object.assign(aiToolsetsQuery(orgIdForList.value), {
-        enabled: !!orgIdForList.value && !toolsetsLocked.value,
-      }),
+      Object.assign(aiToolsetsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
     );
 
     // The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
@@ -244,8 +230,7 @@ export default defineComponent({
       })),
     );
     const showAddDialog = ref(false);
-    // a disabled query stays pending forever
-    const loading = computed(() => !toolsetsLocked.value && toolsetsList.isPending.value);
+    const loading = toolsetsList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = toolsetsList.isFetching;
@@ -254,7 +239,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = toolsetsList.error.value;
-      return forbiddenState(e) || e?.status === 403;
+      return e?.status === 403 || e?.response?.status === 403;
     });
     const viewState = useListViewState("ai-toolsets", {
       filterQuery: "",
@@ -364,7 +349,7 @@ export default defineComponent({
     const refreshData = () => getData(true);
 
     const getData = async (force = false) => {
-      if (force && !toolsetsLocked.value) await toolsetsList.refetch();
+      if (force) await toolsetsList.refetch();
     };
 
     let dismissLoading: (() => void) | null = null;
@@ -516,7 +501,6 @@ export default defineComponent({
       fetching,
       lastUpdatedAt,
       forbidden,
-      toolsetsLocked,
       tabledata,
       columns,
       showAddDialog,

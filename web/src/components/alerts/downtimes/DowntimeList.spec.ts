@@ -208,28 +208,6 @@ describe("DowntimeList", () => {
       },
     } as never);
 
-  it("reads no synthetics folders while synthetics is license-locked", async () => {
-    cutList();
-    store.state.zoConfig.features = { synthetics: "locked" };
-    try {
-      const wrapper = await mountList();
-      const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
-      expect(types).toContain("alerts");
-      expect(types).not.toContain("synthetics");
-      wrapper.unmount();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
-
-  it("reads the synthetics folders while synthetics is enabled", async () => {
-    cutList();
-    const wrapper = await mountList();
-    const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
-    expect(types).toContain("synthetics");
-    wrapper.unmount();
-  });
-
   it("says when the list is cut and keeps a folder's tiles on the rows it shows", async () => {
     cutList();
     const wrapper = await mountList({ folder: "team-a" });

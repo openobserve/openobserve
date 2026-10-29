@@ -4,7 +4,6 @@ import { Primitive } from "reka-ui";
 import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useFeatureLock } from "@/composables/useFeatureLock";
 
 defineOptions({ inheritAttrs: false });
 
@@ -23,11 +22,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
 const emit = defineEmits<ButtonEmits>();
 const attrs = useAttrs();
 const id = useId();
-const { locked } = useFeatureLock();
-const isDisabled = computed(() => props.disabled || locked.value);
-// No native `disabled` reaches an anchor or a slotted child, so a locked one is styled and blocked by hand.
-const lockedLink = computed(() => locked.value && (props.as !== "button" || !!props.asChild));
-const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
+const unavailable = computed(() => props.disabled && props.focusableUnavailable);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
 // Labels that arrive with data are not unnamed, so the dev check waits for them.
@@ -457,11 +452,9 @@ const classes = computed<string[]>(() => [
      1.38:1 in light and 1.50:1 in dark, against the 3:1 SC 1.4.11 floor. Solid, it is
      4.80:1 / 6.82:1. This override is why the per-variant ring classes never paint. */
   "focus-visible:ring-[0.125rem]! focus-visible:ring-focus-ring-accent!",
-  unavailable.value || lockedLink.value
-    ? "cursor-not-allowed!"
-    : "disabled:cursor-not-allowed enabled:cursor-pointer",
+  unavailable.value ? "cursor-not-allowed!" : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
-  unavailable.value || lockedLink.value
+  unavailable.value
     ? unavailableClasses.value
     : props.active
       ? activeClasses
@@ -477,8 +470,8 @@ function handleKeydown(event: KeyboardEvent): void {
 }
 
 function handleClick(event: MouseEvent): void {
-  if (isDisabled.value || props.loading) {
-    if (unavailable.value || lockedLink.value) {
+  if (props.disabled || props.loading) {
+    if (unavailable.value) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -496,11 +489,9 @@ function handleClick(event: MouseEvent): void {
     :class="classes"
     :type="as === 'button' ? type : undefined"
     :disabled="
-      as === 'button'
-        ? (isDisabled && !focusableUnavailable) || (loading && !unavailable)
-        : undefined
+      as === 'button' ? (disabled && !focusableUnavailable) || (loading && !unavailable) : undefined
     "
-    :aria-disabled="isDisabled || loading || undefined"
+    :aria-disabled="disabled || loading || undefined"
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"

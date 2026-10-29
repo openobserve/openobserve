@@ -9,7 +9,6 @@ import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useDragHandle from "@/composables/useDragHandle";
-import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 // Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
 // on the inner clickable TabsTrigger (Reka button) instead of the wrapper
@@ -25,7 +24,6 @@ const slots = defineSlots<OTabSlots>();
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY);
 
-const isDisabled = useLockedDisabled(() => props.disable);
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name);
 const isDense = computed<boolean>(() => context?.value.dense ?? false);
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
@@ -102,16 +100,7 @@ const baseClasses = computed<string>(() =>
 );
 
 const stateClasses = computed<string>(() => {
-  // A locked page disables its active tab too; it still has to read as the current one.
-  if (isDisabled.value && isActive.value) {
-    return [
-      "text-tabs-active-text cursor-not-allowed opacity-60",
-      isVertical.value
-        ? "bg-tabs-active-bg border-s-2 border-tabs-indicator"
-        : "border-b-2 border-transparent",
-    ].join(" ");
-  }
-  if (isDisabled.value) {
+  if (props.disable) {
     return [
       "text-tabs-disabled-text cursor-not-allowed opacity-60",
       // Keep the transparent left border so disabled items don't shift width.
@@ -157,7 +146,7 @@ const heightClasses = computed<string>(() => {
     on the button itself never renders. The span wrapper intercepts hover and
     shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <span :class="isDisabled ? 'cursor-not-allowed' : 'contents'">
+  <span :class="disable ? 'cursor-not-allowed' : 'contents'">
     <!--
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
@@ -169,8 +158,8 @@ const heightClasses = computed<string>(() => {
     -->
     <TabsTrigger
       :value="name"
-      :disabled="isDisabled"
-      :aria-disabled="isDisabled || undefined"
+      :disabled="disable"
+      :aria-disabled="disable || undefined"
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses, isDragging ? 'opacity-40' : '']"
@@ -196,7 +185,7 @@ const heightClasses = computed<string>(() => {
            (disableDrag, e.g. label editing) the grip stays mounted but inert so
            nothing shifts. Decorative for AT — drag has no keyboard path. -->
       <span
-        v-if="isReorderable && !isDisabled"
+        v-if="isReorderable && !disable"
         aria-hidden="true"
         data-otab-grip
         class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"

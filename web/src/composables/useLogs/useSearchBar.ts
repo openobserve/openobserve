@@ -47,7 +47,6 @@ import {
 import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
-import { featureState } from "@/utils/featureGate";
 
 let selectionToken = 0;
 
@@ -147,7 +146,6 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   const getRegionInfo = () => {
-    if (featureState(store.state.zoConfig?.features, "super_cluster") === "locked") return;
     searchService.get_regions().then((res) => {
       const clusterData = [];
       let regionObj: any = {};

@@ -15,7 +15,6 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import { featureState, withLicenseFeature } from "@/utils/featureGate";
 import store from "@/stores";
 import {
   withFeatureGate as withFeatureGateBase,
@@ -32,15 +31,11 @@ const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
     getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)),
   );
 
-// A locked license also turns the feature's legacy flag off, yet its page still renders, locked.
-const isLicenseLocked = (feature: string): boolean =>
-  featureState(store.state.zoConfig?.features, feature) === "locked";
-
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
 // access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.synthetics_enabled === false && !isLicenseLocked("synthetics")) {
+  if (store.state.zoConfig?.synthetics_enabled === false) {
     next("/");
     return;
   }
@@ -53,10 +48,7 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
 // without await, so redirecting on "not yet known" would bounce a bookmarked
 // link on a cold load.
 const privateLocationRouteGuard = (to: any, from: any, next: any) => {
-  if (
-    store.state.zoConfig?.synthetics_private_locations_enabled === false &&
-    !isLicenseLocked("synthetics")
-  ) {
+  if (store.state.zoConfig?.synthetics_private_locations_enabled === false) {
     next("/");
     return;
   }
@@ -74,7 +66,7 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 // never flashes in) — the two are not meant to match. Same split as
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
-  if (!isLicenseLocked("workflows") && store.state.zoConfig?.workflows_enabled === false) {
+  if (store.state.zoConfig?.workflows_enabled === false) {
     next("/");
     return;
   }
@@ -156,7 +148,6 @@ const useEnterpriseRoutes = () => {
           name: "syntheticsTokens",
           meta: {
             titleKey: "iam.syntheticsTokens",
-            licenseFeature: "synthetics",
           },
           component: () => import("@/components/iam/SyntheticsTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -205,7 +196,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "mcpServer",
           name: "mcpServer",
-          meta: { titleKey: "iam.mcpServerLabel", licenseFeature: "mcp" },
+          meta: { titleKey: "iam.mcpServerLabel" },
           component: () => import("@/components/iam/McpServer.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -225,16 +216,17 @@ const useEnterpriseRoutes = () => {
   // `?section=status-pages`), so it needs no route of its own — it ships
   // with synthetics, no separate toggle. Notices/Custom Domains within it
   // are Enterprise-only, gated in-view on `build_type` instead.
-  const syntheticsRoutes = [
-    {
-      path: "synthetics",
-      name: "synthetics",
-      component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
-      beforeEnter(to: any, from: any, next: any) {
-        syntheticsRouteGuard(to, from, next);
-      },
+  routes.push({
+    path: "synthetics",
+    name: "synthetics",
+    component: () => import("@/views/SyntheticMonitoring.vue"),
+    meta: { titleKey: "menu.synthetic", allowOnEmptyData: true },
+    beforeEnter(to: any, from: any, next: any) {
+      syntheticsRouteGuard(to, from, next);
     },
+  });
+
+  routes.push(
     {
       path: "synthetics/add",
       name: "synthetics-add",
@@ -289,8 +281,7 @@ const useEnterpriseRoutes = () => {
         syntheticsRouteGuard(to, from, next);
       },
     },
-  ];
-  routes.push(...syntheticsRoutes.map((route) => withLicenseFeature("synthetics", route)));
+  );
 
   //the below are the routes that we support for enterprise and cloud
   //the above are the routes that we support for oss including both enterprise and cloud
@@ -300,7 +291,7 @@ const useEnterpriseRoutes = () => {
   // `withFeatureGate`) when the edition doesn't unlock them, instead of
   // landing on the real page or a 404.
   // On-call is configured before any data flows, so every route here stays open on an empty org.
-  const oncallRoutes = [
+  routes.push(
     {
       path: "oncall/responses",
       name: "onCallResponses",
@@ -368,11 +359,10 @@ const useEnterpriseRoutes = () => {
       meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
       beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
-  ];
-  routes.push(...oncallRoutes.map((route) => withLicenseFeature("oncall", route)));
+  );
 
   routes.push(
-    withLicenseFeature("incidents", {
+    {
       path: "incidents",
       name: "incidentList",
       component: IncidentList,
@@ -380,8 +370,8 @@ const useEnterpriseRoutes = () => {
         titleKey: "menu.incidents",
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
-    }),
-    withLicenseFeature("incidents", {
+    },
+    {
       path: "incidents/:id",
       name: "incidentDetail",
       component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
@@ -389,7 +379,7 @@ const useEnterpriseRoutes = () => {
         titleKey: "routeTitles.incidentDetail",
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
-    }),
+    },
   );
 
   if (config.isEnterprise == "true") {
@@ -431,43 +421,41 @@ const useEnterpriseRoutes = () => {
 
   // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
   // renders in its <router-view> for add/edit.
-  routes.push(
-    withLicenseFeature("workflows", {
-      path: "workflows",
-      name: "workflows",
-      component: WorkflowsList,
-      meta: {
-        titleKey: "menu.workflows",
+  routes.push({
+    path: "workflows",
+    name: "workflows",
+    component: WorkflowsList,
+    meta: {
+      titleKey: "menu.workflows",
+    },
+    beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+    children: [
+      {
+        path: "add",
+        name: "createWorkflow",
+        component: WorkflowEditor,
+        meta: { titleKey: "workflow.create" },
+        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
       },
-      beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-      children: [
-        {
-          path: "add",
-          name: "createWorkflow",
-          component: WorkflowEditor,
-          meta: { titleKey: "workflow.create" },
-          beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-        },
-        {
-          path: "edit",
-          name: "workflowEditor",
-          component: WorkflowEditor,
-          meta: { titleKey: "workflow.editMode" },
-          beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-        },
-        {
-          // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
-          // from the editor so viewing a past run never drops the user into the
-          // builder; deep-linkable by ?run_id.
-          path: "runs",
-          name: "workflowRuns",
-          component: WorkflowRuns,
-          meta: { titleKey: "workflow.runs.title" },
-          beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-        },
-      ],
-    }),
-  );
+      {
+        path: "edit",
+        name: "workflowEditor",
+        component: WorkflowEditor,
+        meta: { titleKey: "workflow.editMode" },
+        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+      },
+      {
+        // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
+        // from the editor so viewing a past run never drops the user into the
+        // builder; deep-linkable by ?run_id.
+        path: "runs",
+        name: "workflowRuns",
+        component: WorkflowRuns,
+        meta: { titleKey: "workflow.runs.title" },
+        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+      },
+    ],
+  });
   routes[0].children.push(
     ...[
       {
@@ -506,13 +494,13 @@ const useEnterpriseRoutes = () => {
         component: EditRole,
         beforeEnter: withFeatureGate("rbac", routeGuard),
       },
-    ].map((route) => withLicenseFeature("rbac", route)),
-    withLicenseFeature("ratelimit", {
-      path: "quota",
-      name: "quota",
-      component: Quota,
-      beforeEnter: withFeatureGate("rbac", routeGuard),
-    }),
+      {
+        path: "quota",
+        name: "quota",
+        component: Quota,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
+      },
+    ],
   );
 
   if (config.isCloud == "true") {

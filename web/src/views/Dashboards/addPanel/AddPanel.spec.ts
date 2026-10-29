@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { flushPromises, mount, shallowMount } from "@vue/test-utils";
+import { mount, shallowMount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
@@ -298,24 +298,6 @@ describe("AddPanel.vue", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeDefined();
-    });
-
-    it.each([
-      ["locked", 0],
-      ["enabled", 1],
-    ])("loads the dashboard only when dashboards is not locked (%s)", async (state, calls) => {
-      store.state.zoConfig.features = { dashboards: state };
-      vi.mocked(getDashboard).mockClear();
-      vi.mocked(getDashboard).mockResolvedValue({});
-      wrapper = shallowMount(AddPanel, {
-        global: {
-          plugins: [store, router, i18n],
-          stubs: { PanelEditor: true, PanelSchemaRenderer: true },
-        },
-        props: { metaData: null },
-      });
-      await flushPromises();
-      expect(vi.mocked(getDashboard)).toHaveBeenCalledTimes(calls);
     });
   });
 

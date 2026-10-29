@@ -199,7 +199,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { featureState } from "@/utils/featureGate";
 
 function isStripeCheckoutReferrer(referrer: string): boolean {
   try {
@@ -256,8 +255,6 @@ export default defineComponent({
         });
     },
     async fetchAiUsage() {
-      // A locked assistant answers with a license 403, which would raise the license popup here.
-      if (featureState(this.store.state.zoConfig?.features, "ai_assistant") !== "enabled") return;
       try {
         const orgId = this.store.state.selectedOrganization.identifier;
         this.aiUsage = (await BillingService.get_ai_usage(orgId)).data;

@@ -32,7 +32,6 @@ import { alertDependenciesQuery } from "@/services/alerts.queries";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { I18nKey } from "@/types/i18n";
 
 /** `template`/`destination` are graph-native; the rest are consumers the P0 delete guard checks. */
@@ -457,7 +456,6 @@ export function useDependencyGraph() {
   const graph = ref<DepGraph>(emptyGraph());
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const { locked: alertsLocked } = useLicenseLock("alerts");
 
   // Pure builder — separated from the fetch so it can be unit-tested with fixtures.
   const buildGraph = (
@@ -627,15 +625,13 @@ export function useDependencyGraph() {
         });
       }
       const [alerts, destinations, templates] = await Promise.all([
-        // Destinations and templates stay free when alerts is license-locked; their alerts list would 403.
-        alertsLocked.value ? [] : queryClient.fetchQuery(inputs.alerts),
+        queryClient.fetchQuery(inputs.alerts),
         queryClient.fetchQuery(inputs.destinations),
         queryClient.fetchQuery(inputs.templates),
       ]);
 
       graph.value = buildGraph(alerts, destinations, templates);
-      // A graph without alerts must not outlive the lock that emptied it.
-      if (!alertsLocked.value) graphCache = { org, graph: graph.value, at: Date.now() };
+      graphCache = { org, graph: graph.value, at: Date.now() };
     } catch (err: any) {
       error.value = err?.response?.data?.message || err?.message || "unknown";
       graph.value = emptyGraph();

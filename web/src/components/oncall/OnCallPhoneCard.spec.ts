@@ -18,7 +18,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
 import i18n from "@/locales";
-import { queryClient } from "@/composables/query/queryClient";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { Contact, RefusalReason, VerificationRefusalBody } from "@/ts/interfaces/oncall";
@@ -201,23 +200,6 @@ describe("OnCallPhoneCard", () => {
   it("reads the caller's own contact", async () => {
     await render(contact());
     expect(service.getContact).toHaveBeenCalledWith({ org_identifier: ORG, user_email: EMAIL });
-  });
-
-  it("says nothing about a read the license refused, and still reports any other failure", async () => {
-    service.getContact.mockRejectedValue({
-      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
-    });
-    const denied = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
-    await flushPromises();
-    expect(find(denied, "load-failed").exists()).toBe(false);
-    denied.unmount();
-
-    queryClient.clear();
-    service.getContact.mockRejectedValue({ response: { status: 403, data: {} } });
-    const failed = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
-    await flushPromises();
-    expect(find(failed, "load-failed").exists()).toBe(true);
-    failed.unmount();
   });
 
   it("empty: offers a number box and Send code", async () => {

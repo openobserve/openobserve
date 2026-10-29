@@ -269,24 +269,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
 
       <div class="border-border-default pe-page-edge flex shrink-0 items-center gap-2 border-b">
-        <!-- Sub-tab navigation stays live on a license-locked page. -->
-        <FeatureLockExempt class="contents">
-          <OTabs
-            :model-value="activeSubTab"
-            align="left"
-            dense
-            class="min-w-0 flex-1"
-            @update:model-value="onSubTabChange"
-          >
-            <OTab
-              v-for="tab in subTabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-              :data-test="`rum-analytics-subtab-${tab.value}`"
-            />
-          </OTabs>
-        </FeatureLockExempt>
+        <OTabs
+          :model-value="activeSubTab"
+          align="left"
+          dense
+          class="min-w-0 flex-1"
+          @update:model-value="onSubTabChange"
+        >
+          <OTab
+            v-for="tab in subTabs"
+            :key="tab.value"
+            :name="tab.value"
+            :label="tab.label"
+            :data-test="`rum-analytics-subtab-${tab.value}`"
+          />
+        </OTabs>
         <SampledTag
           v-if="showSampledTag"
           :ratio="sampleRatio"
@@ -344,7 +341,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";

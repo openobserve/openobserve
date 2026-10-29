@@ -458,30 +458,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
                only, where they are what's on screen. -->
-          <OTooltip
-            v-if="isWorkspace && grid.favorites.value.length && dashboardsLocked"
-            :content="dashboardsLockedReason"
-          >
-            <span class="inline-flex">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                disabled
-                data-test="metrics-explorer-convert-dashboard"
-              >
-                <template #icon-left>
-                  <OIcon
-                    name="lock"
-                    size="sm"
-                    data-test="metrics-explorer-convert-dashboard-lock"
-                  />
-                </template>
-                {{ t("metrics.explorer.convertToDashboard") }}
-              </OButton>
-            </span>
-          </OTooltip>
           <OButton
-            v-else-if="isWorkspace && grid.favorites.value.length"
+            v-if="isWorkspace && grid.favorites.value.length"
             variant="outline"
             size="sm-action"
             icon-left="dashboard-customize"
@@ -741,7 +719,6 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -862,8 +839,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
-      useLicenseLock("dashboards");
     const router = useRouter();
     const route = useRoute();
     const grid = useMetricsExplorerGrid(t);
@@ -2335,8 +2310,6 @@ export default defineComponent({
       onApplyOverride,
       onRestoreOverride,
       openConvertToDashboard,
-      dashboardsLocked,
-      dashboardsLockedReason,
       panelRateWindowFor,
       convertPanels,
       convertDialogOpen,

@@ -125,7 +125,6 @@ import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import { queryClient } from "@/composables/query/queryClient";
 import { dimensionAnalyticsQuery, semanticGroupsQuery } from "@/services/service_streams.queries";
 import { downtimeResourcesQuery, downtimeValuesQuery } from "@/services/downtimes.queries";
@@ -165,7 +164,6 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { toast } = useToast();
 const orgId = useOrgId();
-const { locked: correlationLocked } = useLicenseLock("correlation");
 
 const semanticGroups = useQuery(() =>
   Object.assign(semanticGroupsQuery(orgId.value), { enabled: !!orgId.value }),
@@ -180,8 +178,7 @@ const hasHost = computed(() => dimensionOptions.value.some((o) => o.value === DE
 // The registry's ranking is only needed when the org has no `host` group.
 const analytics = useQuery(() =>
   Object.assign(dimensionAnalyticsQuery(orgId.value), {
-    enabled:
-      !!orgId.value && !!semanticGroups.data.value && !hasHost.value && !correlationLocked.value,
+    enabled: !!orgId.value && !!semanticGroups.data.value && !hasHost.value,
   }),
 );
 

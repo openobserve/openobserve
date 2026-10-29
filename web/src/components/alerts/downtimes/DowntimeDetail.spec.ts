@@ -21,7 +21,6 @@ import DowntimeDetail from "./DowntimeDetail.vue";
 import downtimes from "@/services/downtimes";
 import type { DowntimeDetail as DowntimeDetailData } from "@/services/downtimes";
 import alerts from "@/services/alerts";
-import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 
@@ -234,22 +233,6 @@ describe("DowntimeDetail", () => {
     expect(downtimes.get).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(downtimes.get).toHaveBeenCalledTimes(2), { timeout: 5_000 });
     wrapper.unmount();
-  });
-
-  it("reads no synthetics folders while synthetics is license-locked", async () => {
-    vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
-    vi.mocked(common.list_Folders).mockClear();
-    store.state.zoConfig.features = { synthetics: "locked" };
-    try {
-      const { wrapper } = await mountDetail();
-      await flushPromises();
-      const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
-      expect(types).toContain("alerts");
-      expect(types).not.toContain("synthetics");
-      wrapper.unmount();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
   });
 
   it("shows a not-found state on a 404", async () => {

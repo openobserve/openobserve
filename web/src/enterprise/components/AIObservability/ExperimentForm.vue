@@ -658,7 +658,6 @@ import {
 } from "../../views/AIObservability/experimentPreview";
 import { aiExperimentsRoute } from "../../views/AIObservability/experimentRoutes";
 import ExperimentPreviewPanel from "./ExperimentPreviewPanel.vue";
-import { useFeatureLock } from "@/composables/useFeatureLock";
 import {
   EXPERIMENT_ROW_SOURCES,
   experimentFormDefaults,
@@ -1254,11 +1253,8 @@ onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
-// A locked page cannot be edited, and its locked confirm button would trap the user.
-const { locked: pageLocked } = useFeatureLock();
-
 onBeforeRouteLeave((to, _from, next) => {
-  if (allowLeave || pageLocked.value || !isDirty.value) {
+  if (allowLeave || !isDirty.value) {
     next();
     return;
   }

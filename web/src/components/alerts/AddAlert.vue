@@ -198,12 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="option.value"
                   :value="option.value"
                   size="sm"
-                  :disabled="option.locked"
-                  :tooltip="option.locked ? anomalyLockedReason : undefined"
                   :data-test="`add-alert-type-tab-${option.value}`"
                 >
                   <template #icon-left>
-                    <OIcon :name="option.locked ? 'lock' : option.icon" size="sm" />
+                    <OIcon :name="option.icon" size="sm" />
                   </template>
                   {{ option.label }}
                 </OToggleGroupItem>
@@ -676,7 +674,6 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -756,8 +753,6 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
-    const { locked: anomalyLicenseLocked, lockedReason: anomalyLockedReason } =
-      useLicenseLock("anomaly_detection");
 
     // §4.8: keyed off the config API's notice_class field alone.
     const anomalyNoticeBadge = computed(() => {
@@ -863,13 +858,12 @@ export default defineComponent({
     const alertTypeOptions = computed(() => [
       { label: alertForm.t("alerts.scheduled"), value: "false", icon: "schedule" },
       { label: alertForm.t("alerts.realTime"), value: "true", icon: "bolt" },
-      ...(isAnomalyDetectionEnabled.value || anomalyLicenseLocked.value
+      ...(isAnomalyDetectionEnabled.value
         ? [
             {
               label: alertForm.t("alerts.anomalyDetection"),
               value: "anomaly",
               icon: "query-stats",
-              locked: anomalyLicenseLocked.value,
             },
           ]
         : []),
@@ -950,7 +944,6 @@ export default defineComponent({
     // the ONE form directly. The existing watch on is_real_time still drives the
     // anomaly/composite tab switch.
     const onAlertTypeChange = (value: unknown) => {
-      if (value === "anomaly" && anomalyLicenseLocked.value) return;
       alertForm.setF("is_real_time", value);
       // Realtime runs Builder only. The query text and Compare-with-Past windows
       // stay in the form for a switch back; the payload never sends windows here.
@@ -1037,7 +1030,6 @@ export default defineComponent({
       anomalyNoticeBadge,
       anomalyNoticeTooltip,
       alertTypeOptions,
-      anomalyLockedReason,
       alertTabs,
       activeFolderName,
       goBackToAlertsList,

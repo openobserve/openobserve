@@ -52,29 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="min-h-0 overflow-y-auto">
             <div class="flex flex-col px-2 pb-2">
-              <OTooltip
-                v-if="store.state.zoConfig.super_cluster_enabled && superClusterLocked"
-                :content="superClusterLockedReason"
-              >
-                <span class="mb-2 flex flex-col gap-1">
-                  <OButton
-                    v-for="key in ['region', 'cluster'] as const"
-                    :key="key"
-                    variant="ghost"
-                    size="sm"
-                    class="justify-start"
-                    disabled
-                    :data-test="`nodes-${key}-filter-locked`"
-                  >
-                    <template #icon-left>
-                      <OIcon name="lock" size="sm" />
-                    </template>
-                    {{ t(`nodes.${key}`) }}
-                  </OButton>
-                </span>
-              </OTooltip>
               <OCollapsible
-                v-if="regionRows.length > 0 && superClusterOn"
+                v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
                 variant="sidebar"
                 :model-value="sectionOpen.region"
                 @update:model-value="(v) => (sectionOpen.region = v)"
@@ -108,12 +87,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OCollapsible>
               <OSeparator
-                v-if="regionRows.length > 0 && superClusterOn && sectionOpen.region"
+                v-if="
+                  regionRows.length > 0 &&
+                  store.state.zoConfig.super_cluster_enabled &&
+                  sectionOpen.region
+                "
                 class="my-2"
               />
 
               <OCollapsible
-                v-if="clusterRows.length > 0 && superClusterOn"
+                v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
                 variant="sidebar"
                 :model-value="sectionOpen.cluster"
                 @update:model-value="(v) => (sectionOpen.cluster = v)"
@@ -147,7 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OCollapsible>
               <OSeparator
-                v-if="clusterRows.length > 0 && superClusterOn && sectionOpen.cluster"
+                v-if="
+                  clusterRows.length > 0 &&
+                  store.state.zoConfig.super_cluster_enabled &&
+                  sectionOpen.cluster
+                "
                 class="my-2"
               />
 
@@ -514,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
 
-            <template v-if="superClusterOn" #cell-region="{ row }">
+            <template v-if="store.state.zoConfig.super_cluster_enabled" #cell-region="{ row }">
               <OTag type="fieldTag" class="badge-region me-1"
                 >{{ row.region }}
                 <OTooltip :content="t('nodes.region')" />
@@ -590,7 +577,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -625,11 +611,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18nTyped();
-    const { locked: superClusterLocked, lockedReason: superClusterLockedReason } =
-      useLicenseLock("super_cluster");
-    const superClusterOn = computed(
-      () => !!store.state.zoConfig.super_cluster_enabled && !superClusterLocked.value,
-    );
 
     const sectionOpen = reactive({
       region: false,
@@ -774,7 +755,7 @@ export default defineComponent({
       ];
       // Region/cluster only mean something in a super-cluster. Filter by id rather
       // than by position so adding a column can't silently drop the wrong one.
-      if (!superClusterOn.value) {
+      if (!store.state.zoConfig.super_cluster_enabled) {
         return columns.filter((col) => col.id !== "region");
       }
       return columns;
@@ -1324,9 +1305,6 @@ export default defineComponent({
       cpuUsage,
       memoryUsage,
       regionRows,
-      superClusterOn,
-      superClusterLocked,
-      superClusterLockedReason,
       clusterRows,
       nodetypeRows,
       statusesRows,

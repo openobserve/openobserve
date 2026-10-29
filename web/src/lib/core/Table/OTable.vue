@@ -13,8 +13,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { useFeatureNames } from "@/composables/useFeatureLock";
+import { useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
@@ -66,7 +65,6 @@ import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
-const { featureNames } = useFeatureNames();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -1782,21 +1780,7 @@ defineExpose({
 
         <!-- ── Access Denied State ───────────────────────────── -->
         <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
-          <OEmptyState
-            v-if="Array.isArray(props.forbidden)"
-            size="hero"
-            preset="no-access"
-            :title="t('featureLock.toastTitle')"
-            :description="
-              props.forbidden.length
-                ? t('featureLock.toastMessage', {
-                    features: raw(featureNames(props.forbidden)),
-                  })
-                : t('featureLock.toastMessageGeneric')
-            "
-            data-test="o2-table-license-denied"
-          />
-          <OEmptyState v-else size="hero" preset="no-access" />
+          <OEmptyState size="hero" preset="no-access" />
         </OTableEmpty>
 
         <!-- ── Empty State ───────────────────────────────────── -->

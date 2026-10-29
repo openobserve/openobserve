@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive, computed, ref, nextTick } from "vue";
+import { reactive, computed, ref } from "vue";
 import {
   getMetricsConfig,
   encodeMetricsConfig,
@@ -183,13 +183,9 @@ const visualizeApplyPanelData = vi.fn();
  *  Visualize; null/query-less means "blank canvas, nothing to share". */
 let visualizePanel: any = null;
 
-const mountExplorer = (
-  stubOverrides: Record<string, any> = {},
-  provide: Record<string, unknown> = {},
-) =>
+const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
   mount(MetricsExplorer, {
     global: {
-      provide,
       stubs: {
         OPageHeader: true,
         DateTimePickerDashboard: true,
@@ -485,34 +481,6 @@ describe("MetricsExplorer wiring", () => {
       expect((wrapper.vm as any).convertPanels).toHaveLength(2);
       expect((wrapper.vm as any).convertPanels[0].title).toBe("http_requests_total");
       expect((wrapper.vm as any).convertDialogOpen).toBe(true);
-    });
-
-    it("renders the convert button disabled with a lock when the license locks dashboards", async () => {
-      (storeState.zoConfig as any).features = { dashboards: "locked" };
-      try {
-        const wrapper = mountExplorer(
-          {
-            OTooltip: { template: "<div><slot /></div>" },
-            OButton: {
-              props: { disabled: Boolean },
-              template: '<button :disabled="disabled"><slot name="icon-left" /><slot /></button>',
-            },
-            OIcon: { template: "<i />" },
-          },
-          // useFeatureLock reaches vuex before this file's mock applies, so it injects the store.
-          { store: { state: storeState } },
-        );
-        (wrapper.vm as any).setMode("workspace");
-        grid.favorites.value = ["http_requests_total"];
-        await nextTick();
-        const btn = wrapper.find('[data-test="metrics-explorer-convert-dashboard"]');
-        expect(btn.attributes("disabled")).toBeDefined();
-        expect(wrapper.find('[data-test="metrics-explorer-convert-dashboard-lock"]').exists()).toBe(
-          true,
-        );
-      } finally {
-        delete (storeState.zoConfig as any).features;
-      }
     });
 
     it("does nothing when nothing is pinned", () => {

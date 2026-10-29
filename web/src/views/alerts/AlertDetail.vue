@@ -101,18 +101,8 @@
         :groups="firingGroups"
         @changed="onAckMuteChanged"
       />
-      <OTooltip v-if="!notFound && editAnomalyLocked" :content="anomalyLockedReason">
-        <span class="inline-flex">
-          <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
-            <template #icon-left>
-              <OIcon name="lock" size="sm" data-test="alerts-alertdetail-edit-lock" />
-            </template>
-            {{ t("alerts.edit") }}
-          </OButton>
-        </span>
-      </OTooltip>
       <OButton
-        v-else-if="!notFound"
+        v-if="!notFound"
         variant="outline"
         size="sm-action"
         icon-left="edit"
@@ -268,8 +258,6 @@
             name="charts"
             :label="t('alerts.anomaly.chartsTab')"
             icon="bar-chart"
-            :suffix-icon="anomalyLocked ? 'lock' : undefined"
-            :tooltip="anomalyLocked ? anomalyLockedReason : undefined"
             data-test="alerts-alertdetail-tab-charts"
           />
           <OTab name="history" :label="t('alerts.history')" icon="history" />
@@ -304,12 +292,7 @@
              repeat the same non-answer on every line. -->
           <OTabPanel v-if="isAnomalyAlert" name="charts" stretch>
             <OContent class="h-full overflow-y-auto py-4">
-              <LicenseDeniedState
-                v-if="anomalyLocked"
-                :features="['anomaly_detection']"
-                data-test="alerts-alertdetail-anomaly-license-denied"
-              />
-              <AnomalyDetectionChart v-else-if="alert" :alert="alert" :anomaly-id="alertId" />
+              <AnomalyDetectionChart v-if="alert" :alert="alert" :anomaly-id="alertId" />
             </OContent>
           </OTabPanel>
 
@@ -407,9 +390,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
 import { alertAcksQuery, alertsListQuery } from "@/services/alerts.queries";
@@ -442,8 +422,6 @@ const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
-const { locked: anomalyLocked, lockedReason: anomalyLockedReason } =
-  useLicenseLock("anomaly_detection");
 
 const alertId = computed(() => String(route.params.alert_id || ""));
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
@@ -551,17 +529,13 @@ const backTarget = computed(() => ({
 // Plain row-click still lands here — only the EDIT action diverts to the SLO
 // page — so this page has to describe an alert with no stream and no query.
 const isSloAlertView = computed(() => isSloAlert(alert.value));
-// Anomaly configs and SLO alerts are edited on anomaly-detection pages.
-const editAnomalyLocked = computed(
-  () => anomalyLocked.value && (isAnomalyAlert.value || isSloAlertView.value),
-);
 const sloId = computed(() => sloIdOf(alert.value));
 // The alert GET carries `slo_condition` but not the SLO's NAME, which is the
 // one thing a human recognises. One extra fetch; failure degrades to the id.
 const sloName = ref("");
 
 const fetchSloName = async () => {
-  if (!orgId.value || !sloId.value || anomalyLocked.value) return;
+  if (!orgId.value || !sloId.value) return;
   try {
     const res = await sloService.get(orgId.value, sloId.value);
     sloName.value = res.data?.name || "";

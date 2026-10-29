@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { featureState } from "@/utils/featureGate";
 
 /**
  * Service Streams API Client
@@ -204,14 +203,10 @@ export interface DimensionAnalyticsSummary {
  * Get semantic field groups for field name translation
  * Uses the existing alerts/deduplication/semantic-groups API
  */
-export const getSemanticGroups = async (
+export const getSemanticGroups = (
   org_identifier: string,
   options?: { silentForbidden?: boolean },
 ): Promise<{ data: FieldAlias[] }> => {
-  // Imported lazily: chart specs mock vuex and load this module, and a static import would build the store there.
-  const { default: store } = await import("../stores");
-  // The backend licenses this read under alerts, yet free pages call it, so a locked alerts license reads no groups.
-  if (featureState(store.state.zoConfig?.features, "alerts") === "locked") return { data: [] };
   return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, options);
 };
 

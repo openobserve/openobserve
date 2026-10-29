@@ -51,26 +51,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
-            :icon-left="alertsLocked ? 'lock' : 'shield-alert-outline'"
-            :disabled="alertsLocked || !alertReady"
+            icon-left="shield-alert-outline"
+            :disabled="!alertReady"
             data-test="rum-analytics-funnel-alert-btn"
             @click="openAlert"
             >{{ t("rum.analytics.funnel.alert") }}</OButton
           >
-          <OTooltip :content="alertsLocked ? alertsLockedReason : alertTip" />
+          <OTooltip :content="alertTip" />
         </span>
         <span>
           <OButton
             variant="outline"
             size="sm"
-            :icon-left="dashboardsLocked ? 'lock' : 'dashboard-customize'"
-            :disabled="dashboardsLocked || !dashboardReady"
+            icon-left="dashboard-customize"
+            :disabled="!dashboardReady"
             data-test="rum-analytics-funnel-add-dashboard-btn"
             @click="dashboardOpen = true"
             >{{ t("rum.analytics.dashboard.add") }}</OButton
           >
-          <OTooltip v-if="dashboardsLocked" :content="dashboardsLockedReason" />
-          <OTooltip v-else-if="!dashboardReady" :content="dashboardTip" />
+          <OTooltip v-if="!dashboardReady" :content="dashboardTip" />
         </span>
       </template>
       <template v-if="def.steps.length" #menu>
@@ -454,7 +453,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -553,9 +551,6 @@ const dropoffCohort = ref<FunnelCohort | null>(null);
 const valuesField = ref<string | null>(null);
 const whyOpen = ref(false);
 const dashboardOpen = ref(false);
-const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
-  useLicenseLock("dashboards");
-const { locked: alertsLocked, lockedReason: alertsLockedReason } = useLicenseLock("alerts");
 const linkProblem = pa.savedLinkProblem;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let whyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -818,7 +813,6 @@ const snapshotScope = () => ({ ...pa.scope.value, xall: undefined });
 
 // The alert starts at today's conversion, so it fires on any drop below what the user sees now.
 const openAlert = () => {
-  if (alertsLocked.value) return;
   const dt = pa.state.datetime;
   requestAlertCreation(
     buildPrefillFromRumFunnel({

@@ -75,22 +75,4 @@ describe("useAlertCreation", () => {
     expect(mockRouterPush).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
   });
-
-  const withAlerts = (state: string) => ({
-    router: { push: mockRouterPush },
-    store: { state: { ...mockStore.state, zoConfig: { features: { alerts: state } } } },
-  });
-
-  it("does nothing while alerts is license-locked", () => {
-    const { openAlertCreation } = useAlertCreation(withAlerts("locked"));
-    expect(openAlertCreation(prefill())).toBe(false);
-    expect(mockRouterPush).not.toHaveBeenCalled();
-    expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
-  });
-
-  it("routes to the alert form while alerts is enabled", () => {
-    const { openAlertCreation } = useAlertCreation(withAlerts("enabled"));
-    expect(openAlertCreation(prefill())).toBe(true);
-    expect(mockRouterPush).toHaveBeenCalledTimes(1);
-  });
 });

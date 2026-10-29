@@ -231,7 +231,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
@@ -267,7 +266,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const tasks = ref<RemoteTask[]>([]);
 const lastUpdatedAt = ref<number | null>(null);
 const loading = ref(false);
-const forbidden = ref<ForbiddenState>(false);
+const forbidden = ref(false);
 const search = ref("");
 
 /**
@@ -459,7 +458,7 @@ async function refresh(force = false) {
     tasks.value = await queryClient.fetchQuery(opts);
     lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
-    forbidden.value = forbiddenState(error);
+    forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({

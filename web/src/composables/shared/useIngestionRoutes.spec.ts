@@ -169,33 +169,6 @@ describe("useIngestionRoutes", () => {
     });
   });
 
-  describe("license feature tags", () => {
-    const find = (routes: any[], name: string): any => {
-      for (const route of routes) {
-        if (route.name === name) return route;
-        const found = route.children && find(route.children, name);
-        if (found) return found;
-      }
-      return undefined;
-    };
-
-    it.each([
-      ["ingestProfiles", "continuous_profiling"],
-      ["profilesOtelCollector", "continuous_profiling"],
-      ["frontendMonitoring", "rum"],
-      ["recommendedMcp", "mcp"],
-    ])("tags %s with meta.licenseFeature %s", (name, feature) => {
-      expect(find(useIngestionRoutes(), name).meta.licenseFeature).toBe(feature);
-    });
-
-    it.each(["ingestFromKubernetes", "ingestFromLinux", "ingestTraces", "recommended"])(
-      "leaves %s untagged",
-      (name) => {
-        expect(find(useIngestionRoutes(), name).meta?.licenseFeature).toBeUndefined();
-      },
-    );
-  });
-
   describe("custom routes configuration", () => {
     it("should have proper custom route configuration", () => {
       const routes = useIngestionRoutes();

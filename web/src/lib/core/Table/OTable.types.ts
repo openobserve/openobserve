@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { I18nText } from "@/types/i18n";
-import type { ForbiddenState } from "@/utils/featureGate";
 
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
@@ -473,11 +472,11 @@ export interface OTableProps<TData = any> {
   streaming?: boolean;
   error?: string | null;
   /**
-   * The data this table lists was denied (403); feature keys mean a license denial. Shows the no-access state
+   * The data this table lists was denied (403). Shows the no-access state
    * instead of the first-run empty state, which would otherwise invite the
    * user to create something they are not allowed to create.
    */
-  forbidden?: ForbiddenState;
+  forbidden?: boolean;
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;

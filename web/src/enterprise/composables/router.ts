@@ -18,7 +18,6 @@ import {
   useAIObservabilityShellRoute,
   useAIObservabilityExtraRoutes,
 } from "@/composables/shared/useAIObservabilityRoutes";
-import { withLicenseFeature } from "@/utils/featureGate";
 
 const Billing = () => import("@/enterprise/components/billings/Billing.vue");
 const Plans = () => import("@/enterprise/components/billings/plans.vue");
@@ -27,10 +26,6 @@ const Usage = () => import("@/enterprise/components/billings/usage/UsageView.vue
 const BillingGroup = () => import("@/enterprise/components/billings/BillingGroup.vue");
 const AzureMarketplaceSetup = () => import("@/views/AzureMarketplaceSetup.vue");
 const AwsMarketplaceSetup = () => import("@/views/AwsMarketplaceSetup.vue");
-
-// Only this router tags the license feature: OSS's Monitor half works without a license.
-const licensedAIObservabilityShellRoute = () =>
-  withLicenseFeature("ai_observability", useAIObservabilityShellRoute());
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -63,10 +58,8 @@ const useEnvRoutes = () => {
   ];
 
   const homeChildRoutes = [
-    licensedAIObservabilityShellRoute(),
-    ...useAIObservabilityExtraRoutes().map((route) =>
-      withLicenseFeature("ai_observability", route),
-    ),
+    useAIObservabilityShellRoute(),
+    ...useAIObservabilityExtraRoutes(),
     {
       path: "billings",
       name: "billings",

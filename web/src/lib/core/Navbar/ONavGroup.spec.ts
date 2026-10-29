@@ -369,18 +369,8 @@ describe("ONavGroup", () => {
     // Exposes the resolved tile link so the anchor-child rule is assertable.
     const linkedTileStub = {
       template:
-        '<a data-test="tile" href="#" :data-link="link" :data-license-locked="licenseLocked || undefined" @click.prevent="$emit(\'click\')">{{ title }}</a>',
-      props: [
-        "submenu",
-        "asTrigger",
-        "title",
-        "icon",
-        "link",
-        "active",
-        "expanded",
-        "mini",
-        "licenseLocked",
-      ],
+        '<a data-test="tile" href="#" :data-link="link" @click.prevent="$emit(\'click\')">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
       emits: ["click", "keydown"],
     };
 
@@ -419,14 +409,13 @@ describe("ONavGroup", () => {
       });
     }
 
-    function infraStore(dbmEnabled: boolean, hiddenMenus = "", features = {}) {
+    function infraStore(dbmEnabled: boolean, hiddenMenus = "") {
       return createStore({
         state: () => ({
           theme: "light",
           zoConfig: {
             database_monitoring_enabled: dbmEnabled,
             custom_hide_menus: hiddenMenus,
-            features,
           },
           organizationData: {},
           selectedOrganization: { identifier: "default" },
@@ -436,12 +425,7 @@ describe("ONavGroup", () => {
 
     function mountInfraTile(
       dbmEnabled: boolean,
-      {
-        hiddenMenus = "",
-        children = infraChildren(),
-        parentLink = "/infra/databases",
-        features = {},
-      } = {},
+      { hiddenMenus = "", children = infraChildren(), parentLink = "/infra/databases" } = {},
     ) {
       return mount(ONavGroup, {
         props: {
@@ -452,7 +436,7 @@ describe("ONavGroup", () => {
           parentItem: { link: parentLink, title: "Infra", icon: "dns", name: "infra" },
         },
         global: {
-          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus, features), i18n],
+          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus), i18n],
           stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
         },
       });
@@ -481,78 +465,6 @@ describe("ONavGroup", () => {
     it("lands the tile on /infra/hosts when the anchor child gates out (DBM off)", () => {
       // The static parentLink would bounce off the DBM route guard onto Traces.
       wrapper = mountInfraTile(false);
-      expect(tileLink()).toBe("/infra/hosts");
-    });
-
-    it("keeps a license-locked Databases child and its tile link while the DBM flag is off", async () => {
-      const children = infraChildren().map((c) =>
-        c.name === "dbmDatabases" ? { ...c, feature: "db_monitoring" } : c,
-      );
-      wrapper = mountInfraTile(false, { children, features: { db_monitoring: "locked" } });
-      expect(tileLink()).toBe("/infra/databases");
-      await hoverOpenInfra();
-      const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
-      expect(fly.find('[data-test="nav-group-item-dbmDatabases-locked"]').exists()).toBe(true);
-    });
-
-    const licensedInfra = (): SubnavChild[] => [
-      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts", feature: "host_monitoring" },
-      {
-        titleKey: "menu.databases",
-        icon: "database",
-        name: "dbmDatabases",
-        gate: "databaseMonitoring",
-        feature: "db_monitoring",
-      },
-      {
-        titleKey: "menu.kubernetes",
-        icon: "hub",
-        name: "infraKubernetes",
-        feature: "kubernetes_monitoring",
-      },
-    ];
-    const tileLocked = () =>
-      wrapper.find('[data-test="tile"]').attributes("data-license-locked") === "true";
-    const allLocked = {
-      host_monitoring: "locked",
-      db_monitoring: "locked",
-      kubernetes_monitoring: "locked",
-    };
-
-    it("puts the lock on the tile when every visible child is license-locked", () => {
-      wrapper = mountInfraTile(true, { children: licensedInfra(), features: allLocked });
-      expect(tileLocked()).toBe(true);
-    });
-
-    it("ignores a hidden child when deciding the tile lock", () => {
-      wrapper = mountInfraTile(true, {
-        children: licensedInfra(),
-        features: { ...allLocked, kubernetes_monitoring: "hidden" },
-      });
-      expect(tileLocked()).toBe(true);
-    });
-
-    it("keeps the tile unlocked while any visible child is free", () => {
-      wrapper = mountInfraTile(true, {
-        children: [
-          ...licensedInfra(),
-          { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
-        ],
-        features: allLocked,
-      });
-      expect(tileLocked()).toBe(false);
-    });
-
-    it("keeps the tile unlocked when the license enables its children", () => {
-      wrapper = mountInfraTile(true, { children: licensedInfra() });
-      expect(tileLocked()).toBe(false);
-    });
-
-    it("drops a license-hidden Databases child and retargets the tile", () => {
-      const children = infraChildren().map((c) =>
-        c.name === "dbmDatabases" ? { ...c, feature: "db_monitoring" } : c,
-      );
-      wrapper = mountInfraTile(true, { children, features: { db_monitoring: "hidden" } });
       expect(tileLink()).toBe("/infra/hosts");
     });
 
@@ -1368,79 +1280,6 @@ describe("ONavGroup", () => {
       const panel = await openFlyout();
       expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
       expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
-    });
-  });
-
-  describe("license feature state of a child", () => {
-    const workflowsChild: SubnavChild = {
-      titleKey: "menu.workflows",
-      icon: "schema",
-      name: "workflows",
-      feature: "workflows",
-    };
-
-    async function mountWithFeature(state?: "enabled" | "locked" | "hidden") {
-      const featureStore = createStore({
-        state: () => ({
-          theme: "light",
-          zoConfig: { features: state ? { workflows: state } : {} },
-          organizationData: {},
-          selectedOrganization: { identifier: "default" },
-        }),
-      });
-      const router = createRouter({
-        history: createMemoryHistory(),
-        routes: [
-          { path: "/", name: "home", component: { template: "<div />" } },
-          { path: "/streams", name: "logstreams", component: { template: "<div />" } },
-          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
-          { path: "/workflows", name: "workflows", component: { template: "<div />" } },
-          {
-            path: "/feature-locked/:feature",
-            name: "featureLocked",
-            component: { template: "<div />" },
-          },
-        ],
-      });
-      router.push("/");
-      await router.isReady();
-      wrapper = mount(ONavGroup, {
-        props: {
-          groupKey: "data",
-          title: "Data",
-          icon: "database",
-          children: [...children, workflowsChild],
-          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
-        },
-        global: {
-          plugins: [router, featureStore, i18n],
-          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
-        },
-      });
-      await hoverOpen();
-      return router;
-    }
-
-    it("shows a locked child with a lock and opens its own page, which renders locked", async () => {
-      const router = await mountWithFeature("locked");
-      const item = flyout().get('[data-test="nav-group-item-workflows-locked"]');
-      expect(item.element.tagName).toBe("DIV");
-      expect(flyout().find('[data-test="nav-group-item-workflows-lock"]').exists()).toBe(true);
-      await item.trigger("click");
-      await flushPromises();
-      expect(router.currentRoute.value.fullPath).toBe("/workflows?org_identifier=default");
-    });
-
-    it("drops a hidden child", async () => {
-      await mountWithFeature("hidden");
-      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
-      expect(flyout().find('[data-test="nav-group-item-workflows-locked"]').exists()).toBe(false);
-    });
-
-    it("renders an enabled or unsent feature as a normal link", async () => {
-      await mountWithFeature();
-      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(true);
-      expect(flyout().find('[data-test="nav-group-item-workflows-locked"]').exists()).toBe(false);
     });
   });
 

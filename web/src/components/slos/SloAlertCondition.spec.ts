@@ -72,21 +72,6 @@ describe("SloAlertCondition", () => {
     expect(listSpy).not.toHaveBeenCalled();
   });
 
-  it("fetches the SLO list without a supplied SLO", async () => {
-    await mountWith(emptyCondition(), { slo: null });
-    expect(listSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips the SLO list while anomaly_detection is license-locked", async () => {
-    store.state.zoConfig.features = { anomaly_detection: "locked" };
-    try {
-      await mountWith(emptyCondition(), { slo: null });
-      expect(listSpy).not.toHaveBeenCalled();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
-
   it("does not render an SLO selector when the SLO is supplied", async () => {
     const wrapper = await mountWith(emptyCondition());
     expect(wrapper.find('[data-test="slos-sloalertcondition-slo-trigger"]').exists()).toBe(false);

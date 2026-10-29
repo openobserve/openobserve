@@ -597,33 +597,6 @@ describe("AlertDetail — anomaly alerts", () => {
     wrapper = await mountView({ alert: makeSimpleAlert() });
     expect(wrapper.find('[data-test="alerts-alertdetail-tab-charts"]').exists()).toBe(false);
   });
-
-  it("locks the charts tab and Edit while anomaly_detection is license-locked", async () => {
-    store.state.zoConfig.features = { anomaly_detection: "locked" };
-    try {
-      wrapper = await mountView({ alert: makeAnomalyAlert() });
-      expect(wrapper.find('[data-test="alerts-alertdetail-anomaly-license-denied"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.findComponent({ name: "AnomalyDetectionChart" }).exists()).toBe(false);
-      const edit = wrapper.find('[data-test="alerts-alertdetail-edit"]');
-      expect(edit.attributes("disabled")).toBeDefined();
-      expect(wrapper.find('[data-test="alerts-alertdetail-edit-lock"]').exists()).toBe(true);
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
-
-  it("keeps Edit open on a scheduled alert while anomaly_detection is license-locked", async () => {
-    store.state.zoConfig.features = { anomaly_detection: "locked" };
-    try {
-      wrapper = await mountView({ alert: makeSimpleAlert() });
-      const edit = wrapper.find('[data-test="alerts-alertdetail-edit"]');
-      expect(edit.attributes("disabled")).toBeUndefined();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
 });
 
 describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () => {

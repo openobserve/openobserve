@@ -181,20 +181,6 @@ describe("useSearchBar Composable", () => {
       expect(typeof wrapper.vm.getRegionInfo).toBe("function");
     });
 
-    it("fetches no clusters while the license locks super_cluster", async () => {
-      const { default: searchService } = await import("@/services/search");
-      store.state.zoConfig = { ...store.state.zoConfig, features: { super_cluster: "locked" } };
-      try {
-        wrapper.vm.getRegionInfo();
-        expect(searchService.get_regions).not.toHaveBeenCalled();
-        store.state.zoConfig = { ...store.state.zoConfig, features: {} };
-        wrapper.vm.getRegionInfo();
-        expect(searchService.get_regions).toHaveBeenCalledTimes(1);
-      } finally {
-        store.state.zoConfig = { ...store.state.zoConfig, features: {} };
-      }
-    });
-
     it("should expose setSelectedStreams", () => {
       expect(typeof wrapper.vm.setSelectedStreams).toBe("function");
     });

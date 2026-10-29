@@ -3,7 +3,6 @@
 
 import type { RangeProps, RangeEmits, RangeSlots, RangeValue } from "./ORange.types";
 import { computed, ref, useAttrs, useId } from "vue";
-import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -33,8 +32,6 @@ const props = withDefaults(defineProps<RangeProps>(), {
 const emit = defineEmits<RangeEmits>();
 
 defineSlots<RangeSlots>();
-
-const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const baseId = computed(() => props.id ?? _fallbackId);
@@ -206,7 +203,7 @@ function vToValue(clientY: number): number {
 }
 
 function onVertDown(e: PointerEvent) {
-  if (isDisabled.value) return;
+  if (props.disabled) return;
   const target = e.target as HTMLElement;
   e.preventDefault();
   if (target.dataset.thumb === "min") {
@@ -235,7 +232,7 @@ function onVertDown(e: PointerEvent) {
 }
 
 function onVertMove(e: PointerEvent) {
-  if (!dragging || isDisabled.value) return;
+  if (!dragging || props.disabled) return;
   const v = vToValue(e.clientY);
   if (dragging === "min") {
     emit("update:modelValue", {
@@ -251,7 +248,7 @@ function onVertMove(e: PointerEvent) {
 }
 
 function onVertUp(e: PointerEvent) {
-  if (!dragging || isDisabled.value) {
+  if (!dragging || props.disabled) {
     dragging = null;
     return;
   }
@@ -294,7 +291,7 @@ function snapToStep(v: number): number {
 }
 
 function onHorizDown(e: PointerEvent) {
-  if (isDisabled.value) return;
+  if (props.disabled) return;
   // Prevent native range behaviour for pointer events so we control the drag.
   // Keyboard arrow-key events are unaffected by this.
   e.preventDefault();
@@ -321,7 +318,7 @@ function onHorizDown(e: PointerEvent) {
 }
 
 function onHorizMove(e: PointerEvent) {
-  if (!hDragging || isDisabled.value) return;
+  if (!hDragging || props.disabled) return;
   const raw = hToValue(e.clientX);
   const snapped = snapToStep(raw);
   if (hDragging === "min") {
@@ -344,7 +341,7 @@ function onHorizUp(e: PointerEvent) {
   // Always clear visual overrides so the thumb snaps to the final value
   dragVisualMin.value = null;
   dragVisualMax.value = null;
-  if (!hDragging || isDisabled.value) {
+  if (!hDragging || props.disabled) {
     hDragging = null;
     return;
   }
@@ -390,7 +387,7 @@ const { t } = useI18nTyped();
         ref="vertTrackRef"
         class="relative flex h-full shrink-0 justify-center"
         :class="
-          isDisabled
+          disabled
             ? 'cursor-not-allowed opacity-60'
             : hasRange
               ? 'cursor-pointer'
@@ -407,7 +404,7 @@ const { t } = useI18nTyped();
           class="absolute top-0 bottom-0 rounded-full"
           :class="[
             trackWidthV[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
+            disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
           ]"
           aria-hidden="true"
         />
@@ -416,7 +413,7 @@ const { t } = useI18nTyped();
           class="absolute rounded-full"
           :class="[
             trackWidthV[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
+            disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
           ]"
           :style="{ top: vertFilledTop + '%', height: vertFilledHeight + '%' }"
           aria-hidden="true"
@@ -427,7 +424,7 @@ const { t } = useI18nTyped();
             v-for="ml in markerLabels"
             :key="ml.value"
             class="absolute right-0 left-0 h-px opacity-50"
-            :class="isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track'"
+            :class="disabled ? 'bg-slider-disabled-track' : 'bg-slider-track'"
             :style="{ top: valueToTop(ml.value) + '%' }"
             aria-hidden="true"
           />
@@ -440,7 +437,7 @@ const { t } = useI18nTyped();
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMinZClass,
-            isDisabled
+            disabled
               ? 'bg-slider-disabled-thumb cursor-not-allowed'
               : hasRange
                 ? 'bg-slider-thumb cursor-grab'
@@ -462,7 +459,7 @@ const { t } = useI18nTyped();
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMaxZClass,
-            isDisabled
+            disabled
               ? 'bg-slider-disabled-thumb cursor-not-allowed'
               : hasRange
                 ? 'bg-slider-thumb cursor-grab'
@@ -526,7 +523,7 @@ const { t } = useI18nTyped();
         ref="hTrackRef"
         :class="[
           'relative flex w-full items-center',
-          isDisabled
+          disabled
             ? 'cursor-not-allowed opacity-60'
             : hasRange
               ? 'cursor-pointer'
@@ -542,7 +539,7 @@ const { t } = useI18nTyped();
           :class="[
             'absolute right-0 left-0 rounded-full',
             trackHeight[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
+            disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
           ]"
           aria-hidden="true"
         />
@@ -551,7 +548,7 @@ const { t } = useI18nTyped();
           :class="[
             'absolute rounded-full',
             trackHeight[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
+            disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
           ]"
           :style="{
             left: minPercent + '%',
@@ -568,7 +565,7 @@ const { t } = useI18nTyped();
           :max="max"
           :step="step"
           :value="current.min"
-          :disabled="isDisabled"
+          :disabled="disabled"
           :aria-label="t('common.rangeMinimum', { label: label ?? t('common.rangeFallbackLabel') })"
           :aria-invalid="hasError || undefined"
           :class="[
@@ -577,7 +574,7 @@ const { t } = useI18nTyped();
             minZClass,
             'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
             trackHeight[resolvedSize],
-            isDisabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
+            disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
           ]"
           @input="handleMin"
           @change="handleMin"
@@ -592,7 +589,7 @@ const { t } = useI18nTyped();
           :max="max"
           :step="step"
           :value="current.max"
-          :disabled="isDisabled"
+          :disabled="disabled"
           :aria-label="t('common.rangeMaximum', { label: label ?? t('common.rangeFallbackLabel') })"
           :aria-invalid="hasError || undefined"
           :class="[
@@ -601,7 +598,7 @@ const { t } = useI18nTyped();
             maxZClass,
             'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
             trackHeight[resolvedSize],
-            isDisabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
+            disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
           ]"
           @input="handleMax"
           @change="handleMax"
@@ -619,7 +616,7 @@ const { t } = useI18nTyped();
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
             thumbSize[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
+            disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
           ]"
           :style="{
             left: `clamp(0px, calc(${minPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))`,
@@ -632,7 +629,7 @@ const { t } = useI18nTyped();
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
             thumbSize[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
+            disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
           ]"
           :style="{
             left: `clamp(0px, calc(${maxPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))`,

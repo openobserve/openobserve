@@ -204,7 +204,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 export default defineComponent({
@@ -241,7 +240,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = cipherKeysList.error.value;
-      return forbiddenState(e) || e?.status === 403;
+      return e?.status === 403 || e?.response?.status === 403;
     });
     const viewState = useListViewState("cipher-keys", {
       filterQuery: "",

@@ -60,7 +60,6 @@ import {
 } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { featureState } from "@/utils/featureGate";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
@@ -132,10 +131,7 @@ export default defineComponent({
     const errorDataModel = computed(() => props.errorData);
 
     const regionClusterParams = computed(() => {
-      if (
-        store.state.zoConfig?.super_cluster_enabled &&
-        featureState(store.state.zoConfig?.features, "super_cluster") !== "locked"
-      ) {
+      if (store.state.zoConfig?.super_cluster_enabled) {
         return {
           regions: searchObj.meta.regions,
           clusters: searchObj.meta.clusters,

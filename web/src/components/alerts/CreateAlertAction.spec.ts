@@ -16,7 +16,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
-import { createStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -54,11 +53,7 @@ const ButtonStub = {
 const stubs = {
   ODropdownItem: DropdownItemStub,
   OButton: ButtonStub,
-  OTooltip: {
-    name: "OTooltip",
-    props: ["content"],
-    template: `<span>{{ content }}<slot /></span>`,
-  },
+  OTooltip: { name: "OTooltip", props: ["content"], template: `<span>{{ content }}</span>` },
 };
 
 const prefill = (): AlertPrefill => ({
@@ -331,55 +326,5 @@ describe("CreateAlertAction", () => {
   it("uses the registry label for the source", () => {
     wrapper = mountAction({ source: "logs" });
     expect(wrapper.text()).toContain("Create Alert");
-  });
-
-  describe("license lock", () => {
-    const mountWithFeatures = (features: Record<string, string>, props = {}) =>
-      mount(CreateAlertAction, {
-        props: { source: "logs", build: vi.fn(needsDialog), variant: "button", ...props },
-        global: {
-          plugins: [
-            i18n,
-            createStore({ state: { zoConfig: { features, feature_names: { alerts: "Alerts" } } } }),
-          ],
-          stubs,
-        },
-      });
-
-    it.each(["button", "toolbar", "icon"])(
-      "wraps the disabled %s in a hover tooltip with the license reason",
-      (variant) => {
-        wrapper = mountWithFeatures({ alerts: "locked" }, { variant });
-        const tooltip = wrapper.findComponent({ name: "OTooltip" });
-        expect(tooltip.props("content")).toBe("Locked: needs Alerts");
-        const button = tooltip.find("span.inline-flex").findComponent({ name: "OButton" });
-        expect(button.find("button").attributes("disabled")).toBeDefined();
-        expect(button.props("iconLeft")).toBe("lock");
-      },
-    );
-
-    it("opens nothing while locked", async () => {
-      wrapper = mountWithFeatures({ alerts: "locked" });
-
-      (wrapper.vm as any).$.setupState.onActivate();
-      expect(alertCreationDialog.value).toBeNull();
-      expect(mockOpenAlertCreation).not.toHaveBeenCalled();
-    });
-
-    it("disables the menu item with the license reason", () => {
-      wrapper = mountWithFeatures({ alerts: "locked" }, { variant: "menu-item" });
-      const item = wrapper.findComponent(DropdownItemStub);
-      expect(item.props("disabled")).toBe(true);
-      expect(item.props("description")).toBe("Locked: needs Alerts");
-    });
-
-    it("is unchanged while alerts is enabled", async () => {
-      wrapper = mountWithFeatures({ alerts: "enabled" });
-      const button = wrapper.findComponent({ name: "OButton" });
-      expect(button.props("disabled")).toBe(false);
-      expect(button.props("iconLeft")).not.toBe("lock");
-      await wrapper.find("button").trigger("click");
-      expect(alertCreationDialog.value).not.toBeNull();
-    });
   });
 });

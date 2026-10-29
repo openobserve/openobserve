@@ -248,7 +248,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -312,7 +311,7 @@ const fetchFilterValues = async () => {
 
 // State
 const isLoading = ref(false);
-const forbidden = ref<ForbiddenState>(false);
+const forbidden = ref(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
@@ -417,7 +416,7 @@ const fetchSourceMaps = async () => {
     groupSourceMaps();
   } catch (error: any) {
     console.error("Error fetching source maps:", error);
-    forbidden.value = forbiddenState(error);
+    forbidden.value = error?.response?.status === 403;
     sourceMaps.value = [];
     groupedSourceMaps.value = [];
   } finally {

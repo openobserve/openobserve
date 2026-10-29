@@ -107,13 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="store.state.zoConfig?.profiling_enabled"
                   value="profiles"
                   size="sm"
-                  :disabled="profilesLocked"
-                  :tooltip="profilesLocked ? profilesLockedReason : undefined"
-                  data-test="log-stream-profiles-toggle"
                 >
-                  <template #icon-left
-                    ><OIcon :name="profilesLocked ? 'lock' : 'memory'" size="xs" class="shrink-0"
-                  /></template>
+                  <template #icon-left><OIcon name="memory" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
@@ -475,7 +470,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -527,10 +521,6 @@ export default defineComponent({
       sortBy: "name",
       sortOrder: "asc" as "asc" | "desc",
     });
-    const { locked: profilesLocked, lockedReason: profilesLockedReason } =
-      useLicenseLock("continuous_profiling");
-    // a remembered profiles tab must not reopen a locked feature
-    if (profilesLocked.value && viewState.streamType === "profiles") viewState.streamType = "logs";
     const filterQuery = ref(viewState.filterQuery);
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref(viewState.streamType);
@@ -1382,11 +1372,6 @@ export default defineComponent({
       onChangeStreamFilter(tab);
     };
 
-    // The org config, with its license states, can land after this page mounted.
-    watch(profilesLocked, (locked) => {
-      if (locked && selectedStreamType.value === "profiles") filterLogStreamByTab("logs");
-    });
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
@@ -1413,8 +1398,6 @@ export default defineComponent({
       raw,
       router,
       store,
-      profilesLocked,
-      profilesLockedReason,
       logStream: logStream,
       columns,
       selectedIds,

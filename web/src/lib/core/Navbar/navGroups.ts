@@ -16,7 +16,6 @@
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
 import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import { featureState } from "@/utils/featureGate";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -48,24 +47,18 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // On-call: backend /config flag `oncall_enabled` (enterprise
   // O2_ONCALL_ENABLED). `!== false`, matching oncallRouteGuard, so the flyout
   // does not blink out while /config is still in flight on a cold load.
-  // A locked license also reports the flag false, yet the entries stay to show the lock.
-  oncall: (c) => c.oncallEnabled || featureState(c.features, "oncall") === "locked",
+  oncall: (c) => c.oncallEnabled,
   // The runtime flag is the whole gate for the MENU ENTRY, which is not
   // enterprise-only. Three of Database Monitoring's seven tabs (deadlocks,
   // blocked queries, table health) ARE enterprise-only, but they are gated
   // per-tab in DbmSectionTabs.vue and per-route in router.ts — not here. An
   // isEnterprise conjunct at this level would take the four OSS tabs down with
   // them and hide the section from a build that still serves most of it.
-  databaseMonitoring: (c) =>
-    c.databaseMonitoring || featureState(c.features, "db_monitoring") === "locked",
-  // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard; a locked license keeps the entry to show the lock.
-  downtimes: (c) =>
-    (c.isEnterprise || c.isCloud) &&
-    (c.downtimesEnabled || featureState(c.features, "alerts") === "locked"),
-  // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard; a locked license keeps the entry.
-  alertCalibration: (c) =>
-    (c.isEnterprise || c.isCloud) &&
-    (c.alertCalibrationEnabled || featureState(c.features, "alerts") === "locked"),
+  databaseMonitoring: (c) => c.databaseMonitoring,
+  // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard.
+  downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
+  // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard.
+  alertCalibration: (c) => (c.isEnterprise || c.isCloud) && c.alertCalibrationEnabled,
   // Enterprise plus `/config` `fleet_enabled`; the route stays so management reads keep working.
   fleet: (c) => c.isEnterprise && c.fleetEnabled,
 };
@@ -168,7 +161,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertList",
         requires: "alertList",
         categoryKey: "menu.alerts",
-        feature: "alerts",
       },
       {
         titleKey: "alert_destinations.header",
@@ -193,7 +185,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertLibrary",
         requires: "alertList",
         categoryKey: "menu.alerts",
-        feature: "alerts",
       },
       // ── Reliability's other concerns ────────────────────────────────────
       // Deliberately OUTSIDE the Alerts header: an SLO is what an SLO alert
@@ -203,20 +194,13 @@ export const NAV_GROUPS: NavGroupDef[] = [
       // any of them (`custom_hide_menus`, or Incidents being enterprise-gated)
       // shrinks the group, and dropping to a single survivor collapses it back
       // to a plain link rather than leaving a one-item flyout.
-      {
-        titleKey: "menu.slos",
-        icon: "target",
-        name: "sloList",
-        requires: "sloList",
-        feature: "anomaly_detection",
-      },
+      { titleKey: "menu.slos", icon: "target", name: "sloList", requires: "sloList" },
       {
         titleKey: "menu.incidents",
         icon: "notifications-active",
         name: "incidentList",
         requires: "incidentList",
         gate: "incidents",
-        feature: "incidents",
       },
       {
         titleKey: "menu.downtimes",
@@ -224,7 +208,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "downtimes",
         requires: "downtimes",
         gate: "downtimes",
-        feature: "alerts",
         activeOnRoutes: ["addDowntime", "editDowntime", "downtimeDetail"],
         beta: true,
       },
@@ -234,7 +217,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertCalibration",
         requires: "alertList",
         gate: "alertCalibration",
-        feature: "alerts",
         activeOnRoutes: [
           "alertCalibrationRuns",
           "alertCalibrationDigest",
@@ -255,7 +237,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallResponses",
         categoryKey: "menu.onCall",
         gate: "oncall",
-        feature: "oncall",
       },
       {
         titleKey: "oncall.teams",
@@ -263,7 +244,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallTeams",
         categoryKey: "menu.onCall",
         gate: "oncall",
-        feature: "oncall",
       },
       {
         titleKey: "oncall.routingNav",
@@ -271,7 +251,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallRouting",
         categoryKey: "menu.onCall",
         gate: "oncall",
-        feature: "oncall",
       },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where
@@ -282,7 +261,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "webhook",
         name: "alertSources",
         requires: "incidentList",
-        feature: "incidents",
       },
     ],
   },
@@ -311,7 +289,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     placeAfter: "reliability",
     // Hosts leads the flyout; the workload children are ungated on purpose — detection changes page state, never existence.
     children: [
-      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts", feature: "host_monitoring" },
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
       // Moved here from the Traces flyout. The routes are always registered
       // (the guard redirects when the feature is off), so the `gate` is what
       // keeps the link out of the menu.
@@ -327,7 +305,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "database",
         name: "dbmDatabases",
         gate: "databaseMonitoring",
-        feature: "db_monitoring",
         // EVERY in-page tab, not just the first two. Deadlocks and Blocked
         // queries are DbmSectionTabs destinations with no nav child of their
         // own, so omitting them unlit the Databases entry the moment the user
@@ -351,12 +328,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
           "dbmTableHealth",
         ],
       },
-      {
-        titleKey: "menu.kubernetes",
-        icon: "hub",
-        name: "infraKubernetes",
-        feature: "kubernetes_monitoring",
-      },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
     ],
   },
   {
@@ -379,7 +351,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "pipelines",
         requires: "pipeline",
         gate: "streamPipelines",
-        feature: "pipelines",
       },
       // Sits with Pipelines — the two are the same kind of thing (a flow canvas)
       // and share the canvas code. `requires` keys off the top-level entry
@@ -393,7 +364,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "workflows",
         requires: "workflows",
         gate: "workflows",
-        feature: "workflows",
       },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       {
@@ -425,20 +395,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
     parentLink: "/dashboards",
     absorbs: ["dashboards", "reports"],
     children: [
-      {
-        titleKey: "menu.dashboard",
-        icon: "dashboard",
-        name: "dashboards",
-        requires: "dashboards",
-        feature: "dashboards",
-      },
-      {
-        titleKey: "menu.report",
-        icon: "description",
-        name: "reports",
-        requires: "reports",
-        feature: "reports",
-      },
+      { titleKey: "menu.dashboard", icon: "dashboard", name: "dashboards", requires: "dashboards" },
+      { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
     ],
   },
   {
@@ -449,21 +407,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
     parentLink: "/rum",
     absorbs: ["rum", "synthetics", "productAnalytics"],
     children: [
-      {
-        titleKey: "menu.rum",
-        title: "RUM",
-        icon: "devices",
-        name: "RUM",
-        requires: "rum",
-        feature: "rum",
-      },
-      {
-        titleKey: "menu.synthetic",
-        icon: "radar",
-        name: "synthetics",
-        requires: "synthetics",
-        feature: "synthetics",
-      },
+      { titleKey: "menu.rum", title: "RUM", icon: "devices", name: "RUM", requires: "rum" },
+      { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
       // The event editors sit outside the shell route, so name every PA route rather than rely on the path prefix.
       {
         titleKey: "menu.productAnalytics",
@@ -471,7 +416,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: PA_ROUTES.shell,
         requires: PA_ROUTES.shell,
         activeOnRoutes: Object.values(PA_ROUTES),
-        feature: "product_analytics",
         beta: true,
       },
     ],

@@ -8,14 +8,12 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { ALL_FOLDERS, defaultDowntimeValues } from "@/utils/downtimes/downtimeForm";
 import store from "@/test/unit/helpers/store";
 import common from "@/services/common";
-import { queryClient } from "@/composables/query/queryClient";
 import DowntimeTargetCard from "./DowntimeTargetCard.vue";
 
 const toast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ useToast: () => ({ toast }) }));
 
-vi.mock("@/composables/downtimes/useDowntimeItems", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+vi.mock("@/composables/downtimes/useDowntimeItems", () => ({
   useDowntimeItems: () => ({
     items: ref([
       { id: "a1", name: "payments-db-replica-lag", folderId: "payments", tags: [] },
@@ -125,33 +123,6 @@ describe("DowntimeTargetCard", () => {
     expect(common.list_Folders).toHaveBeenCalledWith(expect.any(String), "synthetics", {
       skipAccessToast: true,
     });
-    wrapper.unmount();
-  });
-
-  it("shows the lock and reads no synthetics folders while synthetics is license-locked", async () => {
-    queryClient.clear();
-    vi.mocked(common.list_Folders).mockClear();
-    store.state.zoConfig.features = { synthetics: "locked" };
-    try {
-      const { wrapper } = mountCard("synthetics", false);
-      await flushPromises();
-      expect(wrapper.find('[data-test="downtime-target-synthetics-locked"]').exists()).toBe(true);
-      const picker = wrapper.find('[data-test="downtime-target-synthetics-folders"]');
-      expect(picker.find("[disabled]").exists()).toBe(true);
-      expect(wrapper.find('[data-test="downtime-target-synthetics-add-items"]').exists()).toBe(
-        false,
-      );
-      expect(common.list_Folders).not.toHaveBeenCalled();
-      wrapper.unmount();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
-
-  it("shows no lock while the module's feature is enabled", async () => {
-    const { wrapper } = mountCard("synthetics", false);
-    await flushPromises();
-    expect(wrapper.find('[data-test="downtime-target-synthetics-locked"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });

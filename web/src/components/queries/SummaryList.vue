@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, defineComponent, computed, type PropType } from "vue";
+import { ref, defineComponent, computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -112,7 +112,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type { ForbiddenState } from "@/utils/featureGate";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -127,7 +126,7 @@ export default defineComponent({
       required: true,
     },
     forbidden: {
-      type: [Boolean, Array] as PropType<ForbiddenState>,
+      type: Boolean,
       default: false,
     },
     filtered: {

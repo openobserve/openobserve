@@ -26,11 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-heading text-sm font-semibold">
         {{ t(MODULE_LABEL_KEYS[module]) }}
       </span>
-      <OTooltip v-if="locked" :content="lockedReason">
-        <span class="inline-flex" :data-test="`downtime-target-${module}-locked`">
-          <OIcon name="lock" size="sm" class="text-text-secondary" />
-        </span>
-      </OTooltip>
       <span
         v-if="matchCount !== null"
         class="text-text-secondary ms-auto text-xs"
@@ -48,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : t('alerts.downtimes.form.alertFolders')
       "
       :options="folderOptions"
-      :disabled="noAccess || locked"
+      :disabled="noAccess"
       :help-text="noAccess ? noAccessHint : undefined"
       multiple
       searchable
@@ -116,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="!noAccess && !locked && (!idsOpen || (module === 'synthetics' && !tagsOpen))"
+      v-if="!noAccess && (!idsOpen || (module === 'synthetics' && !tagsOpen))"
       class="flex flex-wrap gap-1"
     >
       <OButton
@@ -218,8 +213,7 @@ import type { IncidentMode, TargetModule } from "@/services/downtimes";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { useToast } from "@/lib/feedback/Toast/useToast";
-import { useDowntimeItems, useTargetModuleLocks } from "@/composables/downtimes/useDowntimeItems";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useDowntimeItems } from "@/composables/downtimes/useDowntimeItems";
 import {
   ALL_FOLDERS,
   exclusiveAllFolders,
@@ -275,15 +269,9 @@ const tagsOpen = computed(() => !!values.value?.tags_open);
 const idsOpen = computed(() => !!values.value?.ids_open);
 const sloMode = computed(() => values.value?.slo_mode);
 
-const moduleLocks = useTargetModuleLocks();
-const locked = computed(() => moduleLocks[props.module].locked.value);
-const lockedReason = computed(() => moduleLocks[props.module].lockedReason.value);
-
 const folderType = computed(() => (props.module === "synthetics" ? "synthetics" : "alerts"));
 const foldersList = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, folderType.value), {
-    enabled: !!orgId.value && !locked.value,
-  }),
+  Object.assign(optionalFoldersQuery(orgId.value, folderType.value), { enabled: !!orgId.value }),
 );
 const folders = computed(() => foldersList.data.value?.folders ?? []);
 const noAccess = computed(() => !!foldersList.data.value?.forbidden);

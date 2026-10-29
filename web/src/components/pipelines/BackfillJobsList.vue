@@ -407,7 +407,6 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
@@ -419,7 +418,7 @@ const { isMobile } = useBreakpoint();
 const qTableRef = ref();
 
 const loading = ref(false);
-const forbidden = ref<ForbiddenState>(false);
+const forbidden = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
@@ -537,7 +536,7 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    forbidden.value = forbiddenState(error);
+    forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({

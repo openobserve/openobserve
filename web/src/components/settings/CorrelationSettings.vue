@@ -37,29 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="correlation-settings-tabs"
         @update:model-value="onTabChange"
       >
-        <OTab
-          name="services"
-          data-test="correlation-settings-services-tab"
-          :label="t('settings.correlation.discoveredServicesTab')"
-          :suffix-icon="correlationLocked ? 'lock' : undefined"
-        />
-        <OTab
-          name="discovery"
-          data-test="correlation-settings-discovery-tab"
-          :label="t('settings.correlation.serviceDiscoveryTab')"
-          :suffix-icon="correlationLocked ? 'lock' : undefined"
-        />
-        <OTab
-          name="alert-correlation"
-          data-test="correlation-settings-alert-correlation-tab"
-          :label="t('settings.correlation.alertCorrelationTab')"
-          :suffix-icon="alertsLocked ? 'lock' : undefined"
-        />
+        <OTab name="services" :label="t('settings.correlation.discoveredServicesTab')" />
+        <OTab name="discovery" :label="t('settings.correlation.serviceDiscoveryTab')" />
+        <OTab name="alert-correlation" :label="t('settings.correlation.alertCorrelationTab')" />
         <OTab
           name="field-aliases"
           data-test="correlation-settings-field-aliases-tab"
           :label="t('settings.correlation.fieldAliasesTab')"
-          :suffix-icon="alertsLocked ? 'lock' : undefined"
         />
       </OTabs>
     </template>
@@ -67,22 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tab content -->
     <div class="min-h-0 flex-1 overflow-hidden">
       <div v-show="activeTab === 'services'" class="h-full">
-        <LicenseDeniedState
-          v-if="correlationLocked"
-          :features="['correlation']"
-          data-test="correlation-services-license-denied"
-        />
-        <DiscoveredServices v-else @navigate-to-configuration="onTabChange('discovery')" />
+        <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
       </div>
 
       <div v-show="activeTab === 'discovery'" class="px-page-edge h-full overflow-y-auto py-4">
-        <LicenseDeniedState
-          v-if="correlationLocked"
-          :features="['correlation']"
-          data-test="correlation-discovery-license-denied"
-        />
         <ServiceIdentitySetup
-          v-else
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
           @navigate-to-aliases="onNavigateToAliases"
@@ -91,13 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-show="activeTab === 'alert-correlation'" class="px-page-edge h-full overflow-y-auto">
-        <LicenseDeniedState
-          v-if="alertsLocked"
-          :features="['alerts']"
-          data-test="correlation-alert-correlation-license-denied"
-        />
         <OrganizationDeduplicationSettings
-          v-else
           :org-id="store.state.selectedOrganization.identifier"
           :config="store.state.organizationSettings?.deduplication_config"
           @saved="onCorrelationSettingsSaved"
@@ -105,13 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-show="activeTab === 'field-aliases'" class="px-page-edge h-full overflow-y-auto py-4">
-        <LicenseDeniedState
-          v-if="alertsLocked"
-          :features="['alerts']"
-          data-test="correlation-field-aliases-license-denied"
-        />
         <SemanticFieldGroupsConfig
-          v-else
           :key="`field-aliases-${fieldAliasesEditorKey}`"
           :semantic-field-groups="draftSemanticGroups"
           :scroll-to-group-id="aliasScrollToGroup"
@@ -152,13 +113,10 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { useLicenseLock } from "@/composables/useFeatureLock";
-import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
 export default defineComponent({
   name: "CorrelationSettings",
   components: {
-    LicenseDeniedState,
     OrganizationDeduplicationSettings,
     DiscoveredServices,
     ServiceIdentitySetup,
@@ -174,8 +132,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const route = useRoute();
-    const { locked: correlationLocked } = useLicenseLock("correlation");
-    const { locked: alertsLocked } = useLicenseLock("alerts");
 
     // URL slug ↔ internal tab name
     const slugToTab: Record<string, string> = {
@@ -229,8 +185,6 @@ export default defineComponent({
       groups.map((g) => ({ ...g, fields: [...(g.fields ?? [])] }));
 
     const loadSemanticGroups = async () => {
-      // the semantic-groups endpoint is licensed under alerts
-      if (alertsLocked.value) return;
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const res = await serviceStreamsService.getSemanticGroups(orgId);
@@ -383,8 +337,6 @@ export default defineComponent({
       isFieldAliasesDirty,
       savingFieldAliases,
       fieldAliasesEditorKey,
-      correlationLocked,
-      alertsLocked,
       t,
     };
   },

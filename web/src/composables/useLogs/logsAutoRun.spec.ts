@@ -294,21 +294,6 @@ describe("unknown windows and the super-cluster check (H1, M5)", () => {
       (config as any).isEnterprise = enterprise;
     }
   });
-
-  it("is no super cluster while the license locks super_cluster", () => {
-    const enterprise = (config as any).isEnterprise;
-    (config as any).isEnterprise = "true";
-    fakeStore.state.zoConfig.super_cluster_enabled = true;
-    fakeStore.state.zoConfig.features = { super_cluster: "locked" };
-    try {
-      expect(isSuperCluster()).toBe(false);
-      fakeStore.state.zoConfig.features = { super_cluster: "enabled" };
-      expect(isSuperCluster()).toBe(true);
-    } finally {
-      delete fakeStore.state.zoConfig.features;
-      (config as any).isEnterprise = enterprise;
-    }
-  });
 });
 
 describe("transport binding (AC4.1, P2 records)", () => {

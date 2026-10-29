@@ -65,7 +65,6 @@ import {
 import type { Point } from "./hoverIntent";
 import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import {
@@ -117,9 +116,6 @@ const flyoutStyle = ref<Record<string, string>>({});
 // group is worth collapsing into at all.
 const gateContext = useNavGateContext();
 
-const licenseState = (c: SubnavChild) =>
-  c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
-
 // A child shows when its route is registered and custom_hide_menus doesn't
 // name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
 // show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
@@ -131,18 +127,13 @@ const visibleChildren = computed<SubnavChild[]>(() =>
   props.children
     .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
     .flatMap((c): SubnavChild[] => {
-      if (c.gate && isFeatureKey(c.gate)) {
+      if (!c.gate) return [{ ...c, locked: false }];
+      if (isFeatureKey(c.gate)) {
         const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
         if (!access.visible) return [];
         if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
+        return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
       }
-      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
-      const license = licenseState(c);
-      if (license === "hidden") return [];
-      if (license === "locked") {
-        return [{ ...c, locked: true, lockedMessage: t("featureLock.locked") }];
-      }
-      if (!c.gate) return [{ ...c, locked: false }];
       return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
     }),
 );
@@ -156,13 +147,6 @@ const visibleChildren = computed<SubnavChild[]>(() =>
 // inert. Collapsing groups reach this too — every child hidden means the tile
 // has nothing left to offer.
 const hasVisibleChildren = computed(() => visibleChildren.value.length > 0);
-
-// One free child keeps the tile unlocked; only a tile whose every destination is license-locked shows the lock.
-const tileLicenseLocked = computed(
-  () =>
-    hasVisibleChildren.value &&
-    visibleChildren.value.every((c) => !!c.feature && licenseState(c) === "locked"),
-);
 
 /**
  * Blocks, not a flat row list, so the grouping is real to assistive tech.
@@ -630,12 +614,7 @@ function onChildClick(event: MouseEvent, child: SubnavChild & { locked?: boolean
   if (child.locked) {
     event.preventDefault();
     close();
-    // A license-locked page renders its own locked state, so it opens like any other.
-    const target =
-      child.feature && licenseState(child) === "locked"
-        ? childTo(child)
-        : { name: "enterpriseFeatures" };
-    router.push(target).catch(() => {});
+    router.push({ name: "enterpriseFeatures" }).catch(() => {});
     return;
   }
   markRailNavigation?.(event);
@@ -674,7 +653,6 @@ function onChildMouseenter(event: MouseEvent) {
       :active="isGroupActive"
       :expanded="isOpen"
       :paywalled="tilePaywalled"
-      :license-locked="tileLicenseLocked"
       @click="onLinkClick"
       @keydown="onTileKeydown"
     />
@@ -688,7 +666,6 @@ function onChildMouseenter(event: MouseEvent) {
       :active="isGroupActive"
       :expanded="isOpen"
       :paywalled="tilePaywalled"
-      :license-locked="tileLicenseLocked"
       @click="onTriggerClick"
       @keydown="onTileKeydown"
     />

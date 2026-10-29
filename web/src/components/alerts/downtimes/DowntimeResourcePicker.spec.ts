@@ -103,19 +103,6 @@ describe("DowntimeResourcePicker", () => {
     expect(keys[keys.length - 1]).toBe("k8s-pod");
   });
 
-  it("asks the correlation analytics nothing while correlation is license-locked", async () => {
-    vi.mocked(serviceStreams.getSemanticGroups).mockResolvedValue({
-      data: [group("aws-ecs-cluster"), group("service"), group("k8s-pod")],
-    } as any);
-    store.state.zoConfig.features = { correlation: "locked" };
-    try {
-      await mountPicker();
-      expect(serviceStreams.getDimensionAnalytics).not.toHaveBeenCalled();
-    } finally {
-      delete store.state.zoConfig.features;
-    }
-  });
-
   it("keeps Load resources for the full list with streams", async () => {
     vi.mocked(serviceStreams.getSemanticGroups).mockResolvedValue({
       data: [group("service"), group("host")],

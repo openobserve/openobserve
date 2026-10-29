@@ -561,40 +561,6 @@ describe("User Component", () => {
     });
   });
 
-  describe("rbac license", () => {
-    const savedZoConfig = store.state.zoConfig;
-
-    const mountEnterprise = async (rbac: string) => {
-      const config = (await import("@/aws-exports")).default as any;
-      config.isEnterprise = "true";
-      store.state.zoConfig = { ...savedZoConfig, rbac_enabled: true, features: { rbac } };
-      wrapper.unmount();
-      queryClient.clear();
-      mockGetRoles.mockClear();
-      wrapper = mountUser();
-      await flushPromises();
-    };
-
-    afterEach(async () => {
-      const config = (await import("@/aws-exports")).default as any;
-      config.isEnterprise = "false";
-      store.state.zoConfig = savedZoConfig;
-    });
-
-    it("never requests the gated custom roles list while rbac is locked", async () => {
-      await mountEnterprise("locked");
-      expect(mockGetRoles).not.toHaveBeenCalled();
-      expect(wrapper.vm.customRoles).toEqual([]);
-    });
-
-    it("loads custom roles once rbac is enabled", async () => {
-      mockGetRoles.mockResolvedValue({ data: ["custom_role"] } as any);
-      await mountEnterprise("enabled");
-      expect(mockGetRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
-      expect(wrapper.vm.customRoles).toEqual(["custom_role"]);
-    });
-  });
-
   describe("getInvitedMembers", () => {
     it("should fetch invited members successfully", async () => {
       const mockInvitedMembers = [{ email: "invited@example.com", status: "pending" }];

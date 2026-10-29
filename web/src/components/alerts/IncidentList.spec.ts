@@ -62,7 +62,6 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import downtimesService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import type { Incident } from "@/services/incidents";
@@ -306,18 +305,6 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
-    });
-
-    it("does not report success when the refresh fails", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      vi.clearAllMocks();
-      (incidentsService.list as any).mockRejectedValue({ response: { status: 403 } });
-      await (wrapper.vm as any).refreshIncidents();
-      await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalled();
-      expect(toast).not.toHaveBeenCalled();
     });
   });
 
