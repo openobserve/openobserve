@@ -201,6 +201,30 @@ fn env_forbidden(name: &str) -> Response {
     ))
 }
 
+/// The install command embeds an `o2syn_` probe token, gated as `agent-setup` is: synthetics PUT.
+async fn can_deploy_agents(org_id: &str, user_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            "synthetic_folder",
+            "PUT",
+            None,
+            true,
+            false,
+            true,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id);
+        true
+    }
+}
+
 // ── Runs API ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Default, Deserialize)]
@@ -2106,9 +2130,17 @@ pub async fn set_agent_token_enabled(
         (status = 404, description = "Not found"),
     ),
 )]
-pub async fn get_location(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn get_location(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match openobserve_synthetics::service::location_detail(&org_id, &id).await {
-        Ok(detail) => MetaHttpResponse::json(detail),
+        Ok(mut detail) => {
+            if !can_deploy_agents(&org_id, &user_email.user_id).await {
+                detail.install = None;
+            }
+            MetaHttpResponse::json(detail)
+        }
         Err(e) => {
             let msg = e.to_string();
             if msg.contains("not found") {
