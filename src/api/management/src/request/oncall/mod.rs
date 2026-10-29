@@ -4778,6 +4778,49 @@ pub async fn get_telephony(
     }
 }
 
+/// Asks Twilio live about the account the org would page with; never carries a SID or token.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/telephony/status",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetTelephonyStatus",
+    summary = "Check the phone provider account the org would page with",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_telephony_status(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(
+            &org_id,
+            &user_email.user_id,
+            SETTINGS,
+            telephony_permission(&axum::http::Method::GET),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        MetaHttpResponse::json(
+            o2_enterprise::enterprise::oncall::telephony_settings::get_telephony_status(&org_id)
+                .await,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// Saved only once Twilio reports the account active, and never without a master key.
 #[utoipa::path(
     put,
@@ -5498,6 +5541,8 @@ mod tests {
             (R::TokenRequired, "token_required"),
             (R::NoMasterKey, "no_master_key"),
             (R::AccountRejected, "account_rejected"),
+            (R::FromNotOnAccount, "from_not_on_account"),
+            (R::Unavailable, "unavailable"),
             (R::Unreadable, "unreadable"),
         ];
         for (reason, wire) in cases {
@@ -5969,6 +6014,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_telephony_is_not_supported_without_enterprise() {
         assert_not_supported(get_telephony(Path("default".to_string())).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_get_telephony_status_is_not_supported_without_enterprise() {
+        assert_not_supported(get_telephony_status(Path("default".to_string())).await).await;
     }
 
     #[cfg(not(feature = "enterprise"))]

@@ -669,6 +669,7 @@
     "dateRangeCopied": "Intervallo di date copiato",
     "dateRangePasted": "Intervallo di date incollato",
     "dateRangePasteError": "Impossibile analizzare l'intervallo di date",
+    "dateRangePasteBlocked": "Questo browser ha bloccato la lettura degli appunti. Premi {shortcut} con il selettore aperto per incollare.",
     "pastSecond": "Ultimo {count} secondo | Ultimi {count} secondi",
     "pastMinute": "Ultimo {count} minuto | Ultimi {count} minuti",
     "pastHour": "Ultima {count} ora | Ultime {count} ore",
@@ -11578,7 +11579,8 @@
         "dailySentence": "Giornaliero · {time} per {duration} · {zone}",
         "weeklySentence": "Settimanale il {days} · {time} per {duration} · {zone}",
         "fromNoEnd": "{schedule}, dal {start} senza data di fine",
-        "fromUntil": "{schedule}, dal {start} al {until}"
+        "fromUntil": "{schedule}, dal {start} al {until}",
+        "onceFor": "Una volta, {duration}"
       },
       "validation": {
         "conditionRequired": "Aggiungi una condizione o rimuovi il blocco condizione.",
@@ -11919,8 +11921,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 h",
-          "2h": "2 h",
           "4h": "4 h",
+          "24h": "24 h",
           "custom": "Personalizzato"
         },
         "endsAt": "Termina il",
@@ -11934,7 +11936,34 @@
         "mutedTooltip": "Silenziato da {name} fino a {end}",
         "exclude": "Escludi una finestra…",
         "firingMuted": "Attivo · silenziato",
-        "firingMutedTooltip": "Ancora attivo. Le notifiche sono silenziate da {name}."
+        "firingMutedTooltip": "Ancora attivo. Le notifiche sono silenziate da {name}.",
+        "untilClear": "Fino alla risoluzione",
+        "untilClearHint": "Termina quando l'avviso si risolve, o al più tardi dopo 24 h.",
+        "confirmUntilClear": "Silenzia fino alla risoluzione",
+        "titleOne": "Silenzia {name}",
+        "subtitleOne": "Continua a funzionare e conserva la sua cronologia. Le notifiche, le notifiche di reperibilità e i workflow si interrompono fino alla fine della finestra.",
+        "untilTime": "Fino a {time}.",
+        "groups": "Gruppi",
+        "groupsThis": "Questo gruppo",
+        "groupsAll": "Tutti i gruppi di questo avviso",
+        "addGroup": "Aggiungi un gruppo attivo",
+        "groupsHint": "Solo questi gruppi sono silenziati; gli altri gruppi continuano a inviare notifiche",
+        "confirm24h": {
+          "title": "Silenziare per 24 ore?",
+          "message": "L'opzione Fino alla risoluzione termina il silenziamento non appena l'avviso si risolve.",
+          "useUntilClear": "Usa fino alla risoluzione",
+          "ok": "Silenzia 24 h"
+        },
+        "muteGroup": "Silenzia questo gruppo",
+        "endNow": "Termina ora il silenziamento",
+        "endMute": "Termina silenziamento",
+        "mutedUntilClear": "Silenziato fino alla risoluzione · 24 h al massimo",
+        "mutedUntilClearGroups": "Silenziato fino alla risoluzione · {count} gruppo | Silenziato fino alla risoluzione · {count} gruppi",
+        "mutedGroups": "Silenziato · {count} gruppo · termina tra {duration} | Silenziato · {count} gruppi · termina tra {duration}",
+        "mutedUntilClearTooltip": "Silenziato da {name} fino alla risoluzione dell'avviso, al più tardi {end}",
+        "mutedGroupsTooltip": "Silenziato da {name} fino a {end}. Gruppi: {labels}",
+        "mutedUntilClearGroupsTooltip": "Silenziato da {name} fino alla risoluzione dell'avviso, al più tardi {end}. Gruppi: {labels}",
+        "untilTomorrow": "Fino alle {time} di domani."
       },
       "corrected": "Corretto",
       "correctedBy": "Punteggio corretto da {names}",
@@ -12020,7 +12049,66 @@
           "sent": "Test inviato a {count} destinazione | Test inviato a {count} destinazioni",
           "failed": "Il test non ha raggiunto {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Fino alla risoluzione",
+        "atMost": "24 h al massimo",
+        "endsWhenClears": "termina alla risoluzione",
+        "byTime": "entro {time}",
+        "whenCleared": "quando si è risolto",
+        "endedBy": "terminato da {product}",
+        "createdFrom": "da {source}"
+      },
+      "groupTarget": "Gruppo: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Silenziamento rapido da un avviso",
+      "endedLabel": "terminato"
+    },
+    "ack": {
+      "acknowledge": "Prendi in carico",
+      "acknowledgeGroups": "Prendi in carico {count} gruppo attivo | Prendi in carico {count} gruppi attivi",
+      "unacknowledge": "Annulla presa in carico",
+      "takeOver": "Subentra",
+      "chip": "Preso in carico da {who} tramite {source} · {time}",
+      "chipTooltip": "Preso in carico da {who} alle {time} da {source}",
+      "firingAcknowledged": "Attivo · preso in carico",
+      "tile": "Preso in carico",
+      "groupsAcknowledged": "{count} presi in carico",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "reperibilità",
+        "incident": "incidente"
+      },
+      "history": {
+        "dedupSuppressed": "soppresso dalla presa in carico ({who})",
+        "acked": "Presa in carico da {who} da {source}",
+        "ackedViaPage": "Presa in carico da {who} tramite notifica {page}",
+        "ackedViaIncident": "Presa in carico da {who} tramite l'incidente {incident}",
+        "unacked": "Presa in carico annullata da {who} da {source}",
+        "unackedResume": "Presa in carico annullata da {who} da {source} · le ripetizioni riprendono alle {time}",
+        "takenOver": "Presa in carico rilevata da {who}, in precedenza {previous} ({source})"
+      },
+      "refused": {
+        "ack": "Non puoi prendere in carico questo avviso. Le azioni Prendi in carico e Silenzia richiedono il ruolo Admin o Editor, oppure essere il responder di reperibilità dell'avviso.",
+        "mute": "Non puoi silenziare questo avviso. Le azioni Prendi in carico e Silenzia richiedono il ruolo Admin o Editor, oppure essere il responder di reperibilità dell'avviso.",
+        "onCall": "In reperibilità: {people}",
+        "canAct": "Possono intervenire: {people}",
+        "people": "In reperibilità: {onCall}. Possono intervenire: {canAct}."
+      },
+      "errors": {
+        "notFiring": "Questo avviso non è attivo, quindi non c'è nulla da prendere in carico.",
+        "firingChanged": "L'avviso si è attivato di nuovo dopo il caricamento della pagina. Aggiorna e riprova."
       }
+    },
+    "groupActions": {
+      "menu": "Azioni di gruppo",
+      "viewHistory": "Visualizza la cronologia di questo gruppo"
+    },
+    "firingState": {
+      "level": "Livello",
+      "firingSince": "Attivo da",
+      "firingFor": "attivo per {duration}",
+      "incident": "Incidente"
     }
   },
   "alert_dependencies": {
@@ -12549,13 +12637,14 @@
       "openSlackSettings": "Configuralo in Impostazioni › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Invia notifiche ai canali Slack",
+      "slackDescription": "Pubblica un nuovo messaggio con il tuo webhook e template. Usalo per le notifiche o layout Slack personalizzati.",
       "discordDescription": "Invia notifiche ai canali Discord",
       "msteamsDescription": "Invia notifiche ai canali Teams",
       "emailDescription": "Invia notifiche email in formato HTML",
       "pagerdutyDescription": "Crea incidenti in PagerDuty",
       "opsgenieDescription": "Crea avvisi in Opsgenie",
-      "servicenowDescription": "Crea incidenti in ServiceNow"
+      "servicenowDescription": "Crea incidenti in ServiceNow",
+      "slackAppDescription": "Aggiorna sul posto gli avvisi pianificati. Prendi in carico, silenzia e analizza da Slack. Richiede un workspace connesso."
     },
     "import": {
       "title": "Importa destinazione",
@@ -12597,7 +12686,8 @@
     "severityCriticalDescription": "Incidenti a priorità massima",
     "severityErrorDescription": "Incidenti di errore standard",
     "severityWarningDescription": "Incidenti di livello di avviso",
-    "severityInfoDescription": "Incidenti informativi"
+    "severityInfoDescription": "Incidenti informativi",
+    "urlRecipientsChannel": "URL / destinatari / canale"
   },
   "pipeline_destinations": {
     "header": "Destinazioni pipeline",
@@ -13120,7 +13210,7 @@
     "groupIntegrations": "Integrazioni",
     "groupAccount": "Account",
     "slackApp": "Slack",
-    "slackAppDesc": "Fai domande a OpenObserve da Slack",
+    "slackAppDesc": "Fai domande a OpenObserve e gestisci gli avvisi da Slack",
     "generalDesc": "Tema, valori predefiniti delle query e preferenze principali",
     "orgDesc": "Parametri e identificatori dell'organizzazione",
     "cipherKeysDesc": "Chiavi di cifratura per i campi sensibili",
@@ -20618,7 +20708,9 @@
         "succeeded": "Riuscito",
         "failed": "Non riuscito",
         "skipped": "Saltato",
-        "pending": "In sospeso"
+        "pending": "In sospeso",
+        "acknowledged": "Preso in carico",
+        "ackevent": "Evento di presa in carico"
       },
       "alertLevel": {
         "ok": "OK",
@@ -20921,7 +21013,16 @@
       "alertSavedSuccessfully": "Avviso salvato con successo.",
       "alertUpdatedSuccessfully": "Avviso aggiornato con successo.",
       "openingDedupConfig": "Apertura configurazione di deduplicazione per: {name}",
-      "editingAlert": "Modifica avviso: {name}"
+      "editingAlert": "Modifica avviso: {name}",
+      "ack": {
+        "acked": "Presa in carico: {name}",
+        "ackedGroups": "Preso in carico {count} gruppo di {name} | Presi in carico {count} gruppi di {name}",
+        "alreadyAcked": "Già preso in carico da {who}",
+        "unacked": "Presa in carico annullata per {name}",
+        "takenOver": "Hai rilevato la presa in carico di {name}",
+        "failed": "Impossibile prendere in carico {name}",
+        "unackFailed": "Impossibile annullare la presa in carico di {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Chiave di cifratura aggiornata con successo",
@@ -21233,7 +21334,14 @@
       "muted": "Silenziato {count} elemento fino a {time}. Archiviato in {folder}. | Silenziati {count} elementi fino a {time}. Archiviati in {folder}.",
       "muteFailed": "Impossibile creare il silenziamento",
       "viewDowntime": "Visualizza downtime",
-      "itemsDropped": "{count} elemento scelto è al di fuori delle cartelle scelte ed è stato rimosso. | {count} elementi scelti sono al di fuori delle cartelle scelte e sono stati rimossi."
+      "itemsDropped": "{count} elemento scelto è al di fuori delle cartelle scelte ed è stato rimosso. | {count} elementi scelti sono al di fuori delle cartelle scelte e sono stati rimossi.",
+      "mutedUntilClear": "Silenziato {name} fino alla risoluzione, al più tardi alle {time}",
+      "alreadyMuted": "{name} è già silenziato fino alle {time}",
+      "muteChanged": "Questo silenziamento è cambiato dopo il caricamento della pagina. Ora termina alle {time}.",
+      "muteEnded": "Silenziamento terminato. Le notifiche riprendono.",
+      "mutedOne": "Silenziato {name} fino alle {time}",
+      "timeTomorrow": "{time} di domani",
+      "notQuickMute": "Questo silenziamento è stato impostato nella pagina Downtime. Modificalo lì."
     }
   },
   "cipherKeys": {
@@ -24013,7 +24121,7 @@
     "deliveriesTitle": "Invii",
     "deliveriesNone": "Non è stato ancora inviato nulla.",
     "deliveriesRun": "Esecuzione della scala {run} — un passaggio di consegne ha riavviato la salita per il team ricevente.",
-    "deliveryLanded": "Consegnato",
+    "deliveryLanded": "Inviato",
     "deliveryFailed": "Non riuscito",
     "deliveriesTruncated": "Mostrando {shown} di {total} invii.",
     "teamChannelTitle": "Canale del team",
@@ -24606,7 +24714,7 @@
     "myDeliveriesPage": "Notifica",
     "myDeliveriesLandedColumn": "Consegna",
     "myDeliveriesSent": "Inviato",
-    "myDeliveriesLanded": "Ti ha raggiunto tramite {channel}",
+    "myDeliveriesLanded": "Inviato a te tramite {channel}",
     "myDeliveriesFailed": "{channel} non ti ha raggiunto",
     "myDeliveriesNone": "Non ti è stato ancora inviato nulla.",
     "myDeliveriesNoUnread": "Nessun avviso non letto.",
@@ -25230,7 +25338,7 @@
     "reachAlarmNoRetry": "Non è previsto nessun nuovo tentativo — l'escalation è terminata.",
     "reachAlarmNoTransport": "Causa probabile: nessun canale di notifica è configurato su questa installazione.",
     "reachAlarmCheckTransports": "Verifica chi può essere contattato",
-    "reachLanded": "contattato",
+    "reachLanded": "inviato",
     "reachUnreached": "non contattato",
     "onCallDetails": "Dettagli del turno",
     "shiftHandover": "Passaggio di consegne",
@@ -25315,7 +25423,8 @@
     "scopeClaimServiceEverywhere": "{service} avvisa questo team in ogni cluster e namespace, chiunque possieda quelli circostanti.",
     "scopeClaimServiceHere": "{service} avvisa questo team solo in {scope}. Altrove spetta a chi possiede l'ambito circostante.",
     "scopeNothingDiscovered": "Non è stato ancora rilevato nulla, quindi non c'è un insieme di risorse da cui scegliere. Usa Avanzate per scrivere la regola in termini di campi oppure invia prima alcuni dati di telemetria.",
-    "scopeAdvancedHint": "Corrisponde a qualsiasi campo e valore, inclusi quelli non coperti dai livelli superiori."
+    "scopeAdvancedHint": "Corrisponde a qualsiasi campo e valore, inclusi quelli non coperti dai livelli superiori.",
+    "simulatorSendsNothing": "Questa priorità non invia nulla che possano ricevere"
   },
   "paidUsage": {
     "consentTitle": "Attivare l'utilizzo a pagamento dell'IA?",
@@ -26427,17 +26536,14 @@
     "saveFailed": "Impossibile salvare l'account. Riprova.",
     "disconnectFailed": "Non è stato possibile disconnettere l'account. Riprova.",
     "connected": "Connesso",
-    "active": "Attivo",
-    "account": "Account",
     "fromNumber": "Numero mittente",
-    "press4": "Tasti chiamata: 4 presa in carico, 6 risoluzione, 8 escalation",
+    "press4": "Tasti chiamata (4 prendere in carico, 6 risolvere, 8 escalare)",
     "press4Available": "Disponibile",
     "press4NotAvailable": "Non disponibile",
     "press4NotAvailableHint": "Le chiamate invitano a prendere in carico dal link nel messaggio.",
     "update": "Aggiorna",
     "disconnect": "Disconnetti",
     "deploymentTitle": "Account {provider} di questa distribuzione",
-    "deploymentNote": "SMS e chiamate funzionano già. Configurati dall'operatore; nessuna azione necessaria qui.",
     "useOwn": "Usa invece il tuo account {provider}",
     "connectTitle": "Connetti {provider}",
     "updateTitle": "Aggiorna {provider}",
@@ -26445,7 +26551,7 @@
     "accountSid": "Account SID",
     "authToken": "Token di autenticazione",
     "tokenKeep": "Lascia vuoto per mantenere il token attuale",
-    "fromHelp": "Un numero {provider} in grado di inviare SMS ed effettuare chiamate, con prefisso internazionale.",
+    "fromHelp": "Un numero da questo account {provider}, con codice paese.",
     "connect": "Connetti",
     "checking": "Verifica con {provider}…",
     "disconnectTitle": "Disconnettere {provider}?",
@@ -26458,8 +26564,21 @@
       "tokenRequired": "Per connettersi è necessario un token di autenticazione.",
       "noMasterKey": "Chiedi al tuo operatore di impostare {variable}.",
       "accountRejected": "{provider} non ha accettato questo account. Verifica l'Account SID e il token di autenticazione, e che l'account sia attivo.",
-      "unreadable": "Impossibile leggere l'account del provider telefonico di questa organizzazione."
-    }
+      "unreadable": "Impossibile leggere l'account del provider telefonico di questa organizzazione.",
+      "fromNotOnAccount": "Questo numero non appartiene a questo account {provider}. Usane uno da Phone Numbers → Active numbers in {provider}.",
+      "unavailable": "{provider} non è raggiungibile. Riprova."
+    },
+    "statusChecking": "Verifica in corso…",
+    "statusBroken": "Non funziona",
+    "statusUnchecked": "Impossibile verificare",
+    "cardMeta": "Da {number} · Account {account}",
+    "deploymentMeta": "Da {number}",
+    "uncheckedNow": "{provider} non è raggiungibile in questo momento.",
+    "trial": "Account di prova: SMS e chiamate raggiungono solo i numeri verificati in {provider}.",
+    "cantText": "Questo numero non può inviare SMS",
+    "cantCall": "Questo numero non può effettuare chiamate",
+    "deploymentOwner": "Impostato dall'operatore, quindi non c'è nulla da configurare qui.",
+    "tokenNewAccount": "Un account diverso richiede il proprio token di autenticazione"
   },
   "slackApp": {
     "prereq": {
@@ -26699,7 +26818,10 @@
       "managedBy": "gestito dall'amministratore dell'istanza",
       "managedTitle": "Gestito dall'amministratore dell'istanza.",
       "managedDetail": "Le credenziali, il collegamento e le organizzazioni che usano {team} sono impostati in _meta.",
-      "managedQuestions": "Domande: {contact}"
+      "managedQuestions": "Domande: {contact}",
+      "outboundQueue": "Messaggi di avviso: {count} in coda, il più vecchio {age} | Messaggi di avviso: {count} in coda, il più vecchio {age}",
+      "outboundEmpty": "Nessun messaggio di avviso in coda",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Impostazioni predefinite dei canali",
@@ -26735,7 +26857,8 @@
       "instanceAdminOnly": "Solo amministratore dell'istanza",
       "ownOrgOnlyHint": "Su un workspace dell'istanza, i canali vengono mappati alla tua organizzazione",
       "claimableHint": "Canali non assegnati e canali di proprietà di {org}",
-      "servedOrgsHint": "Qualsiasi organizzazione servita da questo workspace"
+      "servedOrgsHint": "Qualsiasi organizzazione servita da questo workspace",
+      "alertRoutes": "{count} destinazione | {count} destinazioni"
     },
     "people": {
       "title": "Persone collegate",
@@ -26889,6 +27012,83 @@
       "remove": "Rimuovi",
       "saved": "Organizzazioni salvate",
       "saveFailed": "Non è stato possibile salvare le organizzazioni."
+    },
+    "destination": {
+      "appTile": "App {product}",
+      "webhookTile": "Webhook {product}",
+      "twoWay": "Bidirezionale",
+      "recommendedForAlertResponse": "Consigliato per la risposta agli avvisi",
+      "choiceHint": "Le notifiche e i super cluster usano il webhook. Gli invii manuali e in tempo reale da una destinazione app Slack sono messaggi separati.",
+      "unavailableReason": "Richiede l'app Slack Enterprise su un singolo cluster",
+      "unavailableFlag": "Disattivato su questo server; chiedi al tuo operatore di impostare {variable}",
+      "unavailableMasterKey": "Richiede una chiave di crittografia su questo server; chiedi al tuo operatore di impostare {variable}",
+      "unavailableCloud": "Non ancora attivato per la tua regione Cloud",
+      "unavailableNoAccess": "Chiedi a un amministratore dell'organizzazione di attivare l'app Slack",
+      "postOnly": "Solo invio",
+      "switchToApp": "Passa all'app {product}",
+      "switchThis": "Cambia questa destinazione",
+      "switchBack": "Torna indietro",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Workspace",
+      "channel": "Canale",
+      "mention": "Menzione",
+      "mentionCritical": "{'@'}here per i critici, nessuna per gli altri",
+      "mentionNone": "Nessuna",
+      "mentionHelp": "Usata per le ripetizioni e gli aumenti di livello",
+      "refireReuse": "Riutilizzo per riattivazione (minuti)",
+      "refireReuseHelp": "Una riattivazione entro questo intervallo modifica il messaggio precedente invece di pubblicarne uno nuovo",
+      "buttons": "Pulsanti Prendi in carico, Silenzia e Indaga",
+      "buttonsHelp": "Risolvi viene aggiunto quando l'avviso attivo ha un incidente o una notifica di reperibilità",
+      "autoInvestigate": "Indaga automaticamente per gli avvisi critici",
+      "autoInvestigateHelp": "Viene eseguito come account di servizio AI dell'organizzazione, con i suoi accessi; pubblica i risultati nel thread dell'avviso",
+      "templateDefault": "Template predefinito {product} ({name})",
+      "sendTest": "Invia test",
+      "setsDefault": "Imposta l'organizzazione predefinita di #{channel} su {org}",
+      "answersFor": "#{channel} risponde alle domande per l'organizzazione {org}. Gli avvisi da {thisOrg} vengono pubblicati qui e i relativi thread rispondono in {thisOrg}; l'organizzazione predefinita del canale rimane invariata.",
+      "sharedTag": "Condiviso · {product} Connect",
+      "sharedTitle": "#{channel} è condiviso con persone esterne a {workspace}.",
+      "sharedDetail": "Vedranno nomi degli avvisi, valori, grafici e link. I loro clic sui pulsanti vengono rifiutati.",
+      "sharedConfirm": "Ho capito, pubblica gli avvisi su questo canale condiviso",
+      "sharedRequired": "Conferma che gli avvisi possono essere pubblicati su questo canale condiviso",
+      "versionMismatch": "I nodi eseguono versioni diverse. Aggiorna prima tutti i nodi.",
+      "oncallNotAllowed": "Una destinazione dell'app {product} non può essere un canale del team di reperibilità",
+      "answersForAnother": "#{channel} risponde alle domande per un'altra organizzazione. Gli avvisi da {thisOrg} vengono pubblicati qui e i relativi thread rispondono in {thisOrg}; l'organizzazione predefinita del canale rimane invariata.",
+      "oncallTag": "Canale di reperibilità",
+      "oncallTitle": "Le notifiche di reperibilità per il team {team} vengono pubblicate anche su #{channel} tramite {destination}.",
+      "oncallDetail": "Gli avvisi qui vengono pubblicati separatamente.",
+      "oncallConfirm": "Ho capito, pubblica gli avvisi in questo canale di reperibilità",
+      "oncallRequired": "Conferma che gli avvisi possono essere pubblicati in questo canale di reperibilità",
+      "workspaceRequired": "Scegli un workspace",
+      "refireRange": "Inserisci minuti interi da 0 a {max}",
+      "connectTitle": "Collega {product} per pubblicare avvisi con pulsanti",
+      "connectDetail": "Scegli un canale nella schermata di {product} e seleziona Consenti. OpenObserve crea questa destinazione per quel canale.",
+      "connected": "{name} è stata creata per #{channel}. Controlla le impostazioni e salva.",
+      "saveFailed": "Impossibile salvare la destinazione.",
+      "switched": "{name} ora pubblica tramite l'app {product}",
+      "switchedBack": "{name} pubblica di nuovo tramite il suo webhook",
+      "switchFailed": "Impossibile cambiare {name}: {reason}",
+      "switchedAll": "{count} destinazione cambiata | {count} destinazioni cambiate",
+      "switchThisDetail": "Passala all'app {product} per i pulsanti Prendi in carico, Silenzia e Indaga. Il nome, il template e gli avvisi restano invariati; Torna indietro ripristina il webhook."
+    },
+    "switchAll": {
+      "title": "{count} destinazione webhook pubblica in questo workspace. | {count} destinazioni webhook pubblicano in questo workspace.",
+      "detail": "Passalo all'app {product} per i pulsanti Prendi in carico, Silenzia e Investiga. Il suo nome, il template e gli avvisi restano invariati; l'opzione Torna indietro ripristina il webhook. | Passali all'app {product} per i pulsanti Prendi in carico, Silenzia e Investiga. I nomi, i template e gli avvisi restano invariati; l'opzione Torna indietro ripristina il webhook.",
+      "review": "Rivedi",
+      "action": "Passa tutto",
+      "summary": "{switched} passati · {count} non passati"
+    },
+    "oncallUnlinked": {
+      "title": "Membri di reperibilità non collegati a {product}",
+      "description": "Le notifiche non possono inviare loro messaggi diretti e i loro clic sui pulsanti degli avvisi e delle notifiche restano in attesa finché non si collegano",
+      "remind": "Invia promemoria",
+      "columnPerson": "Persona",
+      "columnTeam": "Team",
+      "columnNextShift": "Prossimo turno",
+      "columnReminder": "Promemoria",
+      "dmSent": "DM inviato {time}",
+      "notSent": "Non inviato",
+      "reminded": "Promemoria inviato a {count} persona | Promemoria inviato a {count} persone",
+      "remindFailed": "Non è stato possibile inviare i promemoria."
     }
   },
   "fleet": {

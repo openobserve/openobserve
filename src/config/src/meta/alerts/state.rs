@@ -20,6 +20,8 @@
 //! `infra::table::alert_states`; everything that decides **whether** and **what**
 //! to write lives here so it is unit-testable without a database.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::{FrequencyType, TriggerCondition};
@@ -128,6 +130,9 @@ pub struct AlertState {
     /// Start of the current firing cycle, the key of acks and Slack messages; `None` = not firing.
     #[serde(default)]
     pub firing_started_at: Option<i64>,
+    /// The labels the group key was computed from, to name a group no longer observed.
+    #[serde(default)]
+    pub group_label_set: Option<BTreeMap<String, String>>,
 }
 
 impl AlertState {
@@ -155,6 +160,7 @@ impl AlertState {
             episode_incident_id: None,
             recovering_since: None,
             firing_started_at: None,
+            group_label_set: None,
         }
     }
 
@@ -431,6 +437,7 @@ pub fn apply_outcome(
         episode_incident_id: prev.and_then(|p| p.episode_incident_id.clone()),
         recovering_since: prev.and_then(|p| p.recovering_since),
         firing_started_at: firing_started_at_after(prev, &outcome, level_computed, at),
+        group_label_set: prev.and_then(|p| p.group_label_set.clone()),
     };
 
     // A change on EITHER axis is a transition — an escalation while still
@@ -501,6 +508,7 @@ mod tests {
             episode_incident_id: None,
             recovering_since: None,
             firing_started_at: None,
+            group_label_set: None,
         }
     }
 
@@ -766,6 +774,7 @@ mod tests {
             episode_incident_id: None,
             recovering_since: None,
             firing_started_at: None,
+            group_label_set: None,
         };
         let update = apply_outcome(
             "alert-1",
@@ -814,6 +823,7 @@ mod tests {
                 episode_incident_id: None,
                 recovering_since: None,
                 firing_started_at: None,
+                group_label_set: None,
             }),
             transition: Some(StateTransition {
                 alert_id: "alert-1".to_string(),

@@ -127,7 +127,7 @@ describe("OnCallMyDeliveries", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-my-delivery-landed-ev_ok"]').text()).toContain(
-      "Reached you",
+      "Sent to you",
     );
     expect(wrapper.find('[data-test="oncall-my-delivery-landed-ev_bad"]').text()).toContain(
       "did not reach you",
