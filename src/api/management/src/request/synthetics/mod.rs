@@ -1896,7 +1896,13 @@ pub async fn create_location(
         Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
     };
     match create_location(&org_id, is_root, req).await {
-        Ok(loc) => MetaHttpResponse::json(loc),
+        Ok(mut loc) => {
+            if !can_deploy_agents(&org_id, &user_email.user_id).await {
+                loc.token = None;
+                loc.install = None;
+            }
+            MetaHttpResponse::json(loc)
+        }
         Err(e) => location_error_response(e),
     }
 }
