@@ -1348,6 +1348,8 @@
     "tookChip": "{took} 毫秒",
     "scanSize": "扫描大小",
     "deltaScanSize": "增量扫描大小",
+    "scannedSoFar": "已扫描 {size}",
+    "resultsProgressLabel": "搜索进度",
     "histogramTitleError": "生成直方图标题时出错。",
     "selectLogStream": "选择日志流",
     "searchInspect": "搜索检查",

@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle border-card-glass-border rounded-default flex overflow-hidden border"
+        class="filter-mode-toggle border-card-glass-border rounded-default flex overflow-hidden border [&_button:focus-visible]:-outline-offset-2!"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton

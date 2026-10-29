@@ -488,6 +488,19 @@ const SEVERITY_INDICATOR_COLORS: Readonly<Record<KnownLogSeverityLevel, string>>
   ok: "var(--color-log-severity-ok-indicator)",
 };
 
+const SEVERITY_TEXT_CLASSES: Readonly<Record<KnownLogSeverityLevel, string>> = {
+  emergency: "text-log-severity-error-text",
+  alert: "text-log-severity-error-text",
+  critical: "text-log-severity-error-text",
+  error: "text-log-severity-error-text",
+  warning: "text-log-severity-warning-text",
+  notice: "text-log-severity-info-text",
+  info: "text-log-severity-info-text",
+  debug: "text-log-severity-debug-text",
+  trace: "text-log-severity-debug-text",
+  ok: "text-log-severity-info-text",
+};
+
 const GUARDED_FIELDS: readonly string[] = [
   ...new Set<string>([...SEVERITY_TIER1_FIELDS, ...SEVERITY_TIER2_FIELDS, ...SEVERITY_HTTP_FIELDS]),
 ];
@@ -578,6 +591,13 @@ export function severityIndicatorColor(severity: LogSeverity): string {
 
 export function severityRowClass(severity: LogSeverity): string {
   return `o2-log-level-${severity.level} o2-log-level-src-${severity.source}`;
+}
+
+/** Level-text classes for a severity field's own cell; empty for any other column or an HTTP status. */
+export function severityFieldTextClass(field: string, value: unknown): string {
+  const resolved = resolveSeverityFieldValue(field, value);
+  if (!resolved || resolved.source !== "field") return "";
+  return `font-mono font-medium ${SEVERITY_TEXT_CLASSES[resolved.level]}`;
 }
 
 export function severityStringValues(levels: readonly LogSeverityLevel[]): string[] {

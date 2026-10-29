@@ -1356,6 +1356,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Scan Size",
     "deltaScanSize": "Delta Scan Size",
+    "scannedSoFar": "Scanned {size}",
+    "resultsProgressLabel": "Search progress",
     "histogramTitleError": "Error while generating histogram title.",
     "selectLogStream": "Select logs stream",
     "searchInspect": "Search Inspect",

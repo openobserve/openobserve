@@ -1348,6 +1348,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Scangrootte",
     "deltaScanSize": "Delta-scangrootte",
+    "scannedSoFar": "Gescand: {size}",
+    "resultsProgressLabel": "Zoekvoortgang",
     "histogramTitleError": "Fout bij het genereren van de histogramtitel.",
     "selectLogStream": "Logstream selecteren",
     "searchInspect": "Zoek Inspect",

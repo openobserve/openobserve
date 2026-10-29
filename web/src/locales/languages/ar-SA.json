@@ -1348,6 +1348,8 @@
     "tookChip": "{took} مللي ثانية",
     "scanSize": "حجم المسح",
     "deltaScanSize": "حجم دلتا سكان",
+    "scannedSoFar": "تم فحص {size}",
+    "resultsProgressLabel": "تقدم البحث",
     "histogramTitleError": "خطأ أثناء إنشاء عنوان المدرج التكراري.",
     "selectLogStream": "اختر تدفق السجلات",
     "searchInspect": "ابحث عن الفحص",

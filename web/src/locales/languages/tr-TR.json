@@ -1348,6 +1348,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Tarama Boyutu",
     "deltaScanSize": "Delta Tarama Boyutu",
+    "scannedSoFar": "Taranan: {size}",
+    "resultsProgressLabel": "Arama ilerlemesi",
     "histogramTitleError": "Histogram başlığı oluşturulurken hata.",
     "selectLogStream": "Günlükler akışını seçin",
     "searchInspect": "Aramayı İncele",

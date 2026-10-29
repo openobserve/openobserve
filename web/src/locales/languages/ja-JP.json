@@ -1348,6 +1348,8 @@
     "tookChip": "{took} ms",
     "scanSize": "スキャンサイズ",
     "deltaScanSize": "デルタスキャンサイズ",
+    "scannedSoFar": "{size} をスキャン済み",
+    "resultsProgressLabel": "検索の進捗",
     "histogramTitleError": "ヒストグラムタイトルの生成中にエラーが発生しました。",
     "selectLogStream": "ログストリームを選択",
     "searchInspect": "検索を検査",

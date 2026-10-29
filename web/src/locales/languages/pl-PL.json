@@ -1348,6 +1348,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Rozmiar skanowania",
     "deltaScanSize": "Delta rozmiaru skanowania",
+    "scannedSoFar": "Przeskanowano {size}",
+    "resultsProgressLabel": "Postęp wyszukiwania",
     "histogramTitleError": "Błąd podczas generowania tytułu histogramu.",
     "selectLogStream": "Wybierz strumień logów",
     "searchInspect": "Inspekcja wyszukiwania",

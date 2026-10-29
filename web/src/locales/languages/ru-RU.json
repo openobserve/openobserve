@@ -1348,6 +1348,8 @@
     "tookChip": "{took} мс",
     "scanSize": "Размер сканирования",
     "deltaScanSize": "Дельта размера сканирования",
+    "scannedSoFar": "Просканировано {size}",
+    "resultsProgressLabel": "Прогресс поиска",
     "histogramTitleError": "Ошибка при формировании заголовка гистограммы.",
     "selectLogStream": "Выбрать поток логов",
     "searchInspect": "Инспекция поиска",

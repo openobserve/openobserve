@@ -78,7 +78,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, fromZonedInputValue, memberAt } from "@/utils/oncall";
+import { formatInZone, fromZonedInputValue, memberAt, shiftBoundary } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 
@@ -128,12 +128,16 @@ const shifts = computed(() => {
   // the same person while the roster has two or more.
   const secondary = rule(anchorMicros - shift);
 
-  return [0, 1, 2].map((index) => {
-    const startMicros = anchorMicros + index * shift;
+  return [0, 1, 2].flatMap((index) => {
+    // A handover is a wall-clock time, so a DST change between turns moves the instant.
+    const startMicros = shiftBoundary(primary, index, timezone.value);
+    if (startMicros === null) return [];
     return {
       startMicros,
-      member: memberAt(primary, startMicros) ?? "",
-      secondary: showSecondary.value ? (memberAt(secondary, startMicros) ?? "") : "",
+      member: memberAt(primary, startMicros, timezone.value) ?? "",
+      secondary: showSecondary.value
+        ? (memberAt(secondary, startMicros, timezone.value) ?? "")
+        : "",
       when: formatInZone(startMicros, timezone.value, {
         dateStyle: "medium",
         timeStyle: "short",

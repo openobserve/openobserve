@@ -1163,7 +1163,7 @@ const swappableShifts = computed<UpcomingShift[]>(() => {
   return rotations.flatMap((rotation) => {
     const rule = winningRule(rotation, now, zone);
     if (!rule) return [];
-    return upcomingShifts(rule, now, SWAPPABLE_SHIFTS).map((shift) => ({
+    return upcomingShifts(rule, now, SWAPPABLE_SHIFTS, zone).map((shift) => ({
       ...shift,
       rotationId: rotation.id,
       rotationName: rotation.name,

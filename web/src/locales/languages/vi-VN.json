@@ -1348,6 +1348,8 @@
     "tookChip": "{took} ms",
     "scanSize": "Kích thước quét",
     "deltaScanSize": "Kích thước quét Delta",
+    "scannedSoFar": "Đã quét {size}",
+    "resultsProgressLabel": "Tiến độ tìm kiếm",
     "histogramTitleError": "Lỗi khi tạo tiêu đề biểu đồ histogram.",
     "selectLogStream": "Chọn stream nhật ký",
     "searchInspect": "Kiểm tra tìm kiếm",
