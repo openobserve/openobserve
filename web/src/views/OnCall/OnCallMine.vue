@@ -37,11 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('oncall.mineTitle')"
     :subtitle="t('oncall.mineSubtitle')"
     icon="person"
-    :back="{
-      label: t('oncall.backToResponses'),
-      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
-      dataTest: 'oncall-mine-back-btn',
-    }"
+    :back="back"
     scroll
   >
     <template #actions>
@@ -97,6 +93,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
         </span>
 
+        <OEmptyState
+          v-if="loadError !== null"
+          size="inline"
+          variant="error"
+          :title="t('oncall.mineTeamsLoadFailed')"
+          :description="raw(loadError)"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-mine-teams-error"
+          @action="refreshPage"
+        />
+
         <div
           v-for="team in mine?.teams ?? []"
           :key="team.team_id"
@@ -149,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OText
-          v-if="loaded && !(mine?.teams ?? []).length"
+          v-if="loaded && loadError === null && !(mine?.teams ?? []).length"
           variant="meta"
           data-test="oncall-mine-no-teams"
         >
@@ -164,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
@@ -180,7 +187,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
@@ -192,6 +199,24 @@ const mine = ref<MyOnCall | null>(null);
 const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const unavailable = ref(false);
+/// Set only when the first load fails; a failed refresh keeps the teams on screen instead.
+const loadError = ref<string | null>(null);
+
+// Opened from the avatar menu or a channel chip, so Back returns there when the history has it.
+const back = computed<{
+  label?: I18nText;
+  to?: RouteLocationRaw;
+  onClick?: () => void;
+  dataTest: string;
+}>(() =>
+  window.history.state?.back
+    ? { onClick: () => router.back(), dataTest: "oncall-mine-back-btn" }
+    : {
+        label: t("oncall.backToResponses"),
+        to: { name: "onCallResponses", query: { org_identifier: orgId.value } },
+        dataTest: "oncall-mine-back-btn",
+      },
+);
 
 const teamNames = computed(() =>
   Object.fromEntries((mine.value?.teams ?? []).map((team) => [team.team_id, team.team_name])),
@@ -212,6 +237,7 @@ async function fetchMine(force = false) {
       });
     }
     mine.value = await queryClient.fetchQuery(options);
+    loadError.value = null;
     lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
   } catch (err: any) {
     if (isOnCallUnavailable(err)) {
@@ -228,6 +254,7 @@ async function fetchMine(force = false) {
       return;
     }
     mine.value = null;
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
   } finally {
     loaded.value = true;
   }

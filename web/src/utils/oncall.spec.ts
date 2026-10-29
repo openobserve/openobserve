@@ -43,6 +43,10 @@ import {
   isRotationValid,
   isShiftRuleValid,
   isSnoozed,
+  isDeletedTeam,
+  pagePhrase,
+  reachedStepOf,
+  pageState,
   isStaffed,
   isUnresolved,
   coverageHoursSummary,
@@ -454,6 +458,182 @@ describe("colorIndexFor", () => {
       const i = colorIndexFor(email, 5);
       expect(i).toBeGreaterThanOrEqual(0);
       expect(i).toBeLessThan(5);
+    }
+  });
+});
+
+describe("pageState", () => {
+  const firedOnce = [{ after_micros: 0, at: 1, targets: [], reached: ["a@o2.ai"] }];
+  const progress = (exhausted: boolean, fired: unknown[] = firedOnce) =>
+    ({ fired, next_targets: [], next_at: null, exhausted }) as any;
+
+  it("says nobody answered for an unanswered page whose ladder ran out", () => {
+    const cases: [Record<string, unknown>, unknown, string][] = [
+      [{ state: "triggered", exhausted_at: 5 }, undefined, "exhausted"],
+      [{ state: "triggered", exhausted_at: null }, undefined, "triggered"],
+      [{ state: "triaged", exhausted_at: 5 }, undefined, "exhausted"],
+      [{ state: "acknowledged", exhausted_at: 5 }, undefined, "acknowledged"],
+      [{ state: "resolved", exhausted_at: 5 }, undefined, "resolved"],
+      // With the ladder's own progress, that is the one signal: the record's flag lags it by minutes.
+      [{ state: "triggered", exhausted_at: null }, progress(true), "exhausted"],
+      [{ state: "triggered", exhausted_at: 5 }, progress(false), "triggered"],
+      [{ state: "acknowledged" }, progress(true), "acknowledged"],
+      // The server marks an empty ladder exhausted; nobody was paged, so nobody failed to answer.
+      [{ state: "triggered" }, progress(true, []), "triggered"],
+    ];
+    for (const [record, ladder, expected] of cases) {
+      expect(pageState(record as any, ladder as any)).toBe(expected);
+    }
+  });
+});
+
+describe("isDeletedTeam", () => {
+  it("calls a team deleted only when it has an id the loaded list does not have", () => {
+    const cases: [string | null | undefined, string[] | null, boolean][] = [
+      [null, ["team_1"], false],
+      [undefined, ["team_1"], false],
+      ["", ["team_1"], false],
+      ["", [], false],
+      ["team_gone", ["team_1"], true],
+      ["team_gone", [], true],
+      ["team_1", ["team_1"], false],
+      ["team_1", null, false],
+    ];
+    for (const [teamId, known, expected] of cases) {
+      expect(isDeletedTeam(teamId, known), `${teamId} / ${known}`).toBe(expected);
+    }
+  });
+});
+
+describe("reachedStepOf", () => {
+  it("names the 1-based step a recorded rung delay matches, or nothing", () => {
+    const steps = [{ after_micros: 900 }, { after_micros: 0 }, { after_micros: 300 }];
+    const cases: [unknown, number | null | undefined, number | null][] = [
+      [steps, 0, 1],
+      [steps, 300, 2],
+      [steps, 900, 3],
+      [steps, 450, null],
+      [steps, null, null],
+      [steps, undefined, null],
+      [null, 300, null],
+    ];
+    for (const [ladder, micros, expected] of cases) {
+      expect(reachedStepOf(ladder as any, micros), `${micros}`).toBe(expected);
+    }
+  });
+});
+
+describe("pagePhrase", () => {
+  const NOW = 1_700_000_000_000_000;
+  const SEC = 1_000_000;
+  const base = { state: "triggered", opened_at: NOW - 600 * SEC };
+  const ladder = (over: Record<string, unknown> = {}) => ({
+    fired: [],
+    next_targets: [],
+    next_at: null,
+    exhausted: false,
+    ...over,
+  });
+  const rung = (reached: string[]) => ({ after_micros: 0, at: NOW, targets: [], reached });
+
+  it("gives each page one phrase, from one signal per fact", () => {
+    const cases: [string, Record<string, unknown>, Record<string, unknown>, unknown][] = [
+      [
+        "resolved",
+        { state: "resolved", closed_at: NOW - 300 * SEC },
+        {},
+        { kind: "resolved", afterMicros: 300 * SEC },
+      ],
+      [
+        "acknowledged",
+        { state: "acknowledged", acked_by: "ana@o2.ai" },
+        {},
+        { kind: "acknowledged", by: "ana@o2.ai" },
+      ],
+      [
+        "snoozed",
+        { snoozed_until: NOW + 60 * SEC },
+        {},
+        { kind: "snoozed", until: NOW + 60 * SEC },
+      ],
+      [
+        "ladder ran out",
+        {},
+        { progress: ladder({ exhausted: true, fired: [rung(["ana@o2.ai"])] }) },
+        { kind: "nobodyAnswered" },
+      ],
+      [
+        "held for triage",
+        {},
+        { progress: ladder({ held_until_micros: NOW + 54.2 * SEC }) },
+        { kind: "held", secondsLeft: 55 },
+      ],
+      [
+        "lapsed hold",
+        {},
+        { progress: ladder({ held_until_micros: NOW - SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "no rungs (the server sends an empty ladder as exhausted)",
+        {},
+        { progress: ladder({ exhausted: true, fired: [] }), totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "the step it is on reached nobody",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), { ...rung([]), reached_nobody: true }],
+          }),
+        },
+        { kind: "reachedNobody", step: 2, total: 3 },
+      ],
+      ["still loading", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "paging",
+        {},
+        { progress: ladder({ fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai", "cy@o2.ai"])] }) },
+        { kind: "paging", step: 2, total: 3, who: ["bo@o2.ai", "cy@o2.ai"] },
+      ],
+      [
+        "paging, no progress on the row",
+        {},
+        { reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
+      [
+        "empty ladder on a list without progress, where the record says it ran out",
+        { exhausted_at: NOW },
+        { totalRungs: 0 },
+        { kind: "pagesNobody" },
+      ],
+      [
+        "no progress asked yet, but the record names its step",
+        {},
+        { progressLoaded: false, reachedStep: 2 },
+        { kind: "paging", step: 2, total: 3, who: [] },
+      ],
+      ["no progress asked, no step recorded", {}, { progressLoaded: false }, { kind: "unknown" }],
+      [
+        "the record paged a step the policy no longer has",
+        { reached_rung_micros: 300 * SEC },
+        { reachedStep: null },
+        { kind: "unknown" },
+      ],
+    ];
+    for (const [name, record, opts, expected] of cases) {
+      const phrase = pagePhrase({
+        record: { ...base, ...record } as any,
+        progress: null,
+        progressLoaded: true,
+        totalRungs: 3,
+        nowMicros: NOW,
+        ...opts,
+      } as any);
+      expect(phrase, name).toEqual(expected);
     }
   });
 });
