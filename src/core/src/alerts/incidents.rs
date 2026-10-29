@@ -2657,7 +2657,7 @@ async fn restart_exhausted_ladder(
     else {
         return Ok(false);
     };
-    // One upsert, so a page re-run is never left without a timer; an existing row keeps its data.
+    // Upsert keeps the row's data; a racing tick may delete it, and the reconcile sweep re-arms it.
     infra::scheduler::arm_with(
         infra::db::get_orm_client_rw().await,
         &Trigger {

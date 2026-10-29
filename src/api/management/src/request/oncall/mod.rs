@@ -2038,7 +2038,11 @@ async fn with_page_details(
             tracing::error!("[oncall] runbook lookup: {e}");
             Default::default()
         });
-    let rungs = infra::table::oncall_responses::deepest_rungs(&ids)
+    let runs: Vec<(String, i32)> = rows
+        .iter()
+        .map(|r| (r.id.clone(), r.current_run()))
+        .collect();
+    let rungs = infra::table::oncall_responses::deepest_rungs(&runs)
         .await
         .unwrap_or_else(|e| {
             tracing::error!("[oncall] rung lookup: {e}");

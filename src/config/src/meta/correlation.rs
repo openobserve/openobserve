@@ -249,8 +249,7 @@ impl ServiceIdentityConfig {
         }
     }
 
-    /// The ids discovery may name a service from, in config order; the ingest processor's list.
-    /// [pure]
+    /// The ids ingest may name a service from, in config order. [pure]
     pub fn naming_alias_ids(&self) -> Vec<String> {
         let mut seen = std::collections::HashSet::new();
         self.tracked_alias_ids
@@ -390,8 +389,7 @@ mod tests {
             label: "Kubernetes".into(),
             distinguish_by: vec!["k8s-cluster".into(), "environment".into(), "service".into()],
         };
-        // The no-config case is `new_default()` after the loader fills the env ids, as ingest gets
-        // it.
+        // No saved config: `new_default()` with the env ids the loader fills in.
         let no_config = |env: &[&str]| ServiceIdentityConfig {
             tracked_alias_ids: env.iter().map(|s| s.to_string()).collect(),
             ..ServiceIdentityConfig::new_default()

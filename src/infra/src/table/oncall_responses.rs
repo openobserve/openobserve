@@ -1625,34 +1625,56 @@ pub async fn routing_sentences(
 #[derive(Debug, FromQueryResult)]
 struct RungReached {
     response_id: String,
+    ladder_run: Option<i32>,
     rung: i64,
 }
 
-/// The deepest rung each of these records reached, in one grouped query. The
+/// The deepest rung each record reached in its current run, in one grouped query. The
 /// pages list has to say how far a firing climbed, and asking the timeline once
 /// per row is the N+1 this avoids — the same reason [`runbook_urls`] takes a
 /// page of ids.
 pub async fn deepest_rungs(
-    ids: &[String],
+    records: &[(String, i32)],
 ) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
-    if ids.is_empty() {
+    deepest_rungs_in(get_orm_client_rw().await, records).await
+}
+
+async fn deepest_rungs_in<C: ConnectionTrait>(
+    db: &C,
+    records: &[(String, i32)],
+) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
+    if records.is_empty() {
         return Ok(Default::default());
     }
-    let client = get_orm_client_rw().await;
-    Ok(oncall_response_events::Entity::find()
-        .filter(oncall_response_events::Column::ResponseId.is_in(ids.to_vec()))
+    let ids: Vec<String> = records.iter().map(|(id, _)| id.clone()).collect();
+    let rows = oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.is_in(ids))
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Page.to_i32()))
         .filter(oncall_response_events::Column::RungMicros.is_not_null())
         .select_only()
         .column_as(oncall_response_events::Column::ResponseId, "response_id")
+        .column_as(oncall_response_events::Column::LadderRun, "ladder_run")
         .column_as(oncall_response_events::Column::RungMicros.max(), "rung")
         .group_by(oncall_response_events::Column::ResponseId)
+        .group_by(oncall_response_events::Column::LadderRun)
         .into_model::<RungReached>()
-        .all(client)
-        .await?
-        .into_iter()
-        .map(|r| (r.response_id, r.rung))
-        .collect())
+        .all(db)
+        .await?;
+    let current: std::collections::HashMap<&str, i32> = records
+        .iter()
+        .map(|(id, run)| (id.as_str(), *run))
+        .collect();
+    let mut deepest: std::collections::HashMap<String, i64> = Default::default();
+    for row in rows {
+        // As `ResponseEvent::run` reads it: an entry with no run belongs to the first.
+        let run = row.ladder_run.unwrap_or(FIRST_LADDER_RUN);
+        if current.get(row.response_id.as_str()) != Some(&run) {
+            continue;
+        }
+        let entry = deepest.entry(row.response_id).or_insert(row.rung);
+        *entry = (*entry).max(row.rung);
+    }
+    Ok(deepest)
 }
 
 #[cfg(test)]
@@ -2003,5 +2025,49 @@ mod tests {
             );
             assert_eq!(row_in(&db).await, to_response(row).unwrap());
         }
+    }
+
+    /// The pages list shows how far the current run climbed, not a run a re-page or handoff ended.
+    #[tokio::test]
+    async fn test_deepest_rung_counts_only_the_records_current_run() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(oncall_response_events::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        // (record, event run, rung): an old event stores no run, which means the first one.
+        let pages = [
+            ("resp_1", None, 900),
+            ("resp_1", Some(1), 600),
+            ("resp_1", Some(2), 0),
+            ("resp_2", None, 300),
+            ("resp_2", Some(1), 600),
+        ];
+        for (i, (record, run, rung)) in pages.into_iter().enumerate() {
+            let mut m = event_model(ResponseEventKind::Page);
+            m.id = format!("ev_{i}");
+            m.response_id = record.into();
+            m.ladder_run = run;
+            m.rung_micros = Some(rung);
+            oncall_response_events::ActiveModel::from(m)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let deepest = deepest_rungs_in(&db, &[("resp_1".into(), 2), ("resp_2".into(), 1)])
+            .await
+            .unwrap();
+        assert_eq!(
+            deepest.get("resp_1"),
+            Some(&0),
+            "run 2 has only reached rung 0"
+        );
+        assert_eq!(
+            deepest.get("resp_2"),
+            Some(&600),
+            "no stored run is the first run"
+        );
     }
 }
