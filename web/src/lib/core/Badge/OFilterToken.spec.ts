@@ -59,6 +59,21 @@ describe("OFilterToken", () => {
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 
+  it("removes a focused token on Backspace or Delete, as a chip in a text field does", async () => {
+    const wrapper = mountToken({ removable: true });
+    await wrapper.find('[data-test="t-field"]').trigger("keydown", { key: "Backspace" });
+    await wrapper.find('[data-test="t-value"]').trigger("keydown", { key: "Delete" });
+    expect(wrapper.emitted("remove")).toHaveLength(2);
+    await wrapper.find('[data-test="t-field"]').trigger("keydown", { key: "a" });
+    expect(wrapper.emitted("remove")).toHaveLength(2);
+  });
+
+  it("keeps a token that cannot be removed when Backspace is pressed on it", async () => {
+    const wrapper = mountToken();
+    await wrapper.find('[data-test="t-field"]').trigger("keydown", { key: "Backspace" });
+    expect(wrapper.emitted("remove")).toBeUndefined();
+  });
+
   it("marks the active segment", () => {
     const wrapper = mountToken({ activePart: "value" });
     expect(wrapper.find('[data-test="t-value"]').classes()).toContain("ring-2");

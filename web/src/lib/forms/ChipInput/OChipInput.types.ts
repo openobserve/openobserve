@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { Component } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
@@ -53,6 +54,10 @@ export interface ChipInputProps {
   /** `plain` drops the input frame, for a field that sits inside an editor surface. */
   appearance?: "field" | "plain";
   ariaLabel?: I18nText;
+  /** The default slot places the caret itself, by rendering its `caret` slot prop where typing should land. */
+  inlineCaret?: boolean;
+  /** Lines of chips shown before the field scrolls inside itself; it grows freely when unset. */
+  maxRows?: number;
   /** Prefix for `data-test`: `-input` caret input, `-search` popover search box, `-suggest` popover, `-suggest-item-{key}` rows. */
   dataTest?: string;
 }
@@ -72,11 +77,23 @@ export interface ChipInputEmits {
   (_e: "activate"): void;
   /** A typed character the parent may treat as a separator (`,`). */
   (_e: "separator", _char: string): void;
+  /** Left or Right on an empty caret: move it one place among the chips. */
+  (_e: "caret-move", _step: -1 | 1): void;
+  /** Delete on an empty caret. */
+  (_e: "delete-empty"): void;
+  /** Ctrl or Cmd + Enter: confirm what is picked, e.g. a multi-select. */
+  (_e: "apply"): void;
+  /** A press on the field's own surface, before the caret is focused; the parent may move the caret there. */
+  (_e: "press", _event: PointerEvent): void;
+  /** Focus moved from the caret to another control inside the field while its list was open. */
+  (_e: "dismiss"): void;
+  /** Focus left the field and its popover. */
+  (_e: "leave"): void;
 }
 
 export interface ChipInputSlots {
-  /** Chips drawn before the caret. */
-  default?(): unknown;
+  /** Chips drawn before the caret; with `inlineCaret`, render `caret` where typing should land. */
+  default?(_props: { caret: Component }): unknown;
   /** Controls on the end edge of the field. */
   trailing?(): unknown;
   /** Custom row content. */

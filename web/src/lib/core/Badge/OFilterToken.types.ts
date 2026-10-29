@@ -27,6 +27,12 @@ export interface FilterTokenProps {
   activePart?: FilterTokenPart | null;
   /** Marks the whole token, for a pending keyboard delete. */
   armed?: boolean;
+  /** Draws the token as needing attention (an unfinished or rejected condition). */
+  invalid?: boolean;
+  /** Read to assistive tech while `invalid`; defaults to a generic "Error". */
+  invalidMessage?: I18nText;
+  /** A soft warning on the value, e.g. a value not seen in recent data; shown as a tooltip. */
+  valueHint?: I18nText;
   /** Segments emit `select`; off for a token that only displays. */
   editable?: boolean;
   removable?: boolean;

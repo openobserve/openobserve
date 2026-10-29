@@ -15,7 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import {
+  computed,
+  defineComponent,
+  h,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  onUpdated,
+  ref,
+  shallowRef,
+  Teleport,
+  watch,
+} from "vue";
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -40,16 +52,25 @@ const props = withDefaults(defineProps<ChipInputProps>(), {
   size: "md",
   appearance: "field",
   ariaLabel: undefined,
+  inlineCaret: false,
+  maxRows: undefined,
   dataTest: undefined,
 });
 const emit = defineEmits<ChipInputEmits>();
 defineSlots<ChipInputSlots>();
 
 const rootRef = ref<HTMLElement | null>(null);
+const linesRef = ref<HTMLElement | null>(null);
 const caretRef = ref<HTMLInputElement | null>(null);
 const searchRef = ref<HTMLInputElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
+const contentRef = ref<{ $el?: HTMLElement } | null>(null);
 const highlighted = ref(-1);
+// Survives the caret moving to another place in the field, so the new caret takes focus back.
+let caretFocused = false;
+// A list opened by typing keeps the typed character instead of selecting it for replacement.
+let openedByTyping = false;
+const capHeight = ref<number | null>(null);
 
 const listId = `o-chip-input-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -76,12 +97,22 @@ const sizeClasses = computed(() => {
 
 const testId = (suffix: string) => (props.dataTest ? `${props.dataTest}-${suffix}` : undefined);
 
+// A row the user moved to stays highlighted when ticking it turns auto-highlight off.
+let navigated = false;
 watch(
-  () => [props.suggestions.map((s) => s.key).join("\u0000"), props.autoHighlight, props.open],
+  [() => props.suggestions.map((s) => s.key).join("\u0000"), () => props.open],
   () => {
+    navigated = false;
     highlighted.value = props.autoHighlight && props.suggestions.length ? 0 : -1;
   },
   { immediate: true },
+);
+watch(
+  () => props.autoHighlight,
+  (auto) => {
+    if (auto) highlighted.value = props.suggestions.length ? Math.max(highlighted.value, 0) : -1;
+    else if (!navigated) highlighted.value = -1;
+  },
 );
 
 watch(highlighted, async (index) => {
@@ -98,26 +129,265 @@ watch([showList, anchorElement, caretSearches], async ([shown]) => {
   await nextTick();
   const target = caretSearches.value ? caretRef.value : searchRef.value;
   target?.focus();
-  target?.select();
+  if (!openedByTyping) target?.select();
+  openedByTyping = false;
 });
 
 function focus() {
   caretRef.value?.focus();
 }
 
+// Deep chips scroll sideways inside the field; whatever takes focus or anchors the list is brought into view there.
+function revealInLines(target: Element | null | undefined) {
+  const lines = linesRef.value;
+  if (!lines || !target || !lines.contains(target) || lines.scrollWidth <= lines.clientWidth)
+    return;
+  const box = lines.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  if (rect.left < box.left) lines.scrollLeft -= box.left - rect.left;
+  else if (rect.right > box.right) {
+    lines.scrollLeft += Math.min(rect.right - box.right, rect.left - box.left);
+  }
+}
+
+function onLinesFocusIn(event: FocusEvent) {
+  revealInLines(event.target as Element | null);
+}
+
+watch(anchorElement, async (element) => {
+  await nextTick();
+  revealInLines(element);
+});
+
+function onCaretFocus() {
+  caretFocused = true;
+}
+
+function onCaretBlur(event: FocusEvent) {
+  const element = event.target as HTMLInputElement;
+  queueMicrotask(() => {
+    if (element.isConnected && document.activeElement !== element) caretFocused = false;
+  });
+}
+
+interface CaretHost {
+  element: HTMLElement | null;
+  props: { grow: boolean };
+}
+
+// The most recently placed caret slot holds the one input; it moves there instead of being remounted.
+const caretHosts = shallowRef<CaretHost[]>([]);
+const caretHost = computed(() => (props.inlineCaret ? (caretHosts.value.at(-1) ?? null) : null));
+const caretGrow = computed(() => caretHost.value?.props.grow ?? true);
+const endHostRef = ref<HTMLElement | null>(null);
+const caretTarget = computed(() => caretHost.value?.element ?? endHostRef.value);
+// A moved input loses focus, and a surrounding dialog's focus trap would take it; this keeps the edit open meanwhile.
+let relocating = false;
+
+const Caret = defineComponent({
+  name: "OChipInputCaret",
+  props: {
+    /** Fill the rest of the line; off between chips, where the caret sizes to its text. */
+    grow: { type: Boolean, default: true },
+  },
+  setup(caretProps) {
+    const host: CaretHost = { element: null, props: caretProps };
+    onMounted(() => {
+      caretHosts.value = [...caretHosts.value, host];
+    });
+    onBeforeUnmount(() => {
+      caretHosts.value = caretHosts.value.filter((entry) => entry !== host);
+    });
+    return () =>
+      h("span", {
+        ref: (el: unknown) => {
+          host.element = el instanceof HTMLElement ? el : null;
+        },
+        class: "contents",
+        "data-o-chip-caret": "",
+      });
+  },
+});
+
+// The caret's last parent; when the input lands elsewhere it was moved and lost focus on the way.
+let placedIn: Element | null = null;
+
+// Runs in the same flush as the move, so focus is back before any focus trap reacts to the removal.
+function restoreFocusAfterMove() {
+  const input = caretRef.value;
+  const parent = input?.parentElement ?? null;
+  if (!input || parent === placedIn) return;
+  placedIn = parent;
+  const active = document.activeElement;
+  if (!caretFocused || active === input || (active && active !== document.body)) return;
+  relocating = true;
+  input.focus({ preventScroll: true });
+  input.scrollIntoView?.({ block: "nearest" });
+  revealInLines(input);
+  setTimeout(() => {
+    relocating = false;
+  });
+}
+
+// Owns the move, so its own update hook sees every new place the input lands in.
+const CaretInput = defineComponent({
+  name: "OChipInputCaretInput",
+  setup() {
+    onMounted(restoreFocusAfterMove);
+    onUpdated(restoreFocusAfterMove);
+    return () =>
+      h(Teleport, { to: caretTarget.value, disabled: !caretTarget.value }, [
+        h("input", {
+          ref: caretRef,
+          value: caretSearches.value ? props.modelValue : "",
+          type: "text",
+          role: "combobox",
+          autocomplete: "off",
+          spellcheck: "false",
+          disabled: props.disabled,
+          "aria-expanded": showList.value && caretSearches.value,
+          "aria-controls": listId,
+          "aria-activedescendant":
+            showList.value && caretSearches.value && highlighted.value >= 0
+              ? `${listId}-${highlighted.value}`
+              : undefined,
+          "aria-label": props.ariaLabel,
+          placeholder: caretPlaceholder.value,
+          "data-test": testId("input"),
+          class: [
+            "text-text-body placeholder:text-text-secondary h-6 min-w-24 border-0 bg-transparent px-1 outline-none disabled:cursor-not-allowed",
+            caretGrow.value ? "flex-1" : "field-sizing-content max-w-full flex-none",
+          ],
+          onInput: onCaretInput,
+          onKeydown: onCaretKeydown,
+          onClick: onCaretClick,
+          onFocus: onCaretFocus,
+          onBlur: onCaretBlur,
+        }),
+      ]);
+  },
+});
+
+// Only focus that fell to the page or to a container around the field (a focus trap's own box) is taken back.
+function keepFocusWhileMoving(landedOn: EventTarget | null): boolean {
+  const input = caretRef.value;
+  if (!relocating || !input?.isConnected) return false;
+  const fell =
+    !landedOn ||
+    landedOn === document.body ||
+    (landedOn instanceof Node && landedOn.contains(input));
+  if (!fell) return false;
+  input.focus({ preventScroll: true });
+  return true;
+}
+
+// A flex-wrap box holds chips on its own lines; anything else is one chip, measured whole.
+function lineItems(container: Element, out: DOMRect[] = []): DOMRect[] {
+  for (const child of Array.from(container.children)) {
+    const style = getComputedStyle(child);
+    if (style.display === "none" || style.position === "absolute") continue;
+    if (style.display === "contents") {
+      lineItems(child, out);
+      continue;
+    }
+    if (child !== container && style.flexWrap === "wrap" && child.children.length) {
+      lineItems(child, out);
+    } else out.push(child.getBoundingClientRect());
+  }
+  return out;
+}
+
+// Caps the field at `maxRows` lines of chips, ending in the gap above the next line so no box is cut.
+function measureRows() {
+  const root = linesRef.value;
+  if (!root || !props.maxRows) {
+    capHeight.value = null;
+    return;
+  }
+  const origin = root.getBoundingClientRect().top - root.scrollTop;
+  const tops: number[] = [];
+  for (const rect of lineItems(root)) {
+    if (!rect.height) continue;
+    const top = rect.top - origin;
+    if (!tops.some((seen) => Math.abs(seen - top) < rect.height / 2)) tops.push(top);
+  }
+  tops.sort((a, b) => a - b);
+  const next = tops[props.maxRows];
+  const previousBottom =
+    next === undefined ? 0 : next - parseFloat(getComputedStyle(root).rowGap || "0") / 2;
+  capHeight.value = next === undefined ? null : Math.floor(previousBottom);
+}
+
+let rowObserver: ResizeObserver | null = null;
+let treeObserver: MutationObserver | null = null;
+let measureFrame = 0;
+const scheduleMeasure = () => {
+  cancelAnimationFrame(measureFrame);
+  measureFrame = requestAnimationFrame(measureRows);
+};
+
+onMounted(() => {
+  if (!props.maxRows || typeof ResizeObserver === "undefined") return;
+  rowObserver = new ResizeObserver(scheduleMeasure);
+  if (linesRef.value) rowObserver.observe(linesRef.value);
+  treeObserver = new MutationObserver(scheduleMeasure);
+  if (linesRef.value) treeObserver.observe(linesRef.value, { childList: true, subtree: true });
+  scheduleMeasure();
+});
+
+onBeforeUnmount(() => {
+  cancelAnimationFrame(measureFrame);
+  rowObserver?.disconnect();
+  treeObserver?.disconnect();
+});
+
+// A measured line position, so it stays in the px getBoundingClientRect reports.
+const capStyle = computed(() =>
+  capHeight.value === null ? undefined : { maxHeight: `${capHeight.value}px` },
+);
+
 defineExpose<ChipInputExpose>({ focus });
 
 function move(step: number) {
   const count = props.suggestions.length;
   if (!count) return;
+  navigated = true;
   highlighted.value = (highlighted.value + step + count) % count;
 }
 
 function onEnter(event: KeyboardEvent) {
   event.preventDefault();
+  if (event.metaKey || event.ctrlKey) {
+    emit("apply");
+    return;
+  }
   const active = props.suggestions[highlighted.value];
-  if (active) emit("select", active.key);
-  else emit("enter");
+  if (!active) {
+    emit("enter");
+    return;
+  }
+  emit("select", active.key);
+  // Enter ticks one value and lets the next Enter apply; Space keeps the row for further ticking.
+  if (props.multiple) {
+    navigated = false;
+    highlighted.value = -1;
+  }
+}
+
+// Keys an empty caret reads as moves between chips rather than as text editing.
+function onCaretKey(event: KeyboardEvent): boolean {
+  if (props.modelValue !== "" || event.altKey || event.metaKey || event.ctrlKey) return false;
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    emit("caret-move", event.key === "ArrowLeft" ? -1 : 1);
+    return true;
+  }
+  if (event.key === "Delete") {
+    event.preventDefault();
+    emit("delete-empty");
+    return true;
+  }
+  return false;
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -136,13 +406,24 @@ function onKeydown(event: KeyboardEvent) {
       return;
     case "Escape":
       event.preventDefault();
-      if (showList.value) emit("escape");
+      // The list closes first, so a surrounding dialog or drawer would otherwise take the same Escape as its own.
+      if (showList.value) {
+        event.stopPropagation();
+        emit("escape");
+      }
       focus();
       return;
     case "Backspace":
       if (props.modelValue === "") {
         event.preventDefault();
         emit("backspace-empty");
+      }
+      return;
+    case " ":
+      // With nothing typed, Space ticks the highlighted value of a multi-select like a checkbox.
+      if (props.multiple && props.modelValue === "" && props.suggestions[highlighted.value]) {
+        event.preventDefault();
+        emit("select", props.suggestions[highlighted.value].key);
       }
       return;
     case ",":
@@ -153,8 +434,9 @@ function onKeydown(event: KeyboardEvent) {
 
 // While the popover is shut the caret only opens it, runs the query, or steps back over chips.
 function onCaretKeydown(event: KeyboardEvent) {
-  if (showList.value) return onKeydown(event);
   if (event.isComposing || props.disabled) return;
+  if (caretSearches.value && onCaretKey(event)) return;
+  if (showList.value) return onKeydown(event);
   if (event.key === "ArrowDown") {
     event.preventDefault();
     emit("activate");
@@ -169,6 +451,7 @@ function onCaretKeydown(event: KeyboardEvent) {
 
 function onInput(event: Event) {
   const opening = !showList.value;
+  if (opening) openedByTyping = true;
   emit("update:modelValue", (event.target as HTMLInputElement).value);
   if (opening) emit("activate");
 }
@@ -185,15 +468,36 @@ function onCaretClick() {
 
 // A pointerdown inside the field (a chip, the add target) is not an outside interaction.
 function onInteractOutside(event: Event) {
-  if (rootRef.value?.contains(event.target as Node)) event.preventDefault();
+  if (rootRef.value?.contains(event.target as Node) || keepFocusWhileMoving(event.target))
+    event.preventDefault();
   else emit("close");
 }
 
+// A press on the field's own surface (padding, a group's box, a chip's border) keeps the caret, or focus would fall to the page and shut the list.
 function onFieldPointerDown(event: PointerEvent) {
-  if (props.disabled || event.target !== rootRef.value) return;
+  const target = event.target as HTMLElement | null;
+  if (props.disabled || !target || target === caretRef.value) return;
+  if (target !== rootRef.value && target.closest("button, input, a, [tabindex]")) return;
   event.preventDefault();
+  emit("press", event);
   focus();
   onCaretClick();
+}
+
+// Focus that settles outside the field and its popover ends the edit; inside the field it only shuts the caret's list.
+function onFieldFocusOut() {
+  setTimeout(() => {
+    if (!document.hasFocus()) return;
+    const active = document.activeElement;
+    const popover = contentRef.value?.$el;
+    if (active && popover?.contains?.(active)) return;
+    if (active && rootRef.value?.contains(active)) {
+      if (active !== caretRef.value && showList.value && caretSearches.value) emit("dismiss");
+      return;
+    }
+    if (keepFocusWhileMoving(active)) return;
+    emit("leave");
+  });
 }
 </script>
 
@@ -204,36 +508,30 @@ function onFieldPointerDown(event: PointerEvent) {
         ref="rootRef"
         :data-test="testId('field')"
         :class="[
-          'flex w-full min-w-0 cursor-text flex-wrap items-center gap-1.5',
+          'flex w-full min-w-0 cursor-text items-center gap-1.5',
           sizeClasses,
           appearance === 'plain' ? 'px-0.5' : fieldClasses,
           disabled ? 'cursor-not-allowed' : '',
         ]"
         @pointerdown="onFieldPointerDown"
+        @focusout="onFieldFocusOut"
       >
-        <slot />
-        <input
-          ref="caretRef"
-          :value="caretSearches ? modelValue : ''"
-          type="text"
-          role="combobox"
-          autocomplete="off"
-          spellcheck="false"
-          :disabled="disabled"
-          :aria-expanded="showList && caretSearches"
-          :aria-controls="listId"
-          :aria-activedescendant="
-            showList && caretSearches && highlighted >= 0 ? `${listId}-${highlighted}` : undefined
-          "
-          :aria-label="ariaLabel"
-          :placeholder="caretPlaceholder"
-          :data-test="testId('input')"
-          class="text-text-body placeholder:text-text-secondary h-6 min-w-24 flex-1 border-0 bg-transparent px-1 outline-none disabled:cursor-not-allowed"
-          @input="onCaretInput"
-          @keydown="onCaretKeydown"
-          @click="onCaretClick"
-        />
-        <div v-if="$slots.trailing" class="ms-auto flex shrink-0 items-center gap-1">
+        <!-- The padding, cancelled by the margin, keeps chip focus rings clear of the scroll clip. -->
+        <div
+          ref="linesRef"
+          :class="[
+            '-m-0.5 flex min-w-0 flex-1 flex-wrap items-center gap-1.5 self-stretch overflow-x-auto p-0.5',
+            capHeight === null ? '' : 'overflow-y-auto',
+          ]"
+          :style="capStyle"
+          data-o-chip-lines
+          @focusin="onLinesFocusIn"
+        >
+          <slot :caret="Caret" />
+          <span ref="endHostRef" class="contents" data-o-chip-caret />
+          <CaretInput />
+        </div>
+        <div v-if="$slots.trailing" class="flex shrink-0 items-center gap-1 self-start">
           <slot name="trailing" />
         </div>
       </div>
@@ -241,6 +539,7 @@ function onFieldPointerDown(event: PointerEvent) {
     <PopoverPortal>
       <!-- The raw var() is reka's measured popover space, not a design token. -->
       <PopoverContent
+        ref="contentRef"
         align="start"
         :side-offset="4"
         :hide-when-detached="true"
