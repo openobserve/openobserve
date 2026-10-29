@@ -770,5 +770,25 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].query).toContain("histogram(_timestamp)");
       });
     });
+
+    describe("alert list", () => {
+      const twoQueries = (type: string) => {
+        const panelData = makePanelData(type);
+        panelData.data.queries.push(makeDefaultQuery({ query: "SELECT 2" }));
+        panelData.layout.currentQueryIndex = 1;
+        panelData.data.queries[1].fields.stream = "demo_app";
+        panelData.data.queries[1].config.time_shift = [{ offSet: "1h" }] as any;
+        return panelData;
+      };
+
+      it("keeps one empty builder query and no query type", () => {
+        const panelData = twoQueries("alert-list");
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(1);
+        expect(panelData.data.queries[0]).toMatchObject({ customQuery: false, query: "" });
+        expect(panelData.data.queries[0].fields.stream).toBe("demo_app");
+        expect(panelData.data.queryType).toBe("");
+      });
+    });
   });
 });

@@ -102,6 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <AlertListPanelRenderer
+          v-else-if="panelSchema.type == 'alert-list'"
+          :config="panelSchema.config"
+          :refresh-signal="selectedTimeObj"
+        />
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
@@ -432,6 +437,10 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const AlertListPanelRenderer = defineAsyncComponent(
+  () => import("./panels/AlertListPanelRenderer.vue"),
+);
+
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
@@ -471,6 +480,7 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    AlertListPanelRenderer,
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
@@ -897,11 +907,11 @@ export default defineComponent({
       injectedPromqlData,
     );
 
-    // Html and markdown render without a query, so they never wait on one.
+    // Html, markdown and the alert list render without a query, so they never wait on one.
     const isAwaitingFirstLoad = computed(
       () =>
         isFirstLoadSettled?.value === false &&
-        !["html", "markdown"].includes(panelSchema.value?.type),
+        !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
     );
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
@@ -2079,7 +2089,7 @@ export default defineComponent({
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
-      if (type === "html" || type === "markdown") {
+      if (type === "html" || type === "markdown" || type === "alert-list") {
         return "";
       }
 

@@ -669,6 +669,7 @@ export const ALL_CHART_TYPES = [
   "node-graph",
   "html",
   "markdown",
+  "alert-list",
   "custom_chart",
 ] as const;
 

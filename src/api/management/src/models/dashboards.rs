@@ -552,6 +552,10 @@ mod tests {
             "funnel_show_percent": false,
             "node_graph_layout": "force",
             "node_graph_show_edge_labels": false,
+            "alert_list_state": ["firing", "ok"],
+            "alert_list_max": 10.0,
+            "alert_list_sort": "time",
+            "alert_list_folder": "",
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

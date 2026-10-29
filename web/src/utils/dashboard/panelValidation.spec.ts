@@ -898,6 +898,77 @@ describe("validatePanel on sunburst", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+describe("validatePanel on the alert list", () => {
+  const run = (config: any = {}, queryType = "") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "alert-list",
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("asks nothing of an alert list, which has no query", () => {
+    expect(run()).toEqual([]);
+  });
+
+  it("checks the allowed values and types of the new keys", () => {
+    expect(
+      run({ alert_list_sort: "time", alert_list_state: ["firing", "paused"], alert_list_max: 5 }),
+    ).toEqual([]);
+    expect(run({ alert_list_sort: "owner" })).toHaveLength(1);
+    expect(run({ alert_list_state: ["firing", "muted"] })).toHaveLength(1);
+    expect(run({ alert_list_max: 0 })).toHaveLength(1);
+    expect(run({ alert_list_max: 5000 })).toHaveLength(1);
+  });
+
+  it("does not allow the alert list on PromQL", () => {
+    expect(run({}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("lists the alert list as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "alert-list",
+              id: "p-alert-list",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "alert-list" },
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
 
 describe("validatePanel on a gauge range", () => {
   const run = (configs: any[]) => {

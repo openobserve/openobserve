@@ -323,6 +323,7 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("sunburst");
         expect(ALL_CHART_TYPES).toContain("funnel");
         expect(ALL_CHART_TYPES).toContain("node-graph");
+        expect(ALL_CHART_TYPES).toContain("alert-list");
         expect(ALL_CHART_TYPES).toContain("hostmap");
         expect(ALL_CHART_TYPES).toContain("treemap");
       });
@@ -396,7 +397,8 @@ describe("panelEditor types and utilities", () => {
       it("all chart types should be accounted for", () => {
         // Distribution summarises raw values, so it does not require aggregation.
         const regularChartTypes = ALL_CHART_TYPES.filter(
-          (type) => !["html", "markdown", "custom_chart", "distribution"].includes(type),
+          (type) =>
+            !["html", "markdown", "custom_chart", "distribution", "alert-list"].includes(type),
         );
 
         regularChartTypes.forEach((type) => {

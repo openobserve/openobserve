@@ -1005,7 +1005,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
 
       let query = "";
-      if (dashboardPanelData.data.type == "geomap") {
+      if (dashboardPanelData.data.type == "alert-list") {
+        query = "";
+      } else if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
       } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);
