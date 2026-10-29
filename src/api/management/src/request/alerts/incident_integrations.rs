@@ -65,14 +65,18 @@ pub struct IntegrationResponse {
     pub org_id: String,
     pub name: String,
     pub source_type: String,
-    pub token: String,
+    /// Absent for a caller without `incident_integrations` PUT: it ingests into the org.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     pub enabled: bool,
     pub config: serde_json::Value,
     pub destinations: Vec<String>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
-    pub url: String,
+    /// Carries the token, so it is withheld with it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
@@ -87,15 +91,20 @@ impl IntegrationResponse {
             org_id: record.org_id,
             name: record.name,
             source_type: record.source_type,
-            token: record.token,
+            token: Some(record.token),
             enabled: record.enabled,
             config: record.config,
             destinations: record.destinations,
             created_by: record.created_by,
             created_at: record.created_at,
             updated_at: record.updated_at,
-            url,
+            url: Some(url),
         }
+    }
+
+    fn withhold_token(&mut self) {
+        self.token = None;
+        self.url = None;
     }
 }
 
@@ -195,15 +204,39 @@ pub async fn list_integrations(
         return MetaHttpResponse::internal_error(e);
     }
 
+    let writable = can_write_integrations(&org_id, &user_email.user_id).await;
     match infra::table::incident_integrations::list_by_org(&org_id).await {
         Ok(records) => MetaHttpResponse::json(ListIntegrationsResponse {
             integrations: records
                 .into_iter()
-                .map(|r| IntegrationResponse::from_record(&org_id, r))
+                .map(|r| {
+                    let mut integration = IntegrationResponse::from_record(&org_id, r);
+                    if !writable {
+                        integration.withhold_token();
+                    }
+                    integration
+                })
                 .collect(),
         }),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
+}
+
+/// Same object and verb as the rotate route, so whoever may rotate a token may read it.
+#[cfg(feature = "enterprise")]
+async fn can_write_integrations(org_id: &str, user_id: &str) -> bool {
+    openobserve_core::auth::check_permissions(
+        org_id,
+        org_id,
+        user_id,
+        "incident_integrations",
+        "PUT",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await
 }
 
 #[cfg(feature = "enterprise")]
@@ -499,6 +532,32 @@ mod tests {
         let p: UpdateIntegrationPayload = serde_json::from_str(json).unwrap();
         assert_eq!(p.name, None);
         assert_eq!(p.destinations, None);
+    }
+
+    #[test]
+    fn a_withheld_integration_carries_its_token_nowhere() {
+        let record = infra::table::incident_integrations::IncidentIntegrationRecord {
+            id: "i1".to_string(),
+            org_id: "o1".to_string(),
+            name: "default".to_string(),
+            source_type: "auto".to_string(),
+            token: "o2iat_secret".to_string(),
+            enabled: true,
+            config: serde_json::json!({}),
+            destinations: vec![],
+            created_by: "a@b.c".to_string(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let mut integration = IntegrationResponse::from_record("o1", record);
+        let full = serde_json::to_string(&integration).unwrap();
+        assert!(full.contains(r#""url":"/api/v2/o1/incidents/events/o2iat_secret""#));
+
+        integration.withhold_token();
+        let withheld = serde_json::to_value(&integration).unwrap();
+        assert!(!withheld.to_string().contains("o2iat_secret"), "{withheld}");
+        assert!(withheld.get("token").is_none() && withheld.get("url").is_none());
+        assert_eq!(withheld["name"], "default");
     }
 
     #[test]
