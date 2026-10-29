@@ -25,7 +25,6 @@ export class DowntimesPage {
     this.dialogPrimary = '[data-test="o-dialog-primary-btn"]';
     this.dialogSecondary = '[data-test="o-dialog-secondary-btn"]';
     this.toastMessage = '[data-test="o-toast-message"]';
-    this.toastAction = '[data-test="o-toast-action-btn"]';
 
     this.addRoot = '[data-test="add-downtime"]';
     this.nameTrigger = '[data-test="add-downtime-name-trigger"]';
@@ -150,11 +149,6 @@ export class DowntimesPage {
 
   async expectUrl(pattern) {
     await expect(this.page).toHaveURL(pattern, { timeout: 20000 });
-  }
-
-  async clickToastAction(text) {
-    const toast = this.page.locator('[data-test^="o-toast-"][data-test-message]').filter({ hasText: text }).first();
-    await toast.locator(this.toastAction).click();
   }
 
   async gotoList(folderId, query = {}) {

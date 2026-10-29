@@ -299,9 +299,59 @@ describe("useHttpStreaming", () => {
       expect(mockHandlers.error).toHaveBeenCalledTimes(2);
 
       expect(mockHandlers.error).toHaveBeenCalledWith(mockData, {
-        content: { trace_id: mockData.traceId },
+        content: { trace_id: mockData.traceId, message: "Network failure" },
         type: "error",
       });
+    });
+
+    it.each([
+      [502, "<html>bad gateway</html>", "HTTP 502"],
+      [403, "<html>forbidden</html>", "HTTP 403"],
+    ])(
+      "passes status %i and a non-empty message of a non-JSON Response to the error handler",
+      async (status, body, message) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        mockFetch.mockResolvedValueOnce(new Response(body, { status }));
+        httpStreaming.traceMap.value[mockData.traceId] = {
+          data: [],
+          error: [mockHandlers.error],
+          complete: [],
+          abortController: new AbortController(),
+        };
+
+        await httpStreaming.fetchQueryDataWithHttpStream(mockData, mockHandlers);
+        await flushPromises();
+
+        expect(mockHandlers.error).toHaveBeenCalledWith(
+          mockData,
+          expect.objectContaining({
+            type: "error",
+            content: expect.objectContaining({ status, message }),
+          }),
+        );
+      },
+    );
+
+    it("passes the message of a rejected fetch to the error handler", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      httpStreaming.traceMap.value[mockData.traceId] = {
+        data: [],
+        error: [mockHandlers.error],
+        complete: [],
+        abortController: new AbortController(),
+      };
+
+      await httpStreaming.fetchQueryDataWithHttpStream(mockData, mockHandlers);
+      await flushPromises();
+
+      expect(mockHandlers.error).toHaveBeenCalledWith(
+        mockData,
+        expect.objectContaining({
+          type: "error",
+          content: expect.objectContaining({ message: "Failed to fetch" }),
+        }),
+      );
     });
 
     // TODO: Fix Worker mocking
@@ -657,6 +707,20 @@ describe("useHttpStreaming", () => {
     it("keeps logging other read failures as errors", async () => {
       const { err } = await failRead(new Error("worker exploded"));
       expect(err).toHaveBeenCalledWith("Error reading stream:", expect.any(Error));
+    });
+
+    it("passes the read failure message to the error handler", async () => {
+      handlers.error.mockClear();
+      await failRead(new TypeError("Failed to fetch"));
+      expect(handlers.error.mock.calls[0][1].content.message).toBe("Failed to fetch");
+    });
+
+    it("keeps an own enumerable status on an Error in the error content", async () => {
+      handlers.error.mockClear();
+      await failRead(Object.assign(new Error("denied"), { status: 403 }));
+      const content = handlers.error.mock.calls[0][1].content;
+      expect(content.status).toBe(403);
+      expect(content.message).toBe("denied");
     });
   });
 

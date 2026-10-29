@@ -192,10 +192,15 @@ mod tests {
         // The history filter and the Suppressed tab of a downtime read this column.
         assert!(field_names.contains(&"downtime_id".to_string()));
 
+        // Alert history shows who acked a run and the ack events themselves from these columns.
+        for f in ["acked_by", "ack_action", "ack_source", "taken_over_from"] {
+            assert!(field_names.contains(&f.to_string()), "missing {f}");
+        }
+
         // Verify count matches struct fields
-        // 43: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
-        // report
-        assert_eq!(field_names.len(), 43);
+        // 47: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
+        // report + 4 ack
+        assert_eq!(field_names.len(), 47);
 
         // Verify no duplicate fields
         let unique_count = field_names

@@ -16,7 +16,7 @@
 use config::meta::slack::SlackChannelDefault;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, Select, Set,
-    sea_query::OnConflict,
+    TransactionTrait, sea_query::OnConflict,
 };
 
 use super::{
@@ -30,6 +30,11 @@ use crate::{
 
 pub async fn put(row: &SlackChannelDefault) -> Result<(), Error> {
     put_with(get_orm_client_rw().await, row).await
+}
+
+/// False when the channel already has a live default; a tombstoned row counts as none.
+pub async fn insert_if_absent(row: &SlackChannelDefault) -> Result<bool, Error> {
+    insert_if_absent_with(get_orm_client_rw().await, row).await
 }
 
 pub async fn get(
@@ -71,6 +76,30 @@ pub async fn put_with<C: ConnectionTrait>(
         .await
         .map_err(db_err)?;
     Ok(())
+}
+
+pub async fn insert_if_absent_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    row: &SlackChannelDefault,
+) -> Result<bool, Error> {
+    let txn = conn.begin().await?;
+    Entity::delete_many()
+        .filter(Column::InstallationId.eq(&row.installation_id))
+        .filter(Column::ChannelId.eq(&row.channel_id))
+        .filter(Column::DeletedAt.is_not_null())
+        .exec(&txn)
+        .await?;
+    let inserted = Entity::insert(to_active(row)?)
+        .on_conflict(
+            OnConflict::columns([Column::InstallationId, Column::ChannelId])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(&txn)
+        .await
+        .map_err(db_err)?;
+    txn.commit().await?;
+    Ok(inserted > 0)
 }
 
 pub async fn get_with<C: ConnectionTrait>(
@@ -244,5 +273,40 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn insert_if_absent_keeps_a_live_default_and_replaces_a_tombstone() {
+        let db = db().await;
+        let first = channel("i1", "C1", "acme");
+        let second = SlackChannelDefault {
+            org_id: "globex".to_string(),
+            set_from: SetFrom::Destination,
+            ..channel("i1", "C1", "globex")
+        };
+        let (a, b) = tokio::join!(
+            insert_if_absent_with(&db, &first),
+            insert_if_absent_with(&db, &second)
+        );
+        assert_eq!([a.unwrap(), b.unwrap()], [true, false]);
+        assert_eq!(
+            list_by_installation_with(&db, "i1").await.unwrap(),
+            vec![first]
+        );
+        put_with(
+            &db,
+            &SlackChannelDefault {
+                deleted_at: Some(1),
+                ..channel("i1", "C2", "acme")
+            },
+        )
+        .await
+        .unwrap();
+        let fresh = SlackChannelDefault {
+            set_from: SetFrom::Destination,
+            ..channel("i1", "C2", "globex")
+        };
+        assert!(insert_if_absent_with(&db, &fresh).await.unwrap());
+        assert_eq!(get_with(&db, "i1", "C2").await.unwrap(), Some(fresh));
     }
 }

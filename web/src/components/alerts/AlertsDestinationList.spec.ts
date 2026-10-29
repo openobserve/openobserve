@@ -20,9 +20,22 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
     default: {
       list: vi.fn(),
       delete: vi.fn(),
+      update: vi.fn(),
     },
   });
 });
+
+vi.mock("@/services/slack", () => ({ default: { listInstallations: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: {
+    listTeams: vi.fn(() => Promise.resolve({ data: [{ id: "t1", name: "payments" }] })),
+    getTeamChannel: vi.fn(() =>
+      Promise.resolve({
+        data: { team_id: "t1", destinations: ["oncall-room-slack"], source: "team" },
+      }),
+    ),
+  },
+}));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -65,6 +78,9 @@ import templateService from "@/services/alert_templates";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import slack from "@/services/slack";
+import { queryClient } from "@/composables/query/queryClient";
+import { installationView } from "@/test/unit/helpers/slack";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -628,6 +644,65 @@ describe("AlertsDestinationList", () => {
       expect(replaceSpy).not.toHaveBeenCalled();
     });
 
+    it("waits for the Review destination to load before opening its editor", async () => {
+      queryClient.clear();
+      let resolveList!: (value: { data: unknown[] }) => void;
+      vi.mocked(destinationService.list).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveList = resolve;
+          }),
+      );
+      const destination = makeDestination(1);
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: destination.name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(false);
+      resolveList({ data: [destination] });
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      expect(wrapper!.vm.editingDestination.name).toBe(destination.name);
+    });
+
+    it("opens the destination editor when Review changes the current list route", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const name = wrapper!.vm.destinations[0].name;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      expect(wrapper!.vm.editingDestination.name).toBe(name);
+      const nextName = wrapper!.vm.destinations[1].name;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: nextName,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "oncall_room_unconfirmed",
+        },
+      };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      expect(wrapper!.vm.editingDestination.name).toBe(nextName);
+    });
+
     it("editDestination(null) preserves the page query param when opening the add form", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -674,6 +749,103 @@ describe("AlertsDestinationList", () => {
       expect(pushedQuery.page).toBe("3");
       expect(pushedQuery.action).toBeUndefined();
       expect(pushedQuery.name).toBeUndefined();
+    });
+
+    it("drops every Review param on cancel, so a later Edit opens the normal form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const dest = wrapper!.vm.destinations[0];
+      const review = {
+        action: "update",
+        name: dest.name,
+        page: "3",
+        org_identifier: "test-org",
+        slack_app_installation: "inst-test",
+        slack_app_refusal: "oncall_room_unconfirmed",
+        slack_app_team: "Test team",
+        slack_app_room: "oncall-test",
+      };
+      const reviewKeys = (query: Record<string, unknown>) =>
+        Object.keys(query).filter((key) => key.startsWith("slack_app_"));
+      wrapper!.vm.showDestinationEditor = true;
+      router.currentRoute.value = { ...router.currentRoute.value, query: { ...review } };
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper!.vm.toggleDestinationEditor();
+      const closed = pushSpy.mock.calls[0][0].query;
+      expect(reviewKeys(closed)).toEqual([]);
+      expect(closed.page).toBe("3");
+
+      router.currentRoute.value = { ...router.currentRoute.value, query: { ...review } };
+      wrapper!.vm.editDestination(dest);
+      const edited = pushSpy.mock.calls[1][0].query;
+      expect(edited.action).toBe("update");
+      expect(edited.name).toBe(dest.name);
+      expect(reviewKeys(edited)).toEqual([]);
+    });
+
+    it("drops the Review params once its save closes the editor, so a later Edit opens the normal form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const [reviewed, other] = wrapper!.vm.destinations;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: reviewed.name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      const pushSpy = vi.spyOn(router, "push");
+      const editor = wrapper!.findComponent('[data-test="add-destination-stub"]');
+      editor.vm.$emit("get:destinations");
+      editor.vm.$emit("cancel:hideform");
+      expect(wrapper!.vm.showDestinationEditor).toBe(false);
+      const closed = pushSpy.mock.calls.at(-1)![0].query;
+      expect(Object.keys(closed).filter((key) => key.startsWith("slack_app_"))).toEqual([]);
+      router.currentRoute.value = { ...router.currentRoute.value, query: closed };
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(false);
+
+      wrapper!.vm.editDestination(other);
+      await flushPromises();
+      const edited = pushSpy.mock.calls.at(-1)![0].query;
+      expect(edited).toMatchObject({ action: "update", name: other.name });
+      expect(Object.keys(edited).filter((key) => key.startsWith("slack_app_"))).toEqual([]);
+      expect(wrapper!.vm.editingDestination.name).toBe(other.name);
+    });
+
+    it("keeps the Review params while the route itself opens the switch form", async () => {
+      queryClient.clear();
+      let resolveList!: (value: { data: unknown[] }) => void;
+      vi.mocked(destinationService.list).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveList = resolve;
+          }),
+      );
+      const destination = makeDestination(1);
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        query: {
+          action: "update",
+          name: destination.name,
+          slack_app_installation: "inst-test",
+          slack_app_refusal: "shared_channel_unconfirmed",
+        },
+      };
+      const pushSpy = vi.spyOn(router, "push");
+      wrapper = mountComponent();
+      await flushPromises();
+      resolveList({ data: [destination] });
+      await flushPromises();
+      expect(wrapper!.vm.showDestinationEditor).toBe(true);
+      const opened = pushSpy.mock.calls.at(-1)![0].query;
+      expect(opened.slack_app_installation).toBe("inst-test");
+      expect(opened.slack_app_refusal).toBe("shared_channel_unconfirmed");
     });
 
     it("importDestination preserves the page query param", async () => {
@@ -740,6 +912,128 @@ describe("AlertsDestinationList", () => {
       });
       expect(w.vm.templates).toEqual([]);
       w.unmount();
+    });
+  });
+
+  // ── Slack app rows (MK-6a, without Last send) ──────────────────────────────
+
+  describe("Slack app and Slack webhook rows", () => {
+    const HOOK = "https://hooks.slack.com/services/T0SAMPLE01/B000/xyz";
+    const appRow = (over: any = {}) => ({
+      name: "sre-prod-slack",
+      type: "slack_app",
+      template: "prebuilt_slack",
+      installation_id: "inst-1",
+      channel_id: "C9",
+      channel_name: "sre-prod",
+      buttons: true,
+      mention: "default",
+      refire_reuse_minutes: 30,
+      auto_investigate: "off",
+      shared_channel_confirmed: false,
+      oncall_room_confirmed: false,
+      ...over,
+    });
+    const hookRow = (name: string, team = "T0SAMPLE01") => ({
+      name,
+      type: "http",
+      url: HOOK,
+      method: "post",
+      template: "prebuilt_slack",
+      metadata: {
+        prebuilt_type: "slack",
+        slack_team_id: team,
+        slack_channel_id: "C1",
+        credential_channel: "#payments",
+      },
+    });
+    const previous = { url: HOOK, method: "post", skip_tls_verify: false, metadata: {} };
+    const zo = (store.state as any).zoConfig;
+    let slackWas: unknown;
+
+    beforeEach(async () => {
+      queryClient.clear();
+      slackWas = zo.slack_enabled;
+      zo.slack_enabled = true;
+      vi.mocked(slack.listInstallations).mockResolvedValue({
+        data: { installations: [installationView()] },
+      } as any);
+      (destinationService.update as any).mockResolvedValue({});
+      (destinationService.list as any).mockResolvedValue({
+        data: [
+          appRow(),
+          appRow({ name: "switched-slack", previous_webhook: previous }),
+          hookRow("payments-slack"),
+          hookRow("other-team-slack", "T0OTHER"),
+          hookRow("oncall-room-slack"),
+        ],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      zo.slack_enabled = slackWas;
+    });
+
+    const text = (test: string) => wrapper!.find(`[data-test="${test}"]`);
+
+    it("lists Slack app rows, tagged Slack app and Two-way, with #channel · workspace", () => {
+      expect((wrapper!.vm as any).visibleRows.map((r: any) => r.name)).toContain("sre-prod-slack");
+      expect(text("destination-type-badge-slack-app-sre-prod-slack").text()).toContain("Slack app");
+      expect(text("destination-type-two-way-sre-prod-slack").text()).toContain("Two-way");
+      expect(text("destination-url-sre-prod-slack").text()).toBe("#sre-prod · Acme Corp");
+      expect(text("destination-method-sre-prod-slack").text().trim()).toBe("");
+    });
+
+    it("has no Last send column", () => {
+      const table = wrapper!.findComponent({ name: "OTable" });
+      const ids = table.props("columns").map((c: any) => c.id);
+      expect(ids).not.toContain("last_send");
+      expect(wrapper!.text()).not.toContain("Last send");
+      const urlCol = table.props("columns").find((c: any) => c.id === "url");
+      expect(urlCol?.header).toBe("URL / recipients / channel");
+    });
+
+    it("labels webhook rows Slack webhook and offers the switch only for a connected team", () => {
+      expect(text("destination-type-badge-slack-webhook-payments-slack").text()).toContain(
+        "Slack webhook",
+      );
+      expect(text("destination-switch-to-app-payments-slack").exists()).toBe(true);
+      expect(text("destination-switch-to-app-other-team-slack").exists()).toBe(false);
+      expect(text("destination-switch-to-app-sre-prod-slack").exists()).toBe(false);
+      expect(text("destination-switch-to-app-oncall-room-slack").exists()).toBe(false);
+    });
+
+    it("switches a webhook row in place, keeping its name and webhook", async () => {
+      await text("destination-switch-to-app-payments-slack").trigger("click");
+      await flushPromises();
+      expect(destinationService.update).toHaveBeenCalledTimes(1);
+      const call = (destinationService.update as any).mock.calls[0][0];
+      expect(call).toMatchObject({
+        org_identifier: "default",
+        destination_name: "payments-slack",
+        data: {
+          name: "payments-slack",
+          type: "slack_app",
+          installation_id: "inst-1",
+          channel_id: "C1",
+          channel_name: "payments",
+          previous_webhook: { url: HOOK },
+        },
+      });
+    });
+
+    it("switches back only a row that kept its webhook", async () => {
+      expect(text("destination-switch-back-sre-prod-slack").exists()).toBe(false);
+      await text("destination-switch-back-switched-slack").trigger("click");
+      await flushPromises();
+      const call = (destinationService.update as any).mock.calls[0][0];
+      expect(call).toMatchObject({
+        destination_name: "switched-slack",
+        data: { name: "switched-slack", type: "http", url: HOOK },
+      });
     });
   });
 });

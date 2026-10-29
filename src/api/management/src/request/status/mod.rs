@@ -319,7 +319,6 @@ struct ConfigBootstrapResponse {
     custom_hide_self_logo: bool,
     /// The editors need it before the authenticated config lands, or `off` arrives too late.
     editor_suggest_mode: String,
-    rum: Rum,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -462,7 +461,6 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         custom_logo_dark_img,
         custom_hide_self_logo,
         editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
-        rum: Rum::from_cfg(cfg.clone()),
     })
 }
 

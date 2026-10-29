@@ -60,6 +60,13 @@ impl From<meta_dest::Destination> for Destination {
                     destination_type: DestinationType::Sns,
                     ..Default::default()
                 },
+                meta_dest::DestinationType::SlackApp(target) => Self {
+                    name: value.name,
+                    template,
+                    destination_type: DestinationType::SlackApp,
+                    ..Default::default()
+                }
+                .with_slack_app(target),
             },
             meta_dest::Module::Pipeline { endpoint } => Self {
                 name: value.name,
@@ -107,6 +114,9 @@ impl Destination {
                     sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
                     aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
                 }),
+                DestinationType::SlackApp => {
+                    meta_dest::DestinationType::SlackApp(self.slack_app.into_target())
+                }
             };
             Ok(meta_dest::Destination {
                 id: None,
@@ -168,7 +178,7 @@ impl Template {
         let template_type = match self.template_type {
             DestinationType::Email => meta_dest::TemplateType::Email { title: self.title },
             DestinationType::Sns => meta_dest::TemplateType::Sns,
-            DestinationType::Http => meta_dest::TemplateType::Http,
+            DestinationType::Http | DestinationType::SlackApp => meta_dest::TemplateType::Http,
         };
         meta_dest::Template {
             id: None,
@@ -258,9 +268,89 @@ pub struct Destination {
     /// Optional key-value metadata for the destination.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
+    /// The `slack_app` fields, flat on the body; absent for every other type.
+    #[serde(flatten)]
+    pub slack_app: SlackAppFields,
     /// Every consumer referencing this destination; present only when `include_usage=true`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uses: Option<Vec<DestinationUseResponse>>,
+}
+
+impl Destination {
+    fn with_slack_app(mut self, target: meta_dest::SlackAppTarget) -> Self {
+        self.slack_app = SlackAppFields::from_target(target);
+        self
+    }
+}
+
+/// `SlackAppTarget` with every field optional, so an omitted one takes the type's default.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SlackAppFields {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "C0FAKE00001")]
+    pub channel_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_name: Option<String>,
+    /// Acknowledge, Mute and Investigate on each message; default true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buttons: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mention: Option<meta_dest::MentionRule>,
+    /// 0 to 240; default 30.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refire_reuse_minutes: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_investigate: Option<meta_dest::AutoInvestigate>,
+    /// Required true when the channel is shared with another company.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared_channel_confirmed: Option<bool>,
+    /// Required true when an on-call team pages into this channel through a Slack webhook.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oncall_room_confirmed: Option<bool>,
+    /// The webhook a switch replaced, kept so it can be switched back; never sent to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub previous_webhook: Option<meta_dest::Endpoint>,
+}
+
+impl SlackAppFields {
+    fn from_target(t: meta_dest::SlackAppTarget) -> Self {
+        Self {
+            installation_id: Some(t.installation_id),
+            channel_id: Some(t.channel_id),
+            channel_name: Some(t.channel_name),
+            buttons: Some(t.buttons),
+            mention: Some(t.mention),
+            refire_reuse_minutes: Some(t.refire_reuse_minutes),
+            auto_investigate: Some(t.auto_investigate),
+            shared_channel_confirmed: Some(t.shared_channel_confirmed),
+            oncall_room_confirmed: Some(t.oncall_room_confirmed),
+            previous_webhook: t.previous_webhook,
+        }
+    }
+
+    pub fn into_target(self) -> meta_dest::SlackAppTarget {
+        let d = meta_dest::SlackAppTarget::default();
+        meta_dest::SlackAppTarget {
+            installation_id: self.installation_id.unwrap_or_default().trim().to_string(),
+            channel_id: self.channel_id.unwrap_or_default().trim().to_string(),
+            channel_name: self
+                .channel_name
+                .unwrap_or_default()
+                .trim()
+                .trim_start_matches('#')
+                .to_string(),
+            buttons: self.buttons.unwrap_or(d.buttons),
+            mention: self.mention.unwrap_or(d.mention),
+            refire_reuse_minutes: self.refire_reuse_minutes.unwrap_or(d.refire_reuse_minutes),
+            auto_investigate: self.auto_investigate.unwrap_or(d.auto_investigate),
+            shared_channel_confirmed: self.shared_channel_confirmed.unwrap_or_default(),
+            oncall_room_confirmed: self.oncall_room_confirmed.unwrap_or_default(),
+            previous_webhook: self.previous_webhook,
+        }
+    }
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
@@ -270,6 +360,7 @@ pub enum DestinationType {
     Http,
     Email,
     Sns,
+    SlackApp,
 }
 
 impl From<&str> for DestinationType {
@@ -277,6 +368,7 @@ impl From<&str> for DestinationType {
         match value.to_lowercase().as_str() {
             "email" => DestinationType::Email,
             "sns" => DestinationType::Sns,
+            "slack_app" => DestinationType::SlackApp,
             _ => DestinationType::Http,
         }
     }
@@ -288,6 +380,7 @@ impl fmt::Display for DestinationType {
             DestinationType::Email => write!(f, "email"),
             DestinationType::Http => write!(f, "http"),
             DestinationType::Sns => write!(f, "sns"),
+            DestinationType::SlackApp => write!(f, "slack_app"),
         }
     }
 }
@@ -655,5 +748,113 @@ mod tests {
             }
             _ => panic!("expected Pipeline module"),
         }
+    }
+
+    /// The body `buildSlackAppDestination` and `switchToSlackApp` (web) send.
+    fn web_slack_app_body() -> serde_json::Value {
+        serde_json::json!({
+            "name": "sre-prod-slack",
+            "type": "slack_app",
+            "installation_id": "I0FAKE00001",
+            "channel_id": "C0FAKE00001",
+            "channel_name": "#sre-prod",
+            "mention": {"subteam_id": "S0FAKE00001", "handle": "sre"},
+            "refire_reuse_minutes": 15,
+            "auto_investigate": "critical",
+            "shared_channel_confirmed": false,
+            "oncall_room_confirmed": true,
+            "template": "prebuilt_slack",
+            "previous_webhook": {
+                "url": "https://hooks.slack.com/services/T0FAKE/B0FAKE/x",
+                "method": "post",
+                "metadata": {"prebuilt_type": "slack", "slack_channel_id": "C0FAKE00001"}
+            }
+        })
+    }
+
+    #[test]
+    fn the_web_slack_app_body_saves_as_a_slack_app_target_with_defaults_for_omitted_fields() {
+        let d: Destination = serde_json::from_value(web_slack_app_body()).unwrap();
+        assert_eq!(d.destination_type, DestinationType::SlackApp);
+        let meta = d.into("prod".to_string(), true).unwrap();
+        let meta_dest::Module::Alert {
+            template,
+            destination_type: meta_dest::DestinationType::SlackApp(t),
+        } = meta.module
+        else {
+            panic!("expected an alert SlackApp module");
+        };
+        assert_eq!(template.as_deref(), Some("prebuilt_slack"));
+        assert_eq!(t.installation_id, "I0FAKE00001");
+        assert_eq!(t.channel_name, "sre-prod", "the leading # is the UI's");
+        assert!(t.buttons, "an omitted buttons field is on");
+        assert_eq!(t.refire_reuse_minutes, 15);
+        assert_eq!(t.auto_investigate, meta_dest::AutoInvestigate::Critical);
+        assert!(t.oncall_room_confirmed && !t.shared_channel_confirmed);
+        assert_eq!(
+            t.mention,
+            meta_dest::MentionRule::Subteam {
+                subteam_id: "S0FAKE00001".into(),
+                handle: "sre".into()
+            }
+        );
+        let previous = t.previous_webhook.as_ref().expect("kept for Switch back");
+        assert_eq!(
+            previous
+                .metadata
+                .get("slack_channel_id")
+                .map(String::as_str),
+            Some("C0FAKE00001")
+        );
+    }
+
+    #[test]
+    fn a_slack_app_destination_reads_back_flat_and_an_http_one_carries_no_slack_fields() {
+        let d: Destination = serde_json::from_value(web_slack_app_body()).unwrap();
+        let meta = d.into("prod".to_string(), true).unwrap();
+        let json = serde_json::to_value(Destination::from(meta)).unwrap();
+        assert_eq!(json["type"], "slack_app");
+        assert_eq!(json["channel_id"], "C0FAKE00001");
+        assert_eq!(json["buttons"], true);
+        assert_eq!(json["mention"]["handle"], "sre");
+        assert_eq!(
+            json["previous_webhook"]["url"],
+            "https://hooks.slack.com/services/T0FAKE/B0FAKE/x"
+        );
+        let http = meta_dest::Destination {
+            name: "hook".into(),
+            module: meta_dest::Module::Alert {
+                template: None,
+                destination_type: meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                    url: "https://example.com/hook".into(),
+                    ..Default::default()
+                }),
+            },
+            ..Default::default()
+        };
+        let json = serde_json::to_value(Destination::from(http)).unwrap();
+        let obj = json.as_object().unwrap();
+        assert_eq!(json["type"], "http");
+        for field in [
+            "installation_id",
+            "channel_id",
+            "buttons",
+            "previous_webhook",
+        ] {
+            assert!(!obj.contains_key(field), "{field} leaked onto an http row");
+        }
+    }
+
+    #[test]
+    fn slack_app_type_names_round_trip() {
+        assert_eq!(
+            DestinationType::from("slack_app"),
+            DestinationType::SlackApp
+        );
+        assert_eq!(
+            DestinationType::from("SLACK_APP"),
+            DestinationType::SlackApp
+        );
+        assert_eq!(DestinationType::SlackApp.to_string(), "slack_app");
     }
 }

@@ -59,6 +59,21 @@ export type StepChipKind = "terminal" | "editor" | "run" | "traces";
  */
 export type StepCompleteOn = "copy" | "detect" | "action";
 
+/** A card-level setup path: the one-command installer, or the step-by-step manual sequence. */
+export type SetupMode = "auto" | "manual";
+
+/**
+ * One entry of the card's setup-mode toggle (see RichCardContent.setupModes).
+ * Steps tagged with this `id` render only while it is selected.
+ */
+export interface RichCardSetupMode {
+  id: SetupMode;
+  /** Toggle label. Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the toggle label, translated by the renderer. */
+  labelKey?: I18nKey;
+}
+
 export interface RichCardChip {
   kind: StepChipKind;
   /** Already-resolved chip text. Omit when `labelKey` is set. */
@@ -192,6 +207,11 @@ export interface RichCardStep {
   required?: boolean;
   /** The step that hosts the live status bar + "most likely fix" box. */
   detectionAnchor?: boolean;
+  /**
+   * Render this step only while the card's setup-mode toggle is on this mode.
+   * Untagged steps render in every mode; ignored when the card has no `setupModes`.
+   */
+  mode?: SetupMode;
 }
 
 export interface RichCardDetect {
@@ -265,6 +285,8 @@ export interface RichCardExtras {
     /** i18n KEY for that paragraph, translated by the renderer. */
     descriptionKey?: I18nKey;
     code: RichCardCode;
+    /** Show the section only in this setup mode (cards with `setupModes`). */
+    mode?: SetupMode;
   };
   troubleshooting?: { q: I18nText; a: I18nText }[];
 }
@@ -340,11 +362,23 @@ export interface RichCardInput {
   flag?: string;
   /** Helm list value: goes into `{flags}` as `--set-string '<key>={a,b}'`, or `--set <key>=null` when blank. */
   helmSet?: string;
+  /** CLI flag for `{flag:<id>}`: a continued `<cliFlag>='<value>'` line, omitted when the field is blank. */
+  cliFlag?: string;
+  /** "slug" lowercases the value and turns anything outside [a-z0-9-] into "-", as the install scripts do. */
+  sanitize?: "slug";
+  /** Value `{flag:<id>}` uses while the field is blank, computed from the other inputs' trimmed values. */
+  fallback?: (get: (id: string) => string) => string;
 }
 
 export interface RichCardContent {
   provider: RichCardProvider;
   steps: RichCardStep[];
+  /**
+   * Setup paths the user chooses between with a toggle above the steps (the
+   * first is selected initially). Steps carry `mode` to belong to one path;
+   * completion and the active step only consider the visible steps.
+   */
+  setupModes?: RichCardSetupMode[];
   /** Omitted by cards with nothing to ingest (e.g. MCP) — no `detectionAnchor` then. */
   detect?: RichCardDetect;
   /** When set, the card shows a stream-name input (see RichCardStreamInput). */

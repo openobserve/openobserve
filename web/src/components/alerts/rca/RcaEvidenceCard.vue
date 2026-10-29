@@ -73,14 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="target.statement"
             @click="$emit('open-hypothesis', citation.hypothesis_id)"
           >
-            {{ target.label }}
+            <RcaInlineText :text="target.label" />
           </button>
         </span>
         <span class="text-text-body">
           <span class="text-text-secondary font-semibold">{{
             t("alerts.incidents.rcaSummary.agentsReading")
-          }}</span>
-          {{ citation.observation }}
+          }}</span
+          >{{ " " }}<RcaInlineText :text="citation.observation" />
         </span>
       </li>
     </ul>
@@ -132,6 +132,7 @@ import type {
 } from "@/services/incidents";
 import { rcaEvidenceLink, rcaEvidenceQuery } from "@/utils/incidents/rcaEvidenceLinks";
 import { rcaEvidenceKindIcon, rcaEvidenceTitle, rcaUtcRange } from "@/utils/incidents/rcaSummary";
+import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 
 const props = withDefaults(

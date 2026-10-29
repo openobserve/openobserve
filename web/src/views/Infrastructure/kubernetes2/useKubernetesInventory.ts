@@ -138,6 +138,8 @@ export function useKubernetesInventory(
   const sql = shallowRef<Map<string, any[]>>(new Map());
   // Kept apart from sql so the drawer events landing does not rebuild the inventory.
   const detailEventHits = shallowRef<any[] | null>(null);
+  // Off the critical path: the sidebar badge fills in after the page has rendered.
+  const eventCountHits = shallowRef<any[] | undefined>(undefined);
   const failed = shallowRef<Map<string, number | null>>(new Map());
   const pageError = ref<string | null>(null);
   const loading = ref(false);
@@ -151,13 +153,18 @@ export function useKubernetesInventory(
     end: number;
     details: DetailsRef | null;
     viewKey: string;
+    scope: string;
   } | null>(null);
   // What each load's object query depends on: a refresh, a new time or another scope changes it.
   const pendingObjects = ref<string | null>(null);
   const loadedObjects = ref<string | null>(null);
 
-  // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
+  // Nothing cancels a superseded query, so its response is dropped by generation.
   let generation = 0;
+  // Separate from generation so a drawer toggle does not discard the deferred event count.
+  let countsGeneration = 0;
+  // The drawer a details-only load is fetching, so closing it before it lands is still a drawer toggle.
+  let detailsTarget: DetailsRef | null | undefined;
   let streamsGeneration = 0;
 
   const has = (stream: string) => metricStreams.value?.has(stream) ?? false;
@@ -250,6 +257,8 @@ export function useKubernetesInventory(
   // An org switch must never query or render with the previous org's streams or rows.
   const reset = () => {
     generation++;
+    countsGeneration++;
+    detailsTarget = undefined;
     streamsGeneration++;
     metricStreams.value = null;
     logStreams.value = null;
@@ -260,6 +269,7 @@ export function useKubernetesInventory(
     results.value = new Map();
     sql.value = new Map();
     detailEventHits.value = null;
+    eventCountHits.value = undefined;
     failed.value = new Map();
     pageError.value = null;
     loading.value = false;
@@ -299,7 +309,7 @@ export function useKubernetesInventory(
       const name = i < send.length ? send[i] : requests[i - send.length].name;
       if (outcome.status === "rejected") {
         out.failed.set(name, statusOf(outcome.reason));
-        out.firstError ??= outcome.reason?.message ?? String(outcome.reason);
+        out.firstError ||= outcome.reason?.message || String(outcome.reason);
       } else if (i < send.length) out.results.set(send[i], outcome.value as Series[]);
       else out.sql.set(name, outcome.value as any[]);
     });
@@ -421,12 +431,113 @@ export function useKubernetesInventory(
     ];
   };
 
+  // A drawer open/close/switch on a committed page must not redo the page's queries.
+  const isDetailsOnly = (s: K8sUrlState, t: K8sTime, cluster: string | null) => {
+    const prior = loadedFor.value;
+    if (loading.value || !loaded.value || pageError.value !== null || !prior) return false;
+    if (prior.end !== t.end || prior.cluster !== cluster) return false;
+    if (prior.scope !== scopeKeyOf(s, cluster)) return false;
+    const shown = detailsTarget === undefined ? prior.details : detailsTarget;
+    return encodeDetailsOrNull(shown) !== encodeDetailsOrNull(s.details);
+  };
+
+  const loadDetailsOnly = async (
+    gen: number,
+    org: string,
+    t: K8sTime,
+    s: K8sUrlState,
+    cluster: string | null,
+    prior: NonNullable<typeof loadedFor.value>,
+  ) => {
+    const plan = (d: DetailsRef | null) => {
+      const at = { ...s, details: d };
+      return {
+        ids: neededIds(at),
+        requests: sqlRequests(at, t, cluster).filter(notCounts),
+      };
+    };
+    detailsTarget = s.details;
+    const old = plan(prior.details);
+    const next = plan(s.details);
+    const keep = new Set<string>([...next.ids, ...next.requests.map((r) => r.name)]);
+    const drop = new Set<string>(["O1obj", "DE", ...old.ids, ...old.requests.map((r) => r.name)]);
+    for (const name of keep) drop.delete(name);
+    const without = <K extends string, V>(m: Map<K, V>) =>
+      new Map([...m].filter(([k]) => !drop.has(k)));
+    detailEventHits.value = null;
+    const commitScope = (r: QueryResults, q: Map<string, any[]>, f: Map<string, number | null>) => {
+      results.value = r;
+      sql.value = q;
+      failed.value = f;
+      loadedFor.value = { ...prior, details: s.details, viewKey: viewKeyOf(s) };
+    };
+    if (!s.details) {
+      commitScope(without(results.value), without(sql.value), without(failed.value));
+      detailLoading.value = false;
+      return;
+    }
+    detailLoading.value = true;
+    const missingIds = next.ids.filter((id) => !results.value.has(id));
+    const missingSql = next.requests.filter((r) => !sql.value.has(r.name));
+    const earlyObject =
+      s.details.kind !== "pod"
+        ? settle(org, t, [], null, detailRequests(s, t, cluster, null, "object"))
+        : null;
+    const extra = await settle(
+      org,
+      t,
+      missingIds,
+      matchersFor(cluster, clusterResults.value),
+      missingSql,
+    );
+    if (gen !== generation) return;
+    commitScope(
+      new Map([...without(results.value), ...extra.results]),
+      new Map([...without(sql.value), ...extra.sql]),
+      new Map([
+        ...[...without(failed.value)].filter(
+          ([k]) => !extra.results.has(k as QueryId) && !extra.sql.has(k),
+        ),
+        ...extra.failed,
+      ]),
+    );
+    const detail = s.details;
+    const rowOf = () =>
+      findRow(
+        inventory.value,
+        detail.kind,
+        rowKey(detail.kind, detail.cluster, detail.namespace, detail.name),
+      );
+    const obj =
+      (await earlyObject) ??
+      (await settle(org, t, [], null, detailRequests(s, t, cluster, rowOf(), "object")));
+    if (gen !== generation) return;
+    mergeSql(obj);
+    const events = await settle(org, t, [], null, detailRequests(s, t, cluster, rowOf(), "events"));
+    if (gen !== generation) return;
+    detailEventHits.value = events.sql.get("DE") ?? null;
+    if (events.failed.size) failed.value = new Map([...failed.value, ...events.failed]);
+    const parts = [extra, obj, events];
+    const attempted = parts.reduce((n, p) => n + p.attempted, 0);
+    // Every drawer request failing is an outage, which the page reports with its retry like a full load does.
+    if (attempted > 0 && parts.reduce((n, p) => n + p.failed.size, 0) === attempted) {
+      fail(parts.find((p) => p.firstError)?.firstError ?? null);
+      return;
+    }
+    detailLoading.value = false;
+  };
+
   const load = async ({ force = false }: { force?: boolean } = {}) => {
     if (detection.value !== "detected") return;
-    const gen = ++generation;
     const org = orgId();
     const t = time();
     const s = state();
+    const resolved = s.cluster ?? clusters.value[0] ?? null;
+    const detailsOnly = !force && isDetailsOnly(s, t, resolved);
+    const gen = ++generation;
+    if (detailsOnly) return loadDetailsOnly(gen, org, t, s, resolved, loadedFor.value!);
+    const countsGen = ++countsGeneration;
+    detailsTarget = undefined;
     loading.value = true;
     detailLoading.value = !!s.details;
     if (force) {
@@ -442,6 +553,14 @@ export function useKubernetesInventory(
       refreshNonce.value,
     ]);
     pendingObjects.value = objectsKey;
+    // SQL needs only the cluster name, so a cluster already in the URL lets it overlap the cluster queries.
+    const planned = s.cluster ? sqlRequests(s, t, s.cluster) : null;
+    const early = planned ? settle(org, t, [], null, planned.filter(notCounts)) : null;
+    // Kept out of the page batch so a drawer read cannot mask every list query failing.
+    const earlyObject =
+      s.cluster && s.details && s.details.kind !== "pod"
+        ? settle(org, t, [], null, detailRequests(s, t, s.cluster, null, "object"))
+        : null;
     const cl = await settle(
       org,
       t,
@@ -467,13 +586,15 @@ export function useKubernetesInventory(
       ].sort((a, b) => a.localeCompare(b));
     }
     const cluster = s.cluster ?? clusters.value[0] ?? null;
-    const main = await settle(
-      org,
-      t,
-      neededIds(s),
-      matchersFor(cluster, cl.results),
-      sqlRequests(s, t, cluster),
-    );
+    const requests = planned ?? sqlRequests(s, t, cluster);
+    const blocking = requests.filter(notCounts);
+    // Same cluster as the early batch, so its SQL is already in flight and only the PromQL is left.
+    const main = early
+      ? mergeSettled(
+          await settle(org, t, neededIds(s), matchersFor(cluster, cl.results), []),
+          await early,
+        )
+      : await settle(org, t, neededIds(s), matchersFor(cluster, cl.results), blocking);
     if (gen !== generation) return;
     if (main.attempted > 0 && main.failed.size === main.attempted) {
       fail(main.firstError);
@@ -481,6 +602,15 @@ export function useKubernetesInventory(
     }
     commit(main, cluster, t, s);
     loadedObjects.value = objectsKey;
+    const counts = requests.filter((r) => r.name === "EC");
+    if (!counts.length) eventCountHits.value = undefined;
+    else {
+      void settle(org, t, [], null, counts).then((ec) => {
+        if (countsGen !== countsGeneration) return;
+        eventCountHits.value = ec.sql.get("EC");
+        if (ec.failed.size) failed.value = new Map([...failed.value, ...ec.failed]);
+      });
+    }
     const detail = s.details;
     if (detail) {
       const row = findRow(
@@ -488,7 +618,10 @@ export function useKubernetesInventory(
         detail.kind,
         rowKey(detail.kind, detail.cluster, detail.namespace, detail.name),
       );
-      const obj = await settle(org, t, [], null, detailRequests(s, t, cluster, row, "object"));
+      // A non-pod object needs no row, so the early batch has already read it.
+      const obj =
+        (await earlyObject) ??
+        (await settle(org, t, [], null, detailRequests(s, t, cluster, row, "object")));
       if (gen !== generation) return;
       mergeSql(obj);
       const enriched = findRow(
@@ -515,6 +648,7 @@ export function useKubernetesInventory(
     results.value = new Map();
     sql.value = new Map();
     detailEventHits.value = null;
+    eventCountHits.value = undefined;
     failed.value = new Map();
     loading.value = false;
     detailLoading.value = false;
@@ -525,12 +659,15 @@ export function useKubernetesInventory(
     results.value = main.results;
     sql.value = main.sql;
     detailEventHits.value = null;
+    // The last count stays until the new one lands; another cluster's count never shows.
+    if (loadedFor.value?.cluster !== cluster) eventCountHits.value = undefined;
     failed.value = main.failed;
     loadedFor.value = {
       cluster,
       end: t.end,
       details: s.details,
       viewKey: viewKeyOf(s),
+      scope: scopeKeyOf(s, cluster),
     };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
@@ -560,7 +697,7 @@ export function useKubernetesInventory(
     return { rows: [...seen.values()], truncated };
   });
 
-  const eventCounts = computed(() => parseEventCounts(sql.value.get("EC")));
+  const eventCounts = computed(() => parseEventCounts(eventCountHits.value));
 
   // Parsed once per hits array: the inventory, banners and drawer all read them, across drawer merges.
   const parsed = new WeakMap<any[], ObjectRecord[]>();
@@ -723,6 +860,26 @@ export function useKubernetesInventory(
 function viewKeyOf(s: K8sUrlState) {
   const byNode = s.view === "map" && groupsPodsByNode(s.entity, s.group);
   return JSON.stringify([s.view, s.cluster, s.namespaces, s.entity, byNode]);
+}
+
+// The drawer can set the cluster the page defaulted to, which is not a scope change.
+function scopeKeyOf(s: K8sUrlState, cluster: string | null) {
+  return viewKeyOf({ ...s, cluster });
+}
+
+const encodeDetailsOrNull = (d: DetailsRef | null) => (d ? encodeDetails(d) : null);
+
+const notCounts = (r: SqlRequest) => r.name !== "EC";
+
+function mergeSettled(a: Settled, b: Settled): Settled {
+  return {
+    results: new Map([...a.results, ...b.results]),
+    sql: new Map([...a.sql, ...b.sql]),
+    failed: new Map([...a.failed, ...b.failed]),
+    firstError: a.firstError ?? b.firstError,
+    attempted: a.attempted + b.attempted,
+    updatedAt: Math.max(a.updatedAt, b.updatedAt),
+  };
 }
 
 function dedupe(requests: SqlRequest[]): SqlRequest[] {
