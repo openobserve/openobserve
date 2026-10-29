@@ -777,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-2xs flex flex-shrink-0 items-center gap-[0.3rem] tabular-nums"
                       >
                         <span class="text-text-secondary font-semibold">
-                          {{ formatDuration(row.duration) }}
+                          {{ formatDuration(row.durationNanos) }}
                         </span>
                         <span class="text-text-muted">
                           ·
@@ -1530,7 +1530,8 @@ const costHotspots = computed(() =>
 );
 interface ToolHotspot {
   name: string;
-  duration: number;
+  /** Summed span duration in nanoseconds, the unit `formatDuration` takes. */
+  durationNanos: number;
   calls: number;
   tokens: number;
   topTraceId: string;
@@ -1543,20 +1544,21 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
   for (const s of sessionSpans.value) {
     if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool") continue;
     const name = String(s.tool_name || s.gen_ai_tool_name || s.operation_name || "tool");
-    const dur = Number(s.duration) || 0;
+    // Span `duration` is in microseconds; the rail formats nanoseconds.
+    const dur = (Number(s.duration) || 0) * 1000;
     const tokens = Number(s.gen_ai_usage_total_tokens) || 0;
     const a =
       agg[name] ||
       (agg[name] = {
         name,
-        duration: 0,
+        durationNanos: 0,
         calls: 0,
         tokens: 0,
         topTraceId: s.trace_id,
         topDur: -1,
         turnsSet: new Set<number>(),
       });
-    a.duration += dur;
+    a.durationNanos += dur;
     a.calls += 1;
     a.tokens += tokens;
     const turnNum = originalTurnIndex(String(s.trace_id)) + 1;
@@ -1574,7 +1576,7 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
       ...rest,
       turns: [...turnsSet].sort((p, q) => p - q),
     }))
-    .sort((x, y) => y.calls - x.calls || y.duration - x.duration);
+    .sort((x, y) => y.calls - x.calls || y.durationNanos - x.durationNanos);
 });
 
 // Jump to a turn (1-based): clear filters so it's visible, expand it, then
