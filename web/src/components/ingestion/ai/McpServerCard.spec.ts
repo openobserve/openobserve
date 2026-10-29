@@ -178,6 +178,39 @@ describe("McpServerCard", () => {
       expect(wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').exists()).toBe(false);
     });
 
+    it("disables Generate with a lock and mints nothing when mcp is license-locked", async () => {
+      const wrapper = mountCard({ features: { mcp: "locked" } });
+
+      const btn = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "ai-integrations-mcp-generate-btn")!;
+      expect(btn.props("disabled")).toBe(true);
+      expect(btn.props("iconLeft")).toBe("lock");
+      await btn.trigger("click");
+      expect(mcp.generate).not.toHaveBeenCalled();
+    });
+
+    it("disables Manage with a lock when mcp is license-locked", () => {
+      mcp.credential = CREDENTIAL;
+      const wrapper = mountCard({ features: { mcp: "locked" } });
+
+      const btn = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "ai-integrations-mcp-manage-btn")!;
+      expect(btn.props("disabled")).toBe(true);
+      expect(btn.props("iconLeft")).toBe("lock");
+    });
+
+    it("keeps Generate live when mcp is enabled", () => {
+      const wrapper = mountCard({ features: { mcp: "enabled" } });
+
+      const btn = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "ai-integrations-mcp-generate-btn")!;
+      expect(btn.props("disabled")).toBeFalsy();
+      expect(btn.props("iconLeft")).toBeUndefined();
+    });
+
     it("mints once per click", async () => {
       const wrapper = mountCard();
 

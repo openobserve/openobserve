@@ -42,6 +42,8 @@ const ODrawerStub = {
 // Stub OButton so we can read the disabled prop directly (the underlying
 // reka-ui button does not always project a DOM `disabled` attribute), and
 // click events still fire the bound @click handler.
+const TooltipStub = { template: "<div><slot /></div>" };
+
 const OButtonStub = {
   name: "OButton",
   props: ["variant", "size", "disabled", "loading"],
@@ -184,6 +186,27 @@ describe("PatternDetailsDialog", () => {
       await wrapper.find('[data-test="pattern-detail-create-alert-btn"]').trigger("click");
       expect(wrapper.emitted("create-alert")![0]).toEqual([mockSelectedPattern.pattern]);
       expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+    });
+
+    it("disables create-alert with a lock and emits nothing when the license locks alerts", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { alerts: "locked" } };
+      try {
+        const locked = mount(PatternDetailsDialog, {
+          props: { modelValue: true, selectedPattern: mockSelectedPattern, totalPatterns },
+          global: { ...globalConfig, stubs: { ...globalConfig.stubs, OTooltip: TooltipStub } },
+        });
+        const btn = locked.find('[data-test="pattern-detail-create-alert-btn"]');
+        const btnComponent = locked
+          .findAllComponents(OButtonStub)
+          .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
+        expect(btnComponent?.props("disabled")).toBeDefined();
+        expect(locked.find('[data-test="pattern-detail-create-alert-lock"]').exists()).toBe(true);
+        await btn.trigger("click");
+        expect(locked.emitted("create-alert")).toBeUndefined();
+        locked.unmount();
+      } finally {
+        store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+      }
     });
   });
 

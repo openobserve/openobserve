@@ -215,6 +215,22 @@ describe("AWSIntegrationTile.vue", () => {
       expect(dashboardBtn.exists()).toBe(true);
     });
 
+    it("locks Add Dashboard and fetches nothing when dashboards are license-locked", async () => {
+      (mockStore.state as any).zoConfig = { features: { dashboards: "locked" } };
+      try {
+        wrapper = createWrapper();
+        const btn = wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "aws-cloudwatch-logs-add-dashboard-btn")!;
+        expect(btn.props("disabled")).toBe(true);
+        expect(btn.props("iconLeft")).toBe("lock");
+        await (wrapper.vm as any).handleAddDashboard();
+        expect(fetch).not.toHaveBeenCalled();
+      } finally {
+        delete (mockStore.state as any).zoConfig;
+      }
+    });
+
     it("should render documentation button when documentationUrl present", () => {
       wrapper = createWrapper();
       const docsBtn = wrapper.find('[data-test="aws-cloudwatch-logs-docs-btn"]');

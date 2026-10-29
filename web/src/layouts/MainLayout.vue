@@ -159,6 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               isDark ? 'border-border-default' : 'border-transparent',
             ]"
           >
+            <!-- Outside the lock boundary, so its own actions stay live. -->
+            <FeatureLockBanner v-if="isLoading" class="shrink-0" :feature="lockedFeature" />
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
@@ -176,11 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @open="firstDataNotice.open"
                 @dismiss="firstDataNotice.dismiss"
               />
-              <router-view v-slot="{ Component }">
-                <keep-alive :include="KEPT_ALIVE_VIEWS">
-                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
-                </keep-alive>
-              </router-view>
+              <FeatureLockBoundary :feature="lockedFeature">
+                <router-view v-slot="{ Component }">
+                  <keep-alive :include="KEPT_ALIVE_VIEWS">
+                    <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                  </keep-alive>
+                </router-view>
+              </FeatureLockBoundary>
             </div>
           </div>
         </main>
@@ -257,6 +261,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { featureState, menuState, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -313,6 +318,9 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import FeatureLockBanner from "@/components/common/FeatureLockBanner.vue";
+import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import { clearLicenseDenials } from "@/composables/useUnauthorizedErrorGrouper";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import {
   FIRST_DATA_NOTICE,
@@ -370,6 +378,8 @@ export default defineComponent({
     ODrawer,
     OButton,
     FirstDataNotice,
+    FeatureLockBanner,
+    FeatureLockBoundary,
     EditorDraftSignOutDialog,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
@@ -478,44 +488,28 @@ export default defineComponent({
       layoutStreams,
     );
     provide(FIRST_DATA_NOTICE, firstDataNotice);
-    const isIncidentsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.incidents_enabled
-      );
+    const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
+    // Locked and hidden come from the license `features` map; the enabled path keeps the legacy flag for older backends.
+    const features = computed(() => store.state.zoConfig?.features);
+    // `route.meta` merges every matched record, so a gated parent locks its child pages too.
+    const lockedFeature = computed<string | null>(() => {
+      const key = router.currentRoute.value.meta?.licenseFeature;
+      return typeof key === "string" && featureState(features.value, key) === "locked" ? key : null;
     });
+    const isIncidentsEnabled = computed(
+      () => isEnterpriseOrCloud && !!store.state.zoConfig.incidents_enabled,
+    );
 
-    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
-    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`
-    // (enterprise `O2_WORKFLOWS_ENABLED`). Reactive so the menu picks it up
-    // regardless of whether the config response arrived before or after mount.
     // `=== true`, not truthy: /config is fetched without await, so the flag is
     // briefly undefined and the entry must stay hidden rather than flash in.
     const isWorkflowsEnabled = computed(
-      () =>
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig?.workflows_enabled === true,
+      () => isEnterpriseOrCloud && store.state.zoConfig?.workflows_enabled === true,
     );
 
-    // Backend `/config` flag `online_evals_enabled` — controlled by
-    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
-    // of whether the config response arrived before or after this component
-    // mounted.
-    const isOnlineEvalsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        Boolean(store.state.zoConfig?.online_evals_enabled)
-      );
-    });
-
-    // The AI Observability menu entry itself ships on true OSS builds too —
-    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
-    // of the module. AIObservabilityShell (Index.vue) renders Evaluate/
-    // Experiment/Annotate/Agent Graph/Agent Behavior too, but locked (lock
-    // icon + tooltip) rather than hidden, so this entry point itself doesn't
-    // need to wait on `isOnlineEvalsEnabled` for those.
-    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
-    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
+    // Monitor needs no flag or (on OSS) license; the eval sections gate on `online_evals_enabled` themselves.
+    const aiObservabilityMenuState = computed<FeatureState>(() =>
+      isEnterpriseOrCloud ? featureState(features.value, "ai_observability") : "enabled",
+    );
 
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
@@ -828,6 +822,17 @@ export default defineComponent({
       }
     });
 
+    // One idempotent add/update/remove for a license-gated entry; `insertAt` returns -1 to skip.
+    const syncFeatureLink = (item: NavItem, state: FeatureState, insertAt: () => number) => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === item.name);
+      // Removed, not just skipped: the menu is rebuilt on org switch and the state can change.
+      if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+      if (state === "hidden") return;
+      const at = insertAt();
+      if (at === -1) return;
+      linksList.value.splice(at, 0, { ...item, licenseLocked: state === "locked" });
+    };
+
     // Shows the entry — locked, if this edition doesn't unlock `featureKey` —
     // whenever `enabledByRuntimeFlag` is true OR the edition flat-out doesn't
     // unlock it (so the locked entry stays discoverable rather than only
@@ -843,7 +848,13 @@ export default defineComponent({
     ) => {
       const existingIndex = linksList.value.findIndex((link) => link.name === name);
       const access = checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig));
-      const shouldShow = enabledByRuntimeFlag || !access.allowed;
+      // The license map applies once the edition allows the feature; a locked license also turns its runtime flag off.
+      const license = access.allowed ? featureState(features.value, featureKey) : "enabled";
+      const locked = !access.allowed;
+      // The real page renders locked, so a license lock keeps the entry navigable.
+      const licenseLocked = license === "locked";
+      const lockedMessage = access.message;
+      const shouldShow = license !== "hidden" && (enabledByRuntimeFlag || locked || licenseLocked);
 
       if (!shouldShow) {
         if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
@@ -851,18 +862,13 @@ export default defineComponent({
       }
 
       if (existingIndex !== -1) {
-        linksList.value[existingIndex].locked = !access.allowed;
-        linksList.value[existingIndex].lockedMessage = access.message;
+        Object.assign(linksList.value[existingIndex], { locked, lockedMessage, licenseLocked });
         return;
       }
 
       const anchor = linksList.value.findIndex((link) => link.name === anchorName);
       if (anchor === -1) return;
-      linksList.value.splice(anchor + 1, 0, {
-        ...entry,
-        locked: !access.allowed,
-        lockedMessage: access.message,
-      });
+      linksList.value.splice(anchor + 1, 0, { ...entry, locked, lockedMessage, licenseLocked });
     };
 
     const updateIncidentsMenu = () => {
@@ -899,18 +905,22 @@ export default defineComponent({
     watch(isExperimentalEnabled, () => updateAutoObserveMenu(), { immediate: false });
 
     // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
-    const isDowntimesEnabled = computed(
-      () =>
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig?.downtimes_enabled === true,
+    const downtimesMenuState = computed<FeatureState>(() =>
+      isEnterpriseOrCloud
+        ? menuState(features.value, "alerts", store.state.zoConfig?.downtimes_enabled === true)
+        : "hidden",
     );
     const updateDowntimesMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "downtimes");
-      if (!isDowntimesEnabled.value) {
+      if (downtimesMenuState.value === "hidden") {
         if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
         return;
       }
-      if (existingIndex !== -1) return;
+      const licenseLocked = downtimesMenuState.value === "locked";
+      if (existingIndex !== -1) {
+        linksList.value[existingIndex].licenseLocked = licenseLocked;
+        return;
+      }
       const anchor = linksList.value.findIndex((link) => link.name === "alertList");
       if (anchor === -1) return;
       linksList.value.splice(anchor + 1, 0, {
@@ -918,9 +928,10 @@ export default defineComponent({
         icon: "notifications-paused",
         link: "/downtimes",
         name: "downtimes",
+        licenseLocked,
       });
     };
-    watch(isDowntimesEnabled, () => updateDowntimesMenu(), { immediate: false });
+    watch(downtimesMenuState, () => updateDowntimesMenu(), { immediate: false });
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
@@ -932,9 +943,10 @@ export default defineComponent({
       });
     };
 
-    // If `/config` resolves after this component mounted (or the flag flips),
+    // If `/config` resolves after this component mounted (or the state flips),
     // keep the menu in sync — same contract as the other flag-driven entries.
-    watch(isWorkflowsEnabled, () => updateWorkflowsMenu(), { immediate: false });
+    watch([isIncidentsEnabled, features], () => updateIncidentsMenu(), { immediate: false });
+    watch([isWorkflowsEnabled, features], () => updateWorkflowsMenu(), { immediate: false });
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -942,83 +954,95 @@ export default defineComponent({
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
     const updateAIObservabilityMenu = () => {
-      const existingIndex = linksList.value.findIndex(
-        (link: any) => link.name === "aiObservability",
-      );
-
-      if (isAiObservabilityMenuVisible.value) {
-        if (existingIndex !== -1) return;
-        const anchorIndex = linksList.value.findIndex(
-          (link: any) => link.name === "profiles" || link.name === "traces",
-        );
-        const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
-        linksList.value.splice(insertAt, 0, {
+      syncFeatureLink(
+        {
           title: t("menu.aiObservability"),
           icon: "auto-awesome",
           link: "/ai",
           name: "aiObservability",
-        });
-      } else if (existingIndex !== -1) {
-        linksList.value.splice(existingIndex, 1);
-      }
+        },
+        aiObservabilityMenuState.value,
+        () => {
+          const anchorIndex = linksList.value.findIndex(
+            (link) => link.name === "profiles" || link.name === "traces",
+          );
+          return anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
+        },
+      );
     };
 
-    // If `/config` resolves after this component mounted (or if the flag
+    // If `/config` resolves after this component mounted (or if the state
     // ever flips at runtime), keep the menu in sync.
-    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(aiObservabilityMenuState, () => updateAIObservabilityMenu(), { immediate: false });
 
+    // A locked license keeps the entry even with the runtime flag off, so the lock stays discoverable.
+    const syntheticsMenuState = computed<FeatureState>(() =>
+      menuState(features.value, "synthetics", isSyntheticsEnabled.value),
+    );
     const updateSyntheticMenu = () => {
-      const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
-
-      if (!isSyntheticsEnabled.value) {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      if (existingIndex !== -1) return;
-
-      const incidentIndex = linksList.value.findIndex((l: any) => l.name === "incidentList");
-      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
-      const insertAt =
-        incidentIndex !== -1
-          ? incidentIndex + 1
-          : alertIndex !== -1
-            ? alertIndex + 1
-            : linksList.value.length;
-
-      linksList.value.splice(insertAt, 0, {
-        title: t("menu.synthetic"),
-        icon: "radar",
-        link: "/synthetics",
-        name: "synthetics",
-      });
+      syncFeatureLink(
+        {
+          title: t("menu.synthetic"),
+          icon: "radar",
+          link: "/synthetics",
+          name: "synthetics",
+        },
+        syntheticsMenuState.value,
+        () => {
+          const incidentIndex = linksList.value.findIndex((l) => l.name === "incidentList");
+          const alertIndex = linksList.value.findIndex((l) => l.name === "alertList");
+          if (incidentIndex !== -1) return incidentIndex + 1;
+          return alertIndex !== -1 ? alertIndex + 1 : linksList.value.length;
+        },
+      );
     };
 
     // Keep the menu in sync if /config resolves after mount.
-    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+    watch(syntheticsMenuState, () => updateSyntheticMenu(), {
       immediate: false,
     });
 
+    const profilesMenuState = computed<FeatureState>(() =>
+      menuState(features.value, "continuous_profiling", isProfilingEnabled.value),
+    );
     const updateProfilesMenu = () => {
-      const existingIndex = linksList.value.findIndex((l: any) => l.name === "profiles");
-
-      if (!isProfilingEnabled.value) {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      if (existingIndex !== -1) return;
-
-      const tracesIndex = linksList.value.findIndex((l: any) => l.name === "traces");
-      const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
-
-      linksList.value.splice(insertAt, 0, {
-        title: t("menu.profiles"),
-        icon: "memory",
-        link: "/profiles",
-        name: "profiles",
-      });
+      syncFeatureLink(
+        {
+          title: t("menu.profiles"),
+          icon: "memory",
+          link: "/profiles",
+          name: "profiles",
+        },
+        profilesMenuState.value,
+        () => {
+          const tracesIndex = linksList.value.findIndex((l) => l.name === "traces");
+          return tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        },
+      );
     };
 
-    watch(isProfilingEnabled, () => updateProfilesMenu(), { immediate: false });
+    watch(profilesMenuState, () => updateProfilesMenu(), { immediate: false });
+
+    // Static rail entries owned by a license feature: locked keeps the entry with a lock, hidden drops it.
+    const LICENSED_LINKS: Record<string, string> = {
+      rum: "rum",
+      productAnalytics: "product_analytics",
+      dashboards: "dashboards",
+      reports: "reports",
+      alertList: "alerts",
+      sloList: "anomaly_detection",
+    };
+    const applyLicenseStates = () => {
+      linksList.value = linksList.value.flatMap((link) => {
+        const key = LICENSED_LINKS[link.name];
+        if (!key) return [link];
+        const state = featureState(features.value, key);
+        if (state === "hidden") return [];
+        const { licenseLocked: _, ...rest } = link;
+        return [state === "locked" ? { ...rest, licenseLocked: true } : rest];
+      });
+    };
+    watch(features, () => applyLicenseStates(), { immediate: false });
 
     // On-call's Pages/Teams/Routing entries live entirely inside the
     // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
@@ -1032,6 +1056,7 @@ export default defineComponent({
       updateSyntheticMenu();
       updateProfilesMenu();
       updateAIObservabilityMenu();
+      applyLicenseStates();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus?.split(",")?.filter((val: string) => val?.trim()) ||
@@ -1679,6 +1704,9 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Path, not the full route: a query-only change (time range, filters) stays on the same page.
+    watch(() => router.currentRoute.value.path, clearLicenseDenials);
+
     // Home page has its own inline AI tab (see toggleAIChat's home special-case
     // above), so the sidebar chat panel is redundant there — close it on
     // arrival so we don't show both the sidebar and the home AI tab at once.
@@ -1710,6 +1738,7 @@ export default defineComponent({
       raw,
       dashboardSaveConflict: dashboardSaveConflictState,
       firstDataNotice,
+      lockedFeature,
       layoutMixin,
       router,
       store,

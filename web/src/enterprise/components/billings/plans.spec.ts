@@ -218,6 +218,19 @@ describe("Plans Component", () => {
     vi.unstubAllGlobals();
   });
 
+  it("skips the AI usage read while the assistant is not licensed", async () => {
+    vi.mocked(BillingService.get_ai_usage).mockClear();
+    store.state.zoConfig.features = { ai_assistant: "locked" };
+    const locked = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(BillingService.get_ai_usage).not.toHaveBeenCalled();
+    locked.unmount();
+    delete store.state.zoConfig.features;
+  });
+
   it("fires billing_checkout_returned once with the plan when Stripe sends the user back", async () => {
     vi.mocked(analytics.track).mockClear();
     Object.defineProperty(document, "referrer", {

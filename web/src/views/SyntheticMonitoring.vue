@@ -74,28 +74,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs
-        :model-value="activeSection"
-        align="left"
-        @change="activeSection = $event as SyntheticsSection"
-      >
-        <OTab name="checks">
-          <OIcon name="radar" size="sm" />
-          <span>{{ t("synthetics.tabs.checks") }}</span>
-        </OTab>
-        <OTab v-if="privateLocationsEnabled" name="private">
-          <OIcon name="location-on" size="sm" />
-          <span>{{ t("synthetics.tabs.private") }}</span>
-        </OTab>
-        <OTab name="status-pages">
-          <OIcon name="monitor-heart" size="sm" />
-          <span>{{ t("statusPages.tabTitle") }}</span>
-        </OTab>
-        <OTab name="variables">
-          <OIcon name="data-object" size="sm" />
-          <span>{{ t("synthetics.tabs.variables") }}</span>
-        </OTab>
-      </OTabs>
+      <!-- Section navigation stays live on a license-locked page; the actions inside each section stay locked. -->
+      <FeatureLockExempt class="contents">
+        <OTabs
+          :model-value="activeSection"
+          align="left"
+          @change="activeSection = $event as SyntheticsSection"
+        >
+          <OTab name="checks">
+            <OIcon name="radar" size="sm" />
+            <span>{{ t("synthetics.tabs.checks") }}</span>
+          </OTab>
+          <OTab v-if="privateLocationsEnabled" name="private">
+            <OIcon name="location-on" size="sm" />
+            <span>{{ t("synthetics.tabs.private") }}</span>
+          </OTab>
+          <OTab name="status-pages">
+            <OIcon name="monitor-heart" size="sm" />
+            <span>{{ t("statusPages.tabTitle") }}</span>
+          </OTab>
+          <OTab name="variables">
+            <OIcon name="data-object" size="sm" />
+            <span>{{ t("synthetics.tabs.variables") }}</span>
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden max-md:flex-col">
@@ -513,6 +516,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -561,6 +565,7 @@ import {
   statusPageEditRoute,
 } from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
+import { forbiddenState } from "@/utils/featureGate";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -736,7 +741,7 @@ const loading = monitorsList.isPending;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.

@@ -281,6 +281,99 @@ describe("IdentityAccessManagement.vue Component", () => {
       expect(groups?.lockedShowUpgradeCta).toBe(false);
       w.unmount();
     });
+
+    it.each([
+      ["locked", true],
+      ["hidden", false],
+    ])("shows groups and roles under a %s rbac license: %s", async (state, shown) => {
+      vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
+      store.state.zoConfig.rbac_enabled = true;
+      store.state.zoConfig.features = { rbac: state };
+
+      const w = mount(IdentityAccessManagement, {
+        global: { provide: { store }, plugins: [i18n, router], stubs: defaultStubs },
+      });
+      await flushPromises();
+
+      const items = visibleItems(w.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "groups")).toBe(shown);
+      expect(items.some((i: any) => i.key === "roles")).toBe(shown);
+      expect(items.some((i: any) => i.key === "users")).toBe(true);
+      w.unmount();
+      delete store.state.zoConfig.features;
+    });
+
+    it.each([
+      ["locked", true],
+      ["enabled", false],
+    ])(
+      "marks groups and roles license-locked under a %s rbac license: %s",
+      async (state, locked) => {
+        vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
+        store.state.zoConfig.rbac_enabled = true;
+        store.state.zoConfig.features = { rbac: state };
+
+        const w = mount(IdentityAccessManagement, {
+          global: { provide: { store }, plugins: [i18n, router], stubs: defaultStubs },
+        });
+        await flushPromises();
+
+        const items = visibleItems(w.vm.sectionGroups);
+        const byKey = (key: string) => items.find((i: any) => i.key === key);
+        expect(byKey("groups")?.licenseLocked).toBe(locked);
+        expect(byKey("roles")?.licenseLocked).toBe(locked);
+        // A license lock is not an edition lock: the click must reach the page, not the upsell.
+        expect(byKey("groups")?.locked).toBe(false);
+        expect(byKey("users")?.licenseLocked).toBeUndefined();
+        w.unmount();
+        delete store.state.zoConfig.features;
+      },
+    );
+  });
+
+  describe("License-gated rail items", () => {
+    const itemsUnder = async (features: Record<string, string>, extra = {}) => {
+      Object.assign(store.state.zoConfig, extra, { features });
+      const w = mount(IdentityAccessManagement, {
+        global: { provide: { store }, plugins: [i18n, router], stubs: defaultStubs },
+      });
+      await flushPromises();
+      const items = allItems(w.vm.sectionGroups);
+      w.unmount();
+      delete store.state.zoConfig.features;
+      return (key: string) => items.find((i: any) => i.key === key);
+    };
+
+    it.each([
+      ["syntheticsTokens", "synthetics"],
+      ["mcpServer", "mcp"],
+      ["quota", "ratelimit"],
+    ])("%s is license-locked under a locked %s license", async (key, feature) => {
+      const byKey = await itemsUnder({ [feature]: "locked" });
+      expect(byKey(key)?.licenseLocked).toBe(true);
+    });
+
+    it.each([
+      ["syntheticsTokens", "synthetics"],
+      ["mcpServer", "mcp"],
+      ["quota", "ratelimit"],
+    ])("%s is hidden under a hidden %s license", async (key, feature) => {
+      const byKey = await itemsUnder({ [feature]: "hidden" });
+      expect(byKey(key)?.visible).toBe(false);
+    });
+
+    it("keeps a locked synthetics tokens item visible though the synthetics flag is off", async () => {
+      const byKey = await itemsUnder({ synthetics: "locked" }, { synthetics_enabled: false });
+      expect(byKey("syntheticsTokens")).toMatchObject({ visible: true, licenseLocked: true });
+      delete store.state.zoConfig.synthetics_enabled;
+    });
+
+    it("leaves the items unlocked and visible when the license enables them", async () => {
+      const byKey = await itemsUnder({});
+      expect(byKey("syntheticsTokens")).toMatchObject({ licenseLocked: false });
+      expect(byKey("mcpServer")).toMatchObject({ visible: true, licenseLocked: false });
+      expect(byKey("quota")?.licenseLocked).toBe(false);
+    });
   });
 
   describe("Tab Configuration Tests - Enterprise vs Open Source", () => {

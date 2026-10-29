@@ -1429,4 +1429,13 @@ describe("SearchResult Component", () => {
       expect(bar.classList.contains("h-9")).toBe(false);
     });
   });
+
+  describe("correlation under a license lock", () => {
+    it("starts no correlation lookup while the license locks correlation", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: { correlation: "locked" } };
+      await wrapper.vm.openCorrelationFromLog({ _timestamp: 1, service: "checkout" });
+      expect(wrapper.vm.correlationLoading).toBe(false);
+      expect(wrapper.vm.correlationContext).toBeNull();
+    });
+  });
 });

@@ -1222,6 +1222,15 @@ describe("OTable", () => {
       expect(isPinned(wrapper)).toBe(true);
     });
 
+    it("names the missing features instead of the no-access copy for a license denial", async () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), forbidden: true } });
+      expect(wrapper.find('[data-test="o2-table-license-denied"]').exists()).toBe(false);
+      await wrapper.setProps({ forbidden: ["dashboards"] });
+      const denied = wrapper.find('[data-test="o2-table-license-denied"]');
+      expect(denied.exists()).toBe(true);
+      expect(denied.text()).toContain("dashboards");
+    });
+
     it("leaves pinning to the <thead> while rows show", () => {
       wrapper = mount(OTable, { props: { data: makeRows(5), columns: makeColumns() } });
       expect(isPinned(wrapper)).toBe(false);

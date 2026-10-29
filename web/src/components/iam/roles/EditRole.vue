@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="h-full"
                   :modules="summaryModules"
                   :loading="isFetchingInitialRoles"
+                  :license-denied="licenseDenied"
                   @open="(moduleKey) => (activeModule = moduleKey)"
                   @preset="applyPreset"
                 >
@@ -155,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         language="json"
                         ref="permissionJsonEditorRef"
                         v-model:query="permissionsJsonValue"
+                        :read-only="pageLocked"
                         style="height: calc(100vh - var(--navbar-height) - 295px)"
                       />
                       <!-- eslint-enable local/no-hardcoded-px -->
@@ -311,7 +313,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 
 interface RoleDraftData {
   added: string[];
@@ -324,6 +328,9 @@ interface RoleDraftData {
 }
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+
+// Monaco is not an O2 primitive, so the page lock cannot disable it on its own.
+const { locked: pageLocked } = useFeatureLock();
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -383,6 +390,8 @@ const addedServiceAccounts = ref(new Set());
 const removedServiceAccounts = ref(new Set());
 
 const roleUsers: Ref<string[]> = ref([]);
+
+const licenseDenied = ref<string[] | null>(null);
 
 const permissionsUiType = ref("table");
 
@@ -563,6 +572,9 @@ const getRoleDetails = () => {
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
+      // The page stays and renders locked; the license bar explains the denial.
+      licenseDenied.value = licenseDeniedFeatures(error);
+      if (licenseDenied.value) return;
       if (error?.response?.status === 404) {
         roleGone = true;
         deleteEditorDraftsFor({

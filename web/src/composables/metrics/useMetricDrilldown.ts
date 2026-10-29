@@ -76,6 +76,8 @@ export interface UseMetricDrilldownDeps {
   inapplicableFilters: () => LabelFilterLike[];
   timeRange: () => { start_time: number; end_time: number };
   serviceStreamsEnabled: () => boolean;
+  /** The license locks correlation: no identity, groups or correlate call is made. */
+  licenseLocked?: () => boolean;
   router: { push: (route: any) => unknown };
   store: { dispatch: (type: string, payload?: unknown) => unknown };
   /** Told the user's names of the identity labels a stream could not apply. */
@@ -93,14 +95,16 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
   let identityConfig: ServiceIdentityConfig = { sets: [], tracked_alias_ids: [] };
   let semanticGroups: FieldAlias[] = [];
 
-  const availability = computed(() =>
-    availabilityOf({
+  const isLicenseLocked = () => deps.licenseLocked?.() ?? false;
+  const availability = computed(() => {
+    const state = availabilityOf({
       isEnterprise: config.isEnterprise,
       serviceStreamsEnabled: deps.serviceStreamsEnabled(),
       identityStatus: identityStatus.value,
       groupsStatus: groupsStatus.value,
-    }),
-  );
+    });
+    return state !== "oss" && isLicenseLocked() ? ("licenseLocked" as const) : state;
+  });
 
   const menu = ref<DrilldownMenu>({ kind: "idle" });
   let pickedService: LabelFilterLike | null = null;
@@ -139,7 +143,7 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
   let readsReady: Promise<void> = Promise.resolve();
   // The detail view stays mounted across an org switch, so the reads follow the org and the discovery flag.
   watch(
-    () => [deps.org(), deps.serviceStreamsEnabled()],
+    () => [deps.org(), deps.serviceStreamsEnabled(), isLicenseLocked()],
     () => {
       ++generation;
       menu.value = { kind: "idle" };
@@ -148,7 +152,7 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
       identityConfig = { sets: [], tracked_alias_ids: [] };
       semanticGroups = [];
       readsReady =
-        config.isEnterprise === "true" && deps.serviceStreamsEnabled()
+        config.isEnterprise === "true" && deps.serviceStreamsEnabled() && !isLicenseLocked()
           ? loadReads()
           : Promise.resolve();
     },

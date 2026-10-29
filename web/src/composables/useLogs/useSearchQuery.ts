@@ -26,6 +26,7 @@ import { cloneDeep } from "lodash-es";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
 import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
+import { featureState } from "@/utils/featureGate";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { hasLimitClause } from "@/utils/query/nonSqlLimit";
@@ -601,7 +602,11 @@ export const useSearchQuery = (t: TranslateFn) => {
         },
       };
 
-      if (config.isEnterprise == "true" && store.state.zoConfig.super_cluster_enabled) {
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled &&
+        featureState(store.state.zoConfig.features, "super_cluster") !== "locked"
+      ) {
         req["regions"] = searchObj.meta.regions;
         req["clusters"] = searchObj.meta.clusters;
       }

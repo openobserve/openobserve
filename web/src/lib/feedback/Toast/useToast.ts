@@ -1,6 +1,7 @@
 import { reactive, ref } from "vue";
 import type { ToastVariant, ToastOptions, ToastPosition, ToastDetail } from "./OToast.types";
 import type { I18nText } from "@/types/i18n";
+import { isLicenseDenialToast } from "@/composables/useFeatureLock";
 
 // ── Internal record shape ────────────────────────────────────────────────────
 
@@ -123,6 +124,8 @@ function capitalizeFirst(str: I18nText): I18nText {
 
 function toast(options: ToastOptions): DismissFn {
   const variant: ToastVariant = options.variant ?? "default";
+  // The license top bar already names the features a refused request needed.
+  if (variant === "error" && isLicenseDenialToast(options.message)) return () => {};
   const position: ToastPosition = options.position ?? defaultPositions[variant];
   const timeout = options.timeout !== undefined ? options.timeout : defaultTimeouts[variant];
 

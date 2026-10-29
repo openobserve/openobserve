@@ -327,6 +327,20 @@ describe("useRumSpanBuilder", () => {
       expect(searchService.search).not.toHaveBeenCalled();
     });
 
+    it("should not read _rumdata when the rum license is locked", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+      (mockStore.state.zoConfig as Record<string, unknown>).features = { rum: "locked" };
+      try {
+        const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+        const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+        expect(result.tracedResources).toEqual([]);
+        expect(mockGetStream).not.toHaveBeenCalled();
+        expect(searchService.search).not.toHaveBeenCalled();
+      } finally {
+        delete (mockStore.state.zoConfig as Record<string, unknown>).features;
+      }
+    });
+
     it("should return empty result when RUM stream schema lacks a trace-id field", async () => {
       mockGetStream.mockResolvedValue(makeRumStream([]));
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);

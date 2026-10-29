@@ -21,6 +21,7 @@
 // without an inline style or a hardcoded px.
 
 import { computed, nextTick, ref, useAttrs, watch } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -61,7 +62,8 @@ const editRootEl = ref<HTMLElement | null>(null);
 
 const displayValue = computed(() => (props.modelValue ?? "").trim());
 const isEmpty = computed(() => displayValue.value === "");
-const canEdit = computed(() => !props.disabled && !props.readonly);
+const isDisabled = useLockedDisabled(() => props.disabled);
+const canEdit = computed(() => !isDisabled.value && !props.readonly);
 
 // Keep the draft in step with the model whenever the user isn't actively typing:
 // in display mode, and in edit mode until the first keystroke. So an auto-name
@@ -338,7 +340,7 @@ defineExpose({ focus: startEdit });
         v-else
         ref="triggerRef"
         type="button"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :aria-label="ariaLabel"
         :data-test="dataTest ? `${dataTest}-trigger` : undefined"
         data-inline-edit-trigger
@@ -350,7 +352,7 @@ defineExpose({ focus: startEdit });
           // clicked into — the required-name state must be visible at rest, not
           // only mid-edit (matches the pipeline/panel headers).
           error ? 'ring-input-border-error' : 'ring-transparent',
-          disabled
+          isDisabled
             ? 'cursor-not-allowed opacity-60'
             : error
               ? 'cursor-text'
@@ -375,7 +377,7 @@ defineExpose({ focus: startEdit });
              sits at reduced opacity so it reads as an affordance, not a control,
              and brightens on hover. -->
         <OIcon
-          v-if="!disabled"
+          v-if="!isDisabled"
           name="edit"
           size="sm"
           class="text-text-secondary shrink-0 opacity-50 transition-opacity group-hover/inline-edit:opacity-100"
@@ -384,7 +386,7 @@ defineExpose({ focus: startEdit });
              than a native `title`: this hint is the ONLY place a generated name
              explains itself, so it can't sit behind the browser's ~1s delay in
              unstyled system chrome. -->
-        <OTooltip v-if="editHint && !disabled" :content="editHint" max-width="18rem" />
+        <OTooltip v-if="editHint && !isDisabled" :content="editHint" max-width="18rem" />
       </button>
 
       <!-- Trailing content beside the name — display mode only, so it never

@@ -30,13 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner size="md" data-test="edit-role-summary-loading" />
     </div>
 
+    <div v-else-if="licenseDenied" class="flex flex-1 items-center justify-center p-6">
+      <LicenseDeniedState :features="licenseDenied" data-test="edit-role-summary-license-denied" />
+    </div>
+
     <div v-else-if="!modules.length" class="flex flex-1 items-center justify-center p-6">
       <OEmptyState
         size="hero"
         preset="no-data"
         :title="t('iam.editRole.summaryEmptyTitle')"
         :description="t('iam.editRole.summaryEmptyDescription')"
-        :actions="presetActions"
+        :actions="locked ? [] : presetActions"
         data-test="edit-role-summary-empty"
         @action="(id: unknown) => emit('preset', String(id))"
       />
@@ -123,6 +127,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { useFeatureLock } from "@/composables/useFeatureLock";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
 export type SummaryAction = { action: string; label: I18nText };
 
@@ -142,6 +148,8 @@ export type SummaryModule = {
 defineProps<{
   modules: SummaryModule[];
   loading: boolean;
+  /** Missing license features when the role's permissions load was license-denied. */
+  licenseDenied?: readonly string[] | null;
 }>();
 
 const emit = defineEmits<{
@@ -163,6 +171,8 @@ const GROUP_TONE: Record<string, string> = {
 const NEUTRAL_TONE = "bg-surface-subtle text-text-secondary";
 
 const { t } = useI18nTyped();
+// The preset cards are a library button the page lock does not reach.
+const { locked } = useFeatureLock();
 
 const grouped = (count: number) => raw(count.toLocaleString());
 

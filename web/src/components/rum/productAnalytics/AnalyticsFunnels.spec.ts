@@ -709,6 +709,28 @@ describe("AnalyticsFunnels", () => {
     expect(wrapper!.findComponent({ name: "AddToDashboard" }).exists()).toBe(false);
   });
 
+  it("locks Add to dashboard and opens no dialog when dashboards are license-locked", async () => {
+    const prev = store.state.zoConfig;
+    store.state.zoConfig = { ...prev, features: { dashboards: "locked" } };
+    try {
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      const btn = wrapper!
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "rum-analytics-funnel-add-dashboard-btn")!;
+      expect(btn.props("disabled")).toBe(true);
+      expect(btn.props("iconLeft")).toBe("lock");
+      await btn.trigger("click");
+      await flushPromises();
+      expect(wrapper!.findComponent({ name: "AddToDashboard" }).exists()).toBe(false);
+    } finally {
+      store.state.zoConfig = prev;
+    }
+  });
+
   it("adds a Sessions funnel without breakdown to a dashboard as a bar panel (AC-53)", async () => {
     await mountFunnels();
     await setSteps([
@@ -751,6 +773,28 @@ describe("AnalyticsFunnels", () => {
     expect(prefill.sql).toMatch(/ < 40$/);
     expect(prefill.warnings.map((w) => w.key)).toContain("rumFunnelSnapshot");
     alertCreationDialog.value = null;
+  });
+
+  it("locks Alert me and opens no alert form when alerts are license-locked", async () => {
+    alertCreationDialog.value = null;
+    const prev = store.state.zoConfig;
+    store.state.zoConfig = { ...prev, features: { alerts: "locked" } };
+    try {
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      const btn = wrapper!
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "rum-analytics-funnel-alert-btn")!;
+      expect(btn.props("disabled")).toBe(true);
+      expect(btn.props("iconLeft")).toBe("lock");
+      await btn.trigger("click");
+      expect(alertCreationDialog.value).toBeNull();
+    } finally {
+      store.state.zoConfig = prev;
+    }
   });
 
   const EVT = "EvtDashboards00000000000001";

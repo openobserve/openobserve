@@ -16,6 +16,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import { createStore } from "vuex";
 
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
@@ -153,6 +154,20 @@ describe("CreateAlertDialogProvider", () => {
     requestAlertCreation(prefill());
     await flushPromises();
 
+    expect(alertCreationDialog.value).toBeNull();
+  });
+
+  it("shows no dialog and drops the request while alerts is license-locked", async () => {
+    wrapper = mount(CreateAlertDialogProvider, {
+      global: {
+        plugins: [i18n, createStore({ state: { zoConfig: { features: { alerts: "locked" } } } })],
+        stubs: { CreateAlertFromSourceDialog: DialogStub },
+      },
+    });
+    requestAlertCreation(prefill());
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent(DialogStub).exists()).toBe(false);
     expect(alertCreationDialog.value).toBeNull();
   });
 });

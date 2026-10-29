@@ -1457,6 +1457,78 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     // The computed initialises activeTab to 'all' when the feature is disabled
     expect(wrapper.vm.activeTab).not.toBe("anomalyDetection");
   });
+
+  describe("anomaly_detection license lock", () => {
+    afterEach(() => {
+      delete (store.state as any).zoConfig.features;
+    });
+
+    const lockedList = async () => {
+      (config as any).isEnterprise = "true";
+      (store.state as any).zoConfig.build_type = "enterprise";
+      (store.state as any).zoConfig.anomaly_detection_enabled = true;
+      (store.state as any).zoConfig.features = { anomaly_detection: "locked" };
+      router.currentRoute.value.query = {} as any;
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      return wrapper;
+    };
+
+    it("opens the locked tab on the license empty state without an anomaly list call", async () => {
+      const wrapper = await lockedList();
+      expect(wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection").locked).toBe(
+        true,
+      );
+      (alertsSvc.listByFolderId as any).mockClear();
+      await wrapper.vm.onAlertTabChange("anomalyDetection");
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("anomalyDetection");
+      expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+      expect(wrapper.vm.displayedAlerts).toEqual([]);
+      expect(wrapper.vm.anomalyTabLicenseLocked).toBe(true);
+      // An earlier spec leaves an edit route behind, which opens the editor instead of the list.
+      wrapper.vm.showAddAlertDialog = false;
+      await flushPromises();
+      const add = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+      expect(add.attributes("disabled")).toBeDefined();
+      expect(wrapper.find('[data-test="alert-list-add-anomaly-lock"]').exists()).toBe(true);
+    });
+
+    it("locks editing anomaly rows but not scheduled ones", async () => {
+      const wrapper = await lockedList();
+      expect(wrapper.vm.rowAnomalyLocked({ type: "anomaly" })).toBe(true);
+      expect(wrapper.vm.rowAnomalyLocked({ type: "alert", is_real_time: false })).toBe(false);
+    });
+
+    it("guards every action on an anomaly row: no dialogs, no state toggle", async () => {
+      const wrapper = await lockedList();
+      const row = { type: "anomaly", alert_id: "an-1", uuid: "u-an-1", name: "an", enabled: true };
+      wrapper.vm.showDeleteDialogFn({ row });
+      wrapper.vm.moveAlertToAnotherFolder(row);
+      await wrapper.vm.duplicateAlert(row);
+      wrapper.vm.toggleAlertState(row);
+      await flushPromises();
+
+      expect(wrapper.vm.confirmDelete).toBe(false);
+      expect(wrapper.vm.showMoveAlertDialog).toBe(false);
+      expect(wrapper.vm.showForm).toBe(false);
+      expect(wrapper.vm.alertStateLoadingMap["u-an-1"]).toBeUndefined();
+      expect(wrapper.vm.anomalyRowLocked(row)).toBe(true);
+      expect(wrapper.vm.anomalyRowLocked({ type: "alert" })).toBe(false);
+    });
+
+    it("leaves the anomaly tab unlocked while anomaly_detection is enabled", async () => {
+      (config as any).isEnterprise = "true";
+      (store.state as any).zoConfig.build_type = "enterprise";
+      (store.state as any).zoConfig.anomaly_detection_enabled = true;
+      (store.state as any).zoConfig.features = { anomaly_detection: "enabled" };
+      const wrapper: any = await mountAlertList();
+      const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+      expect(tab.locked).toBe(false);
+      expect(wrapper.vm.anomalyTabLicenseLocked).toBe(false);
+    });
+  });
 });
 
 // 12. ODialog / ODrawer migration coverage

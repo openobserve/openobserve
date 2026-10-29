@@ -38,6 +38,7 @@ import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { featureState, menuState } from "@/utils/featureGate";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -71,6 +72,14 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   const meta = isMetaOrg.value;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
   const rbacAccess = checkFeatureAccess("rbac", buildFeatureGateContext(store.state.zoConfig));
+  const rbacLicense = featureState(store.state.zoConfig?.features, "rbac");
+  const syntheticsLicense = menuState(
+    store.state.zoConfig?.features,
+    "synthetics",
+    store.state.zoConfig?.synthetics_enabled !== false,
+  );
+  const mcpLicense = featureState(store.state.zoConfig?.features, "mcp");
+  const ratelimitLicense = featureState(store.state.zoConfig?.features, "ratelimit");
 
   const groups: SectionHubGroup[] = [
     {
@@ -107,7 +116,8 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.syntheticsTokensDesc"),
           icon: "key",
           to: { name: "syntheticsTokens", query: orgQuery.value },
-          visible: store.state.zoConfig?.synthetics_enabled !== false,
+          visible: syntheticsLicense !== "hidden",
+          licenseLocked: syntheticsLicense === "locked",
           dataTest: "iam-synthetics-tokens-tab",
         },
         {
@@ -116,9 +126,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.mcpServerDesc", { product: raw("Model Context Protocol") }),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
-          // No `visible` gate: the MCP endpoint is served by every edition, so
-          // the card shows on OSS too. See the route comment in
-          // useEnterpriseRoutes.ts.
+          // No edition gate (every edition serves MCP); only a hidden license removes it.
+          visible: mcpLicense !== "hidden",
+          licenseLocked: mcpLicense === "locked",
           dataTest: "iam-mcp-server-tab",
         },
         {
@@ -141,9 +151,11 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.groupsDesc"),
           icon: "group",
           to: { name: "groups", query: orgQuery.value },
+          visible: rbacLicense !== "hidden",
           locked: !rbacAccess.allowed,
           lockedMessage: rbacAccess.message,
           lockedShowUpgradeCta: rbacAccess.ctaRelevant,
+          licenseLocked: rbacLicense === "locked",
           dataTest: "iam-groups-tab",
         },
         {
@@ -152,9 +164,11 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.rolesDesc"),
           icon: "shield",
           to: { name: "roles", query: orgQuery.value },
+          visible: rbacLicense !== "hidden",
           locked: !rbacAccess.allowed,
           lockedMessage: rbacAccess.message,
           lockedShowUpgradeCta: rbacAccess.ctaRelevant,
+          licenseLocked: rbacLicense === "locked",
           dataTest: "iam-roles-tab",
         },
         {
@@ -165,10 +179,11 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           to: { name: "quota", query: orgQuery.value },
           // Meta-org is a cluster-topology restriction, not an edition
           // upsell — stays a hide, not a lock.
-          visible: meta,
+          visible: meta && ratelimitLicense !== "hidden",
           locked: !rbacAccess.allowed,
           lockedMessage: rbacAccess.message,
           lockedShowUpgradeCta: rbacAccess.ctaRelevant,
+          licenseLocked: ratelimitLicense === "locked",
           dataTest: "iam-quota-tab",
         },
       ],

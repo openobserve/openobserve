@@ -71,6 +71,7 @@ const setup = (
     enabled?: boolean;
     metricLabels?: string[] | undefined;
     org?: Ref<string>;
+    licenseLocked?: Ref<boolean>;
   } = {},
 ) => {
   const router = { push: vi.fn() };
@@ -85,6 +86,7 @@ const setup = (
     inapplicableFilters: () => over.inapplicable ?? [],
     timeRange: () => WINDOW,
     serviceStreamsEnabled: () => over.enabled ?? true,
+    licenseLocked: () => over.licenseLocked?.value ?? false,
     router,
     store,
     onDropped,
@@ -121,6 +123,36 @@ describe("useMetricDrilldown", () => {
       expect(api.getIdentityConfig).not.toHaveBeenCalled();
       expect(api.getSemanticGroups).not.toHaveBeenCalled();
       expect(api.correlate).not.toHaveBeenCalled();
+    });
+
+    it("is license-locked without any identity, groups or correlate call", async () => {
+      const { drilldown } = setup({
+        licenseLocked: ref(true),
+        filters: [{ label: "service_name", value: "checkout" }],
+      });
+      await flushPromises();
+      expect(drilldown.availability.value).toBe("licenseLocked");
+      await drilldown.open();
+      expect(api.getIdentityConfig).not.toHaveBeenCalled();
+      expect(api.getSemanticGroups).not.toHaveBeenCalled();
+      expect(api.correlate).not.toHaveBeenCalled();
+    });
+
+    it("reads once the license unlocks correlation", async () => {
+      const licenseLocked = ref(true);
+      const { drilldown } = setup({ licenseLocked });
+      await flushPromises();
+      licenseLocked.value = false;
+      await flushPromises();
+      expect(api.getIdentityConfig).toHaveBeenCalledTimes(1);
+      expect(drilldown.availability.value).toBe("available");
+    });
+
+    it("keeps the OSS state over a license lock", async () => {
+      (config as any).isEnterprise = "false";
+      const { drilldown } = setup({ licenseLocked: ref(true) });
+      await flushPromises();
+      expect(drilldown.availability.value).toBe("oss");
     });
 
     it("is off when service discovery is off", async () => {

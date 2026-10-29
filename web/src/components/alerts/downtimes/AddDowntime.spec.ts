@@ -133,6 +133,58 @@ describe("AddDowntime", () => {
     await flushPromises();
   };
 
+  it("locks the license-locked target modules and reads no synthetics folders", async () => {
+    vi.mocked(common.list_Folders).mockClear();
+    store.state.zoConfig.features = { synthetics: "locked", anomaly_detection: "locked" };
+    try {
+      const { wrapper } = await mountPage();
+      for (const module of ["synthetics", "anomaly_detections", "slos"]) {
+        const item = wrapper.get(`[data-test="add-downtime-module-${module}"]`);
+        expect(item.attributes("disabled")).toBeDefined();
+      }
+      expect(
+        wrapper.get('[data-test="add-downtime-module-alerts"]').attributes("disabled"),
+      ).toBeUndefined();
+      const types = vi.mocked(common.list_Folders).mock.calls.map((call) => call[1]);
+      expect(types).not.toContain("synthetics");
+      wrapper.unmount();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("drops a prefilled module when a late config locks it", async () => {
+    const router = makeRouter();
+    await router.push({
+      name: "addDowntime",
+      query: { org_identifier: "default", module: "synthetics" },
+    });
+    await router.isReady();
+    const wrapper = mount(AddDowntime, {
+      global: { plugins: [store, router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="downtime-target-synthetics"]').exists()).toBe(true);
+    try {
+      store.state.zoConfig.features = { synthetics: "locked" };
+      await flushPromises();
+      expect(wrapper.find('[data-test="downtime-target-synthetics"]').exists()).toBe(false);
+    } finally {
+      delete store.state.zoConfig.features;
+      wrapper.unmount();
+    }
+  });
+
+  it("leaves every target module open while the features are enabled", async () => {
+    const { wrapper } = await mountPage();
+    for (const module of ["alerts", "synthetics", "anomaly_detections", "slos"]) {
+      const item = wrapper.get(`[data-test="add-downtime-module-${module}"]`);
+      expect(item.attributes("disabled")).toBeUndefined();
+    }
+    wrapper.unmount();
+  });
+
   it("counts the reason against the server's 1,000-character cap", async () => {
     const { wrapper } = await mountPage();
     const field = wrapper.get('[data-test="add-downtime-reason"]');

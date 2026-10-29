@@ -386,6 +386,17 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.incidentDetails.title).toBe("Test Incident");
     });
 
+    it("shows the license empty state when the load is license-denied", async () => {
+      (incidentsService.get as any).mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "incidents" } },
+      });
+      wrapper = await createWrapper({}, {}, "test-123");
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-detail-license-denied"]').text()).toContain(
+        "incidents",
+      );
+    });
+
     it("should set loading state during fetch", async () => {
       // Create a pending promise that we can control
       let resolvePromise: (value: any) => void;
@@ -1480,6 +1491,46 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(dashboard?.exists()).toBe(true);
       expect(dashboard?.props("matchedSetId")).toBe("kubernetes");
       expect(dashboard?.props("chipDimensions")).toEqual({ k8s_pod_name: "pod-abc" });
+    });
+  });
+
+  describe("correlation license lock", () => {
+    afterEach(() => {
+      delete store.state.zoConfig.features;
+    });
+
+    it("locks the telemetry tabs and never calls the correlation API", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      (incidentsService.getCorrelatedStreams as any).mockClear();
+
+      wrapper.vm.activeTab = "logs";
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+
+      expect(wrapper.find('[data-test="incident-correlation-license-denied"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "CorrelatedLogsTable" }).exists()).toBe(false);
+      expect(incidentsService.getCorrelatedStreams).not.toHaveBeenCalled();
+      const logsTab = wrapper
+        .findAllComponents({ name: "OTab" })
+        .find((tab) => tab.props("name") === "logs");
+      expect(logsTab?.props("suffixIcon")).toBe("lock");
+    });
+
+    it("loads correlated streams when correlation is enabled", async () => {
+      store.state.zoConfig.features = { correlation: "enabled" };
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(null);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "logs";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="incident-correlation-license-denied"]').exists()).toBe(
+        false,
+      );
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalled();
     });
   });
 

@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading || !setupLoaded"
       :streaming="backgroundLoading"
       :error="loadError"
+      :forbidden="forbidden"
       pagination="client"
       :page-size="pageSize"
       :current-page="currentPage"
@@ -973,6 +974,7 @@ import {
   nextHandover,
   winningRule,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -1045,6 +1047,7 @@ const lastUpdatedAt = ref<number | null>(null);
 /// for a fetch nothing visible was waiting on.
 const backgroundLoading = ref(false);
 const loadError = ref<string | null>(null);
+const forbidden = ref<ForbiddenState>(false);
 /// §G.8.1: 404 or 403 "Not Supported" from the entry fetch — on-call is not
 /// available on this deployment. A fact about the build, never an error.
 const unavailable = ref(false);
@@ -1843,6 +1846,7 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     // From the payload, cache hit included: the cap describes these rows, not this request.
     truncated.value = walk.truncated;
     loadError.value = null;
+    forbidden.value = false;
     // Only on SUCCESS. Setting this in `finally` would let a transient API
     // error render the first-run checklist, telling a configured org that
     // nothing is set up.
@@ -1857,6 +1861,12 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     // to create teams.
     if (isOnCallUnavailable(err)) {
       unavailable.value = true;
+      return;
+    }
+    // A license denial is not a failed read: the table shows the license copy, with no retry.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) {
+      forbidden.value = denied;
       return;
     }
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));

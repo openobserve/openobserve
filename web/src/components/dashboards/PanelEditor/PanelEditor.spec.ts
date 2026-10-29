@@ -31,7 +31,8 @@ const mockStore = {
   getters: {},
 };
 
-vi.mock("vuex", () => ({
+vi.mock("vuex", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useStore: () => mockStore,
 }));
 
@@ -548,6 +549,28 @@ describe("PanelEditor.vue", () => {
 
       // The emit would normally be triggered by clicking "Add to Dashboard" button
       expect(wrapper.emitted()).toBeDefined();
+    });
+
+    const mountWithFeatures = (features: Record<string, string>) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "metrics", showAddToDashboardButton: true },
+        global: {
+          ...mountGlobal,
+          provide: {
+            store: { ...mockStore, state: { ...mockStore.state, zoConfig: { features } } },
+          },
+        },
+      });
+
+    it("blocks Add to dashboard with the license reason while dashboards is locked", () => {
+      wrapper = mountWithFeatures({ dashboards: "locked" });
+      expect(wrapper.vm.$.setupState.dashboardsLocked).toBe(true);
+      expect(wrapper.vm.$.setupState.dashboardsLockedReason).toContain("Locked");
+    });
+
+    it("leaves Add to dashboard unblocked while dashboards is enabled", () => {
+      wrapper = mountWithFeatures({ dashboards: "enabled" });
+      expect(wrapper.vm.$.setupState.dashboardsLocked).toBe(false);
     });
 
     it("should emit customQueryModeChanged on mount (immediate watcher)", () => {

@@ -52,7 +52,7 @@
         row-key="entityId"
         :loading="promptQuery.isPending.value"
         :error="listError"
-        :forbidden="errorStatus(promptQuery.error.value) === 403"
+        :forbidden="forbiddenState(promptQuery.error.value)"
         :frame="false"
         :default-columns="false"
         :show-global-filter="false"
@@ -332,6 +332,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { getFoldersListByType } from "@/utils/commons";
+import { forbiddenState } from "@/utils/featureGate";
 import llmPromptsService, {
   type Prompt,
   type PromptLabel,

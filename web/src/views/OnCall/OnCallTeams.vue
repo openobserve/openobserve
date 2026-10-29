@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       ref="oTableRef"
       :error="loadError"
+      :forbidden="forbidden"
       :frame="false"
       :data="filteredTeams"
       :columns="columns"
@@ -330,6 +331,7 @@ import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
+import { licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -348,6 +350,7 @@ const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
+const forbidden = ref<ForbiddenState>(false);
 const notAvailable = ref(false);
 const savedView = useListViewState("oncall-teams", {
   search: "",
@@ -548,12 +551,19 @@ async function fetchTeams(force = false) {
     await fetchOnCallNow(force);
     loadError.value = null;
     notAvailable.value = false;
+    forbidden.value = false;
   } catch (err: any) {
     // Feature-off (404) and OSS (403 "Not Supported") are the same calm fact,
     // not an error: nothing failed and there is nothing to retry. §G.8.1 —
     // the teams list IS the capability probe.
     if (isOnCallUnavailable(err)) {
       notAvailable.value = true;
+      return;
+    }
+    // A license denial is not a failed read: the table shows the license copy, with no retry.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) {
+      forbidden.value = denied;
       return;
     }
     // The state, not a toast: a toast evaporates and leaves "no teams" on

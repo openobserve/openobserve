@@ -52,6 +52,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -132,6 +133,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 // Without a label the icon is aria-hidden and unreachable by assistive tech; the tooltip's own content never gets a name otherwise.
 const tooltipIconLabel = computed(() =>
@@ -722,7 +724,7 @@ function close() {
 function focus() {
   if (typeof document === "undefined") return;
   document.getElementById(inputId.value)?.focus();
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -737,7 +739,7 @@ defineExpose({ close, focus });
 // event is consumed here so page-level single-letter shortcuts (logs "s",
 // "r", "h", …) never fire while the select has keyboard focus.
 function handleTriggerKeydown(e: KeyboardEvent) {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key.length !== 1 || e.key === " ") return;
   e.preventDefault();
@@ -955,7 +957,7 @@ const isOpen = computed(() => (listboxModeEnabled.value ? popoverOpen.value : se
 // the `click` a native <label for> forwards never opens them; open explicitly.
 // `.prevent` (on the template handler) stops the redundant native forwarding.
 function handleLabelClick() {
-  if (props.disabled) return;
+  if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -1191,7 +1193,7 @@ const overflowSelectedCount = computed(() =>
 // clear button toggles into view.
 const isInlineAppearance = computed(() => props.appearance === "inline");
 const triggerTextTone = computed(() =>
-  props.disabled
+  isDisabled.value
     ? "text-select-disabled-text"
     : hasSelection.value
       ? "text-select-text"
@@ -1211,7 +1213,7 @@ const inlineTriggerClasses = computed(() => [
   "focus:outline-none focus-visible:outline-accent/40 focus-visible:outline-2",
   // The hover ring is gated on !hasError so it can't override the resting error
   // ring on hover (equal specificity, later class wins) and hide the error.
-  props.disabled
+  isDisabled.value
     ? "ring-transparent cursor-not-allowed opacity-60"
     : hasError.value
       ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
@@ -1254,7 +1256,7 @@ const fieldWidthClass = computed(() => {
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text cursor-pointer font-medium',
       ]"
@@ -1279,7 +1281,7 @@ const fieldWidthClass = computed(() => {
             type="button"
             :id="inputId"
             :name="name"
-            :disabled="disabled"
+            :disabled="isDisabled"
             :tabindex="inputTabindex"
             role="combobox"
             :aria-expanded="popoverOpen"
@@ -1389,7 +1391,7 @@ const fieldWidthClass = computed(() => {
                       // width, letting any ancestor squeeze it to a lone ellipsis.
                       isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
                       labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                      disabled
+                      isDisabled
                         ? 'text-select-disabled-text'
                         : hasSelection
                           ? 'text-select-text'
@@ -1494,7 +1496,7 @@ const fieldWidthClass = computed(() => {
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="flex min-h-0 flex-1 flex-col"
               @update:model-value="handleListboxUpdate"
             >
@@ -1919,7 +1921,7 @@ const fieldWidthClass = computed(() => {
       v-else
       :model-value="stringValue"
       :open="selectOpen"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :name="name"
       @update:model-value="handleUpdate"
       @update:open="

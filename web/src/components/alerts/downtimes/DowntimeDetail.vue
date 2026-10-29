@@ -364,6 +364,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import { alertHistoryQuery } from "@/services/alerts.queries";
 import {
@@ -468,8 +469,11 @@ const downtimeFolders = useQuery(() =>
 const alertFolders = useQuery(() =>
   Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
+const { locked: syntheticsLocked } = useLicenseLock("synthetics");
 const syntheticFolders = useQuery(() =>
-  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), {
+    enabled: !!orgId.value && !syntheticsLocked.value,
+  }),
 );
 
 const historyQuery = useQuery(() =>

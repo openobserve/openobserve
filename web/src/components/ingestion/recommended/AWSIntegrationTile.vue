@@ -62,7 +62,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("ingestion.awsSetup.documentation") }}</OButton
       >
       <!-- Add Dashboard Button -->
+      <OTooltip v-if="dashboardsLocked" :content="dashboardsLockedReason">
+        <span class="inline-flex flex-1">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="lock"
+            disabled
+            class="flex-1"
+            :data-test="`aws-${integration.id}-add-dashboard-btn`"
+            >{{ t("ingestion.awsSetup.addDashboard") }}</OButton
+          >
+        </span>
+      </OTooltip>
       <OButton
+        v-else
         variant="outline"
         size="sm"
         @click="handleAddDashboard"
@@ -177,6 +191,7 @@ import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
@@ -194,6 +209,8 @@ export default defineComponent({
     const router = useRouter();
     const dashboardOrgId = useOrgId();
     const createDashboard = useMutation(() => createDashboardMutation(dashboardOrgId.value));
+    const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+      useLicenseLock("dashboards");
     const showTemplateDialog = ref(false);
     const showComponentContent = ref(false);
     const selectedComponent = shallowRef<any>(null);
@@ -423,7 +440,11 @@ export default defineComponent({
     };
 
     const handleAddDashboard = async () => {
-      if (!props.integration.hasDashboard || !props.integration.dashboardGithubUrl) {
+      if (
+        dashboardsLocked.value ||
+        !props.integration.hasDashboard ||
+        !props.integration.dashboardGithubUrl
+      ) {
         return;
       }
 
@@ -581,6 +602,8 @@ export default defineComponent({
       store,
       handleAddSource,
       handleAddDashboard,
+      dashboardsLocked,
+      dashboardsLockedReason,
       handleDocumentation,
       handleTemplateSelection,
       handleComponentSelection,

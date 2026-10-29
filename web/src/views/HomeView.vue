@@ -61,6 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="tab.id"
             :data-test="`home-tab-${tab.id}`"
           >
+            <OIcon
+              v-if="dashboardsLocked && tab.id.startsWith('dash:')"
+              name="lock"
+              size="sm"
+              class="me-1"
+              :data-test="`home-tab-lock-${tab.id}`"
+            />
             <span class="o-tab__label truncate">{{ tab.label }}</span>
             <template v-if="tab.id.startsWith('dash:')" #trailing>
               <button
@@ -234,6 +241,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
@@ -259,6 +267,7 @@ export default defineComponent({
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
     const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
+    const { locked: dashboardsLocked } = useLicenseLock("dashboards");
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
@@ -468,6 +477,7 @@ export default defineComponent({
       isDataTab,
       arrived,
       openArrived,
+      dashboardsLocked,
     };
   },
   components: {

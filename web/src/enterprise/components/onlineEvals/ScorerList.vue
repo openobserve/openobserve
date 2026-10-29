@@ -248,6 +248,7 @@ import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
+import type { ForbiddenState } from "@/utils/featureGate";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -260,7 +261,7 @@ const props = defineProps<{
   providers: Provider[];
   search: string;
   loading?: boolean;
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   /** Epoch-ms of the last list read, for the refresh button's age label. */
   lastRunAt?: number | null;
   /** A reload is in flight — spins the refresh button and blocks a second click. */

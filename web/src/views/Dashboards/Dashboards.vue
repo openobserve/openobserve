@@ -635,6 +635,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -1082,7 +1083,7 @@ export default defineComponent({
           // A newer folder switch cancelled this load; the newer one reports its own outcome.
           if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
-          forbidden.value = asCaughtError(error).response?.status === 403;
+          forbidden.value = forbiddenState(error);
           // The grouped access toast already reports a 403; a second red toast adds nothing.
           if (!forbidden.value) {
             showErrorNotification(
@@ -1334,7 +1335,7 @@ export default defineComponent({
     };
     const loading = ref(true);
     // Only the dashboards fetch is authoritative on access; the folder list is not.
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,

@@ -47,6 +47,7 @@ import {
   type WindowUs,
 } from "@/utils/logs/estimateScanMb";
 import { sqlSources } from "@/utils/logs/sqlSources";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
 import { notePageCancelled } from "@/composables/useLogs/logsRowNav";
 import { noteUserScopeChange } from "@/composables/useLogs/useLogPermalink";
@@ -125,7 +126,11 @@ export function zoConfig(): AutoRunConfig & Record<string, unknown> {
 }
 
 export function isSuperCluster(): boolean {
-  return config.isEnterprise === "true" && !!zoConfig().super_cluster_enabled;
+  return (
+    config.isEnterprise === "true" &&
+    !!zoConfig().super_cluster_enabled &&
+    featureState(zoConfig().features as FeatureStates | undefined, "super_cluster") !== "locked"
+  );
 }
 
 export function setAutoRunTransport(next: AutoRunTransport): void {

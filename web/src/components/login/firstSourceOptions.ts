@@ -16,6 +16,7 @@
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey } from "@/types/i18n";
 import type { UserDataStreamType } from "@/utils/internalStreams";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 
 export type FirstSourceId =
   | "kubernetes"
@@ -43,6 +44,8 @@ export interface FirstSourceOption {
   icon?: IconName;
   /** Signals the picked guide sends. */
   signals: UserDataStreamType[];
+  /** License feature whose locked guide this option opens. */
+  feature?: string;
 }
 
 export interface FirstSourcePrefill {
@@ -108,6 +111,7 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     route: "frontendMonitoring",
     icon: "public",
     signals: ["logs"],
+    feature: "rum",
   },
   {
     id: "llm",
@@ -123,6 +127,7 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     route: "recommendedMcp",
     icon: "auto-awesome",
     signals: [],
+    feature: "mcp",
   },
   {
     id: "unsure",
@@ -160,6 +165,13 @@ const DOCS_SEGMENT_SOURCES: Record<string, FirstSourceId> = {
 /** The option with this id, or undefined for an unknown id. */
 export function firstSourceOption(id: string | null | undefined): FirstSourceOption | undefined {
   return FIRST_SOURCE_OPTIONS.find((option) => option.id === id);
+}
+
+export function isFirstSourceLocked(
+  option: FirstSourceOption,
+  features: FeatureStates | undefined,
+): boolean {
+  return !!option.feature && featureState(features, option.feature) === "locked";
 }
 
 /** Maps an openobserve.ai docs URL to the option its guide belongs to. */

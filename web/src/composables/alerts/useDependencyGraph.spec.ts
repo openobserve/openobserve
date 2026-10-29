@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { defineComponent } from "vue";
+import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import {
   useDependencyGraph,
   buildFocusChain,
@@ -498,5 +501,39 @@ describe("useDependencyGraph.loadGraph", () => {
     await loadGraph("org-a", ["alerts", "templates"]);
 
     expect(calls()).toEqual([2, 1, 2]);
+  });
+
+  const inSetup = (features: Record<string, string>) => {
+    let api!: ReturnType<typeof useDependencyGraph>;
+    const store = createStore({ state: { zoConfig: { features } } });
+    mount(
+      defineComponent({
+        setup() {
+          api = useDependencyGraph();
+          return {};
+        },
+        template: "<div />",
+      }),
+      { global: { plugins: [store] } },
+    );
+    return api;
+  };
+
+  it("skips the alerts list while alerts is license-locked", async () => {
+    const { loadGraph } = inSetup({ alerts: "locked" });
+    await loadGraph("org-b");
+    expect(calls()).toEqual([0, 1, 1]);
+  });
+
+  it("does not cache a graph built while alerts is license-locked", async () => {
+    await inSetup({ alerts: "locked" }).loadGraph("org-d");
+    await inSetup({ alerts: "enabled" }).loadGraph("org-d");
+    expect(graphInputs.alerts).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the alerts list while alerts is enabled", async () => {
+    const { loadGraph } = inSetup({ alerts: "enabled" });
+    await loadGraph("org-c");
+    expect(calls()).toEqual([1, 1, 1]);
   });
 });

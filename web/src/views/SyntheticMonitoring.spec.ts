@@ -474,6 +474,15 @@ describe("SyntheticMonitoring", () => {
       expect(tabElements).toHaveLength(4);
     });
 
+    it("sits the section tabs in a lock-exempt container, so they stay live on a license-locked page", () => {
+      wrapper = mountPage();
+      const tabsWrapper = wrapper.find('[data-test="synthetic-monitoring-header-tabs"]');
+      expect(tabsWrapper.element.closest("[data-feature-lock-exempt]")).not.toBeNull();
+      const newCheck = wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]');
+      expect(newCheck.exists()).toBe(true);
+      expect(newCheck.element.closest("[data-feature-lock-exempt]")).toBeNull();
+    });
+
     it("hides the Private Locations tab when private locations are unavailable", () => {
       // Private locations are served by agents deployed inside the customer's
       // network, which is the one enterprise part of synthetics. An OSS build

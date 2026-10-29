@@ -9,6 +9,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
 // This panel is mounted inside the trace sidebar and in isolation, so the store
@@ -36,6 +39,8 @@ const props = defineProps<{
 const dbmEnabled = computed(() => Boolean(store?.state?.zoConfig?.database_monitoring_enabled));
 
 const fingerprint = computed(() => String(props.span.o2_db_fingerprint ?? ""));
+
+const { locked: dbmLocked, lockedReason: dbmLockedReason } = useLicenseLock("db_monitoring");
 
 const canViewTrend = computed(() => dbmEnabled.value && !!fingerprint.value && !!router);
 
@@ -132,7 +137,24 @@ const metadataRows = computed(() =>
 
 <template>
   <div class="flex h-full flex-col gap-3 overflow-auto">
-    <div v-if="canViewTrend" class="flex justify-end">
+    <div v-if="dbmLocked && fingerprint" class="flex justify-end">
+      <OTooltip :content="dbmLockedReason">
+        <span class="inline-flex">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            disabled
+            data-test="traces-db-span-details-view-trend"
+          >
+            <template #icon-left>
+              <OIcon name="lock" size="sm" />
+            </template>
+            {{ t("traces.dbSpanDetails.viewQueryTrend") }}
+          </OButton>
+        </span>
+      </OTooltip>
+    </div>
+    <div v-else-if="canViewTrend" class="flex justify-end">
       <OButton
         variant="outline"
         size="sm-action"
