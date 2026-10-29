@@ -26429,6 +26429,7 @@
     "update": "Atualizar",
     "disconnect": "Desligar",
     "deploymentTitle": "Conta {provider} desta implementação",
+    "deploymentOwner": "Definido pelo operador, pelo que não há nada para configurar aqui.",
     "useOwn": "Use a sua própria conta {provider} em vez disso",
     "connectTitle": "Ligar {provider}",
     "updateTitle": "Atualizar {provider}",

@@ -26429,6 +26429,7 @@
     "update": "Обновить",
     "disconnect": "Отключить",
     "deploymentTitle": "Аккаунт {provider} этого развертывания",
+    "deploymentOwner": "Задаётся оператором, поэтому здесь нечего настраивать.",
     "useOwn": "Использовать свой аккаунт {provider}",
     "connectTitle": "Подключить {provider}",
     "updateTitle": "Обновить {provider}",

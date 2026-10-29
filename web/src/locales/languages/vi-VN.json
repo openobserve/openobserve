@@ -26429,6 +26429,7 @@
     "update": "Cập nhật",
     "disconnect": "Ngắt kết nối",
     "deploymentTitle": "Tài khoản {provider} của triển khai này",
+    "deploymentOwner": "Do nhà vận hành thiết lập, nên không có gì để cấu hình ở đây.",
     "useOwn": "Dùng tài khoản {provider} của riêng bạn thay thế",
     "connectTitle": "Kết nối {provider}",
     "updateTitle": "Cập nhật {provider}",

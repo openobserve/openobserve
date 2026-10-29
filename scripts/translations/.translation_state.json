@@ -25869,7 +25869,7 @@
     "connectTitle": "c77540af296e0f76",
     "connected": "22965568d22a14ee",
     "deploymentMeta": "581e0efda33a44fb",
-    "deploymentNote": "ffce2ade2058cbc5",
+    "deploymentOwner": "56e56b492a92f39b",
     "deploymentTitle": "dac362376a363607",
     "dialogSubtitle": "e92446b451d06386",
     "disconnect": "acfc5be785a9bb3d",
@@ -25881,6 +25881,8 @@
     "fromNumber": "c2ce4f9ea9a16ddd",
     "loadFailed": "208125292c53f1e1",
     "press4": "99df1d038481a743",
+    "press4Available": "e674447337e83c13",
+    "press4NotAvailable": "67a926f7008e2b0e",
     "press4NotAvailableHint": "6f009ca390074362",
     "readOnly": "35b90d743cb44f28",
     "refusal": {

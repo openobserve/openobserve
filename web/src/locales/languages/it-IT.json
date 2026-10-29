@@ -26429,6 +26429,7 @@
     "update": "Aggiorna",
     "disconnect": "Disconnetti",
     "deploymentTitle": "Account {provider} di questa distribuzione",
+    "deploymentOwner": "Impostato dall'operatore, quindi non c'è nulla da configurare qui.",
     "useOwn": "Usa invece il tuo account {provider}",
     "connectTitle": "Connetti {provider}",
     "updateTitle": "Aggiorna {provider}",

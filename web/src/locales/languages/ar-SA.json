@@ -26429,6 +26429,7 @@
     "update": "تحديث",
     "disconnect": "فصل",
     "deploymentTitle": "حساب {provider} الخاص بهذا النشر",
+    "deploymentOwner": "يتم التعيين بواسطة المشغّل، لذا لا يوجد شيء لتهيئته هنا.",
     "useOwn": "استخدم حساب {provider} الخاص بك بدلاً من ذلك",
     "connectTitle": "ربط {provider}",
     "updateTitle": "تحديث {provider}",

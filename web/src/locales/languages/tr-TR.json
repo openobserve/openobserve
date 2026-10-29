@@ -26429,6 +26429,7 @@
     "update": "Güncelle",
     "disconnect": "Bağlantıyı kes",
     "deploymentTitle": "Bu dağıtımın {provider} hesabı",
+    "deploymentOwner": "Operatör tarafından ayarlandığı için burada yapılandırılacak bir şey yok.",
     "useOwn": "Bunun yerine kendi {provider} hesabınızı kullanın",
     "connectTitle": "{provider} Bağla",
     "updateTitle": "{provider} Güncelle",

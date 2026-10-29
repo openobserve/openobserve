@@ -26429,6 +26429,7 @@
     "update": "Aktualisieren",
     "disconnect": "Trennen",
     "deploymentTitle": "Das {provider}-Konto dieser Bereitstellung",
+    "deploymentOwner": "Vom Betreiber festgelegt, daher gibt es hier nichts zu konfigurieren.",
     "useOwn": "Stattdessen ein eigenes {provider}-Konto verwenden",
     "connectTitle": "{provider} verbinden",
     "updateTitle": "{provider} aktualisieren",

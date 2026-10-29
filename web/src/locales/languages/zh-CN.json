@@ -26429,6 +26429,7 @@
     "update": "更新",
     "disconnect": "断开连接",
     "deploymentTitle": "此部署的 {provider} 账户",
+    "deploymentOwner": "由操作员设置，因此此处无需配置。",
     "useOwn": "改为使用您自己的 {provider} 账户",
     "connectTitle": "连接 {provider}",
     "updateTitle": "更新 {provider}",

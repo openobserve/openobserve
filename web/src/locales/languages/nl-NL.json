@@ -26429,6 +26429,7 @@
     "update": "Bijwerken",
     "disconnect": "Loskoppelen",
     "deploymentTitle": "Het {provider}-account van deze deployment",
+    "deploymentOwner": "Ingesteld door de operator, dus hier valt niets te configureren.",
     "useOwn": "Gebruik in plaats daarvan je eigen {provider}-account",
     "connectTitle": "{provider} koppelen",
     "updateTitle": "{provider} bijwerken",

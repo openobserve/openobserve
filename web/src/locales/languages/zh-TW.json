@@ -26424,6 +26424,7 @@
     "update": "更新",
     "disconnect": "中斷連線",
     "deploymentTitle": "此部署的 {provider} 帳戶",
+    "deploymentOwner": "由操作員設定，因此這裡無需設定。",
     "useOwn": "改用您自己的 {provider} 帳戶",
     "connectTitle": "連接 {provider}",
     "updateTitle": "更新 {provider}",

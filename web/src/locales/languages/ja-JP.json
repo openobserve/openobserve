@@ -26429,6 +26429,7 @@
     "update": "更新",
     "disconnect": "切断",
     "deploymentTitle": "このデプロイメントの {provider} アカウント",
+    "deploymentOwner": "オペレーターによって設定されるため、ここで設定する項目はありません。",
     "useOwn": "代わりに独自の {provider} アカウントを使用する",
     "connectTitle": "{provider} を接続",
     "updateTitle": "{provider} を更新",
