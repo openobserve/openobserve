@@ -2734,8 +2734,29 @@ export default defineComponent({
       // The caller's promise must cover the update, not just the confirm dialog.
       return updateStatus("acknowledged");
     };
-    const resolveIncident = () => updateStatus("resolved");
-    const reopenIncident = () => updateStatus("open");
+    // Resolving closes the incident, so it confirms like Acknowledge; Reopen too.
+    const resolveIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("resolved");
+    };
+    const reopenIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("open");
+    };
 
     // Title editing. OInlineEdit owns the open/close and the Escape-restores
     // behaviour; this only has to persist a committed value. `isEditingTitle`
@@ -2883,45 +2904,15 @@ export default defineComponent({
       return typeof conditionData === "string" ? conditionData : "--";
     };
 
-    // Handle status change from dropdown
-    const handleStatusChange = async (newStatus: "open" | "acknowledged" | "resolved") => {
-      if (!incidentDetails.value || updating.value) return;
-
-      updating.value = true;
-      try {
-        const response = await updateIncidentStatus.mutateAsync({
-          id: incidentDetails.value.id,
-          status: newStatus,
-        });
-
-        // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        editableStatus.value = response.data.status;
-
-        toast({
-          variant: "success",
-          message: t("toastMessages.alerts.incidentStatusUpdatedTo", {
-            status: response.data.status,
-          }),
-        });
-        // Mark data as stale so incident list will refresh
-        store.dispatch("incidents/setShouldRefresh", true);
-
-        // Refresh events in timeline if Activity tab is active
-        if (activeTab.value === "activity") {
-          timelineRefreshTrigger.value++;
-        }
-      } catch (error: any) {
-        console.error("Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
-        });
-        // Revert on error
-        editableStatus.value = incidentDetails.value.status;
-      } finally {
-        updating.value = false;
-      }
+    // The Manage panel chips take the same confirmed path as the header buttons.
+    const handleStatusChange = (newStatus: "open" | "acknowledged" | "resolved") => {
+      if (updating.value) return;
+      const actions = {
+        open: reopenIncident,
+        acknowledged: acknowledgeIncident,
+        resolved: resolveIncident,
+      };
+      return actions[newStatus]();
     };
 
     // Handle trigger row click - find the alert index by name
