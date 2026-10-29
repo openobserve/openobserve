@@ -1672,6 +1672,21 @@ describe("AddDestination — email destinations", () => {
     );
   });
 
+  it("keeps Save hidden for Jira until the create screen has loaded", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+  });
+
   it("hides Additional Settings for Jira once it is ready to save", async () => {
     wrapper = mountComp();
     const form = getForm(wrapper);
@@ -1682,6 +1697,12 @@ describe("AddDestination — email destinations", () => {
       connectedAs: "Alerts Bot",
       projectKey: "OPS",
       issueTypeId: "10004",
+      createMeta: {
+        projectName: "Operations",
+        issueTypeName: "Bug",
+        hasLabels: true,
+        requiredFields: [],
+      },
     });
     await flushPromises();
     expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(true);

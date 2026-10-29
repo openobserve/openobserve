@@ -28,7 +28,11 @@ import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 import { makePrebuiltDestinationSchema } from "./PrebuiltDestinationForm.schema";
 import { DEFAULT_SLACK_APP_NAME, SLACK_APP_NAME_MAX_LENGTH } from "@/utils/slackManifest";
-import { toJiraFieldValue, type JiraCreateMeta } from "@/utils/prebuilt-templates/jira";
+import {
+  jiraKeepsSavedToken,
+  toJiraFieldValue,
+  type JiraCreateMeta,
+} from "@/utils/prebuilt-templates/jira";
 
 // One row in the dynamic api-headers array-field. Both fields are free-form
 // text (a blank starter row is valid — only non-empty rows persist on save).
@@ -151,9 +155,7 @@ export const makeAddDestinationSchema = (
         );
         // A saved Jira token never comes back to the browser; it is required again only after Change.
         const keepsSavedToken =
-          val.destination_type === "jira" &&
-          !!val.credentials.savedDestination &&
-          !val.credentials.changing;
+          val.destination_type === "jira" && jiraKeepsSavedToken(val.credentials);
         if (!credResult.success) {
           for (const issue of credResult.error.issues) {
             if (keepsSavedToken && issue.path[0] === "token") continue;
@@ -202,6 +204,9 @@ export const makeAddDestinationSchema = (
             path: ["credentials", "issueTypeId"],
             message,
           });
+        if (!meta && credentials.projectKey && credentials.issueTypeId) {
+          blockIssueType(t("alerts.prebuiltDestinations.jiraCreateScreenNotLoaded"));
+        }
         if (meta && !meta.hasLabels) {
           blockIssueType(
             t("alerts.prebuiltDestinations.jiraLabelsMissing", {

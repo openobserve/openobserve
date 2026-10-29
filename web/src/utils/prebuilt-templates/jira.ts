@@ -84,6 +84,10 @@ export const parseJiraFields = (json: unknown): Record<string, unknown> => {
   }
 };
 
+/** A saved Jira token never comes back to the browser; it is required again only after Change. */
+export const jiraKeepsSavedToken = (credentials: Credentials): boolean =>
+  !!credentials.savedDestination && !credentials.changing;
+
 export const jiraSetupRequest = (
   credentials: Credentials,
   action: JiraSetupAction,

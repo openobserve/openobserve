@@ -33,7 +33,7 @@ import {
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
 } from "@/utils/prebuilt-templates";
-import { jiraSetupRequest } from "@/utils/prebuilt-templates/jira";
+import { jiraKeepsSavedToken, jiraSetupRequest } from "@/utils/prebuilt-templates/jira";
 
 /**
  * System Templates Architecture:
@@ -250,6 +250,8 @@ export function usePrebuiltDestinations() {
     // Validate each credential field
     for (const field of config.credentialFields) {
       const value = credentials[field.key];
+
+      if (type === "jira" && field.key === "token" && jiraKeepsSavedToken(credentials)) continue;
 
       // Check required fields
       if (field.required && (!value || value.toString().trim() === "")) {

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -73,8 +73,16 @@ const priorityOptions = computed(() => toOptions(priorities.value));
 
 const set = (key: string, value: unknown) => form.setFieldValue(`credentials.${key}`, value);
 
+// Bumped whenever the login, project or issue type changes, so older responses are dropped.
+let generation = 0;
+const invalidateLookups = (): void => {
+  generation++;
+  loading.value = null;
+};
+
 // Credentials never reach a cache: every lookup is a fresh POST (destination payloads are memory-only).
 async function callJira<T>(action: JiraSetupAction): Promise<T | null> {
+  const mine = generation;
   loading.value = action;
   error.value = null;
   try {
@@ -82,12 +90,14 @@ async function callJira<T>(action: JiraSetupAction): Promise<T | null> {
       store.state.selectedOrganization.identifier,
       jiraSetupRequest(credentials.value, action),
     );
-    return res.data;
+    return mine === generation ? res.data : null;
   } catch (e) {
-    error.value = requestErrorMessage(e, t("alerts.prebuilt.testFailedUnknownError"));
+    if (mine === generation) {
+      error.value = requestErrorMessage(e, t("alerts.prebuilt.testFailedUnknownError"));
+    }
     return null;
   } finally {
-    loading.value = null;
+    if (mine === generation) loading.value = null;
   }
 }
 
@@ -149,7 +159,9 @@ const connect = async (): Promise<void> => {
     failed(t("alerts.prebuiltDestinations.jiraConnectMissing"));
     return;
   }
+  const mine = generation;
   const data = await callJira<JiraConnectResponse>("connect");
+  if (mine !== generation) return;
   if (!data) return failed();
   projects.value = data.projects;
   set("connectedAs", data.display_name);
@@ -160,17 +172,20 @@ const connect = async (): Promise<void> => {
 
 // A changed login must be checked again before the destination can be saved.
 watch([deployment, url, email, token], () => {
+  invalidateLookups();
   error.value = null;
   if (connectedAs.value) set("connectedAs", "");
 });
 
 watch(projectKey, (next) => {
+  invalidateLookups();
   issueTypes.value = [];
   set("issueTypeId", "");
   if (next && connectedAs.value) void loadIssueTypes();
 });
 
 watch(issueTypeId, (next) => {
+  invalidateLookups();
   priorities.value = [];
   set("createMeta", undefined);
   set("fieldValues", {});
@@ -192,6 +207,8 @@ watch(
 );
 
 const fieldOptions = (requiredField: JiraRequiredField) => toOptions(requiredField.options);
+
+onBeforeUnmount(invalidateLookups);
 
 onMounted(() => {
   if (!deployment.value) set("deployment", "cloud");

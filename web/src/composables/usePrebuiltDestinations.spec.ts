@@ -935,6 +935,37 @@ describe("usePrebuiltDestinations", () => {
       expect(lastTestResult.value).toEqual(result);
     });
 
+    it("tests a saved destination with an empty token and sends its name", async () => {
+      mockJiraSetup.mockResolvedValue({
+        data: { key: "OPS-142", url: "https://acme.atlassian.net/browse/OPS-142" },
+      });
+      const { testDestination } = usePrebuiltDestinations();
+      const saved = { ...jiraCloud, token: "", savedDestination: "jira-ops" };
+      const result = await testDestination("jira", saved);
+
+      expect(result).toMatchObject({ success: true });
+      expect(mockJiraSetup).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ action: "test_issue", token: "", destination: "jira-ops" }),
+      );
+    });
+
+    it("still requires the token for a new account or after Change", async () => {
+      mockJiraSetup.mockClear();
+      const { testDestination } = usePrebuiltDestinations();
+      const fresh = await testDestination("jira", { ...jiraCloud, token: "" });
+      const changed = await testDestination("jira", {
+        ...jiraCloud,
+        token: "",
+        savedDestination: "jira-ops",
+        changing: true,
+      });
+
+      expect(fresh.success).toBe(false);
+      expect(changed.success).toBe(false);
+      expect(mockJiraSetup).not.toHaveBeenCalled();
+    });
+
     it("shows the setup route's error message when the test fails", async () => {
       mockJiraSetup.mockRejectedValue({
         message: "Request failed with status code 400",
